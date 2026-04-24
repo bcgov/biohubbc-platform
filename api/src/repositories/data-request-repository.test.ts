@@ -164,6 +164,21 @@ describe('DataRequestRepository', () => {
 
       expect(result).to.eql([]);
     });
+
+    it('should enforce active team membership in query', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const sql = query.toSQL().sql.toLowerCase();
+          expect(sql).to.include('join "team" as "t" on "t"."team_id" = "dr"."team_id"');
+          expect(sql).to.include('"t"."record_end_date" is null');
+          expect(sql).to.include('"tm"."record_end_date" is null');
+          return { rowCount: 0, rows: [] } as QueryResult<any>;
+        }
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+      await repo.findDataRequestsByTeamMembership([1]);
+    });
   });
 
   describe('getDataRequestById', () => {

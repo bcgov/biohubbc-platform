@@ -42,6 +42,10 @@ export interface AuthorizeBySystemUser {
  */
 export type TeamAuthorizationEntity =
   | {
+      entity: 'ticket';
+      ticketId: string;
+    }
+  | {
       entity: 'data_request';
       dataRequestId: string;
     }
