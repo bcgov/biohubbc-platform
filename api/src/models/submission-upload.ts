@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { UploadArtifactRoleEnum } from './upload-artifact';
 
-export const SubmissionUploadJobStatus = z.enum(['pending', 'in_progress', 'succeeded', 'invalid', 'failed']);
+export const SubmissionUploadJobStatus = z.enum([
+  'uploaded',
+  'ingesting',
+  'ingested',
+  'indexing',
+  'indexed',
+  // Terminal failure states
+  'invalid',
+  'failed'
+]);
 export type SubmissionUploadJobStatus = z.infer<typeof SubmissionUploadJobStatus>;
 
 /**
@@ -23,7 +32,8 @@ export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
 export const CreateSubmissionUpload = z.object({
   submission_id: z.number(),
   upload_id: z.string().uuid(),
-  ticket_id: z.string().uuid()
+  ticket_id: z.string().uuid(),
+  status: SubmissionUploadJobStatus
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
 
