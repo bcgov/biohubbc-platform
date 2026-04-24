@@ -53,20 +53,47 @@ export async function seed(knex: Knex): Promise<void> {
 
     // Cross-join every seeded system_user with every seeded submission via submission_team
     const systemUsers = await trx('system_user').select('system_user_id');
+    const teamName = `Seed Submission Team ${faker.string.alphanumeric(12)}`;
     const [{ team_id: seedTeamId }] = await trx('team')
       .insert({
-        name: 'Seed Submission Team',
+        name: teamName,
         description: 'Auto-generated team for seeded submissions.',
         create_user: 1
       })
       .returning('team_id');
 
     for (const { system_user_id } of systemUsers) {
-      await trx('team_member').insert({ team_id: seedTeamId, system_user_id, create_user: 1 });
+      await trx.raw(
+        `
+          INSERT INTO team_member (team_id, system_user_id, create_user)
+          SELECT ?, ?, 1
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM team_member tm
+            WHERE tm.team_id = ?
+              AND tm.system_user_id = ?
+              AND tm.record_end_date IS NULL
+          );
+        `,
+        [seedTeamId, system_user_id, seedTeamId, system_user_id]
+      );
     }
 
     for (const { submission_id } of seedContexts) {
-      await trx('submission_team').insert({ submission_id, team_id: seedTeamId, create_user: 1 });
+      await trx.raw(
+        `
+          INSERT INTO submission_team (submission_id, team_id, create_user)
+          SELECT ?, ?, 1
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM submission_team st
+            WHERE st.submission_id = ?
+              AND st.team_id = ?
+              AND st.record_end_date IS NULL
+          );
+        `,
+        [submission_id, seedTeamId, submission_id, seedTeamId]
+      );
     }
 
     // Backfill data_byte_size for seeded rows — migration runs before seeds,
