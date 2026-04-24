@@ -1,12 +1,12 @@
 import { Knex } from 'knex';
+import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { DOWNLOAD_FEATURE_BATCH_SIZE, FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateDownload,
-  DownloadArtifactInfo,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
@@ -115,8 +115,12 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Link an artifact to a download via the download_artifact join table.
    *
-   * Downloads are tracked as formal artifacts from the moment they're requested.
-   * The artifact is created as 'pending' (no file yet) and linked here.
+   * Idempotent — the Parquet pipeline writes one download_artifact per feature-type
+   * Parquet file, and a retry of the same feature type must not produce duplicate
+   * links. The `ON CONFLICT … WHERE record_end_date IS NULL DO NOTHING` clause
+   * matches the table's partial unique index so a re-insert on a still-active link
+   * is a silent no-op. A first-time insert returns rowCount=1; a conflict returns
+   * rowCount=0 — both are valid outcomes and neither throws.
    *
    * @param {string} downloadId - The download ID.
    * @param {string} artifactId - The artifact ID.
@@ -126,17 +130,11 @@ export class DownloadRepository extends BaseRepository {
   async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO download_artifact (download_id, artifact_id)
-      VALUES (${downloadId}, ${artifactId});
+      VALUES (${downloadId}, ${artifactId})
+      ON CONFLICT (download_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
     `;
 
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to link artifact to download', [
-        'DownloadRepository->createDownloadArtifact',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
+    await this.connection.sql(sql);
   }
 
   /**
@@ -168,6 +166,29 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, DownloadRecord);
 
     return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get a download record by ID, throwing if not found.
+   *
+   * `get*` throws on missing row (codebase convention — companion to `findDownloadById`).
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadRecord>}
+   * @throws {ApiNotFoundError} when no download matches the given ID.
+   * @memberof DownloadRepository
+   */
+  async getDownloadById(downloadId: string): Promise<DownloadRecord> {
+    const download = await this.findDownloadById(downloadId);
+
+    if (!download) {
+      throw new ApiNotFoundError('Download not found', [
+        'DownloadRepository->getDownloadById',
+        `no download with id ${downloadId}`
+      ]);
+    }
+
+    return download;
   }
 
   /**
@@ -208,9 +229,11 @@ export class DownloadRepository extends BaseRepository {
       ])
       .from('download as d')
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
+      .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
       .where('tm.system_user_id', systemUserId)
       .whereNull('dt.record_end_date')
+      .whereNull('t.record_end_date')
       .whereNull('tm.record_end_date');
 
     if (pagination) {
@@ -452,10 +475,9 @@ export class DownloadRepository extends BaseRepository {
     cartId: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
-    const cursorName = `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<DownloadFeatureSummary>({
+      cursorName: `dl_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.submission_id,
@@ -466,20 +488,9 @@ export class DownloadRepository extends BaseRepository {
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         WHERE csf.cart_id = $1
         ORDER BY ft.name, sf.submission_feature_id`,
-      [cartId]
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
-        if (result.rows.length === 0) {
-          break;
-        }
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: [cartId],
+      batchSize
+    });
   }
 
   /**
@@ -502,10 +513,9 @@ export class DownloadRepository extends BaseRepository {
     searchBindings: any[],
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
-    const cursorName = `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<DownloadFeatureSummary>({
+      cursorName: `dl_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.submission_id,
@@ -515,20 +525,9 @@ export class DownloadRepository extends BaseRepository {
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         WHERE sf.submission_feature_id IN (${searchSql})
         ORDER BY ft.name, sf.submission_feature_id`,
-      searchBindings
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
-        if (result.rows.length === 0) {
-          break;
-        }
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: searchBindings,
+      batchSize
+    });
   }
 
   /**
@@ -603,10 +602,12 @@ export class DownloadRepository extends BaseRepository {
       SELECT EXISTS (
         SELECT 1
         FROM download_team dt
+        JOIN team t ON t.team_id = dt.team_id
         JOIN team_member tm ON tm.team_id = dt.team_id
         WHERE dt.download_id = ${downloadId}
           AND tm.system_user_id = ${systemUserId}
           AND dt.record_end_date IS NULL
+          AND t.record_end_date IS NULL
           AND tm.record_end_date IS NULL
       ) AS authorized;
     `;
@@ -636,36 +637,6 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, HasTeams);
 
     return response.rows[0]?.has_teams ?? false;
-  }
-
-  /**
-   * Get the artifact info (S3 object key) linked to a download.
-   *
-   * The Parquet pipeline needs the S3 key to know where to write the output file.
-   * JOINs through download_artifact to the artifact table.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadArtifactInfo>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadArtifact(downloadId: string): Promise<DownloadArtifactInfo> {
-    const sql = SQL`
-      SELECT a.artifact_id, a.object_key
-      FROM download_artifact da
-      INNER JOIN artifact a ON da.artifact_id = a.artifact_id
-      WHERE da.download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql, DownloadArtifactInfo);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Download artifact not found', [
-        'DownloadRepository->getDownloadArtifact',
-        'rowCount was 0, expected 1'
-      ]);
-    }
-
-    return response.rows[0];
   }
 
   /**
@@ -719,38 +690,6 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Update the artifact status for a download's linked artifact.
-   *
-   * Uses a JOIN-UPDATE through download_artifact so the pipeline only needs
-   * the download_id — avoids passing artifact_id through the call chain.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} status - The new artifact status (e.g. 'uploaded').
-   * @param {string} uploadedAt - ISO timestamp for uploaded_at.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateArtifactStatusByDownloadId(downloadId: string, status: string, uploadedAt: string): Promise<void> {
-    const sql = SQL`
-      UPDATE artifact a
-      SET artifact_status = ${status}, uploaded_at = ${uploadedAt}::timestamptz
-      FROM download_artifact da
-      WHERE da.download_id = ${downloadId}
-        AND da.artifact_id = a.artifact_id
-        AND da.record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to update artifact status for download', [
-        'DownloadRepository->updateArtifactStatusByDownloadId',
-        'rowCount was 0, expected at least 1'
-      ]);
-    }
-  }
-
-  /**
    * Stream base feature rows for a cart-based download, filtered by feature type.
    *
    * Returns the feature skeleton (id, uuid, data JSONB, parent_uuid) without
@@ -771,13 +710,12 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
-      /[^a-z0-9_]/gi,
-      '_'
-    )}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<BaseFeatureRow>({
+      cursorName: `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+        /[^a-z0-9_]/gi,
+        '_'
+      )}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.uuid,
@@ -790,22 +728,9 @@ export class DownloadRepository extends BaseRepository {
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
         WHERE csf.cart_id = $1 AND ft.name = $2
         ORDER BY sf.submission_feature_id`,
-      [cartId, featureTypeName]
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
-
-        if (result.rows.length === 0) {
-          break;
-        }
-
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: [cartId, featureTypeName],
+      batchSize
+    });
   }
 
   /**
@@ -831,17 +756,16 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
-      /[^a-z0-9_]/gi,
-      '_'
-    )}`;
-
     // featureTypeName is the last positional parameter after all search bindings
     const allBindings = [...searchBindings, featureTypeName];
     const typeParamIndex = allBindings.length;
 
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<BaseFeatureRow>({
+      cursorName: `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+        /[^a-z0-9_]/gi,
+        '_'
+      )}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.uuid,
@@ -853,17 +777,45 @@ export class DownloadRepository extends BaseRepository {
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
         WHERE sf.submission_feature_id IN (${searchSql}) AND ft.name = $${typeParamIndex}
         ORDER BY sf.submission_feature_id`,
-      allBindings
-    );
+      bindings: allBindings,
+      batchSize
+    });
+  }
+
+  /**
+   * Shared cursor streaming loop for large result sets.
+   *
+   * DECLARE the cursor, FETCH batches until exhausted, CLOSE on exit.
+   * Caller supplies the cursor name, the inner SELECT (without the DECLARE ... CURSOR FOR prefix),
+   * and the parameter bindings.
+   *
+   * Must be called within an open transaction — Postgres cursors require tx context.
+   *
+   * @template T - Row shape yielded by the cursor.
+   * @param {object} opts
+   * @param {string} opts.cursorName - Postgres cursor name (caller is responsible for uniqueness).
+   * @param {string} opts.declareSql - Inner SELECT for the cursor.
+   * @param {any[]} opts.bindings - Parameter bindings for the SELECT.
+   * @param {number} opts.batchSize - Rows per FETCH.
+   * @yields {T[]} Batches of rows.
+   * @memberof DownloadRepository
+   */
+  private async *streamWithCursor<T extends QueryResultRow>(opts: {
+    cursorName: string;
+    declareSql: string;
+    bindings: any[];
+    batchSize: number;
+  }): AsyncGenerator<T[]> {
+    const { cursorName, declareSql, bindings, batchSize } = opts;
+
+    await this.connection.query(`DECLARE ${cursorName} CURSOR FOR ${declareSql}`, bindings);
 
     try {
       while (true) {
-        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
-
+        const result = await this.connection.query<T>(`FETCH ${batchSize} FROM ${cursorName}`);
         if (result.rows.length === 0) {
           break;
         }
-
         yield result.rows;
       }
     } finally {

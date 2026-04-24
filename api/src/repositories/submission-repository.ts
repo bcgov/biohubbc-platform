@@ -1157,6 +1157,9 @@ export class SubmissionRepository extends BaseRepository {
     const normalizedSearch = filters?.search?.trim().toLowerCase();
 
     const queryBuilder = knex('team_member as tm')
+      .innerJoin('team as t', function () {
+        this.on('t.team_id', '=', 'tm.team_id').andOnNull('t.record_end_date');
+      })
       .innerJoin('submission_team as st', function () {
         this.on('st.team_id', '=', 'tm.team_id').andOnNull('st.record_end_date');
       })
@@ -1253,6 +1256,9 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           s.submission_id
         FROM team_member tm
+        INNER JOIN team t
+          ON  t.team_id = tm.team_id
+          AND t.record_end_date IS NULL
         INNER JOIN submission_team st
           ON  st.team_id = tm.team_id
           AND st.record_end_date IS NULL
