@@ -1683,4 +1683,38 @@ describe('SubmissionRepository', () => {
       expect(sqlText).to.include('and t.record_end_date is null');
     });
   });
+
+  describe('team membership authorization guards', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('getSubmissionsByUserId should require active team records', async () => {
+      const knexStub = sinon.stub().callsFake(async (query: any) => {
+        const sql = query.toSQL().sql.toLowerCase();
+        expect(sql).to.include('inner join "team" as "t"');
+        expect(sql).to.include('"t"."record_end_date" is null');
+        return { rowCount: 0, rows: [] } as QueryResult<any>;
+      });
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.getSubmissionsByUserId(1, { page: 1, limit: 10 });
+
+      expect(knexStub).to.have.been.calledOnce;
+    });
+
+    it('getSubmissionsByUserIdCount should require active team records', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 0 }] } as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.getSubmissionsByUserIdCount(1);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
+      expect(sqlText).to.include('inner join team t');
+      expect(sqlText).to.include('and t.record_end_date is null');
+    });
+  });
 });
