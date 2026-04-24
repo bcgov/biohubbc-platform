@@ -216,6 +216,21 @@ describe('PolicyRepository', () => {
 
       expect(result).to.eql(mockRows);
     });
+
+    it('includes active team guard in SQL', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      await repository.getPoliciesThatAuthorizeFeatureAccessByUrn(
+        { submissionId: '1', featureTypeName: 'telemetry', submissionFeatureId: '1' },
+        10
+      );
+
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
+      expect(sqlText).to.include('inner join team t');
+      expect(sqlText).to.include('and t.record_end_date is null');
+    });
   });
 
   describe('updatePolicy', () => {

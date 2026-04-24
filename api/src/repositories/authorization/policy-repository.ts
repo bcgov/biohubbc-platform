@@ -144,6 +144,9 @@ export class PolicyRepository extends BaseRepository {
       INNER JOIN team_policy tp 
         ON tp.policy_id = p.policy_id 
         AND tp.record_end_date IS NULL
+      INNER JOIN team t
+        ON t.team_id = tp.team_id
+        AND t.record_end_date IS NULL
       INNER JOIN team_member tm 
         ON tm.team_id = tp.team_id 
         AND tm.record_end_date IS NULL

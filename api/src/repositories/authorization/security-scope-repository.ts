@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
@@ -167,10 +168,14 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT 1
          FROM policy_statement_scope pss
          JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+         JOIN policy p ON p.policy_id = ps.policy_id
          JOIN submission_feature anchor_sf ON anchor_sf.submission_feature_id = b.anchor_submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = anchor_sf.feature_type_id
          WHERE pss.security_scope_id = $1
            AND ps.record_end_date IS NULL
+           AND ps.effect = '${PolicyEffect.ALLOW}'
+           AND p.record_end_date IS NULL
+           AND p.status = 'approved'
            AND anchor_sf.record_end_date IS NULL
            AND (ps.urn_submission_id = anchor_sf.submission_id::text OR ps.urn_submission_id = '*')
            AND (ps.urn_feature_type = ft.name                       OR ps.urn_feature_type = '*')
@@ -248,8 +253,12 @@ export class SecurityScopeRepository extends BaseRepository {
       `SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
        FROM policy_statement_scope pss
        JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+       JOIN policy p ON p.policy_id = ps.policy_id
        WHERE pss.security_scope_id = $1
          AND ps.record_end_date IS NULL
+         AND ps.effect = '${PolicyEffect.ALLOW}'
+         AND p.record_end_date IS NULL
+         AND p.status = 'approved'
        LIMIT 1`,
       [securityScopeId]
     );
@@ -482,10 +491,18 @@ export class SecurityScopeRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
       SELECT ${teamId}, pss.security_scope_id
-      FROM policy_statement ps
-      JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
-      WHERE ps.policy_id = ${policyId}
+      FROM policy p
+      JOIN policy_statement ps
+        ON ps.policy_id = p.policy_id
+        AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
+      JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
+      JOIN team t
+        ON t.team_id = ${teamId}
+        AND t.record_end_date IS NULL
+      WHERE p.policy_id = ${policyId}
+        AND p.status = 'approved'
+        AND p.record_end_date IS NULL
       ON CONFLICT (team_id, security_scope_id) DO NOTHING;
     `;
 
@@ -519,8 +536,16 @@ export class SecurityScopeRepository extends BaseRepository {
       INSERT INTO team_security_scope (team_id, security_scope_id)
       SELECT tp.team_id, pss.security_scope_id
       FROM team_policy tp
+      JOIN team t
+        ON t.team_id = tp.team_id
+        AND t.record_end_date IS NULL
+      JOIN policy p
+        ON p.policy_id = tp.policy_id
+        AND p.record_end_date IS NULL
+        AND p.status = 'approved'
       JOIN policy_statement ps
         ON ps.policy_id = tp.policy_id
+        AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
       JOIN policy_statement_scope pss
         ON pss.policy_statement_id = ps.policy_statement_id
@@ -546,7 +571,11 @@ export class SecurityScopeRepository extends BaseRepository {
       SELECT DISTINCT pss.security_scope_id
       FROM policy_statement ps
       JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
+      JOIN policy p ON p.policy_id = ps.policy_id
       WHERE ps.record_end_date IS NULL
+        AND ps.effect = ${PolicyEffect.ALLOW}
+        AND p.record_end_date IS NULL
+        AND p.status = 'approved'
         AND (ps.urn_submission_id = ${String(submissionId)} OR ps.urn_submission_id = '*');
     `;
 
