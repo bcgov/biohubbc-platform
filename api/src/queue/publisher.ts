@@ -1,3 +1,4 @@
+import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../constants/submission-upload';
 import { IDBConnection } from '../database/db';
 import { DownloadStatusEnum } from '../models/download-status';
 import { SubmissionUpload } from '../models/submission-upload';
@@ -64,7 +65,7 @@ export type PublishJobResult =
 /**
  * Options for process submission features jobs.
  *
- * Singleton key is per-submission
+ * Singleton key is per-submission-upload.
  * pg-boss won't dequeue a new job for the same singleton key while the current one is active.
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
@@ -103,13 +104,12 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
  * Queues slow operations (indexing, regions) for submission feature processing.
  * Also creates a submission_validation record for tracking.
  *
- * Blocks if an existing validation record exists unless status is 'failed',
- * which allows retrying failed jobs.
+ * Blocks if the upload lifecycle is terminal or an active validation record exists.
  *
  * Caller provides the pre-resolved submission_upload bridge record — avoids
  * redundant lookups since the caller (ArtifactSecurityService) already has it.
- * Singleton key is per-submission (not per-upload) to prevent concurrent jobs for the
- * same submission — two uploads must serialize to avoid conflicting feature writes.
+ * Singleton key is per-submission-upload to keep queue identity aligned with the
+ * upload lifecycle row and validation record.
  *
  * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {SubmissionUpload} submissionUpload Pre-resolved bridge record
@@ -124,6 +124,36 @@ export const publishProcessSubmissionFeaturesJob = async (
   const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
 
   try {
+    if (TERMINAL_UPLOAD_STATUSES.includes(submissionUpload.status)) {
+      defaultLog.warn({
+        label: 'publishProcessSubmissionFeaturesJob',
+        message: 'Blocked: submission upload is terminal',
+        submissionUploadId,
+        uploadStatus: submissionUpload.status
+      });
+
+      return {
+        status: 'blocked',
+        message: `Submission upload is terminal with status '${submissionUpload.status}'`,
+        existingStatus: submissionUpload.status
+      };
+    }
+
+    if (!PROCESS_START_STATUSES.includes(submissionUpload.status)) {
+      defaultLog.warn({
+        label: 'publishProcessSubmissionFeaturesJob',
+        message: 'Blocked: submission upload is not process-startable',
+        submissionUploadId,
+        uploadStatus: submissionUpload.status
+      });
+
+      return {
+        status: 'blocked',
+        message: `Submission upload is not process-startable with status '${submissionUpload.status}'`,
+        existingStatus: submissionUpload.status
+      };
+    }
+
     const submissionValidationService = publisherDependencies.createSubmissionValidationService(connection);
 
     // Check for existing validation record by submission_upload_id
@@ -132,7 +162,6 @@ export const publishProcessSubmissionFeaturesJob = async (
     );
 
     if (existingValidation) {
-      // Only allow retry if status is 'failed' or 'invalid'
       if (existingValidation.status !== 'failed' && existingValidation.status !== 'invalid') {
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
@@ -151,8 +180,10 @@ export const publishProcessSubmissionFeaturesJob = async (
 
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
-        message: 'Retrying failed validation',
+        message: 'Retrying validation for non-terminal upload',
         submissionUploadId,
+        uploadStatus: submissionUpload.status,
+        existingStatus: existingValidation.status,
         previousJobId: existingValidation.job_id
       });
     }
@@ -173,10 +204,10 @@ export const publishProcessSubmissionFeaturesJob = async (
     // Full bridge record travels through the queue — handler uses it directly
     const jobData: SubmissionUpload = submissionUpload;
 
-    // Use singletonKey to prevent duplicate concurrent jobs for the same submission
+    // Use singletonKey to prevent duplicate concurrent jobs for the same submission upload.
     const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, jobData, {
       ...mergedOptions,
-      singletonKey: `submission-${submissionId}`,
+      singletonKey: `submission-upload-${submissionUploadId}`,
       db
     });
 
@@ -200,7 +231,7 @@ export const publishProcessSubmissionFeaturesJob = async (
         submissionUploadId
       });
 
-      return { status: 'duplicate', message: 'Job already exists for this submission' };
+      return { status: 'duplicate', message: 'Job already exists for this submission upload' };
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -408,11 +439,11 @@ export const publishIndexSubmissionFeaturesJob = async (
 
     await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
 
-    // Use singletonKey to prevent duplicate concurrent indexing jobs for the same submission
+    // Use singletonKey to prevent duplicate concurrent indexing jobs for the same submission upload.
     // Pass caller's connection via db option so job insert is part of the same transaction
     const jobId = await boss.send(JobQueues.INDEX_SUBMISSION_FEATURES, data, {
       ...mergedOptions,
-      singletonKey: `submission-idx-${data.submissionId}`,
+      singletonKey: `submission-upload-idx-${data.submissionUploadId}`,
       db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
     });
 
@@ -421,7 +452,8 @@ export const publishIndexSubmissionFeaturesJob = async (
         label: 'publishIndexSubmissionFeaturesJob',
         message: 'Index submission features job published',
         jobId,
-        submissionId: data.submissionId
+        submissionId: data.submissionId,
+        submissionUploadId: data.submissionUploadId
       });
 
       return { status: 'published', jobId };
@@ -430,10 +462,11 @@ export const publishIndexSubmissionFeaturesJob = async (
     defaultLog.warn({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Job not published (duplicate or throttled)',
-      submissionId: data.submissionId
+      submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId
     });
 
-    return { status: 'duplicate', message: 'Job already exists for this submission' };
+    return { status: 'duplicate', message: 'Job already exists for this submission upload' };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -441,6 +474,7 @@ export const publishIndexSubmissionFeaturesJob = async (
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId,
       error
     });
 

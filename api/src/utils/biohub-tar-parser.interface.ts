@@ -7,7 +7,7 @@ export interface IUploadedMediaFile {
   fileName: string;
   /** The S3 key the file was uploaded to */
   s3Key: string;
-  /** Original file path relative to files/ in the tar archive */
+  /** Original tarball-relative file path (for example, "files/images/photo.jpg") */
   path: string;
   /** File size in bytes from TAR header */
   byteSize: number;
@@ -18,6 +18,13 @@ export interface IUploadedMediaFile {
 }
 
 export type TarNext = () => void;
+
+export type TarEntryHeader = {
+  name?: string | null;
+  type?: string | null;
+  size?: number;
+  pax?: Record<string, string | undefined> | null;
+};
 
 export interface MediaUploadContext {
   path: string;

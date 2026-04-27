@@ -45,7 +45,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
     try {
       currentPhase = 'resolve contributor';
-      const contributor = await this.contributorService.getContributorBySubmissionId(submissionId);
+      const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'resolved contributor',
@@ -354,13 +354,19 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await this.submissionFeaturePropertyIngestionRepository.clearComplexPropertyCandidateStagingBySubmissionUploadId(
       submissionUploadId
     );
-    await this.submissionFeaturePropertyIngestionRepository.populateDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId);
-    await this.submissionFeaturePropertyIngestionRepository.populateSpatialCandidateStagingBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateDatetimeCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.populateSpatialCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
     await this.submissionFeaturePropertyIngestionRepository.populateCodeCandidateStagingBySubmissionUploadId(
       submissionUploadId,
       contributorId
     );
-    await this.submissionFeaturePropertyIngestionRepository.populateTaxonCandidateStagingBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateTaxonCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
     await this.submissionFeaturePropertyIngestionRepository.populateArtifactCandidateStagingBySubmissionUploadId(
       submissionUploadId
     );

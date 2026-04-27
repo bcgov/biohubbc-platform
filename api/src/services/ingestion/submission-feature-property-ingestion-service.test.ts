@@ -1,14 +1,17 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../../__mocks__/db';
+import { Contributor } from '../../models/contributor';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ContributorService } from '../contributor-service';
 import { SubmissionFeaturePropertyIngestionService } from './submission-feature-property-ingestion-service';
 
 describe('SubmissionFeaturePropertyIngestionService', () => {
+  const contributor: Contributor = { contributor_id: 77, client_id: 'test-client' };
+
   afterEach(() => {
     sinon.restore();
   });
@@ -16,7 +19,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
   it('runs deterministic upload-scoped SQL phases and succeeds when no errors are recorded', async () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
-    sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({ contributor_id: 77 } as any);
+    sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
 
     const deleteDerivedPropertiesStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -30,7 +33,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const stageStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearTypedPropertyValueStagingBySubmissionUploadId').resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'clearTypedPropertyValueStagingBySubmissionUploadId'
+      )
+      .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearResolvedPropertyStagingBySubmissionUploadId')
       .resolves();
@@ -46,7 +54,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         'populateResolvedPropertyStagingBySubmissionUploadId'
       )
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'populateTypedPropertyValueStagingBySubmissionUploadId').resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'populateTypedPropertyValueStagingBySubmissionUploadId'
+      )
+      .resolves();
     const requiredStub = sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
@@ -106,13 +119,13 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const insertGeometryStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertGeometryPropertiesBySubmissionUploadId')
       .resolves();
-    sinon
+    const insertCodeStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertCodePropertiesBySubmissionUploadId')
       .resolves();
-    sinon
+    const insertTaxonStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertTaxonPropertiesBySubmissionUploadId')
       .resolves();
-    sinon
+    const insertArtifactStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactLinksBySubmissionUploadId')
       .resolves();
 
@@ -138,6 +151,11 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     );
 
     expect(insertStringStub.calledOnce).to.equal(true);
+    expect(insertCodeStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', contributor.contributor_id)).to.equal(
+      true
+    );
+    expect(insertTaxonStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
+    expect(insertArtifactStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertReferencesStub.calledOnce).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
@@ -162,6 +180,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       insertStringStub,
       insertTimestampStub,
       insertGeometryStub,
+      insertCodeStub,
+      insertTaxonStub,
+      insertArtifactStub,
       insertReferencesStub
     );
   });
@@ -169,7 +190,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
   it('returns invalid outcome when validation errors exist', async () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
-    sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({ contributor_id: 77 } as any);
+    sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
       .resolves();
@@ -180,7 +201,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearTypedPropertyValueStagingBySubmissionUploadId').resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'clearTypedPropertyValueStagingBySubmissionUploadId'
+      )
+      .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearResolvedPropertyStagingBySubmissionUploadId')
       .resolves();
@@ -196,7 +222,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         'populateResolvedPropertyStagingBySubmissionUploadId'
       )
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'populateTypedPropertyValueStagingBySubmissionUploadId').resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'populateTypedPropertyValueStagingBySubmissionUploadId'
+      )
+      .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,

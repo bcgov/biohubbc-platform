@@ -7,8 +7,6 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
-import { getMockDBConnection } from '../../__mocks__/db';
-import { SearchFeatureService } from '../../services/search-feature-service';
 import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
@@ -34,7 +32,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     } as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
 
   const stubConnections = () => {
-    sinon.stub(db, 'getAPIUserDBConnection').callsFake(() => {
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
       const conn = getMockDBConnection();
       conn.open = sinon.stub().resolves();
       conn.commit = sinon.stub().resolves();
@@ -58,19 +56,18 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
   });
-    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
   it('indexes successfully and sets indexed', async () => {
-    sinon
+    const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
-    const toIndexingStub = SubmissionUploadService.prototype
-      .transitionSubmissionUploadToIndexing as sinon.SinonStub;
+    const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
     expect(toIndexingStub.calledWith('submission-upload-1')).to.be.true;
+    expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
     expect(toIndexedStub.calledWith('submission-upload-1')).to.be.true;
   });
 
@@ -85,7 +82,6 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       });
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
-    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
@@ -107,7 +103,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
+    const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
+    expect(toIndexingStub.called).to.be.false;
   });
 
   it('skips work when status is not index-startable', async () => {
@@ -126,10 +124,12 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
+    const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
+    expect(toIndexingStub.called).to.be.false;
   });
 
-  it('marks failed and rethrows on unexpected errors', async () => {
+  it('rethrows on unexpected errors without marking failed before queue retries are exhausted', async () => {
     const testError = new Error('Indexing failed');
     sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
@@ -143,9 +143,25 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     }
 
     const transitionStatusStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
-    expect(
-      transitionStatusStub.calledWith('submission-upload-1', 'failed', ['uploaded', 'ingesting', 'ingested', 'indexing'])
-    ).to.be.true;
+    expect(transitionStatusStub.called).to.be.false;
+  });
+
+  it('allows retry/resume when status is already indexing', async () => {
+    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+      submission_upload_id: 'submission-upload-1',
+      submission_id: 777,
+      upload_id: 'upload-1',
+      status: 'indexing',
+      ticket_id: '11111111-1111-1111-1111-111111111111'
+    });
+
+    const indexStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({ status: 'ok' });
+
+    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+
+    expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
   });
 
   it('skips retry when status is failed terminal', async () => {
@@ -164,23 +180,28 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
-    const toIndexingStub = SubmissionUploadService.prototype
-      .transitionSubmissionUploadToIndexing as sinon.SinonStub;
+    const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
     expect(toIndexingStub.called).to.be.false;
-    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+  });
 
-    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
+  it('processes multiple jobs in sequence', async () => {
+    const indexStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({ status: 'ok' });
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(1, 'job-1'), createMockJob(2, 'job-2')]);
+    await indexSubmissionFeaturesJobHandler([
+      createMockJob(1, 'upload-1', 'job-1'),
+      createMockJob(2, 'upload-2', 'job-2')
+    ]);
 
     expect(indexStub.callCount).to.equal(2);
-    expect(openStub.callCount).to.equal(2);
-    expect(commitStub.callCount).to.equal(2);
-    expect(releaseStub.callCount).to.equal(2);
+    expect(indexStub.firstCall.calledWith(1, 'upload-1')).to.be.true;
+    expect(indexStub.secondCall.calledWith(2, 'upload-2')).to.be.true;
   });
 
   it('should handle empty jobs array', async () => {
+    sinon.restore();
     const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     await indexSubmissionFeaturesJobHandler([]);
@@ -194,9 +215,22 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     sinon.restore();
   });
 
-  it('logs failure without throwing', async () => {
-  it('should log failure with error output without throwing', async () => {
-    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+  const stubConnections = () => {
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
+      const conn = getMockDBConnection();
+      conn.open = sinon.stub().resolves();
+      conn.commit = sinon.stub().resolves();
+      conn.rollback = sinon.stub().resolves();
+      conn.release = sinon.stub();
+      return conn;
+    });
+  };
+
+  it('marks upload failed and logs failure with error output without throwing', async () => {
+    stubConnections();
+    const transitionStatusStub = sinon
+      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+      .resolves();
 
     const job = {
       id: 'job-1',
@@ -205,24 +239,40 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
       output: { message: 'failed after retries' }
     } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
 
-    await indexSubmissionFeaturesFailedHandler([job]);
+    let thrownError: unknown;
+    try {
+      await indexSubmissionFeaturesFailedHandler([job]);
+    } catch (error) {
+      thrownError = error;
+    }
 
-    // DLQ handler is log-only — no DB connection should be opened
-    expect(getConnectionStub).not.to.have.been.called;
+    expect(thrownError).to.be.undefined;
+    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['ingested', 'indexing', 'failed'])).to.be
+      .true;
   });
 
-  it('should log default message when output is null', async () => {
-    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+  it('should mark upload failed and log default message when output is null', async () => {
+    stubConnections();
+    const transitionStatusStub = sinon
+      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+      .resolves();
 
     const job = {
       id: 'job-2',
       name: 'index-submission-features-failed',
-      data: { submissionId: 888 },
+      data: { submissionId: 888, submissionUploadId: 'submission-upload-2' },
       output: null
     } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
 
-    await indexSubmissionFeaturesFailedHandler([job]);
+    let thrownError: unknown;
+    try {
+      await indexSubmissionFeaturesFailedHandler([job]);
+    } catch (error) {
+      thrownError = error;
+    }
 
-    expect(getConnectionStub).not.to.have.been.called;
+    expect(thrownError).to.be.undefined;
+    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['ingested', 'indexing', 'failed'])).to.be
+      .true;
   });
 });

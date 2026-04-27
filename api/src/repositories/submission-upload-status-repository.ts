@@ -143,7 +143,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
                 SELECT 
                   role,
                   COUNT(*)::int AS count,
-                  COALESCE(SUM(artifact.byte_size)::int, 0) AS byte_size
+                  COALESCE(SUM(artifact.byte_size)::bigint, 0) AS byte_size
                 FROM upload_artifacts
                 LEFT JOIN artifact ON upload_artifacts.artifact_id = artifact.artifact_id
                 WHERE upload_artifacts.upload_id = submission_uploads.upload_id

@@ -21,7 +21,7 @@ describe('MediaIngestionService', () => {
           artifact_id: 'artifact-1',
           artifact_status: 'uploaded',
           bucket: 'gblhvt',
-          object_key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
+          object_key: 'submissions/123/uploads/submission-upload-1/media/files/path/to/key.pdf',
           byte_size: '10',
           checksum_sha256: '1'.repeat(64),
           uploaded_at: '2026-01-01T00:00:00Z',
@@ -31,7 +31,7 @@ describe('MediaIngestionService', () => {
           artifact_id: 'artifact-2',
           artifact_status: 'uploaded',
           bucket: 'gblhvt',
-          object_key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
+          object_key: 'submissions/123/uploads/submission-upload-1/media/files/photo-2.jpg',
           byte_size: '20',
           checksum_sha256: '2'.repeat(64),
           uploaded_at: '2026-01-01T00:00:00Z',
@@ -46,16 +46,16 @@ describe('MediaIngestionService', () => {
       await service.persistUploadedMediaBatch('upload-1', 'archive-1', 'submission-upload-1', [
         {
           fileName: 'key.pdf',
-          s3Key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
-          path: 'path/to/key.pdf',
+          s3Key: 'submissions/123/uploads/submission-upload-1/media/files/path/to/key.pdf',
+          path: 'files/path/to/key.pdf',
           byteSize: 10,
           checksumSha256: '1'.repeat(64),
           mimetype: 'application/pdf'
         },
         {
           fileName: 'photo-2.jpg',
-          s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
-          path: 'photo-2.jpg',
+          s3Key: 'submissions/123/uploads/submission-upload-1/media/files/photo-2.jpg',
+          path: 'files/photo-2.jpg',
           byteSize: 20,
           checksumSha256: '2'.repeat(64),
           mimetype: 'image/jpeg'
@@ -69,14 +69,14 @@ describe('MediaIngestionService', () => {
           artifact_id: 'artifact-1',
           role: 'attachment',
           upload_archive_id: 'archive-1',
-          path: 'path/to/key.pdf'
+          path: 'files/path/to/key.pdf'
         },
         {
           upload_id: 'upload-1',
           artifact_id: 'artifact-2',
           role: 'attachment',
           upload_archive_id: 'archive-1',
-          path: 'photo-2.jpg'
+          path: 'files/photo-2.jpg'
         }
       ]);
     });

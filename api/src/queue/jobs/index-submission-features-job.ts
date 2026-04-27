@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss';
-import { TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
+import { INDEX_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
@@ -47,7 +47,7 @@ function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): b
  * @returns {boolean} `true` when indexing is permitted for the given status.
  */
 function isIndexStartableSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return status === 'ingested' || status === 'indexing';
+  return INDEX_START_STATUSES.includes(status);
 }
 
 /**
@@ -209,8 +209,8 @@ async function runIndexSubmissionFeaturesStage(
  * For each dequeued job:
  * - log job context
  * - run the indexing stage orchestrator
- * - on unexpected failure, transition upload status to `failed` (when currently
- *   in an allowed non-terminal state) and rethrow so pg-boss retry policy applies
+ * - on unexpected failure, rethrow so pg-boss retry policy applies. Terminal
+ *   `failed` state is persisted by the DLQ handler after retries are exhausted.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs Batched jobs provided by pg-boss.
  * @returns {Promise<void>}
@@ -230,16 +230,6 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
     try {
       await runIndexSubmissionFeaturesStage(submissionId, submissionUploadId, job.id);
     } catch (error) {
-      await withConnection(async (connection) => {
-        const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
-          'uploaded',
-          'ingesting',
-          'ingested',
-          'indexing'
-        ]);
-      });
-
       defaultLog.error({
         label: 'indexSubmissionFeaturesJobHandler',
         message: 'Index submission features job failed',
@@ -249,7 +239,9 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
         error
       });
 
-      throw error; // pg-boss will handle retry based on configuration
+      // Rethrow so pg-boss can apply configured retries.
+      // Final terminal status ('failed') is persisted by the DLQ handler once retries are exhausted.
+      throw error;
     }
   }
 };
@@ -257,8 +249,8 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 /**
  * Dead-letter handler for jobs that exhausted all retry attempts.
  *
- * This handler does not mutate lifecycle state; it emits terminal operational logs
- * with final job metadata/output so failures are observable and diagnosable.
+ * This handler runs after queue retries are exhausted. It persists terminal
+ * `failed` lifecycle state and emits operational logs with final job metadata.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs Failed jobs moved to the DLQ.
  * @returns {Promise<void>}
@@ -271,6 +263,15 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
+
+    await withConnection(async (connection) => {
+      const submissionUploadService = new SubmissionUploadService(connection);
+      await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
+        'ingested',
+        'indexing',
+        'failed'
+      ]);
+    });
 
     defaultLog.warn({
       label: 'indexSubmissionFeaturesFailedHandler',

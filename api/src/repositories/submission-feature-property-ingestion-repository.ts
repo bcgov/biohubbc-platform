@@ -6,10 +6,7 @@ import {
   IngestionErrorSummary,
   IngestionErrorSummaryRow
 } from '../models/submission-feature-property-ingestion';
-import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
-
-const defaultLog = getLogger('repositories/submission-feature-property-ingestion-repository');
 
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
@@ -26,32 +23,6 @@ const defaultLog = getLogger('repositories/submission-feature-property-ingestion
  */
 export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository {
   /**
-   * Execute one upload-scoped SQL phase and emit timing/row-count diagnostics.
-   *
-   * @param {string} phaseName Human-readable phase identifier.
-   * @param {string} submissionUploadId Upload scope.
-   * @param {SQLStatement} sqlStatement SQL statement to execute.
-   * @returns {Promise<void>}
-   */
-  private async executeUploadScopedPhase(
-    phaseName: string,
-    submissionUploadId: string,
-    sqlStatement: any
-  ): Promise<void> {
-    const startedAt = Date.now();
-    const response = await this.connection.sql(sqlStatement);
-
-    defaultLog.debug({
-      label: 'executeUploadScopedPhase',
-      message: 'phase complete',
-      phase_name: phaseName,
-      submission_upload_id: submissionUploadId,
-      elapsed_ms: Date.now() - startedAt,
-      rows_written: response?.rowCount ?? 0
-    });
-  }
-
-  /**
    * Remove all raw property staging rows for a single upload.
    *
    * This is the reset step before re-expanding `submission_feature.data.properties`
@@ -66,7 +37,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_raw_property
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear raw property staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -193,7 +164,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         AND jsonb_typeof(sf.data -> 'properties') = 'object';
     `;
 
-    await this.executeUploadScopedPhase('stage expanded properties', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -211,7 +182,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_typed_property_value
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear typed property value staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -229,7 +200,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_resolved_property
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear resolved property staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -250,7 +221,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   async populateResolvedPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_resolved_property (
-        submission_feature_property_staging_id,
         submission_feature_id,
         submission_upload_id,
         feature_type_id,
@@ -262,7 +232,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         property_type_name
       )
       SELECT
-        s.submission_feature_property_staging_id,
         s.submission_feature_id,
         s.submission_upload_id,
         s.feature_type_id,
@@ -285,7 +254,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND ftp.record_end_date IS NULL
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('populate resolved property staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -349,7 +318,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         AND rsp.allow_multiple = TRUE
         AND arr.value <> 'null'::jsonb;
     `;
-    await this.executeUploadScopedPhase('populate typed property value staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -366,7 +335,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_datetime_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear datetime candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -383,7 +352,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_spatial_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear spatial candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -400,7 +369,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_code_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear code candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -416,7 +385,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_taxon_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear taxon candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -433,7 +402,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       DELETE FROM submission_upload_staging_artifact_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.executeUploadScopedPhase('clear artifact candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -462,7 +431,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       )
       SELECT 1;
     `;
-    await this.executeUploadScopedPhase('clear upload property working-set staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -503,7 +472,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       )
       SELECT 1;
     `;
-    await this.executeUploadScopedPhase('clear complex candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -576,7 +545,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         END AS time_value
       FROM candidates c;
     `;
-    await this.executeUploadScopedPhase('populate datetime candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -679,7 +648,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         (p.parsed_geom IS NOT NULL AND public.ST_IsValid(p.parsed_geom)) AS is_valid
       FROM parsed p;
     `;
-    await this.executeUploadScopedPhase('populate spatial candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -768,7 +737,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND ccc.key = n.contributor_codeset_code_key
        AND ccc.record_end_date IS NULL;
     `;
-    await this.executeUploadScopedPhase('populate code candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -819,17 +788,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         AND jsonb_typeof(v.logical_value) = 'number'
         AND (v.logical_value #>> '{}') ~ '^-?[0-9]+$';
     `;
-    await this.executeUploadScopedPhase('populate taxon candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
-   * Create `submission_upload_staging_artifact_candidate` with normalized references and resolved artifact IDs.
+   * Create `submission_upload_staging_artifact_candidate` with tarball-relative references and resolved artifact IDs.
    *
-   * Artifact-key values are normalized by trimming and removing a leading
-   * `files/` segment and any leading slashes. Resolution is then performed within
-   * the upload's `upload_id` by joining against `upload_artifact.path`.
+   * Artifact-key values are trimmed only. Resolution is performed within the
+   * upload's `upload_id` by joining against `upload_artifact.path`, which is the
+   * exact tarball-relative archive entry path. For example, an archive entry
+   * `sample_upload/files/images/img-001.jpg` must be referenced as
+   * `files/images/img-001.jpg`.
    *
-   * Candidate rows keep both normalized reference and nullable `artifact_id` so
+   * Candidate rows keep both the lookup reference and nullable `artifact_id` so
    * downstream phases can insert valid links and record unresolved references.
    *
    * @param {string} submissionUploadId Upload scope.
@@ -877,14 +848,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       normalized AS (
         SELECT
           c.*,
-          regexp_replace(
-            CASE
-              WHEN btrim(c.raw_value #>> '{}') LIKE 'files/%' THEN substring(btrim(c.raw_value #>> '{}') FROM 7)
-              ELSE btrim(c.raw_value #>> '{}')
-            END,
-            '^/+',
-            ''
-          ) AS normalized_reference
+          btrim(c.raw_value #>> '{}') AS normalized_reference
         FROM candidates c
       )
       SELECT
@@ -901,7 +865,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         ON ua.upload_id = us.upload_id
        AND ua.path = n.normalized_reference;
     `;
-    await this.executeUploadScopedPhase('populate artifact candidate staging', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -917,8 +881,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     const sql = SQL`
       WITH upload_feature_types AS (
         SELECT DISTINCT feature_type_id
-        FROM submission_upload_staging_raw_property
+        FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_end_date IS NULL
       ),
       required_properties AS (
         SELECT
@@ -934,17 +899,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         WHERE ftp.record_end_date IS NULL
           AND COALESCE(ftp.required_value, false) = TRUE
       ),
-      present_properties AS (
-        SELECT DISTINCT
-          rsp.submission_feature_id,
-          rsp.feature_type_property_id
-        FROM submission_upload_staging_resolved_property rsp
-        WHERE rsp.submission_upload_id = ${submissionUploadId}::uuid
-          AND rsp.feature_type_property_id IS NOT NULL
-          AND rsp.value IS NOT NULL
-          AND rsp.value <> 'null'::jsonb
-          AND NOT (jsonb_typeof(rsp.value) = 'array' AND jsonb_array_length(rsp.value) = 0)
-      ),
       grouped_errors AS (
         SELECT
           sf.submission_upload_id,
@@ -956,12 +910,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         FROM submission_feature sf
         JOIN required_properties rp
           ON rp.feature_type_id = sf.feature_type_id
-        LEFT JOIN present_properties pp
-          ON pp.submission_feature_id = sf.submission_feature_id
-         AND pp.feature_type_property_id = rp.feature_type_property_id
         WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
           AND sf.record_end_date IS NULL
-          AND pp.submission_feature_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_upload_staging_raw_property raw
+            WHERE raw.submission_upload_id = ${submissionUploadId}::uuid
+              AND raw.submission_feature_id = sf.submission_feature_id
+              AND raw.property_name = rp.property_name
+              AND raw.value IS NOT NULL
+              AND raw.value <> 'null'::jsonb
+              AND NOT (jsonb_typeof(raw.value) = 'array' AND jsonb_array_length(raw.value) = 0)
+          )
         GROUP BY sf.submission_upload_id, rp.feature_type_property_id, rp.property_name
       )
       INSERT INTO submission_feature_error (
@@ -994,7 +954,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
-    await this.executeUploadScopedPhase('record required property validation errors', submissionUploadId, sql);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -1790,7 +1750,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         source_feature_id,
         target_feature_id
       FROM resolved
-      ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING;
+      ON CONFLICT DO NOTHING;
     `;
 
     await this.connection.sql(sql);
@@ -1836,8 +1796,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           CASE
             WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload'
             ELSE 'Feature reference cannot point to itself'
-          END AS error_message,
-          COUNT(*)::integer AS count
+          END AS error_message
         FROM expanded e
         LEFT JOIN submission_feature target
           ON target.submission_upload_id = ${submissionUploadId}::uuid

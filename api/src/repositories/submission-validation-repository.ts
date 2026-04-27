@@ -48,20 +48,22 @@ export class SubmissionValidationRepository extends BaseRepository {
    *
    * @param {string} jobId - The pg-boss job UUID.
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
   async updateSubmissionValidationStatus(
     jobId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
+    const metadataJson = JSON.stringify(metadata);
+
     const sql = SQL`
       UPDATE submission_validation
       SET
         status = ${status},
-        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
+        metadata = ${metadataJson}::jsonb,
         started_at = CASE WHEN ${status} = 'started' THEN now() ELSE started_at END,
         ended_at = CASE WHEN ${status} IN ('completed', 'invalid', 'failed') THEN now() ELSE ended_at END
       WHERE job_id = ${jobId}::uuid;
@@ -101,20 +103,22 @@ export class SubmissionValidationRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
   async updateSubmissionValidationStatusBySubmissionUploadId(
     submissionUploadId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
+    const metadataJson = JSON.stringify(metadata);
+
     const sql = SQL`
       UPDATE submission_validation
       SET
         status = ${status},
-        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
+        metadata = ${metadataJson}::jsonb,
         ended_at = CASE WHEN ${status} IN ('completed', 'invalid', 'failed') THEN now() ELSE ended_at END
       WHERE submission_validation_id = (
         SELECT submission_validation_id

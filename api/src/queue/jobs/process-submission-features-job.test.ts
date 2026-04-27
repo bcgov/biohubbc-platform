@@ -8,6 +8,7 @@ import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
+import { IValidationError, ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
@@ -81,10 +82,14 @@ describe('process-submission-features-job', () => {
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
-      expect(publishStub.calledBefore(toIngestedStub)).to.be.true;
+      expect(toIngestedStub.calledBefore(publishStub)).to.be.true;
+      expect(publishStub.firstCall.args[1]).to.eql({
+        submissionId: 123,
+        submissionUploadId: 'test-sub-upload-id'
+      });
     });
 
-    it('rethrows when enqueue returns error and does not mark upload ingested', async () => {
+    it('rethrows when enqueue returns error from the ingested transition transaction', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
         .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
@@ -102,15 +107,20 @@ describe('process-submission-features-job', () => {
         .updateSubmissionValidationStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
         .deleteFeaturesBySubmissionUploadId as sinon.SinonStub;
-      expect(toIngestedStub.called).to.be.false;
-      expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.false;
+      expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.true;
       expect(deleteFeaturesStub.calledWith('test-sub-upload-id')).to.be.true;
     });
 
     it('marks upload invalid when ingestion returns deterministic validation errors', async () => {
+      const validationError: IValidationError = {
+        type: ValidationErrorType.INVALID_PROPERTY_TYPE,
+        message: 'bad data'
+      };
+
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({
         valid: false,
-        errors: [{ message: 'bad data' } as any]
+        errors: [validationError]
       });
 
       const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob');
@@ -196,20 +206,19 @@ describe('process-submission-features-job', () => {
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
     });
 
-    it('allows reprocessing when current status is failed', async () => {
+    it('skips processing when current status is failed', async () => {
       (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
         status: 'failed'
       });
-      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
-      sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
-        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
       const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
-      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
+      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.false;
+      expect(ingestStub.called).to.be.false;
     });
   });
 

@@ -298,4 +298,106 @@ describe('SubmissionUploadService', () => {
       }
     });
   });
+
+  describe('transitionSubmissionUploadToIndexing', () => {
+    it('updates status from ingested to indexing', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'ingested',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIndexing('artifact-1');
+      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'indexing' });
+    });
+
+    it('does not update when already indexing', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'indexing',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIndexing('artifact-1');
+      expect(updateStub).not.to.have.been.called;
+    });
+
+    it('throws ApiConflictError from invalid source state', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+
+      try {
+        await service.transitionSubmissionUploadToIndexing('artifact-1');
+        expect.fail('Expected ApiConflictError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+      }
+    });
+  });
+
+  describe('transitionSubmissionUploadToIndexed', () => {
+    it('updates status from indexing to indexed', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'indexing',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIndexed('artifact-1');
+      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'indexed' });
+    });
+
+    it('does not update when already indexed', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'indexed',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIndexed('artifact-1');
+      expect(updateStub).not.to.have.been.called;
+    });
+
+    it('throws ApiConflictError from invalid source state', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'ingested',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+
+      try {
+        await service.transitionSubmissionUploadToIndexed('artifact-1');
+        expect.fail('Expected ApiConflictError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+      }
+    });
+  });
 });

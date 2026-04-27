@@ -211,6 +211,46 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Transition to indexing when the indexing stage starts.
+   * - ingested -> indexing
+   * - indexing -> indexing (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIndexing(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexing') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['ingested']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexing' });
+  }
+
+  /**
+   * Transition to indexed when the indexing stage completes successfully.
+   * - indexing -> indexed
+   * - indexed -> indexed (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIndexed(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexed') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexed', ['indexing']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+  }
+
+  /**
    * Soft-deletes a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the record to soft-delete

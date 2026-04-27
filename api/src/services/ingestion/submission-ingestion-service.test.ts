@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
+import { Contributor } from '../../models/contributor';
 import { UploadArchive } from '../../models/upload-archive';
 import { ContributorService } from '../contributor-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
@@ -45,6 +46,10 @@ describe('SubmissionIngestionService', () => {
       uploaded_at: '2025-01-01T00:00:00Z',
       format: 'tar'
     };
+    const mockContributor: Contributor = {
+      contributor_id: 99,
+      client_id: 'test-client'
+    };
 
     beforeEach(() => {
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
@@ -76,7 +81,7 @@ describe('SubmissionIngestionService', () => {
         .resolves();
       const contributorByUploadStub = sinon
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
-        .resolves({ contributor_id: 99 } as any);
+        .resolves(mockContributor);
       const streamArchiveStub = sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
         featureCount: 1,
         uploadedCount: 2,
@@ -85,7 +90,23 @@ describe('SubmissionIngestionService', () => {
 
       const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
 
-      expect(result).to.eql({ valid: true, errors: [] });
+      expect(result).to.eql({
+        valid: true,
+        errors: [],
+        metadata: {
+          errorCount: 0,
+          recordCount: 0,
+          featureCount: 1,
+          uploadedCount: 2,
+          codesetFileCount: 1,
+          featureBatchCount: 0,
+          codesetBatchCount: 0,
+          mediaBatchCount: 0,
+          featureRowsPersisted: 0,
+          mediaFilesPersisted: 0,
+          mediaBytesPersisted: 0
+        }
+      });
       expect(deleteFeaturesStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
       expect(deleteUploadArtifactsStub.calledOnceWithExactly(mockSubmissionUpload.upload_id)).to.be.true;
       expect(deleteUploadArtifactsStub.calledBefore(streamArchiveStub)).to.be.true;
@@ -99,9 +120,7 @@ describe('SubmissionIngestionService', () => {
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
-      sinon
-        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
-        .resolves({ contributor_id: 99 } as any);
+      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon
         .stub(submissionIngestionDependencies, 'streamSubmissionArchive')
         .rejects(new Error('archive stream failed'));
@@ -133,9 +152,7 @@ describe('SubmissionIngestionService', () => {
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
-      sinon
-        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
-        .resolves({ contributor_id: 99 } as any);
+      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon
         .stub(submissionIngestionDependencies, 'streamSubmissionArchive')
         .rejects(new Error('archive persist failed'));
@@ -154,9 +171,7 @@ describe('SubmissionIngestionService', () => {
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
-      sinon
-        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
-        .resolves({ contributor_id: 99 } as any);
+      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
         featureCount: 0,
         uploadedCount: 0,

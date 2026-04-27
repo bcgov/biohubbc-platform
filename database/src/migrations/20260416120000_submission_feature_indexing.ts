@@ -473,13 +473,17 @@ export async function up(knex: Knex): Promise<void> {
     --   across connection boundaries.
     -- - They are UNLOGGED for write throughput (operational working-set tables, not canonical records).
     -- - Staging tables intentionally omit FK constraints to minimize ingest-path write amplification.
+    -- - Staging tables intentionally omit synthetic primary keys because no downstream phase
+    --   addresses individual staging rows by identity. Avoiding PK/sequence maintenance reduces
+    --   write amplification on high-volume ingestion inserts.
+    -- - Staging indexes are deliberately limited to the upload-scoped read patterns used by
+    --   validation, resolution, and canonical insert phases.
     --------------------------------------------------------------------------------
     --------------------------------------------------------------------------------
     -- 6.1) Base property staging
     --      Expand raw submission_feature.data.properties JSON into one row per key/value.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_raw_property (
-      submission_feature_property_staging_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       submission_feature_id integer NOT NULL,
       submission_upload_id uuid NOT NULL,
       feature_type_id integer NOT NULL,
@@ -490,12 +494,14 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX IF NOT EXISTS sfp_staging_work_idx1
       ON submission_upload_staging_raw_property (submission_upload_id, feature_type_id, property_name);
     CREATE INDEX IF NOT EXISTS sfp_staging_work_idx2
-      ON submission_upload_staging_raw_property (submission_upload_id, property_name);
+      ON submission_upload_staging_raw_property (
+        submission_upload_id,
+        submission_feature_id,
+        property_name
+      );
 
     COMMENT ON TABLE submission_upload_staging_raw_property IS
       'UNLOGGED upload-scoped raw property staging rows extracted from submission_feature.data.properties.';
-    COMMENT ON COLUMN submission_upload_staging_raw_property.submission_feature_property_staging_id IS
-      'Synthetic staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_raw_property.submission_feature_id IS
       'Submission feature identifier owning the raw property key/value.';
     COMMENT ON COLUMN submission_upload_staging_raw_property.submission_upload_id IS
@@ -513,8 +519,6 @@ export async function up(knex: Knex): Promise<void> {
     --      This intentionally subsumes the need for a separate feature_type_property map staging table.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_resolved_property (
-      submission_upload_staging_resolved_property_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      submission_feature_property_staging_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       submission_upload_id uuid NOT NULL,
       feature_type_id integer NOT NULL,
@@ -537,10 +541,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_resolved_property IS
       'UNLOGGED upload-scoped property staging rows enriched with resolved feature metadata.';
-    COMMENT ON COLUMN submission_upload_staging_resolved_property.submission_upload_staging_resolved_property_id IS
-      'Synthetic resolved staging row identifier.';
-    COMMENT ON COLUMN submission_upload_staging_resolved_property.submission_feature_property_staging_id IS
-      'Foreign reference to raw staging row identity.';
     COMMENT ON COLUMN submission_upload_staging_resolved_property.submission_feature_id IS
       'Submission feature identifier owning the resolved property.';
     COMMENT ON COLUMN submission_upload_staging_resolved_property.submission_upload_id IS
@@ -565,7 +565,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Materialize one logical value per row (including array expansion where allowed).
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_typed_property_value (
-      submission_upload_staging_typed_property_value_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_feature_id integer NOT NULL,
       submission_upload_id uuid NOT NULL,
       feature_type_id integer NOT NULL,
@@ -592,8 +591,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_typed_property_value IS
       'UNLOGGED upload-scoped typed logical property values (one logical value per row).';
-    COMMENT ON COLUMN submission_upload_staging_typed_property_value.submission_upload_staging_typed_property_value_id IS
-      'Synthetic typed-value staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_typed_property_value.submission_feature_id IS
       'Submission feature identifier owning the typed logical value.';
     COMMENT ON COLUMN submission_upload_staging_typed_property_value.submission_upload_id IS
@@ -616,7 +613,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Store parsed date/time candidates for validation + canonical insert reuse.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_datetime_candidate (
-      submission_upload_staging_datetime_candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       property_name text NOT NULL,
@@ -634,8 +630,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_datetime_candidate IS
       'UNLOGGED upload-scoped parsed datetime candidates for validation and timestamp insertion.';
-    COMMENT ON COLUMN submission_upload_staging_datetime_candidate.submission_upload_staging_datetime_candidate_id IS
-      'Synthetic datetime candidate staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_datetime_candidate.submission_upload_id IS
       'Upload scope for staging lifecycle management.';
     COMMENT ON COLUMN submission_upload_staging_datetime_candidate.submission_feature_id IS
@@ -658,7 +652,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Store normalized/parsible geometry candidates and validity metadata.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_spatial_candidate (
-      submission_upload_staging_spatial_candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       property_name text NOT NULL,
@@ -677,8 +670,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_spatial_candidate IS
       'UNLOGGED upload-scoped normalized spatial candidates with parse/validity metadata.';
-    COMMENT ON COLUMN submission_upload_staging_spatial_candidate.submission_upload_staging_spatial_candidate_id IS
-      'Synthetic spatial candidate staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_spatial_candidate.submission_upload_id IS
       'Upload scope for staging lifecycle management.';
     COMMENT ON COLUMN submission_upload_staging_spatial_candidate.submission_feature_id IS
@@ -703,7 +694,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Store parsed code slugs and resolved contributor_codeset_code_id lookups.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_code_candidate (
-      submission_upload_staging_code_candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       property_name text NOT NULL,
@@ -721,8 +711,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_code_candidate IS
       'UNLOGGED upload-scoped parsed code reference candidates and resolution outputs.';
-    COMMENT ON COLUMN submission_upload_staging_code_candidate.submission_upload_staging_code_candidate_id IS
-      'Synthetic code candidate staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_code_candidate.submission_upload_id IS
       'Upload scope for staging lifecycle management.';
     COMMENT ON COLUMN submission_upload_staging_code_candidate.submission_feature_id IS
@@ -745,7 +733,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Store parsed TSNs and resolved taxon_id lookups.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_taxon_candidate (
-      submission_upload_staging_taxon_candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       property_name text NOT NULL,
@@ -762,8 +749,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_taxon_candidate IS
       'UNLOGGED upload-scoped parsed taxon TSN candidates and resolution outputs.';
-    COMMENT ON COLUMN submission_upload_staging_taxon_candidate.submission_upload_staging_taxon_candidate_id IS
-      'Synthetic taxon candidate staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_taxon_candidate.submission_upload_id IS
       'Upload scope for staging lifecycle management.';
     COMMENT ON COLUMN submission_upload_staging_taxon_candidate.submission_feature_id IS
@@ -784,7 +769,6 @@ export async function up(knex: Knex): Promise<void> {
     --      Store normalized artifact references and resolved artifact_id lookups.
     --------------------------------------------------------------------------------
     CREATE UNLOGGED TABLE IF NOT EXISTS submission_upload_staging_artifact_candidate (
-      submission_upload_staging_artifact_candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       submission_feature_id integer NOT NULL,
       property_name text NOT NULL,
@@ -801,8 +785,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON TABLE submission_upload_staging_artifact_candidate IS
       'UNLOGGED upload-scoped parsed artifact reference candidates and resolution outputs.';
-    COMMENT ON COLUMN submission_upload_staging_artifact_candidate.submission_upload_staging_artifact_candidate_id IS
-      'Synthetic artifact candidate staging row identifier.';
     COMMENT ON COLUMN submission_upload_staging_artifact_candidate.submission_upload_id IS
       'Upload scope for staging lifecycle management.';
     COMMENT ON COLUMN submission_upload_staging_artifact_candidate.submission_feature_id IS
@@ -817,12 +799,21 @@ export async function up(knex: Knex): Promise<void> {
       'Normalized artifact reference used for upload_artifact lookup.';
     COMMENT ON COLUMN submission_upload_staging_artifact_candidate.artifact_id IS
       'Resolved artifact identifier when lookup succeeds.';
+
+    CREATE INDEX IF NOT EXISTS submission_feature_idx6
+      ON submission_feature(submission_upload_id, source_id)
+      WHERE record_end_date IS NULL;
+
+    COMMENT ON INDEX submission_feature_idx6 IS
+      'Partial index for resolving active upload-scoped submission_feature source_id references.';
   `);
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
+
+    DROP INDEX IF EXISTS submission_feature_idx6;
 
     --------------------------------------------------------------------------------
     -- 1) Drop submission_feature_error table

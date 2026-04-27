@@ -44,14 +44,14 @@ export class SubmissionValidationService extends DBService {
    *
    * @param {string} jobId - The pg-boss job UUID.
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationService
    */
   async updateSubmissionValidationStatus(
     jobId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
     return this.submissionValidationRepository.updateSubmissionValidationStatus(jobId, status, metadata);
   }
@@ -77,14 +77,14 @@ export class SubmissionValidationService extends DBService {
    *
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationService
    */
   async updateSubmissionValidationStatusBySubmissionUploadId(
     submissionUploadId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
     return this.submissionValidationRepository.updateSubmissionValidationStatusBySubmissionUploadId(
       submissionUploadId,
