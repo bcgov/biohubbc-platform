@@ -16,6 +16,8 @@ export enum HTTPCustomErrorType {
 }
 
 export class HTTPError extends BaseError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTPError');
+
   status: number;
 
   constructor(
@@ -39,6 +41,8 @@ export class HTTPError extends BaseError {
  * @extends {HTTPError}
  */
 export class HTTP400 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP400');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.BAD_REQUEST, 400, message, errors, stack);
   }
@@ -56,6 +60,8 @@ export class HTTP400 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP401 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP401');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.UNAUTHORIZE, 401, message, errors, stack);
   }
@@ -73,6 +79,8 @@ export class HTTP401 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP403 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP403');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.FORBIDDEN, 403, message, errors, stack);
   }
@@ -90,6 +98,8 @@ export class HTTP403 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP404 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP404');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.NOT_FOUND, 404, message, errors, stack);
   }
@@ -107,6 +117,8 @@ export class HTTP404 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP409 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP409');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.CONFLICT, 409, message, errors, stack);
   }
@@ -124,6 +136,8 @@ export class HTTP409 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP500 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP500');
+
   constructor(message: string, errors?: (string | object)[], stack?: string) {
     super(HTTPErrorType.INTERNAL_SERVER_ERROR, 500, message, errors, stack);
   }
