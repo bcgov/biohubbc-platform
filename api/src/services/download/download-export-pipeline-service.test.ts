@@ -234,6 +234,65 @@ describe('DownloadExportPipelineService', () => {
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
     });
 
+    it('throws when no Parquet artifacts exist for the download (avoids empty-zip output)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
+        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves([]);
+      const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
+      const writePartStub = sinon.stub(DownloadExportPipelineService.prototype, 'writePartZip');
+
+      try {
+        await service.runExport(EXPORT_ID);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.include('no Parquet artifacts');
+      }
+
+      // Only PROCESSING fired — READY was never reached, and no work was done.
+      expect(transitionStub.calledOnce).to.be.true;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(writeStub.called).to.be.false;
+      expect(writePartStub.called).to.be.false;
+    });
+
+    it('throws when every feature type resolves to zero rows (avoids empty-zip output)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
+        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
+      sinon
+        .stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport')
+        .resolves({ finalPart: 1, chunksWritten: 0, fileRefs: [] });
+      const writePartStub = sinon.stub(DownloadExportPipelineService.prototype, 'writePartZip');
+
+      try {
+        await service.runExport(EXPORT_ID);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.include('zero rows');
+      }
+
+      // READY never fired, and no part-zips were finalized.
+      expect(transitionStub.calledOnce).to.be.true;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(writePartStub.called).to.be.false;
+    });
+
     it('propagates error from writeFeatureTypeExport and does not transition to READY', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);

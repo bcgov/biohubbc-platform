@@ -238,8 +238,15 @@ describe('Download Export pipeline (integration)', function () {
 
       // Stub the write-sink so the real archiver bytes drain into a no-op S3 upload.
       sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-      // Zero rows — the feature type is enumerable but produces an empty CSV body.
-      stubParquetReaderWithRows([]);
+      // At least one row is required — the empty-zip guard in `runExport` refuses
+      // to finalize an export where every feature type resolves to zero rows.
+      stubParquetReaderWithRows([
+        {
+          uuid: '00000000-0000-0000-0000-000000000001',
+          parent_uuid: null,
+          submission_feature_id: 1
+        }
+      ]);
 
       await pipelineService.runExport(exportId);
 
@@ -372,34 +379,37 @@ describe('Download Export pipeline (integration)', function () {
   });
 
   describe('runExport zero-row feature type', () => {
-    it('still produces exactly one part-zip artifact with a CSV header entry', async () => {
+    it('throws rather than writing an empty zip; leaves no part-zip artifact and status non-READY', async () => {
       const { downloadId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
       const exportId = await seedPendingExport(downloadId);
 
       sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       stubParquetReaderWithRows([]);
 
-      await pipelineService.runExport(exportId);
+      let caught: Error | undefined;
+      try {
+        await pipelineService.runExport(exportId);
+      } catch (err) {
+        caught = err as Error;
+      }
+      expect(caught).to.be.instanceOf(Error);
+      expect(caught?.message).to.include('zero rows');
 
-      // Exactly one part-zip link row — the pipeline always finalizes the
-      // open bundle at part 1 even when a feature type contributes no rows.
+      // Pipeline threw before finalizing any part — no download_export_artifact rows landed.
       const joinRows = await connection.sql(SQL`
-        SELECT dea.chunk_id, a.byte_size
+        SELECT dea.download_export_artifact_id
         FROM download_export_artifact dea
-        INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
         WHERE dea.download_export_id = ${exportId}
-          AND dea.record_end_date IS NULL
-        ORDER BY dea.chunk_id ASC;
+          AND dea.record_end_date IS NULL;
       `);
-      expect(joinRows.rowCount).to.equal(1);
-      expect(joinRows.rows[0].chunk_id).to.equal(1);
-      // An empty-ish zip still has framing + the (header-only) CSV entry, so byte_size > 0.
-      expect(Number(joinRows.rows[0].byte_size)).to.be.greaterThan(0);
+      expect(joinRows.rowCount).to.equal(0);
 
+      // The PROCESSING transition landed but READY never fired — terminal FAILED
+      // is owned by the pg-boss DLQ handler (retry-as-lifecycle), not runExport.
       const exportRow = await connection.sql(SQL`
         SELECT status FROM download_export WHERE download_export_id = ${exportId};
       `);
-      expect(exportRow.rows[0].status).to.equal(DownloadStatusEnum.READY);
+      expect(exportRow.rows[0].status).to.equal(DownloadStatusEnum.PROCESSING);
     });
   });
 });

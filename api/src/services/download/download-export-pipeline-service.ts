@@ -510,6 +510,17 @@ export class DownloadExportPipelineService extends DBService {
     const schemaLookup = await this.buildSchemaLookup();
     const featureTypes = await this.listExportFeatureTypes(download.download_id);
 
+    // Fail loud if the parent download has no Parquet artifacts — otherwise the
+    // archiver finalizes an empty zip (just the central-directory record) and the
+    // user downloads a file their OS refuses to extract. Retry-as-lifecycle: the
+    // DLQ handler transitions the export to FAILED after the pg-boss retry budget
+    // is exhausted, and the error_message is propagated to the card.
+    if (featureTypes.length === 0) {
+      throw new Error(
+        `Export ${exportId}: parent download ${download.download_id} has no Parquet artifacts to export — refusing to write an empty zip.`
+      );
+    }
+
     const maxPartSizeBytes = BigInt(exportRecord.max_part_size_bytes);
     const archiverByPart = new Map<number, PartArchiverBundle>();
     let currentPart = 1;
@@ -524,6 +535,7 @@ export class DownloadExportPipelineService extends DBService {
     // `files{N}/...` entries that never land in the zip.
     const allFileRefs: FileFeatureRef[] = [];
     const objectStorageService = new ObjectStorageService();
+    let totalChunksWritten = 0;
 
     try {
       for (const featureTypeName of featureTypes) {
@@ -556,6 +568,7 @@ export class DownloadExportPipelineService extends DBService {
           });
 
           allFileRefs.push(...result.fileRefs);
+          totalChunksWritten += result.chunksWritten;
 
           if (result.pendingReader === undefined || result.pendingCursor === undefined) {
             // Cursor drained.
@@ -591,6 +604,17 @@ export class DownloadExportPipelineService extends DBService {
           pendingCursor = result.pendingCursor;
           pendingChunkIndex = result.pendingChunkIndex;
         }
+      }
+
+      // Every discovered feature type produced zero rows — the Parquet files
+      // exist but contain no data. Fail loud rather than finalize an empty zip
+      // the user's OS will refuse to extract.
+      if (totalChunksWritten === 0) {
+        throw new Error(
+          `Export ${exportId}: every feature type resolved to zero rows (${featureTypes.join(
+            ', '
+          )}) — refusing to write an empty zip.`
+        );
       }
 
       // Finalize any still-open parts in ascending index order. Stream each
