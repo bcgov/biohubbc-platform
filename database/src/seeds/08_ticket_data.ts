@@ -408,10 +408,23 @@ const createSeedDataRequestPolicy = async (
   createUser: number,
   lifecycleStatus: 'requested' | 'reviewed' | 'approved' | 'denied'
 ): Promise<string> => {
+  const policyName = `Seed data-request policy ${seedKey}`.slice(0, 100);
+  const policyDescription = `Auto-created policy for seeded data request ${seedKey}`.slice(0, 1000);
+
+  const existing = await knex('policy')
+    .where({ name: policyName })
+    .whereNull('record_end_date')
+    .select('policy_id')
+    .first();
+
+  if (existing) {
+    return existing.policy_id;
+  }
+
   const [created] = await knex('policy')
     .insert({
-      name: `Seed data-request policy ${seedKey}`.slice(0, 100),
-      description: `Auto-created policy for seeded data request ${seedKey}`.slice(0, 1000),
+      name: policyName,
+      description: policyDescription,
       status: lifecycleStatus,
       create_user: createUser
     })

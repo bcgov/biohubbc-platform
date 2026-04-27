@@ -290,12 +290,7 @@ export class DownloadExportPipelineService extends DBService {
         const submissionFeatureId = typeof next.submission_feature_id === 'number' ? next.submission_feature_id : 0;
         const flattened = flattenFeatureBySchema(next, properties, submissionFeatureId, `files${currentPart}`);
 
-        for (const prop of artifactKeyProperties) {
-          const raw = (next[prop.feature_property_name] ?? next['file']) as string | undefined;
-          if (raw) {
-            fileRefs.push({ submissionFeatureId, filePath: raw, partIndex: currentPart });
-          }
-        }
+        fileRefs.push(...this.collectArtifactKeyRefs(next, artifactKeyProperties, submissionFeatureId, currentPart));
 
         const line = headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',') + '\n';
         const lineBytes = BigInt(Buffer.byteLength(line, 'utf8'));
@@ -349,6 +344,27 @@ export class DownloadExportPipelineService extends DBService {
       await reader.close().catch(() => undefined);
       throw error;
     }
+  }
+
+  /**
+   * Collect artifact-key file references from a single Parquet row. Extracted
+   * from the row loop so the caller's cognitive complexity stays low and so
+   * the (pure) collection rule is testable in isolation.
+   */
+  private collectArtifactKeyRefs(
+    row: Record<string, unknown>,
+    artifactKeyProperties: CsvPropertyDefinition[],
+    submissionFeatureId: number,
+    partIndex: number
+  ): FileFeatureRef[] {
+    const refs: FileFeatureRef[] = [];
+    for (const prop of artifactKeyProperties) {
+      const raw = (row[prop.feature_property_name] ?? row['file']) as string | undefined;
+      if (raw) {
+        refs.push({ submissionFeatureId, filePath: raw, partIndex });
+      }
+    }
+    return refs;
   }
 
   /**

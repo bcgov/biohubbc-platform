@@ -35,17 +35,59 @@ export class SubmissionUploadRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+    const methodLabel = 'SubmissionUploadRepository->getSubmissionUpload';
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Submission upload not found', [
-        'SubmissionUploadRepository->getSubmissionUpload',
-        { submissionUploadId }
-      ]);
+      throw new ApiNotFoundError('Submission upload not found', [methodLabel, { submissionUploadId }]);
     }
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
-        'SubmissionUploadRepository->getSubmissionUpload',
+        methodLabel,
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get and lock a single active submission_upload record by ID.
+   *
+   * Uses `FOR UPDATE` to serialize concurrent workers attempting to start
+   * process-stage work for the same submission_upload_id.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record.
+   * @returns {Promise<SubmissionUpload>} - The locked submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   */
+  async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_upload_id,
+        submission_id,
+        upload_id,
+        status,
+        ticket_id
+      FROM
+        submission_upload
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      FOR UPDATE;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+    const methodLabel = 'SubmissionUploadRepository->getSubmissionUploadWithLock';
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [methodLabel, { submissionUploadId }]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        methodLabel,
         `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
@@ -128,7 +170,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
       .where('submission_upload.submission_id', submissionId)
-      .whereNull('submission_upload.record_end_date');
+      .whereNull('submission_upload.record_end_date')
+      .whereNull('ua.record_end_date');
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -154,11 +197,13 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id
+        ticket_id,
+        status
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
-        ${submissionUpload.ticket_id}
+        ${submissionUpload.ticket_id},
+        ${submissionUpload.status}
       )
       RETURNING submission_upload_id;
     `;
@@ -193,14 +238,17 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id
+        ticket_id,
+        status
       )
       SELECT
         ${submissionId},
         ua.upload_id,
-        ${ticketId}
+        ${ticketId},
+        'uploaded'::submission_upload_job_status
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
+        AND ua.record_end_date IS NULL
       RETURNING submission_upload_id;
     `;
 

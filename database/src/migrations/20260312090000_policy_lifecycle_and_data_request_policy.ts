@@ -25,6 +25,31 @@ export async function up(knex: Knex): Promise<void> {
     ALTER TABLE data_request
       ADD COLUMN policy_id uuid;
 
+    WITH to_backfill AS (
+      SELECT
+        dr.data_request_id,
+        dr.create_user,
+        CONCAT('Data Request ', dr.data_request_id::text) AS policy_name
+      FROM data_request dr
+      WHERE dr.policy_id IS NULL
+    ),
+    inserted_policies AS (
+      INSERT INTO policy (name, description, create_user)
+      SELECT
+        tb.policy_name,
+        CONCAT('Auto-generated policy for data request ', tb.data_request_id::text),
+        tb.create_user
+      FROM to_backfill tb
+      RETURNING policy_id, name
+    )
+    UPDATE data_request dr
+    SET policy_id = ip.policy_id
+    FROM to_backfill tb
+    JOIN inserted_policies ip
+      ON ip.name = tb.policy_name
+    WHERE dr.data_request_id = tb.data_request_id
+      AND dr.policy_id IS NULL;
+
     ALTER TABLE data_request
       ADD CONSTRAINT data_request_policy_fk
       FOREIGN KEY (policy_id)

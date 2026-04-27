@@ -5,6 +5,7 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
+import { UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES } from '../constants/upload';
 import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
@@ -12,11 +13,11 @@ import { BucketType } from '../services/object-storage/object-storage-service';
 import {
   IUploadedMediaFile,
   MediaUploadContext,
-  ProcessMediaEntryOptions,
-  StreamMediaOptions,
+  StreamSubmissionArchiveOptions,
   TarNext,
   UploadMediaEntryOptions
 } from './biohub-tar-parser.interface';
+import { getLogger } from './logger';
 
 /**
  * TAR ingestion helpers for submission archives.
@@ -39,20 +40,133 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   content: z.array(z.string()),
   parent: z.string().nullable()
 });
+const defaultLog = getLogger('utils/biohub-tar-parser');
 
 /**
- * Collect all bytes from a readable stream.
+ * Collect all bytes from a readable stream with a strict max byte cap.
  *
  * @param {Readable} stream - Source stream to buffer.
+ * @param {number} maxBytes - Maximum bytes allowed before rejecting.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} [expectedBytes] - Optional tar header size; when provided, a fixed
+ * buffer is allocated up-front to avoid a temporary `Buffer.concat` copy.
  * @returns {Promise<Buffer>} Buffer containing all chunks from `stream`.
  */
-function streamToBuffer(stream: Readable): Promise<Buffer> {
+function streamToBuffer(
+  stream: Readable,
+  maxBytes: number,
+  entryName: string,
+  expectedBytes?: number
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    const hasExpectedSize =
+      typeof expectedBytes === 'number' &&
+      Number.isFinite(expectedBytes) &&
+      expectedBytes >= 0 &&
+      expectedBytes <= maxBytes;
+    const fixedBuffer = hasExpectedSize ? Buffer.allocUnsafe(expectedBytes) : undefined;
     const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
+    let totalBytes = 0;
+    let fixedBufferOffset = 0;
+    let settled = false;
+
+    // Guard against duplicate resolve/reject paths (e.g., manual destroy + error event).
+    const fail = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+
+    stream.on('data', (chunk: Buffer | string) => {
+      const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += chunkBuffer.byteLength;
+
+      if (totalBytes > maxBytes) {
+        const error = new IngestionValidationError(
+          `Archive JSON entry exceeds max size: entry=${entryName}; maxBytes=${maxBytes}`
+        );
+        fail(error);
+        stream.destroy(error);
+        return;
+      }
+
+      if (fixedBuffer) {
+        if (fixedBufferOffset + chunkBuffer.byteLength > fixedBuffer.byteLength) {
+          const error = new IngestionValidationError(
+            `Archive JSON entry size mismatch: entry=${entryName}; entrySizeBytes=${
+              fixedBuffer.byteLength
+            }; streamedBytes=${fixedBufferOffset + chunkBuffer.byteLength}`
+          );
+          fail(error);
+          stream.destroy(error);
+          return;
+        }
+
+        chunkBuffer.copy(fixedBuffer, fixedBufferOffset);
+        fixedBufferOffset += chunkBuffer.byteLength;
+        return;
+      }
+
+      chunks.push(chunkBuffer);
+    });
+
+    stream.on('end', () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+
+      if (fixedBuffer) {
+        resolve(fixedBuffer.subarray(0, fixedBufferOffset));
+        return;
+      }
+
+      resolve(Buffer.concat(chunks));
+    });
+    stream.on('error', fail);
   });
+}
+
+/**
+ * Fail fast when tar header advertises JSON entry size above configured cap.
+ *
+ * @param {number | undefined} entrySizeBytes - Declared tar header size in bytes.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} maxBytes - Maximum bytes allowed.
+ */
+function assertEntrySizeWithinLimit(entrySizeBytes: number | undefined, entryName: string, maxBytes: number): void {
+  if (typeof entrySizeBytes === 'number' && Number.isFinite(entrySizeBytes) && entrySizeBytes > maxBytes) {
+    throw new IngestionValidationError(
+      `Archive JSON entry exceeds max size: entry=${entryName}; entrySizeBytes=${entrySizeBytes}; maxBytes=${maxBytes}`
+    );
+  }
+}
+
+/**
+ * Parse one JSON tar entry with hard byte limits.
+ *
+ * Enforces two guards:
+ * - header-level check (`entrySizeBytes`) when available
+ * - streamed-byte check during buffering
+ *
+ * @param {Readable} stream - Tar entry stream.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} entrySizeBytes - Tar header declared byte size.
+ * @returns {Promise<{ parsed: unknown; byteLength: number }>} Parsed payload and buffered byte length.
+ */
+async function parseJsonArchiveEntry(
+  stream: Readable,
+  entryName: string,
+  entrySizeBytes?: number
+): Promise<{ parsed: unknown; byteLength: number }> {
+  assertEntrySizeWithinLimit(entrySizeBytes, entryName, UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES);
+  const buffer = await streamToBuffer(stream, UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES, entryName, entrySizeBytes);
+  return {
+    parsed: JSON.parse(buffer.toString('utf-8')) as unknown,
+    byteLength: buffer.byteLength
+  };
 }
 
 /**
@@ -279,317 +393,393 @@ async function uploadMediaEntry(
 }
 
 /**
- * Handle one tar entry for media ingestion.
+ * Attempt to process one `features/*.json` tar entry.
  *
- * Non-media entries are drained and skipped. Media entries (`files/*`) are uploaded and
- * `next` is called after upload completion so archive processing stays serialized.
+ * Behavior:
+ * - Returns `false` when the entry is outside `features/`, not JSON, or not a file.
+ * - Buffers and parses JSON payloads for matching entries.
+ * - Accepts either one object or an array payload and forwards each item through
+ *   `ingestFeatureEntry` so caller-owned batching/validation rules stay centralized.
+ * - Computes a per-item byte estimate from the buffered JSON payload and forwards
+ *   it so callers can enforce byte-based batch flush thresholds.
+ * - Returns `true` once the entry has been fully consumed and processed.
  *
- * @param {{ name?: string | null; type?: string | null; size?: number }} header - Tar entry header.
- * @param {Readable} stream - Tar entry data stream.
- * @param {TarNext} next - Tar continuation callback.
- * @param {(err: unknown) => void} reject - Error callback for entry processing failures.
- * @param {ProcessMediaEntryOptions} options - Upload dependencies and callbacks.
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {{
+ *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
+ * }} options
+ * Feature processing callback and dependencies.
+ * @returns {Promise<boolean>} True when the entry matched and was handled.
+ */
+async function processFeatureArchiveEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  options: {
+    ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
+  }
+): Promise<boolean> {
+  const resolvedFeatureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
+  if (!(resolvedFeatureEntryName && resolvedFeatureEntryName.endsWith('.json') && header.type === 'file')) {
+    return false;
+  }
+
+  const parsedJson = await parseJsonArchiveEntry(stream, resolvedFeatureEntryName, header.size);
+  const parsedEntries = Array.isArray(parsedJson.parsed) ? parsedJson.parsed : [parsedJson.parsed];
+  const entryBytesEstimate = Math.max(1, Math.ceil(parsedJson.byteLength / parsedEntries.length));
+
+  for (const parsedEntry of parsedEntries) {
+    await options.ingestFeatureEntry(parsedEntry, resolvedFeatureEntryName, entryBytesEstimate);
+  }
+
+  return true;
+}
+
+/**
+ * Attempt to process one `codes/*.json` tar entry.
+ *
+ * Behavior:
+ * - Returns `false` when the entry is outside `codes/`, not JSON, or not a file.
+ * - Buffers and parses the JSON payload.
+ * - Validates/transforms through `extractCodesetsFromTarballEntry`.
+ * - Persists via `ingestCodesets` and increments caller-owned counters.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {{
+ *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+ *   onCodesetFileParsed: () => void;
+ * }} options Codeset sink and side-effect callback.
+ * @returns {Promise<boolean>} True when the entry matched and was handled.
+ */
+async function processCodesArchiveEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  options: {
+    ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+    onCodesetFileParsed: () => void;
+  }
+): Promise<boolean> {
+  const resolvedCodesEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
+  if (!(resolvedCodesEntryName && resolvedCodesEntryName.endsWith('.json') && header.type === 'file')) {
+    return false;
+  }
+
+  const parsedJson = await parseJsonArchiveEntry(stream, resolvedCodesEntryName, header.size);
+  const codesets = extractCodesetsFromTarballEntry(parsedJson.parsed, resolvedCodesEntryName);
+  await options.ingestCodesets(codesets);
+  options.onCodesetFileParsed();
+  return true;
+}
+
+/**
+ * Attempt to process one `files/*` media entry with bounded concurrency.
+ *
+ * Behavior:
+ * - Returns `false` for non-media entries.
+ * - Starts upload immediately for matched entries and tracks the promise in
+ *   `inFlightMediaUploads` for lifecycle management.
+ * - Applies backpressure via `Promise.race` when in-flight uploads reach the
+ *   configured concurrency ceiling.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {(err: unknown) => void} reject Error callback for async upload failures.
+ * @param {{
+ *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+ *   s3KeyPrefix: string;
+ *   ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+ *   onUploaded: () => void;
+ *   mediaConcurrency: number;
+ *   inFlightMediaUploads: Set<Promise<void>>;
+ * }} options Media upload dependencies and tracking state.
+ * @returns {Promise<boolean>} True when the entry matched and upload was started.
+ */
+async function processConcurrentMediaArchiveEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  reject: (err: unknown) => void,
+  options: {
+    objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+    s3KeyPrefix: string;
+    ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+    onUploaded: () => void;
+    mediaConcurrency: number;
+    inFlightMediaUploads: Set<Promise<void>>;
+  }
+): Promise<boolean> {
+  const resolvedMediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
+  if (!(resolvedMediaEntryName && header.type === 'file')) {
+    return false;
+  }
+
+  const context = buildMediaUploadContext(resolvedMediaEntryName, options.s3KeyPrefix, header.size ?? 0);
+  const uploadPromise = uploadMediaEntry(stream, context, {
+    objectStorageService: options.objectStorageService,
+    ingestMediaFile: options.ingestMediaFile,
+    onUploaded: options.onUploaded
+  });
+
+  options.inFlightMediaUploads.add(uploadPromise);
+  uploadPromise.finally(() => options.inFlightMediaUploads.delete(uploadPromise)).catch(reject);
+
+  if (options.inFlightMediaUploads.size >= options.mediaConcurrency) {
+    await Promise.race(options.inFlightMediaUploads);
+  }
+
+  return true;
+}
+
+/**
+ * Route one tar entry through feature, codeset, and media handlers.
+ *
+ * Processing order is intentional:
+ * 1. Directories are drained and skipped.
+ * 2. Feature JSON entries are processed first.
+ * 3. Codeset JSON entries are processed second.
+ * 4. Media file entries are uploaded last with concurrency bounds.
+ * 5. Everything else is drained and ignored.
+ *
+ * This function is responsible for always calling `next()` exactly once per entry.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {TarNext} next Tar continuation callback.
+ * @param {(err: unknown) => void} reject Error callback for asynchronous failures.
+ * @param {{
+ *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
+ *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+ *   onCodesetFileParsed: () => void;
+ *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+ *   s3KeyPrefix: string;
+ *   ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+ *   onUploaded: () => void;
+ *   mediaConcurrency: number;
+ *   inFlightMediaUploads: Set<Promise<void>>;
+ * }} options Entry handlers and shared processing state.
  * @returns {Promise<void>}
  */
-async function processMediaEntry(
+async function processSubmissionArchiveEntry(
   header: { name?: string | null; type?: string | null; size?: number },
   stream: Readable,
   next: TarNext,
   reject: (err: unknown) => void,
-  options: ProcessMediaEntryOptions
+  options: {
+    ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
+    ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+    onCodesetFileParsed: () => void;
+    objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+    s3KeyPrefix: string;
+    ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+    onUploaded: () => void;
+    mediaConcurrency: number;
+    inFlightMediaUploads: Set<Promise<void>>;
+  }
 ): Promise<void> {
-  const { objectStorageService, s3KeyPrefix, ingestMediaFile, onUploaded } = options;
-  const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'files');
-  if (!(resolvedEntryName && header.type === 'file')) {
+  if (header.type === 'directory') {
     await drainStream(stream);
     next();
     return;
   }
 
-  const context = buildMediaUploadContext(resolvedEntryName, s3KeyPrefix, header.size ?? 0);
+  if (
+    await processFeatureArchiveEntry(header, stream, {
+      ingestFeatureEntry: options.ingestFeatureEntry
+    })
+  ) {
+    next();
+    return;
+  }
 
-  uploadMediaEntry(stream, context, { objectStorageService, ingestMediaFile, onUploaded }).then(next).catch(reject);
+  if (
+    await processCodesArchiveEntry(header, stream, {
+      ingestCodesets: options.ingestCodesets,
+      onCodesetFileParsed: options.onCodesetFileParsed
+    })
+  ) {
+    next();
+    return;
+  }
+
+  if (
+    await processConcurrentMediaArchiveEntry(header, stream, reject, {
+      objectStorageService: options.objectStorageService,
+      s3KeyPrefix: options.s3KeyPrefix,
+      ingestMediaFile: options.ingestMediaFile,
+      onUploaded: options.onUploaded,
+      mediaConcurrency: options.mediaConcurrency,
+      inFlightMediaUploads: options.inFlightMediaUploads
+    })
+  ) {
+    next();
+    return;
+  }
+
+  await drainStream(stream);
+  next();
 }
 
 /**
- * Stream features from a TAR archive and emit fixed-size flattened batches.
+ * Stream a submission archive once and persist media, codesets, and features.
  *
  * Processing rules:
- * - Only `features/*.json` file entries are parsed.
- * - Non-feature entries are drained and ignored so extraction can continue.
- * - Each parsed entry may be a single object or an array of objects.
- * - Objects are validated against `IFlattenedBlock` shape (shallow validation only).
- * - Valid objects are buffered into `batchSize` chunks and sent to `ingestFeatureBatch`.
+ * - `features/*.json` are parsed and batched to `ingestFeatureBatch`.
+ *   Batching is bounded by both `featureBatchSize` and `featureMaxBatchBytes`.
+ * - `codes/*.json` are parsed and sent to `ingestCodesets`.
+ * - `files/*` entries are streamed to object storage and batched to `ingestMediaBatch`.
+ * - Function resolves only after all in-flight media uploads complete and all
+ *   pending feature/media batches have been flushed.
  *
- * Error behavior:
- * - Invalid JSON rejects the stream.
- * - Schema validation rejects with `IngestionValidationError`.
- * - Any error thrown by `ingestFeatureBatch` rejects the stream.
- *
- * Usage contract:
- * - Caller is responsible for transactional behavior and persistence inside `ingestFeatureBatch`.
- * - `batchSize` should be > 0; very small values increase callback overhead.
- *
- * @param {Readable} inputStream - Tar archive stream.
- * @param {number} batchSize - Max features per callback invocation.
- * @param {(blocks: IFlattenedBlock[]) => Promise<void>} ingestFeatureBatch - Async sink for parsed feature batches.
- * @returns {Promise<{ featureCount: number }>} Count of parsed feature objects.
- * @throws {Error} When JSON parsing, shallow validation, or callback processing fails.
+ * @param {Readable} inputStream
+ * @param {StreamSubmissionArchiveOptions} options
+ * @returns {Promise<{ featureCount: number; uploadedCount: number; codesetFileCount: number }>}
  */
-export async function streamFeatures(
+export async function streamSubmissionArchive(
   inputStream: Readable,
-  batchSize: number,
-  ingestFeatureBatch: (blocks: IFlattenedBlock[]) => Promise<void>
-): Promise<{ featureCount: number }> {
-  if (batchSize < 1) {
-    throw new Error('batchSize must be greater than 0');
+  options: StreamSubmissionArchiveOptions
+): Promise<{ featureCount: number; uploadedCount: number; codesetFileCount: number }> {
+  const {
+    objectStorageService,
+    s3KeyPrefix,
+    featureBatchSize,
+    featureMaxBatchBytes,
+    mediaBatchSize,
+    mediaMaxBatchBytes,
+    mediaConcurrency,
+    ingestFeatureBatch,
+    ingestCodesets,
+    ingestMediaBatch
+  } = options;
+
+  if (featureBatchSize < 1) {
+    throw new Error('featureBatchSize must be greater than 0');
+  }
+  if (featureMaxBatchBytes < 1) {
+    throw new Error('featureMaxBatchBytes must be greater than 0');
+  }
+  if (mediaBatchSize < 1) {
+    throw new Error('mediaBatchSize must be greater than 0');
+  }
+  if (mediaMaxBatchBytes < 1) {
+    throw new Error('mediaMaxBatchBytes must be greater than 0');
+  }
+  if (mediaConcurrency < 1) {
+    throw new Error('mediaConcurrency must be greater than 0');
   }
 
   const extract = tar.extract();
+
   let featureCount = 0;
-  let pendingBlocks: IFlattenedBlock[] = [];
+  let uploadedCount = 0;
+  let codesetFileCount = 0;
+  let mediaStateQueue: Promise<void> = Promise.resolve();
+  let pendingFeatureBlocks: IFlattenedBlock[] = [];
+  // Byte estimate (derived from parsed JSON payload size) used to bound feature
+  // batch memory in addition to feature count.
+  let pendingFeatureBytes = 0;
+  let pendingUploadedFiles: IUploadedMediaFile[] = [];
+  let pendingUploadedBytes = 0;
+  const inFlightMediaUploads = new Set<Promise<void>>();
 
   /**
-   * Flush buffered feature blocks through the caller callback.
+   * Flush buffered feature blocks to caller persistence callback.
    */
-  const flushPending = async (): Promise<void> => {
-    if (!pendingBlocks.length) {
+  const flushPendingFeatures = async (): Promise<void> => {
+    if (!pendingFeatureBlocks.length) {
       return;
     }
 
-    const currentBlocks = pendingBlocks;
-    pendingBlocks = [];
+    const currentBlocks = pendingFeatureBlocks;
+    pendingFeatureBlocks = [];
+    pendingFeatureBytes = 0;
     await ingestFeatureBatch(currentBlocks);
   };
 
-  let rejectEntryPromise: (err: unknown) => void;
-  const entryPromise = new Promise<void>((resolve, reject) => {
-    rejectEntryPromise = reject;
-
-    extract.on('entry', async (header, stream, next) => {
-      try {
-        if (header.type === 'directory') {
-          await drainStream(stream);
-          next();
-          return;
-        }
-
-        const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'features');
-        if (!(resolvedEntryName && resolvedEntryName.endsWith('.json') && header.type === 'file')) {
-          await drainStream(stream);
-          next();
-          return;
-        }
-
-        const buffer = await streamToBuffer(stream);
-        const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
-
-        for (const parsedEntry of parsedEntries) {
-          const block = extractFeatureFromTarballEntry(parsedEntry, resolvedEntryName);
-          pendingBlocks.push(block);
-          featureCount += 1;
-
-          if (pendingBlocks.length >= batchSize) {
-            await flushPending();
-          }
-        }
-
-        next();
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    extract.on('finish', async () => {
-      try {
-        await flushPending();
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    });
-    extract.on('error', reject);
-  });
-
-  pipeline(inputStream, extract).catch((error) => {
-    rejectEntryPromise(error);
-  });
-
-  await entryPromise;
-  return { featureCount };
-}
-
-/**
- * Stream codesets from a TAR archive and emit each parsed file payload.
- *
- * Processing rules:
- * - Only `codes/*.json` file entries are parsed.
- * - Each codes file is parsed and validated independently.
- * - Non-codes entries are drained and ignored.
- *
- * Error behavior:
- * - Invalid JSON rejects the stream.
- * - Schema validation rejects with `IngestionValidationError`.
- * - Any error thrown by `ingestCodesets` rejects the stream.
- *
- * Usage contract:
- * - Caller handles persistence/merge strategy for each parsed codes payload.
- *
- * @param {Readable} inputStream - Tar archive stream.
- * @param {(codesets: TarCodesets) => Promise<void>} ingestCodesets - Async sink for each parsed codeset file.
- * @returns {Promise<void>}
- * @throws {Error} When JSON parsing, validation, or callback processing fails.
- */
-export async function streamCodesets(
-  inputStream: Readable,
-  ingestCodesets: (codesets: TarCodesets) => Promise<void>
-): Promise<void> {
-  const extract = tar.extract();
-
-  let rejectEntryPromise: (err: unknown) => void;
-  const entryPromise = new Promise<void>((resolve, reject) => {
-    rejectEntryPromise = reject;
-
-    extract.on('entry', async (header, stream, next) => {
-      try {
-        if (header.type === 'directory') {
-          await drainStream(stream);
-          next();
-          return;
-        }
-
-        const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
-        if (!(resolvedEntryName && resolvedEntryName.endsWith('.json') && header.type === 'file')) {
-          await drainStream(stream);
-          next();
-          return;
-        }
-
-        const buffer = await streamToBuffer(stream);
-        const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const codesets = extractCodesetsFromTarballEntry(parsed, resolvedEntryName);
-
-        await ingestCodesets(codesets);
-        next();
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    extract.on('finish', resolve);
-    extract.on('error', reject);
-  });
-
-  pipeline(inputStream, extract).catch((error) => {
-    rejectEntryPromise(error);
-  });
-
-  await entryPromise;
-}
-
-/**
- * Stream media files from a TAR archive to object storage.
- * Non-media entries are skipped.
- *
- * Processing rules:
- * - Only `files/*` file entries are uploaded.
- * - Uploads are intentionally serialized (one active upload at a time).
- * - SHA-256 is computed while streaming to storage (no duplicate full buffering).
- * - Relative archive path under `files/` is preserved in the stored object key.
- *
- * For each uploaded file, metadata is generated:
- * - `fileName`: basename of the archive path
- * - `path`: archive-relative path under `files/`
- * - `s3Key`: `${s3KeyPrefix}/${path}`
- * - `byteSize`: tar header size
- * - `checksumSha256`: streaming digest of uploaded bytes
- *
- * Error behavior:
- * - Upload failures reject the stream.
- * - Any error thrown by `ingestMediaBatch` rejects the stream.
- *
- * @param {Readable} inputStream - Tar archive stream.
- * @param {StreamMediaOptions} options - Media stream dependencies and batching thresholds.
- * @returns {Promise<{ uploadedCount: number }>} Count of uploaded media files.
- * @throws {Error} When stream processing, upload, or callback processing fails.
- */
-export async function streamMedia(
-  inputStream: Readable,
-  options: StreamMediaOptions
-): Promise<{ uploadedCount: number }> {
-  const { objectStorageService, s3KeyPrefix, batchSize, maxBatchBytes, ingestMediaBatch } = options;
-
-  if (batchSize < 1) {
-    throw new Error('batchSize must be greater than 0');
-  }
-  if (maxBatchBytes < 1) {
-    throw new Error('maxBatchBytes must be greater than 0');
-  }
-
-  const extract = tar.extract();
-  let uploadedCount = 0;
-  let pendingUploadedFiles: IUploadedMediaFile[] = [];
-  let pendingUploadedBytes = 0;
-
-  const onUploaded = (): void => {
-    uploadedCount += 1;
-  };
-
-  const shouldFlush = (): boolean => {
-    return pendingUploadedFiles.length >= batchSize || pendingUploadedBytes >= maxBatchBytes;
-  };
-
   /**
-   * Flush buffered uploaded media records through the caller callback.
+   * Flush buffered media metadata rows to caller persistence callback.
    */
-  const flushPending = async (): Promise<void> => {
-    if (!pendingUploadedFiles.length) {
+  const flushPendingMedia = async (): Promise<void> => {
+    const hasPendingMedia = pendingUploadedFiles.length > 0;
+    if (!hasPendingMedia) {
       return;
     }
 
-    const currentBatch = pendingUploadedFiles;
-    pendingUploadedFiles = [];
+    const currentBatch = pendingUploadedFiles.splice(0, pendingUploadedFiles.length);
     pendingUploadedBytes = 0;
     await ingestMediaBatch(currentBatch);
   };
 
   /**
-   * Queue one uploaded media file and flush when thresholds are reached.
+   * Serialize media metadata buffering and threshold-based flushes.
    *
-   * @param {IUploadedMediaFile} uploadedFile
-   * @returns {Promise<void>}
+   * Upload completion callbacks may resolve concurrently; this queue ensures
+   * shared mutable state (`pendingUploadedFiles`, `pendingUploadedBytes`) is
+   * mutated in one logical write stream.
    */
-  const ingestMediaFile = async (uploadedFile: IUploadedMediaFile): Promise<void> => {
-    pendingUploadedFiles.push(uploadedFile);
-    pendingUploadedBytes += uploadedFile.byteSize;
+  const enqueueUploadedMediaFile = (uploadedFile: IUploadedMediaFile): Promise<void> => {
+    const nextWrite = mediaStateQueue.then(async () => {
+      pendingUploadedFiles.push(uploadedFile);
+      pendingUploadedBytes += uploadedFile.byteSize;
 
-    if (shouldFlush()) {
-      await flushPending();
-    }
+      if (pendingUploadedFiles.length >= mediaBatchSize || pendingUploadedBytes >= mediaMaxBatchBytes) {
+        await flushPendingMedia();
+      }
+    });
+
+    mediaStateQueue = nextWrite.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return nextWrite;
   };
 
   let rejectEntryPromise: (err: unknown) => void;
-
   const entryPromise = new Promise<void>((resolve, reject) => {
     rejectEntryPromise = reject;
 
-    extract.on('entry', async (header, stream, next) => {
-      try {
-        await processMediaEntry(header, stream, next, reject, {
-          objectStorageService,
-          s3KeyPrefix,
-          ingestMediaFile,
-          onUploaded
-        });
-      } catch (err) {
-        reject(err);
-      }
+    extract.on('entry', (header, stream, next) => {
+      processSubmissionArchiveEntry(header, stream, next, reject, {
+        ingestFeatureEntry: async (entryValue, entryName, entryBytesEstimate) => {
+          const block = extractFeatureFromTarballEntry(entryValue, entryName);
+          pendingFeatureBlocks.push(block);
+          // Estimate, not exact retained heap size; sufficient for consistent flush gating.
+          pendingFeatureBytes += entryBytesEstimate;
+          featureCount += 1;
+          if (pendingFeatureBlocks.length >= featureBatchSize || pendingFeatureBytes >= featureMaxBatchBytes) {
+            await flushPendingFeatures();
+          }
+        },
+        ingestCodesets,
+        onCodesetFileParsed: () => {
+          codesetFileCount += 1;
+        },
+        objectStorageService,
+        s3KeyPrefix,
+        ingestMediaFile: enqueueUploadedMediaFile,
+        onUploaded: () => {
+          uploadedCount += 1;
+        },
+        mediaConcurrency,
+        inFlightMediaUploads
+      }).catch(reject);
     });
 
     extract.on('finish', async () => {
       try {
-        await flushPending();
+        // Wait for uploads and serialized media queue before final flushes so no
+        // late-arriving media rows are dropped.
+        await Promise.all(inFlightMediaUploads);
+        await mediaStateQueue;
+        await flushPendingFeatures();
+        await flushPendingMedia();
+        defaultLog.debug({
+          label: 'streamSubmissionArchive',
+          message: 'Completed archive stream',
+          uploadedCount,
+          featureCount,
+          codesetFileCount
+        });
         resolve();
       } catch (error) {
         reject(error);
@@ -598,14 +788,11 @@ export async function streamMedia(
     extract.on('error', reject);
   });
 
-  // Pipe input into the tar extractor. Forward pipeline errors to the entry
-  // promise — if inputStream fails before any entries are emitted, the extract
-  // 'error' event may not fire and entryPromise would hang indefinitely.
-  pipeline(inputStream, extract).catch((err) => {
-    rejectEntryPromise(err);
+  pipeline(inputStream, extract).catch((error) => {
+    rejectEntryPromise(error);
   });
 
   await entryPromise;
 
-  return { uploadedCount };
+  return { featureCount, uploadedCount, codesetFileCount };
 }

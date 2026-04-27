@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { TicketWithHistorySchema } from '../../../openapi/schemas/ticket';
@@ -10,8 +11,14 @@ import { getLogger } from '../../../utils/logger';
 const defaultLog = getLogger('paths/administrative/tickets/{ticketId}');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'SystemUser' }]
+  authorizeRequestHandler((req) => ({
+    or: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      },
+      { discriminator: 'Team', entity: 'ticket', ticketId: req.params.ticketId }
+    ]
   })),
   getTicketForUser()
 ];
