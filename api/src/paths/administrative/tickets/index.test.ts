@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { Ticket } from '../../../models/ticket';
 import { TicketService } from '../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { createTicket, getTickets } from './index';
 
 chai.use(sinonChai);
@@ -31,7 +31,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(TicketService.prototype, 'createTicket').resolves(mockTicket);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -49,7 +49,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(21);
 
@@ -92,7 +92,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
 

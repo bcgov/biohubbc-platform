@@ -25,7 +25,8 @@ export class UploadArtifactRepository extends BaseRepository {
       FROM
         upload_artifact
       WHERE
-        upload_artifact_id = ${uploadArtifactId};
+        upload_artifact_id = ${uploadArtifactId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
@@ -62,48 +63,13 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_archive_id,
         path
       FROM
-        upload_artifact;
+        upload_artifact
+      WHERE
+        record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
     return response.rows;
-  }
-
-  /**
-   * Insert a new upload artifact into the database.
-   *
-   * @param {CreateUploadArtifact} uploadArtifact - The upload artifact data to insert.
-   * @returns {Promise<{ upload_artifact_id: string }>} - The inserted upload artifact ID.
-   * @throws {ApiExecuteSQLError} - Throws an error if the insertion fails.
-   */
-  async insertUploadArtifact(uploadArtifact: CreateUploadArtifact): Promise<{ upload_artifact_id: string }> {
-    const sqlStatement = SQL`
-      INSERT INTO upload_artifact (
-        upload_id,
-        artifact_id,
-        role,
-        upload_archive_id,
-        path
-      ) VALUES (
-        ${uploadArtifact.upload_id},
-        ${uploadArtifact.artifact_id},
-        ${uploadArtifact.role},
-        ${uploadArtifact.upload_archive_id},
-        ${uploadArtifact.path ?? null}
-      )
-      RETURNING upload_artifact_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert upload artifact record', [
-        'UploadArtifactRepository->insertUploadArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
-    }
-
-    return response.rows[0];
   }
 
   /**
@@ -140,6 +106,13 @@ export class UploadArtifactRepository extends BaseRepository {
         ${uploadArchiveIds}::uuid[],
         ${paths}::text[]
       )
+      ON CONFLICT (upload_id, artifact_id)
+      WHERE record_end_date IS NULL
+      DO UPDATE SET
+        role = EXCLUDED.role,
+        upload_archive_id = EXCLUDED.upload_archive_id,
+        path = EXCLUDED.path,
+        record_end_date = NULL
       RETURNING upload_artifact_id;
     `;
 
@@ -153,6 +126,28 @@ export class UploadArtifactRepository extends BaseRepository {
     }
 
     return response.rows;
+  }
+
+  /**
+   * Soft-delete active upload_artifact rows for one upload.
+   *
+   * Used as pre-ingest idempotency cleanup to avoid uniqueness conflicts when
+   * reprocessing the same upload.
+   *
+   * @param {string} uploadId
+   * @returns {Promise<void>}
+   * @memberof UploadArtifactRepository
+   */
+  async deleteUploadArtifactsByUploadId(uploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE upload_artifact
+      SET
+        record_end_date = NOW()
+      WHERE upload_id = ${uploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 
   /**
@@ -177,6 +172,7 @@ export class UploadArtifactRepository extends BaseRepository {
         path = COALESCE(${uploadArtifact.path ?? null}, path)
       WHERE
         upload_artifact_id = ${uploadArtifactId}
+        AND record_end_date IS NULL
       RETURNING upload_artifact_id;
     `;
 

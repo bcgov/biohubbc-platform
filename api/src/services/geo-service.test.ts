@@ -1,9 +1,16 @@
-import axios from 'axios';
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { BcgwEnvRegionsLayer, BcgwNrmRegionsLayer } from './bcgw-layer-service';
-import { Epsg3005, GeoService, WebFeatureService, WebMapService, Wfs, Wms } from './geo-service';
+import {
+  Epsg3005,
+  GeoService,
+  WebFeatureService,
+  WebMapService,
+  Wfs,
+  Wms,
+  geoServiceDependencies
+} from './geo-service';
 
 chai.use(sinonChai);
 
@@ -51,7 +58,7 @@ describe('GeoService', () => {
     it('makes a get request', async () => {
       const mockAxiosResponse = { data: 'mockData' };
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(geoServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const geoService = new GeoService({ baseUrl: 'www.baseurl.com/ows' });
 
@@ -66,7 +73,7 @@ describe('GeoService', () => {
     it('makes a post request', async () => {
       const mockAxiosResponse = { data: 'mockData' };
 
-      const axiosStub = sinon.stub(axios, 'post').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(geoServiceDependencies, 'post').resolves(mockAxiosResponse);
 
       const geoService = new GeoService({ baseUrl: 'www.baseurl.com/ows' });
 

@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getSubmissionUploadStatus } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { SubmissionUploadStatus } from '../../../../../models/submission-upload-status';
 import { SubmissionUploadStatusService } from '../../../../../services/submission-upload-status-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -22,7 +22,7 @@ describe('getSubmissionUploadStatus', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionId: '1' };
@@ -45,7 +45,7 @@ describe('getSubmissionUploadStatus', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const submissionId = 123;
 

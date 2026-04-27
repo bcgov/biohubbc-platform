@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
+import { GeoJSONFeatureCollectionZodSchema, GeoJSONGeometryZodSchema } from '../zod-schema/geoJsonZodSchema';
 
 // Searchable record schemas
 const SearchableRecord = z.object({
@@ -31,7 +31,7 @@ export const StringSearchableRecord = SearchableRecord.extend({
 
 export const SpatialSearchableRecord = SearchableRecord.extend({
   search_spatial_id: z.number(),
-  value: z.any() // GeoJSON
+  value: GeoJSONGeometryZodSchema
 });
 
 export const InsertDatetimeSearchableRecord = DatetimeSearchableRecord.pick(InsertSearchableRecordKeys);

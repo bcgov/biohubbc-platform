@@ -2,11 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { ArtifactService } from '../../services/old-artifact-service';
-import * as keycloakUtils from '../../utils/keycloak-utils';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
-import { deleteArtifact } from './delete';
+import * as path from './delete';
 
 chai.use(sinonChai);
 
@@ -18,14 +17,14 @@ describe('delete artifact', () => {
 
     it('catches and throws error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(path.deleteArtifactDependencies, 'getServiceClientSystemUser').returns(null);
       sinon.stub(ArtifactService.prototype, 'deleteArtifacts').throws('There was an issue deleting an artifact.');
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         artifactUUIDs: ['ff84ecfc-046e-4cac-af59-a597047ce63d']
       };
-      const requestHandler = deleteArtifact();
+      const requestHandler = path.deleteArtifact();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -39,14 +38,14 @@ describe('delete artifact', () => {
 
     it('responds with proper data', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(path.deleteArtifactDependencies, 'getServiceClientSystemUser').returns(null);
       sinon.stub(ArtifactService.prototype, 'deleteArtifacts').resolves();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         artifactUUIDs: ['ff84ecfc-046e-4cac-af59-a597047ce63d']
       };
-      const requestHandler = deleteArtifact();
+      const requestHandler = path.deleteArtifact();
 
       await requestHandler(mockReq, mockRes, mockNext);
       expect(dbConnectionObj.release).to.have.been.calledOnce;

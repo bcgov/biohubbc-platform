@@ -1,8 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import * as pgBossConfig from './pg-boss-config';
-import { getPgBoss, stopPgBoss } from './pg-boss-service';
+import { getPgBoss, pgBossDependencies, stopPgBoss } from './pg-boss-service';
 
 describe('pg-boss-service', () => {
   afterEach(() => {
@@ -35,11 +34,11 @@ describe('pg-boss-service', () => {
         schema: 'pgboss'
       };
 
-      sinon.stub(pgBossConfig, 'getPgBossConfig').returns(mockConfig);
+      sinon.stub(pgBossDependencies, 'getPgBossConfig').returns(mockConfig);
 
       // We can't easily test initPgBoss without a real database
       // This test verifies the config is fetched correctly
-      expect(pgBossConfig.getPgBossConfig()).to.deep.equal(mockConfig);
+      expect(pgBossDependencies.getPgBossConfig()).to.deep.equal(mockConfig);
     });
   });
 

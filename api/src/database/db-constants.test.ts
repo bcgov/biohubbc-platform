@@ -3,10 +3,9 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon, { SinonStub } from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SystemUser } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
-import * as db from './db';
-import { getDBConstants, initDBConstants } from './db-constants';
+import { SystemUser } from '../repositories/user-repository';
+import { dbConstantsDependencies, getDBConstants, initDBConstants } from './db-constants';
 
 chai.use(sinonChai);
 
@@ -18,7 +17,11 @@ describe('db-constants', () => {
   describe('when db constants has not been initialized', () => {
     describe('initDBConstants', () => {
       it('catches and re-throws an error', async () => {
-        const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').throws(new Error('test error'));
+        const getAPIUserDBConnectionStub = sinon
+          .stub(dbConstantsDependencies, 'getAPIUserDBConnection')
+          .resolves(() => {
+            throw new Error('test error');
+          });
 
         try {
           await initDBConstants();
@@ -45,8 +48,8 @@ describe('db-constants', () => {
   });
 
   describe('when db constants has been initialized', () => {
-    let dbConnectionObj: db.IDBConnection;
-    let getAPIUserDBConnectionStub: SinonStub<[], db.IDBConnection>;
+    let dbConnectionObj: import('./db').IDBConnection;
+    let getAPIUserDBConnectionStub: SinonStub;
 
     before(async () => {
       const mockQueryResponse = {
@@ -75,7 +78,9 @@ describe('db-constants', () => {
         sql: sinon.stub().resolves(mockQueryResponse)
       });
 
-      getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      getAPIUserDBConnectionStub = sinon
+        .stub(dbConstantsDependencies, 'getAPIUserDBConnection')
+        .resolves(() => dbConnectionObj);
 
       await initDBConstants();
     });

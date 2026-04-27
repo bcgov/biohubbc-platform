@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import * as db from '../../../../../../database/db';
 import { TicketComment } from '../../../../../../models/ticket-comment';
 import { TicketCommentService } from '../../../../../../services/ticket-comment-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import { deleteTicketComment, updateTicketComment } from './index';
 
 chai.use(sinonChai);
@@ -23,7 +23,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const updatedComment: TicketComment = {
       ticket_comment_id: ticketCommentId,
@@ -58,7 +58,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketCommentByTicketId').resolves();
 

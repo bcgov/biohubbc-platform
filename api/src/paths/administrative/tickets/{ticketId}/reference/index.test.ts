@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { TicketReference } from '../../../../../models/ticket-reference';
 import { TicketService } from '../../../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTicketReference } from './index';
 
 chai.use(sinonChai);
@@ -38,7 +38,7 @@ describe('paths/administrative/tickets/{ticketId}/reference', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createReferenceStub = sinon
       .stub(TicketService.prototype, 'createTicketReference')
       .resolves(createdReferences);

@@ -81,6 +81,8 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         SELECT 1 FROM ancestor_chain ac
         JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+        JOIN team t ON t.team_id = tss.team_id
+          AND t.record_end_date IS NULL
         JOIN team_member tm ON tm.team_id = tss.team_id
           AND tm.system_user_id = ?  -- bound by caller
           AND tm.record_end_date IS NULL

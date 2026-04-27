@@ -41,6 +41,16 @@ export class UploadIngestionService extends DBService {
   ticketService = new TicketService(this.connection);
 
   /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    publishMalwareScanJob,
+    generateMultipartUploadPresignedUrls,
+    getSecurityS3Client,
+    getSecurityObjectStoreBucketName
+  };
+
+  /**
    * Create a new archive upload along with a new submission record.
    *
    * @param {number} bytes
@@ -114,7 +124,8 @@ export class UploadIngestionService extends DBService {
     const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload({
       submission_id: submissionId,
       upload_id,
-      ticket_id: ticket.ticket_id
+      ticket_id: ticket.ticket_id,
+      status: 'uploaded'
     });
 
     // 4. Create initial review status (submitted = unreviewed)
@@ -147,7 +158,7 @@ export class UploadIngestionService extends DBService {
       uploadId: s3UploadId,
       presignedUrls,
       partCount
-    } = await generateMultipartUploadPresignedUrls({
+    } = await UploadIngestionService.dependencies.generateMultipartUploadPresignedUrls({
       key,
       contentType: 'application/x-tar',
       bytes
@@ -206,10 +217,10 @@ export class UploadIngestionService extends DBService {
     ]);
 
     // 6. Complete the multipart upload in the security bucket
-    const s3Client = getSecurityS3Client();
+    const s3Client = UploadIngestionService.dependencies.getSecurityS3Client();
     await s3Client.send(
       new CompleteMultipartUploadCommand({
-        Bucket: getSecurityObjectStoreBucketName(),
+        Bucket: UploadIngestionService.dependencies.getSecurityObjectStoreBucketName(),
         Key: key,
         UploadId: s3UploadId,
         MultipartUpload: { Parts: parts }
@@ -219,7 +230,9 @@ export class UploadIngestionService extends DBService {
     // 7. Publish malware scan jobs for each artifact_security record
     await Promise.all(
       securityRecords.map((record) =>
-        publishMalwareScanJob(this.connection, { artifactSecurityId: record.artifact_security_id })
+        UploadIngestionService.dependencies.publishMalwareScanJob(this.connection, {
+          artifactSecurityId: record.artifact_security_id
+        })
       )
     );
   }

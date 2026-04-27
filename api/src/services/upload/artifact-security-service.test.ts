@@ -2,16 +2,14 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Readable } from 'stream';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { UploadArchive } from '../../models/upload-archive';
-import * as publisher from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
-import * as fileUtils from '../../utils/file-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ArtifactSecurityService } from './artifact-security-service';
@@ -288,7 +286,7 @@ describe('ArtifactSecurityService', () => {
         .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.INFECTED });
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
-      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').resolves({
         scanStream: sinon.stub().resolves({ isInfected: true, viruses: ['TestVirus'] })
       } as any);
 
@@ -322,7 +320,7 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
 
       // KEY INPUT: ClamAV says infected
-      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').resolves({
         scanStream: sinon.stub().resolves({ isInfected: true, viruses: ['TestVirus'] })
       } as any);
 
@@ -361,7 +359,7 @@ describe('ArtifactSecurityService', () => {
         .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.CLEAN });
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
-      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').resolves({
         scanStream: sinon.stub().resolves({ isInfected: false })
       } as any);
 
@@ -374,11 +372,11 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 123,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
       const publishStub = sinon
-        .stub(publisher, 'publishProcessSubmissionFeaturesJob')
+        .stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.executeScan('security-1');
@@ -390,7 +388,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 123,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
     });
@@ -408,7 +406,7 @@ describe('ArtifactSecurityService', () => {
         .resolves({ artifact_security_scan_id: 'scan-1' });
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
-      sinon.stub(fileUtils, '_getClamAvScanner').rejects(testError);
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').rejects(testError);
 
       try {
         await service.executeScan('security-1');
@@ -455,7 +453,7 @@ describe('ArtifactSecurityService', () => {
         .resolves({ artifact_security_scan_id: 'scan-1' });
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
-      sinon.stub(fileUtils, '_getClamAvScanner').rejects(testError);
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').rejects(testError);
 
       try {
         await service.executeScan('security-1');
@@ -529,11 +527,11 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '22222222-2222-2222-2222-222222222222'
       });
       const publishStub = sinon
-        .stub(publisher, 'publishProcessSubmissionFeaturesJob')
+        .stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.publishNextPipelineStep(mockUploadArchive);
@@ -544,7 +542,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '22222222-2222-2222-2222-222222222222'
       });
     });

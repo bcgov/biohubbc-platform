@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createPolicy, getPolicies } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { PolicyEffect } from '../../../models/policy-statement';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { PolicyWithStatements } from '../../../services/access-policy/policy-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -25,7 +25,7 @@ describe('paths/administrative/policies/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -46,13 +46,14 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockPolicies = [
         {
           policy_id: '1',
           name: 'Test Policy',
           description: 'Test description',
+          status: 'approved' as const,
           statements: []
         }
       ];
@@ -98,7 +99,7 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getPoliciesWithStatementsStub = sinon
         .stub(PolicyService.prototype, 'getPoliciesWithStatements')
@@ -141,12 +142,12 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockPoliciesResponse = {
         policies: [
-          { policy_id: '1', name: 'Alpha Policy', description: null, statements: [] },
-          { policy_id: '2', name: 'Beta Policy', description: null, statements: [] }
+          { policy_id: '1', name: 'Alpha Policy', description: null, status: 'approved' as const, statements: [] },
+          { policy_id: '2', name: 'Beta Policy', description: null, status: 'approved' as const, statements: [] }
         ],
         pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'asc' as const }
       };
@@ -190,12 +191,12 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockPoliciesResponse = {
         policies: [
-          { policy_id: '2', name: 'Zebra Policy', description: null, statements: [] },
-          { policy_id: '1', name: 'Alpha Policy', description: null, statements: [] }
+          { policy_id: '2', name: 'Zebra Policy', description: null, status: 'approved' as const, statements: [] },
+          { policy_id: '1', name: 'Alpha Policy', description: null, status: 'approved' as const, statements: [] }
         ],
         pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'desc' as const }
       };
@@ -241,7 +242,7 @@ describe('paths/administrative/policies/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -262,12 +263,13 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockCreatedPolicy: PolicyWithStatements = {
         policy_id: '1',
         name: 'New Policy',
         description: 'New description',
+        status: 'approved',
         statements: [
           {
             policy_statement_id: 's1',
@@ -301,7 +303,7 @@ describe('paths/administrative/policies/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(createPolicyWithStatementsStub).to.have.been.calledOnceWith(
-        { name: 'New Policy', description: 'New description' },
+        { name: 'New Policy', description: 'New description', status: 'requested' },
         [{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }]
       );
       expect(mockRes.statusValue).to.equal(201);
@@ -315,12 +317,13 @@ describe('paths/administrative/policies/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockCreatedPolicy: PolicyWithStatements = {
         policy_id: '1',
         name: 'Empty Policy',
         description: null,
+        status: 'approved',
         statements: []
       };
 
@@ -340,7 +343,7 @@ describe('paths/administrative/policies/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(createPolicyWithStatementsStub).to.have.been.calledOnceWith(
-        { name: 'Empty Policy', description: undefined },
+        { name: 'Empty Policy', description: undefined, status: 'requested' },
         []
       );
       expect(mockRes.statusValue).to.equal(201);

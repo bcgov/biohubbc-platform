@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import {
   CreateTeamMember,
   TeamMember,
@@ -10,7 +11,6 @@ import {
   UpdateTeamMember
 } from '../../models/team-member';
 import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';
 
 chai.use(sinonChai);

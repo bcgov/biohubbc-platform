@@ -9,6 +9,15 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/delete');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const deleteArtifactDependencies = {
+  getServiceClientSystemUser,
+  getServiceAccountDBConnection,
+  getDBConnection
+};
+
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
@@ -96,11 +105,11 @@ export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
 
-    const serviceClientUser = getServiceClientSystemUser(req.keycloak_token);
+    const serviceClientUser = deleteArtifactDependencies.getServiceClientSystemUser(req.keycloak_token);
 
     const connection = serviceClientUser
-      ? getServiceAccountDBConnection(serviceClientUser)
-      : getDBConnection(req.keycloak_token);
+      ? deleteArtifactDependencies.getServiceAccountDBConnection(serviceClientUser)
+      : deleteArtifactDependencies.getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

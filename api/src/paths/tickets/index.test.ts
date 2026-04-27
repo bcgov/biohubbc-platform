@@ -1,11 +1,11 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { Ticket } from '../../models/ticket';
 import { TeamMemberService } from '../../services/access-policy/team-member-service';
 import { TicketService } from '../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { getTicketsForUser } from './index';
 
 chai.use(sinonChai);
@@ -37,7 +37,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const getTeamIdsStub = sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves(teamIds);
       const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
@@ -68,7 +68,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves([]);
       const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([]);
@@ -93,7 +93,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fetchError = new Error('service failure');
       sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').rejects(fetchError);

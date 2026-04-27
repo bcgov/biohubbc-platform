@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
 import { CodeRepository } from '../repositories/code-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 
 chai.use(sinonChai);

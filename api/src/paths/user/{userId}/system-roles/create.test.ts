@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { UserService } from '../../../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as system_roles from './create';
 
 chai.use(sinonChai);
@@ -27,7 +27,7 @@ describe('getAddSystemRolesHandler', () => {
       roles: [1]
     };
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
         return 20;
@@ -57,7 +57,7 @@ describe('getAddSystemRolesHandler', () => {
       roles: null
     };
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
         return 20;
@@ -78,7 +78,7 @@ describe('getAddSystemRolesHandler', () => {
   it('re-throws the error thrown by UserService.addUserSystemRoles', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -142,7 +142,7 @@ describe('getAddSystemRolesHandler', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       sql: mockQuery
     });
@@ -195,7 +195,7 @@ describe('getAddSystemRolesHandler', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       sql: mockQuery
     });

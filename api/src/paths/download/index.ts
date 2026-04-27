@@ -4,7 +4,7 @@ import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
-import * as publisher from '../../queue/publisher';
+import { publishProcessDownloadJob } from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
@@ -13,6 +13,15 @@ import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/download');
+
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const downloadPathDependencies = {
+  getDBConnection,
+  getAPIUserDBConnection,
+  publishProcessDownloadJob
+};
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -87,7 +96,7 @@ GET.apiDoc = {
  */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const connection = downloadPathDependencies.getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
@@ -187,7 +196,9 @@ POST.apiDoc = {
 export function createDownload(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = isAuthenticated
+      ? downloadPathDependencies.getDBConnection(req.keycloak_token)
+      : downloadPathDependencies.getAPIUserDBConnection();
 
     try {
       await connection.open();
@@ -209,7 +220,7 @@ export function createDownload(): RequestHandler {
       }
 
       // Store filters on download — features re-derived at pipeline time via search re-run
-      const downloadId = await downloadService.createDownload({ filters, format: 'csv' });
+      const downloadId = await downloadService.createDownload({ filters, format: 'parquet' });
 
       // Link download to a new team for authenticated users.
       // Anonymous downloads have no download_team rows — UUID is the credential.
@@ -224,7 +235,7 @@ export function createDownload(): RequestHandler {
       }
 
       // Publish async processing job within the transaction
-      await publisher.publishProcessDownloadJob(connection, { downloadId: downloadId.download_id });
+      await downloadPathDependencies.publishProcessDownloadJob(connection, { downloadId: downloadId.download_id });
 
       await connection.commit();
 

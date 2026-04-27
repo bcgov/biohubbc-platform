@@ -1,10 +1,11 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactService } from './artifact-service';
 
 chai.use(sinonChai);
@@ -139,6 +140,92 @@ describe('ArtifactService', () => {
       } catch (err) {
         expect((err as Error).message).to.equal('Insert failed');
       }
+    });
+  });
+
+  describe('insertArtifacts', () => {
+    it('should insert artifact rows when no duplicate keys are present', async () => {
+      const artifacts: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 1,
+          checksum_sha256: 'a',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 2,
+          checksum_sha256: 'b',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ];
+      const insertArtifactsStub = sinon.stub(ArtifactRepository.prototype, 'insertArtifacts').resolves([
+        {
+          artifact_id: '11111111-1111-1111-1111-111111111111',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-a',
+          object_key: 'a/key.txt',
+          byte_size: '1',
+          checksum_sha256: 'a'.repeat(64),
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          artifact_id: '22222222-2222-2222-2222-222222222222',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-b',
+          object_key: 'b/key.txt',
+          byte_size: '2',
+          checksum_sha256: 'b'.repeat(64),
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ]);
+
+      const result = await service.insertArtifacts(artifacts);
+
+      expect(insertArtifactsStub.calledOnceWithExactly(artifacts)).to.be.true;
+      expect(result).to.have.length(2);
+    });
+
+    it('should throw conflict error and skip repository call when duplicate keys are present', async () => {
+      const artifacts: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 1,
+          checksum_sha256: 'a',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 2,
+          checksum_sha256: 'b',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ];
+      const insertArtifactsStub = sinon.stub(ArtifactRepository.prototype, 'insertArtifacts');
+
+      try {
+        await service.insertArtifacts(artifacts);
+        expect.fail('Expected conflict error');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+        expect((error as Error).message).to.equal('Duplicate artifact keys in bulk insert payload');
+      }
+
+      expect(insertArtifactsStub.called).to.be.false;
     });
   });
 

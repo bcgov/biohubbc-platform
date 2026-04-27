@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { TicketComment } from '../../../../../models/ticket-comment';
 import { TicketCommentService } from '../../../../../services/ticket-comment-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTicketComment } from './index';
 
 chai.use(sinonChai);
@@ -30,7 +30,7 @@ describe('paths/administrative/tickets/{ticketId}/comment', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createCommentStub = sinon
       .stub(TicketCommentService.prototype, 'createTicketComment')
       .resolves(createdComment);

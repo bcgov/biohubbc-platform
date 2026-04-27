@@ -39,12 +39,20 @@ describe('submission-upload-utils', () => {
       expect(result.partCount).to.be.lessThan(50);
     });
 
+    it('caps part size at 100 MiB for a 5 GiB upload', () => {
+      const fiveGiB = 5 * 1024 * 1024 * 1024;
+      const result = calculateMultipartLayout(fiveGiB);
+
+      expect(result.partSizeBytes).to.equal(100 * 1024 * 1024);
+      expect(result.partCount).to.equal(52);
+    });
+
     it('increases part size for very large uploads to keep parts <= 10000', () => {
       const oneTiB = 1024 * 1024 * 1024 * 1024;
       const result = calculateMultipartLayout(oneTiB);
 
       expect(result.partCount).to.be.at.most(10000);
-      expect(result.partSizeBytes).to.be.greaterThan(5 * 1024 * 1024);
+      expect(result.partSizeBytes).to.be.greaterThan(100 * 1024 * 1024);
     });
 
     it('throws for non-positive bytes', () => {

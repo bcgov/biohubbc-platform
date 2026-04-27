@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SearchService } from '../../services/search-service';
 import { SearchResponseWithCounts } from '../../services/search-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -43,7 +43,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose habitat', page: '1', limit: '2' };
@@ -69,7 +69,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose', feature_type_name: 'dataset', page: '1', limit: '2' };
@@ -96,7 +96,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'wildlife', page: '2', limit: '5' };
@@ -122,7 +122,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '2' };
@@ -148,7 +148,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'test', page: '1', limit: '2' };

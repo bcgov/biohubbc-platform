@@ -2,6 +2,8 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import {
+  _getClamAvScanner,
+  _getS3Client,
   bulkDeleteFilesFromS3,
   deleteFileFromS3,
   generateDatasetS3FileKey,
@@ -9,9 +11,7 @@ import {
   getObjectStoreUrl,
   getS3HostUrl,
   getS3KeyPrefix,
-  getS3SignedURL,
-  _getClamAvScanner,
-  _getS3Client
+  getS3SignedURL
 } from './file-utils';
 
 describe('deleteFileFromS3', () => {
@@ -198,6 +198,6 @@ describe('generateDatasetS3FileKey', () => {
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/datasets/123-456-789/dwca/testFileName`);
+    expect(result).to.equal(`${getS3KeyPrefix()}/datasets/123-456-789/dwca/testFileName`);
   });
 });

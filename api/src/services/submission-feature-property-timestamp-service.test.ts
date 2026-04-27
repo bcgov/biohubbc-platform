@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   CreateSubmissionFeaturePropertyTimestamp,
   SubmissionFeaturePropertyTimestamp
 } from '../models/submission-feature-property-timestamp';
 import { SubmissionFeaturePropertyTimestampRepository } from '../repositories/submission-feature-property-timestamp-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionFeaturePropertyTimestampService } from './submission-feature-property-timestamp-service';
 
 chai.use(sinonChai);

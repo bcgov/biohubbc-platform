@@ -3,11 +3,11 @@ import { Request } from 'express';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
 import { AuthorizationService } from '../../services/authorization/authorization-service';
 import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
-import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
 import * as authorization from './authorization';
 
 chai.use(sinonChai);
@@ -22,7 +22,7 @@ describe('authorizeRequestHandler', function () {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(authorization, 'authorizeRequest').resolves(false);
+    sinon.stub(authorization.authorizationDependencies, 'authorizeRequest').resolves(false);
 
     const mockAuthorizationSchemeCallback = () => {
       return { or: [] };
@@ -46,7 +46,7 @@ describe('authorizeRequestHandler', function () {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(authorization, 'authorizeRequest').resolves(true);
+    sinon.stub(authorization.authorizationDependencies, 'authorizeRequest').resolves(true);
 
     const mockAuthorizationSchemeCallback = () => {
       return { or: [] };

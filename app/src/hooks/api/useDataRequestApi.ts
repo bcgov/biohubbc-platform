@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { CreateDataRequestPayload, DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
+import { CreateTicketDataRequestPayload, DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 
 /**
  * Returns a set of supported api methods for working with data requests.
@@ -14,12 +14,15 @@ export const useDataRequestApi = (axios: AxiosInstance) => {
    * @param {CreateDataRequestPayload} payload
    * @return {Promise<DataRequestResponse>}
    */
-  const createDataRequest = async (payload: CreateDataRequestPayload): Promise<DataRequestResponse> => {
-    const { data } = await axios.post<DataRequestResponse>('/api/data-request', payload);
+  const createTicketDataRequest = async (
+    ticketId: string,
+    payload: CreateTicketDataRequestPayload
+  ): Promise<DataRequestResponse> => {
+    const { data } = await axios.post<DataRequestResponse>(`/api/tickets/${ticketId}/data-request`, payload);
     return data;
   };
 
   return {
-    createDataRequest
+    createTicketDataRequest
   };
 };

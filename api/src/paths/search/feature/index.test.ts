@@ -3,10 +3,10 @@ import dayjs from 'dayjs';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { SearchFeatureService } from '../../../services/search-feature-service';
 import { SearchFeatureResultWithRelevancy } from '../../../services/search-feature-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -23,7 +23,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -80,7 +80,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -137,7 +137,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -196,7 +196,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -237,7 +237,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -273,7 +273,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -327,7 +327,7 @@ describe('searchFeatures', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -354,7 +354,7 @@ describe('searchFeatures', () => {
       open: sinon.stub().resolves(),
       systemUserId: () => 123
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

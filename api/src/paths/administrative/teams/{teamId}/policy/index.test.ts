@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { TeamPolicy } from '../../../../../models/team-policy';
 import { TeamPolicyService } from '../../../../../services/access-policy/team-policy-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTeamPolicies } from './index';
 
 chai.use(sinonChai);
@@ -24,7 +24,7 @@ describe('teams/{teamId}/policy', () => {
       policies: ['33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444']
     };
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const mockResponse: TeamPolicy[] = [
       {
@@ -60,7 +60,7 @@ describe('teams/{teamId}/policy', () => {
     mockReq.params = { teamId: '22222222-2222-2222-2222-222222222222' };
     mockReq.body = { policies: [] };
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createStub = sinon.stub(TeamPolicyService.prototype, 'createTeamPolicies').resolves([]);
 
     const requestHandler = createTeamPolicies();

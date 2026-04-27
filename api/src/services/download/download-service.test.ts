@@ -2,20 +2,18 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { getMockDBConnection } from '../../__mocks__/db';
+import { createMockDownloadRecord } from '../../__mocks__/download';
+import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { ArtifactStatusEnum } from '../../models/artifact';
-import { DownloadRecord } from '../../models/download';
+import { CreateDownload } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
-import * as fileUtils from '../../utils/file-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamService } from '../access-policy/team-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { ArtifactService } from '../upload/artifact-service';
 import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
@@ -62,7 +60,7 @@ describe('DownloadService', () => {
         {
           download_id: 'aaaa0000-0000-0000-0000-000000000001',
           download_status: 'ready' as const,
-          format: 'csv',
+          format: 'parquet',
           metadata: null,
           started_at: '2025-01-01T00:00:00Z',
           completed_at: '2025-01-01T00:01:00Z',
@@ -101,87 +99,36 @@ describe('DownloadService', () => {
   });
 
   describe('createDownload', () => {
-    const mockPayload = {
+    const mockPayload: CreateDownload = {
       cartId: 'aaaa0000-0000-0000-0000-000000000001',
-      format: 'csv'
+      format: 'parquet'
     };
 
-    it('creates download, pending artifact, and download_artifact link', async () => {
+    it('delegates to downloadRepository.createDownload and returns its result', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
       const createDownloadStub = sinon
         .stub(DownloadRepository.prototype, 'createDownload')
         .resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
-      const insertArtifactStub = sinon
-        .stub(ArtifactService.prototype, 'insertArtifact')
-        .resolves({ artifact_id: 'art-uuid-1' });
-      const createDownloadArtifactStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
 
       const result = await service.createDownload(mockPayload);
 
       expect(result).to.deep.equal({ download_id: 'dl-uuid-1' });
       expect(createDownloadStub).to.have.been.calledOnceWith(mockPayload);
-      const artifactCall = insertArtifactStub.firstCall.args[0];
-      expect(artifactCall.bucket).to.equal('test-bucket');
-      expect(artifactCall.object_key).to.match(/^downloads\/dl-uuid-1\/download-\d{4}-\d{2}-\d{2}T\d{6}Z\.csv$/);
-      expect(artifactCall.byte_size).to.be.null;
-      expect(artifactCall.artifact_status).to.equal(ArtifactStatusEnum.PENDING);
-      expect(artifactCall.checksum_sha256).to.be.null;
-      expect(artifactCall.uploaded_at).to.be.null;
-      expect(createDownloadArtifactStub).to.have.been.calledOnceWith('dl-uuid-1', 'art-uuid-1');
     });
 
-    it('propagates error when artifact insert fails', async () => {
+    it('does not create an artifact at request time', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').rejects(new Error('Artifact insert failed'));
+      const createDownloadArtifactSpy = sinon.spy(DownloadRepository.prototype, 'createDownloadArtifact');
 
-      try {
-        await service.createDownload(mockPayload);
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Artifact insert failed');
-      }
+      await service.createDownload(mockPayload);
+
+      expect(createDownloadArtifactSpy).to.not.have.been.called;
     });
-
-    it('propagates error when createDownloadArtifact fails', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'art-uuid-1' });
-      sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').rejects(new Error('Link failed'));
-
-      try {
-        await service.createDownload(mockPayload);
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Link failed');
-      }
-    });
-  });
-
-  // Helper: create a mock download record
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
-    download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    download_status: DownloadStatusEnum.PROCESSING,
-    format: 'csv',
-    metadata: null,
-    started_at: null,
-    completed_at: null,
-    downloaded_at: null,
-    total_fragments: 1,
-    completed_fragments: 0,
-    estimated_total_size_bytes: null,
-    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
-    create_date: '2026-01-01T00:00:00.000Z',
-    ...overrides
   });
 
   describe('createDownloadTeam', () => {

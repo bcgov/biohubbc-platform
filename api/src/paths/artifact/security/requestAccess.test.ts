@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { GCNotifyService } from '../../../services/gcnotify-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { requestAccess } from './requestAccess';
 
 chai.use(sinonChai);
@@ -18,7 +18,7 @@ describe('requestAccess', () => {
     const mockDBConnection = getMockDBConnection();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').resolves(true);
 
     const requestHandler = requestAccess();
@@ -31,7 +31,7 @@ describe('requestAccess', () => {
     const mockDBConnection = getMockDBConnection();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').resolves(false);
 
     const requestHandler = requestAccess();
@@ -44,7 +44,7 @@ describe('requestAccess', () => {
     const mockDBConnection = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').throws(new Error('test error'));
 
     const requestHandler = requestAccess();

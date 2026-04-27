@@ -2,11 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { HTTPError } from '../errors/http-error';
 import { Artifact } from '../repositories/artifact-repository';
 import { SecurityRepository } from '../repositories/security-repository';
-import * as fileUtils from '../utils/file-utils';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { ArtifactService } from './old-artifact-service';
 import { SecurityService } from './security-service';
@@ -324,7 +323,7 @@ describe('SecurityService', () => {
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
         .resolves([1, 2, 3]);
 
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
+      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
 
       await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
 
@@ -360,7 +359,7 @@ describe('SecurityService', () => {
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
         .resolves([]);
 
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
+      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
 
       await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
 
@@ -396,7 +395,7 @@ describe('SecurityService', () => {
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
         .resolves([1, 2, 3, 4]);
 
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
+      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
 
       await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
 

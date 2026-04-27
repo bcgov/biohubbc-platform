@@ -4,7 +4,6 @@ import { PageSection } from 'components/section/PageSection';
 import { TicketComment } from 'features/admin/tickets/detail/comment/TicketComment';
 import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
 import { TicketTimeline } from 'features/admin/tickets/detail/timeline/TicketTimeline';
-import { sortChronological } from 'features/admin/tickets/utils/sortChronological';
 import { PortalTicketHeader } from '../header/PortalTicketHeader';
 import { PortalTicketSidebar } from '../sidebar/PortalTicketSidebar';
 import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageContent.interface';
@@ -35,10 +34,7 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
                 alignItems: 'flex-start'
               }}>
               <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
-                <TicketTimeline
-                  history={[...(ticket?.statuses ?? []), ...(ticket?.comments ?? [])].sort(sortChronological)}
-                  isLoading={isLoading}
-                />
+                <TicketTimeline ticket={ticket} isLoading={isLoading} />
                 {ticket?.status === 'open' && (
                   <TicketComment
                     comment={comment}

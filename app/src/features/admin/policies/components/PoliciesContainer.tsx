@@ -19,13 +19,14 @@ import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
-import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
+import { transformPolicyJsonToApi } from '../utils/policyTransform';
 import {
   AddPolicyForm,
   AddPolicyFormInitialValues,
   AddPolicyFormYupSchema,
   IAddPolicyFormValues
 } from './AddPolicyForm';
+import { EditPolicyDialog } from './EditPolicyDialog';
 
 /**
  * Props for the PoliciesContainer component.
@@ -174,6 +175,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
       await biohubApi.policies.createPolicy({
         name: values.name,
         description: values.description || undefined,
+        status: values.status,
         statements
       });
 
@@ -212,6 +214,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
       await biohubApi.policies.updatePolicy(editingPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
+        status: values.status,
         statements
       });
 
@@ -227,24 +230,6 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  /**
-   * Get initial form values for the edit policy dialog.
-   *
-   * Transforms the policy's API format to form format for editing.
-   *
-   * @returns {IAddPolicyFormValues} Form values pre-populated with the editing policy's data
-   */
-  const getEditPolicyInitialValues = (): IAddPolicyFormValues => {
-    if (!editingPolicy) {
-      return AddPolicyFormInitialValues;
-    }
-    return {
-      name: editingPolicy.name,
-      description: editingPolicy.description || '',
-      policy_json: transformApiToPolicyJson(editingPolicy.statements)
-    };
   };
 
   const columns: GridColDef<IPolicy>[] = [
@@ -373,22 +358,18 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
         onSave={handleAddPolicySave}
       />
 
-      <EditDialog
-        isLoading={isLoading}
-        dialogTitle={'Edit Policy'}
-        open={openEditPolicyDialog}
-        dialogSaveButtonLabel={'Save'}
-        component={{
-          element: <AddPolicyForm />,
-          initialValues: getEditPolicyInitialValues(),
-          validationSchema: AddPolicyFormYupSchema
-        }}
-        onCancel={() => {
-          setOpenEditPolicyDialog(false);
-          setEditingPolicy(null);
-        }}
-        onSave={handleEditPolicySave}
-      />
+      {editingPolicy && (
+        <EditPolicyDialog
+          open={openEditPolicyDialog}
+          isLoading={isLoading}
+          policy={editingPolicy}
+          onCancel={() => {
+            setOpenEditPolicyDialog(false);
+            setEditingPolicy(null);
+          }}
+          onSave={handleEditPolicySave}
+        />
+      )}
     </>
   );
 };

@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { TicketWithHistory } from '../../../models/ticket';
 import { TicketService } from '../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { getTicketForUser } from './index';
 
 chai.use(sinonChai);
@@ -29,7 +29,8 @@ describe('paths/tickets/{ticketId}', () => {
       }
     ],
     comments: [],
-    references: []
+    references: [],
+    data_requests: []
   };
 
   afterEach(() => {
@@ -43,7 +44,7 @@ describe('paths/tickets/{ticketId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       const getTicketStub = sinon.stub(TicketService.prototype, 'getTicket').resolves(mockTicketWithHistory);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -62,7 +63,7 @@ describe('paths/tickets/{ticketId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fetchError = new Error('ticket not found');
       sinon.stub(TicketService.prototype, 'getTicket').rejects(fetchError);

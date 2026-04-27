@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import * as db from '../../../../../../database/db';
 import { TicketService } from '../../../../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import { deleteTicketReference } from './index';
 
 chai.use(sinonChai);
@@ -22,7 +22,7 @@ describe('paths/administrative/tickets/{ticketId}/reference/{ticketReferenceId}'
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const deleteReferenceStub = sinon.stub(TicketService.prototype, 'deleteTicketReference').resolves();
 

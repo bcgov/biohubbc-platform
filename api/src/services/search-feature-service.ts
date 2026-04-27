@@ -1,4 +1,3 @@
-import { FeatureCollection } from 'geojson';
 import { Knex } from 'knex';
 import { IDBConnection } from '../database/db';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
@@ -163,7 +162,7 @@ export class SearchFeatureService extends DBService {
             spatialRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentFeaturePropertyValue as FeatureCollection
+              value: currentFeaturePropertyValue
             });
             break;
 

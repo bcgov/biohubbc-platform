@@ -857,7 +857,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
           overflow: 'visible'
         }}>
         <Editor
-          height="400px"
+          height="200px"
           defaultLanguage="json"
           value={value || JSON.stringify(defaultPolicyDocument, null, 2)}
           onChange={handleChange}

@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import {
   CreateUploadArtifact,
@@ -9,7 +10,6 @@ import {
   UploadArtifactRoleEnum
 } from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArtifactService } from './upload-artifact-service';
 
 chai.use(sinonChai);
@@ -99,40 +99,67 @@ describe('UploadArtifactService', () => {
     });
   });
 
-  describe('insertUploadArtifact', () => {
-    it('should insert a new upload artifact and return its ID', async () => {
-      const fakeInput: CreateUploadArtifact = {
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-id-1',
-        upload_archive_id: 'upload-archive-id-1',
-        role: UploadArtifactRoleEnum.FEATURE
-      };
+  describe('insertUploadArtifacts', () => {
+    it('should insert upload artifacts in bulk and return ids', async () => {
+      const fakeInput: CreateUploadArtifact[] = [
+        {
+          upload_id: 'upload-1',
+          artifact_id: 'artifact-id-1',
+          upload_archive_id: 'upload-archive-id-1',
+          role: UploadArtifactRoleEnum.FEATURE
+        }
+      ];
 
       const stub = sinon
-        .stub(UploadArtifactRepository.prototype, 'insertUploadArtifact')
-        .resolves({ upload_artifact_id: 'artifact-new' });
+        .stub(UploadArtifactRepository.prototype, 'insertUploadArtifacts')
+        .resolves([{ upload_artifact_id: 'artifact-new' }]);
 
-      const result = await service.insertUploadArtifact(fakeInput);
+      const result = await service.insertUploadArtifacts(fakeInput);
 
       expect(stub).to.have.been.calledWith(fakeInput);
-      expect(result).to.eql({ upload_artifact_id: 'artifact-new' });
+      expect(result).to.eql([{ upload_artifact_id: 'artifact-new' }]);
     });
 
     it('should throw an error if repository fails', async () => {
-      const fakeInput: CreateUploadArtifact = {
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-id-1',
-        upload_archive_id: 'upload-archive-id-1',
-        role: UploadArtifactRoleEnum.FEATURE
-      };
+      const fakeInput: CreateUploadArtifact[] = [
+        {
+          upload_id: 'upload-1',
+          artifact_id: 'artifact-id-1',
+          upload_archive_id: 'upload-archive-id-1',
+          role: UploadArtifactRoleEnum.FEATURE
+        }
+      ];
 
-      sinon.stub(UploadArtifactRepository.prototype, 'insertUploadArtifact').throws(new Error('Insert failed'));
+      sinon.stub(UploadArtifactRepository.prototype, 'insertUploadArtifacts').throws(new Error('Insert failed'));
 
       try {
-        await service.insertUploadArtifact(fakeInput);
+        await service.insertUploadArtifacts(fakeInput);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('Insert failed');
+      }
+    });
+  });
+
+  describe('deleteUploadArtifactsByUploadId', () => {
+    it('should delete archive-derived upload artifact rows for upload id', async () => {
+      const stub = sinon.stub(UploadArtifactRepository.prototype, 'deleteUploadArtifactsByUploadId').resolves();
+
+      await service.deleteUploadArtifactsByUploadId('upload-1');
+
+      expect(stub).to.have.been.calledWith('upload-1');
+    });
+
+    it('should throw an error if repository fails', async () => {
+      sinon
+        .stub(UploadArtifactRepository.prototype, 'deleteUploadArtifactsByUploadId')
+        .throws(new Error('Delete failed'));
+
+      try {
+        await service.deleteUploadArtifactsByUploadId('upload-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Delete failed');
       }
     });
   });

@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { PropertySearchService } from '../../../services/property-search-service';
 import { GroupedPropertyResults } from '../../../services/property-search-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -35,7 +35,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -73,7 +73,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -111,7 +111,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -151,7 +151,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -184,7 +184,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {

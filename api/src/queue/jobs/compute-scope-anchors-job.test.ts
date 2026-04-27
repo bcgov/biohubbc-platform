@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
-import { getMockDBConnection } from '../../__mocks__/db';
 import {
   computeScopeAnchorsFailedHandler,
   computeScopeAnchorsJobHandler,
@@ -35,7 +35,7 @@ describe('computeScopeAnchorsJobHandler', () => {
     mockDBConnection.commit = commitStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const resolveUrnStub = sinon
       .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
@@ -74,7 +74,7 @@ describe('computeScopeAnchorsJobHandler', () => {
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.release = sinon.stub();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
     sinon.stub(SecurityScopeService.prototype, 'deleteOrphanedScopeData').resolves();
@@ -100,7 +100,7 @@ describe('computeScopeAnchorsJobHandler', () => {
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     sinon
       .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
@@ -131,7 +131,7 @@ describe('computeScopeAnchorsJobHandler', () => {
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     sinon
       .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
@@ -166,7 +166,7 @@ describe('computeScopeAnchorsJobHandler', () => {
     mockDBConnection.commit = commitStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
 
@@ -178,7 +178,7 @@ describe('computeScopeAnchorsJobHandler', () => {
   });
 
   it('should handle empty jobs array', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     await computeScopeAnchorsJobHandler([]);
 
@@ -192,7 +192,7 @@ describe('computeScopeAnchorsFailedHandler', () => {
   });
 
   it('should log failure with error output without throwing', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     const job = {
       id: 'job-1',
@@ -208,7 +208,7 @@ describe('computeScopeAnchorsFailedHandler', () => {
   });
 
   it('should log default message when output is null', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     const job = {
       id: 'job-2',

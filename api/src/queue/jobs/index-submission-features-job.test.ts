@@ -3,10 +3,12 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
@@ -56,6 +58,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
   });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
   it('indexes successfully and sets indexed', async () => {
     sinon
@@ -82,6 +85,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       });
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
@@ -164,6 +168,24 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       .transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
     expect(toIndexingStub.called).to.be.false;
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
+
+    await indexSubmissionFeaturesJobHandler([createMockJob(1, 'job-1'), createMockJob(2, 'job-2')]);
+
+    expect(indexStub.callCount).to.equal(2);
+    expect(openStub.callCount).to.equal(2);
+    expect(commitStub.callCount).to.equal(2);
+    expect(releaseStub.callCount).to.equal(2);
+  });
+
+  it('should handle empty jobs array', async () => {
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+
+    await indexSubmissionFeaturesJobHandler([]);
+
+    expect(getConnectionStub).not.to.have.been.called;
   });
 });
 
@@ -173,6 +195,9 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
   });
 
   it('logs failure without throwing', async () => {
+  it('should log failure with error output without throwing', async () => {
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+
     const job = {
       id: 'job-1',
       name: 'index-submission-features-failed',
@@ -181,5 +206,23 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
 
     await indexSubmissionFeaturesFailedHandler([job]);
+
+    // DLQ handler is log-only — no DB connection should be opened
+    expect(getConnectionStub).not.to.have.been.called;
+  });
+
+  it('should log default message when output is null', async () => {
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+
+    const job = {
+      id: 'job-2',
+      name: 'index-submission-features-failed',
+      data: { submissionId: 888 },
+      output: null
+    } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
+
+    await indexSubmissionFeaturesFailedHandler([job]);
+
+    expect(getConnectionStub).not.to.have.been.called;
   });
 });

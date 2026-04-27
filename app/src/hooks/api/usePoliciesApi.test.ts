@@ -1,5 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import usePoliciesApi from './usePoliciesApi';
 
@@ -17,7 +18,9 @@ describe('usePoliciesApi', () => {
   describe('getPolicies', () => {
     it('returns paginated policies', async () => {
       const mockResponse = {
-        policies: [{ policy_id: '1', name: 'Policy 1', description: null, statements: [] }],
+        policies: [
+          { policy_id: '1', name: 'Policy 1', description: null, status: PolicyStatus.APPROVED, statements: [] }
+        ],
         pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
       };
 
@@ -48,6 +51,7 @@ describe('usePoliciesApi', () => {
         policy_id: '123',
         name: 'Test Policy',
         description: 'Test description',
+        status: PolicyStatus.APPROVED,
         statements: [
           {
             policy_statement_id: 's1',
@@ -79,6 +83,7 @@ describe('usePoliciesApi', () => {
         policy_id: '456',
         name: 'New Policy',
         description: 'New description',
+        status: PolicyStatus.APPROVED,
         statements: []
       };
 
@@ -94,6 +99,7 @@ describe('usePoliciesApi', () => {
     it('updates an existing policy', async () => {
       const updateData = {
         name: 'Updated Policy',
+        status: PolicyStatus.APPROVED,
         statements: []
       };
 
@@ -101,6 +107,7 @@ describe('usePoliciesApi', () => {
         policy_id: '123',
         name: 'Updated Policy',
         description: null,
+        status: PolicyStatus.APPROVED,
         statements: []
       };
 

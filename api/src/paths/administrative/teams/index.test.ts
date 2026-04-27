@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { Team } from '../../../models/team';
 import { TeamService } from '../../../services/access-policy/team-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { createTeam, getTeams } from './index';
 
 chai.use(sinonChai);
@@ -22,7 +22,7 @@ describe('getTeams', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '50' };
@@ -47,7 +47,7 @@ describe('getTeams', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(TeamService.prototype, 'getTeams').resolves(mockTeams);
     sinon.stub(TeamService.prototype, 'getTeamsCount').resolves(1);
 
@@ -63,7 +63,7 @@ describe('getTeams', () => {
 
   it('should filter by search parameter', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeams').resolves([]);
     const getTeamsCountStub = sinon.stub(TeamService.prototype, 'getTeamsCount').resolves(0);
 
@@ -87,7 +87,7 @@ describe('getTeams', () => {
 
   it('should pass through limit from query params', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeams').resolves([]);
     sinon.stub(TeamService.prototype, 'getTeamsCount').resolves(0);
 
@@ -121,7 +121,7 @@ describe('createTeam', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = { name: 'New Team' };
@@ -145,7 +145,7 @@ describe('createTeam', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createStub = sinon.stub(TeamService.prototype, 'createTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -168,7 +168,7 @@ describe('createTeam', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createStub = sinon.stub(TeamService.prototype, 'createTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
