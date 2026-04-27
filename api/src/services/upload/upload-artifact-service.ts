@@ -39,17 +39,6 @@ export class UploadArtifactService extends DBService {
   }
 
   /**
-   * Inserts a new upload artifact record.
-   *
-   * @param {CreateUploadArtifact} uploadArtifact The upload artifact data to insert
-   * @return {Promise<{ upload_artifact_id: string }>} The newly created upload artifact ID
-   * @memberof UploadArtifactService
-   */
-  async insertUploadArtifact(uploadArtifact: CreateUploadArtifact): Promise<{ upload_artifact_id: string }> {
-    return this.uploadArtifactServiceRepository.insertUploadArtifact(uploadArtifact);
-  }
-
-  /**
    * Inserts upload artifact records in bulk.
    *
    * @param {CreateUploadArtifact[]} uploadArtifacts
@@ -58,6 +47,17 @@ export class UploadArtifactService extends DBService {
    */
   async insertUploadArtifacts(uploadArtifacts: CreateUploadArtifact[]): Promise<{ upload_artifact_id: string }[]> {
     return this.uploadArtifactServiceRepository.insertUploadArtifacts(uploadArtifacts);
+  }
+
+  /**
+   * Delete archive-derived upload artifact rows for one upload.
+   *
+   * @param {string} uploadId
+   * @returns {Promise<void>}
+   * @memberof UploadArtifactService
+   */
+  async deleteUploadArtifactsByUploadId(uploadId: string): Promise<void> {
+    return this.uploadArtifactServiceRepository.deleteUploadArtifactsByUploadId(uploadId);
   }
 
   /**

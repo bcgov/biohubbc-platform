@@ -120,8 +120,7 @@ export class CodeRepository extends BaseRepository {
       fp.name = ${featurePropertyName}
       AND ftp.record_end_date IS NULL
     ORDER BY
-      ftp.feature_type_property_id
-    LIMIT 1;
+      ftp.feature_type_property_id;
   `;
 
     const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);

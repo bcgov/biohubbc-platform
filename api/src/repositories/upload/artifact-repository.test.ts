@@ -11,6 +11,143 @@ import { ArtifactRepository } from './artifact-repository';
 chai.use(sinonChai);
 
 describe('ArtifactRepository', () => {
+  describe('insertArtifacts', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('builds a direct upsert query without DISTINCT ON dedupe CTEs', async () => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        if (sqlStatement.text.includes('INSERT INTO artifact')) {
+          expect(sqlStatement.text).to.not.include('DISTINCT ON (bucket, object_key)');
+          expect(sqlStatement.text).to.not.include('WITH ORDINALITY');
+          expect(sqlStatement.text).to.not.include('distinct_input');
+          expect(sqlStatement.text).to.include('FROM UNNEST(');
+          expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+          expect(sqlStatement.text).to.include('SET');
+        }
+
+        return Promise.resolve({
+          rowCount: 3,
+          rows: [
+            {
+              artifact_id: '11111111-1111-1111-1111-111111111111',
+              artifact_status: ArtifactStatusEnum.UPLOADED,
+              bucket: 'bucket-a',
+              object_key: 'a/key.txt',
+              byte_size: '100',
+              checksum_sha256: 'a'.repeat(64),
+              uploaded_at: '2026-01-01T00:00:00Z',
+              format: 'csv'
+            },
+            {
+              artifact_id: '33333333-3333-3333-3333-333333333333',
+              artifact_status: ArtifactStatusEnum.UPLOADED,
+              bucket: 'bucket-a',
+              object_key: 'a/key-2.txt',
+              byte_size: '200',
+              checksum_sha256: 'b'.repeat(64),
+              uploaded_at: '2026-01-01T00:01:00Z',
+              format: 'csv'
+            },
+            {
+              artifact_id: '22222222-2222-2222-2222-222222222222',
+              artifact_status: ArtifactStatusEnum.UPLOADED,
+              bucket: 'bucket-b',
+              object_key: 'b/key.txt',
+              byte_size: '300',
+              checksum_sha256: 'c'.repeat(64),
+              uploaded_at: '2026-01-01T00:02:00Z',
+              format: 'csv'
+            }
+          ]
+        } as any);
+      });
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const payload: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 100,
+          checksum_sha256: 'aaa',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key-2.txt',
+          byte_size: 200,
+          checksum_sha256: 'bbb',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 300,
+          checksum_sha256: 'ccc',
+          uploaded_at: '2026-01-01T00:02:00Z',
+          format: 'csv'
+        }
+      ];
+
+      const result = await repo.insertArtifacts(payload);
+      expect(result).to.have.length(3);
+    });
+
+    it('returns rows as-is when rowCount is lower than input key count', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: () =>
+          Promise.resolve({
+            rowCount: 1,
+            rows: [
+              {
+                artifact_id: '11111111-1111-1111-1111-111111111111',
+                artifact_status: ArtifactStatusEnum.UPLOADED,
+                bucket: 'bucket-a',
+                object_key: 'a/key.txt',
+                byte_size: '100',
+                checksum_sha256: 'a'.repeat(64),
+                uploaded_at: '2026-01-01T00:00:00Z',
+                format: 'csv'
+              }
+            ]
+          } as any)
+      });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.insertArtifacts([
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 100,
+          checksum_sha256: 'aaa',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 200,
+          checksum_sha256: 'bbb',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ]);
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.include({ bucket: 'bucket-a', object_key: 'a/key.txt' });
+    });
+  });
+
   describe('getArtifact', () => {
     afterEach(() => {
       sinon.restore();
@@ -115,18 +252,23 @@ describe('ArtifactRepository', () => {
     });
 
     it('returns the existing artifact ID on conflict', async () => {
-      const existingRow = { artifact_id: 'existing-uuid' };
-      let callCount = 0;
+      const existingRow = {
+        artifact_id: 'existing-uuid',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'bucket',
+        object_key: 'key.txt',
+        byte_size: '100',
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
+      };
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+        expect(sqlStatement.text).to.not.include('ON CONFLICT (bucket, object_key) DO NOTHING');
+        return Promise.resolve({ rowCount: 1, rows: [existingRow] } as any);
+      });
       const mockDBConnection = getMockDBConnection({
-        sql: () => {
-          callCount++;
-          if (callCount === 1) {
-            // INSERT with DO NOTHING — conflict, no rows returned
-            return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-          }
-          // Follow-up SELECT returns existing row
-          return { rowCount: 1, rows: [existingRow] } as any as Promise<QueryResult<any>>;
-        }
+        sql: sqlStub
       });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -141,8 +283,7 @@ describe('ArtifactRepository', () => {
       };
 
       const result = await repo.insertArtifact(payload);
-      expect(result).to.eql(existingRow);
-      expect(callCount).to.equal(2);
+      expect(result.artifact_id).to.eql(existingRow.artifact_id);
     });
   });
 
