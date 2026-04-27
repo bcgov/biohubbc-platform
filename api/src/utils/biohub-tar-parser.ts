@@ -321,18 +321,6 @@ function resolveScopedEntryName(entryName: string, scope: 'features' | 'codes' |
 }
 
 /**
- * Resolve the logical archive path for tar entries with GNU sparse metadata.
- *
- * Some tar readers expose sparse files under an internal `GNUSparseFile.*`
- * path while preserving the real archive path in the PAX sparse name field.
- */
-function getLogicalEntryName(header: TarEntryHeader): string {
-  const sparseEntryName = header.pax?.['GNU.sparse.name'];
-
-  return typeof sparseEntryName === 'string' && sparseEntryName.length > 0 ? sparseEntryName : header.name ?? '';
-}
-
-/**
  * Create a pass-through transform that updates a running checksum per chunk.
  *
  * @param {ReturnType<typeof createHash>} checksum - Mutable hash state.
@@ -521,7 +509,9 @@ async function processConcurrentMediaArchiveEntry(
     inFlightMediaUploads: Set<Promise<void>>;
   }
 ): Promise<boolean> {
-  const resolvedMediaEntryName = resolveScopedEntryName(getLogicalEntryName(header), 'files');
+  // GNU sparse entries may expose an internal header name while preserving the archive path in PAX metadata.
+  const entryName = header.pax?.['GNU.sparse.name'] || header.name || '';
+  const resolvedMediaEntryName = resolveScopedEntryName(entryName, 'files');
   if (!(resolvedMediaEntryName && header.type === 'file')) {
     return false;
   }

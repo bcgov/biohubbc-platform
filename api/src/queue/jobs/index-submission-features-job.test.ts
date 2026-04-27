@@ -164,7 +164,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
   });
 
-  it('skips retry when status is failed terminal', async () => {
+  it('skips retry when status is failed because failed uploads restart from processing', async () => {
     (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,

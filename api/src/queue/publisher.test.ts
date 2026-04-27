@@ -228,12 +228,33 @@ describe('publisher', () => {
 
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
         ...defaultSubmissionUpload,
-        status: 'failed'
+        status: 'indexed'
       });
 
       expect(result.status).to.equal('blocked');
-      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('failed');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('indexed');
       expect(getValidationStub.called).to.be.false;
+    });
+
+    it('publishes when submission upload is failed for explicit restart', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('features-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 1 });
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        ...defaultSubmissionUpload,
+        status: 'failed'
+      });
+
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('features-job-id');
     });
 
     it('returns blocked status when submission upload is not process-startable', async () => {

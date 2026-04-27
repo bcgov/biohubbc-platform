@@ -2,10 +2,8 @@ import { z } from 'zod';
 
 export enum FEATURE_PROPERTY_TYPE {
   STRING = 'string',
-  ARRAY = 'array',
   NUMBER = 'number',
   BOOLEAN = 'boolean',
-  OBJECT = 'object',
   SPATIAL = 'spatial',
   DATETIME = 'datetime',
   CODE = 'code',
@@ -15,10 +13,8 @@ export enum FEATURE_PROPERTY_TYPE {
 
 export const FeaturePropertyTypeName = z.enum([
   'string',
-  'array',
   'number',
   'boolean',
-  'object',
   'spatial',
   'datetime',
   'code',
