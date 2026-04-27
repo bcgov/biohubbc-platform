@@ -365,34 +365,53 @@ observation_datasets AS (
   )
   JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
   WHERE ft_dataset.name = 'dataset'
+),
+observation_subcounts AS (
+  -- Link parent observations to their subcounts via submission_feature_feature
+  SELECT DISTINCT
+    sff.source_feature_id AS parent_observation_id,
+    sff.target_feature_id AS subcount_id
+  FROM biohub.submission_feature_feature sff
+  JOIN biohub.submission_feature sf_parent ON sff.source_feature_id = sf_parent.submission_feature_id
+  JOIN biohub.submission_feature sf_subcount ON sff.target_feature_id = sf_subcount.submission_feature_id
+  JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+  JOIN biohub.feature_type ft_subcount ON sf_subcount.feature_type_id = ft_subcount.feature_type_id
+  WHERE ft_parent.name = 'species_observation'
+    AND ft_subcount.name = 'species_observation'
+    AND sf_parent.data::text LIKE '%subcount%' IS FALSE  -- parent doesn't have subcount_ fields
+    AND sf_subcount.data::text LIKE '%subcount%'  -- subcount has subcount_ fields
 )
 SELECT
-    sf.submission_feature_id AS Feature_ID,
+    COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) AS observation_id,
+    parent_obs.subcount_id AS observation_subcount_id,
+    COALESCE(sf_subcount.submission_feature_id, sf.submission_feature_id) AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
     public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
     (sf.data->>'sign')::text AS sign,
-    (sf.data->>'count')::int AS count,
+    COALESCE((sf_subcount.data->>'subcount_count')::int, (sf.data->>'count')::int) AS count,
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     od.dataset_id AS dataset_id,
     od.dataset_name AS dataset_name,
-    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text) AS sex,
+    COALESCE(ccc_life_stage.label, (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::text) AS life_stage,
     'N' AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
+LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
 LEFT JOIN observation_datasets od
-  ON sf.submission_feature_id = od.observation_id
+  ON COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
-  ON t.itis_tsn = (sf.data->>'taxon_id')::int
+  ON t.itis_tsn = (COALESCE(sf_subcount.data->>'taxon_id', sf.data->>'taxon_id'))::int
 LEFT JOIN biohub.contributor_codeset_code ccc_sex
-  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::int = ccc_sex.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
-  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
@@ -403,7 +422,9 @@ WHERE ft.name = 'species_observation'
   `);
 
   await knex.raw(`
-    COMMENT ON COLUMN bcgw.observations_public.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.observations_public.observation_id IS 'Parent observation feature_id; multiple rows if observation has subcounts';
+    COMMENT ON COLUMN bcgw.observations_public.observation_subcount_id IS 'Subcount observation_feature_id; NULL if observation has no subcounts';
+    COMMENT ON COLUMN bcgw.observations_public.Feature_ID IS 'System generated surrogate primary key identifier (subcount or observation feature_id)';
     COMMENT ON COLUMN bcgw.observations_public.Latitude IS 'The latitude of the observation location';
     COMMENT ON COLUMN bcgw.observations_public.Longitude IS 'The longitude of the observation location';
     COMMENT ON COLUMN bcgw.observations_public.DATETIME IS 'The timestamp of the observation';
@@ -467,22 +488,39 @@ observation_datasets AS (
   )
   JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
   WHERE ft_dataset.name = 'dataset'
+),
+observation_subcounts AS (
+  -- Link parent observations to their subcounts via submission_feature_feature
+  SELECT DISTINCT
+    sff.source_feature_id AS parent_observation_id,
+    sff.target_feature_id AS subcount_id
+  FROM biohub.submission_feature_feature sff
+  JOIN biohub.submission_feature sf_parent ON sff.source_feature_id = sf_parent.submission_feature_id
+  JOIN biohub.submission_feature sf_subcount ON sff.target_feature_id = sf_subcount.submission_feature_id
+  JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+  JOIN biohub.feature_type ft_subcount ON sf_subcount.feature_type_id = ft_subcount.feature_type_id
+  WHERE ft_parent.name = 'species_observation'
+    AND ft_subcount.name = 'species_observation'
+    AND sf_parent.data::text LIKE '%subcount%' IS FALSE  -- parent doesn't have subcount_ fields
+    AND sf_subcount.data::text LIKE '%subcount%'  -- subcount has subcount_ fields
 )
 SELECT
+    COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) AS observation_id,
+    parent_obs.subcount_id AS observation_subcount_id,
     sf.submission_feature_id AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
     public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
-    (sf.data->>'sign')::text AS sign,
-    (sf.data->>'count')::int AS count,
-    (sf.data->>'taxon_id')::int AS taxon_id,
+    (COALESCE(sf_subcount.data->>'sign', sf.data->>'sign'))::text AS sign,
+    COALESCE((sf_subcount.data->>'subcount_count')::int, (sf.data->>'count')::int) AS count,
+    (COALESCE(sf_subcount.data->>'taxon_id', sf.data->>'taxon_id'))::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     od.dataset_id AS dataset_id,
     od.dataset_name AS dataset_name,
-    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text) AS sex,
+    COALESCE(ccc_life_stage.label, (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::text) AS life_stage,
     CASE
       WHEN EXISTS (
         SELECT 1
@@ -492,23 +530,27 @@ SELECT
       ELSE 'N'
     END AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
+LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
 LEFT JOIN observation_datasets od
-  ON sf.submission_feature_id = od.observation_id
+  ON COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (sf.data->>'taxon_id')::int
 LEFT JOIN biohub.contributor_codeset_code ccc_sex
-  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::int = ccc_sex.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
-  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id IN (SELECT submission_feature_id FROM site_linked_observations);
   `);
 
   await knex.raw(`
-    COMMENT ON COLUMN bcgw.observations_all.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.observations_all.observation_id IS 'Parent observation feature_id; multiple rows if observation has subcounts';
+    COMMENT ON COLUMN bcgw.observations_all.observation_subcount_id IS 'Subcount observation_feature_id; NULL if observation has no subcounts';
+    COMMENT ON COLUMN bcgw.observations_all.Feature_ID IS 'System generated surrogate primary key identifier (subcount or observation feature_id)';
     COMMENT ON COLUMN bcgw.observations_all.Latitude IS 'The latitude of the observation location';
     COMMENT ON COLUMN bcgw.observations_all.Longitude IS 'The longitude of the observation location';
     COMMENT ON COLUMN bcgw.observations_all.DATETIME IS 'The timestamp of the observation';
@@ -572,34 +614,53 @@ observation_datasets AS (
   )
   JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
   WHERE ft_dataset.name = 'dataset'
+),
+observation_subcounts AS (
+  -- Link parent observations to their subcounts via submission_feature_feature
+  SELECT DISTINCT
+    sff.source_feature_id AS parent_observation_id,
+    sff.target_feature_id AS subcount_id
+  FROM biohub.submission_feature_feature sff
+  JOIN biohub.submission_feature sf_parent ON sff.source_feature_id = sf_parent.submission_feature_id
+  JOIN biohub.submission_feature sf_subcount ON sff.target_feature_id = sf_subcount.submission_feature_id
+  JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+  JOIN biohub.feature_type ft_subcount ON sf_subcount.feature_type_id = ft_subcount.feature_type_id
+  WHERE ft_parent.name = 'species_observation'
+    AND ft_subcount.name = 'species_observation'
+    AND sf_parent.data::text LIKE '%subcount%' IS FALSE  -- parent doesn't have subcount_ fields
+    AND sf_subcount.data::text LIKE '%subcount%'  -- subcount has subcount_ fields
 )
 SELECT
+    COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) AS observation_id,
+    parent_obs.subcount_id AS observation_subcount_id,
     sf.submission_feature_id AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
     public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
     (sf.data->>'sign')::text AS sign,
-    (sf.data->>'count')::int AS count,
+    COALESCE((sf_subcount.data->>'subcount_count')::int, (sf.data->>'count')::int) AS count,
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     od.dataset_id AS dataset_id,
     od.dataset_name AS dataset_name,
-    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text) AS sex,
+    COALESCE(ccc_life_stage.label, (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::text) AS life_stage,
     'N' AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
+LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
 LEFT JOIN observation_datasets od
-  ON sf.submission_feature_id = od.observation_id
+  ON COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (sf.data->>'taxon_id')::int
 LEFT JOIN biohub.contributor_codeset_code ccc_sex
-  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::int = ccc_sex.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
-  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
@@ -610,7 +671,9 @@ WHERE ft.name = 'species_observation'
   `);
 
   await knex.raw(`
-    COMMENT ON COLUMN bcgw.incidental_public.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.incidental_public.observation_id IS 'Parent observation feature_id; multiple rows if observation has subcounts';
+    COMMENT ON COLUMN bcgw.incidental_public.observation_subcount_id IS 'Subcount observation_feature_id; NULL if observation has no subcounts';
+    COMMENT ON COLUMN bcgw.incidental_public.Feature_ID IS 'System generated surrogate primary key identifier (subcount or observation feature_id)';
     COMMENT ON COLUMN bcgw.incidental_public.Latitude IS 'The latitude of the observation location';
     COMMENT ON COLUMN bcgw.incidental_public.Longitude IS 'The longitude of the observation location';
     COMMENT ON COLUMN bcgw.incidental_public.DATETIME IS 'The timestamp of the observation';
@@ -674,22 +737,39 @@ observation_datasets AS (
   )
   JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
   WHERE ft_dataset.name = 'dataset'
+),
+observation_subcounts AS (
+  -- Link parent observations to their subcounts via submission_feature_feature
+  SELECT DISTINCT
+    sff.source_feature_id AS parent_observation_id,
+    sff.target_feature_id AS subcount_id
+  FROM biohub.submission_feature_feature sff
+  JOIN biohub.submission_feature sf_parent ON sff.source_feature_id = sf_parent.submission_feature_id
+  JOIN biohub.submission_feature sf_subcount ON sff.target_feature_id = sf_subcount.submission_feature_id
+  JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+  JOIN biohub.feature_type ft_subcount ON sf_subcount.feature_type_id = ft_subcount.feature_type_id
+  WHERE ft_parent.name = 'species_observation'
+    AND ft_subcount.name = 'species_observation'
+    AND sf_parent.data::text LIKE '%subcount%' IS FALSE  -- parent doesn't have subcount_ fields
+    AND sf_subcount.data::text LIKE '%subcount%'  -- subcount has subcount_ fields
 )
 SELECT
+    COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) AS observation_id,
+    parent_obs.subcount_id AS observation_subcount_id,
     sf.submission_feature_id AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
     public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
     (sf.data->>'sign')::text AS sign,
-    (sf.data->>'count')::int AS count,
+    COALESCE((sf_subcount.data->>'subcount_count')::int, (sf.data->>'count')::int) AS count,
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     od.dataset_id AS dataset_id,
     od.dataset_name AS dataset_name,
-    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text) AS sex,
+    COALESCE(ccc_life_stage.label, (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::text) AS life_stage,
     CASE
       WHEN EXISTS (
         SELECT 1
@@ -699,16 +779,18 @@ SELECT
       ELSE 'N'
     END AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
+LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
 LEFT JOIN observation_datasets od
-  ON sf.submission_feature_id = od.observation_id
+  ON COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (sf.data->>'taxon_id')::int
 LEFT JOIN biohub.contributor_codeset_code ccc_sex
-  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::int = ccc_sex.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
-  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
+  ON (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (SELECT submission_feature_id FROM site_linked_observations);
