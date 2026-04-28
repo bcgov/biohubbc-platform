@@ -226,6 +226,60 @@ describe('ArtifactRepository', () => {
     });
   });
 
+  describe('getArtifactByteSizesByObjectKeys', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns an empty map without hitting the DB when given no keys', async () => {
+      const sqlStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.getArtifactByteSizesByObjectKeys('bucket-a', []);
+
+      expect(result).to.be.instanceOf(Map);
+      expect(result.size).to.equal(0);
+      expect(sqlStub.called).to.be.false;
+    });
+
+    it('returns a map of object_key → byte_size for matched rows', async () => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        // Sanity-check the query shape — bucket guard, ANY() against the keys
+        // array, and the IS NOT NULL filter. The contract is that
+        // unuploaded/pending rows contribute zero, not undefined.
+        expect(sqlStatement.text).to.include('FROM');
+        expect(sqlStatement.text).to.include('artifact');
+        expect(sqlStatement.text).to.include('bucket =');
+        expect(sqlStatement.text).to.include('object_key = ANY(');
+        expect(sqlStatement.text).to.include('byte_size IS NOT NULL');
+
+        return Promise.resolve({
+          rowCount: 2,
+          rows: [
+            { object_key: 'a/key.txt', byte_size: 100 },
+            { object_key: 'a/key-2.txt', byte_size: 200 }
+          ]
+        } as any);
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.getArtifactByteSizesByObjectKeys('bucket-a', [
+        'a/key.txt',
+        'a/key-2.txt',
+        'a/missing.txt'
+      ]);
+
+      // The repo doesn't fabricate entries for missing keys — the caller
+      // (export pipeline) treats absence as zero.
+      expect(result.size).to.equal(2);
+      expect(result.get('a/key.txt')).to.equal(100);
+      expect(result.get('a/key-2.txt')).to.equal(200);
+      expect(result.has('a/missing.txt')).to.be.false;
+    });
+  });
+
   describe('insertArtifact', () => {
     afterEach(() => {
       sinon.restore();

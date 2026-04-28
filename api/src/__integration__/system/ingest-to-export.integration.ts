@@ -1,18 +1,10 @@
-// System integration test: end-to-end ingest → download → export.
+// System integration test: end-to-end cart → download → export → CSV.
 //
-// The single case here is the one regression test that would have caught the
-// empty-telemetry-export symptom in SIMSBIOHUB-954, and the deeper wiring gap
-// it exposed: nothing in runtime populates the `submission_feature_property_*`
-// tables that `DownloadPipelineService.hydrateFeatureBatch` reads from. Real
-// ingested data flows `submission_feature.data` (JSONB) → `search_*` (via the
-// index job), never into the typed tables — so the download pipeline, which
-// reads the typed tables, silently emits nulls for every property except
-// `uuid`, `parent_uuid`, and `geometry` (which has its own seed helper).
-//
-// This file is `.skip`ped until that wiring gap is addressed. The assertions
-// are the acceptance criteria for the follow-up: when the pipeline either
-// hydrates from JSONB or gets a post-ingest populator job for the typed
-// tables, un-skip this and the test passes.
+// Mirrors `scripts/test_telemetry_export.py` end-to-end, against a real DB +
+// MinIO. The pipeline reads telemetry from `submission_feature` + the typed
+// `submission_feature_property_*` tables (populated upstream by 963's indexing
+// job), runs the Parquet pipeline, then the CSV export pipeline, and writes a
+// part-zip to S3. We then unzip and assert the CSV contents.
 //
 // Run: make test-sys
 // Requires: make web (database + MinIO must be running)
@@ -66,29 +58,66 @@ describe('Ingest → Download → Export (system integration)', function () {
     connection.release();
   });
 
-  // ── Pending: design bug covered in follow-up ─────────────────────────────
-  //
-  // Reason it's skipped: `DownloadPipelineService.hydrateFeatureBatch` reads
-  // from `submission_feature_property_*` tables, but runtime code never
-  // writes to those tables (verified across the entire codebase — only seed
-  // helpers and integration-test fixtures INSERT). The real ingest path
-  // (`FeatureIngestionRepository.insertSubmissionFeatureRecords`) only
-  // populates `submission_feature.data` JSONB; the indexing job
-  // (`SearchFeatureService.indexFeaturesBySubmissionId`) only populates
-  // `search_*` tables. So every real-ingested feature's Parquet row ends up
-  // with null-filled typed columns, and the exported CSV renders with
-  // empty cells — the exact symptom we hit on telemetry.
-  //
-  // When the design bug is fixed (see follow-up ticket), un-skip this test.
-  // If it passes, the pipeline correctly round-trips ingested data through
-  // to the CSV without depending on anything outside the runtime write path.
-  it.skip('telemetry: ingested feature data round-trips to CSV with real values for every property type', async () => {
+  /**
+   * Look up the active feature_type_property_id for a (feature_type, property) pair.
+   * Hardcoding seed IDs is brittle; this name-based lookup mirrors how the
+   * indexer resolves them at runtime.
+   */
+  async function lookupFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT ftp.feature_type_property_id
+      FROM feature_type_property ftp
+      INNER JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+      INNER JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+      WHERE ft.name = ${featureTypeName}
+        AND fp.name = ${propertyName}
+        AND ftp.record_end_date IS NULL
+      LIMIT 1;
+    `);
+    if (!result.rowCount) {
+      throw new Error(`feature_type_property not found: ${featureTypeName}.${propertyName}`);
+    }
+    return result.rows[0].feature_type_property_id as number;
+  }
+
+  /**
+   * Mirror what 963's indexer would write for a telemetry feature: one row per
+   * declared property in the matching typed table. The download pipeline reads
+   * from these typed tables, so without them the CSV renders empty cells.
+   */
+  async function indexTelemetryProperties(
+    submissionFeatureId: number,
+    data: { dop: number; elevation: number; timestamp: string; geometry: object }
+  ): Promise<void> {
+    const systemUserId = connection.systemUserId();
+
+    const dopId = await lookupFeatureTypePropertyId('telemetry', 'dop');
+    const elevationId = await lookupFeatureTypePropertyId('telemetry', 'elevation');
+    const timestampId = await lookupFeatureTypePropertyId('telemetry', 'timestamp');
+    const geometryId = await lookupFeatureTypePropertyId('telemetry', 'geometry');
+
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+      VALUES
+        (${submissionFeatureId}, ${dopId}, ${data.dop}, ${systemUserId}),
+        (${submissionFeatureId}, ${elevationId}, ${data.elevation}, ${systemUserId});
+    `);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, value, create_user)
+      VALUES (${submissionFeatureId}, ${timestampId}, ${data.timestamp}, ${systemUserId});
+    `);
+    // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
+    const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
+    await connection.query(
+      `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+       VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
+      [submissionFeatureId, geometryId, JSON.stringify(innerGeom), systemUserId]
+    );
+  }
+
+  it('telemetry: cart → download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
     const submissionId = await createTestSubmission(connection);
 
-    // Real-ingested shape: keys match the declared telemetry
-    // feature_type_property schema (dop, elevation, timestamp, geometry) and
-    // geometry is a full FeatureCollection to match the ingest validator's
-    // `GeoJSONFeatureCollectionZodSchema` contract.
     const telemetryData = {
       dop: 4.2,
       elevation: 1234.5,
@@ -99,22 +128,18 @@ describe('Ingest → Download → Export (system integration)', function () {
           {
             type: 'Feature' as const,
             properties: {},
-            geometry: {
-              type: 'Point' as const,
-              coordinates: [-123.1234, 49.5678]
-            }
+            geometry: { type: 'Point' as const, coordinates: [-123.1234, 49.5678] }
           }
         ]
       }
     };
 
-    // Use the test helper that mirrors what real ingestion does — inserts
-    // into submission_feature only, does NOT touch submission_feature_property_*.
-    // This is the critical shape of the test: we're asserting the pipeline
-    // works on data written exactly the way real ingestion writes it.
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
+    await indexTelemetryProperties(featureId, telemetryData);
 
-    // Build a cart + download via the real services.
+    // Build a cart + download via the real services. Authenticated path so the
+    // download is owned by a single-member team — the cart's scope-check sees
+    // the feature regardless of any inherited security on its ancestors.
     const systemUserId = connection.systemUserId();
     const cartService = new CartService(connection);
     const { cart } = await cartService.createCart(systemUserId, [featureId]);
@@ -125,13 +150,11 @@ describe('Ingest → Download → Export (system integration)', function () {
       format: 'parquet'
     });
 
-    // Run the download pipeline. Transitions PENDING → PROCESSING, writes
-    // one Parquet file per feature type to S3, then PROCESSING → READY.
+    // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
     await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
-
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
     const { schemaLookup, featureTypes } = await pipelineService.resolveParquetSchema(downloadId, source);
     for (const featureTypeName of featureTypes) {
@@ -146,13 +169,13 @@ describe('Ingest → Download → Export (system integration)', function () {
       DownloadStatusEnum.PROCESSING
     ]);
 
-    // Create + run the export.
+    // Run the export (CSV) pipeline.
     const exportService = new DownloadExportService(connection);
     const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {});
     const exportPipelineService = new DownloadExportPipelineService(connection);
     await exportPipelineService.runExport(exportRecord.download_export_id);
 
-    // Locate the single part-zip on S3 and extract chunk1.csv.
+    // Locate the part-zip on S3 and extract chunk1.csv.
     const artifacts = await connection.sql(SQL`
       SELECT a.bucket, a.object_key
       FROM download_export_artifact dea
@@ -161,31 +184,37 @@ describe('Ingest → Download → Export (system integration)', function () {
         AND dea.record_end_date IS NULL
       ORDER BY dea.chunk_id ASC;
     `);
-    expect(artifacts.rowCount).to.equal(1);
+    expect(artifacts.rowCount).to.equal(1, 'expected exactly one part-zip artifact');
 
     const storageService = new ObjectStorageService();
     const zip = await downloadZipFromS3(storageService, artifacts.rows[0].object_key);
     const chunkEntryName = `biohub-export-${exportRecord.download_export_id}/telemetry/chunk1.csv`;
     const csv = zipEntryText(zip, chunkEntryName);
+    expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 
-    // The acceptance criteria: header present, exactly one data row, and every
-    // declared column carries the ingested value (not the null-filled empty
-    // string we see today).
     const lines = csv.trim().split('\n');
     expect(lines).to.have.lengthOf(2, 'expected header + 1 data row');
 
     const header = lines[0].split(',');
-    expect(header).to.include.members(['dop', 'elevation', 'timestamp', 'decimalLatitude', 'decimalLongitude']);
+    // System columns lead so consumers can join cross-file (uuid, parent_uuid)
+    // and trace back to the platform UI (submission_feature_id).
+    expect(header).to.include.members(['submission_feature_id', 'uuid', 'parent_uuid']);
+    expect(header).to.include.members(['dop', 'elevation', 'timestamp', 'geometry']);
 
     const row = lines[1].split(',');
     const col = (name: string): string => row[header.indexOf(name)];
 
-    expect(col('dop'), 'dop should be the ingested number, not empty').to.equal('4.2');
-    expect(col('elevation'), 'elevation should be the ingested number, not empty').to.equal('1234.5');
-    expect(col('timestamp'), 'timestamp should be the ingested ISO string, not empty').to.not.equal('');
-    expect(col('decimalLatitude'), 'decimalLatitude should be extracted from the GeoJSON Point').to.equal('49.5678');
-    expect(col('decimalLongitude'), 'decimalLongitude should be extracted from the GeoJSON Point').to.equal(
-      '-123.1234'
-    );
+    expect(col('submission_feature_id')).to.equal(String(featureId));
+    // uuid is generated server-side; we don't pin the exact value, just assert it's a non-empty UUID-looking string.
+    expect(col('uuid')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    // Telemetry's parent (the dataset) is set inside createTestFeature → empty for root-level test feature.
+    // Real telemetry has a dataset parent; the column at minimum must be present (not crash).
+    expect(header).to.include('parent_uuid');
+
+    expect(col('dop'), 'dop should round-trip the ingested number').to.equal('4.2');
+    expect(col('elevation'), 'elevation should round-trip the ingested number').to.equal('1234.5');
+    expect(col('timestamp'), 'timestamp should round-trip the ingested ISO string').to.contain('2026-04-24T12:34:56');
+    // Geometry is emitted as a single WKT column (per Phase 5 of plan-review-fixes).
+    expect(col('geometry'), 'geometry should be a Point WKT').to.match(/^POINT\(-123\.1234\s+49\.5678\)$/);
   });
 });

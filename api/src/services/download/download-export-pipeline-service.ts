@@ -45,6 +45,12 @@ export interface FileFeatureRef {
  * The pipeline rolls to a new part once `maxPartSizeBytes` is crossed; one of
  * these is active at a time, plus up to N already-finalized bundles tracked by
  * part index so the orchestrator can finalize in order.
+ *
+ * `byteCount` is the part's projected uncompressed payload size — CSV bytes
+ * already written plus the `byte_size` of every binary attachment that's been
+ * earmarked for this part by `collectArtifactKeyRefs`. The projection lets the
+ * rollover check fire before `streamBinariesToPart` appends those binaries and
+ * blows past `max_part_size_bytes`.
  */
 export interface PartArchiverBundle {
   archive: archiver.Archiver;
@@ -186,17 +192,20 @@ export class DownloadExportPipelineService extends DBService {
    * line. Without this, a slow S3 upload would let the row loop produce faster
    * than zlib + S3 can consume, defeating the bound.
    *
-   * Header rule: written on `chunkIndex === 1` within each part. A roll-over
-   * to a new part restarts `chunkIndex` at 1 so the first chunk of every part
-   * is self-describing — the export's promise is that each part zip extracts
-   * into a usable subset.
+   * Header rule: written on every chunk so each `chunkN.csv` is independently
+   * usable when opened on its own.
    *
-   * Part-rolling rule: uncompressed CSV bytes written to the current part are
-   * tracked on the bundle's `byteCount`. Once that crosses `maxPartSizeBytes`
-   * the method closes the current entry, returns with `finalPart > currentPart`,
-   * and the orchestrator finalizes the old part and creates the next bundle
-   * before re-calling this method to drain what's left of the feature type's
-   * cursor.
+   * Part-rolling rule: the bundle's `byteCount` tracks both uncompressed CSV
+   * bytes written to the current part AND the projected `byte_size` of every
+   * binary attachment earmarked for this part (looked up from the `artifact`
+   * table when `collectArtifactKeyRefs` discovers an `artifact_key`). Without
+   * the binary projection the part can stay under `maxPartSizeBytes` while
+   * rows stream and then balloon far past it once `streamBinariesToPart`
+   * appends the referenced files later. Once `byteCount` crosses
+   * `maxPartSizeBytes` the method closes the current entry, returns with
+   * `finalPart > currentPart`, and the orchestrator finalizes the old part
+   * and creates the next bundle before re-calling this method to drain
+   * what's left of the feature type's cursor.
    */
   async writeFeatureTypeExport(params: {
     exportId: string;
@@ -210,9 +219,13 @@ export class DownloadExportPipelineService extends DBService {
     resumeReader?: ParquetReader;
     // The chunk index to start at within this feature type — continues the
     // monotonic `chunkN.csv` sequence across part-zip roll-overs so a user
-    // who extracts every part side-by-side can byte-concatenate
-    // `{featureType}/chunk1.csv + chunk2.csv + ...` into a valid CSV.
+    // who extracts every part side-by-side sees `chunk1.csv`, `chunk2.csv`,
+    // … with stable, non-colliding names.
     resumeChunkIndex?: number;
+    // Row buffered by the previous call's roll-over look-ahead. When set, the
+    // resumed call processes this row first instead of re-reading the cursor —
+    // the look-ahead has already advanced past it.
+    resumeRow?: Record<string, unknown>;
   }): Promise<{
     finalPart: number;
     chunksWritten: number;
@@ -222,6 +235,9 @@ export class DownloadExportPipelineService extends DBService {
     pendingReader?: ParquetReader;
     pendingCursor?: Awaited<ReturnType<ParquetReader['getCursor']>>;
     pendingChunkIndex?: number;
+    // The row peeked at roll-over time; the resumed call processes it before
+    // pulling the cursor again.
+    pendingRow?: Record<string, unknown>;
   }> {
     const { exportId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
     let { currentPart } = params;
@@ -231,7 +247,11 @@ export class DownloadExportPipelineService extends DBService {
     const reader = params.resumeReader ?? (await this.openParquetReader(downloadId, featureTypeName));
     const cursor = params.resumeCursor ?? reader.getCursor();
 
-    const headers = buildSchemaHeaders(properties);
+    // submission_feature_id leads so consumers can trace a CSV row back to
+    // its feature-detail page in the platform. `uuid` + `parent_uuid` follow
+    // as the cross-file star-schema join keys — telemetry → deployment →
+    // animal joins downstream by `parent_uuid → uuid`.
+    const headers = ['submission_feature_id', 'uuid', 'parent_uuid', ...buildSchemaHeaders(properties)];
     const headerLine = headers.map(escapeCsvField).join(',') + '\n';
     // Hoisted: most feature types have zero artifact_key properties, so
     // pre-filter once instead of re-scanning every row.
@@ -280,43 +300,85 @@ export class DownloadExportPipelineService extends DBService {
     // header-only `chunk1.csv` in the output.
     let currentEntry: PassThrough | null = null;
 
+    // Look-ahead buffer: when the roll threshold is reached, we peek the
+    // cursor before deciding to roll. If the peek returns null the row we
+    // just wrote was the last for this feature type and rolling would create
+    // an empty trailing part-zip. Otherwise we stash the peeked row here and
+    // hand it back to the caller as `pendingRow`.
+    let pendingRow: Record<string, unknown> | null = params.resumeRow ?? null;
+
+    // Cache `byte_size` lookups for artifact_key references. Same key can
+    // recur across rows (e.g. the same photo referenced by sibling rows);
+    // the cache turns those into one DB hit instead of one per row. Lives
+    // for the duration of this writer call only — across roll-overs the
+    // orchestrator re-enters with a fresh map, which is fine: cross-part
+    // duplicates re-resolve from the DB, and the projection still bounds
+    // each part's individual rollover decision.
+    const artifactSizeCache = new Map<string, bigint>();
+
     try {
       while (true) {
-        const next = (await cursor.next()) as Record<string, unknown> | null;
+        const next = pendingRow ?? ((await cursor.next()) as Record<string, unknown> | null);
+        pendingRow = null;
         if (next === null) {
           break;
         }
 
-        const submissionFeatureId = typeof next.submission_feature_id === 'number' ? next.submission_feature_id : 0;
+        // submission_feature_id is NOT NULL in the Parquet schema. INT64
+        // reads come back as BigInt; cast to number (the column is int4).
+        const rawId = next.submission_feature_id;
+        if (rawId === null || rawId === undefined) {
+          throw new Error(
+            `DownloadExportPipelineService->writeFeatureTypeExport: Parquet row for ${featureTypeName} is missing submission_feature_id`
+          );
+        }
+        const submissionFeatureId = typeof rawId === 'bigint' ? Number(rawId) : (rawId as number);
         const flattened = flattenFeatureBySchema(next, properties, submissionFeatureId, `files${currentPart}`);
+        flattened['submission_feature_id'] = String(submissionFeatureId);
+        // `uuid` is NOT NULL in the Parquet schema; `parent_uuid` is nullable
+        // (root types like `dataset` have no parent) — emit empty string so
+        // the column is still present.
+        flattened['uuid'] = String(next.uuid ?? '');
+        flattened['parent_uuid'] = next.parent_uuid == null ? '' : String(next.parent_uuid);
 
-        fileRefs.push(...this.collectArtifactKeyRefs(next, artifactKeyProperties, submissionFeatureId, currentPart));
+        const refsForRow = this.collectArtifactKeyRefs(next, artifactKeyProperties, submissionFeatureId, currentPart);
+        fileRefs.push(...refsForRow);
+        // Add the projected binary bytes to the bundle's byteCount BEFORE the
+        // rollover check below, so a row whose attachments would push the
+        // part past the cap rolls now instead of after the binaries are
+        // appended in `streamBinariesToPart` (where it's too late).
+        await this.accountBinaryProjection(refsForRow, artifactSizeCache, currentBundle());
 
         const line = headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',') + '\n';
         const lineBytes = BigInt(Buffer.byteLength(line, 'utf8'));
 
-        // Lazy-open the chunk entry on the first row of this call. Header
-        // rule: written only on chunk 1 of a feature type. Later chunks
-        // (within the same feature type, in later part-zips) start directly
-        // with data rows so `cat chunk1.csv chunk2.csv ...` reconstructs a
-        // valid CSV.
+        // Lazy-open the chunk entry on the first row of this call; the
+        // header is written on every chunk so a user opening any single
+        // `chunkN.csv` sees column names without a reconstruction step.
         if (currentEntry === null) {
           currentEntry = openChunkEntry();
-          if (chunkIndex === 1) {
-            await writeLine(currentEntry, headerLine);
-            currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
-          }
+          await writeLine(currentEntry, headerLine);
+          currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
         }
 
         await writeLine(currentEntry, line);
         currentBundle().byteCount += lineBytes;
 
         if (shouldRollPart(currentBundle().byteCount, maxPartSizeBytes)) {
-          // Close the current entry, step the part pointer + chunk counter,
-          // and return so the orchestrator can finalize the just-closed part
-          // zip and open a new archiver bundle before we resume. chunkIndex
-          // advances across the rollover so the next part's entry is
-          // `{featureType}/chunk{N+1}.csv` — distinct from any previous part.
+          // Look ahead one row before committing to a roll. If the cursor is
+          // drained, the row we just wrote was the last and rolling would
+          // produce an empty trailing part-zip — close cleanly instead.
+          const lookahead = (await cursor.next()) as Record<string, unknown> | null;
+          if (lookahead === null) {
+            currentEntry.end();
+            await reader.close();
+            return { finalPart: currentPart, chunksWritten, fileRefs };
+          }
+
+          // More data exists: roll to a new part and resume on the buffered
+          // row. chunkIndex advances across the roll-over so the next part's
+          // entry is `{featureType}/chunk{N+1}.csv` — distinct from any
+          // previous part.
           currentEntry.end();
           currentEntry = null;
           currentPart += 1;
@@ -327,7 +389,8 @@ export class DownloadExportPipelineService extends DBService {
             fileRefs,
             pendingReader: reader,
             pendingCursor: cursor,
-            pendingChunkIndex: chunkIndex
+            pendingChunkIndex: chunkIndex,
+            pendingRow: lookahead
           };
         }
       }
@@ -343,6 +406,45 @@ export class DownloadExportPipelineService extends DBService {
       currentEntry?.end();
       await reader.close().catch(() => undefined);
       throw error;
+    }
+  }
+
+  /**
+   * Resolve the `byte_size` of any newly seen artifact_key references and
+   * add them to the bundle's projected `byteCount`. Caches resolved sizes
+   * within a single writer call so the same artifact key referenced by
+   * multiple rows costs one DB hit, not N.
+   *
+   * Treats unknown keys (no matching `artifact` row) as zero — the streaming
+   * path already writes a `.error.txt` placeholder for objects it can't
+   * fetch, and we'd rather under-project than fail the export. The
+   * projection is therefore a best-effort upper bound: a part's actual size
+   * can still exceed `maxPartSizeBytes` if `byte_size` is null on the
+   * artifact row, but that's a data-integrity issue the upload pipeline
+   * fixes upstream.
+   */
+  private async accountBinaryProjection(
+    refs: FileFeatureRef[],
+    cache: Map<string, bigint>,
+    bundle: PartArchiverBundle
+  ): Promise<void> {
+    if (refs.length === 0) {
+      return;
+    }
+
+    const keysToLookup = refs.map((ref) => ref.filePath).filter((key) => !cache.has(key));
+    if (keysToLookup.length > 0) {
+      const sizes = await this.artifactService.getArtifactByteSizesByObjectKeys(
+        getObjectStoreBucketName(),
+        keysToLookup
+      );
+      for (const key of keysToLookup) {
+        cache.set(key, BigInt(sizes.get(key) ?? 0));
+      }
+    }
+
+    for (const ref of refs) {
+      bundle.byteCount += cache.get(ref.filePath) ?? 0n;
     }
   }
 
@@ -543,13 +645,15 @@ export class DownloadExportPipelineService extends DBService {
 
     archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
 
-    // Binary file references are collected as rows stream by, each tagged
-    // with the part index the referring row landed in. Each part's binaries
-    // must stream into that part's archiver BEFORE the part is finalized —
-    // whether that finalize happens on roll-over (mid-stream, for memory
-    // bounds) or at the end. Otherwise a finalized part's CSV would reference
-    // `files{N}/...` entries that never land in the zip.
-    const allFileRefs: FileFeatureRef[] = [];
+    // Binary file references are collected as rows stream by, grouped by the
+    // part index the referring row landed in. Each part's binaries must stream
+    // into that part's archiver BEFORE the part is finalized — whether that
+    // finalize happens on roll-over (mid-stream, for memory bounds) or at the
+    // end. Once a part is finalized its bucket is removed from the map so the
+    // working set tracks only still-open parts (mirrors `archiverByPart`),
+    // turning the per-part lookup into O(refs-in-this-part) instead of
+    // O(all-refs-ever).
+    const fileRefsByPart = new Map<number, FileFeatureRef[]>();
     const objectStorageService = new ObjectStorageService();
     let totalChunksWritten = 0;
 
@@ -563,11 +667,11 @@ export class DownloadExportPipelineService extends DBService {
         // cursor (handed back via `pendingReader` + `pendingCursor` +
         // `pendingChunkIndex`). The chunk index threads across the roll-over so
         // `observation/chunk1.csv`, `observation/chunk2.csv`, … stay monotonic
-        // across part-zips — a user extracting every part side-by-side can
-        // byte-concatenate chunks in order.
+        // across part-zips and don't collide on flat-extract.
         let pendingReader: ParquetReader | undefined;
         let pendingCursor: Awaited<ReturnType<ParquetReader['getCursor']>> | undefined;
         let pendingChunkIndex: number | undefined;
+        let pendingRow: Record<string, unknown> | undefined;
 
         while (true) {
           const result = await this.writeFeatureTypeExport({
@@ -580,10 +684,15 @@ export class DownloadExportPipelineService extends DBService {
             currentPart,
             resumeReader: pendingReader,
             resumeCursor: pendingCursor,
-            resumeChunkIndex: pendingChunkIndex
+            resumeChunkIndex: pendingChunkIndex,
+            resumeRow: pendingRow
           });
 
-          allFileRefs.push(...result.fileRefs);
+          for (const ref of result.fileRefs) {
+            const partRefs = fileRefsByPart.get(ref.partIndex) ?? [];
+            partRefs.push(ref);
+            fileRefsByPart.set(ref.partIndex, partRefs);
+          }
           totalChunksWritten += result.chunksWritten;
 
           if (result.pendingReader === undefined || result.pendingCursor === undefined) {
@@ -599,7 +708,7 @@ export class DownloadExportPipelineService extends DBService {
           const oldBundle = archiverByPart.get(oldPartIndex)!;
           await this.streamBinariesToPart(
             oldBundle,
-            allFileRefs.filter((ref) => ref.partIndex === oldPartIndex),
+            fileRefsByPart.get(oldPartIndex) ?? [],
             exportId,
             oldPartIndex,
             objectStorageService
@@ -613,12 +722,14 @@ export class DownloadExportPipelineService extends DBService {
             hashCount: oldBundle.hashCount
           });
           archiverByPart.delete(oldPartIndex);
+          fileRefsByPart.delete(oldPartIndex);
 
           currentPart = result.finalPart;
           archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
           pendingReader = result.pendingReader;
           pendingCursor = result.pendingCursor;
           pendingChunkIndex = result.pendingChunkIndex;
+          pendingRow = result.pendingRow;
         }
       }
 
@@ -641,7 +752,7 @@ export class DownloadExportPipelineService extends DBService {
         const bundle = archiverByPart.get(partIndex)!;
         await this.streamBinariesToPart(
           bundle,
-          allFileRefs.filter((ref) => ref.partIndex === partIndex),
+          fileRefsByPart.get(partIndex) ?? [],
           exportId,
           partIndex,
           objectStorageService
@@ -655,6 +766,7 @@ export class DownloadExportPipelineService extends DBService {
           hashCount: bundle.hashCount
         });
         archiverByPart.delete(partIndex);
+        fileRefsByPart.delete(partIndex);
       }
     } catch (error) {
       this.abortOpenArchivers(archiverByPart);

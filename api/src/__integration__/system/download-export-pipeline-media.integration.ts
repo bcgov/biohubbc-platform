@@ -58,6 +58,7 @@ async function writeFatParquetToMinIO(
   const schema = new parquetjs.ParquetSchema({
     uuid: { type: 'UTF8', optional: false },
     parent_uuid: { type: 'UTF8', optional: true },
+    submission_feature_id: { type: 'INT64', optional: false },
     observation_name: { type: 'UTF8', optional: true },
     description: { type: 'UTF8', optional: true }
   });
@@ -95,6 +96,10 @@ async function writeFatParquetToMinIO(
     await writer.appendRow({
       uuid: `uuid-${rowsWritten.toString(36)}`,
       parent_uuid: null,
+      // submission_feature_id is NOT NULL in the Parquet schema; the export
+      // pipeline throws on missing/null. Use the row index as a synthetic PK
+      // — the export only needs uniqueness for filename namespacing.
+      submission_feature_id: rowsWritten + 1,
       observation_name: `obs-${rowsWritten}`,
       description: payload.toString('base64')
     });
