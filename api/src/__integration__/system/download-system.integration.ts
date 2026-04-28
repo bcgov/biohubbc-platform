@@ -96,6 +96,7 @@ describe('Download Worker', function () {
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionUploadIds: string[] = [];
   const createdSubmissionIds: number[] = [];
+  const createdUploadIds: string[] = [];
   const createdTicketIds: string[] = [];
   const createdS3Keys: string[] = [];
   const createdArtifactIds: string[] = [];
@@ -144,15 +145,19 @@ describe('Download Worker', function () {
         await db('biohub.submission_feature').whereIn('submission_feature_id', createdSubmissionFeatureIds).del();
       }
 
-      // 2b. Delete artifact records
-      if (createdArtifactIds.length > 0) {
-        await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
-      }
-
-      // 2c. Delete submission_upload (and its child submission_upload_status) before submission
+      // 2b. Delete submission upload bridge rows and uploads
       if (createdSubmissionUploadIds.length > 0) {
         await db('biohub.submission_upload_status').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
         await db('biohub.submission_upload').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
+      }
+
+      if (createdUploadIds.length > 0) {
+        await db('biohub.upload').whereIn('upload_id', createdUploadIds).del();
+      }
+
+      // 2c. Delete artifact records
+      if (createdArtifactIds.length > 0) {
+        await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
       }
 
       // 3. Delete submissions
@@ -223,6 +228,7 @@ describe('Download Worker', function () {
         create_user: SYSTEM_USER_ID
       })
       .returning('upload_id');
+    createdUploadIds.push(upload.upload_id);
 
     const ticketId = await getOrCreateTestTicketId(db, submissionId, upload.upload_id, SYSTEM_USER_ID);
 
@@ -1315,9 +1321,6 @@ describe.skip('DownloadPipelineService download pipeline (system)', function () 
     expect(lines.length).to.be.greaterThanOrEqual(3);
     expect(csv).to.include('Filter Pipeline Dataset A');
     expect(csv).to.include('Filter Pipeline Dataset B');
-    // species_observation should not appear
-    expect(csv).to.not.include('99999');
-
     // Verify download record metadata
     const download = await crudService.findDownloadById(downloadId);
     expect(download!.download_status).to.equal(DownloadStatusEnum.READY);

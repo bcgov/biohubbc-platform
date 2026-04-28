@@ -251,12 +251,21 @@ const insertContributorSQL = (contributorClientId: string) => `
 `;
 
 /**
- * SQL to join the Keycloak service account system user to the contributor.
+ * SQL to join seeded system users to the contributor.
  *
  * @param {string} contributorClientId
  * @param {string} contributorSystemUserGuid
  */
 const insertContributorSystemUserSQL = (contributorClientId: string, contributorSystemUserGuid: string) => `
+  WITH seeded_system_user AS (
+    SELECT su.system_user_id
+    FROM "system_user" su
+    WHERE su.record_end_date IS NULL
+      AND (
+        LOWER(su.user_identifier) IN (${systemUsers.map((user) => `'${user.identifier.toLowerCase()}'`).join(', ')})
+        OR LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')
+      )
+  )
   INSERT INTO contributor_system_user (
     contributor_id,
     system_user_id,
@@ -264,22 +273,16 @@ const insertContributorSystemUserSQL = (contributorClientId: string, contributor
   )
   SELECT
     c.contributor_id,
-    su.system_user_id,
-    su.system_user_id
+    ssu.system_user_id,
+    ssu.system_user_id
   FROM contributor c
-  INNER JOIN "system_user" su
-    ON LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')
-   AND su.record_end_date IS NULL
-  INNER JOIN user_identity_source uis
-    ON su.user_identity_source_id = uis.user_identity_source_id
-   AND LOWER(uis.name) = LOWER('${SYSTEM_IDENTITY_SOURCE.SYSTEM}')
-   AND uis.record_end_date IS NULL
+  CROSS JOIN seeded_system_user ssu
   WHERE LOWER(c.client_id) = LOWER('${contributorClientId}')
     AND c.record_end_date IS NULL
     AND NOT EXISTS (
       SELECT 1
       FROM contributor_system_user csu
-      WHERE csu.system_user_id = su.system_user_id
+      WHERE csu.system_user_id = ssu.system_user_id
         AND csu.record_end_date IS NULL
     )
   ON CONFLICT DO NOTHING;

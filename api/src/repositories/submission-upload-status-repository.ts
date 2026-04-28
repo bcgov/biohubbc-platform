@@ -64,7 +64,8 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
       .with('upload_artifacts', (qb) => {
         qb.select('upload_artifact.upload_id', 'upload_artifact.artifact_id', 'upload_artifact.role')
           .from('upload_artifact')
-          .whereIn('upload_artifact.upload_id', knex.select('upload_id').from('submission_uploads'));
+          .whereIn('upload_artifact.upload_id', knex.select('upload_id').from('submission_uploads'))
+          .whereNull('upload_artifact.record_end_date');
       })
       .with('enriched_artifacts', (qb) => {
         qb.select(

@@ -36,9 +36,21 @@ export const GeoJSONMultiPolygonZodSchema = z.object({
   bbox: z.array(z.number()).min(4).optional()
 });
 
+export const GeoJSONGeometryZodSchema: z.ZodTypeAny = z.lazy(() =>
+  z.union([
+    GeoJSONPointZodSchema,
+    GeoJSONLineStringZodSchema,
+    GeoJSONPolygonZodSchema,
+    GeoJSONMultiPointZodSchema,
+    GeoJSONMultiLineStringZodSchema,
+    GeoJSONMultiPolygonZodSchema,
+    GeoJSONGeometryCollectionZodSchema
+  ])
+);
+
 export const GeoJSONGeometryCollectionZodSchema = z.object({
   type: z.enum(['GeometryCollection']),
-  geometries: z.array(z.record(z.string(), z.any())),
+  geometries: z.array(GeoJSONGeometryZodSchema),
   bbox: z.array(z.number()).min(4).optional()
 });
 
@@ -46,12 +58,12 @@ export const GeoJSONFeatureZodSchema = z.object({
   type: z.enum(['Feature']),
   id: z.union([z.number(), z.string()]).optional(),
   properties: z.record(z.string(), z.any()),
-  geometry: z.record(z.string(), z.any()),
+  geometry: GeoJSONGeometryZodSchema,
   bbox: z.array(z.number()).min(4).optional()
 });
 
 export const GeoJSONFeatureCollectionZodSchema = z.object({
   type: z.enum(['FeatureCollection']),
-  features: z.array(z.record(z.string(), z.any())),
+  features: z.array(GeoJSONFeatureZodSchema),
   bbox: z.array(z.number()).min(4).optional()
 });
