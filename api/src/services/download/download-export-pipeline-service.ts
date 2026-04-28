@@ -325,21 +325,23 @@ export class DownloadExportPipelineService extends DBService {
         }
 
         // submission_feature_id is NOT NULL in the Parquet schema. INT64
-        // reads come back as BigInt; cast to number (the column is int4).
+        // reads come back as BigInt; `Number()` accepts both BigInt and
+        // number for the int4 column range.
         const rawId = next.submission_feature_id;
         if (rawId === null || rawId === undefined) {
           throw new Error(
             `DownloadExportPipelineService->writeFeatureTypeExport: Parquet row for ${featureTypeName} is missing submission_feature_id`
           );
         }
-        const submissionFeatureId = typeof rawId === 'bigint' ? Number(rawId) : (rawId as number);
+        const submissionFeatureId = Number(rawId);
         const flattened = flattenFeatureBySchema(next, properties, submissionFeatureId, `files${currentPart}`);
         flattened['submission_feature_id'] = String(submissionFeatureId);
         // `uuid` is NOT NULL in the Parquet schema; `parent_uuid` is nullable
         // (root types like `dataset` have no parent) — emit empty string so
-        // the column is still present.
-        flattened['uuid'] = String(next.uuid ?? '');
-        flattened['parent_uuid'] = next.parent_uuid == null ? '' : String(next.parent_uuid);
+        // the column is still present. Narrow to `string | null` rather than
+        // `String(unknown)` so we don't risk an `[object Object]` stringify.
+        flattened['uuid'] = (next.uuid as string | null) ?? '';
+        flattened['parent_uuid'] = (next.parent_uuid as string | null) ?? '';
 
         const refsForRow = this.collectArtifactKeyRefs(next, artifactKeyProperties, submissionFeatureId, currentPart);
         fileRefs.push(...refsForRow);
