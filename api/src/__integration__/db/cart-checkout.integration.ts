@@ -3,11 +3,14 @@
 // works correctly against the real database.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
+// pg-boss is not running in the make test-db environment, so CartService.dependencies.publishProcessDownloadJob
+// is stubbed in beforeEach to resolve without attempting a real enqueue.
 //
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
@@ -31,11 +34,18 @@ describe('Cart checkout (integration)', function () {
     await connection.open();
     cartService = new CartService(connection);
     downloadService = new DownloadService(connection);
+
+    // pg-boss is not running in the make test-db environment; stub the publisher so
+    // CartService.checkoutCart can complete without attempting a real enqueue.
+    sinon
+      .stub(CartService.dependencies, 'publishProcessDownloadJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
   });
 
   afterEach(async () => {
     await connection.rollback();
     connection.release();
+    sinon.restore();
   });
 
   /**

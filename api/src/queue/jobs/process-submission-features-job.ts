@@ -258,13 +258,13 @@ async function finalizeProcessSubmissionFeaturesStage(
 }
 
 /**
- * Publish downstream index work.
+ * Publish downstream index work, warn-and-commit on failure.
  *
- * This step is intentionally isolated in its own transaction boundary:
- * - If enqueue fails, the process job throws and is retried by pg-boss.
- * - Because earlier phases are already committed, retries resume from persisted state.
- *
- * Index publish is required for successful process-stage completion.
+ * Indexing is best-effort: the just-completed ingestion/validation status updates are durable
+ * work and finalize regardless of whether the downstream indexing job enqueues. Throwing here
+ * would unwind real completed work and trigger pg-boss retry of the whole ingestion stage,
+ * which is undesirable. On enqueue failure we log a warning and let the orchestrator continue
+ * to its finalize phase.
  *
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
@@ -277,34 +277,33 @@ async function executeIndexSubmissionFeaturesPublish(
   jobId: string
 ): Promise<void> {
   await withConnection(async (connection) => {
-    // Enqueue downstream indexing and treat enqueue failures as retryable job failures.
     const publishStart = Date.now();
-    const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
-      submissionId
-    });
 
-    if (indexResult.status === 'error') {
-      defaultLog.error({
+    try {
+      const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+        submissionId
+      });
+
+      defaultLog.info({
         label: 'executeIndexSubmissionFeaturesPublish',
-        message: 'Index submission publish failed',
+        message: 'Index submission publish completed',
         jobId,
         submissionUploadId,
         submissionId,
         elapsedMs: Date.now() - publishStart,
         indexResult
       });
-      throw new Error(`Index submission publish failed: ${indexResult.message}`);
+    } catch (error) {
+      defaultLog.warn({
+        label: 'executeIndexSubmissionFeaturesPublish',
+        message: 'Index submission publish failed; finalizing ingestion status anyway',
+        jobId,
+        submissionUploadId,
+        submissionId,
+        elapsedMs: Date.now() - publishStart,
+        error: toErrorMetadata(error)
+      });
     }
-
-    defaultLog.info({
-      label: 'executeIndexSubmissionFeaturesPublish',
-      message: 'Index submission publish completed',
-      jobId,
-      submissionUploadId,
-      submissionId,
-      elapsedMs: Date.now() - publishStart,
-      indexResult
-    });
   });
 }
 

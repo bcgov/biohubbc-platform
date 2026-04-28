@@ -390,6 +390,30 @@ describe('CartService', () => {
       expect(updateCartStub).to.not.have.been.called;
       expect(publishStub).to.not.have.been.called;
     });
+
+    it('throws when publishProcessDownloadJob throws', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new CartService(mockDBConnection);
+
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([1, 2, 3]);
+      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
+      sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: 'team-1',
+        name: 'team',
+        description: 'description',
+        member_count: 0
+      });
+      sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
+      sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      sinon.stub(CartService.dependencies, 'publishProcessDownloadJob').rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.checkoutCart('cart-1', 42);
+        expect.fail('expected checkoutCart to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+    });
   });
 
   describe('updateCart', () => {
