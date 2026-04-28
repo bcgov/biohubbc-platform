@@ -804,16 +804,18 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('rethrows when pg-boss throws so the caller transaction rolls back', async () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
-      });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishProcessDownloadExportJob(mockConnection, {
+          downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+        });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
   });
 });

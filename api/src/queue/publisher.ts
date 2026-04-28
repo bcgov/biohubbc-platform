@@ -399,6 +399,10 @@ export const publishProcessDownloadJob = async (
  *
  * `singletonKey: export-{downloadExportId}` paired with `policy: 'short'` on
  * the queue (see worker.ts) prevents two concurrent jobs for the same export.
+ *
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishProcessDownloadExportJob = async (
   connection: IDBConnection,
@@ -446,16 +450,13 @@ export const publishProcessDownloadExportJob = async (
 
     return { status: 'duplicate', message: 'Job already exists for this download export' };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishProcessDownloadExportJob',
       message: 'Failed to publish job',
       downloadExportId: data.downloadExportId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };
 
