@@ -3,6 +3,7 @@ import { DataRequestResponse } from './useDataRequestApi.interface';
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+export type TicketSystemUserStatus = 'requested' | 'started' | 'blocked' | 'resolved';
 
 export interface ITicket {
   ticket_id: string;
@@ -53,11 +54,25 @@ export interface ITicketReference {
   create_date: string;
 }
 
+export interface ITicketSystemUser {
+  ticket_system_user_id: string;
+  ticket_id: string;
+  system_user_id: number;
+  status: TicketSystemUserStatus;
+  system_user: {
+    system_user_id: number;
+    display_name: string | null;
+    user_identifier: string;
+    email: string | null;
+  };
+}
+
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
+  ticket_system_users: ITicketSystemUser[];
 }
 
 export interface ICreateTicketRequest {
@@ -85,6 +100,15 @@ export interface ICreateTicketReference {
 
 export interface ICreateTicketReferenceRequest {
   references: ICreateTicketReference[];
+}
+
+export interface ICreateTicketSystemUser {
+  system_user_id: number;
+  status: TicketSystemUserStatus;
+}
+
+export interface IUpdateTicketSystemUserStatusRequest {
+  status: TicketSystemUserStatus;
 }
 
 export interface IGetTicketsResponse {

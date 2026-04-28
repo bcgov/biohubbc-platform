@@ -1,9 +1,9 @@
 import Stack from '@mui/material/Stack';
+import { TeamForm } from 'components/form/TeamForm';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
-import { TicketTeamForm } from 'features/admin/tickets/components/dialog/team/form/TicketTeamForm';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useFormikContext } from 'formik';
-import { IAvailableUser, ITeamMember } from 'interfaces/useTeamsApi.interface';
+import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
 
 interface ICreateDataRequestFormProps {
   options: SidebarOption[];
@@ -29,10 +29,9 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
   const { options, isLoadingUsers, isSubmitting, onSearchUsers } = props;
   const { values, setFieldValue } = useFormikContext<ICreateDataRequestFormValues>();
 
-  const members: ITeamMember[] = values.system_users.map((user) => ({
-    team_member_id: String(user.system_user_id),
-    system_user_id: user.system_user_id,
-    user_identifier: user.user_identifier
+  const users = values.system_users.map((user) => ({
+    id: String(user.system_user_id),
+    label: user.user_identifier
   }));
 
   const handleSelectUser = (option: SidebarOption | null) => {
@@ -56,8 +55,8 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
     setFieldValue('system_users', nextSystemUsers);
   };
 
-  const handleRemoveMember = (teamMemberId: string) => {
-    const removeUserId = Number(teamMemberId);
+  const handleRemoveUser = (userId: string) => {
+    const removeUserId = Number(userId);
     const nextSystemUsers = values.system_users.filter((user) => user.system_user_id !== removeUserId);
 
     setFieldValue('system_users', nextSystemUsers);
@@ -74,14 +73,14 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
         slotProps={{ htmlInput: { maxLength: 2000 } }}
       />
 
-      <TicketTeamForm
+      <TeamForm
         options={options}
         isLoading={isLoadingUsers}
-        members={members}
+        users={users}
         isSubmitting={isSubmitting}
         onSearch={onSearchUsers}
         onSelectUser={handleSelectUser}
-        onRemoveAssignee={handleRemoveMember}
+        onRemoveUser={handleRemoveUser}
       />
     </Stack>
   );
