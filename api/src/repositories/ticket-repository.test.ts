@@ -4,7 +4,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { Ticket, TicketSlug } from '../models/ticket';
 import { TicketRepository } from './ticket-repository';
 
@@ -151,9 +151,9 @@ describe('TicketRepository', () => {
         await repo.getTicketById(mockTicket.ticket_id);
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        if (error instanceof ApiExecuteSQLError) {
-          expect(error.message).to.equal('Failed to get ticket record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        if (error instanceof ApiNotFoundError) {
+          expect(error.message).to.equal('Ticket not found');
         }
       }
     });
