@@ -86,28 +86,30 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Handle post-scan actions for a clean artifact.
+   * Perform the irreversible post-clean-scan writes: promote the S3 object from the security bucket to the main
+   * bucket, and unblock the upload_archive so extraction can proceed.
    *
-   * Promotes the object from quarantine to main storage and unblocks the corresponding upload archive.
+   * **Ordering contract.** This method must only be called AFTER `publishNextPipelineStep` has successfully
+   * enqueued the downstream submission-processing job. Running it earlier creates an orphan: a CLEAN/promoted
+   * artifact with no downstream pipeline step to consume it. See `executeScan` for the full ordering.
    *
-   * @param {string} artifactId - Artifact identifier.
-   * @param {string} objectKey - S3 object key for the artifact.
-   * @returns {Promise<UploadArchive>} Updated upload archive record after unblocking.
+   * Known residual: if this method itself throws between the CLEAN-security commit and its two writes
+   * (e.g. S3 outage between `promoteFromSecurity` and `updateUploadArchive`), a narrower orphan direction
+   * is possible (security=CLEAN but archive=BLOCKED). Fixing that tail requires a transactional outbox or
+   * similar structural change.
+   *
+   * @param {UploadArchive} uploadArchive - The already-looked-up archive record for the artifact.
+   * @param {string} objectKey - S3 object key to promote from security to main bucket.
+   * @returns {Promise<void>}
    */
-  async handleCleanScanResult(artifactId: string, objectKey: string): Promise<UploadArchive> {
-    const uploadArchiveService = new UploadArchiveService(this.connection);
-    const uploadArchive = await uploadArchiveService.getUploadArchiveByArtifactId(artifactId);
-
-    // 1. Copy file from security bucket to main bucket
+  async handleCleanScanResult(uploadArchive: UploadArchive, objectKey: string): Promise<void> {
     const storageService = new ObjectStorageService();
     await storageService.promoteFromSecurity(objectKey);
 
-    // 2. Unblock the upload_archive for extraction
+    const uploadArchiveService = new UploadArchiveService(this.connection);
     await uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
       archive_status: ProcessStatusStatusEnum.PENDING
     });
-
-    return uploadArchive;
   }
 
   /**
@@ -183,15 +185,35 @@ export class ArtifactSecurityService extends DBService {
         results: sanitizeJsonbValue(scanOutcome.results)
       });
 
-      // 5. Update artifact security status
-      await this.updateArtifactSecurity(artifactSecurityId, {
-        security: scanOutcome.securityStatus
-      });
-
-      // 6. Handle post-scan actions for clean files
+      // 5. Handle post-scan actions by scan outcome.
       if (scanOutcome.securityStatus === SecurityStatusEnum.CLEAN) {
-        const uploadArchive = await this.handleCleanScanResult(artifact.artifact_id, artifact.object_key);
+        // Publish BEFORE committing any point-of-no-return write
+        // (security = CLEAN, archive unblock, S3 promote).
+        //
+        // If `publishProcessSubmissionFeaturesJob` throws here — e.g. pg-boss's DB is
+        // unavailable — the caller's transaction rolls back with nothing CLEAN persisted,
+        // the archive stays BLOCKED, and the S3 object stays in the security bucket.
+        // pg-boss retries the whole scan on a fresh connection; `getArtifactSecurity`
+        // still reads `security = PENDING`, so `executeScan` re-runs the full flow and
+        // converges. Without this ordering, a queue outage at this step leaves a clean
+        // artifact with no downstream submission-processing job.
+        const uploadArchiveService = new UploadArchiveService(this.connection);
+        const uploadArchive = await uploadArchiveService.getUploadArchiveByArtifactId(artifact.artifact_id);
+
         await this.publishNextPipelineStep(uploadArchive);
+
+        // Point-of-no-return: publish succeeded; now commit the CLEAN state and
+        // the irreversible S3 + archive writes.
+        await this.updateArtifactSecurity(artifactSecurityId, {
+          security: SecurityStatusEnum.CLEAN
+        });
+        await this.handleCleanScanResult(uploadArchive, artifact.object_key);
+      } else {
+        // INFECTED / ERROR / SKIPPED: no publish, no S3 promote, no archive unblock.
+        // Write the security status directly — no orphan risk on this branch.
+        await this.updateArtifactSecurity(artifactSecurityId, {
+          security: scanOutcome.securityStatus
+        });
       }
 
       return {
