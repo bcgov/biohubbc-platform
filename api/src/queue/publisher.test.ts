@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ApiNotFoundError } from '../errors/api-error';
 import type { DownloadRecord } from '../models/download';
 import type { SubmissionUpload } from '../models/submission-upload';
 import type { SubmissionValidationRecord } from '../models/submission-validation';
@@ -166,16 +167,18 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('throws when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
 
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, defaultSubmissionUpload);
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishProcessSubmissionFeaturesJob(mockConnection, defaultSubmissionUpload);
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
 
     it('returns blocked status when validation record exists with non-failed status', async () => {
@@ -346,15 +349,17 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('throws when pg-boss throws', async () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishMalwareScanJob(getMockDBConnection(), {
-        artifactSecurityId: 'artifact-security-000'
-      });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishMalwareScanJob(getMockDBConnection(), {
+          artifactSecurityId: 'artifact-security-000'
+        });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
   });
 
@@ -449,16 +454,16 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('throws when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777
-      });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
   });
 
@@ -537,15 +542,19 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error when download not found', async () => {
+    it('throws ApiNotFoundError when download not found', async () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999' };
-      const result = await publishProcessDownloadJob(mockConnection, data);
 
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('Download not found');
+      try {
+        await publishProcessDownloadJob(mockConnection, data);
+        expect.fail('expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Download not found');
+      }
     });
 
     it('uses singletonKey based on downloadId to prevent duplicates', async () => {
@@ -586,18 +595,20 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('throws when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
 
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
-      });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishProcessDownloadJob(mockConnection, {
+          downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+        });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
   });
 
@@ -684,14 +695,16 @@ describe('publisher', () => {
       );
     });
 
-    it('returns error status when pg-boss throws', async () => {
+    it('throws when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+      try {
+        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
     });
   });
 });

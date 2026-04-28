@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { ApiNotFoundError } from '../errors/api-error';
 import { DownloadStatusEnum } from '../models/download-status';
 import { SubmissionUpload } from '../models/submission-upload';
 import { DownloadService } from '../services/download/download-service';
@@ -58,8 +59,7 @@ export interface IPublishOptions {
 export type PublishJobResult =
   | { status: 'published'; jobId: string }
   | { status: 'blocked'; message: string; existingStatus: string }
-  | { status: 'duplicate'; message: string }
-  | { status: 'error'; message: string };
+  | { status: 'duplicate'; message: string };
 
 /**
  * Options for process submission features jobs.
@@ -114,7 +114,9 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
  * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {SubmissionUpload} submissionUpload Pre-resolved bridge record
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
@@ -203,16 +205,13 @@ export const publishProcessSubmissionFeaturesJob = async (
       return { status: 'duplicate', message: 'Job already exists for this submission' };
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishProcessSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionUploadId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };
 
@@ -224,7 +223,9 @@ export const publishProcessSubmissionFeaturesJob = async (
  * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {IMalwareScanJobData} data Job data containing artifactSecurityId
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishMalwareScanJob = async (
   connection: IDBConnection,
@@ -270,16 +271,13 @@ export const publishMalwareScanJob = async (
 
     return { status: 'duplicate', message: 'Job already exists for this artifact security record' };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishMalwareScanJob',
       message: 'Failed to publish job',
       artifactSecurityId: data.artifactSecurityId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };
 
@@ -292,7 +290,10 @@ export const publishMalwareScanJob = async (
  * @param {IDBConnection} connection Database connection for download record updates
  * @param {IProcessDownloadJobData} data Job data containing downloadId
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws {ApiNotFoundError} When the download row does not exist.
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishProcessDownloadJob = async (
   connection: IDBConnection,
@@ -306,7 +307,7 @@ export const publishProcessDownloadJob = async (
     const download = await downloadService.findDownloadById(data.downloadId);
 
     if (!download) {
-      return { status: 'error', message: 'Download not found' };
+      throw new ApiNotFoundError('Download not found', ['publishProcessDownloadJob', { downloadId: data.downloadId }]);
     }
 
     // Check if download is already being processed or completed
@@ -361,16 +362,13 @@ export const publishProcessDownloadJob = async (
 
     return { status: 'duplicate', message: 'Job already exists for this download' };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishProcessDownloadJob',
       message: 'Failed to publish job',
       downloadId: data.downloadId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };
 
@@ -395,7 +393,9 @@ const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishIndexSubmissionFeaturesJob = async (
   connection: IDBConnection,
@@ -435,16 +435,13 @@ export const publishIndexSubmissionFeaturesJob = async (
 
     return { status: 'duplicate', message: 'Job already exists for this submission' };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };
 
@@ -470,7 +467,9 @@ const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IComputeScopeAnchorsJobData} data Job data containing securityScopeId
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
  */
 export const publishComputeScopeAnchorsJob = async (
   connection: IDBConnection,
@@ -512,15 +511,12 @@ export const publishComputeScopeAnchorsJob = async (
 
     return { status: 'duplicate', message: 'Job already exists for this security scope' };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
     defaultLog.error({
       label: 'publishComputeScopeAnchorsJob',
       message: 'Failed to publish job',
       securityScopeId: data.securityScopeId,
       error
     });
-
-    return { status: 'error', message: errorMessage };
+    throw error;
   }
 };

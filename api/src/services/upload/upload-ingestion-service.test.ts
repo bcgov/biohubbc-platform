@@ -498,5 +498,37 @@ describe('UploadIngestionService', () => {
         expect(publishStub.called).to.be.false;
       }
     });
+
+    describe('when publishMalwareScanJob throws', () => {
+      beforeEach(() => {
+        // Parent beforeEach pre-stubs publishMalwareScanJob to resolve;
+        // restore that stub and re-stub to reject so the publisher throws.
+        (UploadIngestionService.dependencies.publishMalwareScanJob as sinon.SinonStub).restore();
+        sinon
+          .stub(UploadIngestionService.dependencies, 'publishMalwareScanJob')
+          .rejects(new Error('pg-boss unavailable'));
+      });
+
+      it('throws when publishMalwareScanJob throws', async () => {
+        sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+        sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
+        sinon.stub(ArtifactService.prototype, 'updateArtifactsByUploadId').resolves();
+        sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurityByUploadId').resolves(mockSecurityRecords);
+        sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
+
+        const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
+        sinon
+          .stub(UploadIngestionService.dependencies, 'getSecurityS3Client')
+          .returns(s3ClientStub as unknown as S3Client);
+        sinon.stub(UploadIngestionService.dependencies, 'getSecurityObjectStoreBucketName').returns('security-bucket');
+
+        try {
+          await service.completeArchiveUpload(mockParams);
+          expect.fail('expected completeArchiveUpload to throw');
+        } catch (error) {
+          expect((error as Error).message).to.equal('pg-boss unavailable');
+        }
+      });
+    });
   });
 });
