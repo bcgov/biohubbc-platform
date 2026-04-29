@@ -75,11 +75,6 @@ app:
     fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
     fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
 
-  # Media ingestion batching
-  mediaIngestion:
-    batchBytes: "" # Optional override for MEDIA_INGEST_BATCH_BYTES
-    batchFiles: "" # Optional override for MEDIA_INGEST_BATCH_FILES
-
   # Submission archive multipart upload sizing
   uploadMultipart:
     partSizeCapBytes: "104857600" # Prefer max 100 MiB part size (configurable)
@@ -96,7 +91,7 @@ app:
     featureBatchMaxBytes: "52428800" # Flush feature batches when in-memory estimate reaches this size
     mediaConcurrency: "" # Optional override for UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
     jsonFileMaxBytes: "104857600" # Max bytes for a single features/*.json or codes/*.json archive entry
-    
+
   # ITIS SOLR
   itisSolr: "https://services.itis.gov"
 
