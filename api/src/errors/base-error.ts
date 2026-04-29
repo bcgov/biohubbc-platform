@@ -21,7 +21,7 @@ export class BaseError extends Error {
     // instances correctly match `instanceof Parent` across module boundaries.
     let cls: unknown = new.target;
     while (cls && cls !== Function.prototype) {
-      if (Object.prototype.hasOwnProperty.call(cls, 'brand')) {
+      if (Object.hasOwn(cls as object, 'brand')) {
         const brand = (cls as { brand: unknown }).brand;
         if (typeof brand === 'symbol') {
           Object.defineProperty(this, brand, { value: true, enumerable: false });
@@ -71,7 +71,7 @@ export class BaseError extends Error {
       return false;
     }
 
-    if (Object.prototype.hasOwnProperty.call(this, 'brand')) {
+    if (Object.hasOwn(this as object, 'brand')) {
       const brand = (this as unknown as { brand: unknown }).brand;
       if (typeof brand === 'symbol') {
         return (candidate as Record<symbol, unknown>)[brand] === true;
