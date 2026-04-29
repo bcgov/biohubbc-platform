@@ -91,7 +91,7 @@ describe('useOptimisticMutation', () => {
     expect(setData).toHaveBeenNthCalledWith(1, { value: 2 });
     expect(setData).toHaveBeenNthCalledWith(2, { value: 1 });
     expect(onRollback).toHaveBeenCalledTimes(1);
-    expect(onRollback).toHaveBeenCalledWith({
+    expect(onRollback).toHaveBeenCalledWith(error, {
       currentState: { value: 1 },
       optimisticState: { value: 2 }
     });

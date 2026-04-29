@@ -1,3 +1,4 @@
+import { TeamForm } from 'components/form/TeamForm';
 import { OkDialog } from 'components/dialog/OkDialog';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { APIError } from 'hooks/api/useAxios';
@@ -7,11 +8,10 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { TicketTeamForm } from './form/TicketTeamForm';
 
 interface ITicketTeamDialogProps {
   open: boolean;
-  teamId?: string;
+  teamId: string;
   members: ITeamMember[];
   onClose: () => void;
   onMemberAdd: (member: ITeamMember) => void;
@@ -19,7 +19,7 @@ interface ITicketTeamDialogProps {
 }
 
 /**
- * Dialog for managing ticket assignees.
+ * Dialog for managing ticket participants.
  *
  * @param {ITicketTeamDialogProps} props
  * @return {*}
@@ -41,10 +41,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [dialogContext]
   );
 
-  const availableUsersLoader = useDataLoader(
-    (search?: string) => api.teams.getAvailableUsers(search),
-    (error) => showApiError(error)
-  );
+  const availableUsersLoader = useDataLoader((search?: string) => api.teams.getAvailableUsers(search), showApiError);
 
   useEffect(() => {
     if (!open) {
@@ -58,27 +55,21 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     availableUsersLoader.refresh(search);
   }, 300);
 
-  const handleAvailableUserSearch = useCallback(
-    (search: string) => {
-      debouncedAvailableUserRefresh(search);
-    },
-    [debouncedAvailableUserRefresh]
-  );
-
+  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
   const userOptions = useMemo<SidebarOption[]>(
     () =>
-      (availableUsersLoader.data?.users ?? []).map((user) => ({
+      availableUsers.map((user) => ({
         value: user.system_user_id,
         label: user.user_identifier
       })),
-    [availableUsersLoader.data?.users]
+    [availableUsers]
   );
 
   const memberSystemUserIds = useMemo(() => new Set(members.map((member) => member.system_user_id)), [members]);
 
   const handleSelectUser = useCallback(
     async (option: SidebarOption | null) => {
-      if (!teamId || !option) {
+      if (!option) {
         return;
       }
 
@@ -114,18 +105,14 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [api.teams, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
   );
 
-  const handleRemoveAssignee = useCallback(
-    async (teamMemberId: string) => {
-      if (!teamId) {
-        return;
-      }
-
-      const removedMember = members.find((member) => member.team_member_id === teamMemberId);
+  const handleRemoveUser = useCallback(
+    async (userId: string) => {
+      const removedMember = members.find((member) => member.team_member_id === userId);
 
       try {
         setIsSubmitting(true);
-        onMemberRemove(teamMemberId);
-        await api.teams.deleteTeamMember(teamId, teamMemberId);
+        onMemberRemove(userId);
+        await api.teams.deleteTeamMember(teamId, userId);
       } catch (error) {
         if (removedMember) {
           onMemberAdd(removedMember);
@@ -138,24 +125,33 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [api.teams, members, onMemberAdd, onMemberRemove, showApiError, teamId]
   );
 
+  const users = useMemo(
+    () =>
+      members.map((member) => ({
+        id: member.team_member_id,
+        label: member.user_identifier
+      })),
+    [members]
+  );
+
   return (
     <OkDialog
       open={open}
       onClose={onClose}
-      dialogTitle="Assignees"
+      dialogTitle="Participants"
       dialogText=""
       okButtonLabel="Done"
       okButtonProps={{ size: 'large', disabled: isSubmitting }}
       dialogProps={{ fullWidth: true, maxWidth: 'md' }}
       dialogContent={
-        <TicketTeamForm
+        <TeamForm
           options={userOptions}
           isLoading={availableUsersLoader.isLoading}
-          members={members}
+          users={users}
           isSubmitting={isSubmitting}
-          onSearch={handleAvailableUserSearch}
+          onSearch={debouncedAvailableUserRefresh}
           onSelectUser={handleSelectUser}
-          onRemoveAssignee={handleRemoveAssignee}
+          onRemoveUser={handleRemoveUser}
         />
       }
     />

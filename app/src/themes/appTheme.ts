@@ -105,7 +105,8 @@ const appTheme = createTheme({
     },
     MuiButton: {
       defaultProps: {
-        disableElevation: true
+        disableElevation: true,
+        disableRipple: true
       },
       styleOverrides: {
         root: ({ theme }) => ({
@@ -218,6 +219,18 @@ const appTheme = createTheme({
           padding: '4px 16px',
           '& .MuiListItemText-root': {
             margin: '4px'
+          }
+        }
+      }
+    },
+    MuiListItemIcon: {
+      styleOverrides: {
+        root: {
+          minWidth: 34,
+          '& .MuiSvgIcon-root, & svg': {
+            width: '1.25rem !important',
+            height: '1.25rem !important',
+            fontSize: '1.25rem'
           }
         }
       }
@@ -345,6 +358,18 @@ const appTheme = createTheme({
             color: theme.palette.error.main
           }
         })
+      }
+    },
+    MuiList: {
+      styleOverrides: {
+        root: { padding: 0 }
+      }
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          padding: '8px'
+        }
       }
     },
     MuiAutocomplete: {

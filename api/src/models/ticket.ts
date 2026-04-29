@@ -3,6 +3,7 @@ import { DataRequest } from './data-request';
 import { TicketComment } from './ticket-comment';
 import { TicketReference } from './ticket-reference';
 import { TicketStatus as TicketStatusRecord } from './ticket-status';
+import { TicketSystemUserWithUser } from './ticket-system-user';
 
 export interface TicketFilters {
   team_ids?: string[];
@@ -60,6 +61,7 @@ export const TicketWithHistory = Ticket.extend({
   statuses: z.array(TicketStatusRecord),
   comments: z.array(TicketComment),
   references: z.array(TicketReference),
-  data_requests: z.array(DataRequest)
+  data_requests: z.array(DataRequest),
+  ticket_system_users: z.array(TicketSystemUserWithUser)
 });
 export type TicketWithHistory = z.infer<typeof TicketWithHistory>;

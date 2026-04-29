@@ -7,7 +7,11 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
 import { DownloadId } from '../../../../models/download';
+import { CartRepository } from '../../../../repositories/cart-repository';
+import { TeamService } from '../../../../services/access-policy/team-service';
 import { CartService } from '../../../../services/cart-service';
+import { CartSubmissionFeatureService } from '../../../../services/cart-submission-feature-service';
+import { DownloadService } from '../../../../services/download/download-service';
 
 chai.use(sinonChai);
 
@@ -137,6 +141,42 @@ describe('cart/{cartId}/checkout', () => {
         expect.fail('Expected handler to throw');
       } catch (error) {
         expect((error as ApiError).message).to.equal('Checkout failed');
+        expect(mockDBConnection.rollback).to.have.been.calledOnce;
+        expect(mockDBConnection.release).to.have.been.calledOnce;
+      }
+    });
+
+    it('rolls back and releases when publishProcessDownloadJob throws', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub(),
+        systemUserId: sinon.stub().returns(42)
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([1, 2, 3]);
+      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
+      sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: 'team-1',
+        name: 'team',
+        description: 'description',
+        member_count: 0
+      });
+      sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
+      sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      sinon.stub(CartService.dependencies, 'publishProcessDownloadJob').rejects(new Error('pg-boss unavailable'));
+
+      const requestHandler = checkoutCart();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = 'cart-uuid-5678';
+      mockReq.keycloak_token = { sub: 'user-id' };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }

@@ -84,27 +84,22 @@ describe('process-submission-features-job', () => {
       expect(publishStub.calledBefore(toIngestedStub)).to.be.true;
     });
 
-    it('rethrows when enqueue returns error and does not mark upload ingested', async () => {
+    it('finalizes upload as ingested when indexing publish throws (warn-and-commit)', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
         .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
-        .resolves({ status: 'error', message: 'pg-boss unavailable' });
+        .rejects(new Error('pg-boss unavailable'));
 
-      try {
-        await processSubmissionFeaturesJobHandler([createMockJob()]);
-        expect.fail('expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.contain('Index submission publish failed');
-      }
+      await processSubmissionFeaturesJobHandler([createMockJob()]);
 
       const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
       const updateValidationStub = SubmissionValidationService.prototype
         .updateSubmissionValidationStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
         .deleteFeaturesBySubmissionUploadId as sinon.SinonStub;
-      expect(toIngestedStub.called).to.be.false;
-      expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.false;
-      expect(deleteFeaturesStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.true;
+      expect(deleteFeaturesStub.called).to.be.false;
     });
 
     it('marks upload invalid when ingestion returns deterministic validation errors', async () => {

@@ -51,36 +51,34 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     dialogContext.setYesNoDialog({ open: false });
   };
 
-  const timelineEvents: TimelineEvent[] = ticket
-    ? [
-        ...ticket.statuses.map(
-          (status): StatusEvent => ({
-            kind: 'status',
-            id: status.ticket_status_id,
-            create_date: status.create_date,
-            user_identifier: status.user_identifier,
-            status: status.status
-          })
-        ),
-        ...ticket.comments.map(
-          (comment): CommentEvent => ({
-            kind: 'comment',
-            id: comment.ticket_comment_id,
-            create_date: comment.create_date,
-            user_identifier: comment.user_identifier,
-            comment: comment.comment
-          })
-        ),
-        ...ticket.data_requests.map(
-          (dataRequest): DataRequestEvent => ({
-            kind: 'data_request',
-            id: dataRequest.data_request_id,
-            create_date: dataRequest.create_date ?? '',
-            data_request: dataRequest
-          })
-        )
-      ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime())
-    : [];
+  const timelineEvents: TimelineEvent[] = [
+    ...ticket.statuses.map(
+      (status): StatusEvent => ({
+        kind: 'status',
+        id: status.ticket_status_id,
+        create_date: status.create_date,
+        user_identifier: status.user_identifier,
+        status: status.status
+      })
+    ),
+    ...ticket.comments.map(
+      (comment): CommentEvent => ({
+        kind: 'comment',
+        id: comment.ticket_comment_id,
+        create_date: comment.create_date,
+        user_identifier: comment.user_identifier,
+        comment: comment.comment
+      })
+    ),
+    ...ticket.data_requests.map(
+      (dataRequest): DataRequestEvent => ({
+        kind: 'data_request',
+        id: dataRequest.data_request_id,
+        create_date: dataRequest.create_date ?? '',
+        data_request: dataRequest
+      })
+    )
+  ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime());
 
   if (!timelineEvents.length) {
     return null;

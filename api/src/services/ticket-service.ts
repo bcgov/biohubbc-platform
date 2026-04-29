@@ -13,6 +13,7 @@ import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketStatusService } from './ticket-status-service';
+import { TicketSystemUserService } from './ticket-system-user-service';
 
 export class TicketService extends DBService {
   teamService: TeamService;
@@ -21,6 +22,7 @@ export class TicketService extends DBService {
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
   dataRequestService: DataRequestService;
+  ticketSystemUserService: TicketSystemUserService;
 
   /**
    * Creates an instance of TicketService.
@@ -36,6 +38,7 @@ export class TicketService extends DBService {
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
     this.dataRequestService = new DataRequestService(connection);
+    this.ticketSystemUserService = new TicketSystemUserService(connection);
   }
 
   /**
@@ -78,7 +81,7 @@ export class TicketService extends DBService {
     // Data-request flows intentionally do not backfill requester identifiers onto ticket teams.
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
-      description: 'Auto-generated team for ticket assignees.',
+      description: 'Auto-generated team for ticket system users.',
       system_user_ids: systemUserIds
     });
 
@@ -86,22 +89,31 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Get a ticket by its UUID with separate status and comment logs.
+   * Get a ticket by its UUID with related history and assignment collections.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketWithHistory>} The requested ticket including status and comment logs.
+   * @return {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and ticket system users.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, statuses, comments, references, dataRequests] = await Promise.all([
+    // Read all timeline/relationship collections in parallel to keep detail view latency predictable.
+    const [ticket, statuses, comments, references, dataRequests, ticketSystemUsers] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
       this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
-      this.dataRequestService.findDataRequestsByTicketId(ticketId)
+      this.dataRequestService.findDataRequestsByTicketId(ticketId),
+      this.ticketSystemUserService.getActiveTicketSystemUsersByTicketId(ticketId)
     ]);
 
-    return { ...ticket, statuses, comments, references, data_requests: dataRequests };
+    return {
+      ...ticket,
+      statuses,
+      comments,
+      references,
+      data_requests: dataRequests,
+      ticket_system_users: ticketSystemUsers
+    };
   }
 
   /**

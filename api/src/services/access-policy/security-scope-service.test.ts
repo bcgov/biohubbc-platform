@@ -83,6 +83,39 @@ describe('SecurityScopeService', () => {
       expect(mappingStub).to.have.been.calledOnce;
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
     });
+
+    it('throws when publishComputeScopeAnchorsJob throws (new scope branch)', async () => {
+      const newScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
+      sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(newScope);
+      sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.createScopeForPolicyStatement(policyStatementId, urn);
+        expect.fail('expected createScopeForPolicyStatement to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+    });
+
+    it('throws when publishComputeScopeAnchorsJob throws (existing scope branch)', async () => {
+      const existingScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
+      sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(null);
+      sinon.stub(SecurityScopeRepository.prototype, 'getSecurityScopeByScopeHash').resolves(existingScope);
+      sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.createScopeForPolicyStatement(policyStatementId, urn);
+        expect.fail('expected createScopeForPolicyStatement to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+    });
   });
 
   describe('cleanupScopesForDeletedStatements', () => {
@@ -155,6 +188,28 @@ describe('SecurityScopeService', () => {
       expect(orphanStub).not.to.have.been.called;
       expect(publishStub).not.to.have.been.called;
     });
+
+    it('throws when publishComputeScopeAnchorsJob throws (cleanup loop)', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-1']);
+        expect.fail('expected cleanupScopesForDeletedStatements to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+    });
   });
 
   describe('rebuildTeamSecurityScopes', () => {
@@ -209,6 +264,22 @@ describe('SecurityScopeService', () => {
 
       expect(findStub).to.have.been.calledOnceWith(999);
       expect(publishStub).not.to.have.been.called;
+    });
+
+    it('throws when publishComputeScopeAnchorsJob throws (trigger loop)', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.triggerAnchorComputationForSubmission(1);
+        expect.fail('expected triggerAnchorComputationForSubmission to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
     });
   });
 

@@ -1,14 +1,17 @@
 import { AxiosInstance } from 'axios';
 import {
   ICreateTicketCommentRequest,
+  ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
+  ITicketSystemUser,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
   ITicketExtended,
   ITicketsQueryParams,
+  IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -166,6 +169,51 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Assign one or more system users to a ticket.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketSystemUser[]} payload
+   * @return {*} {Promise<ITicketSystemUser[]>}
+   */
+  const createTicketSystemUsers = async (
+    ticketId: string,
+    payload: ICreateTicketSystemUser[]
+  ): Promise<ITicketSystemUser[]> => {
+    const { data } = await axios.post(`/api/tickets/${ticketId}/system-user`, payload);
+
+    return data;
+  };
+
+  /**
+   * Update ticket system user status.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @param {IUpdateTicketSystemUserStatusRequest} payload
+   * @return {*} {Promise<ITicketSystemUser>}
+   */
+  const updateTicketSystemUserStatus = async (
+    ticketId: string,
+    ticketSystemUserId: string,
+    payload: IUpdateTicketSystemUserStatusRequest
+  ): Promise<ITicketSystemUser> => {
+    const { data } = await axios.patch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Remove a ticket system user (soft delete).
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTicketSystemUser = async (ticketId: string, ticketSystemUserId: string): Promise<void> => {
+    await axios.delete(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`);
+  };
+
   return {
     getTicketsForAdmin,
     getTicketForAdmin,
@@ -177,6 +225,9 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     createTicketReference,
     deleteTicketReference,
     getTicketsForUser,
-    getTicketForUser
+    getTicketForUser,
+    createTicketSystemUsers,
+    updateTicketSystemUserStatus,
+    deleteTicketSystemUser
   };
 };
