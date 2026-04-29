@@ -1,6 +1,9 @@
-export class ClamAvScanValidationError extends TypeError {
+import { BaseError } from './base-error';
+
+export class ClamAvScanValidationError extends BaseError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ClamAvScanValidationError');
+
   constructor(message: string) {
-    super(message);
-    this.name = 'ClamAvScanValidationError';
+    super('ClamAvScanValidationError', message);
   }
 }
