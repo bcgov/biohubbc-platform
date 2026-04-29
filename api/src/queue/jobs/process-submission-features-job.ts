@@ -229,10 +229,9 @@ async function executeProcessSubmissionFeaturesIngestion(
  *   - Persist validation record as `completed`.
  *   - Transition upload to `ingested`.
  *   - Mark upload archive process status as `COMPLETED`.
- *   - Publish the downstream upload-scoped index job.
  *
- * The successful status/archive updates and index-job insert share one transaction so the
- * index job is not visible until the upload has reached the `ingested` state.
+ * Downstream indexing is published after these status/archive updates commit so enqueue
+ * failures do not trigger a retry of already-completed ingestion work.
  *
  * @param {SubmissionUpload} submissionUpload Submission upload payload.
  * @param {string} jobId Job identifier.
@@ -269,46 +268,68 @@ async function finalizeProcessSubmissionFeaturesStage(
     return;
   }
 
-  // Step 2: Commit successful process state and publish downstream indexing atomically.
+  // Step 2: Commit successful process state.
   await withConnection(async (connection) => {
     const submissionValidationService = new SubmissionValidationService(connection);
     const submissionUploadService = new SubmissionUploadService(connection);
     const uploadArchiveService = new UploadArchiveService(connection);
-    const publishStart = Date.now();
 
     await submissionValidationService.updateSubmissionValidationStatus(jobId, 'completed', outcome.validationPayload);
     await submissionUploadService.transitionSubmissionUploadToIngested(submissionUpload.submission_upload_id);
     await uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
       archive_status: ProcessStatusStatusEnum.COMPLETED
     });
+  });
+}
 
-    const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
-      submissionId: submissionUpload.submission_id,
-      submissionUploadId: submissionUpload.submission_upload_id
-    });
+/**
+ * Publish downstream index work, warn-and-commit on failure.
+ *
+ * Indexing is best-effort: the just-completed ingestion/validation status updates are durable
+ * work and finalize regardless of whether the downstream indexing job enqueues. Throwing here
+ * would unwind real completed work and trigger pg-boss retry of the whole ingestion stage,
+ * which is undesirable. On enqueue failure we log a warning and let the orchestrator continue
+ * to its finalize phase.
+ *
+ * @param {number} submissionId Submission scope.
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} jobId Job identifier.
+ * @returns {Promise<void>}
+ */
+async function executeIndexSubmissionFeaturesPublish(
+  submissionId: number,
+  submissionUploadId: string,
+  jobId: string
+): Promise<void> {
+  await withConnection(async (connection) => {
+    const publishStart = Date.now();
 
-    if (indexResult.status === 'error') {
-      defaultLog.error({
-        label: 'finalizeProcessSubmissionFeaturesStage',
-        message: 'Index submission publish failed',
+    try {
+      const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+        submissionId,
+        submissionUploadId
+      });
+
+      defaultLog.info({
+        label: 'executeIndexSubmissionFeaturesPublish',
+        message: 'Index submission publish completed',
         jobId,
-        submissionUploadId: submissionUpload.submission_upload_id,
-        submissionId: submissionUpload.submission_id,
+        submissionUploadId,
+        submissionId,
         elapsedMs: Date.now() - publishStart,
         indexResult
       });
-      throw new Error(`Index submission publish failed: ${indexResult.message}`);
+    } catch (error) {
+      defaultLog.warn({
+        label: 'executeIndexSubmissionFeaturesPublish',
+        message: 'Index submission publish failed; finalizing ingestion status anyway',
+        jobId,
+        submissionUploadId,
+        submissionId,
+        elapsedMs: Date.now() - publishStart,
+        error: toErrorMetadata(error)
+      });
     }
-
-    defaultLog.info({
-      label: 'finalizeProcessSubmissionFeaturesStage',
-      message: 'Index submission publish completed',
-      jobId,
-      submissionUploadId: submissionUpload.submission_upload_id,
-      submissionId: submissionUpload.submission_id,
-      elapsedMs: Date.now() - publishStart,
-      indexResult
-    });
   });
 }
 
@@ -318,8 +339,8 @@ async function finalizeProcessSubmissionFeaturesStage(
  * Pipeline:
  * - Initialize stage guards + start markers.
  * - Execute archive ingestion.
- * - Publish downstream indexing when ingestion succeeds.
  * - Finalize upload/validation/archive statuses.
+ * - Publish downstream indexing when ingestion succeeds.
  *
  * Each phase is delegated to methods that commit through short-lived `withConnection`
  * blocks to preserve partial progress and keep transactions bounded.
@@ -381,6 +402,10 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
     outcomeStatus: outcome.status
   });
   await finalizeProcessSubmissionFeaturesStage(submissionUpload, job.id, outcome);
+
+  if (outcome.status === 'ok') {
+    await executeIndexSubmissionFeaturesPublish(submissionId, submissionUploadId, job.id);
+  }
 
   defaultLog.info({
     label: 'runProcessSubmissionFeaturesStage',

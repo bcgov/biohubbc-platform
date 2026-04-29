@@ -7,37 +7,53 @@ import { TicketSidebarSection } from 'features/admin/tickets/detail/sidebar/Tick
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
+import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
 import { useEffect } from 'react';
 
 interface IPortalTicketSidebarProps {
-  teamId?: string;
+  teamId: string;
+  ticketSystemUsers: ITicketSystemUser[];
 }
 
 /**
- * Read-only ticket sidebar for portal users showing assignees.
+ * Read-only ticket sidebar for portal users showing ticket system users.
  *
  * @param {IPortalTicketSidebarProps} props
  * @return {*}
  */
 export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
-  const { teamId } = props;
+  const { teamId, ticketSystemUsers } = props;
   const api = useApi();
 
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
 
   useEffect(() => {
-    if (!teamId) {
-      return;
-    }
-
     teamMembersLoader.load(teamId);
   }, [teamId, teamMembersLoader]);
 
   const members: ITeamMember[] = teamMembersLoader.data?.members ?? [];
+  const getTicketSystemUserStatusLabel = (status: ITicketSystemUser['status']) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
     <Stack spacing={5}>
-      <TicketSidebarSection label="Assignees">
+      <TicketSidebarSection label="System Users">
+        <LoadingGuard
+          hasNoData={!ticketSystemUsers.length}
+          hasNoDataFallback={<Typography variant="body2">No users</Typography>}>
+          <Stack spacing={0.75}>
+            {ticketSystemUsers.map((ticketSystemUser) => (
+              <TicketSidebarItem
+                key={ticketSystemUser.ticket_system_user_id}
+                label={`${
+                  ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier
+                } (${getTicketSystemUserStatusLabel(ticketSystemUser.status)})`}
+              />
+            ))}
+          </Stack>
+        </LoadingGuard>
+      </TicketSidebarSection>
+      <TicketSidebarSection label="Participants">
         <LoadingGuard
           isLoading={teamMembersLoader.isLoading}
           isLoadingFallback={
@@ -47,7 +63,7 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
             </Stack>
           }
           hasNoData={!members.length}
-          hasNoDataFallback={<Typography variant="body2">No assignees</Typography>}>
+          hasNoDataFallback={<Typography variant="body2">No participants</Typography>}>
           <Stack spacing={0.75}>
             {members.map((member) => (
               <TicketSidebarItem key={member.team_member_id} label={member.user_identifier} />
