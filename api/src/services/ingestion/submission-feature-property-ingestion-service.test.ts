@@ -151,9 +151,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     );
 
     expect(insertStringStub.calledOnce).to.equal(true);
-    expect(insertCodeStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', contributor.contributor_id)).to.equal(
-      true
-    );
+    expect(insertCodeStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertTaxonStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertArtifactStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertReferencesStub.calledOnce).to.equal(true);

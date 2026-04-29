@@ -29,6 +29,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    *
    * Generic property ingestion, datetime normalization, and spatial normalization are all executed
    * as set-based SQL phases. The service remains orchestration-only.
+   *
+   * @param {number} submissionId Submission scope for the features being indexed.
+   * @param {string} submissionUploadId Upload scope for the staged feature rows.
+   * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Indexing outcome with validation diagnostics when invalid.
    */
   async indexSubmissionPropertiesBySubmissionUploadId(
     submissionId: number,
@@ -145,8 +149,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         phase: currentPhase
       });
       await this.submissionFeaturePropertyIngestionRepository.recordCodePropertyResolutionErrorsBySubmissionUploadId(
-        submissionUploadId,
-        contributor.contributor_id
+        submissionUploadId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordTaxonPropertyResolutionErrorsBySubmissionUploadId(
         submissionUploadId
@@ -267,8 +270,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId
       );
       await this.submissionFeaturePropertyIngestionRepository.insertCodePropertiesBySubmissionUploadId(
-        submissionUploadId,
-        contributor.contributor_id
+        submissionUploadId
       );
       await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
         submissionUploadId
@@ -314,6 +316,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
   /**
    * Initialize upload-scoped staging and diagnostics working rows.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   private async initializePropertyIngestionStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearRawPropertyStagingBySubmissionUploadId(
@@ -326,6 +331,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    *
    * This phase materializes the reusable relational state used by requiredness checks, primitive
    * validation, and downstream typed inserts.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   private async populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearUploadPropertyWorkingSetStagingBySubmissionUploadId(
@@ -346,6 +354,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    *
    * Candidate tables are shared by both error-recording and final insert phases to avoid repeated
    * parsing/normalization work for datetime, spatial, code, taxon, and artifact values.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @param {number} contributorId Contributor scope for contributor-owned code resolution.
+   * @returns {Promise<void>}
    */
   private async populateComplexPropertyCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,

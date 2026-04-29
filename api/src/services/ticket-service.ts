@@ -45,7 +45,7 @@ export class TicketService extends DBService {
    * Create a new ticket and write its initial status entry.
    *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
-   * @return {Promise<Ticket>} The newly created ticket.
+   * @returns {Promise<Ticket>} The newly created ticket.
    * @memberof TicketService
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
@@ -73,7 +73,7 @@ export class TicketService extends DBService {
    * Create an internal team record for ticket ownership.
    *
    * @param {{ systemUserIds: number[] }} params - System user IDs to add as initial team members.
-   * @return {*} {Promise<Team>}
+   * @returns {Promise<Team>} Created ticket ownership team.
    * @memberof TicketService
    */
   private async createTicketTeam({ systemUserIds }: { systemUserIds: number[] }): Promise<Team> {
@@ -92,7 +92,7 @@ export class TicketService extends DBService {
    * Get a ticket by its UUID with related history and assignment collections.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and ticket system users.
+   * @returns {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and ticket system users.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
@@ -121,7 +121,7 @@ export class TicketService extends DBService {
    *
    * @param {string} ticketId - Source ticket UUID.
    * @param {CreateTicketReferenceRequest} payload - Ticket reference payload.
-   * @return {Promise<TicketReference[]>} Created ticket references.
+   * @returns {Promise<TicketReference[]>} Created ticket references.
    * @memberof TicketService
    */
   async createTicketReference(ticketId: string, payload: CreateTicketReferenceRequest): Promise<TicketReference[]> {
@@ -141,7 +141,7 @@ export class TicketService extends DBService {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketReferenceId - Ticket reference UUID.
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof TicketService
    */
   async deleteTicketReference(ticketId: string, ticketReferenceId: string): Promise<void> {
@@ -153,7 +153,7 @@ export class TicketService extends DBService {
    *
    * @param {TicketFilters} [filters] - Optional ticket list filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
-   * @return {Promise<Ticket[]>} Matching tickets.
+   * @returns {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketService
    */
   async getTickets(filters?: TicketFilters, pagination?: ApiPaginationOptions): Promise<Ticket[]> {
@@ -164,7 +164,7 @@ export class TicketService extends DBService {
    * Count tickets with optional filters.
    *
    * @param {TicketFilters} [filters] - Optional ticket list filters.
-   * @return {Promise<number>} Total count of matching tickets.
+   * @returns {Promise<number>} Total count of matching tickets.
    * @memberof TicketService
    */
   async getTicketsCount(filters?: TicketFilters): Promise<number> {
@@ -176,7 +176,7 @@ export class TicketService extends DBService {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {UpdateTicketRequest} ticket - Partial ticket update payload.
-   * @return {Promise<Ticket>} Updated ticket record.
+   * @returns {Promise<Ticket>} Updated ticket record.
    * @memberof TicketService
    */
   async updateTicket(ticketId: string, ticket: UpdateTicketRequest): Promise<Ticket> {
@@ -214,7 +214,7 @@ export class TicketService extends DBService {
    *
    * @private
    * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
-   * @return {void}
+   * @returns {void}
    * @memberof TicketService
    */
   private assertCanCloseTicket(dataRequestStatuses: PolicyStatus[]): void {
@@ -232,7 +232,7 @@ export class TicketService extends DBService {
    * Soft delete an active ticket.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof TicketService
    */
   async deleteTicket(ticketId: string): Promise<void> {
@@ -248,7 +248,7 @@ export class TicketService extends DBService {
    *
    * @private
    * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
-   * @return {void}
+   * @returns {void}
    * @memberof TicketService
    */
   private assertCanDeleteTicket(dataRequestStatuses: PolicyStatus[]): void {

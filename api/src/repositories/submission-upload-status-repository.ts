@@ -20,7 +20,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
    * Get security details for a submission by its ID.
    *
    * @param {number} submissionId
-   * @return {SubmissionUploadStatus}
+   * @returns {SubmissionUploadStatus}
    * @memberof SubmissionUploadStatusRepository
    */
   async getSubmissionUploadStatusById(submissionId: number): Promise<SubmissionUploadStatus> {
@@ -47,7 +47,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
    *
    * @private
    * @param {number} submissionId - The submission ID to query
-   * @return {Knex.QueryBuilder} Query builder for getting submission upload status
+   * @returns {Knex.QueryBuilder} Query builder for getting submission upload status
    * @memberof SubmissionUploadStatusRepository
    */
   private _makeGetSubmissionUploadStatusQuery(submissionId: number): Knex.QueryBuilder {

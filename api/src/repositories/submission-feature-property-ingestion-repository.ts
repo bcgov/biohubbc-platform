@@ -1116,13 +1116,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @param {number} _contributorId Unused at this stage; kept for interface compatibility.
    * @returns {Promise<void>}
    */
-  async recordCodePropertyResolutionErrorsBySubmissionUploadId(
-    submissionUploadId: string,
-    _contributorId: number
-  ): Promise<void> {
+  async recordCodePropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       WITH format_errors AS (
         SELECT
@@ -1622,10 +1618,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `contributor_codeset_code_id` from code candidate staging.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @param {number} contributorId Contributor scope for code resolution.
    * @returns {Promise<void>}
    */
-  async insertCodePropertiesBySubmissionUploadId(submissionUploadId: string, _contributorId: number): Promise<void> {
+  async insertCodePropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_property_code (
         submission_feature_id,

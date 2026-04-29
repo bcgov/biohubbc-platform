@@ -540,15 +540,11 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777,
-        submissionUploadId: 'sub-upload-uuid-idx-1'
-      });
-
-      expect(result.status).to.equal('error');
-      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
       try {
-        await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+        await publishIndexSubmissionFeaturesJob(mockConnection, {
+          submissionId: 777,
+          submissionUploadId: 'sub-upload-uuid-idx-1'
+        });
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
@@ -613,7 +609,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns duplicate when download is not in pending status', async () => {

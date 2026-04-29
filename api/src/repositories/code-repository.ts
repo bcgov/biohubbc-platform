@@ -15,7 +15,7 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureType[]>}
+   * @returns {Promise<FeatureType[]>} Active feature type records.
    * @memberof CodeRepository
    */
   async getFeatureTypes(): Promise<FeatureType[]> {
@@ -38,7 +38,7 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature type property codes for all feature types.
    *
-   * @return {*}  {Promise<FeatureTypeWithProperties[]>}
+   * @returns {Promise<FeatureTypeWithProperties[]>} Active feature types with property metadata.
    * @memberof CodeRepository
    */
   async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
@@ -95,7 +95,7 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureTypeProperty>}
+   * @returns {Promise<FeatureTypeProperty>} Matching active feature property record.
    * @memberof CodeRepository
    */
   async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {

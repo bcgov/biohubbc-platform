@@ -21,7 +21,7 @@ export class SubmissionValidationRepository extends BaseRepository {
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {number} submissionId - The submission ID.
    * @param {string} jobId - The pg-boss job UUID.
-   * @return {Promise<{ submission_validation_id: number }>} The created record ID.
+   * @returns {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationRepository
    */
   async createSubmissionValidation(
@@ -49,7 +49,7 @@ export class SubmissionValidationRepository extends BaseRepository {
    * @param {string} jobId - The pg-boss job UUID.
    * @param {SubmissionValidationStatus} status - The new status.
    * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
   async updateSubmissionValidationStatus(
@@ -76,7 +76,7 @@ export class SubmissionValidationRepository extends BaseRepository {
    * Get the most recent submission validation record for a submission upload.
    *
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
-   * @return {Promise<SubmissionValidationRecord | null>}
+   * @returns {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationRepository
    */
   async getSubmissionValidationBySubmissionUploadId(
@@ -104,7 +104,7 @@ export class SubmissionValidationRepository extends BaseRepository {
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
    * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
   async updateSubmissionValidationStatusBySubmissionUploadId(

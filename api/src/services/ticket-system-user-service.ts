@@ -42,7 +42,7 @@ export class TicketSystemUserService extends DBService {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {CreateTicketSystemUser[]} payload - Ticket system user payloads.
-   * @return {Promise<TicketSystemUser[]>} Newly created assignment rows.
+   * @returns {Promise<TicketSystemUser[]>} Newly created assignment rows.
    * @memberof TicketSystemUserService
    */
   async createTicketSystemUsers(ticketId: string, payload: CreateTicketSystemUser[]): Promise<TicketSystemUser[]> {
@@ -73,7 +73,7 @@ export class TicketSystemUserService extends DBService {
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
    * @param {UpdateTicketSystemUserStatusRequest} payload - New status payload.
-   * @return {Promise<TicketSystemUser>} Updated assignment row.
+   * @returns {Promise<TicketSystemUser>} Updated assignment row.
    * @throws {HTTP404} When the ticket system user row is not found.
    * @memberof TicketSystemUserService
    */
@@ -108,7 +108,7 @@ export class TicketSystemUserService extends DBService {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof TicketSystemUserService
    */
   async deleteTicketSystemUser(ticketId: string, ticketSystemUserId: string): Promise<void> {
@@ -119,7 +119,7 @@ export class TicketSystemUserService extends DBService {
    * Return active ticket system users for a ticket with nested system user details.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketSystemUserWithUser[]>} Active assignment rows with user payload.
+   * @returns {Promise<TicketSystemUserWithUser[]>} Active assignment rows with user payload.
    * @memberof TicketSystemUserService
    */
   async getActiveTicketSystemUsersByTicketId(ticketId: string): Promise<TicketSystemUserWithUser[]> {

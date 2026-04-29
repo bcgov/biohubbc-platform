@@ -24,7 +24,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    * Find active ticket system users using optional filters.
    *
    * @param {TicketSystemUsersFilters} [filters] - Optional query filters.
-   * @return {Promise<TicketSystemUser[]>} Matching active ticket system users.
+   * @returns {Promise<TicketSystemUser[]>} Matching active ticket system users.
    * @memberof TicketSystemUserRepository
    */
   async findTicketSystemUsers(filters?: TicketSystemUsersFilters): Promise<TicketSystemUser[]> {
@@ -57,7 +57,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {CreateTicketSystemUser} createTicketSystemUser - Assignment payload.
-   * @return {Promise<TicketSystemUser>} Inserted ticket system user row.
+   * @returns {Promise<TicketSystemUser>} Inserted ticket system user row.
    * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
    * @memberof TicketSystemUserRepository
    */
@@ -94,7 +94,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
-   * @return {Promise<TicketSystemUser | null>} Matching active ticket system user, or null when not found.
+   * @returns {Promise<TicketSystemUser | null>} Matching active ticket system user, or null when not found.
    * @memberof TicketSystemUserRepository
    */
   async getTicketSystemUserByTicketAndSystemUserId(
@@ -119,7 +119,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
    * @param {UpdateTicketSystemUserStatusRequest} update - New status payload.
-   * @return {Promise<TicketSystemUser>} Updated ticket system user row.
+   * @returns {Promise<TicketSystemUser>} Updated ticket system user row.
    * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
    * @memberof TicketSystemUserRepository
    */
@@ -160,7 +160,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
    * @memberof TicketSystemUserRepository
    */
@@ -194,7 +194,7 @@ export class TicketSystemUserRepository extends BaseRepository {
    * - orders by display name (falling back to user identifier) for stable UI display
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketSystemUserWithUser[]>} Active ticket system user rows with nested user payload.
+   * @returns {Promise<TicketSystemUserWithUser[]>} Active ticket system user rows with nested user payload.
    * @memberof TicketSystemUserRepository
    */
   async getActiveTicketSystemUsersByTicketId(ticketId: string): Promise<TicketSystemUserWithUser[]> {

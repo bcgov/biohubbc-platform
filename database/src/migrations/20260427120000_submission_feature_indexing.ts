@@ -362,6 +362,11 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_artifact_id integer GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       submission_feature_id integer NOT NULL,
       artifact_id uuid NOT NULL,
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
       CONSTRAINT submission_feature_artifact_pk PRIMARY KEY (submission_feature_artifact_id),
       CONSTRAINT submission_feature_artifact_fk1
         FOREIGN KEY (submission_feature_id)
@@ -382,6 +387,24 @@ export async function up(knex: Knex): Promise<void> {
       'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN submission_feature_artifact.artifact_id IS
       'Foreign key to the artifact table.';
+    COMMENT ON COLUMN submission_feature_artifact.create_date IS
+      'The datetime the record was created.';
+    COMMENT ON COLUMN submission_feature_artifact.create_user IS
+      'The id of the user who created the record.';
+    COMMENT ON COLUMN submission_feature_artifact.update_date IS
+      'The datetime the record was updated.';
+    COMMENT ON COLUMN submission_feature_artifact.update_user IS
+      'The id of the user who updated the record.';
+    COMMENT ON COLUMN submission_feature_artifact.revision_count IS
+      'Revision count used for concurrency control.';
+
+    CREATE TRIGGER audit_submission_feature_artifact
+      BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_artifact
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+
+    CREATE TRIGGER journal_submission_feature_artifact
+      AFTER INSERT OR UPDATE OR DELETE ON submission_feature_artifact
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     --------------------------------------------------------------------------------
     -- 4) Add durable upload-scoped submission_feature_error validation summary table
@@ -395,6 +418,11 @@ export async function up(knex: Knex): Promise<void> {
       error_message text NOT NULL,
       count integer NOT NULL,
       details jsonb,
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
       CONSTRAINT submission_feature_error_pk PRIMARY KEY (submission_feature_error_id),
       CONSTRAINT submission_feature_error_fk1
         FOREIGN KEY (submission_upload_id)
@@ -434,10 +462,36 @@ export async function up(knex: Knex): Promise<void> {
       'Number of feature-level validation error instances represented by this row.';
     COMMENT ON COLUMN submission_feature_error.details IS
       'Optional structured aggregated metadata for the grouped validation issue.';
+    COMMENT ON COLUMN submission_feature_error.create_date IS
+      'The datetime the record was created.';
+    COMMENT ON COLUMN submission_feature_error.create_user IS
+      'The id of the user who created the record.';
+    COMMENT ON COLUMN submission_feature_error.update_date IS
+      'The datetime the record was updated.';
+    COMMENT ON COLUMN submission_feature_error.update_user IS
+      'The id of the user who updated the record.';
+    COMMENT ON COLUMN submission_feature_error.revision_count IS
+      'Revision count used for concurrency control.';
+
+    CREATE TRIGGER audit_submission_feature_error
+      BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_error
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+
+    CREATE TRIGGER journal_submission_feature_error
+      AFTER INSERT OR UPDATE OR DELETE ON submission_feature_error
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     --------------------------------------------------------------------------------
     -- 5) Complete cutover to explicit submission_upload lifecycle states
     --    pending -> uploaded, in_progress -> ingesting, succeeded -> ingested
+    --
+    --    uploaded: file artifacts are accepted and ready for ingestion.
+    --    ingesting: feature extraction and validation are in progress.
+    --    ingested: feature rows and validation results are persisted.
+    --    indexing: derived search/index tables are being populated.
+    --    indexed: derived search/index tables are ready for use.
+    --    invalid: ingestion completed with deterministic validation errors.
+    --    failed: processing failed due to an operational/runtime error.
     --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_job_status_v2 AS ENUM (
       'uploaded',
@@ -467,11 +521,14 @@ export async function up(knex: Knex): Promise<void> {
 
     ALTER TYPE submission_upload_job_status_v2 RENAME TO submission_upload_job_status;
 
+    COMMENT ON TYPE submission_upload_job_status IS
+      'Submission upload lifecycle: uploaded=accepted and ready for ingestion; ingesting=feature extraction and validation running; ingested=feature rows and validation persisted; indexing=derived indexes being populated; indexed=derived indexes ready; invalid=deterministic validation errors; failed=operational/runtime failure.';
+
     ALTER TABLE submission_upload
       ALTER COLUMN status SET DEFAULT 'uploaded'::submission_upload_job_status;
 
     COMMENT ON COLUMN submission_upload.status IS
-      'Submission pipeline lifecycle status: uploaded, ingesting, ingested, indexing, indexed, invalid, failed.';
+      'Submission upload lifecycle status. uploaded=accepted and ready for ingestion; ingesting=feature extraction and validation running; ingested=feature rows and validation persisted; indexing=derived indexes being populated; indexed=derived indexes ready; invalid=deterministic validation errors; failed=operational/runtime failure.';
 
     --------------------------------------------------------------------------------
     -- 6) Create upload-scoped staging/work tables for deep property ingestion
@@ -826,11 +883,15 @@ export async function down(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- 1) Drop submission_feature_error table
     --------------------------------------------------------------------------------
+    DROP TRIGGER IF EXISTS journal_submission_feature_error ON submission_feature_error;
+    DROP TRIGGER IF EXISTS audit_submission_feature_error ON submission_feature_error;
     DROP TABLE IF EXISTS submission_feature_error;
 
     --------------------------------------------------------------------------------
     -- 2) Drop submission_feature_artifact table
     --------------------------------------------------------------------------------
+    DROP TRIGGER IF EXISTS journal_submission_feature_artifact ON submission_feature_artifact;
+    DROP TRIGGER IF EXISTS audit_submission_feature_artifact ON submission_feature_artifact;
     DROP TABLE IF EXISTS submission_feature_artifact;
 
     --------------------------------------------------------------------------------
@@ -876,17 +937,16 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS time_value;
 
     --------------------------------------------------------------------------------
-    -- 4) Deprecated property type rollback is intentionally non-automated
-    --    The array/object remap in up() is data-driven and does not persist an exact reverse map.
-    --    Automatic rollback is blocked to avoid non-deterministic/hardcoded restores.
+    -- 4) Drop upload-scoped work tables (reverse dependency order)
     --------------------------------------------------------------------------------
-    DO $$
-    BEGIN
-      RAISE EXCEPTION USING
-        MESSAGE = 'Down migration blocked: deprecated property type remap is non-reversible without preserved mapping metadata',
-        HINT = 'Restore feature_property and feature_type_property mappings from backup, then perform a controlled manual rollback.';
-    END
-    $$;
+    DROP TABLE IF EXISTS submission_upload_staging_artifact_candidate;
+    DROP TABLE IF EXISTS submission_upload_staging_taxon_candidate;
+    DROP TABLE IF EXISTS submission_upload_staging_code_candidate;
+    DROP TABLE IF EXISTS submission_upload_staging_spatial_candidate;
+    DROP TABLE IF EXISTS submission_upload_staging_datetime_candidate;
+    DROP TABLE IF EXISTS submission_upload_staging_typed_property_value;
+    DROP TABLE IF EXISTS submission_upload_staging_resolved_property;
+    DROP TABLE IF EXISTS submission_upload_staging_raw_property;
 
     --------------------------------------------------------------------------------
     -- 5) Revert submission_upload lifecycle enum cutover to legacy states
@@ -923,15 +983,16 @@ export async function down(knex: Knex): Promise<void> {
       ALTER COLUMN status SET DEFAULT 'pending'::submission_upload_job_status;
 
     --------------------------------------------------------------------------------
-    -- 6) Drop upload-scoped work tables (reverse dependency order)
+    -- 6) Deprecated property type rollback is intentionally non-automated
+    --    The array/object remap in up() is data-driven and does not persist an exact reverse map.
+    --    Automatic rollback is blocked to avoid non-deterministic/hardcoded restores.
     --------------------------------------------------------------------------------
-    DROP TABLE IF EXISTS submission_upload_staging_artifact_candidate;
-    DROP TABLE IF EXISTS submission_upload_staging_taxon_candidate;
-    DROP TABLE IF EXISTS submission_upload_staging_code_candidate;
-    DROP TABLE IF EXISTS submission_upload_staging_spatial_candidate;
-    DROP TABLE IF EXISTS submission_upload_staging_datetime_candidate;
-    DROP TABLE IF EXISTS submission_upload_staging_typed_property_value;
-    DROP TABLE IF EXISTS submission_upload_staging_resolved_property;
-    DROP TABLE IF EXISTS submission_upload_staging_raw_property;
+    DO $$
+    BEGIN
+      RAISE EXCEPTION USING
+        MESSAGE = 'Down migration blocked: deprecated property type remap is non-reversible without preserved mapping metadata',
+        HINT = 'Restore feature_property and feature_type_property mappings from backup, then perform a controlled manual rollback.';
+    END
+    $$;
   `);
 }
