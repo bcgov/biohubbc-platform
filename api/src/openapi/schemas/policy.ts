@@ -6,6 +6,7 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
  * Schema for policy statement condition.
@@ -87,6 +88,10 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: PolicyStatementConditionSchema,
       description: 'Conditions that must be met for this statement to apply'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description: 'Optional expression tree that builds the runtime feature graph for this statement'
     }
   }
 };
@@ -231,6 +236,11 @@ export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
         }
       },
       description: 'Optional conditions for this statement'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description:
+        'Optional expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
     }
   }
 };

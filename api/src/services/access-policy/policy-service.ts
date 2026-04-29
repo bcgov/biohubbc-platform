@@ -7,8 +7,10 @@ import { PolicyRepository } from '../../repositories/authorization/policy-reposi
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyFilters, PolicyStatementWithConditions, PolicyWithStatements } from './policy-service.interface';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
+import { PolicyStatementExpressionService } from './policy-statement-expression-service';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
 
@@ -16,6 +18,8 @@ export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
   policyStatementConditionService: PolicyStatementConditionService;
+  policyStatementExpressionService: PolicyStatementExpressionService;
+  expressionTreeService: ExpressionTreeService;
   securityScopeService: SecurityScopeService;
   teamPolicyRepository: TeamPolicyRepository;
 
@@ -30,6 +34,8 @@ export class PolicyService extends DBService {
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyStatementConditionService = new PolicyStatementConditionService(connection);
+    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
@@ -221,10 +227,23 @@ export class PolicyService extends DBService {
     const statements = await this.policyStatementService.getPolicyStatements(policyId);
 
     return Promise.all(
-      statements.map(async (stmt) => ({
-        ...stmt,
-        conditions: await this.policyStatementConditionService.getPolicyStatementConditions(stmt.policy_statement_id)
-      }))
+      statements.map(async (stmt) => {
+        const [conditions, expressionLinks] = await Promise.all([
+          this.policyStatementConditionService.getPolicyStatementConditions(stmt.policy_statement_id),
+          this.policyStatementExpressionService.getPolicyStatementExpressionsByPolicyStatementId(
+            stmt.policy_statement_id
+          )
+        ]);
+        const expression = expressionLinks[0]
+          ? await this.expressionTreeService.readExpressionTree(expressionLinks[0].expression_id)
+          : undefined;
+
+        return {
+          ...stmt,
+          conditions,
+          ...(expression ? { expression } : {})
+        };
+      })
     );
   }
 
@@ -317,7 +336,15 @@ export class PolicyService extends DBService {
           )
         );
 
-        return { ...statement, conditions };
+        if (stmt.expression) {
+          const { expression_id } = await this.expressionTreeService.writeExpressionTree(stmt.expression);
+          await this.policyStatementExpressionService.replacePolicyStatementExpression(
+            statement.policy_statement_id,
+            expression_id
+          );
+        }
+
+        return { ...statement, conditions, ...(stmt.expression ? { expression: stmt.expression } : {}) };
       })
     );
 

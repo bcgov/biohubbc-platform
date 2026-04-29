@@ -11,17 +11,47 @@ import * as search from './index';
 chai.use(sinonChai);
 
 describe('searchProperties', () => {
-  const mockStringResults = [{ feature_property_id: 1, property_name: 'Length', relevancy_score: 1 }];
-  const mockNumberResults = [{ feature_property_id: 2, property_name: 'Depth', relevancy_score: 1 }];
+  const mockStringResults = [
+    {
+      feature_property_id: 1,
+      property_name: 'length',
+      property_display_name: 'Length',
+      feature_property_type: 'string' as const,
+      operators: ['Equals', 'ILike', 'Exists'],
+      value_input: 'string' as const,
+      relevancy_score: 1
+    }
+  ];
+  const mockNumberResults = [
+    {
+      feature_property_id: 2,
+      property_name: 'depth',
+      property_display_name: 'Depth',
+      feature_property_type: 'number' as const,
+      operators: ['Equals', 'GreaterThan', 'Exists'],
+      value_input: 'number' as const,
+      relevancy_score: 1
+    }
+  ];
 
   const mockResultsWithData: GroupedPropertyResults = {
     string: mockStringResults,
-    number: mockNumberResults
+    number: mockNumberResults,
+    boolean: [],
+    datetime: [],
+    taxon: [],
+    spatial: [],
+    code: []
   };
 
   const mockResultsEmpty: GroupedPropertyResults = {
     string: [],
-    number: []
+    number: [],
+    boolean: [],
+    datetime: [],
+    taxon: [],
+    spatial: [],
+    code: []
   };
 
   afterEach(() => {

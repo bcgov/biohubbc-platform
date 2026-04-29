@@ -1,3 +1,4 @@
+import { ExpressionTree } from '../../models/expression-tree';
 import { Policy } from '../../models/policy';
 import { PolicyStatement } from '../../models/policy-statement';
 import { PolicyStatementCondition } from '../../models/policy-statement-condition';
@@ -22,6 +23,7 @@ export interface PolicyFilters {
  */
 export interface PolicyStatementWithConditions extends PolicyStatement {
   conditions: PolicyStatementCondition[];
+  expression?: ExpressionTree;
 }
 
 /**

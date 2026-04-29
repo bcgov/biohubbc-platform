@@ -15,11 +15,18 @@ describe('PropertySearchRepository', () => {
     Sinon.restore();
   });
 
-  describe('searchStringProperties', () => {
-    it('returns string property search results', async () => {
+  describe('searchProperties', () => {
+    it('returns feature_property search results', async () => {
       const mockRows: SearchPropertyResult[] = [
-        { feature_property_id: 1, property_name: 'Length', relevancy_score: 1 },
-        { feature_property_id: 2, property_name: 'Width', relevancy_score: 1 }
+        {
+          feature_property_id: 1,
+          property_name: 'length',
+          property_display_name: 'Length',
+          feature_property_type: 'number',
+          operators: ['Equals', 'GreaterThan', 'Exists'],
+          value_input: 'number',
+          relevancy_score: 1
+        }
       ];
 
       const mockQueryResponse = {
@@ -33,146 +40,84 @@ describe('PropertySearchRepository', () => {
 
       const repo = new PropertySearchRepository(mockDBConnection);
 
-      const result = await repo.searchStringProperties({ keyword: 'len' });
+      const result = await repo.searchProperties({ keyword: 'len' });
 
       expect(result).to.eql(mockRows);
     });
 
-    it('returns empty array when no results', async () => {
-      const mockRows: SearchPropertyResult[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
+    it('queries feature_property instead of search value tables', async () => {
+      let sql = '';
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        knex: async (query: any) => {
+          sql = query.toString();
+
+          return {
+            rowCount: 0,
+            rows: []
+          } as unknown as QueryResult<any>;
+        }
       });
 
       const repo = new PropertySearchRepository(mockDBConnection);
 
-      const result = await repo.searchStringProperties({ keyword: 'none' });
+      await repo.searchProperties({ keyword: 'name' }, { page: 1, limit: 10 });
+
+      expect(sql).to.include('"feature_property" as "fp"');
+      expect(sql).to.not.include('search_string');
+      expect(sql).to.not.include('search_number');
+      expect(sql).to.not.include('feature_type_property');
+      expect(sql).to.include('"fp"."name" ilike');
+      expect(sql).to.include('"fp"."display_name" ilike');
+      expect(sql).to.include('limit 10');
+    });
+
+    it('returns empty array when no results', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async () =>
+          ({
+            rowCount: 0,
+            rows: []
+          } as unknown as QueryResult<any>)
+      });
+
+      const repo = new PropertySearchRepository(mockDBConnection);
+
+      const result = await repo.searchProperties({ keyword: 'none' });
 
       expect(result).to.eql([]);
     });
   });
 
-  describe('searchNumberProperties', () => {
-    it('returns number property search results', async () => {
-      const mockRows: SearchPropertyResult[] = [{ feature_property_id: 3, property_name: 'Depth', relevancy_score: 1 }];
-
-      const mockQueryResponse = {
-        rowCount: mockRows.length,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new PropertySearchRepository(mockDBConnection);
-
-      const result = await repo.searchNumberProperties({ keyword: 'dep' });
-
-      expect(result).to.eql(mockRows);
-    });
-
-    it('returns empty array when no results', async () => {
-      const mockRows: SearchPropertyResult[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new PropertySearchRepository(mockDBConnection);
-
-      const result = await repo.searchNumberProperties({ keyword: 'none' });
-
-      expect(result).to.eql([]);
-    });
-  });
-
-  describe('searchStringPropertiesCount', () => {
+  describe('searchPropertiesCount', () => {
     it('returns count when rows exist', async () => {
-      const mockRows = [{ count: 7 }];
-
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        knex: async () =>
+          ({
+            rowCount: 1,
+            rows: [{ count: 7 }]
+          } as unknown as QueryResult<any>)
       });
 
       const repo = new PropertySearchRepository(mockDBConnection);
 
-      const result = await repo.searchStringPropertiesCount({ keyword: 'name' });
+      const result = await repo.searchPropertiesCount({ keyword: 'name' });
 
       expect(result).to.equal(7);
     });
 
     it('returns 0 when no rows', async () => {
-      const mockRows: { count: number }[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        knex: async () =>
+          ({
+            rowCount: 0,
+            rows: []
+          } as unknown as QueryResult<any>)
       });
 
       const repo = new PropertySearchRepository(mockDBConnection);
 
-      const result = await repo.searchStringPropertiesCount({ keyword: 'none' });
-
-      expect(result).to.equal(0);
-    });
-  });
-
-  describe('searchNumberPropertiesCount', () => {
-    it('returns count when rows exist', async () => {
-      const mockRows = [{ count: 12 }];
-
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new PropertySearchRepository(mockDBConnection);
-
-      const result = await repo.searchNumberPropertiesCount({ keyword: 'height' });
-
-      expect(result).to.equal(12);
-    });
-
-    it('returns 0 when no rows', async () => {
-      const mockRows: { count: number }[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new PropertySearchRepository(mockDBConnection);
-
-      const result = await repo.searchNumberPropertiesCount({ keyword: 'none' });
+      const result = await repo.searchPropertiesCount({ keyword: 'none' });
 
       expect(result).to.equal(0);
     });

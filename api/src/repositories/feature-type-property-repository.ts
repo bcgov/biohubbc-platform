@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { ExpressionPredicatePropertyMetadata, FeatureTypeProperty } from '../models/feature-type-property';
 import { BaseRepository } from './base-repository';
 
 export class FeatureTypePropertyRepository extends BaseRepository {
@@ -16,6 +16,8 @@ export class FeatureTypePropertyRepository extends BaseRepository {
     const sqlStatement = SQL`
     SELECT
       ftp.feature_type_property_id,
+      fp.feature_property_id,
+      fpt.feature_property_type_id,
       fp.name,
       fp.display_name,
       fp.description,
@@ -69,6 +71,8 @@ export class FeatureTypePropertyRepository extends BaseRepository {
     const sqlStatement = SQL`
     SELECT
       ftp.feature_type_property_id,
+      fp.feature_property_id,
+      fpt.feature_property_type_id,
       fp.name,
       fp.display_name,
       fp.description,
@@ -101,6 +105,75 @@ export class FeatureTypePropertyRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
         'FeatureTypePropertyRepository->getFeaturePropertyByFeatureTypePropertyId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Resolve property metadata for expression predicate semantic validation.
+   *
+   * When `featureTypePropertyId` is supplied, the row must belong to the
+   * supplied `featurePropertyId`. When it is omitted, only shared property
+   * metadata is resolved.
+   *
+   * @param {number} featurePropertyId - Shared feature property id.
+   * @param {number | null} featureTypePropertyId - Optional concrete feature type property id.
+   * @return {Promise<ExpressionPredicatePropertyMetadata>} Resolved metadata.
+   */
+  async getExpressionPredicatePropertyMetadata(
+    featurePropertyId: number,
+    featureTypePropertyId: number | null
+  ): Promise<ExpressionPredicatePropertyMetadata> {
+    const sqlStatement =
+      featureTypePropertyId === null
+        ? SQL`
+            SELECT
+              fp.feature_property_id,
+              NULL::integer as feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as type_name,
+              fp.display_name
+            FROM feature_property fp
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+              AND fpt.record_end_date IS NULL
+            WHERE fp.feature_property_id = ${featurePropertyId}
+              AND fp.record_end_date IS NULL;
+          `
+        : SQL`
+            SELECT
+              fp.feature_property_id,
+              ftp.feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as type_name,
+              fp.display_name
+            FROM feature_type_property ftp
+            INNER JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+              AND fp.record_end_date IS NULL
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+              AND fpt.record_end_date IS NULL
+            WHERE fp.feature_property_id = ${featurePropertyId}
+              AND ftp.feature_type_property_id = ${featureTypePropertyId}
+              AND ftp.record_end_date IS NULL;
+          `;
+
+    const response = await this.connection.sql(sqlStatement, ExpressionPredicatePropertyMetadata);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property metadata not found', [
+        'FeatureTypePropertyRepository->getExpressionPredicatePropertyMetadata',
+        { featurePropertyId, featureTypePropertyId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeatureTypePropertyRepository->getExpressionPredicatePropertyMetadata',
         `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }

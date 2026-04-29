@@ -21,10 +21,28 @@ export const propertySearchFiltersSchema: OpenAPIV3.SchemaObject = {
  */
 const propertyResultSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['feature_property_id', 'property_name', 'relevancy_score'],
+  required: [
+    'feature_property_id',
+    'property_name',
+    'property_display_name',
+    'feature_property_type',
+    'operators',
+    'value_input',
+    'relevancy_score'
+  ],
   properties: {
     feature_property_id: { type: 'integer' },
     property_name: { type: 'string' },
+    property_display_name: { type: 'string' },
+    feature_property_type: {
+      type: 'string',
+      enum: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']
+    },
+    operators: {
+      type: 'array',
+      items: { type: 'string' }
+    },
+    value_input: { type: 'string', enum: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code'] },
     relevancy_score: { type: 'number' }
   }
 };
@@ -34,10 +52,15 @@ const propertyResultSchema: OpenAPIV3.SchemaObject = {
  */
 const groupedPropertiesSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['string', 'number'],
+  required: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code'],
   properties: {
     string: { type: 'array', items: propertyResultSchema },
-    number: { type: 'array', items: propertyResultSchema }
+    number: { type: 'array', items: propertyResultSchema },
+    boolean: { type: 'array', items: propertyResultSchema },
+    datetime: { type: 'array', items: propertyResultSchema },
+    taxon: { type: 'array', items: propertyResultSchema },
+    spatial: { type: 'array', items: propertyResultSchema },
+    code: { type: 'array', items: propertyResultSchema }
   }
 };
 
