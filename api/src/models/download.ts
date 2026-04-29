@@ -11,10 +11,6 @@ export const DownloadRecord = z.object({
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
   downloaded_at: z.string().nullable(),
-  total_fragments: z.number(),
-  completed_fragments: z.number(),
-  estimated_total_size_bytes: z.string().nullable(),
-  fragment_size_bytes: z.string(),
   create_date: z.string()
 });
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
@@ -95,7 +91,6 @@ export type DownloadSource = z.infer<typeof DownloadSource>;
  * Team linking is handled separately via download_team.
  */
 export const CreateDownload = z.object({
-  fragmentSizeBytes: z.number().optional(),
   filters: SearchFeatureFiltersSchema.optional(),
   cartId: z.string().uuid().optional(),
   format: z.string()

@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
-import { DOWNLOAD_FEATURE_BATCH_SIZE, FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
+import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
@@ -65,12 +65,11 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { fragmentSizeBytes, filters, cartId, format } = payload;
-    const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
+    const { filters, cartId, format } = payload;
 
     const sql = SQL`
-      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id, format)
-      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null}, ${format})
+      INSERT INTO download (download_status, filters, cart_id, format)
+      VALUES ('pending', ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null}, ${format})
       RETURNING download_id;
     `;
 
@@ -179,10 +178,6 @@ export class DownloadRepository extends BaseRepository {
         started_at,
         completed_at,
         downloaded_at,
-        total_fragments,
-        completed_fragments,
-        estimated_total_size_bytes,
-        fragment_size_bytes,
         create_date
       FROM download
       WHERE download_id = ${downloadId};
@@ -245,10 +240,6 @@ export class DownloadRepository extends BaseRepository {
         'd.started_at',
         'd.completed_at',
         'd.downloaded_at',
-        'd.total_fragments',
-        'd.completed_fragments',
-        'd.estimated_total_size_bytes',
-        'd.fragment_size_bytes',
         'd.create_date',
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
@@ -553,61 +544,6 @@ export class DownloadRepository extends BaseRepository {
       bindings: searchBindings,
       batchSize
     });
-  }
-
-  /**
-   * Update fragment counts on a download record.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} totalFragments - Total number of fragments.
-   * @param {number} completedFragments - Number of completed fragments.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateDownloadFragmentCounts(
-    downloadId: string,
-    totalFragments: number,
-    completedFragments: number
-  ): Promise<void> {
-    const sql = SQL`
-      UPDATE download
-      SET total_fragments = ${totalFragments}, completed_fragments = ${completedFragments}
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update download fragment counts', [
-        'DownloadRepository->updateDownloadFragmentCounts',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-  }
-
-  /**
-   * Update estimated total size on a download record.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} bytes - Estimated total size in bytes.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateEstimatedTotalSize(downloadId: string, bytes: number): Promise<void> {
-    const sql = SQL`
-      UPDATE download
-      SET estimated_total_size_bytes = ${bytes}
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update estimated total size', [
-        'DownloadRepository->updateEstimatedTotalSize',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
   }
 
   /**
