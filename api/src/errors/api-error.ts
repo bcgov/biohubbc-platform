@@ -10,6 +10,8 @@ export enum ApiErrorType {
 }
 
 export class ApiError extends BaseError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiError');
+
   constructor(name: ApiErrorType, message: string, errors?: (string | object)[], stack?: string) {
     super(name, message, errors, stack);
   }
@@ -23,6 +25,8 @@ export class ApiError extends BaseError {
  * @extends {ApiError}
  */
 export class ApiGeneralError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiGeneralError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.GENERAL, message, errors);
   }
@@ -36,6 +40,8 @@ export class ApiGeneralError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiUnknownError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiUnknownError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.UNKNOWN, message, errors);
   }
@@ -51,6 +57,8 @@ export class ApiUnknownError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiConflictError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiConflictError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.CONFLICT, message, errors);
   }
@@ -64,6 +72,8 @@ export class ApiConflictError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiNotFoundError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiNotFoundError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.NOT_FOUND, message, errors);
   }
@@ -81,6 +91,8 @@ export class ApiNotFoundError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiExecuteSQLError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiExecuteSQLError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.EXECUTE_SQL, message, errors);
   }
@@ -94,6 +106,8 @@ export class ApiExecuteSQLError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiBuildSQLError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiBuildSQLError');
+
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.BUILD_SQL, message, errors);
   }
