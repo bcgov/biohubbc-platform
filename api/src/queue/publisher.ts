@@ -9,6 +9,7 @@ import { JobQueues } from './jobs';
 import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
+import { IProcessDownloadExportJobData } from './jobs/process-download-export-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
 import { getPgBoss } from './pg-boss-service';
 
@@ -95,6 +96,21 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
   retryDelay: 60,
   retryBackoff: true,
   expireInSeconds: 60 * 60 * 4 // 4 hours
+};
+
+/**
+ * Options for process download export jobs.
+ *
+ * Shorter budget than `PROCESS_DOWNLOAD` because exports read already-finalized
+ * Parquet artifacts (the expensive feature-gathering work is done) — the
+ * bounded work is read-one-row-group / write-one-CSV-chunk / upload-one-zip
+ * per feature type, sequentially.
+ */
+const PROCESS_DOWNLOAD_EXPORT_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 // 1 hour
 };
 
 /**
@@ -366,6 +382,78 @@ export const publishProcessDownloadJob = async (
       label: 'publishProcessDownloadJob',
       message: 'Failed to publish job',
       downloadId: data.downloadId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Publish a process download export job to the queue.
+ *
+ * Queues async CSV export packaging for an already-created `download_export`
+ * row. The caller (route handler) creates the row inside an open transaction
+ * and passes the same connection here; pg-boss's `db` option makes the job
+ * insert participate in that transaction, so the row and the job either both
+ * commit or both roll back — no ghost jobs and no orphaned exports.
+ *
+ * `singletonKey: export-{downloadExportId}` paired with `policy: 'short'` on
+ * the queue (see worker.ts) prevents two concurrent jobs for the same export.
+ *
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishProcessDownloadExportJob = async (
+  connection: IDBConnection,
+  data: IProcessDownloadExportJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    const mergedOptions = { ...PROCESS_DOWNLOAD_EXPORT_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+
+    // Insert the job in the same transaction as the business data via the
+    // `db` option. Prevents ghost jobs (job exists but data rolled back) and
+    // lost jobs (data committed but job never sent).
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
+    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD_EXPORT, data, {
+      ...mergedOptions,
+      singletonKey: `export-${data.downloadExportId}`,
+      db
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishProcessDownloadExportJob',
+        message: 'Process download export job published',
+        jobId,
+        downloadExportId: data.downloadExportId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishProcessDownloadExportJob',
+      message: 'Job not published (duplicate or throttled)',
+      downloadExportId: data.downloadExportId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this download export' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishProcessDownloadExportJob',
+      message: 'Failed to publish job',
+      downloadExportId: data.downloadExportId,
       error
     });
     throw error;

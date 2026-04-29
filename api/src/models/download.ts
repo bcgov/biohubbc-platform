@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SearchFeatureFiltersSchema } from '../services/search-feature-service.interface';
+import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
 
 export const DownloadRecord = z.object({
@@ -19,18 +20,31 @@ export const DownloadRecord = z.object({
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
 /**
- * Extended download record for the list endpoint.
- * feature_count removed — download_feature table dropped (SIMSBIOHUB-950).
- * Feature count is no longer cheaply derivable without the join table.
+ * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
+ * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
  */
-export const DownloadListRecord = DownloadRecord;
+export const DownloadListRecordBase = DownloadRecord;
+export type DownloadListRecordBase = z.infer<typeof DownloadListRecordBase>;
+
+/**
+ * Service-layer (and public API) list-row shape. `exports[]` is attached by
+ * `DownloadService.getDownloadsByTeamMembership` via a parallel batch-fetch from
+ * `DownloadExportService` and grouped by download_id in JS. Mirrors the assembly
+ * pattern used by `TicketService.getTicket` (`ticket-service.ts`) — composed at
+ * the service layer rather than via SQL aggregation so repositories stay
+ * single-SQL CRUD.
+ */
+export const DownloadListRecord = DownloadListRecordBase.extend({
+  exports: z.array(DownloadExportListRow)
+});
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
 /**
- * Internal row shape returned by the paginated list query.
- * Includes total_count from COUNT(*) OVER() window function — stripped before returning to callers.
+ * Internal row shape returned by the paginated list query. Carries `total_count`
+ * from the COUNT(*) OVER() window — stripped before returning to callers. Does
+ * NOT carry `exports`; those are fetched separately and attached in the service.
  */
-export const DownloadListRow = DownloadRecord.extend({
+export const DownloadListRow = DownloadListRecordBase.extend({
   total_count: z.number()
 });
 export type DownloadListRow = z.infer<typeof DownloadListRow>;

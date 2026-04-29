@@ -1,3 +1,4 @@
+import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 /**
@@ -14,6 +15,12 @@ export interface DownloadRecord {
   started_at: string | null;
   completed_at: string | null;
   downloaded_at: string | null;
+  /**
+   * CSV exports for this download. Pre-joined on the list response by the backend
+   * (`json_agg(ORDER BY create_date DESC)`) so the card never needs a second round-trip.
+   * Empty array when the download has no exports.
+   */
+  exports: DownloadExport[];
 }
 
 /**

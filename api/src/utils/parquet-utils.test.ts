@@ -127,6 +127,16 @@ describe('parquet-utils', () => {
       expect(schema.fields['meta']).to.exist;
       expect(schema.fields['file']).to.exist;
     });
+
+    it('should always include submission_feature_id as a NOT NULL INT64 column', () => {
+      const schema = buildParquetSchema([]);
+
+      const sfid = schema.fields['submission_feature_id'];
+      expect(sfid).to.exist;
+      expect(sfid.primitiveType).to.equal('INT64');
+      // optional=false in @dsnp/parquetjs surfaces as REQUIRED on the schema field.
+      expect(sfid.repetitionType).to.equal('REQUIRED');
+    });
   });
 
   describe('featureToRow', () => {
@@ -143,6 +153,13 @@ describe('parquet-utils', () => {
       const row = featureToRow(feature, []);
 
       expect(row['uuid']).to.equal('abc-123');
+    });
+
+    it('should include submission_feature_id in every row', () => {
+      const feature = makeFeature({});
+      const row = featureToRow(feature, []);
+
+      expect(row['submission_feature_id']).to.equal(1);
     });
 
     it('should always include parent_uuid', () => {

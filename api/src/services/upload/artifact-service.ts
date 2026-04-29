@@ -40,6 +40,19 @@ export class ArtifactService extends DBService {
   }
 
   /**
+   * Bulk-look-up `byte_size` by `(bucket, object_key)`. See
+   * `ArtifactRepository.getArtifactByteSizesByObjectKeys` for the why.
+   *
+   * @param {string} bucket
+   * @param {string[]} objectKeys
+   * @return {Promise<Map<string, number>>} object_key → byte_size
+   * @memberof ArtifactService
+   */
+  async getArtifactByteSizesByObjectKeys(bucket: string, objectKeys: string[]): Promise<Map<string, number>> {
+    return this.artifactRepository.getArtifactByteSizesByObjectKeys(bucket, objectKeys);
+  }
+
+  /**
    * Inserts a new artifact record.
    *
    * @param {CreateArtifact} artifact The artifact data to insert

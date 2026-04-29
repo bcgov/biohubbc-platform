@@ -52,7 +52,7 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'download_status', 'create_date'],
+                  required: ['download_id', 'download_status', 'create_date', 'exports'],
                   properties: {
                     download_id: {
                       type: 'string',
@@ -72,6 +72,41 @@ GET.apiDoc = {
                     completed_at: {
                       type: 'string',
                       nullable: true
+                    },
+                    exports: {
+                      type: 'array',
+                      description:
+                        'Exports attached to this download, ordered by create_date DESC. Empty when no exports exist.',
+                      items: {
+                        type: 'object',
+                        required: [
+                          'download_export_id',
+                          'download_id',
+                          'format',
+                          'status',
+                          'mode',
+                          'max_part_size_bytes',
+                          'started_at',
+                          'completed_at',
+                          'error_message',
+                          'part_count'
+                        ],
+                        properties: {
+                          download_export_id: { type: 'string', format: 'uuid' },
+                          download_id: { type: 'string', format: 'uuid' },
+                          format: { type: 'string' },
+                          status: {
+                            type: 'string',
+                            enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+                          },
+                          mode: { type: 'string', enum: ['per_feature_type', 'denormalized'] },
+                          max_part_size_bytes: { type: 'string' },
+                          started_at: { type: 'string', nullable: true },
+                          completed_at: { type: 'string', nullable: true },
+                          error_message: { type: 'string', nullable: true },
+                          part_count: { type: 'integer', minimum: 0 }
+                        }
+                      }
                     }
                   }
                 }

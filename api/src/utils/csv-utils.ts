@@ -3,6 +3,7 @@
  *
  * Used by the download pipeline to convert JSON feature data to CSV format.
  */
+import wkx from 'wkx';
 
 export interface CsvPropertyDefinition {
   feature_property_name: string;
@@ -11,7 +12,10 @@ export interface CsvPropertyDefinition {
 
 /**
  * Build CSV header names from schema property definitions.
- * Spatial properties expand to `decimalLatitude` and `decimalLongitude`.
+ *
+ * Spatial properties emit a single column under the property's own name —
+ * the cell value is WKT (decoded from the Parquet WKB buffer at flatten
+ * time). artifact_key properties map to a single `filePath` column.
  *
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
  * @returns {string[]} Ordered header names.
@@ -20,9 +24,7 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
   const headers: string[] = [];
 
   for (const prop of properties) {
-    if (prop.feature_property_type_name === 'spatial') {
-      headers.push('decimalLatitude', 'decimalLongitude');
-    } else if (prop.feature_property_type_name === 'artifact_key') {
+    if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
     } else {
       headers.push(prop.feature_property_name);
@@ -95,16 +97,18 @@ export function flattenFeatureWithParent(
  *
  * Type-aware rules:
  * - string, number, datetime, boolean → String(value)
- * - spatial → extract first Point from GeoJSON → decimalLatitude/decimalLongitude
+ * - spatial → decode WKB Buffer (as produced by the Parquet writer) → single
+ *   column under the property's own name, value is WKT
  * - array → delegate to flattenArray()
  * - artifact_key → files/{submissionFeatureId}_{filename}
  * - object → JSON.stringify(value)
- * - null/undefined → empty string (spatial gets two empty strings)
+ * - null/undefined → empty string
  *
- * @param {Record<string, unknown>} data - The feature's JSONB data.
- * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
- * @param {number} submissionFeatureId - The submission_feature_id for artifact_key paths.
- * @returns {Record<string, string>} Flattened key-value pairs keyed by header name.
+ * @param data - The feature's JSONB data.
+ * @param properties - Schema property definitions.
+ * @param submissionFeatureId - The submission_feature_id for artifact_key paths.
+ * @param filesFolderName - Subfolder name in the zip for artifact_key paths. Defaults to `'files'`.
+ * @returns Flattened key-value pairs keyed by header name.
  */
 export function flattenFeatureBySchema(
   data: Record<string, unknown>,
@@ -119,7 +123,7 @@ export function flattenFeatureBySchema(
 
     switch (prop.feature_property_type_name) {
       case 'spatial':
-        Object.assign(result, flattenSpatialValue(value));
+        result[prop.feature_property_name] = wkbToWkt(value);
         break;
       case 'artifact_key':
         result['filePath'] = flattenArtifactKeyValue(value, data, submissionFeatureId, filesFolderName);
@@ -153,14 +157,20 @@ function toStringOrEmpty(value: unknown): string {
 }
 
 /**
- * Flatten a spatial property to decimalLatitude/decimalLongitude.
+ * Decode a WKB Buffer (as produced by the Parquet writer) into a WKT string.
+ * Returns an empty string for null/undefined or any value that isn't a Buffer,
+ * and swallows parse errors — a malformed geometry shouldn't fail the whole
+ * CSV.
  */
-function flattenSpatialValue(value: unknown): Record<string, string> {
-  const coords = extractFirstPointCoordinates(value);
-  if (coords) {
-    return { decimalLatitude: String(coords[1]), decimalLongitude: String(coords[0]) };
+function wkbToWkt(value: unknown): string {
+  if (!Buffer.isBuffer(value)) {
+    return '';
   }
-  return { decimalLatitude: '', decimalLongitude: '' };
+  try {
+    return wkx.Geometry.parse(value).toWkt();
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -181,40 +191,6 @@ function flattenArtifactKeyValue(
 }
 
 /**
- * Extract the first Point coordinates from a GeoJSON value.
- * Handles bare Point, Feature wrapping Point, and FeatureCollection with Features.
- *
- * @param {unknown} value - The GeoJSON value.
- * @returns {[number, number] | null} [longitude, latitude] or null if no Point found.
- */
-function extractFirstPointCoordinates(value: unknown): [number, number] | null {
-  if (value == null || typeof value !== 'object') {
-    return null;
-  }
-
-  const geo = value as Record<string, unknown>;
-
-  if (geo.type === 'Point' && Array.isArray(geo.coordinates)) {
-    return geo.coordinates as [number, number];
-  }
-
-  if (geo.type === 'Feature') {
-    return extractFirstPointCoordinates(geo.geometry);
-  }
-
-  if (geo.type === 'FeatureCollection' && Array.isArray(geo.features)) {
-    for (const feature of geo.features) {
-      const coords = extractFirstPointCoordinates(feature);
-      if (coords) {
-        return coords;
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
  * Flatten a nested object to a single-level object with dot-notation keys.
  * Arrays are converted to semicolon-separated strings.
  *
@@ -222,9 +198,9 @@ function extractFirstPointCoordinates(value: unknown): [number, number] | null {
  * flattenObject({ a: 1, b: { c: 2 }, d: [1, 2, 3] })
  * // Returns: { a: '1', b_c: '2', d: '1;2;3' }
  *
- * @param {Record<string, unknown>} obj - The object to flatten
- * @param {string} [prefix=''] - Key prefix for nested properties
- * @returns {Record<string, string>} Flattened object with string values
+ * @param obj - The object to flatten.
+ * @param prefix - Key prefix for nested properties. Defaults to `''`.
+ * @returns Flattened object with string values.
  */
 export function flattenObject(obj: Record<string, unknown>, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {};

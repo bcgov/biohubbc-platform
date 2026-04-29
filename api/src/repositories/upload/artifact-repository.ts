@@ -114,6 +114,52 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
+   * Look up `byte_size` for many artifacts in one round-trip, keyed by
+   * `(bucket, object_key)`. Used by the export pipeline to project the size
+   * of binary attachments that will be appended to a part-zip *after* the
+   * CSV-byte rollover check, so the part can roll before the binaries push
+   * it past `max_part_size_bytes`.
+   *
+   * Filters `byte_size IS NOT NULL` so unuploaded / pending rows contribute
+   * zero to the projection rather than poisoning it. Missing keys are
+   * absent from the returned map — the caller treats absence as zero, since
+   * the streaming path already writes a `.error.txt` placeholder for
+   * objects that aren't fetchable.
+   *
+   * @param {string} bucket - The S3 bucket the keys live in.
+   * @param {string[]} objectKeys - Object keys to look up.
+   * @returns {Promise<Map<string, number>>} - object_key → byte_size.
+   */
+  async getArtifactByteSizesByObjectKeys(bucket: string, objectKeys: string[]): Promise<Map<string, number>> {
+    if (objectKeys.length === 0) {
+      return new Map();
+    }
+
+    const sqlStatement = SQL`
+      SELECT
+        object_key,
+        byte_size
+      FROM
+        artifact
+      WHERE
+        bucket = ${bucket}
+        AND object_key = ANY(${objectKeys}::text[])
+        AND byte_size IS NOT NULL;
+    `;
+
+    const response = await this.connection.sql(
+      sqlStatement,
+      z.object({ object_key: z.string(), byte_size: z.number().int().nonnegative() })
+    );
+
+    const result = new Map<string, number>();
+    for (const row of response.rows) {
+      result.set(row.object_key, row.byte_size);
+    }
+    return result;
+  }
+
+  /**
    * Get all artifact records.
    *
    * @returns {Promise<Artifact[]>} - Array of all artifact records.

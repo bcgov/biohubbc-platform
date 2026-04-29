@@ -13,6 +13,11 @@ import {
 } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
+  IProcessDownloadExportJobData,
+  processDownloadExportFailedHandler,
+  processDownloadExportJobHandler
+} from './jobs/process-download-export-job';
+import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,
   processDownloadJobHandler
@@ -39,6 +44,8 @@ export interface WorkerDependencies {
   malwareScanFailedHandler: typeof malwareScanFailedHandler;
   processDownloadJobHandler: typeof processDownloadJobHandler;
   processDownloadFailedHandler: typeof processDownloadFailedHandler;
+  processDownloadExportJobHandler: typeof processDownloadExportJobHandler;
+  processDownloadExportFailedHandler: typeof processDownloadExportFailedHandler;
   indexSubmissionFeaturesJobHandler: typeof indexSubmissionFeaturesJobHandler;
   indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
   computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
@@ -53,6 +60,8 @@ export const workerDependencies: WorkerDependencies = {
   malwareScanFailedHandler,
   processDownloadJobHandler,
   processDownloadFailedHandler,
+  processDownloadExportJobHandler,
+  processDownloadExportFailedHandler,
   indexSubmissionFeaturesJobHandler,
   indexSubmissionFeaturesFailedHandler,
   computeScopeAnchorsJobHandler,
@@ -129,6 +138,33 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IProcessDownloadJobData>(
     JobQueues.PROCESS_DOWNLOAD_FAILED,
     workerDependencies.processDownloadFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singletonKey uniqueness for queued (created) jobs.
+  // Without this, the default 'standard' policy ignores singletonKey entirely,
+  // and two concurrent POST /export calls for the same export would both run.
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT, {
+    deadLetter: JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register process download export job handler
+  await boss.work<IProcessDownloadExportJobData>(
+    JobQueues.PROCESS_DOWNLOAD_EXPORT,
+    workerDependencies.processDownloadExportJobHandler
+  );
+
+  // Register dead letter queue handler for failed download export jobs
+  await boss.work<IProcessDownloadExportJobData>(
+    JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED,
+    workerDependencies.processDownloadExportFailedHandler
   );
 
   // Create dead letter queue first (must exist before main queue references it)
