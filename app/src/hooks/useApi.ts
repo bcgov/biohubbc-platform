@@ -4,6 +4,7 @@ import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import { useCartApi } from './api/useCartApi';
 import { useDownloadApi } from './api/useDownloadApi';
+import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
@@ -56,6 +57,8 @@ export const useApi = () => {
 
   const download = useDownloadApi(apiAxios);
 
+  const downloadExport = useDownloadExportApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   const tickets = useTicketsApi(apiAxios);
@@ -77,6 +80,7 @@ export const useApi = () => {
     teams,
     cart,
     download,
+    downloadExport,
     teamPolicies,
     tickets,
     dataRequest

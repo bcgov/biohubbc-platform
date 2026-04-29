@@ -1,0 +1,220 @@
+// System integration test: end-to-end cart → download → export → CSV.
+//
+// Mirrors `scripts/test_telemetry_export.py` end-to-end, against a real DB +
+// MinIO. The pipeline reads telemetry from `submission_feature` + the typed
+// `submission_feature_property_*` tables (populated upstream by 963's indexing
+// job), runs the Parquet pipeline, then the CSV export pipeline, and writes a
+// part-zip to S3. We then unzip and assert the CSV contents.
+//
+// Run: make test-sys
+// Requires: make web (database + MinIO must be running)
+
+import AdmZip from 'adm-zip';
+import { expect } from 'chai';
+import SQL from 'sql-template-strings';
+import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadRepository } from '../../repositories/download/download-repository';
+import { CartService } from '../../services/cart-service';
+import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
+import { DownloadExportService } from '../../services/download/download-export-service';
+import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadService } from '../../services/download/download-service';
+import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+
+/** Download a zip file from S3 and return it as an AdmZip instance. */
+async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: string): Promise<AdmZip> {
+  const fileStream = await storageService.getFileStream(BucketType.MAIN, s3Key);
+  const chunks: Buffer[] = [];
+  for await (const chunk of fileStream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return new AdmZip(Buffer.concat(chunks));
+}
+
+/** Read a zip entry as a UTF-8 string. */
+function zipEntryText(zip: AdmZip, entry: string): string {
+  return zip.readFile(entry)?.toString('utf-8') ?? '';
+}
+
+describe('Ingest → Download → Export (system integration)', function () {
+  // Real Parquet round-trip + S3 multipart upload is slow; give it headroom.
+  this.timeout(60000);
+
+  let connection: IDBConnection;
+
+  before(() => {
+    initDBPool(defaultPoolConfig);
+  });
+
+  beforeEach(async () => {
+    connection = getAPIUserDBConnection();
+    await connection.open();
+  });
+
+  afterEach(async () => {
+    await connection.rollback();
+    connection.release();
+  });
+
+  /**
+   * Look up the active feature_type_property_id for a (feature_type, property) pair.
+   * Hardcoding seed IDs is brittle; this name-based lookup mirrors how the
+   * indexer resolves them at runtime.
+   */
+  async function lookupFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT ftp.feature_type_property_id
+      FROM feature_type_property ftp
+      INNER JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+      INNER JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+      WHERE ft.name = ${featureTypeName}
+        AND fp.name = ${propertyName}
+        AND ftp.record_end_date IS NULL
+      LIMIT 1;
+    `);
+    if (!result.rowCount) {
+      throw new Error(`feature_type_property not found: ${featureTypeName}.${propertyName}`);
+    }
+    return result.rows[0].feature_type_property_id as number;
+  }
+
+  /**
+   * Mirror what 963's indexer would write for a telemetry feature: one row per
+   * declared property in the matching typed table. The download pipeline reads
+   * from these typed tables, so without them the CSV renders empty cells.
+   */
+  async function indexTelemetryProperties(
+    submissionFeatureId: number,
+    data: { dop: number; elevation: number; timestamp: string; geometry: object }
+  ): Promise<void> {
+    const systemUserId = connection.systemUserId();
+
+    const dopId = await lookupFeatureTypePropertyId('telemetry', 'dop');
+    const elevationId = await lookupFeatureTypePropertyId('telemetry', 'elevation');
+    const timestampId = await lookupFeatureTypePropertyId('telemetry', 'timestamp');
+    const geometryId = await lookupFeatureTypePropertyId('telemetry', 'geometry');
+
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+      VALUES
+        (${submissionFeatureId}, ${dopId}, ${data.dop}, ${systemUserId}),
+        (${submissionFeatureId}, ${elevationId}, ${data.elevation}, ${systemUserId});
+    `);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, value, create_user)
+      VALUES (${submissionFeatureId}, ${timestampId}, ${data.timestamp}, ${systemUserId});
+    `);
+    // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
+    const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
+    await connection.query(
+      `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+       VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
+      [submissionFeatureId, geometryId, JSON.stringify(innerGeom), systemUserId]
+    );
+  }
+
+  it('telemetry: cart → download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
+    const submissionId = await createTestSubmission(connection);
+
+    const telemetryData = {
+      dop: 4.2,
+      elevation: 1234.5,
+      timestamp: '2026-04-24T12:34:56.789Z',
+      geometry: {
+        type: 'FeatureCollection' as const,
+        features: [
+          {
+            type: 'Feature' as const,
+            properties: {},
+            geometry: { type: 'Point' as const, coordinates: [-123.1234, 49.5678] }
+          }
+        ]
+      }
+    };
+
+    const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
+    await indexTelemetryProperties(featureId, telemetryData);
+
+    // Build a cart + download via the real services. Authenticated path so the
+    // download is owned by a single-member team — the cart's scope-check sees
+    // the feature regardless of any inherited security on its ancestors.
+    const systemUserId = connection.systemUserId();
+    const cartService = new CartService(connection);
+    const { cart } = await cartService.createCart(systemUserId, [featureId]);
+
+    const downloadService = new DownloadService(connection);
+    const { download_id: downloadId } = await downloadService.createDownload({
+      cartId: cart.cart_id,
+      format: 'parquet'
+    });
+
+    // Run the download (Parquet) pipeline.
+    const pipelineService = new DownloadPipelineService(connection);
+    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+      DownloadStatusEnum.PENDING
+    ]);
+    const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
+    const { schemaLookup, featureTypes } = await pipelineService.resolveParquetSchema(downloadId, source);
+    for (const featureTypeName of featureTypes) {
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: schemaLookup.get(featureTypeName) ?? [],
+        featureTypeName
+      });
+    }
+    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+      DownloadStatusEnum.PROCESSING
+    ]);
+
+    // Run the export (CSV) pipeline.
+    const exportService = new DownloadExportService(connection);
+    const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {});
+    const exportPipelineService = new DownloadExportPipelineService(connection);
+    await exportPipelineService.runExport(exportRecord.download_export_id);
+
+    // Locate the part-zip on S3 and extract chunk1.csv.
+    const artifacts = await connection.sql(SQL`
+      SELECT a.bucket, a.object_key
+      FROM download_export_artifact dea
+      INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
+      WHERE dea.download_export_id = ${exportRecord.download_export_id}
+        AND dea.record_end_date IS NULL
+      ORDER BY dea.chunk_id ASC;
+    `);
+    expect(artifacts.rowCount).to.equal(1, 'expected exactly one part-zip artifact');
+
+    const storageService = new ObjectStorageService();
+    const zip = await downloadZipFromS3(storageService, artifacts.rows[0].object_key);
+    const chunkEntryName = `biohub-export-${exportRecord.download_export_id}/telemetry/chunk1.csv`;
+    const csv = zipEntryText(zip, chunkEntryName);
+    expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
+
+    const lines = csv.trim().split('\n');
+    expect(lines).to.have.lengthOf(2, 'expected header + 1 data row');
+
+    const header = lines[0].split(',');
+    // System columns lead so consumers can join cross-file (uuid, parent_uuid)
+    // and trace back to the platform UI (submission_feature_id).
+    expect(header).to.include.members(['submission_feature_id', 'uuid', 'parent_uuid']);
+    expect(header).to.include.members(['dop', 'elevation', 'timestamp', 'geometry']);
+
+    const row = lines[1].split(',');
+    const col = (name: string): string => row[header.indexOf(name)];
+
+    expect(col('submission_feature_id')).to.equal(String(featureId));
+    // uuid is generated server-side; we don't pin the exact value, just assert it's a non-empty UUID-looking string.
+    expect(col('uuid')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    // Telemetry's parent (the dataset) is set inside createTestFeature → empty for root-level test feature.
+    // Real telemetry has a dataset parent; the column at minimum must be present (not crash).
+    expect(header).to.include('parent_uuid');
+
+    expect(col('dop'), 'dop should round-trip the ingested number').to.equal('4.2');
+    expect(col('elevation'), 'elevation should round-trip the ingested number').to.equal('1234.5');
+    expect(col('timestamp'), 'timestamp should round-trip the ingested ISO string').to.contain('2026-04-24T12:34:56');
+    // Geometry is emitted as a single WKT column (per Phase 5 of plan-review-fixes).
+    expect(col('geometry'), 'geometry should be a Point WKT').to.match(/^POINT\(-123\.1234\s+49\.5678\)$/);
+  });
+});

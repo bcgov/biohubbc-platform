@@ -322,7 +322,8 @@ describe('paths/download/index', () => {
           completed_fragments: 1,
           estimated_total_size_bytes: '1000',
           fragment_size_bytes: '1000',
-          create_date: '2026-01-01'
+          create_date: '2026-01-01',
+          exports: []
         }
       ];
 
@@ -345,6 +346,59 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue.pagination).to.have.property('current_page', 1);
       expect(mockRes.jsonValue.pagination).to.have.property('last_page', 1);
       expect(mockRes.jsonValue.pagination).to.have.property('per_page', 25);
+    });
+
+    it('forwards populated exports on each download row', async () => {
+      const mockDownloads: DownloadListRecord[] = [
+        {
+          download_id: 'uuid-1',
+          download_status: 'ready',
+          format: 'csv',
+          metadata: null,
+          started_at: '2026-01-01',
+          completed_at: '2026-01-01',
+          downloaded_at: null,
+          total_fragments: 1,
+          completed_fragments: 1,
+          estimated_total_size_bytes: '1000',
+          fragment_size_bytes: '1000',
+          create_date: '2026-01-01',
+          exports: [
+            {
+              download_export_id: 'eeee0000-0000-0000-0000-000000000001',
+              download_id: 'uuid-1',
+              format: 'csv',
+              status: 'ready',
+              mode: 'per_feature_type',
+              max_part_size_bytes: '524288000',
+              started_at: '2026-01-01',
+              completed_at: '2026-01-01',
+              error_message: null,
+              part_count: 2
+            }
+          ]
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon
+        .stub(DownloadService.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: mockDownloads, count: 1 });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = { page: '1', limit: '25' };
+
+      const requestHandler = getDownloads();
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.downloads[0].exports).to.have.length(1);
+      expect(mockRes.jsonValue.downloads[0].exports[0]).to.have.property(
+        'download_export_id',
+        'eeee0000-0000-0000-0000-000000000001'
+      );
+      expect(mockRes.jsonValue.downloads[0].exports[0]).to.have.property('part_count', 2);
     });
 
     it('should pass pagination options to service', async () => {

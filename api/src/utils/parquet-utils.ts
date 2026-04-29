@@ -85,6 +85,14 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
   // Always present so consumers don't need to know which types are roots.
   fields['parent_uuid'] = { type: 'UTF8', optional: true };
 
+  // The DB integer PK for the row. Carried alongside `uuid` because it's the
+  // identifier the platform's UI exposes — the feature-detail route is
+  // `/submission/:submissionId/feature/:submissionFeatureId`. Downstream
+  // consumers (CSV export, DuckDB, pandas) use it both to namespace artifact
+  // filenames (avoiding `0_*.bin` collisions when many rows reference files)
+  // and as a clickable trace back into the platform.
+  fields['submission_feature_id'] = { type: 'INT64', optional: false };
+
   for (const prop of properties) {
     fields[prop.feature_property_name] = {
       type: propertyTypeToParquetType(prop.feature_property_type_name),
@@ -117,6 +125,7 @@ export function featureToRow(
 
   row['uuid'] = feature.uuid;
   row['parent_uuid'] = feature.parent_uuid ?? null;
+  row['submission_feature_id'] = feature.submission_feature_id;
 
   for (const prop of properties) {
     const value = feature.data[prop.feature_property_name];

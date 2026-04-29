@@ -101,6 +101,21 @@ describe('ArtifactService', () => {
     });
   });
 
+  describe('getArtifactByteSizesByObjectKeys', () => {
+    it('forwards arguments to the repository and returns its map verbatim', async () => {
+      const fakeMap = new Map<string, number>([
+        ['a/key.txt', 100],
+        ['a/key-2.txt', 200]
+      ]);
+      const stub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByteSizesByObjectKeys').resolves(fakeMap);
+
+      const result = await service.getArtifactByteSizesByObjectKeys('bucket-a', ['a/key.txt', 'a/key-2.txt']);
+
+      expect(stub).to.have.been.calledOnceWith('bucket-a', ['a/key.txt', 'a/key-2.txt']);
+      expect(result).to.equal(fakeMap);
+    });
+  });
+
   describe('insertArtifact', () => {
     it('should insert a new artifact and return its ID', async () => {
       const fakeInput: CreateArtifact = {
