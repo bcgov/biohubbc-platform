@@ -8,8 +8,10 @@ import {
   DownloadListRecord,
   DownloadRecord
 } from '../../models/download';
+import { DownloadExportListRow } from '../../models/download-export';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
@@ -35,6 +37,13 @@ import { SearchFeatureService } from '../search-feature-service';
 export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
+  /**
+   * Held directly (not via `DownloadExportService`) to avoid a circular
+   * construction chain — `DownloadExportService` already composes `DownloadService`
+   * for its auth helper, and layering a `DownloadExportService` dependency here
+   * would loop at construction time.
+   */
+  downloadExportRepository: DownloadExportRepository;
   teamService: TeamService;
   searchFeatureService: SearchFeatureService;
 
@@ -42,6 +51,7 @@ export class DownloadService extends DBService {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
+    this.downloadExportRepository = new DownloadExportRepository(connection);
     this.teamService = new TeamService(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
   }
@@ -80,7 +90,17 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get paginated download records accessible to a user, with total count.
+   * Get paginated download records with each download's exports attached.
+   *
+   * The page of downloads and the export rows for every download on that page
+   * are loaded with two sequential queries (the second depends on the id set
+   * from the first); exports are grouped by `download_id` in JS and spread
+   * onto each download. Empty-page short-circuit skips the export query.
+   *
+   * Shape mirrors `TicketService.getTicket` — composed at the service layer
+   * rather than via SQL aggregation so repositories stay single-SQL CRUD.
+   * Pre-joining the exports lets the frontend render from props without a
+   * per-row fetch or cache map.
    *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
@@ -91,7 +111,26 @@ export class DownloadService extends DBService {
     systemUserId: number,
     pagination?: ApiPaginationOptions
   ): Promise<{ downloads: DownloadListRecord[]; count: number }> {
-    return this.downloadRepository.getDownloadsByTeamMembership(systemUserId, pagination);
+    const { downloads: baseDownloads, count } = await this.downloadRepository.getDownloadsByTeamMembership(
+      systemUserId,
+      pagination
+    );
+
+    if (baseDownloads.length === 0) {
+      return { downloads: [], count };
+    }
+
+    const downloadIds = baseDownloads.map((d) => d.download_id);
+    const exportRows = await this.downloadExportRepository.listDownloadExportsByDownloadIds(downloadIds);
+
+    const exportsByDownloadId = groupExportsByDownloadId(exportRows);
+
+    const downloads: DownloadListRecord[] = baseDownloads.map((d) => ({
+      ...d,
+      exports: exportsByDownloadId.get(d.download_id) ?? []
+    }));
+
+    return { downloads, count };
   }
 
   /**
@@ -310,3 +349,23 @@ export class DownloadService extends DBService {
     return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
   }
 }
+
+/**
+ * Group a flat list of export rows by `download_id`.
+ *
+ * Preserves per-download-id order — the repository returns rows sorted by
+ * `download_id` then `create_date DESC`, so the first occurrence of each id
+ * seeds that id's bucket and subsequent rows append in the repo's order.
+ */
+export const groupExportsByDownloadId = (rows: DownloadExportListRow[]): Map<string, DownloadExportListRow[]> => {
+  const grouped = new Map<string, DownloadExportListRow[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.download_id);
+    if (list) {
+      list.push(row);
+    } else {
+      grouped.set(row.download_id, [row]);
+    }
+  }
+  return grouped;
+};

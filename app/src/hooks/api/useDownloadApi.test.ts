@@ -28,7 +28,8 @@ describe('useDownloadApi', () => {
             estimated_total_size_bytes: '1024',
             started_at: '2026-03-01T00:01:00Z',
             completed_at: '2026-03-01T00:02:00Z',
-            downloaded_at: null
+            downloaded_at: null,
+            exports: []
           }
         ],
         pagination: { total: 1, current_page: 1, last_page: 1 }

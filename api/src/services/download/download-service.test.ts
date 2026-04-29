@@ -3,18 +3,19 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadRecord } from '../../__mocks__/download';
+import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { TeamService } from '../access-policy/team-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { DownloadService } from './download-service';
+import { DownloadService, groupExportsByDownloadId } from './download-service';
 
 chai.use(sinonChai);
 
@@ -38,50 +39,108 @@ describe('DownloadService', () => {
   });
 
   describe('getDownloadsByTeamMembership', () => {
-    it('delegates to repository', async () => {
+    it('short-circuits on empty page and does not fetch exports', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      const stub = sinon
+      const listStub = sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [], count: 0 });
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
-      expect(stub).to.have.been.calledOnceWith(42);
+      expect(listStub).to.have.been.calledOnceWith(42);
+      expect(exportsStub).not.to.have.been.called;
       expect(result).to.deep.equal({ downloads: [], count: 0 });
     });
 
-    it('passes through DownloadListRecord fields including create_date', async () => {
+    it('attaches exports to each download grouped by download_id', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      const mockRecords = [
-        {
-          download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          download_status: 'ready' as const,
-          format: 'parquet',
-          metadata: null,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          downloaded_at: null,
-          total_fragments: 1,
-          completed_fragments: 1,
-          estimated_total_size_bytes: '1000',
-          fragment_size_bytes: '524288000',
-          create_date: '2025-01-01T00:00:00Z'
-        }
-      ];
+      const baseA = createMockDownloadRecord({ download_id: 'a' });
+      const baseB = createMockDownloadRecord({ download_id: 'b' });
+
+      const exportA1 = createMockDownloadExportListRow({
+        download_export_id: 'ex-a1',
+        download_id: 'a',
+        part_count: 2
+      });
+      const exportA2 = createMockDownloadExportListRow({
+        download_export_id: 'ex-a2',
+        download_id: 'a',
+        part_count: 0
+      });
+      // b has no exports — service must fall through to `[]`.
 
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
-        .resolves({ downloads: mockRecords, count: 1 });
+        .resolves({ downloads: [baseA, baseB], count: 2 });
+      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([exportA1, exportA2]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
-      expect(result.downloads).to.have.length(1);
-      expect(result.downloads[0]).to.have.property('create_date', '2025-01-01T00:00:00Z');
-      expect(result.count).to.equal(1);
+      expect(result.count).to.equal(2);
+      expect(result.downloads).to.have.length(2);
+      expect(result.downloads[0].download_id).to.equal('a');
+      expect(result.downloads[0].exports).to.deep.equal([exportA1, exportA2]);
+      expect(result.downloads[1].download_id).to.equal('b');
+      expect(result.downloads[1].exports).to.deep.equal([]);
+    });
+
+    it('preserves the download page order from the repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const first = createMockDownloadRecord({ download_id: 'first' });
+      const second = createMockDownloadRecord({ download_id: 'second' });
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: [first, second], count: 2 });
+      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+
+      const result = await service.getDownloadsByTeamMembership(42);
+
+      expect(result.downloads.map((d) => d.download_id)).to.deep.equal(['first', 'second']);
+    });
+
+    it('passes the full set of download ids to the exports batch fetch', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const ids = ['one', 'two', 'three'];
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: ids.map((id) => createMockDownloadRecord({ download_id: id })), count: 3 });
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
+
+      await service.getDownloadsByTeamMembership(42);
+
+      expect(exportsStub).to.have.been.calledOnceWith(ids);
+    });
+  });
+
+  describe('groupExportsByDownloadId (pure helper)', () => {
+    it('returns an empty map for an empty input', () => {
+      expect(groupExportsByDownloadId([])).to.deep.equal(new Map());
+    });
+
+    it('groups rows by download_id preserving input order within each group', () => {
+      const a1 = createMockDownloadExportListRow({ download_export_id: 'a1', download_id: 'a' });
+      const a2 = createMockDownloadExportListRow({ download_export_id: 'a2', download_id: 'a' });
+      const b1 = createMockDownloadExportListRow({ download_export_id: 'b1', download_id: 'b' });
+
+      const grouped = groupExportsByDownloadId([a1, a2, b1]);
+
+      expect(grouped.get('a')).to.deep.equal([a1, a2]);
+      expect(grouped.get('b')).to.deep.equal([b1]);
     });
   });
 

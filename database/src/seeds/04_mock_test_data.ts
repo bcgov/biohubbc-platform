@@ -145,10 +145,12 @@ export const insertDatasetRecord = async (
         description: faker.lorem.sentence({ min: 5, max: 15 }),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
+        // Full FeatureCollection matches the ingest contract (see
+        // `feature-validation-service.ts:266` — `spatial` is `GeoJSONFeatureCollectionZodSchema`).
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
-        )['features'][0]['geometry']
+        )
       }
     })}`
   );
@@ -308,10 +310,11 @@ export const insertSampleSiteRecord = async (
       data: {
         name: `Sample Site ${faker.lorem.words(3)}`,
         description: faker.lorem.words({ min: 5, max: 100 }),
+        // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
-        )['features'][0]['geometry']
+        )
       }
     })}`
   );
@@ -337,10 +340,11 @@ export const insertObservationRecord = async (
       feature_type: 'species_observation',
       data: {
         taxon_id: faker.number.int({ min: 10000, max: 99999 }),
+        // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
-        )['features'][0]['geometry'],
+        ),
         count: faker.number.int({ min: 0, max: 100 })
       }
     })}`
@@ -681,14 +685,15 @@ export const insertTelemetryRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
+  // Match the `feature_type_property` schema for telemetry (dop, elevation,
+  // timestamp, geometry). Property names MUST align with the declarations in
+  // `20251001000000_insert_feature_types.ts`. Full FeatureCollection matches
+  // the ingest contract.
   const telemetryData = {
-    device_id: faker.string.alphanumeric({ length: 8 }),
-    latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
-    longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
+    dop: faker.number.float({ min: 0.5, max: 10, multipleOf: 0.1 }),
+    elevation: faker.number.float({ min: 0, max: 3000, multipleOf: 0.1 }),
     timestamp: faker.date.recent().toISOString(),
-    temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
-    humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
-    status: faker.helpers.arrayElement(['active', 'idle', 'error'])
+    geometry: random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])
   };
 
   const response = await knex.raw(
@@ -703,17 +708,45 @@ export const insertTelemetryRecord = async (
 
   const submission_feature_id = response.rows[0].submission_feature_id;
 
-  // Add search indices
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`); // e.g., status
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., temperature
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., humidity
-
-  // Spatial search index
+  // The download pipeline hydrates typed properties from the
+  // `submission_feature_property_*` tables (not from the JSONB `data` column —
+  // see `DownloadPipelineService.hydrateFeatureBatch`). Keep both in sync so
+  // the exported Parquet/CSV contains the same values a consumer would see in
+  // search. Generic helpers above (`insertSearchString`/`insertSearchNumber`)
+  // are hardcoded to `name`/`count` property names, so we use inline SQL here
+  // to target telemetry's specific property names.
   await knex.raw(
-    `${insertSpatialPoint({
-      submission_feature_id
-    })}`
+    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?, 1
+     FROM submission_feature sf
+     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'dop';`,
+    [telemetryData.dop, submission_feature_id]
   );
+
+  await knex.raw(
+    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?, 1
+     FROM submission_feature sf
+     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'elevation';`,
+    [telemetryData.elevation, submission_feature_id]
+  );
+
+  await knex.raw(
+    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?::timestamptz, 1
+     FROM submission_feature sf
+     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'timestamp';`,
+    [telemetryData.timestamp, submission_feature_id]
+  );
+
+  // Geometry: use the shared helper which targets `fp.name = 'geometry'`.
+  await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
 
   return submission_feature_id;
 };
