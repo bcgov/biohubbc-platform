@@ -14,6 +14,7 @@ import {
   IUploadedMediaFile,
   MediaUploadContext,
   StreamSubmissionArchiveOptions,
+  TarEntryHeader,
   TarNext,
   UploadMediaEntryOptions
 } from './biohub-tar-parser.interface';
@@ -278,8 +279,8 @@ function extractFeatureFromTarballEntry(value: unknown, entryName: string): IFla
  * @returns {MediaUploadContext} Context used to upload and persist media metadata.
  */
 function buildMediaUploadContext(entryName: string, s3KeyPrefix: string, byteSize: number): MediaUploadContext {
-  const path = entryName.substring('files/'.length).replace(/^\/+/, '');
-  const fileName = nodePath.basename(path);
+  const path = entryName;
+  const fileName = nodePath.basename(entryName);
   const s3Key = `${s3KeyPrefix}/${path}`;
 
   return {
@@ -404,7 +405,7 @@ async function uploadMediaEntry(
  *   it so callers can enforce byte-based batch flush thresholds.
  * - Returns `true` once the entry has been fully consumed and processed.
  *
- * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {TarEntryHeader} header Tar entry header.
  * @param {Readable} stream Tar entry data stream.
  * @param {{
  *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
@@ -413,7 +414,7 @@ async function uploadMediaEntry(
  * @returns {Promise<boolean>} True when the entry matched and was handled.
  */
 async function processFeatureArchiveEntry(
-  header: { name?: string | null; type?: string | null; size?: number },
+  header: TarEntryHeader,
   stream: Readable,
   options: {
     ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
@@ -453,7 +454,7 @@ async function processFeatureArchiveEntry(
  * @returns {Promise<boolean>} True when the entry matched and was handled.
  */
 async function processCodesArchiveEntry(
-  header: { name?: string | null; type?: string | null; size?: number },
+  header: TarEntryHeader,
   stream: Readable,
   options: {
     ingestCodesets: (codesets: TarCodesets) => Promise<void>;
@@ -496,7 +497,7 @@ async function processCodesArchiveEntry(
  * @returns {Promise<boolean>} True when the entry matched and upload was started.
  */
 async function processConcurrentMediaArchiveEntry(
-  header: { name?: string | null; type?: string | null; size?: number },
+  header: TarEntryHeader,
   stream: Readable,
   reject: (err: unknown) => void,
   options: {
@@ -508,7 +509,9 @@ async function processConcurrentMediaArchiveEntry(
     inFlightMediaUploads: Set<Promise<void>>;
   }
 ): Promise<boolean> {
-  const resolvedMediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
+  // GNU sparse entries may expose an internal header name while preserving the archive path in PAX metadata.
+  const entryName = header.pax?.['GNU.sparse.name'] || header.name || '';
+  const resolvedMediaEntryName = resolveScopedEntryName(entryName, 'files');
   if (!(resolvedMediaEntryName && header.type === 'file')) {
     return false;
   }
@@ -560,7 +563,7 @@ async function processConcurrentMediaArchiveEntry(
  * @returns {Promise<void>}
  */
 async function processSubmissionArchiveEntry(
-  header: { name?: string | null; type?: string | null; size?: number },
+  header: TarEntryHeader,
   stream: Readable,
   next: TarNext,
   reject: (err: unknown) => void,

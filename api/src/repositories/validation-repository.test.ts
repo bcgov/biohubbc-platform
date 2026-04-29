@@ -61,7 +61,8 @@ describe('ValidationRepository', () => {
           description: 'asd',
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
       const mockQueryResponse = mockQueryResult(mockData);

@@ -11,7 +11,8 @@ export const FeatureTypeProperty = z.object({
   description: z.string(),
   type_name: z.string(),
   required_value: z.boolean(),
-  calculated_value: z.boolean()
+  calculated_value: z.boolean(),
+  allow_multiple: z.boolean()
 });
 
 export type FeatureTypeProperty = z.infer<typeof FeatureTypeProperty>;

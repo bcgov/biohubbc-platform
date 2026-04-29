@@ -13,6 +13,14 @@ export async function up(knex: Knex): Promise<void> {
 
     --------------------------------------------------------------------------------
     -- 1) Cut over submission_upload.status to lifecycle v2 enum
+    --
+    --    uploaded: file artifacts are accepted and ready for ingestion.
+    --    ingesting: feature extraction and validation are in progress.
+    --    ingested: feature rows and validation results are persisted.
+    --    indexing: derived search/index tables are being populated.
+    --    indexed: derived search/index tables are ready for use.
+    --    invalid: ingestion completed with deterministic validation errors.
+    --    failed: processing failed due to an operational/runtime error.
     --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_job_status_v2 AS ENUM (
       'uploaded',
@@ -42,11 +50,14 @@ export async function up(knex: Knex): Promise<void> {
 
     ALTER TYPE submission_upload_job_status_v2 RENAME TO submission_upload_job_status;
 
+    COMMENT ON TYPE submission_upload_job_status IS
+      'Submission upload lifecycle: uploaded=accepted and ready for ingestion; ingesting=feature extraction and validation running; ingested=feature rows and validation persisted; indexing=derived indexes being populated; indexed=derived indexes ready; invalid=deterministic validation errors; failed=operational/runtime failure.';
+
     ALTER TABLE submission_upload
       ALTER COLUMN status SET DEFAULT 'uploaded'::submission_upload_job_status;
 
     COMMENT ON COLUMN submission_upload.status IS
-      'Submission pipeline lifecycle status: uploaded, ingesting, ingested, indexing, indexed, invalid, failed.';
+      'Submission upload lifecycle status. uploaded=accepted and ready for ingestion; ingesting=feature extraction and validation running; ingested=feature rows and validation persisted; indexing=derived indexes being populated; indexed=derived indexes ready; invalid=deterministic validation errors; failed=operational/runtime failure.';
 
     --------------------------------------------------------------------------------
     -- 2) Add upload_artifact soft-delete marker and active-row uniqueness

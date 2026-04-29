@@ -285,7 +285,23 @@ export class SubmissionIngestionService {
       mediaBytesPersisted,
       elapsedMs: Date.now() - startTime
     });
-    return { valid: true, errors: [] };
+    return {
+      valid: true,
+      errors: [],
+      metadata: {
+        errorCount: 0,
+        recordCount: 0,
+        featureCount,
+        uploadedCount,
+        codesetFileCount,
+        featureBatchCount,
+        codesetBatchCount,
+        mediaBatchCount,
+        featureRowsPersisted,
+        mediaFilesPersisted,
+        mediaBytesPersisted
+      }
+    };
   }
 
   /**

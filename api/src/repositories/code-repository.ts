@@ -15,7 +15,7 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureType[]>}
+   * @returns {Promise<FeatureType[]>} Active feature type records.
    * @memberof CodeRepository
    */
   async getFeatureTypes(): Promise<FeatureType[]> {
@@ -38,7 +38,7 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature type property codes for all feature types.
    *
-   * @return {*}  {Promise<FeatureTypeWithProperties[]>}
+   * @returns {Promise<FeatureTypeWithProperties[]>} Active feature types with property metadata.
    * @memberof CodeRepository
    */
   async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
@@ -58,7 +58,8 @@ export class CodeRepository extends BaseRepository {
               'description', fp.description,
               'type_name', fpt.name,
               'required_value', ftp.required_value,
-              'calculated_value', fp.calculated_value
+              'calculated_value', fp.calculated_value,
+              'allow_multiple', ftp.allow_multiple
             )
             ORDER BY ftp.sort
           ) FILTER (WHERE ftp.feature_type_property_id IS NOT NULL),
@@ -94,7 +95,7 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureTypeProperty>}
+   * @returns {Promise<FeatureTypeProperty>} Matching active feature property record.
    * @memberof CodeRepository
    */
   async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
@@ -106,7 +107,8 @@ export class CodeRepository extends BaseRepository {
       fp.description,
       fpt.name as type_name,
       ftp.required_value,
-      fp.calculated_value
+      fp.calculated_value,
+      ftp.allow_multiple
     FROM
       feature_type_property ftp
     INNER JOIN

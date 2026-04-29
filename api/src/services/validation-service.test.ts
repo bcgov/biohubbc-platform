@@ -215,7 +215,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -258,7 +259,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -267,7 +269,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -276,7 +279,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -285,7 +289,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -294,7 +299,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -303,7 +309,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -347,7 +354,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -356,7 +364,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -365,7 +374,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -374,7 +384,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -383,7 +394,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -392,7 +404,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -437,7 +450,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -446,7 +460,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -455,7 +470,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -464,7 +480,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -473,7 +490,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -482,7 +500,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -527,7 +546,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -536,7 +556,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -545,7 +566,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -554,7 +576,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -563,7 +586,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -572,7 +596,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -617,7 +642,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -626,7 +652,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -635,7 +662,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -644,7 +672,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -653,7 +682,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -662,7 +692,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -707,7 +738,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -716,7 +748,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -725,7 +758,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'tags',
@@ -734,7 +768,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'array',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -743,7 +778,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -752,7 +788,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -797,7 +834,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'array',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -823,7 +861,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -832,7 +871,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -841,7 +881,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -850,7 +891,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -859,7 +901,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -868,7 +911,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -901,7 +945,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -910,7 +955,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -919,7 +965,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -928,7 +975,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -937,7 +985,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -946,7 +995,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -991,7 +1041,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -1000,7 +1051,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -1009,7 +1061,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -1018,7 +1071,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -1027,7 +1081,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -1036,7 +1091,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -1081,7 +1137,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'count',
@@ -1090,7 +1147,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'published',
@@ -1099,7 +1157,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'boolean',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'permit',
@@ -1108,7 +1167,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'object',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'tags',
@@ -1117,7 +1177,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'array',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'geometry',
@@ -1126,7 +1187,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'spatial',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'start_date',
@@ -1135,7 +1197,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -1181,7 +1244,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'description',
@@ -1190,7 +1254,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -1219,7 +1284,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'description',
@@ -1228,7 +1294,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 
@@ -1249,7 +1316,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'number',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ]);
 
@@ -1270,7 +1338,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         },
         {
           name: 'description',
@@ -1279,7 +1348,8 @@ describe('ValidationService', () => {
           feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
 

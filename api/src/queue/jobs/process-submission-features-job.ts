@@ -75,6 +75,21 @@ function isValidationFailure(error: unknown): boolean {
 }
 
 /**
+ * Metadata recorded when the process validation stage starts.
+ *
+ * @param {string} submissionUploadId Submission upload scope.
+ * @returns {Record<string, unknown>} Initial validation metadata.
+ */
+function getStartedValidationMetadata(submissionUploadId: string): Record<string, unknown> {
+  return {
+    stage: 'process-submission-features',
+    submissionUploadId,
+    errorCount: 0,
+    recordCount: 0
+  };
+}
+
+/**
  * Initialize process-stage preconditions and record stage start.
  *
  * Flow:
@@ -125,7 +140,11 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
     // Locked row + in-transaction write prevents duplicate concurrent starts.
     await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
 
-    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'started');
+    await submissionValidationService.updateSubmissionValidationStatus(
+      jobId,
+      'started',
+      getStartedValidationMetadata(submissionUploadId)
+    );
     return true;
   });
 }
@@ -164,19 +183,31 @@ async function executeProcessSubmissionFeaturesIngestion(
     });
 
     if (!ingestionResult.valid) {
+      const errorCount = ingestionResult.errors.length;
       return {
         status: 'invalid',
-        validationPayload: { errors: ingestionResult.errors },
-        errorCount: ingestionResult.errors.length
+        validationPayload: {
+          ...(ingestionResult.metadata ?? { errorCount, recordCount: ingestionResult.records?.length ?? 0 }),
+          errorCount,
+          recordCount: ingestionResult.records?.length ?? 0,
+          errors: ingestionResult.errors
+        },
+        errorCount
       };
     }
 
-    return { status: 'ok' };
+    return {
+      status: 'ok',
+      validationPayload: ingestionResult.metadata ?? {
+        errorCount: 0,
+        recordCount: ingestionResult.records?.length ?? 0
+      }
+    };
   } catch (error) {
     if (isValidationFailure(error)) {
       return {
         status: 'invalid',
-        validationPayload: { error: toErrorMetadata(error) },
+        validationPayload: { errorCount: 1, recordCount: 0, error: toErrorMetadata(error) },
         errorCount: 1
       };
     }
@@ -199,7 +230,8 @@ async function executeProcessSubmissionFeaturesIngestion(
  *   - Transition upload to `ingested`.
  *   - Mark upload archive process status as `COMPLETED`.
  *
- * Each write is committed in its own `withConnection` so partial progress survives retries.
+ * Downstream indexing is published after these status/archive updates commit so enqueue
+ * failures do not trigger a retry of already-completed ingestion work.
  *
  * @param {SubmissionUpload} submissionUpload Submission upload payload.
  * @param {string} jobId Job identifier.
@@ -236,21 +268,14 @@ async function finalizeProcessSubmissionFeaturesStage(
     return;
   }
 
-  // Step 2a: Mark validation stage as completed.
+  // Step 2: Commit successful process state.
   await withConnection(async (connection) => {
     const submissionValidationService = new SubmissionValidationService(connection);
-    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'completed', outcome.validationPayload);
-  });
-
-  // Step 2b: Move submission upload into post-ingest state.
-  await withConnection(async (connection) => {
     const submissionUploadService = new SubmissionUploadService(connection);
-    await submissionUploadService.transitionSubmissionUploadToIngested(submissionUpload.submission_upload_id);
-  });
-
-  // Step 2c: Mark archive processing status complete for downstream visibility.
-  await withConnection(async (connection) => {
     const uploadArchiveService = new UploadArchiveService(connection);
+
+    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'completed', outcome.validationPayload);
+    await submissionUploadService.transitionSubmissionUploadToIngested(submissionUpload.submission_upload_id);
     await uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
       archive_status: ProcessStatusStatusEnum.COMPLETED
     });
@@ -281,7 +306,8 @@ async function executeIndexSubmissionFeaturesPublish(
 
     try {
       const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
-        submissionId
+        submissionId,
+        submissionUploadId
       });
 
       defaultLog.info({
@@ -313,8 +339,8 @@ async function executeIndexSubmissionFeaturesPublish(
  * Pipeline:
  * - Initialize stage guards + start markers.
  * - Execute archive ingestion.
- * - Publish downstream indexing when ingestion succeeds.
  * - Finalize upload/validation/archive statuses.
+ * - Publish downstream indexing when ingestion succeeds.
  *
  * Each phase is delegated to methods that commit through short-lived `withConnection`
  * blocks to preserve partial progress and keep transactions bounded.
@@ -366,18 +392,6 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
     outcomeStatus: outcome.status
   });
 
-  if (outcome.status === 'ok') {
-    // Indexing enqueue is required; if enqueue fails, process-stage completion must retry.
-    defaultLog.debug({
-      label: 'runProcessSubmissionFeaturesStage',
-      message: 'Publishing index submission features job',
-      jobId: job.id,
-      submissionId,
-      submissionUploadId
-    });
-    await executeIndexSubmissionFeaturesPublish(submissionId, submissionUploadId, job.id);
-  }
-
   // Persist final process-stage status transitions.
   defaultLog.debug({
     label: 'runProcessSubmissionFeaturesStage',
@@ -388,6 +402,10 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
     outcomeStatus: outcome.status
   });
   await finalizeProcessSubmissionFeaturesStage(submissionUpload, job.id, outcome);
+
+  if (outcome.status === 'ok') {
+    await executeIndexSubmissionFeaturesPublish(submissionId, submissionUploadId, job.id);
+  }
 
   defaultLog.info({
     label: 'runProcessSubmissionFeaturesStage',

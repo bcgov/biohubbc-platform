@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
+import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
@@ -18,6 +19,8 @@ import {
   publishProcessDownloadJob,
   publishProcessSubmissionFeaturesJob
 } from './publisher';
+
+type MockPgBoss = Pick<PgBoss, 'send' | 'createQueue'>;
 
 describe('publisher', () => {
   afterEach(() => {
@@ -38,9 +41,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       // No existing validation record
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
@@ -71,9 +74,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
@@ -92,9 +95,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
@@ -111,9 +114,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves(null);
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
 
       const createValidationStub = sinon.stub(SubmissionValidationService.prototype, 'createSubmissionValidation');
@@ -122,18 +125,18 @@ describe('publisher', () => {
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this submission'
+        'Job already exists for this submission upload'
       );
       expect(createValidationStub.called).to.be.false;
     });
 
-    it('uses singletonKey based on submissionId resolved from bridge to prevent duplicates', async () => {
+    it('uses singletonKey based on submissionUploadId to prevent duplicates', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
@@ -146,16 +149,16 @@ describe('publisher', () => {
       });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('submission-456');
+      expect(options.singletonKey).to.equal('submission-upload-sub-upload-uuid-2');
     });
 
     it('passes db option to boss.send for transactional publishing', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
@@ -200,13 +203,88 @@ describe('publisher', () => {
       expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('pending');
     });
 
+    it('publishes when submission upload is already ingesting for idempotent resume', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('features-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 1 });
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        ...defaultSubmissionUpload,
+        status: 'ingesting'
+      });
+
+      expect(result.status).to.equal('published');
+    });
+
+    it('returns blocked status when submission upload is terminal', async () => {
+      const mockConnection = getMockDBConnection();
+      const getValidationStub = sinon.stub(
+        SubmissionValidationService.prototype,
+        'getSubmissionValidationBySubmissionUploadId'
+      );
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        ...defaultSubmissionUpload,
+        status: 'indexed'
+      });
+
+      expect(result.status).to.equal('blocked');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('indexed');
+      expect(getValidationStub.called).to.be.false;
+    });
+
+    it('publishes when submission upload is failed for explicit restart', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('features-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves(null);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 1 });
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        ...defaultSubmissionUpload,
+        status: 'failed'
+      });
+
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('features-job-id');
+    });
+
+    it('returns blocked status when submission upload is not process-startable', async () => {
+      const mockConnection = getMockDBConnection();
+      const getValidationStub = sinon.stub(
+        SubmissionValidationService.prototype,
+        'getSubmissionValidationBySubmissionUploadId'
+      );
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        ...defaultSubmissionUpload,
+        status: 'ingested'
+      });
+
+      expect(result.status).to.equal('blocked');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('ingested');
+      expect(getValidationStub.called).to.be.false;
+    });
+
     it('allows retry when validation record exists with invalid status', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('new-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       const mockInvalidValidationRecord: SubmissionValidationRecord = {
         submission_validation_id: 1,
         job_id: 'invalid-job-id',
@@ -247,9 +325,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('new-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       const mockFailedValidationRecord: SubmissionValidationRecord = {
         submission_validation_id: 1,
         job_id: 'failed-job-id',
@@ -273,9 +351,9 @@ describe('publisher', () => {
     it('publishes a malware scan job', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const mockConnection = getMockDBConnection();
       const data = { artifactSecurityId: 'artifact-security-123' };
@@ -293,9 +371,9 @@ describe('publisher', () => {
     it('uses malware scan options with 60 minute timeout', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishMalwareScanJob(getMockDBConnection(), { artifactSecurityId: 'artifact-security-456' });
 
@@ -309,9 +387,9 @@ describe('publisher', () => {
     it('uses singletonKey based on artifactSecurityId to prevent duplicates', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishMalwareScanJob(getMockDBConnection(), { artifactSecurityId: '123' });
 
@@ -322,9 +400,9 @@ describe('publisher', () => {
     it('passes db option to boss.send for transactional publishing', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishMalwareScanJob(getMockDBConnection(), { artifactSecurityId: 'tx-test-123' });
 
@@ -336,9 +414,9 @@ describe('publisher', () => {
     it('returns duplicate status when send returns null', async () => {
       const sendStub = sinon.stub().resolves(null);
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishMalwareScanJob(getMockDBConnection(), {
         artifactSecurityId: 'artifact-security-999'
@@ -369,11 +447,11 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('index-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const data = { submissionId: 777 };
+      const data = { submissionId: 777, submissionUploadId: 'sub-upload-uuid-idx-1' };
       const result = await publishIndexSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -389,12 +467,13 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('index-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -408,12 +487,13 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('index-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -421,37 +501,39 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
     });
 
-    it('uses singletonKey based on submissionId to prevent duplicates', async () => {
+    it('uses singletonKey based on submissionUploadId to prevent duplicates', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('index-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 456
+        submissionId: 456,
+        submissionUploadId: 'sub-upload-uuid-idx-2'
       });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('submission-idx-456');
+      expect(options.singletonKey).to.equal('submission-upload-idx-sub-upload-uuid-idx-2');
     });
 
     it('returns duplicate status when send returns null', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves(null);
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this submission'
+        'Job already exists for this submission upload'
       );
     });
 
@@ -460,7 +542,10 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
-        await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+        await publishIndexSubmissionFeaturesJob(mockConnection, {
+          submissionId: 777,
+          submissionUploadId: 'sub-upload-uuid-idx-1'
+        });
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
@@ -489,9 +574,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('download-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
@@ -511,9 +596,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection({ query: queryStub });
       const sendStub = sinon.stub().resolves('download-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       await publishProcessDownloadJob(mockConnection, {
@@ -525,7 +610,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns duplicate when download is not in pending status', async () => {
@@ -562,9 +647,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('download-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
         .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(createMockDownload({ download_id: 'aaaa0000-0000-0000-0000-000000000456' }));
@@ -581,9 +666,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves(null);
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       const result = await publishProcessDownloadJob(mockConnection, {
@@ -618,9 +703,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const data = { securityScopeId: 'scope-uuid-1' };
       const result = await publishComputeScopeAnchorsJob(mockConnection, data);
@@ -638,9 +723,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 
@@ -655,9 +740,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 
@@ -670,9 +755,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
 
@@ -684,9 +769,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves(null);
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 

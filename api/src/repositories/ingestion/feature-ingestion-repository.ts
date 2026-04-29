@@ -56,7 +56,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    *   data: unknown;
    *   dataByteSize: number;
    * }>} records
-   * @return {Promise<number>}
+   * @returns {Promise<number>}
    * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecordsByTypeId(
@@ -127,7 +127,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    * (append, replace).
    *
    * @param {InsertSubmissionFeatureRecord} record The submission feature insert payload.
-   * @return {*}  {Promise<{ submission_feature_id: number }>}
+   * @returns {Promise<{ submission_feature_id: number }>} Inserted submission feature identifier.
    * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecord(
@@ -185,7 +185,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    * re-ingesting one upload must not affect features from other uploads.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -201,11 +201,38 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
+   * Resolve parent feature references for rows produced by one upload.
+   *
+   * Shallow ingestion stores raw feature payloads first. The indexing stage then
+   * resolves `data.parent` source identifiers to canonical `submission_feature_id`
+   * values after all rows for the upload have been inserted.
+   *
+   * @param {string} submissionUploadId The submission_upload_id (UUID).
+   * @returns {Promise<void>}
+   * @memberof FeatureIngestionRepository
+   */
+  async updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature AS child
+      SET parent_submission_feature_id = parent.submission_feature_id
+      FROM submission_feature AS parent
+      WHERE child.submission_upload_id = ${submissionUploadId}
+        AND parent.submission_upload_id = child.submission_upload_id
+        AND parent.source_id = child.data->>'parent'
+        AND child.data->>'parent' IS NOT NULL
+        AND child.record_end_date IS NULL
+        AND parent.record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Get feature type with its associated properties.
    * Returns null if the feature type does not exist.
    *
    * @param {string} name Feature type name.
-   * @return {Promise<FeatureTypeWithProperties | null>}
+   * @returns {Promise<FeatureTypeWithProperties | null>}
    * @memberof FeatureIngestionRepository
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {

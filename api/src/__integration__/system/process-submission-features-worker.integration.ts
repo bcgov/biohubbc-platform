@@ -322,22 +322,18 @@ describe('Process Submission Features Worker', function () {
     expect(features.some((f: { feature_type_name: string }) => f.feature_type_name === 'dataset')).to.be.true;
   });
 
-  it('should prevent concurrent jobs for same submission via singleton key', async () => {
-    // Singleton key is `submission-${submissionId}` (not per-upload). Prod runs 2 worker replicas —
-    // per-upload keys would allow two uploads for the same submission to process simultaneously,
-    // causing conflicting feature writes.
-    //
+  it('should prevent concurrent jobs for same submission upload via singleton key', async () => {
     // Tests pg-boss singleton enforcement directly: two sends with the same key back-to-back,
     // the second should return null (ON CONFLICT DO NOTHING). Requires queue policy = 'short'.
 
     const boss = getPgBoss();
-    const testSubmissionId = Date.now(); // unique per run, avoids collisions
-    const singletonKey = `submission-${testSubmissionId}`;
+    const submissionUploadId = randomUUID();
+    const singletonKey = `submission-upload-${submissionUploadId}`;
 
     // Send first job — should succeed
     const jobId1 = await boss.send(
       JobQueues.PROCESS_SUBMISSION_FEATURES,
-      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { submission_upload_id: submissionUploadId, upload_id: randomUUID(), submission_id: Date.now() },
       { singletonKey, expireInSeconds: 5 }
     );
     expect(jobId1).to.not.be.null;
@@ -345,7 +341,7 @@ describe('Process Submission Features Worker', function () {
     // Send second job with same singleton key — should be rejected
     const jobId2 = await boss.send(
       JobQueues.PROCESS_SUBMISSION_FEATURES,
-      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { submission_upload_id: submissionUploadId, upload_id: randomUUID(), submission_id: Date.now() },
       { singletonKey, expireInSeconds: 5 }
     );
     expect(jobId2).to.be.null;

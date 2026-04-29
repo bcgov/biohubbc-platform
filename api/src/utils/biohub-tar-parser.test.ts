@@ -27,6 +27,30 @@ async function createTestTar(files: { name: string; content: string | Buffer }[]
   });
 }
 
+async function createTarWithSparseMediaEntry(): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const pack = tar.pack();
+    const chunks: Buffer[] = [];
+    const content = Buffer.from('jpeg-data');
+    const sparseHeader = {
+      name: 'files/images/GNUSparseFile.0/img-001.jpg',
+      size: content.byteLength,
+      type: 'file',
+      pax: {
+        'GNU.sparse.major': '1',
+        'GNU.sparse.minor': '0',
+        'GNU.sparse.name': 'files/images/img-001.jpg',
+        'GNU.sparse.realsize': '8192'
+      }
+    } as tar.Headers & { pax: Record<string, string> };
+
+    pack.on('data', (chunk: Buffer) => chunks.push(chunk));
+    pack.on('end', () => resolve(Buffer.concat(chunks)));
+    pack.entry(sparseHeader, content);
+    pack.finalize();
+  });
+}
+
 function bufferToStream(buffer: Buffer): Readable {
   return Readable.from(buffer);
 }
@@ -70,6 +94,7 @@ describe('biohub-tar-parser', () => {
       const featureBatchSizes: number[] = [];
       let codesetPayloadCount = 0;
       let mediaPayloadCount = 0;
+      const mediaPaths: string[] = [];
       const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
         objectStorageService: new ObjectStorageService(),
         s3KeyPrefix: 'submissions/42/media',
@@ -86,17 +111,20 @@ describe('biohub-tar-parser', () => {
         },
         ingestMediaBatch: async (uploadedFiles) => {
           mediaPayloadCount += uploadedFiles.length;
+          mediaPaths.push(...uploadedFiles.map((file) => file.path));
         }
       });
 
       expect(uploadStreamStub.calledOnce).to.be.true;
       expect(uploadStreamStub.firstCall.args[0]).to.equal(BucketType.MAIN);
+      expect(uploadStreamStub.firstCall.args[3]).to.equal('submissions/42/media/files/photo.jpg');
       expect(result.featureCount).to.equal(1);
       expect(result.uploadedCount).to.equal(1);
       expect(result.codesetFileCount).to.equal(1);
       expect(featureBatchSizes).to.deep.equal([1]);
       expect(codesetPayloadCount).to.equal(1);
       expect(mediaPayloadCount).to.equal(1);
+      expect(mediaPaths).to.deep.equal(['files/photo.jpg']);
     });
 
     it('flushes feature batches when byte threshold is reached', async () => {
@@ -145,6 +173,32 @@ describe('biohub-tar-parser', () => {
 
       expect(result.featureCount).to.equal(2);
       expect(featureBatchSizes).to.deep.equal([1, 1]);
+    });
+
+    it('uses GNU sparse PAX name as the media archive path', async () => {
+      const tarBuffer = await createTarWithSparseMediaEntry();
+      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const mediaPaths: string[] = [];
+
+      const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        featureBatchSize: 100,
+        featureMaxBatchBytes: 1024 * 1024,
+        mediaBatchSize: 100,
+        mediaMaxBatchBytes: 1024 * 1024,
+        mediaConcurrency: 2,
+        ingestFeatureBatch: async () => undefined,
+        ingestCodesets: async () => undefined,
+        ingestMediaBatch: async (uploadedFiles) => {
+          mediaPaths.push(...uploadedFiles.map((file) => file.path));
+        }
+      });
+
+      expect(uploadStreamStub.calledOnce).to.be.true;
+      expect(uploadStreamStub.firstCall.args[3]).to.equal('submissions/42/media/files/images/img-001.jpg');
+      expect(result.uploadedCount).to.equal(1);
+      expect(mediaPaths).to.deep.equal(['files/images/img-001.jpg']);
     });
 
     it('throws on malformed feature payloads', async () => {

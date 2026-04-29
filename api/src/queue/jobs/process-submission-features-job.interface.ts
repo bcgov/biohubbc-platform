@@ -1,6 +1,6 @@
 export type ProcessSubmissionFeatureSuccess = {
   status: 'ok';
-  validationPayload?: Record<string, unknown>;
+  validationPayload: Record<string, unknown>;
 };
 
 export type ProcessSubmissionFeatureError = {

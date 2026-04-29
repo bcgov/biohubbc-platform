@@ -39,7 +39,7 @@ export class ArtifactRepository extends BaseRepository {
       FROM UNNEST(
         ${buckets}::text[],
         ${objectKeys}::text[],
-        ${byteSizes}::integer[],
+        ${byteSizes}::bigint[],
         ${artifactStatuses}::artifact_status[],
         ${checksums}::text[],
         ${uploadedAts}::timestamptz[],
@@ -206,7 +206,7 @@ export class ArtifactRepository extends BaseRepository {
       VALUES (
         ${artifact.bucket}::text,
         ${artifact.object_key}::text,
-        ${artifact.byte_size ?? null}::integer,
+        ${artifact.byte_size ?? null}::bigint,
         ${artifact.artifact_status}::artifact_status,
         ${artifact.checksum_sha256 ?? null}::text,
         ${artifact.uploaded_at ?? null}::timestamptz,

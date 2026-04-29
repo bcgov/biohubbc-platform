@@ -8,6 +8,7 @@ import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
+import { IValidationError, ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
@@ -81,7 +82,11 @@ describe('process-submission-features-job', () => {
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
-      expect(publishStub.calledBefore(toIngestedStub)).to.be.true;
+      expect(toIngestedStub.calledBefore(publishStub)).to.be.true;
+      expect(publishStub.firstCall.args[1]).to.eql({
+        submissionId: 123,
+        submissionUploadId: 'test-sub-upload-id'
+      });
     });
 
     it('finalizes upload as ingested when indexing publish throws (warn-and-commit)', async () => {
@@ -103,9 +108,14 @@ describe('process-submission-features-job', () => {
     });
 
     it('marks upload invalid when ingestion returns deterministic validation errors', async () => {
+      const validationError: IValidationError = {
+        type: ValidationErrorType.INVALID_PROPERTY_TYPE,
+        message: 'bad data'
+      };
+
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({
         valid: false,
-        errors: [{ message: 'bad data' } as any]
+        errors: [validationError]
       });
 
       const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob');
@@ -191,12 +201,15 @@ describe('process-submission-features-job', () => {
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
     });
 
-    it('allows reprocessing when current status is failed', async () => {
+    it('allows restart when current status is failed', async () => {
       (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
         status: 'failed'
       });
-      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
+
+      const ingestStub = sinon
+        .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')
+        .resolves({ valid: true, errors: [] });
       sinon
         .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
@@ -205,6 +218,7 @@ describe('process-submission-features-job', () => {
 
       const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
+      expect(ingestStub.calledOnce).to.be.true;
     });
   });
 
