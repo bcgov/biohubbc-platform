@@ -736,13 +736,13 @@ export const insertTelemetryRecord = async (
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?::timestamptz, 1
+    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
      FROM submission_feature sf
      JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'timestamp';`,
-    [telemetryData.timestamp, submission_feature_id]
+    [telemetryData.timestamp, telemetryData.timestamp, submission_feature_id]
   );
 
   // Geometry: use the shared helper which targets `fp.name = 'geometry'`.
