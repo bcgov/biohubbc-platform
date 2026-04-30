@@ -384,25 +384,13 @@ describe('Download Export pipeline — media (system)', function () {
     expect(status.rows[0].status).to.equal(DownloadStatusEnum.READY);
   });
 
-  // Edge Case 4 — cross-part binary duplication. Currently skipped because the
-  // production pipeline has a real bug: `runExport` finalizes rolled-over parts
-  // inside the CSV streaming loop (download-export-pipeline-service.ts:562-570
-  // calls `writePartZip` + `archiverByPart.delete(oldPartIndex)`), so by the time
-  // the post-CSV `for (const partIndex of openPartIndexes)` binary-copy loop runs
-  // (same file, line 590), only the final still-open part is in
-  // `archiverByPart`. Binaries for rolled-over parts are silently dropped — their
-  // `fileRefs` entries never match a bundle and the CSV `filePath` column points
-  // at a `filesN/` entry that doesn't exist in the zip.
-  //
-  // Reproducer (confirmed 2026-04-22, pipe branch):
-  //   - 2 rows, `max_part_size_bytes = '1'` → 3 part-zips produced.
-  //   - Part 1 contains `file/chunk1.csv` only (no `files1/` binary).
-  //   - Part 2 contains `file/chunk2.csv` only (no `files2/` binary).
-  //   - Part 3 is empty.
-  //
-  // Un-skip after the bug is fixed (append binaries per rolled-over part before
-  // finalizing, or defer all finalizes until after the binary-copy loop).
-  it.skip('cross-part duplication — shared binary is copied into each part and the CSV paths match the owning part', async () => {
+  // Edge Case 4 — cross-part binary duplication. Two rows reference the same
+  // artifact, `max_part_size_bytes='1'` forces a roll-over, and each part-zip
+  // must contain its own copy of the binary plus a CSV path that points at
+  // the owning part's `filesN/` directory. `runExport` streams each part's
+  // binaries in before finalizing it (both on roll-over and at end-of-stream),
+  // so the assertions below would fail loud if a regression dropped that step.
+  it('cross-part duplication — shared binary is copied into each part and the CSV paths match the owning part', async () => {
     const fileContent = Buffer.from('shared file content for both rows');
     const filename = 'shared.bin';
     const { downloadId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(

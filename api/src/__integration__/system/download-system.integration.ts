@@ -602,7 +602,4 @@ describe('Download Worker', function () {
       expect(hash).to.equal(row.checksum_sha256);
     }
   });
-
-
 });
-

@@ -744,7 +744,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       .where('a.object_key', 'like', `submissions/${submissionId}/uploads/${submissionUploadId}/media/%`)
       .select<Array<{ path: string | null }>>('ua.path');
     expect(mediaUploadArtifacts).to.have.lengthOf(1);
-    expect(mediaUploadArtifacts[0].path).to.equal('photo.jpg');
+    expect(mediaUploadArtifacts[0].path).to.equal('files/photo.jpg');
   });
 
   it('should ingest successfully when referenced media file is missing from tar', async () => {

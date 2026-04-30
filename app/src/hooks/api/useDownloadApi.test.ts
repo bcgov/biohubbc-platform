@@ -53,5 +53,4 @@ describe('useDownloadApi', () => {
       expect(mock.history.get[0].params).toEqual({ page: 2, limit: 10 });
     });
   });
-
 });
