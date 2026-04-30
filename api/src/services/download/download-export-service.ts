@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { CreateDownloadExportRequest, DownloadExportListRow, DownloadExportRecord } from '../../models/download-export';
@@ -11,8 +11,8 @@ import { DownloadService } from './download-service';
 /**
  * Shape of a single entry in the detail endpoint's `parts[]` response.
  *
- * `byte_size` is renamed to `file_size_bytes` here to match the legacy
- * fragment-endpoint response shape the frontend already consumes.
+ * `byte_size` is renamed to `file_size_bytes` here to match the response shape
+ * the frontend already consumes.
  */
 export interface DownloadExportPart {
   chunk_id: number | null;
@@ -121,9 +121,9 @@ export class DownloadExportService extends DBService {
   /**
    * Build the `parts[]` array for the detail endpoint response.
    *
-   * One presigned URL per part-zip, signed at request time with the same TTL
-   * as fragment URLs. The `byte_size → file_size_bytes` rename matches the
-   * legacy fragment response shape the frontend already consumes.
+   * One presigned URL per part-zip, signed at request time. The
+   * `byte_size → file_size_bytes` rename matches the response shape the
+   * frontend already consumes.
    *
    * The presigned URL carries a `Content-Disposition` override so the browser
    * saves each zip as `{YYYYMMDD-HHMMSS}-biohub-{exportId}-part-{N}.zip`. The
@@ -146,7 +146,7 @@ export class DownloadExportService extends DBService {
           url: await objectStorageService.getSignedUrl(
             BucketType.MAIN,
             artifact.object_key,
-            SIGNED_URL_EXPIRY_FRAGMENT,
+            SIGNED_URL_EXPIRY_DOWNLOAD,
             `attachment; filename="${downloadFileName}"`
           )
         };

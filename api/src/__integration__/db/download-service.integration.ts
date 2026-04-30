@@ -1,5 +1,5 @@
 // Integration test for Download services — verifies multi-step download operations
-// (create download, cart/filter feature resolution, status transitions, fragment planning, auth, claiming)
+// (create download, cart/filter feature resolution, status transitions, auth, claiming)
 // work correctly against the real database.
 //
 // DownloadService = request-time operations (path handlers)

@@ -1,4 +1,4 @@
-export const SIGNED_URL_EXPIRY_FRAGMENT = 432000; // 5 days for fragment URLs
+export const SIGNED_URL_EXPIRY_DOWNLOAD = 432000; // 5 days
 
 /**
  * Default `download_export.max_part_size_bytes` (500 MB). Applied by the service

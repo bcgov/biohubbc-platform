@@ -20,11 +20,10 @@ import { ArtifactService } from '../upload/artifact-service';
  * Background processing pipeline for downloads.
  *
  * Called exclusively by the pg-boss job handler (processDownloadJobHandler).
- * Handles fragment planning, streaming CSV/zip generation, S3 upload, and
- * status transitions during async processing.
+ * Handles Parquet generation, S3 upload, and status transitions during async
+ * processing.
  *
- * Request-time operations (CRUD, auth, team linking, fragment URL delivery)
- * live in DownloadService.
+ * Request-time operations (CRUD, auth, team linking) live in DownloadService.
  *
  * @export
  * @class DownloadPipelineService

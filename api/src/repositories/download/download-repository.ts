@@ -476,11 +476,10 @@ export class DownloadRepository extends BaseRepository {
    * Stream features for a cart-based download using a SQL cursor.
    *
    * Yields batches of DownloadFeatureSummary to avoid loading 500K+ rows
-   * into JS memory. Features are sorted by feature_type_name so bin packing
-   * keeps same types together, minimizing duplicate CSVs across fragments.
+   * into JS memory. Features are sorted by feature_type_name so consumers
+   * can group output by type without re-sorting.
    *
    * Must be called within an open transaction (cursors require tx context).
-   * Follows the streamFragmentFeaturesByType pattern.
    *
    * @param {string} cartId - The cart ID (from download.cart_id).
    * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.

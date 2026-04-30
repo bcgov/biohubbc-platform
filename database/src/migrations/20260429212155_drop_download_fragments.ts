@@ -64,6 +64,11 @@ export async function down(knex: Knex): Promise<void> {
       ADD COLUMN fragment_size_bytes        BIGINT  NOT NULL DEFAULT 524288000,
       ADD COLUMN estimated_total_size_bytes BIGINT;
 
+    COMMENT ON COLUMN download.total_fragments            IS 'Total number of zip fragments for this download.';
+    COMMENT ON COLUMN download.completed_fragments        IS 'Number of fragments that have completed processing.';
+    COMMENT ON COLUMN download.estimated_total_size_bytes IS 'Estimated total size in bytes, calculated before processing.';
+    COMMENT ON COLUMN download.fragment_size_bytes        IS 'Target fragment size in bytes. Default 500 MB (524288000). Users may choose 500 MB, 1 GB, or 5 GB.';
+
     --------------------------------------------------------------------------------
     -- Create download_fragment table
     --------------------------------------------------------------------------------

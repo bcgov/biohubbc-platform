@@ -19,11 +19,11 @@ import { SearchFeatureService } from '../search-feature-service';
  * Request-time service for downloads.
  *
  * Owns all operations called by path handlers during HTTP requests:
- * CRUD, request creation, access control, team linking, fragment listing,
- * and signed URL delivery. Composes TeamService + repositories.
+ * CRUD, request creation, access control, and team linking. Composes
+ * TeamService + repositories.
  *
- * Background processing (fragment planning, streaming, S3 upload) lives
- * in DownloadPipelineService.
+ * Background processing (Parquet generation, S3 upload) lives in
+ * DownloadPipelineService.
  *
  * @export
  * @class DownloadService
@@ -177,7 +177,7 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Mark a download as downloaded after the client has retrieved all fragments.
+   * Mark a download as downloaded after the client has retrieved the export.
    *
    * Sets `downloaded_at` timestamp and status to `downloaded` (AC #3).
    *
