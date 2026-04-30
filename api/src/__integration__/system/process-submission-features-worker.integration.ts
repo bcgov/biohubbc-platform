@@ -147,6 +147,7 @@ describe('Process Submission Features Worker', function () {
       }
 
       if (createdTicketIds.length) {
+        await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
@@ -456,6 +457,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
 
       if (createdTicketIds.length) {
+        await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 

@@ -19,10 +19,6 @@ const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRe
   started_at: '2025-01-01T00:00:00Z',
   completed_at: '2025-01-01T00:01:00Z',
   downloaded_at: null,
-  total_fragments: 1,
-  completed_fragments: 1,
-  estimated_total_size_bytes: '12000',
-  fragment_size_bytes: '209715200',
   create_date: '2025-01-01T00:00:00Z',
   ...overrides
 });
@@ -33,29 +29,14 @@ describe('paths/download/{downloadId}/index', () => {
   });
 
   describe('findDownloadById', () => {
-    it('should return 200 with download details and fragments when user is authorized', async () => {
+    it('should return 200 with download details when user is authorized', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = makeDownloadRecord();
 
-      const mockFragments = [
-        {
-          fragment_index: 0,
-          fragment_status: 'ready',
-          file_name: 'biohub-aaaa0000-0000-0000-0000-000000000001.zip',
-          file_size_bytes: 12345,
-          estimated_size_bytes: 12000,
-          feature_count: 3,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          error_message: null
-        }
-      ];
-
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -70,26 +51,9 @@ describe('paths/download/{downloadId}/index', () => {
       expect(mockRes.jsonValue).to.eql({
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
         status: 'ready',
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: '12000',
         started_at: '2025-01-01T00:00:00Z',
         completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null,
-        fragments: [
-          {
-            fragment_index: 0,
-            status: 'ready',
-            file_name: 'biohub-aaaa0000-0000-0000-0000-000000000001.zip',
-            file_size_bytes: 12345,
-            estimated_size_bytes: 12000,
-            feature_count: 3,
-            started_at: '2025-01-01T00:00:00Z',
-            completed_at: '2025-01-01T00:01:00Z',
-            error_message: null
-          }
-        ],
-        instructions: null
+        downloaded_at: null
       });
     });
 
@@ -101,7 +65,6 @@ describe('paths/download/{downloadId}/index', () => {
       const mockDownload = makeDownloadRecord();
 
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -124,7 +87,6 @@ describe('paths/download/{downloadId}/index', () => {
       const mockDownload = makeDownloadRecord();
 
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -224,133 +186,6 @@ describe('paths/download/{downloadId}/index', () => {
         expect((error as HTTPError).status).to.equal(403);
         expect((error as HTTPError).message).to.equal('Access denied');
       }
-    });
-
-    it('should include signed URLs and instructions for anonymous ready download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-
-      const mockDownload = makeDownloadRecord({
-        total_fragments: 2,
-        completed_fragments: 2,
-        estimated_total_size_bytes: '24000'
-      });
-
-      const mockFragments = [
-        {
-          fragment_index: 0,
-          fragment_status: 'ready',
-          file_name: 'fragment_0.zip',
-          file_size_bytes: 12000,
-          estimated_size_bytes: 12000,
-          feature_count: 3,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          error_message: null
-        },
-        {
-          fragment_index: 1,
-          fragment_status: 'ready',
-          file_name: 'fragment_1.zip',
-          file_size_bytes: 12000,
-          estimated_size_bytes: 12000,
-          feature_count: 2,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          error_message: null
-        }
-      ];
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
-      sinon
-        .stub(DownloadService.prototype, 'getFragmentSignedUrl')
-        .onFirstCall()
-        .resolves('https://s3.example.com/fragment_0.zip')
-        .onSecondCall()
-        .resolves('https://s3.example.com/fragment_1.zip');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue.fragments[0].url).to.equal('https://s3.example.com/fragment_0.zip');
-      expect(mockRes.jsonValue.fragments[1].url).to.equal('https://s3.example.com/fragment_1.zip');
-      expect(mockRes.jsonValue.instructions).to.include('Your download is ready');
-      expect(mockRes.jsonValue.instructions).to.include('curl');
-    });
-
-    it('should not include URLs for authenticated ready download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const mockDownload = makeDownloadRecord();
-
-      const mockFragments = [
-        {
-          fragment_index: 0,
-          fragment_status: 'ready',
-          file_name: 'fragment_0.zip',
-          file_size_bytes: 12000,
-          estimated_size_bytes: 12000,
-          feature_count: 3,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          error_message: null
-        }
-      ];
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
-      const getFragmentSignedUrlStub = sinon.stub(DownloadService.prototype, 'getFragmentSignedUrl');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getFragmentSignedUrlStub).to.not.have.been.called;
-      expect(mockRes.jsonValue.fragments[0]).to.not.have.property('url');
-      expect(mockRes.jsonValue.instructions).to.equal(null);
-    });
-
-    it('should not include URLs for anonymous pending download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-
-      const mockDownload = makeDownloadRecord({
-        download_status: 'pending',
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        started_at: null,
-        completed_at: null
-      });
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-      sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves([]);
-      const getFragmentSignedUrlStub = sinon.stub(DownloadService.prototype, 'getFragmentSignedUrl');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getFragmentSignedUrlStub).to.not.have.been.called;
-      expect(mockRes.jsonValue.instructions).to.equal(null);
     });
 
     it('should throw HTTP403 when authenticated user is not authorized for the download', async () => {

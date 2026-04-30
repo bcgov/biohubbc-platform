@@ -45,11 +45,10 @@ export class DownloadExportService extends DBService {
    * Create a CSV export for a ready download.
    *
    * `max_part_size_bytes` lives per-export so a single download can be re-exported
-   * at different part sizes without re-running the Parquet pipeline —
-   * `download.fragment_size_bytes` is the write-side knob, this is the read-side
-   * knob. `format` is hard-coded to `'csv'` and `mode` to `'per_feature_type'`
-   * here because this ticket ships the single-shape contract; a future
-   * denormalized-mode addition opens `mode` at the request layer.
+   * at different part sizes without re-running the Parquet pipeline. `format` is
+   * hard-coded to `'csv'` and `mode` to `'per_feature_type'` here because this
+   * ticket ships the single-shape contract; a future denormalized-mode addition
+   * opens `mode` at the request layer.
    *
    * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and
    * require team membership on the parent download — delegates to
