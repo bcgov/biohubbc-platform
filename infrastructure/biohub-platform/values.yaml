@@ -86,3 +86,20 @@ queue:
     changeId: ""
     ts: ""
   # Add any queue-specific overrides here
+
+# Values passed to biohub-platform-queue subchart
+biohub-platform-queue:
+  # Queue tuning overrides (optional)
+  # app:
+  #   ingestion:
+  #     featureBatchSize: "10000"
+  #     contributorCodeBatchSize: ""
+  #     mediaBatchBytes: ""
+  #     mediaBatchFiles: ""
+  #   security:
+  #     scopeAnchorBatchSize: "5000"
+  #   uploadIngestion:
+  #     featureBatchMaxBytes: "52428800"
+  #     mediaConcurrency: ""
+  #     jobBatchSize: ""
+  #     jsonFileMaxBytes: "104857600"

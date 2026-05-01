@@ -2,13 +2,13 @@ import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { CreateContributorCodeset } from '../../models/contributor-codeset';
 import { CreateContributorCodesetCode } from '../../models/contributor-codeset-code';
+import { INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE } from '../../constants/ingestion';
 import { normalizeOptionalText } from '../../utils/normalize';
 import { ContributorCodesetCodeService } from '../contributor-codeset-code-service';
 import { ContributorCodesetService } from '../contributor-codeset-service';
 import { DBService } from '../db-service';
 import type { TarCodesets } from './submission-ingestion-codes-service.interface';
 
-const CONTRIBUTOR_CODE_INSERT_BATCH_SIZE = 10000;
 type ExistingContributorCodeset = Awaited<
   ReturnType<ContributorCodesetService['getContributorCodesetsByContributorIdAndKeys']>
 >[number];
@@ -128,8 +128,8 @@ export class CodesetIngestionService extends DBService {
       return;
     }
 
-    for (let index = 0; index < codes.length; index += CONTRIBUTOR_CODE_INSERT_BATCH_SIZE) {
-      const currentBatch = codes.slice(index, index + CONTRIBUTOR_CODE_INSERT_BATCH_SIZE);
+    for (let index = 0; index < codes.length; index += INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE) {
+      const currentBatch = codes.slice(index, index + INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE);
       await this.contributorCodesetCodeService.createContributorCodesetCodes(currentBatch);
     }
   }

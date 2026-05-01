@@ -182,14 +182,45 @@ spec:
               value: {{ .Values.app.logging.fileMaxSize | quote }}
             - name: LOG_FILE_MAX_FILES
               value: {{ .Values.app.logging.fileMaxFiles | quote }}
-            # Media ingestion batching
-            {{ if .Values.app.mediaIngestion.batchBytes }}
-            - name: MEDIA_INGEST_BATCH_BYTES
-              value: {{ .Values.app.mediaIngestion.batchBytes | quote }}
+            # Ingestion pipeline
+            - name: INGESTION_FEATURE_BATCH_SIZE
+              value: {{ .Values.app.ingestion.featureBatchSize | quote }}
+            {{ if .Values.app.ingestion.contributorCodeBatchSize }}
+            - name: INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE
+              value: {{ .Values.app.ingestion.contributorCodeBatchSize | quote }}
             {{ end }}
-            {{ if .Values.app.mediaIngestion.batchFiles }}
+            {{ if .Values.app.ingestion.mediaBatchBytes }}
+            - name: INGESTION_MEDIA_BATCH_BYTES
+              value: {{ .Values.app.ingestion.mediaBatchBytes | quote }}
+            {{ end }}
+            {{ if .Values.app.ingestion.mediaBatchFiles }}
+            - name: INGESTION_MEDIA_BATCH_FILES
+              value: {{ .Values.app.ingestion.mediaBatchFiles | quote }}
+            {{ end }}
+            # Security scope
+            - name: SECURITY_SCOPE_ANCHOR_BATCH_SIZE
+              value: {{ .Values.app.security.scopeAnchorBatchSize | quote }}
+            # Upload pipeline (archive ingestion)
+            - name: UPLOAD_FEATURE_BATCH_MAX_BYTES
+              value: {{ .Values.app.uploadIngestion.featureBatchMaxBytes | quote }}
+            {{ if .Values.app.uploadIngestion.mediaConcurrency }}
+            - name: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
+              value: {{ .Values.app.uploadIngestion.mediaConcurrency | quote }}
+            {{ end }}
+            {{ if .Values.app.uploadIngestion.jobBatchSize }}
+            - name: UPLOAD_JOB_BATCH_SIZE
+              value: {{ .Values.app.uploadIngestion.jobBatchSize | quote }}
+            {{ end }}
+            - name: UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES
+              value: {{ .Values.app.uploadIngestion.jsonFileMaxBytes | quote }}
+            # Backward-compatible media ingest aliases (legacy env names)
+            {{ if .Values.app.ingestion.mediaBatchBytes }}
+            - name: MEDIA_INGEST_BATCH_BYTES
+              value: {{ .Values.app.ingestion.mediaBatchBytes | quote }}
+            {{ end }}
+            {{ if .Values.app.ingestion.mediaBatchFiles }}
             - name: MEDIA_INGEST_BATCH_FILES
-              value: {{ .Values.app.mediaIngestion.batchFiles | quote }}
+              value: {{ .Values.app.ingestion.mediaBatchFiles | quote }}
             {{ end }}
             # Download pipeline
             - name: DOWNLOAD_FEATURE_BATCH_SIZE
