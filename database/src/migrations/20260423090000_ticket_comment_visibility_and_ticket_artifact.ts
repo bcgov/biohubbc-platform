@@ -27,10 +27,21 @@ export async function up(knex: Knex): Promise<void> {
       ON ticket_artifact(ticket_id, artifact_id)
       WHERE record_end_date IS NULL;
     CREATE INDEX ticket_artifact_ticket_idx
-      ON ticket_artifact(ticket_id)
+      ON ticket_artifact(ticket_id, create_date)
       WHERE record_end_date IS NULL;
     CREATE INDEX ticket_artifact_artifact_idx
       ON ticket_artifact(artifact_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX ticket_artifact_ticket_artifact_id_idx
+      ON ticket_artifact(ticket_id, ticket_artifact_id)
+      WHERE record_end_date IS NULL;
+
+    CREATE INDEX artifact_security_artifact_create_date_idx
+      ON artifact_security(artifact_id, create_date DESC)
+      WHERE record_end_date IS NULL;
+
+    CREATE INDEX upload_artifact_upload_role_active_idx
+      ON upload_artifact(upload_id, role)
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE ticket_artifact IS 'Associates an artifact to the ticket that owns the attachment.';
@@ -66,8 +77,11 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS audit_ticket_artifact ON ticket_artifact;
 
     DROP INDEX IF EXISTS ticket_artifact_artifact_idx;
+    DROP INDEX IF EXISTS ticket_artifact_ticket_artifact_id_idx;
     DROP INDEX IF EXISTS ticket_artifact_ticket_idx;
     DROP INDEX IF EXISTS ticket_artifact_nuk1;
+    DROP INDEX IF EXISTS artifact_security_artifact_create_date_idx;
+    DROP INDEX IF EXISTS upload_artifact_upload_role_active_idx;
 
     DROP TABLE IF EXISTS ticket_artifact;
 

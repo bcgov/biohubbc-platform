@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ToggleButtons, ToggleButtonView } from 'components/toggle-button/ToggleButtons';
-import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent';
+import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from 'react';
 

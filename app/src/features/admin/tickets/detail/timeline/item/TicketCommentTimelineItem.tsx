@@ -1,4 +1,4 @@
-import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent';
+import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { TicketTimelineItem } from './TicketTimelineItem';
 

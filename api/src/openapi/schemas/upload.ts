@@ -263,7 +263,7 @@ export const CreateTicketUploadSchema: OpenAPIV3.SchemaObject = {
     byte_size: {
       type: 'integer',
       minimum: 1,
-      maximum: 26214400,
+      maximum: 15728640,
       description: 'Attachment file size in bytes.'
     },
     content_type: {
