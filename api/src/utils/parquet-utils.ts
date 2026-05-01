@@ -11,7 +11,7 @@ import { ParquetSchema, type FieldDefinition, type SchemaDefinition } from '@dsn
 
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../models/datetime-column';
 import { ParquetFeatureData } from '../models/download';
-import { CsvPropertyDefinition } from './csv-utils';
+import type { CsvPropertyDefinition } from './csv-utils';
 
 /**
  * Output column spec produced by expanding a single feature property definition.
@@ -28,7 +28,8 @@ export interface FeatureColumnSpec {
  * Expand a feature property definition into one or more output column specs.
  *
  * Most property types map 1:1 to a single output column. `datetime` is the
- * exception: it expands into `<name><_date>` and `<name><_time>` UTF8 columns
+ * exception: it expands into `<name>_date` (Parquet `DATE` — INT32 days-since-
+ * epoch) and `<name>_time` (Parquet `TIME_MILLIS` — INT32 ms-since-midnight)
  * so partial-component values (date-only, time-only, or both) round-trip
  * losslessly and remain filterable as native columnar predicates in DuckDB,
  * pandas, and GIS tools.
@@ -38,18 +39,17 @@ export interface FeatureColumnSpec {
  * query plans and discarding partial-component data that the underlying DB
  * stores as first-class (the `submission_feature_property_timestamp` table
  * holds nullable `date_value` / `time_value` columns with a CHECK that at
- * least one is set).
- *
- * UTF8 over native Parquet `DATE` / `TIME_MILLIS` logical types because the
- * canonical ISO strings (`YYYY-MM-DD`, `HH:MM:SS`) are predicate-friendly
- * (DuckDB `CAST(... AS DATE)` or string compare on ISO order) and avoid
- * @dsnp/parquetjs logical-type writer-support uncertainty. A future upgrade
- * lands here only.
+ * least one is set). UTF8 strings would force per-row CAST in DuckDB and
+ * break per-row-group min/max predicate pushdown — choosing native logical
+ * types preserves both. CSV remains UTF8 because CSV is untyped at the
+ * format level.
  *
  * The `_date` / `_time` suffixes are imported from `models/datetime-column`
  * and shared with the SQL projection in `download-repository.ts`. The two
  * sites must produce identical names for the same input property — a drift
- * silently nulls cells.
+ * silently nulls cells. Conversion from the SQL projection's ISO strings to
+ * the writer's expected primitives happens in `featureToRow` via
+ * `dateStringToParquet` and `timeStringToMillis`.
  *
  * @param prop - Feature property definition (name + type).
  * @returns Array of column specs. Single-element for non-datetime types;
@@ -102,6 +102,42 @@ export function dateStringToParquet(s: string): Date {
 export function timeStringToMillis(s: string): number {
   const [hh, mm, ss] = s.split(':').map(Number);
   return (hh * 3600 + mm * 60 + ss) * 1000;
+}
+
+/**
+ * Convert a `Date` (as returned by `@dsnp/parquetjs` reading a DATE column —
+ * UTC midnight on the stored day) back to a canonical `'YYYY-MM-DD'` string.
+ *
+ * Used by the CSV flattener so the read-back of a Parquet `<prop>_date` column
+ * matches the original SQL projection's `to_char(date_value, 'YYYY-MM-DD')`
+ * output exactly. Without this, the flattener would JSON-stringify the Date
+ * (producing a quoted ISO-with-`Z` blob).
+ *
+ * @param d Date at UTC midnight (parquetjs `fromPrimitive_DATE` always sets it).
+ * @returns ISO date string in `'YYYY-MM-DD'` format.
+ */
+export function parquetDateToString(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Convert milliseconds-since-midnight (as returned by `@dsnp/parquetjs` reading
+ * a TIME_MILLIS column) back to a canonical `'HH:MM:SS'` string.
+ *
+ * Used by the CSV flattener so the read-back of a Parquet `<prop>_time` column
+ * matches the original SQL projection's `to_char(time_value, 'HH24:MI:SS')`
+ * output exactly. Without this, the flattener would render the raw integer
+ * count (e.g. `'45296000'`).
+ *
+ * @param ms Milliseconds since midnight (range 0–86_399_999).
+ * @returns 24-hour time string in `'HH:MM:SS'` format.
+ */
+export function parquetTimeMillisToString(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hh = Math.floor(totalSeconds / 3600);
+  const mm = Math.floor((totalSeconds % 3600) / 60);
+  const ss = totalSeconds % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
 /**

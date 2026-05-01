@@ -12,6 +12,8 @@ import {
   extractGeoJsonGeometry,
   featureToRow,
   geoJsonToWkb,
+  parquetDateToString,
+  parquetTimeMillisToString,
   propertyTypeToParquetType,
   timeStringToMillis
 } from './parquet-utils';
@@ -132,6 +134,37 @@ describe('parquet-utils', () => {
     it('should produce a value within INT32 range for the last second of the day', () => {
       // 23:59:59 → 86_399_000; INT32 ceiling is ~2.14e9 so we have plenty of headroom.
       expect(timeStringToMillis('23:59:59')).to.equal(86_399_000);
+    });
+  });
+
+  describe('parquetDateToString', () => {
+    it('should round-trip dateStringToParquet output back to the original string', () => {
+      const original = '2024-06-15';
+      expect(parquetDateToString(dateStringToParquet(original))).to.equal(original);
+    });
+
+    it('should format a UTC midnight Date as YYYY-MM-DD', () => {
+      expect(parquetDateToString(new Date('2026-04-24T00:00:00Z'))).to.equal('2026-04-24');
+    });
+  });
+
+  describe('parquetTimeMillisToString', () => {
+    it('should round-trip timeStringToMillis output back to the original string', () => {
+      const original = '13:45:00';
+      expect(parquetTimeMillisToString(timeStringToMillis(original))).to.equal(original);
+    });
+
+    it('should format midnight as 00:00:00', () => {
+      expect(parquetTimeMillisToString(0)).to.equal('00:00:00');
+    });
+
+    it('should format the last second of the day as 23:59:59', () => {
+      expect(parquetTimeMillisToString(86_399_000)).to.equal('23:59:59');
+    });
+
+    it('should zero-pad single-digit components', () => {
+      // 04:05:06 → (4*3600 + 5*60 + 6) * 1000 = 14_706_000
+      expect(parquetTimeMillisToString(14_706_000)).to.equal('04:05:06');
     });
   });
 
@@ -301,10 +334,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'created', feature_property_type_name: 'datetime' }
       ];
-      const row = featureToRow(
-        makeFeature({ created_date: '2024-06-15', created_time: '13:45:00' }),
-        properties
-      );
+      const row = featureToRow(makeFeature({ created_date: '2024-06-15', created_time: '13:45:00' }), properties);
 
       // DATE column: a Date instance at UTC midnight (the writer encodes
       // `getTime() / 86_400_000` to days-since-epoch INT32).

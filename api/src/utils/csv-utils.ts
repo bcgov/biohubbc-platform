@@ -6,6 +6,7 @@
 import wkx from 'wkx';
 
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../models/datetime-column';
+import { parquetDateToString, parquetTimeMillisToString } from './parquet-utils';
 
 export interface CsvPropertyDefinition {
   feature_property_name: string;
@@ -135,10 +136,18 @@ export function flattenFeatureBySchema(
 
   for (const prop of properties) {
     if (prop.feature_property_type_name === 'datetime') {
+      // The CSV is written from rows the Parquet reader returns. parquetjs reads
+      // `DATE` columns as JS `Date` objects (UTC midnight on the stored day) and
+      // `TIME_MILLIS` columns as raw millisecond integers. Both must be
+      // formatted back into the canonical `'YYYY-MM-DD'` / `'HH:MM:SS'` strings
+      // the SQL projection produced — otherwise the generic `toStringOrEmpty`
+      // path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`)
+      // and render the raw ms count for time. Strings still pass through
+      // unchanged for callers that haven't gone through Parquet.
       const dateKey = `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`;
       const timeKey = `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`;
-      result[dateKey] = toStringOrEmpty(data[dateKey]);
-      result[timeKey] = toStringOrEmpty(data[timeKey]);
+      result[dateKey] = formatDatetimeDateCell(data[dateKey]);
+      result[timeKey] = formatDatetimeTimeCell(data[timeKey]);
       continue;
     }
 
@@ -164,6 +173,38 @@ export function flattenFeatureBySchema(
   }
 
   return result;
+}
+
+/**
+ * Format a `<prop>_date` cell value for CSV output. parquetjs hands back a
+ * `Date` (UTC midnight) for native `DATE` columns; the SQL projection emits a
+ * `'YYYY-MM-DD'` string when CSV is fed directly without a Parquet round-trip.
+ * Either form normalizes to the canonical date string. Null/undefined → empty.
+ */
+function formatDatetimeDateCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (value instanceof Date) {
+    return parquetDateToString(value);
+  }
+  return String(value as string);
+}
+
+/**
+ * Format a `<prop>_time` cell value for CSV output. parquetjs hands back a
+ * raw millisecond integer for native `TIME_MILLIS` columns; the SQL projection
+ * emits a `'HH:MM:SS'` string when CSV is fed directly. Either form normalizes
+ * to the canonical time string. Null/undefined → empty.
+ */
+function formatDatetimeTimeCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'number') {
+    return parquetTimeMillisToString(value);
+  }
+  return String(value as string);
 }
 
 /**
