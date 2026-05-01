@@ -268,6 +268,17 @@ describe('csv-utils', () => {
 
       expect(buildSchemaHeaders(properties)).to.deep.equal(['description', 'geometry', 'centroid', 'name']);
     });
+
+    it('should expand a datetime property into two suffixed columns (no bare column)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+
+      const result = buildSchemaHeaders(properties);
+
+      expect(result).to.deep.equal(['observed_at_date', 'observed_at_time']);
+      expect(result).to.not.include('observed_at');
+    });
   });
 
   describe('buildCombinedHeaders', () => {
@@ -283,12 +294,14 @@ describe('csv-utils', () => {
 
       const result = buildCombinedHeaders(parentProperties, childProperties, ['dataset_name', 'dataset_id']);
 
+      // datetime expands into two suffixed columns; the bare `timestamp` is gone.
       expect(result).to.deep.equal([
         'dataset_name',
         'dataset_id',
         'device_key',
         'animal_identifier',
-        'timestamp',
+        'timestamp_date',
+        'timestamp_time',
         'geometry'
       ]);
     });
@@ -313,7 +326,7 @@ describe('csv-utils', () => {
 
       const result = buildCombinedHeaders(parentProperties, childProperties);
 
-      expect(result).to.deep.equal(['device_key', 'timestamp']);
+      expect(result).to.deep.equal(['device_key', 'timestamp_date', 'timestamp_time']);
     });
 
     it('should return only child headers when no parent and no system headers', () => {
@@ -338,14 +351,16 @@ describe('csv-utils', () => {
         { feature_property_name: 'temperature', feature_property_type_name: 'number' }
       ];
       const parentData = { device_key: 'TAG-001', animal_identifier: 'M12345' };
-      const childData = { timestamp: '2024-01-01T12:00:00Z', temperature: 22.5 };
+      // datetime arrives hydrated as two suffixed keys, not a combined ISO string.
+      const childData = { timestamp_date: '2024-01-01', timestamp_time: '12:00:00', temperature: 22.5 };
 
       const result = flattenFeatureWithParent(childData, childProperties, parentData, parentProperties, 100);
 
       expect(result).to.deep.equal({
         device_key: 'TAG-001',
         animal_identifier: 'M12345',
-        timestamp: '2024-01-01T12:00:00Z',
+        timestamp_date: '2024-01-01',
+        timestamp_time: '12:00:00',
         temperature: '22.5'
       });
     });
@@ -406,15 +421,65 @@ describe('csv-utils', () => {
         { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' },
         { feature_property_name: 'active', feature_property_type_name: 'boolean' }
       ];
-      const data = { name: 'Bear', count: 5, timestamp: '2024-01-01T00:00:00Z', active: true };
+      // datetime is hydrated as two suffixed keys; the flattener pulls each cell directly.
+      const data = {
+        name: 'Bear',
+        count: 5,
+        timestamp_date: '2024-01-01',
+        timestamp_time: '00:00:00',
+        active: true
+      };
 
       const result = flattenFeatureBySchema(data, properties, 100);
 
       expect(result).to.deep.equal({
         name: 'Bear',
         count: '5',
-        timestamp: '2024-01-01T00:00:00Z',
+        timestamp_date: '2024-01-01',
+        timestamp_time: '00:00:00',
         active: 'true'
+      });
+    });
+
+    it('should emit two cells (date + time) for a datetime property with both components set', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const data = { observed_at_date: '2024-06-15', observed_at_time: '13:45:00' };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: '13:45:00'
+      });
+    });
+
+    it('should emit empty string for the missing component of a date-only datetime', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const data = { observed_at_date: '2024-06-15', observed_at_time: null };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: ''
+      });
+    });
+
+    it('should emit empty string for the missing component of a time-only datetime', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const data = { observed_at_date: null, observed_at_time: '13:45:00' };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({
+        observed_at_date: '',
+        observed_at_time: '13:45:00'
       });
     });
 

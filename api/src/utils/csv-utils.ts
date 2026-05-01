@@ -5,6 +5,8 @@
  */
 import wkx from 'wkx';
 
+import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../models/datetime-column';
+
 export interface CsvPropertyDefinition {
   feature_property_name: string;
   feature_property_type_name: string;
@@ -17,6 +19,12 @@ export interface CsvPropertyDefinition {
  * the cell value is WKT (decoded from the Parquet WKB buffer at flatten
  * time). artifact_key properties map to a single `filePath` column.
  *
+ * `datetime` properties emit two columns (`<prop>_date`, `<prop>_time`) so
+ * partial-component data (date-only, time-only, or both) round-trips
+ * losslessly and remains queryable as native columnar predicates. The
+ * suffix convention is shared with the SQL projection and the Parquet
+ * column expansion — all three sites must agree on the names.
+ *
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
  * @returns {string[]} Ordered header names.
  */
@@ -26,6 +34,9 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
   for (const prop of properties) {
     if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
+    } else if (prop.feature_property_type_name === 'datetime') {
+      headers.push(`${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`);
+      headers.push(`${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`);
     } else {
       headers.push(prop.feature_property_name);
     }
@@ -96,7 +107,11 @@ export function flattenFeatureWithParent(
  * Flatten a feature's JSONB data using schema-defined property types.
  *
  * Type-aware rules:
- * - string, number, datetime, boolean → String(value)
+ * - string, number, boolean → String(value)
+ * - datetime → expands to two cells (`<prop>_date`, `<prop>_time`); each
+ *   pulled directly from the matching key on `data`. Partial-component data
+ *   round-trips losslessly: a null component produces an empty cell while
+ *   the other carries its ISO string. See {@link buildSchemaHeaders}.
  * - spatial → decode WKB Buffer (as produced by the Parquet writer) → single
  *   column under the property's own name, value is WKT
  * - array → delegate to flattenArray()
@@ -119,6 +134,14 @@ export function flattenFeatureBySchema(
   const result: Record<string, string> = {};
 
   for (const prop of properties) {
+    if (prop.feature_property_type_name === 'datetime') {
+      const dateKey = `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`;
+      const timeKey = `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`;
+      result[dateKey] = toStringOrEmpty(data[dateKey]);
+      result[timeKey] = toStringOrEmpty(data[timeKey]);
+      continue;
+    }
+
     const value = data[prop.feature_property_name];
 
     switch (prop.feature_property_type_name) {
