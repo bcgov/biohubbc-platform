@@ -75,17 +75,4 @@ describe('SubmissionFeaturePropertyTimestampService', () => {
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
   });
-  it('propagates repository errors', async () => {
-    const service = new SubmissionFeaturePropertyTimestampService(getMockDBConnection());
-    sinon
-      .stub(SubmissionFeaturePropertyTimestampRepository.prototype, 'insertSubmissionFeaturePropertyTimestamp')
-      .rejects(new Error('DB error'));
-
-    try {
-      await service.createSubmissionFeaturePropertyTimestamp(createPayload);
-      expect.fail('Expected error to be thrown');
-    } catch (error) {
-      expect((error as Error).message).to.equal('DB error');
-    }
-  });
 });

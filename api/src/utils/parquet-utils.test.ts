@@ -12,8 +12,6 @@ import {
   extractGeoJsonGeometry,
   featureToRow,
   geoJsonToWkb,
-  parquetDateToString,
-  parquetTimeMillisToString,
   propertyTypeToParquetType,
   timeStringToMillis
 } from './parquet-utils';
@@ -135,36 +133,13 @@ describe('parquet-utils', () => {
       // 23:59:59 → 86_399_000; INT32 ceiling is ~2.14e9 so we have plenty of headroom.
       expect(timeStringToMillis('23:59:59')).to.equal(86_399_000);
     });
-  });
 
-  describe('parquetDateToString', () => {
-    it('should round-trip dateStringToParquet output back to the original string', () => {
-      const original = '2024-06-15';
-      expect(parquetDateToString(dateStringToParquet(original))).to.equal(original);
-    });
-
-    it('should format a UTC midnight Date as YYYY-MM-DD', () => {
-      expect(parquetDateToString(new Date('2026-04-24T00:00:00Z'))).to.equal('2026-04-24');
-    });
-  });
-
-  describe('parquetTimeMillisToString', () => {
-    it('should round-trip timeStringToMillis output back to the original string', () => {
-      const original = '13:45:00';
-      expect(parquetTimeMillisToString(timeStringToMillis(original))).to.equal(original);
-    });
-
-    it('should format midnight as 00:00:00', () => {
-      expect(parquetTimeMillisToString(0)).to.equal('00:00:00');
-    });
-
-    it('should format the last second of the day as 23:59:59', () => {
-      expect(parquetTimeMillisToString(86_399_000)).to.equal('23:59:59');
-    });
-
-    it('should zero-pad single-digit components', () => {
-      // 04:05:06 → (4*3600 + 5*60 + 6) * 1000 = 14_706_000
-      expect(parquetTimeMillisToString(14_706_000)).to.equal('04:05:06');
+    it('should clamp Postgres end-of-day 24:00:00 to 86_399_999', () => {
+      // Postgres `time` accepts '24:00:00' as ISO 8601 nominal end-of-day, but
+      // Parquet TIME_MILLIS doesn't define 86_400_000 and downstream readers
+      // disagree on how to handle it. The clamp keeps the cell in the de facto
+      // 0..86_399_999 range at a 1 ms cost, preferable to wrapping to 00:00:00.
+      expect(timeStringToMillis('24:00:00')).to.equal(86_399_999);
     });
   });
 
@@ -263,6 +238,17 @@ describe('parquet-utils', () => {
       expect(sfid.primitiveType).to.equal('INT64');
       // optional=false in @dsnp/parquetjs surfaces as REQUIRED on the schema field.
       expect(sfid.repetitionType).to.equal('REQUIRED');
+    });
+
+    it('should throw when a datetime expansion collides with a sibling property name', () => {
+      // Schema-build is the gate for collision detection; downstream consumers
+      // (hydrator, writer) trust the validated list.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observation', feature_property_type_name: 'datetime' },
+        { feature_property_name: 'observation_date', feature_property_type_name: 'string' }
+      ];
+
+      expect(() => buildParquetSchema(properties)).to.throw(/observation_date/);
     });
   });
 

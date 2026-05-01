@@ -5,8 +5,11 @@
  */
 import wkx from 'wkx';
 
-import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../models/datetime-column';
-import { parquetDateToString, parquetTimeMillisToString } from './parquet-utils';
+import {
+  assertNoDatetimeColumnCollisions,
+  DATETIME_DATE_SUFFIX,
+  DATETIME_TIME_SUFFIX
+} from '../models/datetime-column';
 
 export interface CsvPropertyDefinition {
   feature_property_name: string;
@@ -30,6 +33,8 @@ export interface CsvPropertyDefinition {
  * @returns {string[]} Ordered header names.
  */
 export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[] {
+  assertNoDatetimeColumnCollisions(properties);
+
   const headers: string[] = [];
 
   for (const prop of properties) {
@@ -180,15 +185,19 @@ export function flattenFeatureBySchema(
  * `Date` (UTC midnight) for native `DATE` columns; the SQL projection emits a
  * `'YYYY-MM-DD'` string when CSV is fed directly without a Parquet round-trip.
  * Either form normalizes to the canonical date string. Null/undefined → empty.
+ *
+ * The Date branch matches the original SQL projection's
+ * `to_char(date_value, 'YYYY-MM-DD')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`).
  */
 function formatDatetimeDateCell(value: unknown): string {
   if (value == null) {
     return '';
   }
   if (value instanceof Date) {
-    return parquetDateToString(value);
+    return value.toISOString().slice(0, 10);
   }
-  return String(value as string);
+  return String(value);
 }
 
 /**
@@ -196,15 +205,24 @@ function formatDatetimeDateCell(value: unknown): string {
  * raw millisecond integer for native `TIME_MILLIS` columns; the SQL projection
  * emits a `'HH:MM:SS'` string when CSV is fed directly. Either form normalizes
  * to the canonical time string. Null/undefined → empty.
+ *
+ * The number branch matches the original SQL projection's
+ * `to_char(time_value, 'HH24:MI:SS')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would render the raw integer count
+ * (e.g. `'45296000'`).
  */
 function formatDatetimeTimeCell(value: unknown): string {
   if (value == null) {
     return '';
   }
   if (typeof value === 'number') {
-    return parquetTimeMillisToString(value);
+    const totalSeconds = Math.floor(value / 1000);
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   }
-  return String(value as string);
+  return String(value);
 }
 
 /**

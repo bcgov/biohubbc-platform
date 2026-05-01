@@ -279,6 +279,17 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal(['observed_at_date', 'observed_at_time']);
       expect(result).to.not.include('observed_at');
     });
+
+    it('should throw when a datetime expansion collides with a sibling property name', () => {
+      // Schema-build is the gate for collision detection; downstream consumers
+      // (flattener) trust the validated list.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observation', feature_property_type_name: 'datetime' },
+        { feature_property_name: 'observation_time', feature_property_type_name: 'number' }
+      ];
+
+      expect(() => buildSchemaHeaders(properties)).to.throw(/observation_time/);
+    });
   });
 
   describe('buildCombinedHeaders', () => {
@@ -481,6 +492,37 @@ describe('csv-utils', () => {
         observed_at_date: '',
         observed_at_time: '13:45:00'
       });
+    });
+
+    it('should format Date and millisecond inputs from a Parquet round-trip back to canonical strings', () => {
+      // parquetjs returns Date (UTC midnight) for native DATE columns and ms-since-midnight
+      // numbers for TIME_MILLIS columns. Both must normalize back to the SQL projection's
+      // canonical strings — without this branch the generic toStringOrEmpty path would
+      // JSON-stringify the Date and render the raw ms count.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      // 13:45:00 → (13*3600 + 45*60) * 1000 = 49_500_000.
+      const data = { observed_at_date: new Date('2024-06-15T00:00:00Z'), observed_at_time: 49_500_000 };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: '13:45:00'
+      });
+    });
+
+    it('should zero-pad single-digit components when formatting a TIME_MILLIS millisecond input', () => {
+      // 04:05:06 → (4*3600 + 5*60 + 6) * 1000 = 14_706_000.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const data = { observed_at_date: null, observed_at_time: 14_706_000 };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result.observed_at_time).to.equal('04:05:06');
     });
 
     it('should flatten arrays with semicolons', () => {

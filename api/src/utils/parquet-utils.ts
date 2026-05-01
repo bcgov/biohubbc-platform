@@ -9,7 +9,11 @@
  */
 import { ParquetSchema, type FieldDefinition, type SchemaDefinition } from '@dsnp/parquetjs';
 
-import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../models/datetime-column';
+import {
+  assertNoDatetimeColumnCollisions,
+  DATETIME_DATE_SUFFIX,
+  DATETIME_TIME_SUFFIX
+} from '../models/datetime-column';
 import { ParquetFeatureData } from '../models/download';
 import type { CsvPropertyDefinition } from './csv-utils';
 
@@ -93,51 +97,24 @@ export function dateStringToParquet(s: string): Date {
 
 /**
  * Convert a `'HH:MM:SS'` string to milliseconds-since-midnight for
- * `@dsnp/parquetjs`'s TIME_MILLIS writer (INT32, range 0–86_400_000).
+ * `@dsnp/parquetjs`'s TIME_MILLIS writer (INT32, valid range 0–86_399_999).
+ *
+ * Postgres `time without time zone` accepts the literal `'24:00:00'` as ISO
+ * 8601 nominal end-of-day. The Parquet TIME_MILLIS spec doesn't define a
+ * value at exactly 86_400_000 ms, and downstream readers (DuckDB, Arrow,
+ * pandas) handle the boundary inconsistently — accept, clip, or throw.
+ * We clamp at `86_399_999` so the cell stays in the de facto valid range.
+ * The 1 ms loss preserves "near end of day" semantics rather than wrapping
+ * to `00:00:00`, and the source Postgres value is unaffected.
  *
  * @param s 24-hour time string in `'HH:MM:SS'` format, exactly as the SQL
  *   projection emits via `to_char(time_value, 'HH24:MI:SS')`.
- * @returns Milliseconds since midnight.
+ * @returns Milliseconds since midnight, clamped to `86_399_999`.
  */
 export function timeStringToMillis(s: string): number {
   const [hh, mm, ss] = s.split(':').map(Number);
-  return (hh * 3600 + mm * 60 + ss) * 1000;
-}
-
-/**
- * Convert a `Date` (as returned by `@dsnp/parquetjs` reading a DATE column —
- * UTC midnight on the stored day) back to a canonical `'YYYY-MM-DD'` string.
- *
- * Used by the CSV flattener so the read-back of a Parquet `<prop>_date` column
- * matches the original SQL projection's `to_char(date_value, 'YYYY-MM-DD')`
- * output exactly. Without this, the flattener would JSON-stringify the Date
- * (producing a quoted ISO-with-`Z` blob).
- *
- * @param d Date at UTC midnight (parquetjs `fromPrimitive_DATE` always sets it).
- * @returns ISO date string in `'YYYY-MM-DD'` format.
- */
-export function parquetDateToString(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * Convert milliseconds-since-midnight (as returned by `@dsnp/parquetjs` reading
- * a TIME_MILLIS column) back to a canonical `'HH:MM:SS'` string.
- *
- * Used by the CSV flattener so the read-back of a Parquet `<prop>_time` column
- * matches the original SQL projection's `to_char(time_value, 'HH24:MI:SS')`
- * output exactly. Without this, the flattener would render the raw integer
- * count (e.g. `'45296000'`).
- *
- * @param ms Milliseconds since midnight (range 0–86_399_999).
- * @returns 24-hour time string in `'HH:MM:SS'` format.
- */
-export function parquetTimeMillisToString(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hh = Math.floor(totalSeconds / 3600);
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  const ms = (hh * 3600 + mm * 60 + ss) * 1000;
+  return Math.min(ms, 86_399_999);
 }
 
 /**
@@ -205,6 +182,8 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * @returns A ParquetSchema instance ready for writer construction.
  */
 export function buildParquetSchema(properties: CsvPropertyDefinition[]): ParquetSchema {
+  assertNoDatetimeColumnCollisions(properties);
+
   const fields: SchemaDefinition = {};
 
   // Every Parquet file includes the feature UUID for cross-file joins
