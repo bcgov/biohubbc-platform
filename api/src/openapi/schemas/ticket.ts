@@ -14,7 +14,24 @@ export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
     ticket_id: { type: 'string', format: 'uuid' },
     user_identifier: { type: 'string' },
     create_date: { type: 'string', format: 'date-time' },
-    comment: { type: 'string' }
+    comment: {
+      type: 'string',
+      description: 'Markdown-formatted comment text'
+    }
+  }
+};
+
+export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['ticket_artifact_id', 'ticket_id', 'artifact_id', 'record_end_date', 'create_date', 'key'],
+  properties: {
+    ticket_artifact_id: { type: 'string', format: 'uuid' },
+    ticket_id: { type: 'string', format: 'uuid' },
+    artifact_id: { type: 'string', format: 'uuid' },
+    record_end_date: { type: 'string', format: 'date-time', nullable: true },
+    create_date: { type: 'string', format: 'date-time' },
+    key: { type: 'string', description: 'Artifact object storage key.' }
   }
 };
 
@@ -76,6 +93,7 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'status',
     'statuses',
     'comments',
+    'artifacts',
     'references',
     'data_requests',
     'ticket_system_users'
@@ -107,6 +125,11 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     comments: {
       type: 'array',
       items: TicketCommentSchema
+    },
+    artifacts: {
+      type: 'array',
+      description: 'Active artifacts attached to the ticket.',
+      items: TicketArtifactSchema
     },
     references: {
       type: 'array',
@@ -159,7 +182,12 @@ export const CreateTicketCommentRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['comment'],
   properties: {
-    comment: { type: 'string', minLength: 1, maxLength: 3000 }
+    comment: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 3000,
+      description: 'Markdown-formatted comment text'
+    }
   }
 };
 
@@ -168,7 +196,12 @@ export const UpdateTicketCommentRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['comment'],
   properties: {
-    comment: { type: 'string', minLength: 1, maxLength: 3000 }
+    comment: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 3000,
+      description: 'Markdown-formatted comment text'
+    }
   }
 };
 

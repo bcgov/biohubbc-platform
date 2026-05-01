@@ -1,6 +1,25 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { ITicketCommentLog, ITicketReference, ITicketStatusLog } from 'interfaces/useTicketsApi.interface';
+import {
+  ICompleteTicketUploadRequest,
+  ICreateTicketCommentRequest,
+  ICreateTicketReferenceRequest,
+  ICreateTicketRequest,
+  ICreateTicketSystemUser,
+  ICreateTicketUploadRequest,
+  ICreateTicketUploadResponse,
+  IGetTicketsResponse,
+  ITicket,
+  ITicketArtifact,
+  ITicketArtifactDownloadResponse,
+  ITicketCommentLog,
+  ITicketExtended,
+  ITicketReference,
+  ITicketStatusLog,
+  ITicketSystemUser,
+  IUpdateTicketRequest,
+  IUpdateTicketSystemUserStatusRequest
+} from 'interfaces/useTicketsApi.interface';
 import { useTicketsApi } from './useTicketsApi';
 
 describe('useTicketsApi', () => {
@@ -15,7 +34,7 @@ describe('useTicketsApi', () => {
   });
 
   it('getTickets supports optional filters and pagination', async () => {
-    const response = {
+    const response: IGetTicketsResponse = {
       tickets: [],
       pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
     };
@@ -40,7 +59,7 @@ describe('useTicketsApi', () => {
     const comments: ITicketCommentLog[] = [];
     const references: ITicketReference[] = [];
 
-    const apiTicket = {
+    const apiTicket: ITicketExtended = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       ticket_slug: '04900001',
       subject: 'Test ticket',
@@ -51,6 +70,7 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses,
       comments,
+      artifacts: [],
       references,
       data_requests: [],
       ticket_system_users: []
@@ -64,13 +84,13 @@ describe('useTicketsApi', () => {
   });
 
   it('createTicket posts payload and returns ticket', async () => {
-    const payload = {
+    const payload: ICreateTicketRequest = {
       subject: 'New ticket',
       description: 'desc',
-      priority: 'medium' as const
+      priority: 'medium'
     };
 
-    const ticket = {
+    const ticket: ITicket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       ticket_slug: '04900001',
       subject: 'New ticket',
@@ -90,8 +110,8 @@ describe('useTicketsApi', () => {
 
   it('updateTicket puts payload and returns ticket', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const payload = { subject: 'Updated subject' };
-    const ticket = {
+    const payload: IUpdateTicketRequest = { subject: 'Updated subject' };
+    const ticket: ITicket = {
       ticket_id: ticketId,
       ticket_slug: '04900001',
       subject: 'Updated subject',
@@ -119,7 +139,7 @@ describe('useTicketsApi', () => {
 
   it('updateTicketStatus puts to /status endpoint', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const ticket = {
+    const ticket: ITicket = {
       ticket_id: ticketId,
       ticket_slug: '04900001',
       subject: 'Status changed',
@@ -139,8 +159,8 @@ describe('useTicketsApi', () => {
 
   it('createTicketComment posts payload and returns comment row', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const payload = { comment: 'New comment' };
-    const commentItem = {
+    const payload: ICreateTicketCommentRequest = { comment: 'New comment' };
+    const commentItem: ITicketCommentLog = {
       ticket_comment_id: '33333333-3333-3333-3333-333333333333',
       ticket_id: ticketId,
       user_identifier: 'Sarah',
@@ -155,21 +175,66 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(commentItem);
   });
 
+  it('createTicketUpload posts payload and returns upload initialization response', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const payload: ICreateTicketUploadRequest = { file_name: 'notes.txt', byte_size: 12, content_type: 'text/plain' };
+    const response: ICreateTicketUploadResponse = {
+      upload_id: '33333333-3333-3333-3333-333333333333',
+      presigned_upload_url: 'https://example.com/presigned'
+    };
+
+    mock.onPost(`/api/administrative/tickets/${ticketId}/upload`, payload).reply(201, response);
+
+    const result = await useTicketsApi(axios).createTicketUpload(ticketId, payload);
+
+    expect(result).toEqual(response);
+  });
+
+  it('completeTicketUpload puts payload to upload completion endpoint', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const uploadId = '33333333-3333-3333-3333-333333333333';
+    const payload: ICompleteTicketUploadRequest = { status: 'uploaded' };
+    const response: ITicketArtifact = {
+      ticket_artifact_id: '44444444-4444-4444-8444-444444444444',
+      ticket_id: ticketId,
+      artifact_id: '55555555-5555-4555-8555-555555555555',
+      record_end_date: null,
+      create_date: '2026-02-25T00:00:00.000Z',
+      key: 'tickets/notes.txt'
+    };
+
+    mock.onPut(`/api/administrative/tickets/${ticketId}/upload/${uploadId}`, payload).reply(200, response);
+
+    await expect(useTicketsApi(axios).completeTicketUpload(ticketId, uploadId, payload)).resolves.toEqual(response);
+  });
+
+  it('getTicketArtifactDownloadUrl fetches a presigned ticket attachment URL', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const ticketArtifactId = '33333333-3333-4333-9333-333333333333';
+    const response: ITicketArtifactDownloadResponse = { signed_url: 'https://example.com/download' };
+
+    mock.onGet(`/api/tickets/${ticketId}/artifact/${ticketArtifactId}`).reply(200, response);
+
+    const result = await useTicketsApi(axios).getTicketArtifactDownloadUrl(ticketId, ticketArtifactId);
+
+    expect(result).toEqual(response);
+  });
+
   it('createTicketReference posts payload and returns reference row', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const payload = {
+    const payload: ICreateTicketReferenceRequest = {
       references: [
         {
           target_ticket_id: '22222222-2222-2222-2222-222222222222',
-          relationship: 'relates_to' as const
+          relationship: 'relates_to'
         },
         {
           target_ticket_id: '33333333-3333-3333-3333-333333333333',
-          relationship: 'relates_to' as const
+          relationship: 'relates_to'
         }
       ]
     };
-    const referenceItems = [
+    const referenceItems: ITicketReference[] = [
       {
         ticket_reference_id: '44444444-4444-4444-4444-444444444444',
         source_ticket_id: ticketId,
@@ -213,7 +278,7 @@ describe('useTicketsApi', () => {
   });
 
   it('getTicketsForUser fetches from /api/tickets with optional params', async () => {
-    const response = {
+    const response: IGetTicketsResponse = {
       tickets: [],
       pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
     };
@@ -227,7 +292,7 @@ describe('useTicketsApi', () => {
 
   it('getTicketForUser fetches ticket from /api/tickets/:ticketId', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const apiTicket = {
+    const apiTicket: ITicketExtended = {
       ticket_id: ticketId,
       ticket_slug: '04900001',
       subject: 'Test ticket',
@@ -238,6 +303,7 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses: [],
       comments: [],
+      artifacts: [],
       references: [],
       data_requests: [],
       ticket_system_users: []
@@ -252,12 +318,18 @@ describe('useTicketsApi', () => {
 
   it('createTicketSystemUsers posts payload and returns ticket system users', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const payload = [{ system_user_id: 12, status: 'requested' as const }];
-    const ticketSystemUser = {
+    const payload: ICreateTicketSystemUser[] = [{ system_user_id: 12, status: 'requested' }];
+    const ticketSystemUser: ITicketSystemUser = {
       ticket_system_user_id: '22222222-2222-2222-2222-222222222222',
       ticket_id: ticketId,
       system_user_id: 12,
-      status: 'requested'
+      status: 'requested',
+      system_user: {
+        system_user_id: 12,
+        display_name: 'Sarah',
+        user_identifier: 'sarah',
+        email: 'sarah@example.com'
+      }
     };
 
     mock.onPost(`/api/tickets/${ticketId}/system-user`, payload).reply(201, [ticketSystemUser]);
@@ -270,12 +342,18 @@ describe('useTicketsApi', () => {
   it('updateTicketSystemUserStatus patches payload and returns ticket system user', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
     const ticketSystemUserId = '33333333-3333-3333-3333-333333333333';
-    const payload = { status: 'started' as const };
-    const ticketSystemUser = {
+    const payload: IUpdateTicketSystemUserStatusRequest = { status: 'started' };
+    const ticketSystemUser: ITicketSystemUser = {
       ticket_system_user_id: ticketSystemUserId,
       ticket_id: ticketId,
       system_user_id: 12,
-      status: 'started'
+      status: 'started',
+      system_user: {
+        system_user_id: 12,
+        display_name: 'Sarah',
+        user_identifier: 'sarah',
+        email: 'sarah@example.com'
+      }
     };
 
     mock.onPatch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload).reply(200, ticketSystemUser);

@@ -2,14 +2,14 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { type CreateTicketCommentRequest } from '../../../../../models/ticket-comment';
+import { CreateTicketUpload } from '../../../../../models/ticket-upload';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { CreateTicketCommentRequestSchema, TicketCommentSchema } from '../../../../../openapi/schemas/ticket';
+import { CreateTicketUploadResponseSchema, CreateTicketUploadSchema } from '../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { TicketCommentService } from '../../../../../services/ticket-comment-service';
+import { TicketUploadService } from '../../../../../services/ticket-upload-service';
 import { getLogger } from '../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/tickets/{ticketId}/comment');
+const defaultLog = getLogger('paths/administrative/tickets/{ticketId}/upload');
 
 export const POST: Operation = [
   authorizeRequestHandler((req) => ({
@@ -21,11 +21,11 @@ export const POST: Operation = [
       { discriminator: 'Team', entity: 'ticket', ticketId: req.params.ticketId }
     ]
   })),
-  createTicketComment()
+  createTicketUpload()
 ];
 
 POST.apiDoc = {
-  description: 'Add a comment to a ticket timeline',
+  description: 'Initialize a ticket attachment upload and return a presigned upload URL.',
   tags: ['tickets'],
   security: [
     {
@@ -45,18 +45,19 @@ POST.apiDoc = {
     }
   ],
   requestBody: {
+    required: true,
     content: {
       'application/json': {
-        schema: CreateTicketCommentRequestSchema
+        schema: CreateTicketUploadSchema
       }
     }
   },
   responses: {
     201: {
-      description: 'Ticket comment created successfully',
+      description: 'Ticket upload initialized successfully',
       content: {
         'application/json': {
-          schema: TicketCommentSchema
+          schema: CreateTicketUploadResponseSchema
         }
       }
     },
@@ -64,25 +65,22 @@ POST.apiDoc = {
   }
 };
 
-export function createTicketComment(): RequestHandler {
+export function createTicketUpload(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
-      const ticketCommentService = new TicketCommentService(connection);
-      const commentPayload = req.body as CreateTicketCommentRequest;
-      const createdComment = await ticketCommentService.createTicketComment({
-        ticketId: req.params.ticketId,
-        comment: commentPayload.comment
-      });
+      const payload = req.body as CreateTicketUpload;
+      const ticketUploadService = new TicketUploadService(connection);
+      const response = await ticketUploadService.initializeTicketUpload(req.params.ticketId, payload);
 
       await connection.commit();
 
-      return res.status(201).json(createdComment);
+      return res.status(201).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'createTicketComment', message: 'error', error });
+      defaultLog.error({ label: 'createTicketUpload', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

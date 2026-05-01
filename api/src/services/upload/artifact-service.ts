@@ -1,11 +1,15 @@
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
+import { HTTP401 } from '../../errors/http-error';
 import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { getObjectStoreBucketName, getSecurityObjectStoreBucketName } from '../../utils/file-utils';
 import { DBService } from '../db-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
+  objectStorageService: ObjectStorageService;
 
   /**
    * Creates an instance of ArtifactService.
@@ -16,6 +20,7 @@ export class ArtifactService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.artifactRepository = new ArtifactRepository(connection);
+    this.objectStorageService = new ObjectStorageService();
   }
 
   /**
@@ -37,6 +42,26 @@ export class ArtifactService extends DBService {
    */
   async getArtifacts(): Promise<Artifact[]> {
     return this.artifactRepository.getArtifacts();
+  }
+
+  /**
+   * Create a signed download URL for an artifact.
+   *
+   * Missing artifact IDs and missing artifact rows are returned as access
+   * denied so download routes do not reveal whether an artifact exists.
+   *
+   * @param {string | null | undefined} artifactId
+   * @returns {Promise<string>}
+   * @memberof ArtifactService
+   */
+  async getArtifactSignedUrl(artifactId: string | null | undefined): Promise<string> {
+    if (!artifactId) {
+      throw new HTTP401('Access Denied');
+    }
+
+    const artifact = await this.getArtifact(artifactId);
+
+    return this.objectStorageService.getSignedUrl(this.getBucketTypeForArtifact(artifact.bucket), artifact.object_key);
   }
 
   /**
@@ -138,5 +163,27 @@ export class ArtifactService extends DBService {
    */
   async deleteArtifact(artifactId: string): Promise<void> {
     return this.artifactRepository.deleteArtifact(artifactId);
+  }
+
+  /**
+   * Map a stored bucket name to the object-storage bucket type.
+   *
+   * Unsupported bucket names fail before storage code is called.
+   *
+   * @private
+   * @param {string} bucketName
+   * @returns {BucketType}
+   * @memberof ArtifactService
+   */
+  private getBucketTypeForArtifact(bucketName: string): BucketType {
+    if (bucketName === getObjectStoreBucketName()) {
+      return BucketType.MAIN;
+    }
+
+    if (bucketName === getSecurityObjectStoreBucketName()) {
+      return BucketType.QUARANTINE;
+    }
+
+    throw new Error(`Unsupported artifact bucket: ${bucketName}`);
   }
 }

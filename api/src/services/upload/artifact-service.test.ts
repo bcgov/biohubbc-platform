@@ -3,9 +3,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
+import { HTTP401 } from '../../errors/http-error';
 import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from './artifact-service';
 
 chai.use(sinonChai);
@@ -97,6 +99,115 @@ describe('ArtifactService', () => {
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('DB Error');
+      }
+    });
+  });
+
+  describe('getArtifactSignedUrl', () => {
+    beforeEach(() => {
+      process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
+      process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME = 'quarantine-bucket';
+    });
+
+    it('should return a signed URL for a main-bucket artifact using the complete object key', async () => {
+      const artifact: Artifact = {
+        artifact_id: '11111111-1111-1111-1111-111111111111',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'main-bucket',
+        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+        byte_size: '128',
+        checksum_sha256: null,
+        uploaded_at: '2026-04-29T00:00:00.000Z',
+        format: 'txt'
+      };
+
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      const getSignedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .resolves('https://example.com/download');
+
+      const result = await service.getArtifactSignedUrl(artifact.artifact_id);
+
+      expect(getSignedUrlStub).to.have.been.calledOnceWith(BucketType.MAIN, artifact.object_key);
+      expect(result).to.equal('https://example.com/download');
+    });
+
+    it('should throw access denied when no artifact id is provided', async () => {
+      const getArtifactStub = sinon.stub(ArtifactRepository.prototype, 'getArtifact');
+
+      try {
+        await service.getArtifactSignedUrl(null);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP401);
+        expect((error as Error).message).to.equal('Access Denied');
+        expect(getArtifactStub).not.to.have.been.called;
+      }
+    });
+
+    it('should rethrow when the artifact is not found', async () => {
+      sinon
+        .stub(ArtifactRepository.prototype, 'getArtifact')
+        .rejects(new ApiNotFoundError('Artifact not found', ['ArtifactRepository->getArtifact']));
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl('11111111-1111-1111-1111-111111111111');
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as Error).message).to.equal('Artifact not found');
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    it('should reject unsupported artifact buckets before requesting a signed URL', async () => {
+      const artifact: Artifact = {
+        artifact_id: '11111111-1111-1111-1111-111111111111',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'unsupported-bucket',
+        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+        byte_size: '128',
+        checksum_sha256: null,
+        uploaded_at: '2026-04-29T00:00:00.000Z',
+        format: 'txt'
+      };
+
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Unsupported artifact bucket: unsupported-bucket');
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    it('should not return a signed URL for a quarantine artifact', async () => {
+      const artifact: Artifact = {
+        artifact_id: '11111111-1111-1111-1111-111111111111',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'quarantine-bucket',
+        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+        byte_size: '128',
+        checksum_sha256: null,
+        uploaded_at: '2026-04-29T00:00:00.000Z',
+        format: 'txt'
+      };
+
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      const getSignedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .rejects(new Error('Presigned GET URLs are not allowed for the quarantine bucket'));
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(getSignedUrlStub).to.have.been.calledOnceWith(BucketType.QUARANTINE, artifact.object_key);
+        expect((error as Error).message).to.equal('Presigned GET URLs are not allowed for the quarantine bucket');
       }
     });
   });

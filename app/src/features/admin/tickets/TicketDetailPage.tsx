@@ -18,7 +18,8 @@ import { useTicketComment } from './hooks/useTicketComment';
  */
 export const TicketDetailPage = () => {
   const { ticketDataLoader } = useTicketContext();
-  const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment();
+  const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
+    useTicketComment();
   const ticket = ticketDataLoader.data;
   const isLoading = ticketDataLoader.isLoading;
 
@@ -27,7 +28,6 @@ export const TicketDetailPage = () => {
       {ticket ? (
         <>
           <TicketHeader ticket={ticket} />
-
           <Container maxWidth="xl" sx={{ py: 4 }}>
             <PageSection id="ticket-detail-content" label="Ticket Details">
               <Stack
@@ -41,14 +41,17 @@ export const TicketDetailPage = () => {
                 }}>
                 <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
                   <TicketTimeline ticket={ticket} isLoading={isLoading} />
-                  {ticket.status === 'open' ? (
+                  {ticket.status === 'open' && (
                     <TicketComment
                       comment={comment}
+                      artifacts={ticket.artifacts}
                       setComment={setComment}
                       isSaving={isSavingComment}
+                      isUploadingAttachment={isUploadingAttachment}
                       onAddComment={handleAddComment}
+                      onUploadAttachment={handleUploadAttachment}
                     />
-                  ) : null}
+                  )}
                 </Stack>
 
                 <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>

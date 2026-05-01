@@ -31,6 +31,7 @@ const baseTicket: ITicketExtended = {
   status: 'open',
   statuses: [],
   comments: [],
+  artifacts: [],
   references: [],
   ticket_system_users: [],
   data_requests: []
