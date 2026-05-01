@@ -16,7 +16,7 @@ describe('DownloadRepository', () => {
   });
 
   describe('createDownload', () => {
-    it('inserts download with status, fragment_size_bytes, filters, and cart_id', async () => {
+    it('inserts download with status, filters, and cart_id', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
@@ -30,7 +30,6 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.not.include('system_user_id');
       expect(sqlText).to.not.include('team_id');
       expect(sqlText).to.not.include('data_request_id');
-      expect(sqlText).to.include('fragment_size_bytes');
       expect(sqlText).to.include('cart_id');
     });
 

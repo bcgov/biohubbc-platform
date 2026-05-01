@@ -25,9 +25,8 @@ export const isExportReady = (status: string): boolean => status === 'ready';
  * after 30 seconds.
  *
  * Why iframe over `window.open`: popup blockers reject rapid-fire `window.open` calls (multi-
- * part downloads hit this), and browsers collapse concurrent tabs. The iframe technique was
- * inherited from the legacy `DownloadFeatureCard`'s `handleDownloadFragment` — it works around
- * both problems and avoids stealing focus. The 30s cleanup timeout matches the legacy interval.
+ * part downloads hit this), and browsers collapse concurrent tabs. The iframe technique
+ * works around both problems and avoids stealing focus.
  */
 export const triggerIframeDownload = (url: string): void => {
   const iframe = document.createElement('iframe');

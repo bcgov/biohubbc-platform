@@ -1,6 +1,5 @@
-import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
+import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import {
   CreateDownload,
   DownloadFeatureSummary,
@@ -9,26 +8,22 @@ import {
   DownloadRecord
 } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
-import { DownloadFragmentRecord } from '../../models/download-fragment';
-import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
 
 /**
  * Request-time service for downloads.
  *
  * Owns all operations called by path handlers during HTTP requests:
- * CRUD, request creation, access control, team linking, fragment listing,
- * and signed URL delivery. Composes TeamService + repositories.
+ * CRUD, request creation, access control, and team linking. Composes
+ * TeamService + repositories.
  *
- * Background processing (fragment planning, streaming, S3 upload) lives
- * in DownloadPipelineService.
+ * Background processing (Parquet generation, S3 upload) lives in
+ * DownloadPipelineService.
  *
  * @export
  * @class DownloadService
@@ -36,7 +31,6 @@ import { SearchFeatureService } from '../search-feature-service';
  */
 export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
-  fragmentRepository: DownloadFragmentRepository;
   /**
    * Held directly (not via `DownloadExportService`) to avoid a circular
    * construction chain — `DownloadExportService` already composes `DownloadService`
@@ -50,7 +44,6 @@ export class DownloadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
     this.teamService = new TeamService(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
@@ -184,18 +177,7 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get all fragments for a download.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFragmentRecord[]>}
-   * @memberof DownloadService
-   */
-  async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
-    return this.fragmentRepository.getFragmentsByDownloadId(downloadId);
-  }
-
-  /**
-   * Mark a download as downloaded after the client has retrieved all fragments.
+   * Mark a download as downloaded after the client has retrieved the export.
    *
    * Sets `downloaded_at` timestamp and status to `downloaded` (AC #3).
    *
@@ -315,38 +297,6 @@ export class DownloadService extends DBService {
       `Team for cart ${downloadId}`,
       'Team created when claiming anonymous download'
     );
-  }
-
-  /**
-   * Get a signed URL for downloading a specific fragment.
-   *
-   * Validates the fragment exists and is ready before generating the URL.
-   * Fragment delivery is a download-record concern (access control + URL generation),
-   * not a pipeline concern (processing, streaming, S3 upload).
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} fragmentIndex - The zero-based fragment index.
-   * @return {Promise<string>} The signed download URL.
-   * @memberof DownloadService
-   */
-  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
-    const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
-    const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
-
-    if (!fragment) {
-      throw new HTTP404(`Fragment ${fragmentIndex} not found for download ${downloadId}`);
-    }
-
-    if (fragment.fragment_status !== DownloadStatusEnum.READY) {
-      throw new HTTP409('Fragment is not ready');
-    }
-
-    if (!fragment.s3_key) {
-      throw new HTTP500('Fragment record missing s3_key');
-    }
-
-    const objectStorageService = new ObjectStorageService();
-    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
   }
 }
 

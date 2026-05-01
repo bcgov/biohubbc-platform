@@ -47,8 +47,8 @@ GET.apiDoc = {
  * `parts[]` is populated only when `status === 'ready'`. Non-ready statuses
  * (pending / processing / failed / downloaded) return an empty array so
  * clients don't accidentally attempt to download from URLs for incomplete
- * jobs. Presigned URLs are regenerated per request (expiry matches fragment
- * URLs) so clients should not cache them.
+ * jobs. Presigned URLs are regenerated per request so clients should not
+ * cache them.
  */
 export function getDownloadExportDetail(): RequestHandler {
   return async (req, res) => {

@@ -318,10 +318,6 @@ describe('paths/download/index', () => {
           started_at: '2026-01-01',
           completed_at: '2026-01-01',
           downloaded_at: null,
-          total_fragments: 1,
-          completed_fragments: 1,
-          estimated_total_size_bytes: '1000',
-          fragment_size_bytes: '1000',
           create_date: '2026-01-01',
           exports: []
         }
@@ -358,10 +354,6 @@ describe('paths/download/index', () => {
           started_at: '2026-01-01',
           completed_at: '2026-01-01',
           downloaded_at: null,
-          total_fragments: 1,
-          completed_fragments: 1,
-          estimated_total_size_bytes: '1000',
-          fragment_size_bytes: '1000',
           create_date: '2026-01-01',
           exports: [
             {

@@ -4,7 +4,6 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import * as db from '../../database/db';
 import { DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -53,10 +52,6 @@ describe('process-download-job', () => {
     started_at: null,
     completed_at: null,
     downloaded_at: null,
-    total_fragments: 1,
-    completed_fragments: 0,
-    estimated_total_size_bytes: null,
-    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
     create_date: '2026-01-01T00:00:00.000Z',
     ...overrides
   });

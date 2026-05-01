@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadRecord } from '../../__mocks__/download';
-import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
@@ -205,7 +205,7 @@ describe('DownloadExportService', () => {
       expect(urlStub.firstCall.args).to.deep.equal([
         BucketType.MAIN,
         'downloads/d/exports/e/biohub-e-part-1.zip',
-        SIGNED_URL_EXPIRY_FRAGMENT,
+        SIGNED_URL_EXPIRY_DOWNLOAD,
         `attachment; filename="20260422-153843-biohub-${EXPORT_ID}-part-1.zip"`
       ]);
       expect(urlStub.secondCall.args[3]).to.equal(
