@@ -213,15 +213,6 @@ spec:
             {{ end }}
             - name: UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES
               value: {{ .Values.app.uploadIngestion.jsonFileMaxBytes | quote }}
-            # Backward-compatible media ingest aliases (legacy env names)
-            {{ if .Values.app.ingestion.mediaBatchBytes }}
-            - name: MEDIA_INGEST_BATCH_BYTES
-              value: {{ .Values.app.ingestion.mediaBatchBytes | quote }}
-            {{ end }}
-            {{ if .Values.app.ingestion.mediaBatchFiles }}
-            - name: MEDIA_INGEST_BATCH_FILES
-              value: {{ .Values.app.ingestion.mediaBatchFiles | quote }}
-            {{ end }}
             # Download pipeline
             - name: DOWNLOAD_FEATURE_BATCH_SIZE
               value: {{ .Values.app.download.featureBatchSize | quote }}
