@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FEATURE_PROPERTY_TYPE } from './feature-property';
 
 /**
  * Schema for feature property definition.
@@ -23,7 +24,15 @@ export const ExpressionPredicatePropertyMetadata = z.object({
   feature_property_id: z.number().int().positive(),
   feature_type_property_id: z.number().int().positive().nullable(),
   feature_property_type_id: z.number().int().positive(),
-  type_name: z.enum(['string', 'number', 'boolean', 'spatial', 'datetime', 'code', 'taxon']),
+  feature_property_type_name: z.union([
+    z.literal(FEATURE_PROPERTY_TYPE.STRING),
+    z.literal(FEATURE_PROPERTY_TYPE.NUMBER),
+    z.literal(FEATURE_PROPERTY_TYPE.BOOLEAN),
+    z.literal(FEATURE_PROPERTY_TYPE.SPATIAL),
+    z.literal(FEATURE_PROPERTY_TYPE.DATETIME),
+    z.literal(FEATURE_PROPERTY_TYPE.CODE),
+    z.literal(FEATURE_PROPERTY_TYPE.TAXON)
+  ]),
   display_name: z.string()
 });
 

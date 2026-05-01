@@ -134,7 +134,7 @@ export class FeatureTypePropertyRepository extends BaseRepository {
               fp.feature_property_id,
               NULL::integer as feature_type_property_id,
               fpt.feature_property_type_id,
-              fpt.name as type_name,
+              fpt.name as feature_property_type_name,
               fp.display_name
             FROM feature_property fp
             INNER JOIN feature_property_type fpt
@@ -148,7 +148,7 @@ export class FeatureTypePropertyRepository extends BaseRepository {
               fp.feature_property_id,
               ftp.feature_type_property_id,
               fpt.feature_property_type_id,
-              fpt.name as type_name,
+              fpt.name as feature_property_type_name,
               fp.display_name
             FROM feature_type_property ftp
             INNER JOIN feature_property fp

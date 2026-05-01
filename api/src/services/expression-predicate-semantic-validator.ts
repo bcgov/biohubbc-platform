@@ -1,9 +1,5 @@
 import type { PredicatePropertyTypeName } from '../constants/expression';
-import {
-  InternalPredicateTypeByPropertyType,
-  OperatorsByPropertyType,
-  SupportedExpressionPropertyTypes
-} from '../constants/expression';
+import { OperatorsByPropertyType, SupportedExpressionPropertyTypes } from '../constants/expression';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import type { InternalTypedPredicate, PredicateOperator } from '../models/expression-predicate';
@@ -102,15 +98,15 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     );
 
     // Only property types in the registry are predicate-capable in this branch.
-    if (!SupportedExpressionPropertyTypes.has(metadata.type_name)) {
+    if (!SupportedExpressionPropertyTypes.has(metadata.feature_property_type_name)) {
       throw new ApiGeneralError('Unsupported predicate property type', [
         'ExpressionPredicateSemanticValidator->validatePredicate',
-        { typeName: metadata.type_name }
+        { featurePropertyTypeName: metadata.feature_property_type_name }
       ]);
     }
 
-    const propertyType = metadata.type_name as PredicatePropertyTypeName;
-    const allowedOperators = OperatorsByPropertyType[propertyType] as readonly PredicateOperator[];
+    const propertyType: PredicatePropertyTypeName = metadata.feature_property_type_name;
+    const allowedOperators: readonly PredicateOperator[] = OperatorsByPropertyType[propertyType];
 
     // Operator compatibility is semantic because it depends on the resolved property type.
     if (!allowedOperators.includes(predicate.operator)) {
@@ -129,7 +125,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
       feature_property_type_id: metadata.feature_property_type_id,
       feature_property_type_name: propertyType,
       internal_predicate
-    } as NormalizedExpressionTreePredicate;
+    };
   }
 
   /**
@@ -158,10 +154,22 @@ export class ExpressionPredicateSemanticValidator extends DBService {
         ]);
       }
 
-      return {
-        type: InternalPredicateTypeByPropertyType[propertyType],
-        operator: predicate.operator
-      } as InternalTypedPredicate;
+      switch (propertyType) {
+        case FEATURE_PROPERTY_TYPE.STRING:
+          return { type: 'string', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.NUMBER:
+          return { type: 'number', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.BOOLEAN:
+          return { type: 'boolean', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.DATETIME:
+          return { type: 'timestamp', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.TAXON:
+          return { type: 'taxon', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.SPATIAL:
+          return { type: 'geometry', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.CODE:
+          return { type: 'code', operator: predicate.operator };
+      }
     }
 
     // Route non-Exists values by resolved property domain, not client-supplied type.
@@ -332,7 +340,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     }
 
     // The registry should prevent this path, but keep the guard close to timestamp normalization.
-    if (!['Before', 'After', 'OnDate', 'OnTime'].includes(predicate.operator as PredicateOperator)) {
+    if (!['Before', 'After', 'OnDate', 'OnTime'].includes(predicate.operator)) {
       throw new ApiGeneralError('Unsupported datetime predicate operator', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { operator: predicate.operator }

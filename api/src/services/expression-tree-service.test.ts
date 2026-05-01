@@ -355,6 +355,93 @@ describe('ExpressionTreeService', () => {
       expect(insertPredicateStub.callCount).to.equal(1);
     });
 
+    it('reuses repeated child expression subtrees by hash within the same write', async () => {
+      const service = new ExpressionTreeService(getMockDBConnection());
+
+      const insertPredicateStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
+        predicate_id: 'pred-1',
+        feature_property_id: 10,
+        feature_type_property_id: 1,
+        feature_property_type_id: 1,
+        predicate_hash: 'pred-hash-1',
+        inserted: true
+      } as ResolvedPredicateAnchor);
+
+      const writePredicatePayloadStub = sinon.stub(PredicateRepository.prototype, 'writePredicatePayload').resolves();
+
+      const insertExpressionAnchorStub = sinon
+        .stub(ExpressionRepository.prototype, 'insertExpressionAnchor')
+        .onFirstCall()
+        .resolves({
+          expression_id: 'expr-child',
+          operator: 'AND',
+          expression_hash: 'child-hash',
+          inserted: true
+        } as ResolvedExpressionAnchor)
+        .onSecondCall()
+        .resolves({
+          expression_id: 'expr-root',
+          operator: 'OR',
+          expression_hash: 'root-hash',
+          inserted: true
+        } as ResolvedExpressionAnchor);
+
+      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([] as Predicate[]);
+      sinon.stub(ExpressionRepository.prototype, 'getExpressionsByHashes').resolves([] as Expression[]);
+
+      const insertExpressionClausesStub = sinon
+        .stub(ExpressionClauseRepository.prototype, 'insertExpressionClauses')
+        .resolves([] as ExpressionClause[]);
+
+      const repeatedChild = {
+        type: 'expression' as const,
+        operator: 'AND' as const,
+        clauses: [
+          {
+            type: 'predicate' as const,
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'Equals' as const,
+            value: 'elk'
+          }
+        ]
+      };
+
+      const result = await service.writeExpressionTree({
+        type: 'expression',
+        operator: 'OR',
+        clauses: [repeatedChild, repeatedChild]
+      });
+
+      expect(result).to.eql({ expression_id: 'expr-root' });
+      expect(insertPredicateStub.callCount).to.equal(1);
+      expect(writePredicatePayloadStub.callCount).to.equal(1);
+      expect(insertExpressionAnchorStub.callCount).to.equal(2);
+      expect(insertExpressionClausesStub.callCount).to.equal(2);
+      expect(insertExpressionClausesStub.firstCall.args[0]).to.eql([
+        {
+          expression_id: 'expr-child',
+          sequence: 1,
+          predicate_id: 'pred-1',
+          child_expression_id: null
+        }
+      ]);
+      expect(insertExpressionClausesStub.secondCall.args[0]).to.eql([
+        {
+          expression_id: 'expr-root',
+          sequence: 1,
+          predicate_id: null,
+          child_expression_id: 'expr-child'
+        },
+        {
+          expression_id: 'expr-root',
+          sequence: 2,
+          predicate_id: null,
+          child_expression_id: 'expr-child'
+        }
+      ]);
+    });
+
     it('hashes scalar timestamp predicate values through parsed date and time parts', async () => {
       const service = new ExpressionTreeService(getMockDBConnection());
 

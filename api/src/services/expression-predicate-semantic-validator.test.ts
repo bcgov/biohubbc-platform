@@ -9,13 +9,13 @@ import { FeatureTypePropertyRepository } from '../repositories/feature-type-prop
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 
 const metadata = (
-  type_name: ExpressionPredicatePropertyMetadata['type_name'],
+  feature_property_type_name: ExpressionPredicatePropertyMetadata['feature_property_type_name'],
   overrides?: Partial<ExpressionPredicatePropertyMetadata>
 ): ExpressionPredicatePropertyMetadata => ({
   feature_property_id: 10,
   feature_type_property_id: 20,
   feature_property_type_id: 30,
-  type_name,
+  feature_property_type_name,
   display_name: 'Species',
   ...overrides
 });
@@ -35,7 +35,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
   });
 
   const validateOne = async (
-    propertyType: ExpressionPredicatePropertyMetadata['type_name'],
+    propertyType: ExpressionPredicatePropertyMetadata['feature_property_type_name'],
     operator: PredicateOperator,
     value?: unknown
   ) => {

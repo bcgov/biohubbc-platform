@@ -1199,7 +1199,7 @@ export class SearchFeatureRepository extends BaseRepository {
     knex: Knex
   ): Knex.QueryBuilder {
     const columnName = valueColumn.replace('p.', '');
-    const value = ('value' in clause.internal_predicate ? clause.internal_predicate.value : undefined) as Knex.Value;
+    const value = this.getScalarPredicateValue(clause.internal_predicate);
 
     if (clause.feature_type_property_id !== null) {
       return query.whereNotExists(
@@ -1224,6 +1224,32 @@ export class SearchFeatureRepository extends BaseRepository {
         .where(`p_not_equals.${columnName}`, value)
         .whereNull('ftp_not_equals.record_end_date')
     );
+  }
+
+  /**
+   * Get a scalar predicate value for SQL equality comparisons.
+   *
+   * @param {InternalTypedPredicate} predicate - Typed predicate payload
+   * @return {string | number | boolean | undefined} Scalar value
+   */
+  private getScalarPredicateValue(predicate: InternalTypedPredicate): string | number | boolean | undefined {
+    if (!('value' in predicate)) {
+      return undefined;
+    }
+
+    if (
+      predicate.value === undefined ||
+      typeof predicate.value === 'string' ||
+      typeof predicate.value === 'number' ||
+      typeof predicate.value === 'boolean'
+    ) {
+      return predicate.value;
+    }
+
+    throw new ApiBuildSQLError('Predicate value is not scalar', [
+      'SearchFeatureRepository->getScalarPredicateValue',
+      { predicate }
+    ]);
   }
 
   /**
@@ -1408,7 +1434,7 @@ export class SearchFeatureRepository extends BaseRepository {
       case 'Equals':
         return query.where(column, value);
       case 'ParentOf':
-        return query.whereExists(this.buildTaxonAncestorExistsQuery(knex, value, column, false));
+        return query.whereRaw('EXISTS (?)', [this.buildTaxonAncestorExistsQuery(knex, value, column, false)]);
       case 'ChildOf':
         return query.whereRaw(
           `NULLIF((SELECT itis_data->>'parentTSN' FROM taxon WHERE taxon_id = ${column}), '')::integer = ` +
@@ -1416,9 +1442,9 @@ export class SearchFeatureRepository extends BaseRepository {
           [value]
         );
       case 'DescendsFrom':
-        return query.whereExists(this.buildTaxonDescendantExistsQuery(knex, value, column));
+        return query.whereRaw('EXISTS (?)', [this.buildTaxonDescendantExistsQuery(knex, value, column)]);
       case 'AscendsFrom':
-        return query.whereExists(this.buildTaxonAncestorExistsQuery(knex, value, column, true));
+        return query.whereRaw('EXISTS (?)', [this.buildTaxonAncestorExistsQuery(knex, value, column, true)]);
       default:
         return query;
     }
@@ -1438,7 +1464,7 @@ export class SearchFeatureRepository extends BaseRepository {
     targetTaxonId: number | undefined,
     candidateTaxonColumn: string,
     includeAllAncestors: boolean
-  ): Knex.QueryBuilder {
+  ): Knex.Raw {
     const recursiveLimit = includeAllAncestors ? '' : 'WHERE depth = 1';
 
     return knex.raw(
@@ -1457,7 +1483,7 @@ export class SearchFeatureRepository extends BaseRepository {
       WHERE taxon_id = ${candidateTaxonColumn}
       ${recursiveLimit}`,
       [targetTaxonId]
-    ) as unknown as Knex.QueryBuilder;
+    );
   }
 
   /**
@@ -1472,7 +1498,7 @@ export class SearchFeatureRepository extends BaseRepository {
     knex: Knex,
     targetTaxonId: number | undefined,
     candidateTaxonColumn: string
-  ): Knex.QueryBuilder {
+  ): Knex.Raw {
     return knex.raw(
       `WITH RECURSIVE ancestors AS (
         SELECT taxon_id, itis_tsn, NULLIF(itis_data->>'parentTSN', '')::integer AS parent_tsn
@@ -1488,7 +1514,7 @@ export class SearchFeatureRepository extends BaseRepository {
       FROM ancestors
       WHERE taxon_id = ?`,
       [targetTaxonId]
-    ) as unknown as Knex.QueryBuilder;
+    );
   }
 
   /**

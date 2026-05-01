@@ -32,15 +32,25 @@ import type {
 /**
  * Service for writing and reading reusable expression trees.
  *
+ * Expression trees are authored as API payloads, but persistence stores them as
+ * immutable, reusable graph fragments:
+ * - `predicate` rows identify a single normalized predicate by semantic hash.
+ * - typed predicate payload tables store the value/operator details.
+ * - `expression` rows identify a logical AND/OR node by semantic hash.
+ * - `expression_clause` rows preserve ordered parent-child structure.
+ *
  * Core responsibilities:
  * 1. Normalize and hash expression/predicate nodes deterministically.
  * 2. Reuse existing anchors by hash when possible (dedupe by semantic identity).
  * 3. Insert missing expression/predicate anchors and clause edges when needed.
  * 4. Reconstruct a stored expression tree back into API shape.
+ *
  * Important design detail:
- * Hashes are semantic, not positional row IDs. This lets us share immutable
- * expression fragments across requests while preserving full tree
- * structure through `expression_clause` ordering.
+ * Hashes are semantic, not positional row IDs. Two separately submitted trees
+ * that mean the same thing should resolve to the same stored anchors. This is
+ * why hashing is deliberately type-aware: case-insensitive string predicates,
+ * split timestamp parts, object key order, and expression clause order are all
+ * normalized before hashing.
  */
 export class ExpressionTreeService extends DBService {
   expressionRepository: ExpressionRepository;
@@ -64,10 +74,15 @@ export class ExpressionTreeService extends DBService {
   /**
    * Persist an expression tree and return the resolved root expression id.
    *
+   * Public callers pass an API-shaped expression tree. This method first lets
+   * the semantic validator resolve property metadata and build typed internal
+   * predicates, then the write path hashes and persists that normalized tree.
+   *
    * Flow:
-   * 1. Compute deterministic hashes for all nodes in the tree.
-   * 2. Load existing expression/predicate ids by those hashes in bulk.
-   * 3. Resolve recursively, inserting only missing anchors/clauses.
+   * 1. Validate metadata and normalize predicate values.
+   * 2. Compute deterministic hashes for all nodes in the tree.
+   * 3. Load existing expression/predicate ids by those hashes in bulk.
+   * 4. Resolve recursively, inserting only missing anchors/clauses.
    *
    * @param {ExpressionTree} tree - Root expression tree payload to persist.
    * @return {Promise<{ expression_id: string }>} Resolved root expression id.
@@ -84,6 +99,10 @@ export class ExpressionTreeService extends DBService {
   /**
    * Read a stored expression tree by root expression id.
    *
+   * Storage is normalized across several tables, but callers should receive the
+   * original public tree shape: expression nodes with ordered clauses and
+   * predicate leaves with scalar values.
+   *
    * @param {string} expressionId - Root expression identifier.
    * @return {Promise<ExpressionTree>} Reconstructed API tree.
    * @memberof ExpressionTreeService
@@ -94,6 +113,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Reconstruct an expression node recursively from storage rows.
+   *
+   * Read reconstruction walks the persisted graph from an expression anchor
+   * through its ordered `expression_clause` links. Predicate links are hydrated
+   * in batch for the current node; expression links recurse into child nodes.
    *
    * This routine:
    * 1. Guards against cycles during traversal (defensive check in service layer).
@@ -121,10 +144,10 @@ export class ExpressionTreeService extends DBService {
     const nextVisitedExpressionIds = new Set(visitedExpressionIds);
     nextVisitedExpressionIds.add(expressionId);
 
-    // Anchor row (operator) for this expression node.
+    // The expression anchor stores only node identity: logical operator and hash.
     const expression = await this.expressionRepository.getExpressionById(expressionId);
 
-    // Ordered edges to either predicates or child expressions.
+    // Clause rows are the only source of child ordering and branch structure.
     const links = await this.expressionClauseRepository.getExpressionClausesByExpressionId(expressionId);
 
     if (links.length === 0) {
@@ -136,7 +159,8 @@ export class ExpressionTreeService extends DBService {
 
     const predicateIds = links.map((link) => link.predicate_id).filter((value): value is string => !!value);
 
-    // Batch-read all predicate payload rows referenced by this expression node.
+    // Batch-read predicate payload projections once per expression node to avoid
+    // N+1 reads while still preserving clause order below.
     const readPredicates = await this.predicateRepository.readPredicateNodes(predicateIds);
     const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
 
@@ -170,7 +194,8 @@ export class ExpressionTreeService extends DBService {
 
       readClauses.push({
         sequence: link.sequence,
-        // Recurse into child expression branch.
+        // Child expressions are stored by id, so reconstruct that subtree before
+        // sorting the current node's clauses back into sequence order.
         clause: await this.reconstructExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds)
       });
     }
@@ -186,8 +211,10 @@ export class ExpressionTreeService extends DBService {
   /**
    * Deterministically stringify arbitrary JSON-like values.
    *
-   * Keys are sorted recursively so semantically equivalent objects hash to the same value
-   * regardless of source key order.
+   * Geometry predicates can contain object values. JSON object key order should
+   * not affect predicate identity, so object keys are sorted recursively before
+   * hashing. Arrays intentionally keep their order because coordinate order and
+   * collection order can be meaningful.
    *
    * @private
    * @param {unknown} value - Value to stringify.
@@ -204,7 +231,7 @@ export class ExpressionTreeService extends DBService {
     }
 
     if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+      const entries = Object.entries(value).toSorted(([a], [b]) => a.localeCompare(b));
       const serializedEntries = entries.map(([key, val]) => JSON.stringify(key) + ':' + this.stableStringify(val));
       return '{' + serializedEntries.join(',') + '}';
     }
@@ -214,6 +241,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Compute a SHA-256 hex digest for a normalized identity string.
+   *
+   * The input string is expected to already be canonical. This method only
+   * turns that canonical identity into the fixed-width hash stored on anchor
+   * rows and used for dedupe lookups.
    *
    * @private
    * @param {string} value - Canonical identity string.
@@ -227,8 +258,9 @@ export class ExpressionTreeService extends DBService {
   /**
    * Normalize case-insensitive text before hashing.
    *
-   * Uses NFKC normalization and lower-casing so equivalent Unicode forms and case
-   * variants collapse to the same semantic identity.
+   * Uses NFKC normalization and lower-casing so equivalent Unicode forms and
+   * case variants collapse to the same semantic identity for operators whose
+   * comparison semantics are case-insensitive.
    *
    * @private
    * @param {string} value - Source string.
@@ -241,6 +273,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Check whether a string operator should hash case-insensitively.
+   *
+   * This mirrors query semantics. `ILike` should dedupe values that differ only
+   * by case, while `Like`, `Equals`, and the prefix/suffix operators preserve
+   * case in their identity.
    *
    * @private
    * @param {Extract<InternalTypedPredicate, { type: 'string' }>['operator']} operator - String operator.
@@ -255,6 +291,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Normalize a string predicate value for semantic hashing.
+   *
+   * The semantic validator guarantees a non-Exists string predicate has a
+   * string value. The `undefined` branch is kept for Exists predicates, which
+   * intentionally have no value but still need a stable hash identity.
    *
    * @private
    * @param {Extract<InternalTypedPredicate, { type: 'string' }>} predicate - String predicate payload.
@@ -276,6 +316,10 @@ export class ExpressionTreeService extends DBService {
   /**
    * Normalize a boolean predicate value for semantic hashing.
    *
+   * Boolean values are serialized explicitly instead of relying on generic JSON
+   * stringification so Exists predicates can use the same empty-marker pattern
+   * as other value-bearing predicate types.
+   *
    * @private
    * @param {Extract<InternalTypedPredicate, { type: 'boolean' }>} predicate - Boolean predicate payload.
    * @return {string} Normalized value, or empty string when value is absent.
@@ -291,6 +335,16 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Build canonical predicate identity text from shared and type-specific parts.
+   *
+   * This identity text is the contract for predicate dedupe. It includes:
+   * - the shared property id (`fp`)
+   * - the optional feature-type-property scope (`ftp`)
+   * - the resolved property type id (`fpt`)
+   * - the operator
+   * - type-specific normalized value fields
+   *
+   * Empty strings are used for absent optional fields so `Exists` predicates and
+   * nullable feature-type scopes produce stable, explicit identities.
    *
    * @private
    * @param {number} featurePropertyId - Shared feature property identifier.
@@ -326,11 +380,19 @@ export class ExpressionTreeService extends DBService {
   /**
    * Build canonical predicate identity text used for semantic hashing.
    *
+   * The input is a semantically validated predicate, so this method should not
+   * perform public API validation. It only converts the internal typed predicate
+   * into a stable identity string whose fields match the predicate's runtime
+   * comparison semantics.
+   *
    * Canonicalization is type-aware:
    * - string: supports case-insensitive normalization for ILike.
    * - number: normalized through JS number stringify.
+   * - boolean: normalized to explicit `true`/`false` text.
+   * - timestamp: parsed into date/time parts to match DB storage/search.
+   * - taxon/code: normalized as scalar ids.
    * - geometry/object-like values: stabilized via sorted-key stringify.
-   * - optional values (e.g., Exists): serialized as empty markers.
+   * - Exists predicates: serialized with empty value markers.
    *
    * @private
    * @param {NormalizedExpressionTreePredicate} clause - Predicate clause.
@@ -376,7 +438,11 @@ export class ExpressionTreeService extends DBService {
             value: this.normalizeBooleanPredicateValue(predicate)
           }
         );
-      case 'timestamp':
+      case 'timestamp': {
+        // `undefined` is expected for timestamp Exists predicates. Exists means
+        // "there is a timestamp value row" and therefore has no comparison
+        // literal. Hash it with explicit empty date/time markers so it is
+        // distinct from every date/time comparison but stable across requests.
         if (predicate.value === undefined) {
           return this.buildPredicateIdentity(
             feature_property_id,
@@ -390,6 +456,10 @@ export class ExpressionTreeService extends DBService {
           );
         }
 
+        // Public/internal timestamp predicates keep a scalar string value, but
+        // storage and SQL comparison logic operate on split date/time columns.
+        // Hash on the parsed parts so date-only, time-only, and datetime values
+        // preserve the same semantics used by persistence/search.
         const parsedTimestamp = parseTimestamp(predicate.value);
 
         if (!parsedTimestamp) {
@@ -409,7 +479,9 @@ export class ExpressionTreeService extends DBService {
             time: parsedTimestamp.time_value ?? ''
           }
         );
+      }
       case 'taxon':
+      case 'code':
         return this.buildPredicateIdentity(
           feature_property_id,
           feature_type_property_id,
@@ -429,16 +501,6 @@ export class ExpressionTreeService extends DBService {
             value: predicate.value === undefined ? '' : this.stableStringify(predicate.value)
           }
         );
-      case 'code':
-        return this.buildPredicateIdentity(
-          feature_property_id,
-          feature_type_property_id,
-          feature_property_type_id,
-          predicate.operator,
-          {
-            value: predicate.value ?? ''
-          }
-        );
       default: {
         const exhaustiveType: never = predicate;
         throw new ApiGeneralError('Unsupported predicate type for normalization', [
@@ -452,8 +514,13 @@ export class ExpressionTreeService extends DBService {
   /**
    * Build canonical expression identity text used for semantic hashing.
    *
-   * Clauses are represented as ordered hash references (sequence + type + child hash),
-   * so parent expression identity captures tree shape and clause order.
+   * Clauses are represented as ordered hash references rather than embedding
+   * full child payloads. This keeps parent identity compact and lets child
+   * predicates/expressions be reused independently.
+   *
+   * Sequence is part of the identity because expression trees are authored as
+   * ordered arrays and reconstruction preserves that order. Reordering clauses
+   * therefore creates a different expression anchor.
    *
    * @private
    * @param {LogicalOperator} operator - Expression operator.
@@ -471,6 +538,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Convert an expression tree into a structurally equivalent tree with hashes at every node.
+   *
+   * This is a bottom-up transform for expressions: child predicates and child
+   * expressions receive hashes first, then the parent expression hashes a list
+   * of ordered child hash references.
    *
    * Predicate hashes are derived from normalized predicate identities.
    * Expression hashes are derived from operator + ordered child hash references.
@@ -518,6 +589,8 @@ export class ExpressionTreeService extends DBService {
    * Collect all predicate and expression hashes from a hashed tree.
    *
    * Used to perform bulk lookups of existing anchors before recursive resolve.
+   * The result sets intentionally de-duplicate repeated predicates/expressions
+   * within the submitted tree before the repositories are queried.
    *
    * @private
    * @param {ExpressionTreeExpressionWithHash} expression - Root hashed expression.
@@ -547,6 +620,9 @@ export class ExpressionTreeService extends DBService {
    * Load existing predicate/expression ids by hash in bulk.
    *
    * This reduces write path chatter by front-loading hash lookups once per tree.
+   * The returned maps are mutable caches; recursive resolution adds newly
+   * inserted ids to the same maps so duplicate nodes encountered later in the
+   * same request are reused immediately.
    *
    * @private
    * @param {ExpressionTreeExpressionWithHash} root - Root hashed tree.
@@ -575,6 +651,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Resolve a predicate clause to a predicate id (reuse-or-insert).
+   *
+   * Predicate anchors and payload rows are split intentionally. The anchor is
+   * keyed by semantic hash and can be reused; the typed payload table is written
+   * only when the anchor is first inserted.
    *
    * Concurrency-safe flow:
    * 1. Reuse preloaded id when present.
@@ -614,6 +694,10 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Resolve an expression node to an expression id (reuse-or-insert), recursively.
+   *
+   * Child predicates/expressions must be resolved before the parent expression
+   * can write its `expression_clause` rows, because those rows reference child
+   * ids rather than hashes.
    *
    * Steps:
    * 1. Reuse existing anchor when hash is already known.
@@ -682,6 +766,11 @@ export class ExpressionTreeService extends DBService {
 
   /**
    * Parse and validate a repository predicate read row into API predicate node shape.
+   *
+   * The predicate repository returns JSON projected from the active typed
+   * predicate payload table. This method is the final boundary before returning
+   * data to callers, so it enforces that exactly one payload table matched and
+   * that the projected JSON still conforms to the public predicate schema.
    *
    * Integrity expectations from SQL read shape:
    * - payload_count must equal 1

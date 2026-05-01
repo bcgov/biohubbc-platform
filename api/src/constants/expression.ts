@@ -1,4 +1,4 @@
-import type { InternalTypedPredicate, PredicateOperator } from '../models/expression-predicate';
+import type { PredicateOperator } from '../models/expression-predicate';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 
 /**
@@ -47,16 +47,3 @@ export type PredicatePropertyTypeName = keyof typeof OperatorsByPropertyType;
  * Property types that can be used by expression predicates in this branch.
  */
 export const SupportedExpressionPropertyTypes = new Set<string>(Object.keys(OperatorsByPropertyType));
-
-/**
- * Maps public property type names to internal typed predicate payload/table names.
- */
-export const InternalPredicateTypeByPropertyType = {
-  [FEATURE_PROPERTY_TYPE.STRING]: 'string',
-  [FEATURE_PROPERTY_TYPE.NUMBER]: 'number',
-  [FEATURE_PROPERTY_TYPE.BOOLEAN]: 'boolean',
-  [FEATURE_PROPERTY_TYPE.DATETIME]: 'timestamp',
-  [FEATURE_PROPERTY_TYPE.TAXON]: 'taxon',
-  [FEATURE_PROPERTY_TYPE.SPATIAL]: 'geometry',
-  [FEATURE_PROPERTY_TYPE.CODE]: 'code'
-} as const satisfies Record<PredicatePropertyTypeName, InternalTypedPredicate['type']>;
