@@ -1,6 +1,5 @@
 import dayjs from 'dayjs';
 import mime from 'mime';
-import { INGESTION_MEDIA_BATCH_BYTES, INGESTION_MEDIA_BATCH_FILES } from '../../constants/ingestion';
 import { IDBConnection } from '../../database/db';
 import { ArtifactStatusEnum, CreateArtifact } from '../../models/artifact';
 import { CreateUploadArtifact, UploadArtifactRoleEnum } from '../../models/upload-artifact';
@@ -11,7 +10,7 @@ import { DBService } from '../db-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 
-export { INGESTION_MEDIA_BATCH_BYTES, INGESTION_MEDIA_BATCH_FILES };
+export { INGESTION_MEDIA_BATCH_BYTES, INGESTION_MEDIA_BATCH_FILES } from '../../constants/ingestion';
 const defaultLog = getLogger('services/ingestion/media-ingestion-service');
 
 /**
