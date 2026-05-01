@@ -88,8 +88,9 @@ queue:
   # Add any queue-specific overrides here
 
 # Values passed to biohub-platform-queue subchart
+# Queue tuning overrides (optional)
 biohub-platform-queue:
-  # Queue tuning overrides (optional)
+  app: {}
   # app:
   #   ingestion:
   #     featureBatchSize: "10000"
