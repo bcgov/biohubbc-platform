@@ -73,13 +73,6 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
-    DROP TRIGGER IF EXISTS journal_ticket_artifact ON ticket_artifact;
-    DROP TRIGGER IF EXISTS audit_ticket_artifact ON ticket_artifact;
-
-    DROP INDEX IF EXISTS ticket_artifact_artifact_idx;
-    DROP INDEX IF EXISTS ticket_artifact_ticket_artifact_id_idx;
-    DROP INDEX IF EXISTS ticket_artifact_ticket_idx;
-    DROP INDEX IF EXISTS ticket_artifact_nuk1;
     DROP INDEX IF EXISTS artifact_security_artifact_create_date_idx;
     DROP INDEX IF EXISTS upload_artifact_upload_role_active_idx;
 

@@ -1,0 +1,145 @@
+import { act, renderHook } from '@testing-library/react';
+import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { Mock } from 'vitest';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useApi } from 'hooks/useApi';
+import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useTicketComment } from './useTicketComment';
+
+vi.mock('hooks/useApi', () => ({
+  useApi: vi.fn()
+}));
+
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: vi.fn()
+}));
+
+vi.mock('hooks/useContext', () => ({
+  useDialogContext: vi.fn(),
+  useTicketContext: vi.fn()
+}));
+
+const ticketId = '22222222-2222-4222-8222-222222222222';
+const ticketArtifactId = '90b6df74-1b23-4064-ad62-f83c291d31d2';
+
+const makeTicket = (): ITicketExtended => ({
+  ticket_id: ticketId,
+  ticket_slug: 'TICKET-1',
+  subject: 'Ticket subject',
+  description: null,
+  team_id: '33333333-3333-4333-8333-333333333333',
+  create_date: '2026-02-25T00:00:00.000Z',
+  priority: 'medium',
+  status: 'open',
+  statuses: [],
+  comments: [],
+  artifacts: [],
+  references: [],
+  data_requests: [],
+  ticket_system_users: []
+});
+
+const makeTicketArtifact = (fileName: string): ITicketArtifact => ({
+  ticket_artifact_id: ticketArtifactId,
+  ticket_id: ticketId,
+  artifact_id: '11111111-1111-4111-8111-111111111111',
+  record_end_date: null,
+  create_date: '2026-02-25T00:00:00.000Z',
+  key: `tickets/ticket-id/upload/upload-id/${fileName}`
+});
+
+const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
+  const setSnackbar = vi.fn();
+  const setData = vi.fn();
+  const createTicketUpload = vi.fn().mockResolvedValue({
+    upload_id: '44444444-4444-4444-8444-444444444444',
+    presigned_upload_url: 'https://object-store.example/upload'
+  });
+  const completeTicketUpload = vi.fn().mockResolvedValue(ticketArtifact);
+
+  (useApi as Mock).mockReturnValue({
+    tickets: {
+      createTicketComment: vi.fn(),
+      createTicketUpload,
+      completeTicketUpload
+    }
+  });
+  (useAuthStateContext as Mock).mockReturnValue({
+    biohubUserWrapper: {
+      userIdentifier: 'user@example.com'
+    }
+  });
+  (useDialogContext as Mock).mockReturnValue({
+    setSnackbar
+  });
+  (useTicketContext as Mock).mockReturnValue({
+    ticketId,
+    ticketDataLoader: {
+      data: makeTicket(),
+      error: undefined,
+      isLoading: false,
+      isReady: true,
+      load: vi.fn(),
+      refresh: vi.fn(),
+      clear: vi.fn(),
+      setData
+    }
+  });
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true
+    })
+  );
+
+  return {
+    completeTicketUpload,
+    createTicketUpload,
+    setData,
+    setSnackbar
+  };
+};
+
+describe('useTicketComment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('appends image markdown for files with image MIME types', async () => {
+    setupUploadHook(makeTicketArtifact('diagram.png'));
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['image'], 'diagram.png', { type: 'image/png' });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    expect(result.current.comment).toBe(`![diagram.png](/artifact/${ticketArtifactId})`);
+  });
+
+  it('falls back to image markdown for known image extensions without MIME types', async () => {
+    setupUploadHook(makeTicketArtifact('field-photo.jpg'));
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['image'], 'field-photo.jpg', { type: '' });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    expect(result.current.comment).toBe(`![field-photo.jpg](/artifact/${ticketArtifactId})`);
+  });
+
+  it('appends link markdown for non-image files', async () => {
+    setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
+  });
+});

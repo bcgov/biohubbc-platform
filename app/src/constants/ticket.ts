@@ -3,6 +3,33 @@ import { TicketPriority, TicketSystemUserStatus } from 'interfaces/useTicketsApi
 
 export const TICKET_PRIORITIES: TicketPriority[] = ['low', 'medium', 'high', 'critical'];
 
+export type TicketAttachmentMarkdownType = 'image' | 'link';
+
+type TicketAttachmentMarkdownFormatter = (label: string, href: string) => string;
+
+export const TICKET_ATTACHMENT_IMAGE_FILE_EXTENSIONS = new Set([
+  'avif',
+  'bmp',
+  'gif',
+  'jpeg',
+  'jpg',
+  'png',
+  'svg',
+  'webp'
+]);
+
+export const TICKET_ATTACHMENT_MARKDOWN_TYPE_BY_MEDIA_TYPE: Partial<Record<string, TicketAttachmentMarkdownType>> = {
+  image: 'image'
+};
+
+export const TICKET_ATTACHMENT_MARKDOWN_FORMATTERS: Record<
+  TicketAttachmentMarkdownType,
+  TicketAttachmentMarkdownFormatter
+> = {
+  image: (label, href) => `![${label}](${href})`,
+  link: (label, href) => `[${label}](${href})`
+};
+
 export const TICKET_ARTIFACT_ID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 export const TICKET_ARTIFACT_PATH_PATTERN = new RegExp(`^/artifact/(${TICKET_ARTIFACT_ID_PATTERN})$`, 'i');
 export const TICKET_ARTIFACT_REFERENCE_PATTERN = /^\/artifact/i;
