@@ -1,8 +1,8 @@
+import { INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE } from '../../constants/ingestion';
 import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { CreateContributorCodeset } from '../../models/contributor-codeset';
 import { CreateContributorCodesetCode } from '../../models/contributor-codeset-code';
-import { INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE } from '../../constants/ingestion';
 import { normalizeOptionalText } from '../../utils/normalize';
 import { ContributorCodesetCodeService } from '../contributor-codeset-code-service';
 import { ContributorCodesetService } from '../contributor-codeset-service';

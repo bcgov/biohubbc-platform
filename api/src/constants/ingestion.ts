@@ -11,9 +11,7 @@ export const INGESTION_FEATURE_BATCH_SIZE = Number(
 /**
  * Contributor codes inserted per DB write batch.
  */
-export const INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE = Number(
-  process.env.INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE ?? 10000
-);
+export const INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE = Number(process.env.INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE ?? 10000);
 
 /**
  * Approximate media bytes buffered before a media ingest flush.

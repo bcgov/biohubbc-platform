@@ -378,13 +378,7 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT 1 FROM has_candidate_ancestor hca
          WHERE hca.candidate_id = b.submission_feature_id
        )`,
-      [
-        afterId,
-        urn.urn_submission_id,
-        urn.urn_feature_type,
-        urn.urn_feature_id,
-        SECURITY_SCOPE_ANCHOR_BATCH_SIZE
-      ]
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (result.rows.length > 0) {
@@ -420,13 +414,7 @@ export class SecurityScopeRepository extends BaseRepository {
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ) candidate`,
-      [
-        afterId,
-        urn.urn_submission_id,
-        urn.urn_feature_type,
-        urn.urn_feature_id,
-        SECURITY_SCOPE_ANCHOR_BATCH_SIZE
-      ]
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (!boundaryResult.rows[0]?.last_id) {

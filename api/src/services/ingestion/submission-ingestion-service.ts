@@ -3,10 +3,7 @@ import {
   INGESTION_MEDIA_BATCH_BYTES,
   INGESTION_MEDIA_BATCH_FILES
 } from '../../constants/ingestion';
-import {
-  UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
-  UPLOAD_FEATURE_BATCH_MAX_BYTES
-} from '../../constants/upload';
+import { UPLOAD_ARCHIVE_MEDIA_CONCURRENCY, UPLOAD_FEATURE_BATCH_MAX_BYTES } from '../../constants/upload';
 import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
