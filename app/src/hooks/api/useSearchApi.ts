@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
   CreateDownloadResponse,
   ISearchAllFilters,
@@ -20,18 +21,19 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
  */
 export const useSearchApi = (axios: AxiosInstance) => {
   /**
-   * Search for features by keywords and/or property filters.
+   * Search for features of a feature type by expression tree.
    *
-   * @param {ISearchFeaturesFilters} filters - Search parameters
+   * @param {ExpressionTreeExpression} expressionTree - Optional expression tree search parameters
    * @param {ApiPaginationRequestOptions} pagination
    * @return {Promise<SearchFeatureResponse >} Array of matching features sorted by relevancy
    */
   const searchFeatures = async (
-    filters: ISearchFeaturesFilters,
+    featureType: string,
+    expressionTree?: ExpressionTreeExpression | null,
     pagination?: ApiPaginationRequestOptions
   ): Promise<SearchFeatureResponse> => {
-    const body = { filters, pagination };
-    const { data } = await axios.post<SearchFeatureResponse>('/api/search/feature', body);
+    const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
+    const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body);
 
     return data;
   };

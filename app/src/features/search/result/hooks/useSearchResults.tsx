@@ -3,6 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ISearchFeaturesFilters, SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
@@ -10,40 +11,84 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 import { normalizeQueryParam } from 'utils/query-param';
 
 /**
- * Custom hook for managing search results with URL-driven filters, sorting, and pagination.
+ * Custom hook for managing expression search results with URL-driven state, sorting, and pagination.
  *
  * Features:
- * - Reads query params from URL and builds API request filters + pagination.
+ * - Reads query params from URL and builds API pagination.
  * - All URL param keys and values are normalized to lowercase for case-insensitive handling.
  * - Provides a single type-safe `setSearchParams` for adding, replacing, appending, or removing params.
  * - Automatically debounces API requests when params change.
  */
-export const useSearchResults = () => {
+interface SearchResultsLoaderInput {
+  params: URLSearchParams;
+  expressionTree: ExpressionTreeExpression | null;
+  featureTypeName: string;
+}
+
+/**
+ * Loads feature-search results from URL pagination/sort params and an expression tree.
+ *
+ * Use this hook from result pages that need the current URL query params to be
+ * the source of truth for pagination and sort state. It converts those params to
+ * the search API pagination payload, calls `/api/search/feature/:featureType`,
+ * and returns a typed param setter that keeps the URL and result loader in sync.
+ * Pass `enabled=false` until the route has resolved a valid feature type.
+ *
+ * @param {string} featureTypeName - API feature type route segment to search.
+ * @param {boolean} enabled - Whether the route has enough context to issue requests.
+ * @param {ExpressionTreeExpression | null} expressionTree - Applied expression tree, or null to list target features.
+ * @returns Search rows, pagination, loading state, current URL params, and URL-aware setter.
+ */
+export const useSearchResults = (
+  featureTypeName: string,
+  enabled = true,
+  expressionTree: ExpressionTreeExpression | null = null
+) => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
 
-  /** Build API request from URL params */
-  const buildRequest = (params: URLSearchParams) => {
+  const buildPagination = (
+    params: URLSearchParams
+  ): ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' } => ({
+    page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
+    limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
+    sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
+    order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
+  });
+
+  const buildEmptyResponse = (
+    pagination: ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' }
+  ): SearchFeatureResponse => ({
+    features: [],
+    pagination: {
+      total: 0,
+      per_page: pagination.limit ?? 10,
+      current_page: pagination.page ?? 1,
+      last_page: 1,
+      sort: pagination.sort,
+      order: pagination.order
+    }
+  });
+
+  const buildDownloadFilters = (params: URLSearchParams, featureTypeName: string): ISearchFeaturesFilters => {
     const filters: ISearchFeaturesFilters = {};
 
-    const pagination: ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' } = {
-      page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
-      limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
-      sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
-      order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
-    };
+    const featureTypes = params.getAll(URL_PARAMS.FEATURE_TYPE.toLowerCase());
+
+    if (featureTypes.length > 0) {
+      filters.feature_types = featureTypes;
+    } else if (featureTypeName) {
+      filters.feature_types = [featureTypeName];
+    }
 
     params.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
+
       switch (lowerKey) {
         case URL_PARAMS.SPECIES.toLowerCase():
           filters.species = filters.species ?? [];
           filters.species.push(Number(value));
-          break;
-        case URL_PARAMS.FEATURE_TYPE.toLowerCase():
-          filters.feature_types = filters.feature_types ?? [];
-          filters.feature_types.push(value);
           break;
         case URL_PARAMS.SEARCH_QUERY.toLowerCase():
           filters.keyword = value;
@@ -53,14 +98,19 @@ export const useSearchResults = () => {
       }
     });
 
-    return { filters, pagination };
+    return filters;
   };
 
   /** Data loader for search results */
   const searchDataLoader = useDataLoader(
-    async (params: URLSearchParams): Promise<SearchFeatureResponse> => {
-      const { filters, pagination } = buildRequest(params);
-      return api.search.searchFeatures(filters, pagination);
+    async ({ params, expressionTree, featureTypeName }: SearchResultsLoaderInput): Promise<SearchFeatureResponse> => {
+      const pagination = buildPagination(params);
+
+      if (featureTypeName) {
+        return api.search.searchFeatures(featureTypeName, expressionTree, pagination);
+      }
+
+      return buildEmptyResponse(pagination);
     },
     (error) => {
       dialogContext.setSnackbar({
@@ -72,76 +122,75 @@ export const useSearchResults = () => {
 
   /** Debounced refresh */
   const debouncedRefreshRef = useRef(
-    debounce((params: URLSearchParams) => searchDataLoader.refresh(params), 300)
+    debounce((input: SearchResultsLoaderInput) => searchDataLoader.refresh(input), 300)
   ).current;
 
   /** Low-level URL param updater */
   const updateParams = useCallback(
-    (newParams: TypedURLSearchParams) => {
+    (newParams: TypedURLSearchParams, nextExpressionTree: ExpressionTreeExpression | null = expressionTree) => {
       setRawSearchParams(newParams);
-      debouncedRefreshRef(newParams);
+      debouncedRefreshRef({ params: newParams, expressionTree: nextExpressionTree, featureTypeName });
     },
-    [setRawSearchParams, debouncedRefreshRef]
+    [setRawSearchParams, debouncedRefreshRef, expressionTree, featureTypeName]
   );
 
   /**
-   * Unified setter for URL params
+   * Unified setter for URL params.
+   *
    * @param updates key-value pairs to set (keys and values will be normalized to lowercase)
    * @param replace If true, replace existing values; if false, append (multi-value)
-   * @param callback Optional callback for refreshing recommended options
+   * @param nextExpressionTree Expression tree to use for the immediate result refresh
    */
   const setSearchParams = useCallback(
-    (updates: Partial<Record<UrlParamKey, string>>, replace: boolean = true) => {
+    (
+      updates: Partial<Record<UrlParamKey, string>>,
+      replace: boolean = true,
+      nextExpressionTree: ExpressionTreeExpression | null = expressionTree
+    ) => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
-        const k = key.toLowerCase() as UrlParamKey;
+        const typedKey = key.toLowerCase() as UrlParamKey;
         const normalizedValue = normalizeQueryParam(value);
 
         if (normalizedValue === undefined || normalizedValue === '') {
-          newParams.delete(k);
+          newParams.delete(typedKey);
         } else if (replace) {
-          newParams.delete(k);
-          newParams.append(k, normalizedValue);
+          newParams.delete(typedKey);
+          newParams.append(typedKey, normalizedValue);
         } else {
-          newParams.append(k, normalizedValue);
+          newParams.append(typedKey, normalizedValue);
         }
       });
 
       // Reset page unless the only param being changed is PAGE itself
       const shouldResetPage = Object.keys(updates).some(
-        (k) => k.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
+        (key) => key.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
         newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
       }
 
-      updateParams(newParams);
+      updateParams(newParams, nextExpressionTree);
     },
-    [searchParams, updateParams]
+    [expressionTree, searchParams, updateParams]
   );
 
-  /**
-   * Remove a single value from a multi-value param,
-   * or all values if value is not provided
-   */
   const removeSearchParam = useCallback(
     (key: UrlParamKey, value?: string | number) => {
       const normalizedKey = key.toLowerCase() as UrlParamKey;
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
-      if (value) {
+      if (value !== undefined && value !== null) {
         const normalizedValue = normalizeQueryParam(value);
-        const remaining = newParams.getAll(normalizedKey).filter((v) => v !== normalizedValue);
+        const remaining = newParams.getAll(normalizedKey).filter((existingValue) => existingValue !== normalizedValue);
 
         newParams.delete(normalizedKey);
-        remaining.forEach((v) => newParams.append(normalizedKey, v));
+        remaining.forEach((existingValue) => newParams.append(normalizedKey, existingValue));
       } else {
-        // No value → remove all values for this key
         newParams.delete(normalizedKey);
       }
 
-      // Reset page unless the param being removed is PAGE itself
       if (normalizedKey !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)) {
         newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
       }
@@ -151,21 +200,23 @@ export const useSearchResults = () => {
     [searchParams, updateParams]
   );
 
-  const getParam = useCallback((key: UrlParamKey) => searchParams.get(key) ?? undefined, [searchParams]);
-
-  // Load on mount
+  // Refresh when the route, URL params, or applied expression changes.
   useEffect(() => {
-    searchDataLoader.load(searchParams);
-  }, [searchParams, searchDataLoader]);
+    if (!enabled) {
+      return;
+    }
+
+    searchDataLoader.refresh({ params: searchParams, expressionTree, featureTypeName });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, expressionTree, featureTypeName, enabled]);
 
   return {
     rows: searchDataLoader.data?.features ?? [],
     isLoading: searchDataLoader.isLoading,
     searchParams,
     setSearchParams,
-    getParam,
     removeSearchParam,
     pagination: searchDataLoader.data?.pagination,
-    filters: buildRequest(searchParams).filters
+    filters: buildDownloadFilters(searchParams, featureTypeName)
   };
 };

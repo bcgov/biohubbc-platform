@@ -62,7 +62,8 @@ describe('DownloadSidebarCart', () => {
         feature_description: null,
         submission_name: 'Submission',
         is_secured: true,
-        relevancy_score: 0.9
+        relevancy_score: 0.9,
+        create_date: '2026-01-01T00:00:00Z'
       }
     ];
 
