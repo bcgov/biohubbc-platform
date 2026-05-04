@@ -1,8 +1,9 @@
 import {
-  UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
-  UPLOAD_FEATURE_BATCH_MAX_BYTES,
-  UPLOAD_FEATURE_BATCH_SIZE
-} from '../../constants/upload';
+  INGESTION_FEATURE_BATCH_SIZE,
+  INGESTION_MEDIA_BATCH_BYTES,
+  INGESTION_MEDIA_BATCH_FILES
+} from '../../constants/ingestion';
+import { UPLOAD_ARCHIVE_MEDIA_CONCURRENCY, UPLOAD_FEATURE_BATCH_MAX_BYTES } from '../../constants/upload';
 import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
@@ -15,7 +16,7 @@ import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
-import { MEDIA_INGEST_BATCH_BYTES, MEDIA_INGEST_BATCH_FILES, MediaIngestionService } from './media-ingestion-service';
+import { MediaIngestionService } from './media-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { IValidationResult } from './submission-ingestion-service.interface';
 
@@ -158,10 +159,10 @@ export class SubmissionIngestionService {
       uploadId,
       uploadArchiveId,
       objectKey,
-      featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
+      featureBatchSize: INGESTION_FEATURE_BATCH_SIZE,
       featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
-      mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
-      mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+      mediaBatchSize: INGESTION_MEDIA_BATCH_FILES,
+      mediaMaxBatchBytes: INGESTION_MEDIA_BATCH_BYTES,
       mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
     });
 
@@ -169,10 +170,10 @@ export class SubmissionIngestionService {
       await submissionIngestionDependencies.streamSubmissionArchive(tarStream, {
         objectStorageService: this.objectStorageService,
         s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
-        featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
+        featureBatchSize: INGESTION_FEATURE_BATCH_SIZE,
         featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
-        mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
-        mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+        mediaBatchSize: INGESTION_MEDIA_BATCH_FILES,
+        mediaMaxBatchBytes: INGESTION_MEDIA_BATCH_BYTES,
         mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
         ingestFeatureBatch: async (featureBatch) => {
           featureBatchCount += 1;

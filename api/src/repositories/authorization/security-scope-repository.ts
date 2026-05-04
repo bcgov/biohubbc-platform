@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { SECURITY_SCOPE_ANCHOR_BATCH_SIZE } from '../../constants/security';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { PolicyEffect } from '../../models/policy-statement';
@@ -146,8 +147,6 @@ export class SecurityScopeRepository extends BaseRepository {
    * @returns Next cursor position, or null when no more anchors exist
    */
   async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
-    const BATCH_SIZE = 5000;
-
     const result = await this.connection.query<{
       anchor_submission_feature_id: number;
       page_last_id: number;
@@ -183,7 +182,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
            AND anchor_sf.record_effective_date <= now()
        )`,
-      [securityScopeId, afterId, BATCH_SIZE]
+      [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (result.rows.length > 0) {
@@ -211,7 +210,7 @@ export class SecurityScopeRepository extends BaseRepository {
          ORDER BY ssa.anchor_submission_feature_id
          LIMIT $3
        ) ssa`,
-      [securityScopeId, afterId, BATCH_SIZE]
+      [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (!boundaryResult.rows[0]?.last_id) {
@@ -316,8 +315,6 @@ export class SecurityScopeRepository extends BaseRepository {
     urn: SecurityScopeUrn,
     afterId: number
   ): Promise<AnchorBatchResult | null> {
-    const BATCH_SIZE = 5000;
-
     const result = await this.connection.query<{
       submission_feature_id: number;
       page_last_id: number;
@@ -381,7 +378,7 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT 1 FROM has_candidate_ancestor hca
          WHERE hca.candidate_id = b.submission_feature_id
        )`,
-      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, BATCH_SIZE]
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (result.rows.length > 0) {
@@ -417,7 +414,7 @@ export class SecurityScopeRepository extends BaseRepository {
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ) candidate`,
-      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, BATCH_SIZE]
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
 
     if (!boundaryResult.rows[0]?.last_id) {
