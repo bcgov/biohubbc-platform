@@ -570,8 +570,7 @@ export class DownloadExportPipelineService extends DBService {
    * pipe that never closes — `uploadPromise` would hang forever. Routing the
    * error into `passThrough.destroy(err)` tears down the entire downstream
    * pipeline (passThrough → hashCount → S3 upload) so `uploadPromise`
-   * rejects, which `writePartZip` / `runExport` can observe. Mirrors the
-   * legacy pattern in `DownloadPipelineService.processFragment`.
+   * rejects, which `writePartZip` / `runExport` can observe.
    */
   private createPartArchiverBundle(exportId: string, downloadId: string, partIndex: number): PartArchiverBundle {
     const archive = archiver('zip', { zlib: { level: 5 } });

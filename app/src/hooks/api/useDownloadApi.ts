@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { DownloadListResponse, FragmentUrlResponse } from 'interfaces/useDownloadApi.interface';
+import { DownloadListResponse } from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
@@ -20,17 +20,5 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  /**
-   * Get a signed URL to download a specific fragment of a download package.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} fragmentIndex - The zero-based fragment index.
-   * @return {Promise<FragmentUrlResponse>}
-   */
-  const getFragmentUrl = async (downloadId: string, fragmentIndex: number): Promise<FragmentUrlResponse> => {
-    const { data } = await axios.get<FragmentUrlResponse>(`/api/download/${downloadId}/fragment/${fragmentIndex}/url`);
-    return data;
-  };
-
-  return { getDownloads, getFragmentUrl };
+  return { getDownloads };
 };

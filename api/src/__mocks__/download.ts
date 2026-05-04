@@ -1,4 +1,3 @@
-import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
 import { DownloadListRecord, DownloadRecord } from '../models/download';
 import { DownloadExportListRow } from '../models/download-export';
 import { DownloadStatusEnum } from '../models/download-status';
@@ -15,10 +14,6 @@ export const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): D
   started_at: null,
   completed_at: null,
   downloaded_at: null,
-  total_fragments: 1,
-  completed_fragments: 0,
-  estimated_total_size_bytes: null,
-  fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
   create_date: '2026-01-01T00:00:00.000Z',
   ...overrides
 });

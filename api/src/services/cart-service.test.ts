@@ -266,7 +266,6 @@ describe('CartService', () => {
       expect(result).to.deep.equal({ download_id: 'dl-uuid' });
       expect(getIdsStub).to.have.been.calledOnceWith('cart-1');
       expect(createDownloadStub).to.have.been.calledOnceWith({
-        fragmentSizeBytes: undefined,
         cartId: 'cart-1',
         format: 'parquet'
       });
@@ -302,7 +301,6 @@ describe('CartService', () => {
       await service.checkoutCart('cart-1', null);
 
       expect(createDownloadStub).to.have.been.calledOnceWith({
-        fragmentSizeBytes: undefined,
         cartId: 'cart-1',
         format: 'parquet'
       });
@@ -338,35 +336,6 @@ describe('CartService', () => {
       expect(createTeamStub).to.not.have.been.called;
       expect(updateCartStub).to.not.have.been.called;
       expect(publishStub).to.not.have.been.called;
-    });
-
-    it('should pass custom fragmentSizeBytes to createDownload', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new CartService(mockDBConnection);
-
-      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([1]);
-      const createDownloadStub = sinon
-        .stub(DownloadService.prototype, 'createDownload')
-        .resolves({ download_id: 'dl-uuid' });
-      sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
-      sinon.stub(TeamService.prototype, 'createTeam').resolves({
-        team_id: 'team-1',
-        name: 'team',
-        description: 'description',
-        member_count: 0
-      });
-      sinon.stub(CartRepository.prototype, 'updateCart').resolves();
-      sinon
-        .stub(CartService.dependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
-
-      await service.checkoutCart('cart-1', 7, 500 * 1024 * 1024);
-
-      expect(createDownloadStub).to.have.been.calledOnceWith({
-        fragmentSizeBytes: 500 * 1024 * 1024,
-        cartId: 'cart-1',
-        format: 'parquet'
-      });
     });
 
     it('should propagate errors and not call subsequent steps', async () => {

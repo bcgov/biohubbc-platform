@@ -141,12 +141,11 @@ export class CartService extends DBService {
    *
    * @param {string} cartId - The ID of the cart to check out
    * @param {number | null} systemUserId - The authenticated user ID, or null for anonymous checkout
-   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD in the repository.
    * @return {Promise<DownloadId>} The created download record ID
    * @throws HTTP400 if the cart is empty (no features to download)
    * @memberof CartService
    */
-  async checkoutCart(cartId: string, systemUserId: number | null, fragmentSizeBytes?: number): Promise<DownloadId> {
+  async checkoutCart(cartId: string, systemUserId: number | null): Promise<DownloadId> {
     const featureIds = await this.cartSubmissionFeatureService.getCartSubmissionFeatureIds(cartId);
 
     if (featureIds.length === 0) {
@@ -156,7 +155,6 @@ export class CartService extends DBService {
     // Create download with cart_id FK — features resolved at pipeline time
     // from cart_submission_feature via download.cart_id
     const downloadId = await this.downloadService.createDownload({
-      fragmentSizeBytes,
       cartId,
       format: 'parquet'
     });

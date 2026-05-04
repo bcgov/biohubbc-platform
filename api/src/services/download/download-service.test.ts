@@ -4,17 +4,12 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
-import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
-import { DownloadFragmentRecord } from '../../models/download-fragment';
-import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { TeamService } from '../access-policy/team-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
 chai.use(sinonChai);
@@ -343,115 +338,6 @@ describe('DownloadService', () => {
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
-      }
-    });
-  });
-
-  describe('getFragmentSignedUrl', () => {
-    it('returns signed URL for ready fragment', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const readyFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key:
-          'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
-
-      const getSignedUrlStub = sinon
-        .stub(ObjectStorageService.prototype, 'getSignedUrl')
-        .resolves('https://s3.example.com/fragment-url');
-
-      const result = await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-
-      expect(result).to.equal('https://s3.example.com/fragment-url');
-      expect(getSignedUrlStub).to.have.been.calledOnceWith(
-        BucketType.MAIN,
-        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        SIGNED_URL_EXPIRY_FRAGMENT
-      );
-    });
-
-    it('throws when fragment index is not found', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal(
-          'Fragment 0 not found for download aaaa0000-0000-0000-0000-000000000042'
-        );
-      }
-    });
-
-    it('throws when fragment is not ready', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const processingFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.PROCESSING,
-        s3_key: null,
-        file_name: null,
-        file_size_bytes: null,
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: null,
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([processingFragment]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment is not ready');
-      }
-    });
-
-    it('throws when fragment is ready but missing s3_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const readyButNoKey: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key: null,
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyButNoKey]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment record missing s3_key');
       }
     });
   });

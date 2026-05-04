@@ -16,7 +16,7 @@ export const DownloadExportRecord = z.object({
   download_id: z.string(),
   format: z.string(),
   status: DownloadStatusZod,
-  // BIGINT → string via pg default INT8 parser (matches DownloadRecord.fragment_size_bytes).
+  // BIGINT → string via pg default INT8 parser.
   max_part_size_bytes: z.string(),
   mode: DownloadExportMode,
   started_at: z.string().nullable(),

@@ -141,10 +141,6 @@ describe('paths/download/{downloadId}/export/index', () => {
         started_at: '2025-01-01T00:00:00Z',
         completed_at: '2025-01-01T00:01:00Z',
         downloaded_at: null,
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: '12000',
-        fragment_size_bytes: '209715200',
         create_date: '2025-01-01T00:00:00Z'
       } as any);
 

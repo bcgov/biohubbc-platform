@@ -1,5 +1,5 @@
 // Integration test for Download services — verifies multi-step download operations
-// (create download, cart/filter feature resolution, status transitions, fragment planning, auth, claiming)
+// (create download, cart/filter feature resolution, status transitions, auth, claiming)
 // work correctly against the real database.
 //
 // DownloadService = request-time operations (path handlers)
@@ -15,7 +15,6 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -74,15 +73,11 @@ describe('Download services (integration)', function () {
    * Creates a cart via CartService, then creates a download with the cart_id FK.
    * Returns { download_id } to match the shape callers expect.
    */
-  async function createCartDownload(
-    featureIds: number[],
-    fragmentSizeBytes?: number
-  ): Promise<{ download_id: string }> {
+  async function createCartDownload(featureIds: number[]): Promise<{ download_id: string }> {
     const systemUserId = connection.systemUserId();
     const cartResponse = await cartService.createCart(systemUserId, featureIds);
     return crudService.createDownload({
       cartId: cartResponse.cart.cart_id,
-      fragmentSizeBytes,
       format: 'parquet'
     });
   }
@@ -124,8 +119,8 @@ describe('Download services (integration)', function () {
       // Bypass the service layer and insert directly to test the constraint.
       try {
         await connection.sql(SQL`
-          INSERT INTO download (download_status, fragment_size_bytes, cart_id, filters, format, create_user)
-          VALUES ('pending', 524288000, NULL, NULL, 'parquet', ${connection.systemUserId()});
+          INSERT INTO download (download_status, cart_id, filters, format, create_user)
+          VALUES ('pending', NULL, NULL, 'parquet', ${connection.systemUserId()});
         `);
         expect.fail('Expected CHECK constraint violation');
       } catch (error: any) {
@@ -328,29 +323,6 @@ describe('Download services (integration)', function () {
     });
   });
 
-  describe('estimateDownloadSize (filter-based)', () => {
-    it('should return aggregate total for filter-based downloads via SQL SUM', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size A' });
-      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size B' });
-
-      const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
-
-      const totalBytes = await service.estimateDownloadSize(download_id);
-
-      // Should be > 0 (data_byte_size = octet_length(data::text) + 500 per feature)
-      expect(totalBytes).to.be.greaterThan(0);
-
-      // Cross-check: total should equal sum of individual features
-      const features = await crudService.getDownloadFeatures(download_id);
-      const expectedTotal = features
-        .filter((f: { submission_feature_id: number }) => [feat1, feat2].includes(f.submission_feature_id))
-        .reduce((sum: number, f: { estimated_byte_size: string }) => sum + Number(f.estimated_byte_size), 0);
-      expect(totalBytes).to.be.greaterThanOrEqual(expectedTotal);
-    });
-  });
-
   describe('cursor streaming (streamDownloadFeatures)', () => {
     it('should stream cart-based features via DECLARE CURSOR / FETCH / CLOSE', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -387,7 +359,7 @@ describe('Download services (integration)', function () {
       const downloadRepo = new DownloadRepository(connection);
       const searchService = new SearchFeatureService(connection);
 
-      // Build the subquery the same way planFragments does
+      // Build the subquery the same way the pipeline does
       const subquery = searchService.buildSearchFeatureIdsSubquery(filters, connection.systemUserId());
       const { sql, bindings } = subquery.toSQL().toNative();
 
@@ -423,83 +395,6 @@ describe('Download services (integration)', function () {
       }
 
       expect(batches).to.have.length(0);
-    });
-  });
-
-  describe('streamFragmentFeaturesByType (parent denormalization)', () => {
-    it('should return parent_data and parent_feature_type_name for child features', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Test Dataset',
-        description: 'Parent dataset for testing'
-      });
-      const childFeatureId = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { taxon_id: 180703, count: 5 },
-        parentFeatureId
-      );
-
-      const { download_id } = await createCartDownload([childFeatureId]);
-      const sizeEstimate = await service.estimateDownloadSize(download_id);
-      await service.planFragments(download_id, sizeEstimate);
-
-      const fragments = await crudService.getFragmentsByDownloadId(download_id);
-      expect(fragments).to.have.length(1);
-
-      const fragmentRepo = new DownloadFragmentRepository(connection);
-      const batches: unknown[][] = [];
-      for await (const batch of fragmentRepo.streamFragmentFeaturesByType(
-        fragments[0].download_fragment_id,
-        'species_observation'
-      )) {
-        batches.push(batch);
-      }
-
-      expect(batches).to.have.length(1);
-      expect(batches[0]).to.have.length(1);
-
-      const feature = batches[0][0] as {
-        submission_feature_id: number;
-        parent_data: Record<string, unknown> | null;
-        parent_feature_type_name: string | null;
-      };
-      expect(feature.submission_feature_id).to.equal(childFeatureId);
-      expect(feature.parent_feature_type_name).to.equal('dataset');
-      expect(feature.parent_data).to.not.be.null;
-      expect(feature.parent_data!.name).to.equal('Test Dataset');
-    });
-
-    it('should return null parent fields for root features (no parent)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const rootFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Root Dataset'
-      });
-
-      const { download_id } = await createCartDownload([rootFeatureId]);
-      const sizeEstimate = await service.estimateDownloadSize(download_id);
-      await service.planFragments(download_id, sizeEstimate);
-
-      const fragments = await crudService.getFragmentsByDownloadId(download_id);
-      const fragmentRepo = new DownloadFragmentRepository(connection);
-      const batches: unknown[][] = [];
-      for await (const batch of fragmentRepo.streamFragmentFeaturesByType(
-        fragments[0].download_fragment_id,
-        'dataset'
-      )) {
-        batches.push(batch);
-      }
-
-      expect(batches).to.have.length(1);
-      const feature = batches[0][0] as {
-        submission_feature_id: number;
-        parent_data: Record<string, unknown> | null;
-        parent_feature_type_name: string | null;
-      };
-      expect(feature.submission_feature_id).to.equal(rootFeatureId);
-      expect(feature.parent_feature_type_name).to.be.null;
-      expect(feature.parent_data).to.be.null;
     });
   });
 

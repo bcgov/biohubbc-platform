@@ -64,7 +64,7 @@ describe('cart/{cartId}/checkout', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-5678', 42, undefined);
+      expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-5678', 42);
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(201);
@@ -90,35 +90,11 @@ describe('cart/{cartId}/checkout', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(apiDBStub).to.have.been.calledOnce;
-      expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-anon', null, undefined);
+      expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-anon', null);
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.eql(fakeResult);
-    });
-
-    it('forwards fragment_size_bytes from request body to service', async () => {
-      const mockDBConnection = getMockDBConnection({
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub(),
-        systemUserId: sinon.stub().returns(42)
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-
-      const fakeResult: DownloadId = { download_id: 'dl-uuid-frag' };
-      const checkoutCartStub = sinon.stub(CartService.prototype, 'checkoutCart').resolves(fakeResult);
-
-      const requestHandler = checkoutCart();
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.params.cartId = 'cart-uuid-frag';
-      mockReq.keycloak_token = { sub: 'user-id' };
-      mockReq.body = { fragment_size_bytes: 5242880 };
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-frag', 42, 5242880);
-      expect(mockRes.statusValue).to.equal(201);
     });
 
     it('rolls back and rethrows if CartService.checkoutCart throws', async () => {
