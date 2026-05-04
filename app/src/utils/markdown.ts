@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { defaultUrlTransform } from 'react-markdown';
 import {
   TICKET_ARTIFACT_ID_ONLY_PATTERN,
   TICKET_ARTIFACT_PATH_PATTERN,
@@ -123,7 +124,7 @@ export const getArtifactLinkText = (artifact: ITicketArtifact, children: ReactNo
  *
  * React Markdown calls this for link hrefs and image sources. Ticket artifact
  * references are normalized to the client artifact route, while all other URLs
- * are left untouched so ordinary markdown links behave normally.
+ * use React Markdown's default URL transform.
  *
  * @param {string} url - URL provided by React Markdown.
  * @returns {string} Transformed URL used by markdown rendering.
@@ -133,5 +134,5 @@ export const ticketMarkdownUrlTransform = (url: string) => {
     return getArtifactHref(url);
   }
 
-  return url;
+  return defaultUrlTransform(url);
 };

@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ToggleButtons, ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
+import { useConfigContext, useDialogContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from 'react';
 
@@ -31,6 +32,8 @@ interface ITicketCommentProps {
  */
 export const TicketComment = (props: ITicketCommentProps) => {
   const { comment, artifacts, setComment, isSaving, isUploadingAttachment, onAddComment, onUploadAttachment } = props;
+  const config = useConfigContext();
+  const dialogContext = useDialogContext();
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write');
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const viewOptions: ToggleButtonView<'write' | 'preview'>[] = [
@@ -39,9 +42,18 @@ export const TicketComment = (props: ITicketCommentProps) => {
   ];
 
   const handleAttachmentSelection = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
 
-    if (file) {
+    if (files.length > config.MAX_UPLOAD_NUM_FILES) {
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: 'Number of files uploaded at once exceeds maximum'
+      });
+      event.target.value = '';
+      return;
+    }
+
+    for (const file of files) {
       await onUploadAttachment(file);
     }
 
@@ -82,6 +94,7 @@ export const TicketComment = (props: ITicketCommentProps) => {
               <input
                 ref={attachmentInputRef}
                 type="file"
+                multiple
                 hidden
                 onChange={handleAttachmentSelection}
                 aria-label="Attach file input"

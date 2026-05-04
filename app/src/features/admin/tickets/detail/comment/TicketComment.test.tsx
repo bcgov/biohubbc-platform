@@ -1,8 +1,15 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useConfigContext, useDialogContext } from 'hooks/useContext';
 import { ComponentProps } from 'react';
 import { render } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
 import { TicketComment } from './TicketComment';
+
+vi.mock('hooks/useContext', () => ({
+  useConfigContext: vi.fn(),
+  useDialogContext: vi.fn()
+}));
 
 const baseProps: Omit<ComponentProps<typeof TicketComment>, 'comment'> = {
   artifacts: [],
@@ -14,8 +21,16 @@ const baseProps: Omit<ComponentProps<typeof TicketComment>, 'comment'> = {
 };
 
 describe('TicketComment', () => {
+  const setSnackbar = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    (useConfigContext as Mock).mockReturnValue({
+      MAX_UPLOAD_NUM_FILES: 10
+    });
+    (useDialogContext as Mock).mockReturnValue({
+      setSnackbar
+    });
   });
 
   it('defaults to Write tab and shows multiline text field', () => {
@@ -115,5 +130,48 @@ describe('TicketComment', () => {
 
     expect(onUploadAttachment).toHaveBeenCalledTimes(1);
     expect(onUploadAttachment.mock.calls[0][0]).toEqual(expect.objectContaining({ name: 'hello.txt' }));
+  });
+
+  it('uploads each selected attachment up to the configured maximum', async () => {
+    const user = userEvent.setup();
+    const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
+
+    render(<TicketComment {...baseProps} comment="Draft comment" onUploadAttachment={onUploadAttachment} />);
+
+    const fileInput = screen.getByLabelText('Attach file input') as HTMLInputElement;
+    const files = [
+      new File(['first'], 'first.txt', { type: 'text/plain' }),
+      new File(['second'], 'second.txt', { type: 'text/plain' })
+    ];
+
+    await user.upload(fileInput, files);
+
+    expect(onUploadAttachment).toHaveBeenCalledTimes(2);
+    expect(onUploadAttachment.mock.calls[0][0]).toEqual(expect.objectContaining({ name: 'first.txt' }));
+    expect(onUploadAttachment.mock.calls[1][0]).toEqual(expect.objectContaining({ name: 'second.txt' }));
+  });
+
+  it('rejects selected attachments above the configured maximum file count', async () => {
+    const user = userEvent.setup();
+    const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
+    (useConfigContext as Mock).mockReturnValue({
+      MAX_UPLOAD_NUM_FILES: 1
+    });
+
+    render(<TicketComment {...baseProps} comment="Draft comment" onUploadAttachment={onUploadAttachment} />);
+
+    const fileInput = screen.getByLabelText('Attach file input') as HTMLInputElement;
+    const files = [
+      new File(['first'], 'first.txt', { type: 'text/plain' }),
+      new File(['second'], 'second.txt', { type: 'text/plain' })
+    ];
+
+    await user.upload(fileInput, files);
+
+    expect(setSnackbar).toHaveBeenCalledWith({
+      open: true,
+      snackbarMessage: 'Number of files uploaded at once exceeds maximum'
+    });
+    expect(onUploadAttachment).not.toHaveBeenCalled();
   });
 });

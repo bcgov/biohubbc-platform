@@ -3,7 +3,7 @@ import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.inter
 import { Mock } from 'vitest';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { useTicketComment } from './useTicketComment';
 
 vi.mock('hooks/useApi', () => ({
@@ -15,12 +15,14 @@ vi.mock('hooks/useAuthStateContext', () => ({
 }));
 
 vi.mock('hooks/useContext', () => ({
+  useConfigContext: vi.fn(),
   useDialogContext: vi.fn(),
   useTicketContext: vi.fn()
 }));
 
 const ticketId = '22222222-2222-4222-8222-222222222222';
 const ticketArtifactId = '90b6df74-1b23-4064-ad62-f83c291d31d2';
+const maxTicketAttachmentFileSize = 15728640;
 
 const makeTicket = (): ITicketExtended => ({
   ticket_id: ticketId,
@@ -71,6 +73,9 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
   });
   (useDialogContext as Mock).mockReturnValue({
     setSnackbar
+  });
+  (useConfigContext as Mock).mockReturnValue({
+    MAX_TICKET_ATTACHMENT_FILE_SIZE: maxTicketAttachmentFileSize
   });
   (useTicketContext as Mock).mockReturnValue({
     ticketId,
@@ -141,5 +146,42 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
+  });
+
+  it('adds a space before attachment markdown when appending to existing comment text', async () => {
+    setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
+
+    act(() => {
+      result.current.setComment('See attached');
+    });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    expect(result.current.comment).toBe(`See attached [notes.pdf](/artifact/${ticketArtifactId})`);
+  });
+
+  it('rejects attachments larger than the API limit before starting upload', async () => {
+    const { completeTicketUpload, createTicketUpload, setSnackbar } = setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
+
+    Object.defineProperty(file, 'size', { value: maxTicketAttachmentFileSize + 1 });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    expect(setSnackbar).toHaveBeenCalledWith({
+      open: true,
+      snackbarMessage: 'Attachment exceeds the 15 MB limit.'
+    });
+    expect(createTicketUpload).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(completeTicketUpload).not.toHaveBeenCalled();
+    expect(result.current.isUploadingAttachment).toBe(false);
   });
 });

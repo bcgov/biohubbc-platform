@@ -1,13 +1,13 @@
 import {
-  TicketAttachmentMarkdownType,
   TICKET_ATTACHMENT_IMAGE_FILE_EXTENSIONS,
   TICKET_ATTACHMENT_MARKDOWN_FORMATTERS,
-  TICKET_ATTACHMENT_MARKDOWN_TYPE_BY_MEDIA_TYPE
+  TICKET_ATTACHMENT_MARKDOWN_TYPE_BY_MEDIA_TYPE,
+  TicketAttachmentMarkdownType
 } from 'constants/ticket';
 import { APIError } from 'hooks/api/useAxios';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 
@@ -19,6 +19,7 @@ import { useState } from 'react';
 export const useTicketComment = () => {
   const api = useApi();
   const { ticketId, ticketDataLoader } = useTicketContext();
+  const config = useConfigContext();
   const authStateContext = useAuthStateContext();
   const dialogContext = useDialogContext();
 
@@ -239,6 +240,18 @@ export const useTicketComment = () => {
    * @returns {Promise<void>} Resolves when the upload attempt has completed.
    */
   const handleUploadAttachment = async (file: File) => {
+    const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
+
+    if (file.size > maxTicketAttachmentFileSize) {
+      const maxTicketAttachmentFileSizeMB = Math.round(maxTicketAttachmentFileSize / 1024 / 1024);
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: `Attachment exceeds the ${maxTicketAttachmentFileSizeMB} MB limit.`
+      });
+      return;
+    }
+
     try {
       setIsUploadingAttachment(true);
 
@@ -277,7 +290,14 @@ export const useTicketComment = () => {
         });
       }
 
-      setComment((previousComment) => `${previousComment}${markdownLink}`);
+      setComment((previousComment) => {
+        if (!previousComment) {
+          return markdownLink;
+        }
+
+        const separator = /\s$/.test(previousComment) ? '' : ' ';
+        return `${previousComment}${separator}${markdownLink}`;
+      });
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
