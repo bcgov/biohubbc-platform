@@ -10,15 +10,7 @@ import { DBService } from '../db-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 
-const DEFAULT_MEDIA_INGEST_BATCH_BYTES = 50 * 1024 * 1024;
-const DEFAULT_MEDIA_INGEST_BATCH_FILES = 10000;
-
-export const MEDIA_INGEST_BATCH_BYTES = Number(
-  process.env.MEDIA_INGEST_BATCH_BYTES ?? DEFAULT_MEDIA_INGEST_BATCH_BYTES
-);
-export const MEDIA_INGEST_BATCH_FILES = Number(
-  process.env.MEDIA_INGEST_BATCH_FILES ?? DEFAULT_MEDIA_INGEST_BATCH_FILES
-);
+export { INGESTION_MEDIA_BATCH_BYTES, INGESTION_MEDIA_BATCH_FILES } from '../../constants/ingestion';
 const defaultLog = getLogger('services/ingestion/media-ingestion-service');
 
 /**

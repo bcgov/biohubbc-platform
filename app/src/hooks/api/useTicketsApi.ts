@@ -1,15 +1,20 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICompleteTicketUploadRequest,
   ICreateTicketCommentRequest,
+  ICreateTicketUploadRequest,
+  ICreateTicketUploadResponse,
   ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
   ITicketSystemUser,
   ITicket,
+  ITicketArtifact,
   ITicketCommentLog,
   ITicketReference,
   ITicketExtended,
+  ITicketArtifactDownloadResponse,
   ITicketsQueryParams,
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
@@ -111,6 +116,56 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     payload: ICreateTicketCommentRequest
   ): Promise<ITicketCommentLog> => {
     const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/comment`, payload);
+
+    return data;
+  };
+
+  /**
+   * Initialize a ticket attachment upload.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketUploadRequest} payload
+   * @return {Promise<ICreateTicketUploadResponse>}
+   */
+  const createTicketUpload = async (
+    ticketId: string,
+    payload: ICreateTicketUploadRequest
+  ): Promise<ICreateTicketUploadResponse> => {
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/upload`, payload);
+
+    return data;
+  };
+
+  /**
+   * Finalize a ticket attachment upload and trigger async scan workflow.
+   *
+   * @param {string} ticketId
+   * @param {string} uploadId
+   * @param {ICompleteTicketUploadRequest} payload
+   * @return {Promise<ITicketArtifact>}
+   */
+  const completeTicketUpload = async (
+    ticketId: string,
+    uploadId: string,
+    payload: ICompleteTicketUploadRequest
+  ): Promise<ITicketArtifact> => {
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/upload/${uploadId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Get a presigned download URL for a ticket attachment artifact.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketArtifactId
+   * @return {Promise<ITicketArtifactDownloadResponse>}
+   */
+  const getTicketArtifactDownloadUrl = async (
+    ticketId: string,
+    ticketArtifactId: string
+  ): Promise<ITicketArtifactDownloadResponse> => {
+    const { data } = await axios.get(`/api/tickets/${ticketId}/artifact/${ticketArtifactId}`);
 
     return data;
   };
@@ -222,6 +277,9 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicket,
     updateTicketStatus,
     createTicketComment,
+    createTicketUpload,
+    completeTicketUpload,
+    getTicketArtifactDownloadUrl,
     createTicketReference,
     deleteTicketReference,
     getTicketsForUser,

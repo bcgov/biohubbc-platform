@@ -244,15 +244,6 @@ spec:
               value: {{ .Values.app.uploadMultipart.presignedUrlBatchSize | quote }}
             - name: UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS
               value: {{ .Values.app.uploadMultipart.presignedUrlExpirySeconds | quote }}
-            # Submission archive ingestion tuning
-            - name: UPLOAD_FEATURE_BATCH_SIZE
-              value: {{ .Values.app.uploadIngestion.featureBatchSize | quote }}
-            - name: UPLOAD_FEATURE_BATCH_MAX_BYTES
-              value: {{ .Values.app.uploadIngestion.featureBatchMaxBytes | quote }}
-            - name: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
-              value: {{ .Values.app.uploadIngestion.mediaConcurrency | quote }}
-            - name: UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES
-              value: {{ .Values.app.uploadIngestion.jsonFileMaxBytes | quote }}
             # GCNotify
             - name: GCNOTIFY_SECRET_API_KEY
               valueFrom:

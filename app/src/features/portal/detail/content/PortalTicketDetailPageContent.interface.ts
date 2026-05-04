@@ -7,5 +7,7 @@ export interface IPortalTicketDetailPageContentProps {
   comment: string;
   setComment: Dispatch<SetStateAction<string>>;
   isSavingComment: boolean;
+  isUploadingAttachment: boolean;
   onAddComment: () => Promise<void>;
+  onUploadAttachment: (file: File) => Promise<void>;
 }

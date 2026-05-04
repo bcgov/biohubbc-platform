@@ -10,6 +10,7 @@ import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { DBService } from './db-service';
+import { TicketArtifactService } from './ticket-artifact-service';
 import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketStatusService } from './ticket-status-service';
@@ -18,6 +19,7 @@ import { TicketSystemUserService } from './ticket-system-user-service';
 export class TicketService extends DBService {
   teamService: TeamService;
   ticketRepository: TicketRepository;
+  ticketArtifactService: TicketArtifactService;
   ticketCommentService: TicketCommentService;
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
@@ -34,6 +36,7 @@ export class TicketService extends DBService {
     super(connection);
     this.teamService = new TeamService(connection);
     this.ticketRepository = new TicketRepository(connection);
+    this.ticketArtifactService = new TicketArtifactService(connection);
     this.ticketCommentService = new TicketCommentService(connection);
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
@@ -92,15 +95,16 @@ export class TicketService extends DBService {
    * Get a ticket by its UUID with related history and assignment collections.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @returns {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and ticket system users.
+   * @returns {Promise<TicketWithHistory>} Ticket core fields with status log, comments, artifacts, references, data requests, and ticket system users.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
     // Read all timeline/relationship collections in parallel to keep detail view latency predictable.
-    const [ticket, statuses, comments, references, dataRequests, ticketSystemUsers] = await Promise.all([
+    const [ticket, statuses, comments, artifacts, references, dataRequests, ticketSystemUsers] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
+      this.ticketArtifactService.getTicketArtifacts(ticketId),
       this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
       this.dataRequestService.findDataRequestsByTicketId(ticketId),
       this.ticketSystemUserService.getActiveTicketSystemUsersByTicketId(ticketId)
@@ -110,6 +114,7 @@ export class TicketService extends DBService {
       ...ticket,
       statuses,
       comments,
+      artifacts,
       references,
       data_requests: dataRequests,
       ticket_system_users: ticketSystemUsers

@@ -37,24 +37,40 @@ vi.mock('./detail/timeline/TicketTimeline', () => ({
 }));
 
 vi.mock('./detail/comment/TicketComment', () => ({
-  TicketComment: ({ comment, isSaving }: { comment: string; isSaving: boolean }) => (
-    <div data-testid="ticket-comment" data-comment={comment} data-saving={String(isSaving)} />
+  TicketComment: ({
+    comment,
+    isSaving,
+    isUploadingAttachment
+  }: {
+    comment: string;
+    isSaving: boolean;
+    isUploadingAttachment: boolean;
+  }) => (
+    <div
+      data-testid="ticket-comment"
+      data-comment={comment}
+      data-saving={String(isSaving)}
+      data-uploading={String(isUploadingAttachment)}
+    />
   )
 }));
 
 vi.mock('./detail/sidebar/TicketSidebar', () => ({
   TicketSidebar: ({
     teamId,
+    ticketSystemUsers,
     references,
     dataRequests
   }: {
     teamId?: string;
+    ticketSystemUsers?: unknown[];
     references?: unknown[];
     dataRequests?: unknown[];
   }) => (
     <div
       data-testid="ticket-sidebar"
       data-team-id={teamId ?? ''}
+      data-ticket-system-user-count={String(ticketSystemUsers?.length ?? 0)}
       data-reference-count={String(references?.length ?? 0)}
       data-data-request-count={String(dataRequests?.length ?? 0)}
     />
@@ -103,6 +119,7 @@ const baseTicket: ITicketExtended = {
       status: 'open'
     }
   ],
+  artifacts: [],
   comments: [
     {
       ticket_comment_id: 'comment-1',
@@ -143,6 +160,7 @@ const baseTicket: ITicketExtended = {
 
 const setComment = vi.fn();
 const onAddComment = vi.fn().mockResolvedValue(undefined);
+const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
 
 const makeTicketContext = (ticket: ITicketExtended | undefined, isLoading = false): ITicketContext => {
   const ticketDataLoader: DataLoader<[string], ITicketExtended, unknown> = {
@@ -169,7 +187,9 @@ describe('TicketDetailPage', () => {
       comment: 'Draft comment',
       setComment,
       isSavingComment: false,
-      handleAddComment: onAddComment
+      isUploadingAttachment: false,
+      handleAddComment: onAddComment,
+      handleUploadAttachment: onUploadAttachment
     });
   });
 
@@ -218,7 +238,9 @@ describe('TicketDetailPage', () => {
       comment: 'Hook comment',
       setComment,
       isSavingComment: true,
-      handleAddComment: onAddComment
+      isUploadingAttachment: false,
+      handleAddComment: onAddComment,
+      handleUploadAttachment: onUploadAttachment
     });
     render(<TicketDetailPage />);
 

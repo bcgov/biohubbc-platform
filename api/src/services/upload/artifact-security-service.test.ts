@@ -4,6 +4,7 @@ import sinonChai from 'sinon-chai';
 import { Readable } from 'stream';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
@@ -11,6 +12,7 @@ import { SecurityStatusEnum } from '../../models/security-status';
 import { UploadArchive } from '../../models/upload-archive';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { TicketArtifactService } from '../ticket-artifact-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
@@ -87,7 +89,7 @@ describe('ArtifactSecurityService', () => {
 
   describe('insertArtifactSecurityByUploadId', () => {
     const uploadId = 'upload-456';
-    const fakeInput = {
+    const fakeInput: Omit<CreateArtifactSecurity, 'artifact_id'> = {
       security: SecurityStatusEnum.PENDING
     };
 
@@ -116,7 +118,7 @@ describe('ArtifactSecurityService', () => {
     });
 
     it('should return single record if only one artifact in upload', async () => {
-      const singleRecord = [mockSecurityRecords[0]];
+      const singleRecord: ArtifactSecurity[] = [mockSecurityRecords[0]];
       sinon.stub(ArtifactSecurityRepository.prototype, 'insertArtifactSecurityByUploadId').resolves(singleRecord);
 
       const result = await service.insertArtifactSecurityByUploadId(uploadId, fakeInput);
@@ -366,6 +368,7 @@ describe('ArtifactSecurityService', () => {
       const promoteStub = sinon
         .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
         .resolves({ key: 'test.tar' });
+      sinon.stub(ArtifactService.prototype, 'updateArtifact').resolves({ artifact_id: 'artifact-1' });
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(UploadArchiveService.prototype, 'updateUploadArchive').resolves({ upload_archive_id: 'archive-1' });
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
@@ -391,6 +394,46 @@ describe('ArtifactSecurityService', () => {
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
+    });
+
+    it('keeps ticket artifact stable while promoting a clean ticket attachment', async () => {
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'updateArtifactSecurity')
+        .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.CLEAN });
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+      sinon.stub(ArtifactSecurityService.dependencies, 'getClamAvScanner').resolves({
+        scanStream: sinon.stub().resolves({ isInfected: false })
+      } as any);
+
+      sinon
+        .stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId')
+        .rejects(new ApiNotFoundError('Upload archive not found'));
+      const promoteStub = sinon
+        .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
+        .resolves({ key: 'test.tar' });
+      const updateArtifactStub = sinon.stub(ArtifactService.prototype, 'updateArtifact').resolves({
+        artifact_id: 'artifact-1'
+      });
+      const insertTicketArtifactsStub = sinon
+        .stub(TicketArtifactService.prototype, 'insertTicketArtifacts')
+        .resolves([]);
+      const publishStub = sinon.stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob');
+
+      await service.executeScan('security-1');
+
+      expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
+      expect(updateArtifactStub.calledOnceWith('artifact-1', { bucket: 'main-bucket' })).to.be.true;
+      expect(insertTicketArtifactsStub.called).to.be.false;
+      expect(publishStub.called).to.be.false;
     });
 
     it('should update scan record to FAILED on error and rethrow', async () => {
@@ -496,7 +539,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 123,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
 
@@ -555,6 +598,10 @@ describe('ArtifactSecurityService', () => {
       archive_status: ProcessStatusStatusEnum.BLOCKED
     };
 
+    beforeEach(() => {
+      process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
+    });
+
     it('should promote file and unblock archive', async () => {
       // Verifies: handleCleanScanResult promotes file and updates archive status.
       // Caller is responsible for looking up the archive; this method receives it pre-resolved.
@@ -566,11 +613,32 @@ describe('ArtifactSecurityService', () => {
         upload_archive_id: 'archive-1'
       });
 
-      await service.handleCleanScanResult(mockUploadArchive, 'uploads/test.tar');
+      const updateArtifactStub = sinon.stub(ArtifactService.prototype, 'updateArtifact').resolves({
+        artifact_id: 'artifact-1'
+      });
+
+      await service.handleCleanScanResult(mockUploadArchive, 'artifact-1', 'uploads/test.tar');
 
       expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
+      expect(updateArtifactStub.calledOnceWith('artifact-1', { bucket: 'main-bucket' })).to.be.true;
       expect(updateArchiveStub.calledOnceWith('archive-1', { archive_status: ProcessStatusStatusEnum.PENDING })).to.be
         .true;
+    });
+
+    it('should still promote file when upload_archive is missing', async () => {
+      const promoteStub = sinon
+        .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
+        .resolves({ key: 'test.tar' });
+      const updateArtifactStub = sinon.stub(ArtifactService.prototype, 'updateArtifact').resolves({
+        artifact_id: 'artifact-1'
+      });
+      const updateArchiveStub = sinon.stub(UploadArchiveService.prototype, 'updateUploadArchive');
+
+      await service.handleCleanScanResult(null, 'artifact-1', 'uploads/test.tar');
+
+      expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
+      expect(updateArtifactStub.calledOnceWith('artifact-1', { bucket: 'main-bucket' })).to.be.true;
+      expect(updateArchiveStub.called).to.be.false;
     });
   });
 
@@ -629,7 +697,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '22222222-2222-2222-2222-222222222222'
       });
       sinon

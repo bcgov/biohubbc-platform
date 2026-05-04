@@ -12,12 +12,13 @@ import { getLogger } from '../../../../../utils/logger';
 const defaultLog = getLogger('paths/administrative/tickets/{ticketId}/comment');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [
+  authorizeRequestHandler((req) => ({
+    or: [
       {
         validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
-      }
+      },
+      { discriminator: 'Team', entity: 'ticket', ticketId: req.params.ticketId }
     ]
   })),
   createTicketComment()

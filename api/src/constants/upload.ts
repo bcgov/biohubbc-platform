@@ -107,15 +107,6 @@ export const UPLOAD_PRESIGNED_URL_BATCH_SIZE = Number(process.env.UPLOAD_PRESIGN
 export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = Number(process.env.UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS ?? 3600);
 
 /**
- * Maximum number of feature records buffered before a feature batch flush.
- *
- * Used during archive ingestion when streaming `features/*.json` entries.
- * Works together with `UPLOAD_FEATURE_BATCH_MAX_BYTES`; flush occurs when either
- * threshold is reached.
- */
-export const UPLOAD_FEATURE_BATCH_SIZE = Number(process.env.UPLOAD_FEATURE_BATCH_SIZE ?? 10000);
-
-/**
  * Approximate in-memory byte threshold for pending feature batch flush.
  *
  * Helps bound heap usage for large/verbose feature payloads where record count alone

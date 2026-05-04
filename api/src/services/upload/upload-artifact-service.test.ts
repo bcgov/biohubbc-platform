@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
+import { Artifact } from '../../models/artifact';
 import {
   CreateUploadArtifact,
   UpdateUploadArtifact,
@@ -96,6 +97,30 @@ describe('UploadArtifactService', () => {
       } catch (err) {
         expect((err as Error).message).to.equal('DB Error');
       }
+    });
+  });
+
+  describe('getArtifactsByUploadId', () => {
+    it('should return active artifacts for an upload and role', async () => {
+      const fakeArtifacts: Artifact[] = [
+        {
+          artifact_id: 'artifact-id-1',
+          artifact_status: 'pending' as const,
+          bucket: 'quarantine-bucket',
+          object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+          byte_size: '128',
+          checksum_sha256: null,
+          uploaded_at: null,
+          format: 'txt'
+        }
+      ];
+
+      const stub = sinon.stub(UploadArtifactRepository.prototype, 'getArtifactsByUploadId').resolves(fakeArtifacts);
+
+      const result = await service.getArtifactsByUploadId('upload-1', UploadArtifactRoleEnum.ATTACHMENT);
+
+      expect(stub).to.have.been.calledWith('upload-1', UploadArtifactRoleEnum.ATTACHMENT);
+      expect(result).to.eql(fakeArtifacts);
     });
   });
 

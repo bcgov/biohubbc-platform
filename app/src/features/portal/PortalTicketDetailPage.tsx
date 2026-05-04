@@ -11,7 +11,8 @@ import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDeta
  */
 export const PortalTicketDetailPage = () => {
   const { ticketDataLoader } = useTicketContext();
-  const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment();
+  const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
+    useTicketComment();
   const ticket = ticketDataLoader.data;
 
   return (
@@ -26,7 +27,9 @@ export const PortalTicketDetailPage = () => {
           comment={comment}
           setComment={setComment}
           isSavingComment={isSavingComment}
+          isUploadingAttachment={isUploadingAttachment}
           onAddComment={handleAddComment}
+          onUploadAttachment={handleUploadAttachment}
         />
       ) : null}
     </LoadingGuard>
