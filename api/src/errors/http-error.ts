@@ -1,5 +1,5 @@
 import { DatabaseError } from 'pg';
-import { ApiConflictError, ApiError, ApiErrorType, ApiNotFoundError } from './api-error';
+import { ApiConflictError, ApiError, ApiErrorType, ApiNotFoundError, ApiValidationError } from './api-error';
 import { BaseError } from './base-error';
 
 export enum HTTPErrorType {
@@ -169,6 +169,10 @@ export const ensureHTTPError = (error: HTTPError | ApiError | Error | any): HTTP
 
   if (error instanceof ApiNotFoundError || error?.name === ApiErrorType.NOT_FOUND) {
     return new HTTP404(error?.message || 'Not Found', error?.errors, error?.stack);
+  }
+
+  if (error instanceof ApiValidationError || error?.name === ApiErrorType.VALIDATION) {
+    return new HTTP400(error?.message || 'Bad Request', error?.errors, error?.stack);
   }
 
   if (error instanceof ApiError) {

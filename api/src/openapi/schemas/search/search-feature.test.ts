@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { featureSearchRequestBodySchema } from './search-feature';
+import { featureSearchRequestBodySchema, featureSearchResultSchema } from './search-feature';
 
 describe('featureSearchRequestBodySchema', () => {
   const schema = featureSearchRequestBodySchema.content['application/json'].schema;
@@ -26,5 +26,10 @@ describe('featureSearchRequestBodySchema', () => {
   it('rejects the old filters wrapper body', () => {
     expect(schema).to.have.property('additionalProperties', false);
     expect(schema.properties).to.not.have.property('filters');
+  });
+
+  it('documents every returned feature result field', () => {
+    expect(featureSearchResultSchema.required).to.include('create_date');
+    expect(featureSearchResultSchema.properties).to.have.property('create_date');
   });
 });

@@ -4,6 +4,7 @@ export enum ApiErrorType {
   BUILD_SQL = 'Error constructing SQL query',
   EXECUTE_SQL = 'Error executing SQL query',
   GENERAL = 'Error',
+  VALIDATION = 'Validation Error',
   CONFLICT = 'Conflict',
   NOT_FOUND = 'Not Found',
   UNKNOWN = 'Unknown Error'
@@ -29,6 +30,21 @@ export class ApiGeneralError extends ApiError {
 
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.GENERAL, message, errors);
+  }
+}
+
+/**
+ * API encountered a request validation error.
+ *
+ * @export
+ * @class ApiValidationError
+ * @extends {ApiError}
+ */
+export class ApiValidationError extends ApiError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/ApiValidationError');
+
+  constructor(message: string, errors?: (string | object)[]) {
+    super(ApiErrorType.VALIDATION, message, errors);
   }
 }
 

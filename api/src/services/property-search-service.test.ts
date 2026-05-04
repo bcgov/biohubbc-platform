@@ -17,7 +17,6 @@ describe('PropertySearchService', () => {
     property_display_name: 'Length',
     feature_property_type: 'string',
     operators: ['Equals', 'ILike', 'Exists'],
-    value_input: 'string',
     relevancy_score: 1,
     ...overrides
   });
@@ -32,22 +31,20 @@ describe('PropertySearchService', () => {
       const service = new PropertySearchService(mockDBConnection);
 
       const mockResults: SearchPropertyResult[] = [
-        propertyResult({ feature_property_type: 'string', value_input: 'string' }),
+        propertyResult({ feature_property_type: 'string' }),
         propertyResult({
           feature_property_id: 2,
           property_name: 'depth',
           property_display_name: 'Depth',
           feature_property_type: 'number',
-          operators: ['Equals', 'GreaterThan', 'Exists'],
-          value_input: 'number'
+          operators: ['Equals', 'GreaterThan', 'Exists']
         }),
         propertyResult({
           feature_property_id: 3,
           property_name: 'survey_date',
           property_display_name: 'Survey date',
           feature_property_type: 'datetime',
-          operators: ['Before', 'After', 'Exists'],
-          value_input: 'datetime'
+          operators: ['Before', 'After', 'Exists']
         })
       ];
 

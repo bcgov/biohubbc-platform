@@ -27,7 +27,6 @@ const propertyResultSchema: OpenAPIV3.SchemaObject = {
     'property_display_name',
     'feature_property_type',
     'operators',
-    'value_input',
     'relevancy_score'
   ],
   properties: {
@@ -42,7 +41,6 @@ const propertyResultSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: { type: 'string' }
     },
-    value_input: { type: 'string', enum: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code'] },
     relevancy_score: { type: 'number' }
   }
 };

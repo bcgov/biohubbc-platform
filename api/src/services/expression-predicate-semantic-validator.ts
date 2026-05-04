@@ -1,7 +1,7 @@
 import type { PredicatePropertyTypeName } from '../constants/expression';
 import { OperatorsByPropertyType, SupportedExpressionPropertyTypes } from '../constants/expression';
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiValidationError } from '../errors/api-error';
 import type { InternalTypedPredicate, PredicateOperator } from '../models/expression-predicate';
 import { ExpressionTree, ExpressionTreeClause, ExpressionTreePredicate } from '../models/expression-tree';
 import {
@@ -99,7 +99,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
 
     // Only property types in the registry are predicate-capable in this branch.
     if (!SupportedExpressionPropertyTypes.has(metadata.feature_property_type_name)) {
-      throw new ApiGeneralError('Unsupported predicate property type', [
+      throw new ApiValidationError('Unsupported predicate property type', [
         'ExpressionPredicateSemanticValidator->validatePredicate',
         { featurePropertyTypeName: metadata.feature_property_type_name }
       ]);
@@ -110,7 +110,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
 
     // Operator compatibility is semantic because it depends on the resolved property type.
     if (!allowedOperators.includes(predicate.operator)) {
-      throw new ApiGeneralError('Predicate operator is not valid for property type', [
+      throw new ApiValidationError('Predicate operator is not valid for property type', [
         'ExpressionPredicateSemanticValidator->validatePredicate',
         { operator: predicate.operator, propertyType }
       ]);
@@ -148,7 +148,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     // Exists means "has a value row"; typed value columns remain null.
     if (isExists) {
       if (predicate.value !== undefined) {
-        throw new ApiGeneralError('Exists predicates must not include a value', [
+        throw new ApiValidationError('Exists predicates must not include a value', [
           'ExpressionPredicateSemanticValidator->buildInternalPredicate',
           { predicate }
         ]);
@@ -203,7 +203,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    */
   private requireStringValue(predicate: ExpressionTreePredicate): string {
     if (typeof predicate.value !== 'string' || predicate.value.length > 250) {
-      throw new ApiGeneralError('Predicate value must be a string with max length 250', [
+      throw new ApiValidationError('Predicate value must be a string with max length 250', [
         'ExpressionPredicateSemanticValidator->requireStringValue',
         { predicate }
       ]);
@@ -222,7 +222,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    */
   private requireNumberValue(predicate: ExpressionTreePredicate): number {
     if (typeof predicate.value !== 'number') {
-      throw new ApiGeneralError('Predicate value must be a number', [
+      throw new ApiValidationError('Predicate value must be a number', [
         'ExpressionPredicateSemanticValidator->requireNumberValue',
         { predicate }
       ]);
@@ -241,7 +241,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    */
   private requireBooleanValue(predicate: ExpressionTreePredicate): boolean {
     if (typeof predicate.value !== 'boolean') {
-      throw new ApiGeneralError('Predicate value must be a boolean', [
+      throw new ApiValidationError('Predicate value must be a boolean', [
         'ExpressionPredicateSemanticValidator->requireBooleanValue',
         { predicate }
       ]);
@@ -262,7 +262,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    */
   private requirePositiveIntegerValue(predicate: ExpressionTreePredicate): number {
     if (typeof predicate.value !== 'number' || !Number.isInteger(predicate.value) || predicate.value <= 0) {
-      throw new ApiGeneralError('Predicate value must be a positive integer', [
+      throw new ApiValidationError('Predicate value must be a positive integer', [
         'ExpressionPredicateSemanticValidator->requirePositiveIntegerValue',
         { predicate }
       ]);
@@ -286,7 +286,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     const result = GeoJSONGeometryZodSchema.safeParse(predicate.value);
 
     if (!result.success) {
-      throw new ApiGeneralError('Predicate value must be a valid GeoJSON geometry', [
+      throw new ApiValidationError('Predicate value must be a valid GeoJSON geometry', [
         'ExpressionPredicateSemanticValidator->requireGeometryValue',
         { predicate, issues: result.error.issues }
       ]);
@@ -308,7 +308,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    */
   private buildTimestampPredicate(predicate: ExpressionTreePredicate): InternalTypedPredicate {
     if (typeof predicate.value !== 'string') {
-      throw new ApiGeneralError('Datetime predicate value must be a scalar string', [
+      throw new ApiValidationError('Datetime predicate value must be a scalar string', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { predicate }
       ]);
@@ -318,7 +318,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     const parsed = parseTimestamp(predicate.value);
 
     if (!parsed) {
-      throw new ApiGeneralError('Datetime predicate value is not a supported temporal literal', [
+      throw new ApiValidationError('Datetime predicate value is not a supported temporal literal', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { value: predicate.value }
       ]);
@@ -326,14 +326,14 @@ export class ExpressionPredicateSemanticValidator extends DBService {
 
     // OnDate and OnTime intentionally require strict scalar kinds.
     if (predicate.operator === 'OnDate' && parsed.kind !== 'date') {
-      throw new ApiGeneralError('OnDate requires a date-only temporal literal', [
+      throw new ApiValidationError('OnDate requires a date-only temporal literal', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { value: predicate.value }
       ]);
     }
 
     if (predicate.operator === 'OnTime' && parsed.kind !== 'time') {
-      throw new ApiGeneralError('OnTime requires a time-only temporal literal', [
+      throw new ApiValidationError('OnTime requires a time-only temporal literal', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { value: predicate.value }
       ]);
@@ -341,7 +341,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
 
     // The registry should prevent this path, but keep the guard close to timestamp normalization.
     if (!['Before', 'After', 'OnDate', 'OnTime'].includes(predicate.operator)) {
-      throw new ApiGeneralError('Unsupported datetime predicate operator', [
+      throw new ApiValidationError('Unsupported datetime predicate operator', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
         { operator: predicate.operator }
       ]);

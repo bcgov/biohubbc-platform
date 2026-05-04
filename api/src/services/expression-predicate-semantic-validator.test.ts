@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { beforeEach, describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiValidationError } from '../errors/api-error';
 import { PredicateOperator } from '../models/expression-predicate';
 import { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
 import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
@@ -78,7 +78,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
       await validateOne('taxon', 'After', 123);
       expect.fail();
     } catch (error) {
-      expect(error).to.be.instanceOf(ApiGeneralError);
+      expect(error).to.be.instanceOf(ApiValidationError);
     }
   });
 
@@ -116,7 +116,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
         await validateOne('datetime', operator, value);
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiGeneralError);
+        expect(error).to.be.instanceOf(ApiValidationError);
       }
     }
   });
@@ -138,7 +138,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
         await validateOne(type, operator, value);
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiGeneralError);
+        expect(error).to.be.instanceOf(ApiValidationError);
       }
     }
   });

@@ -62,7 +62,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     'feature_type_name',
     'submission_name',
     'is_secured',
-    'relevancy_score'
+    'relevancy_score',
+    'create_date'
   ],
   properties: {
     submission_feature_id: { type: 'integer' },
@@ -74,7 +75,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     feature_description: { type: 'string', nullable: true },
     submission_name: { type: 'string' },
     is_secured: { type: 'boolean' },
-    relevancy_score: { type: 'number' }
+    relevancy_score: { type: 'number' },
+    create_date: { type: 'string', format: 'date-time' }
   }
 };
 

@@ -104,15 +104,16 @@ export class PropertySearchRepository extends BaseRepository {
    */
   private _buildPropertyQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
     const keyword = filters.keyword?.trim() ?? '';
+    const featureTypes = filters.feature_types ?? [];
 
     const query = knex
+      .distinct()
       .select(
         'fp.feature_property_id',
         'fp.name as property_name',
         'fp.display_name as property_display_name',
         'fpt.name as feature_property_type',
         knex.raw(this.buildOperatorCaseSql()),
-        'fpt.name as value_input',
         this.buildRelevancyScoreSql(keyword, knex)
       )
       .from('feature_property as fp')
@@ -120,6 +121,15 @@ export class PropertySearchRepository extends BaseRepository {
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
       .whereIn('fpt.name', this.supportedPropertyTypes);
+
+    if (featureTypes.length) {
+      query
+        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
+        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
+        .whereIn('ft.name', featureTypes)
+        .whereNull('ftp.record_end_date')
+        .whereNull('ft.record_end_date');
+    }
 
     if (keyword) {
       query.where((builder) => {
@@ -141,13 +151,23 @@ export class PropertySearchRepository extends BaseRepository {
    */
   private _buildPropertyCountQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
     const keyword = filters.keyword?.trim() ?? '';
+    const featureTypes = filters.feature_types ?? [];
 
     const query = knex('feature_property as fp')
       .innerJoin('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
       .whereIn('fpt.name', this.supportedPropertyTypes)
-      .select(knex.raw('count(*)::integer as count'));
+      .select(knex.raw('count(DISTINCT fp.feature_property_id)::integer as count'));
+
+    if (featureTypes.length) {
+      query
+        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
+        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
+        .whereIn('ft.name', featureTypes)
+        .whereNull('ftp.record_end_date')
+        .whereNull('ft.record_end_date');
+    }
 
     if (keyword) {
       query.where((builder) => {

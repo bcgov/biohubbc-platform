@@ -19,7 +19,6 @@ export const SearchPropertyResult = z.object({
   property_display_name: z.string(),
   feature_property_type: z.enum(['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']),
   operators: z.array(z.string()),
-  value_input: z.enum(['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']),
   relevancy_score: z.number()
 });
 

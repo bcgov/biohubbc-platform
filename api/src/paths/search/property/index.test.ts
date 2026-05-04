@@ -18,7 +18,6 @@ describe('searchProperties', () => {
       property_display_name: 'Length',
       feature_property_type: 'string' as const,
       operators: ['Equals', 'ILike', 'Exists'],
-      value_input: 'string' as const,
       relevancy_score: 1
     }
   ];
@@ -29,7 +28,6 @@ describe('searchProperties', () => {
       property_display_name: 'Depth',
       feature_property_type: 'number' as const,
       operators: ['Equals', 'GreaterThan', 'Exists'],
-      value_input: 'number' as const,
       relevancy_score: 1
     }
   ];
