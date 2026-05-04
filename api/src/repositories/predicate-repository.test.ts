@@ -2,12 +2,12 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { PredicateRepository } from './predicate-repository';
 
 const predicateRow = {
   predicate_id: 'pred-1',
+  feature_property_id: 11,
   feature_type_property_id: 22,
   feature_property_type_id: 3,
   predicate_hash: 'hash-1'
@@ -24,8 +24,9 @@ describe('PredicateRepository', () => {
       const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertPredicateAnchor({
+        feature_property_id: 11,
         feature_type_property_id: 22,
-        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING,
+        feature_property_type_id: 3,
         predicate_hash: 'hash-1'
       });
 
@@ -38,8 +39,9 @@ describe('PredicateRepository', () => {
       const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertPredicateAnchor({
+        feature_property_id: 11,
         feature_type_property_id: 22,
-        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING,
+        feature_property_type_id: 3,
         predicate_hash: 'hash-1'
       });
 
@@ -107,6 +109,55 @@ describe('PredicateRepository', () => {
       expect(knexStub.callCount).to.equal(1);
     });
 
+    it('splits scalar timestamp payloads for insert', async () => {
+      const cases = [
+        { value: '2024-01-01', bindings: ['2024-01-01', 'After', 'pred-1', null] },
+        { value: '14:30:00-07:00', bindings: [null, 'After', 'pred-1', '14:30:00-07:00'] },
+        { value: '2024-01-01T14:30:00-07:00', bindings: ['2024-01-01', 'After', 'pred-1', '14:30:00-07:00'] }
+      ];
+
+      for (const testCase of cases) {
+        const knexStub = sinon.stub().resolves(mockQueryResult([], 1));
+        const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
+
+        await repository.writePredicatePayload('pred-1', {
+          type: 'timestamp',
+          operator: 'After',
+          value: testCase.value
+        });
+
+        expect(knexStub.firstCall.args[0].toSQL().bindings).to.eql(testCase.bindings);
+      }
+    });
+
+    it('inserts null timestamp parts for Exists', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repository.writePredicatePayload('pred-1', {
+        type: 'timestamp',
+        operator: 'Exists'
+      });
+
+      expect(knexStub.firstCall.args[0].toSQL().bindings).to.eql([null, 'Exists', 'pred-1', null]);
+    });
+
+    it('throws when timestamp payload value is unsupported', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
+
+      try {
+        await repository.writePredicatePayload('pred-1', {
+          type: 'timestamp',
+          operator: 'After',
+          value: 'not-a-timestamp'
+        });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiGeneralError);
+      }
+    });
+
     it('throws when insert row count is unexpected', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
       const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
@@ -134,8 +185,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 11,
                 feature_type_property_id: 22,
-                predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+                operator: 'Equals',
+                value: 'elk'
               }
             }
           ],
@@ -151,8 +204,10 @@ describe('PredicateRepository', () => {
         payload_count: 1,
         predicate_node: {
           type: 'predicate',
+          feature_property_id: 11,
           feature_type_property_id: 22,
-          predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+          operator: 'Equals',
+          value: 'elk'
         }
       });
     });
@@ -166,8 +221,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 11,
                 feature_type_property_id: 1,
-                predicate: { type: 'string', operator: 'Contains', value: 'elk' }
+                operator: 'Contains',
+                value: 'elk'
               }
             },
             {
@@ -175,8 +232,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 12,
                 feature_type_property_id: 2,
-                predicate: { type: 'number', operator: 'GreaterThan', value: 12.5 }
+                operator: 'GreaterThan',
+                value: 12.5
               }
             },
             {
@@ -184,8 +243,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 13,
                 feature_type_property_id: 3,
-                predicate: { type: 'boolean', operator: 'Equals', value: true }
+                operator: 'Equals',
+                value: true
               }
             },
             {
@@ -193,12 +254,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 14,
                 feature_type_property_id: 4,
-                predicate: {
-                  type: 'timestamp',
-                  operator: 'Before',
-                  value: { date_value: '2024-01-01' }
-                }
+                operator: 'Before',
+                value: '2024-01-01'
               }
             },
             {
@@ -206,8 +265,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 15,
                 feature_type_property_id: 5,
-                predicate: { type: 'taxon', operator: 'DescendsFrom', value: 123 }
+                operator: 'DescendsFrom',
+                value: 123
               }
             },
             {
@@ -215,14 +276,12 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 16,
                 feature_type_property_id: 6,
-                predicate: {
-                  type: 'geometry',
-                  operator: 'Intersects',
-                  value: {
-                    type: 'FeatureCollection',
-                    features: []
-                  }
+                operator: 'Intersects',
+                value: {
+                  type: 'FeatureCollection',
+                  features: []
                 }
               }
             },
@@ -231,8 +290,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 17,
                 feature_type_property_id: 7,
-                predicate: { type: 'code', operator: 'Equals', value: 42 }
+                operator: 'Equals',
+                value: 42
               }
             },
             {
@@ -240,8 +301,9 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 18,
                 feature_type_property_id: 8,
-                predicate: { type: 'string', operator: 'Exists' }
+                operator: 'Exists'
               }
             }
           ],
@@ -267,8 +329,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 11,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Contains', value: 'elk' }
+            operator: 'Contains',
+            value: 'elk'
           }
         },
         {
@@ -276,8 +340,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 12,
             feature_type_property_id: 2,
-            predicate: { type: 'number', operator: 'GreaterThan', value: 12.5 }
+            operator: 'GreaterThan',
+            value: 12.5
           }
         },
         {
@@ -285,8 +351,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 13,
             feature_type_property_id: 3,
-            predicate: { type: 'boolean', operator: 'Equals', value: true }
+            operator: 'Equals',
+            value: true
           }
         },
         {
@@ -294,8 +362,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 14,
             feature_type_property_id: 4,
-            predicate: { type: 'timestamp', operator: 'Before', value: { date_value: '2024-01-01' } }
+            operator: 'Before',
+            value: '2024-01-01'
           }
         },
         {
@@ -303,8 +373,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 15,
             feature_type_property_id: 5,
-            predicate: { type: 'taxon', operator: 'DescendsFrom', value: 123 }
+            operator: 'DescendsFrom',
+            value: 123
           }
         },
         {
@@ -312,8 +384,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 16,
             feature_type_property_id: 6,
-            predicate: { type: 'geometry', operator: 'Intersects', value: { type: 'FeatureCollection', features: [] } }
+            operator: 'Intersects',
+            value: { type: 'FeatureCollection', features: [] }
           }
         },
         {
@@ -321,8 +395,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 17,
             feature_type_property_id: 7,
-            predicate: { type: 'code', operator: 'Equals', value: 42 }
+            operator: 'Equals',
+            value: 42
           }
         },
         {
@@ -330,8 +406,9 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 18,
             feature_type_property_id: 8,
-            predicate: { type: 'string', operator: 'Exists' }
+            operator: 'Exists'
           }
         }
       ]);
@@ -360,8 +437,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 12,
                 feature_type_property_id: 33,
-                predicate: { type: 'string', operator: 'Equals', value: 'wolf' }
+                operator: 'Equals',
+                value: 'wolf'
               }
             },
             {
@@ -369,8 +448,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 11,
                 feature_type_property_id: 22,
-                predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+                operator: 'Equals',
+                value: 'elk'
               }
             }
           ],
@@ -387,8 +468,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 11,
             feature_type_property_id: 22,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+            operator: 'Equals',
+            value: 'elk'
           }
         },
         {
@@ -396,8 +479,10 @@ describe('PredicateRepository', () => {
           payload_count: 1,
           predicate_node: {
             type: 'predicate',
+            feature_property_id: 12,
             feature_type_property_id: 33,
-            predicate: { type: 'string', operator: 'Equals', value: 'wolf' }
+            operator: 'Equals',
+            value: 'wolf'
           }
         }
       ]);
@@ -412,8 +497,10 @@ describe('PredicateRepository', () => {
               payload_count: 1,
               predicate_node: {
                 type: 'predicate',
+                feature_property_id: 11,
                 feature_type_property_id: 22,
-                predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+                operator: 'Equals',
+                value: 'elk'
               }
             }
           ],

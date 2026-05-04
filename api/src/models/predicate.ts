@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import { FEATURE_PROPERTY_TYPE } from './feature-property';
 
 /**
- * Predicate anchor row tied to a feature type property.
+ * Predicate anchor row tied to a feature property.
  *
  * The typed predicate value is stored in one companion payload table.
  */
 export const Predicate = z.object({
   predicate_id: z.string().uuid(),
-  feature_type_property_id: z.number().int(),
+  feature_property_id: z.number().int(),
+  feature_type_property_id: z.number().int().nullable(),
   feature_property_type_id: z.number().int(),
   predicate_hash: z.string()
 });
@@ -21,23 +21,10 @@ export const ResolvedPredicateAnchor = Predicate.extend({
 
 export type ResolvedPredicateAnchor = z.infer<typeof ResolvedPredicateAnchor>;
 
-export type PredicateFeaturePropertyTypeName =
-  | FEATURE_PROPERTY_TYPE.STRING
-  | FEATURE_PROPERTY_TYPE.NUMBER
-  | FEATURE_PROPERTY_TYPE.BOOLEAN
-  | FEATURE_PROPERTY_TYPE.DATETIME
-  | FEATURE_PROPERTY_TYPE.TAXON
-  | FEATURE_PROPERTY_TYPE.SPATIAL
-  | FEATURE_PROPERTY_TYPE.CODE;
-
-export interface PredicateAnchorAttributes {
-  feature_type_property_id: number;
-  feature_property_type_name: PredicateFeaturePropertyTypeName;
-}
-
-export type PredicateResolveInput = PredicateAnchorAttributes & {
-  predicate_hash: string;
-};
+export type PredicateResolveInput = Pick<
+  Predicate,
+  'feature_property_id' | 'feature_type_property_id' | 'feature_property_type_id' | 'predicate_hash'
+>;
 
 export const ReadPredicateNodeRow = z.object({
   predicate_id: z.string().uuid(),

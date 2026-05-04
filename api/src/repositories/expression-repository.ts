@@ -1,16 +1,9 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { Expression } from '../models/expression';
+import { Expression, ResolvedExpressionAnchor } from '../models/expression';
 import { LogicalOperator } from '../models/logical-operator';
 import { BaseRepository } from './base-repository';
-
-const ResolvedExpressionAnchor = Expression.extend({
-  inserted: z.boolean()
-});
-
-export type ResolvedExpressionAnchor = z.infer<typeof ResolvedExpressionAnchor>;
 
 export class ExpressionRepository extends BaseRepository {
   /**

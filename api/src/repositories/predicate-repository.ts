@@ -1,9 +1,10 @@
 import type { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { TypedPredicate } from '../models/expression-tree';
+import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
+import type { InternalTypedPredicate } from '../models/expression-predicate';
 import { Predicate, PredicateResolveInput, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
+import { parseTimestamp } from '../utils/timestamp';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -20,13 +21,15 @@ export class PredicateRepository extends BaseRepository {
   async insertPredicateAnchor(payload: PredicateResolveInput): Promise<ResolvedPredicateAnchor> {
     const sql = SQL`
       INSERT INTO predicate (
+        feature_property_id,
         feature_type_property_id,
         feature_property_type_id,
         predicate_hash
       )
       VALUES (
+        ${payload.feature_property_id},
         ${payload.feature_type_property_id},
-        (SELECT fpt.feature_property_type_id FROM feature_property_type fpt WHERE fpt.name = ${payload.feature_property_type_name} AND fpt.record_end_date IS NULL),
+        ${payload.feature_property_type_id},
         ${payload.predicate_hash}
       )
       ON CONFLICT (predicate_hash) WHERE record_end_date IS NULL
@@ -34,6 +37,7 @@ export class PredicateRepository extends BaseRepository {
         predicate_hash = EXCLUDED.predicate_hash
       RETURNING
         predicate_id,
+        feature_property_id,
         feature_type_property_id,
         feature_property_type_id,
         predicate_hash,
@@ -61,7 +65,13 @@ export class PredicateRepository extends BaseRepository {
   async findPredicateByHash(predicateHash: string): Promise<Predicate | null> {
     const knex = getKnex();
     const query = knex('predicate')
-      .select(['predicate_id', 'feature_type_property_id', 'feature_property_type_id', 'predicate_hash'])
+      .select([
+        'predicate_id',
+        'feature_property_id',
+        'feature_type_property_id',
+        'feature_property_type_id',
+        'predicate_hash'
+      ])
       .where('predicate_hash', predicateHash)
       .whereNull('record_end_date');
 
@@ -94,7 +104,13 @@ export class PredicateRepository extends BaseRepository {
 
     const knex = getKnex();
     const query = knex('predicate')
-      .select(['predicate_id', 'feature_type_property_id', 'feature_property_type_id', 'predicate_hash'])
+      .select([
+        'predicate_id',
+        'feature_property_id',
+        'feature_type_property_id',
+        'feature_property_type_id',
+        'predicate_hash'
+      ])
       .whereIn('predicate_hash', [...new Set(predicateHashes)])
       .whereNull('record_end_date');
 
@@ -118,7 +134,6 @@ export class PredicateRepository extends BaseRepository {
     CASE
       WHEN ps.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'string',
           'operator', ps.operator::text
         ) || CASE
           WHEN ps.operator::text <> 'Exists' THEN jsonb_build_object('value', ps.value)
@@ -126,7 +141,6 @@ export class PredicateRepository extends BaseRepository {
         END
       WHEN pn.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'number',
           'operator', pn.operator::text
         ) || CASE
           WHEN pn.operator::text <> 'Exists' THEN jsonb_build_object('value', pn.value)
@@ -134,7 +148,6 @@ export class PredicateRepository extends BaseRepository {
         END
       WHEN pb.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'boolean',
           'operator', pb.operator::text
         ) || CASE
           WHEN pb.operator::text <> 'Exists' THEN jsonb_build_object('value', pb.value)
@@ -142,23 +155,18 @@ export class PredicateRepository extends BaseRepository {
         END
       WHEN pt.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'timestamp',
           'operator', pt.operator::text
         ) || CASE
-          WHEN pt.operator::text <> 'Exists' THEN jsonb_build_object(
-            'value',
-            jsonb_strip_nulls(
-              jsonb_build_object(
-                'date_value', pt.date_value,
-                'time_value', pt.time_value
-              )
-            )
-          )
+          WHEN pt.operator::text <> 'Exists' AND pt.date_value IS NOT NULL AND pt.time_value IS NOT NULL
+            THEN jsonb_build_object('value', pt.date_value::text || 'T' || pt.time_value::text)
+          WHEN pt.operator::text <> 'Exists' AND pt.date_value IS NOT NULL
+            THEN jsonb_build_object('value', pt.date_value::text)
+          WHEN pt.operator::text <> 'Exists' AND pt.time_value IS NOT NULL
+            THEN jsonb_build_object('value', pt.time_value::text)
           ELSE '{}'::jsonb
         END
       WHEN px.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'taxon',
           'operator', px.operator::text
         ) || CASE
           WHEN px.operator::text <> 'Exists' THEN jsonb_build_object('value', px.taxon_id)
@@ -166,7 +174,6 @@ export class PredicateRepository extends BaseRepository {
         END
       WHEN pg.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'geometry',
           'operator', pg.operator::text
         ) || CASE
           WHEN pg.operator::text <> 'Exists' THEN jsonb_build_object('value', ST_AsGeoJSON(pg.value)::jsonb)
@@ -174,7 +181,6 @@ export class PredicateRepository extends BaseRepository {
         END
       WHEN pc.predicate_id IS NOT NULL THEN
         jsonb_build_object(
-          'type', 'code',
           'operator', pc.operator::text
         ) || CASE
           WHEN pc.operator::text <> 'Exists' THEN jsonb_build_object('value', pc.contributor_codeset_code_id)
@@ -209,6 +215,7 @@ export class PredicateRepository extends BaseRepository {
     const baseReadQuery = knex('predicate as p')
       .select([
         'p.predicate_id',
+        'p.feature_property_id',
         'p.feature_type_property_id',
         knex.raw(`${this.readPayloadCountExpression} AS payload_count`),
         knex.raw(`${this.readTypedPredicateExpression} AS typed_predicate_json`)
@@ -246,9 +253,10 @@ export class PredicateRepository extends BaseRepository {
               WHEN base.payload_count = 1 THEN
                 jsonb_build_object(
                   'type', 'predicate',
+                  'feature_property_id', base.feature_property_id,
                   'feature_type_property_id', base.feature_type_property_id,
-                  'predicate', base.typed_predicate_json
-                )
+                  'operator', base.typed_predicate_json->>'operator'
+                ) || (base.typed_predicate_json - 'operator')
               ELSE NULL
             END AS predicate_node
           `
@@ -264,13 +272,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'string' }>} predicate - Typed string payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'string' }>} predicate - Typed string payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildStringPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'string' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'string' }>
   ): Knex.QueryBuilder {
     const stringValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
 
@@ -288,13 +296,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'number' }>} predicate - Typed number payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'number' }>} predicate - Typed number payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildNumberPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'number' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'number' }>
   ): Knex.QueryBuilder {
     const numberValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
 
@@ -312,13 +320,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'boolean' }>} predicate - Typed boolean payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'boolean' }>} predicate - Typed boolean payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildBooleanPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'boolean' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'boolean' }>
   ): Knex.QueryBuilder {
     const booleanValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
 
@@ -337,16 +345,26 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'timestamp' }>} predicate - Typed timestamp payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'timestamp' }>} predicate - Typed timestamp payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildTimestampPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'timestamp' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'timestamp' }>
   ): Knex.QueryBuilder {
-    const dateValue = predicate.operator === 'Exists' ? null : predicate.value?.date_value ?? null;
-    const timeValue = predicate.operator === 'Exists' ? null : predicate.value?.time_value ?? null;
+    const parsedValue =
+      predicate.operator === 'Exists' || predicate.value === undefined ? null : parseTimestamp(predicate.value);
+
+    if (predicate.operator !== 'Exists' && !parsedValue) {
+      throw new ApiGeneralError('Timestamp predicate value is not a supported temporal literal', [
+        'PredicateRepository->buildTimestampPredicateInsert',
+        { value: predicate.value }
+      ]);
+    }
+
+    const dateValue = parsedValue?.date_value ?? null;
+    const timeValue = parsedValue?.time_value ?? null;
 
     return knex('predicate_timestamp').insert({
       predicate_id: predicateId,
@@ -363,13 +381,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'taxon' }>} predicate - Typed taxon payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'taxon' }>} predicate - Typed taxon payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildTaxonPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'taxon' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'taxon' }>
   ): Knex.QueryBuilder {
     const taxonId = predicate.operator === 'Exists' ? null : predicate.value ?? null;
 
@@ -388,13 +406,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'geometry' }>} predicate - Typed geometry payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'geometry' }>} predicate - Typed geometry payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildGeometryPredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'geometry' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'geometry' }>
   ): Knex.QueryBuilder {
     const geometryValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
     return knex('predicate_geometry').insert({
@@ -411,13 +429,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {Knex} knex - Knex instance used to build queries.
    * @param {string} predicateId - Base predicate identifier.
-   * @param {Extract<TypedPredicate, { type: 'code' }>} predicate - Typed code payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'code' }>} predicate - Typed code payload.
    * @return {Knex.QueryBuilder} Insert query.
    */
   private buildCodePredicateInsert(
     knex: Knex,
     predicateId: string,
-    predicate: Extract<TypedPredicate, { type: 'code' }>
+    predicate: Extract<InternalTypedPredicate, { type: 'code' }>
   ): Knex.QueryBuilder {
     const contributorCodesetCodeId = predicate.operator === 'Exists' ? null : predicate.value ?? null;
 
@@ -436,11 +454,11 @@ export class PredicateRepository extends BaseRepository {
    * insert response.
    *
    * @param {string} predicateId - Base predicate identifier.
-   * @param {TypedPredicate} predicate - Typed predicate payload.
+   * @param {InternalTypedPredicate} predicate - Typed predicate payload.
    * @return {Promise<void>}
    * @throws {ApiExecuteSQLError} If insert does not affect exactly one row.
    */
-  async writePredicatePayload(predicateId: string, predicate: TypedPredicate): Promise<void> {
+  async writePredicatePayload(predicateId: string, predicate: InternalTypedPredicate): Promise<void> {
     const knex = getKnex();
     const query = (() => {
       switch (predicate.type) {

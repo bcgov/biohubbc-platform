@@ -8,9 +8,8 @@ import { GroupedPropertyResults, ISearchPropertyFilters } from './property-searc
 const defaultLog = getLogger('services/property-search-service');
 
 /**
- * Service for searching properties across all searchable tables.
+ * Service for searching feature properties.
  * Delegates to PropertySearchRepository for all database operations.
- * Combines string and number property results using Promise.all.
  */
 export class PropertySearchService extends DBService {
   searchRepository: PropertySearchRepository;
@@ -29,9 +28,6 @@ export class PropertySearchService extends DBService {
   /**
    * Searches properties by filters with results grouped by type.
    *
-   * Executes parallel searches for string and number properties, then combines
-   * results into a GroupedPropertyResults object organized by value type.
-   *
    * @param {ISearchPropertyFilters} filters - Filter criteria for property search
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
    * @return {Promise<GroupedPropertyResults>} Property results grouped by type (string, number)
@@ -44,22 +40,21 @@ export class PropertySearchService extends DBService {
   ): Promise<GroupedPropertyResults> {
     defaultLog.debug({ label: 'searchProperty', filters, pagination });
 
-    const [stringResults, numberResults] = await Promise.all([
-      this.searchRepository.searchStringProperties(filters, pagination),
-      this.searchRepository.searchNumberProperties(filters, pagination)
-    ]);
+    const results = await this.searchRepository.searchProperties(filters, pagination);
 
     return {
-      string: stringResults,
-      number: numberResults
+      string: results.filter((result) => result.feature_property_type === 'string'),
+      number: results.filter((result) => result.feature_property_type === 'number'),
+      boolean: results.filter((result) => result.feature_property_type === 'boolean'),
+      datetime: results.filter((result) => result.feature_property_type === 'datetime'),
+      taxon: results.filter((result) => result.feature_property_type === 'taxon'),
+      spatial: results.filter((result) => result.feature_property_type === 'spatial'),
+      code: results.filter((result) => result.feature_property_type === 'code')
     };
   }
 
   /**
    * Returns the total count of properties matching the search filters.
-   *
-   * Executes parallel count queries for string and number properties,
-   * then returns the combined total.
    *
    * @param {ISearchPropertyFilters} filters - Filter criteria for property search
    * @return {Promise<number>} Total count of matching properties across all types
@@ -69,11 +64,6 @@ export class PropertySearchService extends DBService {
   async getSearchPropertyCount(filters: ISearchPropertyFilters): Promise<number> {
     defaultLog.debug({ label: 'getSearchPropertyCount', filters });
 
-    const [stringCount, numberCount] = await Promise.all([
-      this.searchRepository.searchStringPropertiesCount(filters),
-      this.searchRepository.searchNumberPropertiesCount(filters)
-    ]);
-
-    return stringCount + numberCount;
+    return this.searchRepository.searchPropertiesCount(filters);
   }
 }

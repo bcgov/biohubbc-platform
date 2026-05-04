@@ -3,15 +3,96 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { Expression } from '../models/expression';
+import { Expression, ResolvedExpressionAnchor } from '../models/expression';
 import { ExpressionClause } from '../models/expression-clause';
+import { ExpressionTree, ExpressionTreeClause, ExpressionTreePredicate } from '../models/expression-tree';
+import {
+  NormalizedExpressionTreeClause,
+  NormalizedExpressionTreeExpression,
+  NormalizedExpressionTreePredicate
+} from '../models/expression-tree-internal';
 import { Predicate, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
-import { ExpressionRepository, ResolvedExpressionAnchor } from '../repositories/expression-repository';
+import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
+import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 import { ExpressionTreeService } from './expression-tree-service';
 
+const normalizePredicateForTest = (predicate: ExpressionTreePredicate): NormalizedExpressionTreePredicate => {
+  if (['Before', 'After', 'OnDate', 'OnTime'].includes(predicate.operator)) {
+    return {
+      ...predicate,
+      feature_property_type_id: 4,
+      feature_property_type_name: 'datetime',
+      internal_predicate: {
+        type: 'timestamp',
+        operator: predicate.operator,
+        value: typeof predicate.value === 'string' ? predicate.value : undefined
+      }
+    };
+  }
+
+  if (typeof predicate.value === 'number') {
+    return {
+      ...predicate,
+      feature_property_type_id: 2,
+      feature_property_type_name: 'number',
+      internal_predicate: {
+        type: 'number',
+        operator: predicate.operator,
+        value: predicate.value
+      }
+    };
+  }
+
+  if (typeof predicate.value === 'boolean') {
+    return {
+      ...predicate,
+      feature_property_type_id: 3,
+      feature_property_type_name: 'boolean',
+      internal_predicate: {
+        type: 'boolean',
+        operator: predicate.operator,
+        value: predicate.value
+      }
+    };
+  }
+
+  return {
+    ...predicate,
+    feature_property_type_id: 1,
+    feature_property_type_name: 'string',
+    internal_predicate: {
+      type: 'string',
+      operator: predicate.operator,
+      value: typeof predicate.value === 'string' ? predicate.value : undefined
+    }
+  };
+};
+
+const normalizeClauseForTest = (clause: ExpressionTreeClause): NormalizedExpressionTreeClause => {
+  if (clause.type === 'expression') {
+    return {
+      ...clause,
+      clauses: clause.clauses.map(normalizeClauseForTest)
+    };
+  }
+
+  return normalizePredicateForTest(clause);
+};
+
+const normalizeExpressionTreeForTest = (tree: ExpressionTree): NormalizedExpressionTreeExpression => ({
+  ...tree,
+  clauses: tree.clauses.map(normalizeClauseForTest)
+});
+
 describe('ExpressionTreeService', () => {
+  beforeEach(() => {
+    sinon
+      .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+      .callsFake(async (tree: ExpressionTree) => normalizeExpressionTreeForTest(tree));
+  });
+
   afterEach(() => {
     sinon.restore();
   });
@@ -42,6 +123,7 @@ describe('ExpressionTreeService', () => {
         .onFirstCall()
         .resolves({
           predicate_id: 'pred-1',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
@@ -50,6 +132,7 @@ describe('ExpressionTreeService', () => {
         .onSecondCall()
         .resolves({
           predicate_id: 'pred-2',
+          feature_property_id: 20,
           feature_type_property_id: 2,
           feature_property_type_id: 2,
           predicate_hash: 'p2',
@@ -70,8 +153,10 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+            operator: 'Equals',
+            value: 'elk'
           },
           {
             type: 'expression',
@@ -79,8 +164,10 @@ describe('ExpressionTreeService', () => {
             clauses: [
               {
                 type: 'predicate',
+                feature_property_id: 20,
                 feature_type_property_id: 2,
-                predicate: { type: 'number', operator: 'GreaterThan', value: 3 }
+                operator: 'GreaterThan',
+                value: 3
               }
             ]
           }
@@ -117,6 +204,7 @@ describe('ExpressionTreeService', () => {
 
       sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
         predicate_id: 'pred-1',
+        feature_property_id: 10,
         feature_type_property_id: 1,
         feature_property_type_id: 1,
         predicate_hash: 'p1',
@@ -131,6 +219,7 @@ describe('ExpressionTreeService', () => {
       sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([
         {
           predicate_id: 'pred-1',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1'
@@ -151,8 +240,10 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+            operator: 'Equals',
+            value: 'elk'
           }
         ]
       });
@@ -160,6 +251,49 @@ describe('ExpressionTreeService', () => {
       expect(result).to.eql({ expression_id: 'expr-1' });
       expect(writePredicatePayloadStub.notCalled).to.equal(true);
       expect(insertExpressionClausesStub.notCalled).to.equal(true);
+    });
+
+    it('persists predicates with nullable feature_type_property_id', async () => {
+      const service = new ExpressionTreeService(getMockDBConnection());
+
+      const insertPredicateStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
+        predicate_id: 'pred-1',
+        feature_property_id: 10,
+        feature_type_property_id: null,
+        feature_property_type_id: 1,
+        predicate_hash: 'p1',
+        inserted: true
+      } as ResolvedPredicateAnchor);
+      sinon.stub(ExpressionRepository.prototype, 'insertExpressionAnchor').resolves({
+        expression_id: 'expr-1',
+        operator: 'AND',
+        expression_hash: 'expr-hash-1',
+        inserted: true
+      } as ResolvedExpressionAnchor);
+      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([] as Predicate[]);
+      sinon.stub(ExpressionRepository.prototype, 'getExpressionsByHashes').resolves([] as Expression[]);
+      sinon.stub(PredicateRepository.prototype, 'writePredicatePayload').resolves();
+      sinon.stub(ExpressionClauseRepository.prototype, 'insertExpressionClauses').resolves([] as ExpressionClause[]);
+
+      await service.writeExpressionTree({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: null,
+            operator: 'Equals',
+            value: 'elk'
+          }
+        ]
+      });
+
+      expect(insertPredicateStub.firstCall.args[0]).to.include({
+        feature_property_id: 10,
+        feature_type_property_id: null,
+        feature_property_type_id: 1
+      });
     });
 
     it('normalizes ILike values for case-insensitive dedupe', async () => {
@@ -170,6 +304,7 @@ describe('ExpressionTreeService', () => {
         .onFirstCall()
         .resolves({
           predicate_id: 'pred-1',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
@@ -178,6 +313,7 @@ describe('ExpressionTreeService', () => {
         .onSecondCall()
         .resolves({
           predicate_id: 'pred-2',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p2',
@@ -201,18 +337,186 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'ILike', value: 'Wolf' }
+            operator: 'ILike',
+            value: 'Wolf'
           },
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'ILike', value: 'wOLF' }
+            operator: 'ILike',
+            value: 'wOLF'
           }
         ]
       });
 
       expect(insertPredicateStub.callCount).to.equal(1);
+    });
+
+    it('reuses repeated child expression subtrees by hash within the same write', async () => {
+      const service = new ExpressionTreeService(getMockDBConnection());
+
+      const insertPredicateStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
+        predicate_id: 'pred-1',
+        feature_property_id: 10,
+        feature_type_property_id: 1,
+        feature_property_type_id: 1,
+        predicate_hash: 'pred-hash-1',
+        inserted: true
+      } as ResolvedPredicateAnchor);
+
+      const writePredicatePayloadStub = sinon.stub(PredicateRepository.prototype, 'writePredicatePayload').resolves();
+
+      const insertExpressionAnchorStub = sinon
+        .stub(ExpressionRepository.prototype, 'insertExpressionAnchor')
+        .onFirstCall()
+        .resolves({
+          expression_id: 'expr-child',
+          operator: 'AND',
+          expression_hash: 'child-hash',
+          inserted: true
+        } as ResolvedExpressionAnchor)
+        .onSecondCall()
+        .resolves({
+          expression_id: 'expr-root',
+          operator: 'OR',
+          expression_hash: 'root-hash',
+          inserted: true
+        } as ResolvedExpressionAnchor);
+
+      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([] as Predicate[]);
+      sinon.stub(ExpressionRepository.prototype, 'getExpressionsByHashes').resolves([] as Expression[]);
+
+      const insertExpressionClausesStub = sinon
+        .stub(ExpressionClauseRepository.prototype, 'insertExpressionClauses')
+        .resolves([] as ExpressionClause[]);
+
+      const repeatedChild = {
+        type: 'expression' as const,
+        operator: 'AND' as const,
+        clauses: [
+          {
+            type: 'predicate' as const,
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'Equals' as const,
+            value: 'elk'
+          }
+        ]
+      };
+
+      const result = await service.writeExpressionTree({
+        type: 'expression',
+        operator: 'OR',
+        clauses: [repeatedChild, repeatedChild]
+      });
+
+      expect(result).to.eql({ expression_id: 'expr-root' });
+      expect(insertPredicateStub.callCount).to.equal(1);
+      expect(writePredicatePayloadStub.callCount).to.equal(1);
+      expect(insertExpressionAnchorStub.callCount).to.equal(2);
+      expect(insertExpressionClausesStub.callCount).to.equal(2);
+      expect(insertExpressionClausesStub.firstCall.args[0]).to.eql([
+        {
+          expression_id: 'expr-child',
+          sequence: 1,
+          predicate_id: 'pred-1',
+          child_expression_id: null
+        }
+      ]);
+      expect(insertExpressionClausesStub.secondCall.args[0]).to.eql([
+        {
+          expression_id: 'expr-root',
+          sequence: 1,
+          predicate_id: null,
+          child_expression_id: 'expr-child'
+        },
+        {
+          expression_id: 'expr-root',
+          sequence: 2,
+          predicate_id: null,
+          child_expression_id: 'expr-child'
+        }
+      ]);
+    });
+
+    it('hashes scalar timestamp predicate values through parsed date and time parts', async () => {
+      const service = new ExpressionTreeService(getMockDBConnection());
+
+      const insertPredicateStub = sinon
+        .stub(PredicateRepository.prototype, 'insertPredicateAnchor')
+        .callsFake(async (payload) => ({
+          predicate_id: `pred-${insertPredicateStub.callCount}`,
+          feature_property_id: payload.feature_property_id,
+          feature_type_property_id: payload.feature_type_property_id,
+          feature_property_type_id: payload.feature_property_type_id,
+          predicate_hash: payload.predicate_hash,
+          inserted: true
+        }));
+
+      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([] as Predicate[]);
+      sinon.stub(ExpressionRepository.prototype, 'getExpressionsByHashes').resolves([] as Expression[]);
+      sinon.stub(PredicateRepository.prototype, 'writePredicatePayload').resolves();
+      sinon.stub(ExpressionRepository.prototype, 'insertExpressionAnchor').resolves({
+        expression_id: 'expr-1',
+        operator: 'AND',
+        expression_hash: 'expr-hash-1',
+        inserted: true
+      } as ResolvedExpressionAnchor);
+      sinon.stub(ExpressionClauseRepository.prototype, 'insertExpressionClauses').resolves([] as ExpressionClause[]);
+
+      await service.writeExpressionTree({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '2024-01-01'
+          },
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '2024-01-01'
+          },
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '14:30:00-07:00'
+          },
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '14:30:00-07:00'
+          },
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '2024-01-01T14:30:00-07:00'
+          },
+          {
+            type: 'predicate',
+            feature_property_id: 10,
+            feature_type_property_id: 1,
+            operator: 'After',
+            value: '2024-01-01T14:30:00-07:00'
+          }
+        ]
+      });
+
+      expect(insertPredicateStub.callCount).to.equal(3);
     });
 
     it('returns a new root expression id when authored tree semantics change', async () => {
@@ -240,6 +544,7 @@ describe('ExpressionTreeService', () => {
         .onFirstCall()
         .resolves({
           predicate_id: 'pred-1',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
@@ -248,6 +553,7 @@ describe('ExpressionTreeService', () => {
         .onSecondCall()
         .resolves({
           predicate_id: 'pred-2',
+          feature_property_id: 10,
           feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p2',
@@ -265,8 +571,10 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
+            operator: 'Equals',
+            value: 'elk'
           }
         ]
       });
@@ -277,8 +585,10 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 10,
             feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'wolf' }
+            operator: 'Equals',
+            value: 'wolf'
           }
         ]
       });
@@ -341,8 +651,10 @@ describe('ExpressionTreeService', () => {
             payload_count: 1,
             predicate_node: {
               type: 'predicate',
+              feature_property_id: 70,
               feature_type_property_id: 7,
-              predicate: { type: 'number', operator: 'GreaterThan', value: 5 }
+              operator: 'GreaterThan',
+              value: 5
             }
           }
         ] as ReadPredicateNodeRow[])
@@ -353,8 +665,10 @@ describe('ExpressionTreeService', () => {
             payload_count: 1,
             predicate_node: {
               type: 'predicate',
+              feature_property_id: 80,
               feature_type_property_id: 8,
-              predicate: { type: 'boolean', operator: 'Equals', value: true }
+              operator: 'Equals',
+              value: true
             }
           }
         ] as ReadPredicateNodeRow[]);
@@ -367,8 +681,10 @@ describe('ExpressionTreeService', () => {
         clauses: [
           {
             type: 'predicate',
+            feature_property_id: 70,
             feature_type_property_id: 7,
-            predicate: { type: 'number', operator: 'GreaterThan', value: 5 }
+            operator: 'GreaterThan',
+            value: 5
           },
           {
             type: 'expression',
@@ -376,8 +692,10 @@ describe('ExpressionTreeService', () => {
             clauses: [
               {
                 type: 'predicate',
+                feature_property_id: 80,
                 feature_type_property_id: 8,
-                predicate: { type: 'boolean', operator: 'Equals', value: true }
+                operator: 'Equals',
+                value: true
               }
             ]
           }

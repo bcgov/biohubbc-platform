@@ -10,7 +10,9 @@ import { PolicyRepository } from '../../repositories/authorization/policy-reposi
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyService } from './policy-service';
+import { PolicyStatementExpressionService } from './policy-statement-expression-service';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);
@@ -20,6 +22,9 @@ describe('PolicyService', () => {
   let policyService: PolicyService;
 
   beforeEach(() => {
+    sinon
+      .stub(PolicyStatementExpressionService.prototype, 'getPolicyStatementExpressionsByPolicyStatementId')
+      .resolves([]);
     mockDBConnection = getMockDBConnection();
     policyService = new PolicyService(mockDBConnection);
   });
@@ -380,6 +385,56 @@ describe('PolicyService', () => {
       expect(createScopeStub).to.have.been.calledTwice;
       expect(createScopeStub.firstCall).to.have.been.calledWith('s1', 'urn:*:telemetry:*');
       expect(createScopeStub.secondCall).to.have.been.calledWith('s2', 'urn:10:*:*');
+    });
+
+    it('should persist optional statement expressions', async () => {
+      const mockPolicy: Policy = { policy_id: '1', name: 'Expression Policy', description: null, status: 'requested' };
+      const mockStatement: PolicyStatement = {
+        policy_statement_id: 's1',
+        policy_id: '1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:*:sampling_site:*'
+      };
+      const expression = {
+        type: 'expression' as const,
+        operator: 'AND' as const,
+        clauses: [
+          {
+            type: 'predicate' as const,
+            feature_property_id: 10,
+            feature_type_property_id: 20,
+            operator: 'Equals' as const,
+            value: 'caribou'
+          }
+        ]
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
+      sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
+      sinon.stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement').resolves('scope-1');
+      const writeExpressionTreeStub = sinon
+        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
+        .resolves({ expression_id: 'expr-1' });
+      const replaceExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .resolves();
+
+      const result = await policyService.createPolicyWithStatements(
+        { name: 'Expression Policy', status: 'requested' } as CreatePolicy,
+        [
+          {
+            effect: PolicyEffect.ALLOW,
+            submission_feature_urn: 'urn:*:sampling_site:*',
+            expression
+          }
+        ]
+      );
+
+      expect(writeExpressionTreeStub).to.have.been.calledOnceWith(expression);
+      expect(replaceExpressionStub).to.have.been.calledOnceWith('s1', 'expr-1');
+      expect(result.statements[0]).to.include({ ...mockStatement });
+      expect(result.statements[0].expression).to.eql(expression);
     });
   });
 

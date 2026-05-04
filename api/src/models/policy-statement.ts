@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExpressionTree } from './expression-tree';
 import { PolicyConditionOperator } from './policy-statement-condition';
 
 export enum PolicyEffect {
@@ -24,6 +25,7 @@ export interface CreatePolicyStatement {
 export interface CreatePolicyStatementPayload {
   effect: PolicyEffect;
   submission_feature_urn: string;
+  expression?: ExpressionTree;
   conditions?: {
     operator: PolicyConditionOperator;
     key: string;
