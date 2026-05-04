@@ -1,0 +1,309 @@
+import { expect } from 'chai';
+import Sinon from 'sinon';
+import { getMockDBConnection } from '../__mocks__/db';
+import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { ExpressionEvaluationRepository } from './expression-evaluation-repository';
+
+const normalizedPredicate = (
+  feature_property_id: number,
+  feature_type_property_id: number | null,
+  internal_predicate: any
+) => ({
+  type: 'predicate' as const,
+  feature_property_id,
+  feature_type_property_id,
+  operator: internal_predicate.operator,
+  ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
+  feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
+  feature_property_type_name: internal_predicate.type === 'geometry' ? 'spatial' : internal_predicate.type,
+  internal_predicate
+});
+
+describe('ExpressionEvaluationRepository', () => {
+  afterEach(() => {
+    Sinon.restore();
+  });
+
+  describe('buildExpressionTreeFeatureIdsSubquery', () => {
+    it('should build typed property SQL that matches shared properties through feature_type_property', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(47, null, {
+              type: 'number',
+              operator: 'GreaterThan',
+              value: 5
+            })
+          },
+          {
+            ...normalizedPredicate(46, null, {
+              type: 'string',
+              operator: 'Contains',
+              value: 'wetland'
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('inner join "feature_type_property" as "ftp"');
+      expect(sql).to.include('"ftp"."feature_property_id"');
+      expect(sql).to.include('"ft"."name" = \'dataset\'');
+      expect(sql).to.include('from (with recursive "evidence"');
+      expect(sql).to.include('intersect');
+      expect(sql).to.include('feature_property_id');
+    });
+
+    it('should apply anonymous security filtering to predicate evidence', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(10, null, {
+              type: 'number',
+              operator: 'Exists'
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+
+      expect(sql).to.include('p"."submission_feature_id');
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+
+    it('should apply authenticated security filtering to predicate evidence', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(10, null, {
+              type: 'number',
+              operator: 'Exists'
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+
+      expect(sql).to.include('p"."submission_feature_id');
+      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('team_security_scope');
+      expect(sql).to.include('42');
+    });
+
+    it('should narrow predicate evidence by feature_type_property_id when provided', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(46, 123, {
+              type: 'string',
+              operator: 'Contains',
+              value: 'wetland'
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+
+      expect(sql).to.include('"ftp"."feature_property_id" = 46');
+      expect(sql).to.include('"p"."feature_type_property_id" = 123');
+    });
+
+    it('should project related predicate evidence to anchor feature ids through bounded graph traversal', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(99, null, {
+              type: 'taxon',
+              operator: 'Equals',
+              value: 456
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
+
+      expect(sql).to.include('submission_feature_property_taxon');
+      expect(sql).to.include('with recursive "evidence"');
+      expect(sql).to.include('"connected_features" as');
+      expect(sql).to.include('as "graph_edges"');
+      expect(sql).to.include('"evidence"."submission_feature_id" as "root_feature_id"');
+      expect(sql).to.include('"evidence"."submission_feature_id" as "connected_feature_id"');
+      expect(sql).to.include('0 as depth');
+      expect(sql).to.include('from "submission_feature_feature"');
+      expect(sql).to.include('inner join "submission_feature" as "source_sf"');
+      expect(sql).to.include('inner join "submission_feature" as "target_sf"');
+      expect(sql).to.include('"source_sf"."record_end_date" is null');
+      expect(sql).to.include('"target_sf"."record_end_date" is null');
+      expect(sql).to.include('"source_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"target_feature_id" as "to_feature_id"');
+      expect(sql).to.include('"target_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"source_feature_id" as "to_feature_id"');
+      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"parent_submission_feature_id" as "to_feature_id"');
+      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
+      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "to_feature_id"');
+      expect(sql).to.include('"connected_features"."depth" < 6');
+      expect(sql).to.include('NOT edges.to_feature_id = ANY(connected_features.path)');
+      expect(sql).to.include('"ft"."name" = \'telemetry\'');
+      expect(sql).to.include('"sf"."record_end_date" is null');
+    });
+
+    it('should union child target sets for OR expressions', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [
+          {
+            ...normalizedPredicate(46, null, {
+              type: 'string',
+              operator: 'Equals',
+              value: 'moose'
+            })
+          },
+          {
+            ...normalizedPredicate(47, null, {
+              type: 'string',
+              operator: 'Equals',
+              value: 'feeding'
+            })
+          }
+        ]
+      };
+
+      const sql = repository
+        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+        .toString();
+
+      expect(sql).to.include(' union ');
+      expect(sql).to.not.include(' intersect ');
+      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+    });
+
+    it('should recursively compose nested expression target sets', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(46, null, {
+              type: 'string',
+              operator: 'Equals',
+              value: 'moose'
+            })
+          },
+          {
+            type: 'expression',
+            operator: 'OR',
+            clauses: [
+              {
+                ...normalizedPredicate(47, null, {
+                  type: 'string',
+                  operator: 'Equals',
+                  value: 'feeding'
+                })
+              },
+              {
+                ...normalizedPredicate(47, null, {
+                  type: 'string',
+                  operator: 'Equals',
+                  value: 'resting'
+                })
+              }
+            ]
+          }
+        ]
+      };
+
+      const sql = repository
+        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+        .toString();
+
+      expect(sql).to.include(' intersect ');
+      expect(sql).to.include(' union ');
+      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+    });
+
+    it('should use feature-level NotEquals evidence semantics for multi-value properties', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(48, null, {
+              type: 'string',
+              operator: 'NotEquals',
+              value: 'red'
+            })
+          }
+        ]
+      };
+
+      const sql = repository
+        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+        .toString();
+
+      expect(sql).to.include('from "submission_feature_property_string" as "p"');
+      expect(sql).to.include('not exists');
+      expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
+      expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
+      expect(sql).to.include('"p_not_equals"."value" = \'red\'');
+    });
+
+    it('should project parent dataset evidence to species observation targets through hierarchy edges', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(46, null, {
+              type: 'string',
+              operator: 'Equals',
+              value: 'X'
+            })
+          }
+        ]
+      };
+
+      const sql = repository
+        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+        .toString();
+
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('"ftp"."feature_property_id" = 46');
+      expect(sql).to.include('from "submission_feature"');
+      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"submission_feature_id" as "from_feature_id"');
+      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
+      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+    });
+  });
+});

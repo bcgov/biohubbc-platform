@@ -6,6 +6,8 @@
  * (e.g. 'sf.submission_feature_id'), never user input.
  */
 
+import { Knex } from 'knex';
+
 /**
  * Per-row "effectively secured" check: walks UP from a feature through its
  * ancestors to determine if it or any ancestor has an active security rule
@@ -88,4 +90,48 @@ export function isAccessibleToUser(featureIdExpr: string): string {
           AND tm.record_end_date IS NULL
       )
   )`;
+}
+
+/**
+ * Builds a single security filter that walks ancestors once per candidate feature and checks:
+ *   1. Unsecured — no ancestor has a submission_feature_security row → visible
+ *   2. Secured + granted — any ancestor is a scope anchor the user's team can reach → visible
+ *   3. Secured + denied — secured but no matching scope anchor → filtered out
+ *
+ * For anonymous users (systemUserId is null), only unsecured features pass.
+ *
+ * Composes the shared fragments above:
+ * - `isEffectivelySecured` — a feature is "effectively secured" only when it or an ancestor
+ *   has an active security rule AND the feature is past its `record_effective_date`.
+ * - `isAccessibleToUser` — walks ancestors to find a scope anchor the user's team can reach.
+ *
+ * Walk-up (not expand-down) strategy: callers have already narrowed features to a small
+ * candidate set. For each candidate, walk UP the parent chain (~3-5 levels) to check
+ * scope anchors. Cost is O(candidates × depth), not O(features in scope).
+ *
+ * Shared by the filter-based search wrapper and the expression-tree evaluator so both
+ * read paths apply identical security semantics.
+ *
+ * @param knex - Knex instance
+ * @param systemUserId - The authenticated user's ID, or null for anonymous, or undefined
+ *   for internal callers that should not be security-filtered.
+ * @param submissionFeatureIdColumn - Fully-qualified candidate feature id column.
+ * @returns Raw SQL fragment for WHERE clause, or null if no filtering needed.
+ */
+export function buildSecurityFilter(
+  knex: Knex,
+  systemUserId: number | null | undefined,
+  submissionFeatureIdColumn = 'aggregated_results.submission_feature_id'
+): Knex.Raw | null {
+  if (systemUserId === undefined) {
+    return null;
+  }
+
+  if (!systemUserId) {
+    // Anonymous: only unsecured features
+    return knex.raw(`NOT ${isEffectivelySecured(submissionFeatureIdColumn)}`);
+  }
+
+  // Authenticated: feature is unsecured OR user has team scope grant (single ancestor walk)
+  return knex.raw(`${isAccessibleToUser(submissionFeatureIdColumn)}`, [systemUserId]);
 }
