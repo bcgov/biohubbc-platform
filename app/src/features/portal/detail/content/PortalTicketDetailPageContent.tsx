@@ -13,7 +13,16 @@ import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageCon
  * @returns {JSX.Element}
  */
 export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageContentProps) => {
-  const { ticket, isLoading, comment, setComment, isSavingComment, onAddComment } = props;
+  const {
+    ticket,
+    isLoading,
+    comment,
+    setComment,
+    isSavingComment,
+    isUploadingAttachment,
+    onAddComment,
+    onUploadAttachment
+  } = props;
 
   return (
     <>
@@ -35,9 +44,12 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
               {ticket.status === 'open' ? (
                 <TicketComment
                   comment={comment}
+                  artifacts={ticket.artifacts}
                   setComment={setComment}
                   isSaving={isSavingComment}
+                  isUploadingAttachment={isUploadingAttachment}
                   onAddComment={onAddComment}
+                  onUploadAttachment={onUploadAttachment}
                 />
               ) : null}
             </Stack>

@@ -1,5 +1,11 @@
 import { IDBConnection } from '../../database/db';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
+import { Artifact } from '../../models/artifact';
+import {
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact,
+  UploadArtifactRoleEnum
+} from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
 import { DBService } from '../db-service';
 
@@ -36,6 +42,18 @@ export class UploadArtifactService extends DBService {
    */
   async getUploadArtifacts(): Promise<UploadArtifact[]> {
     return this.uploadArtifactServiceRepository.getUploadArtifacts();
+  }
+
+  /**
+   * List active artifacts for an upload and role.
+   *
+   * @param {string} uploadId - Upload session UUID.
+   * @param {UploadArtifactRoleEnum} role - Expected artifact role for the caller's workflow.
+   * @returns {Promise<Artifact[]>} Active artifacts linked through upload_artifact.
+   * @memberof UploadArtifactService
+   */
+  async getArtifactsByUploadId(uploadId: string, role: UploadArtifactRoleEnum): Promise<Artifact[]> {
+    return this.uploadArtifactServiceRepository.getArtifactsByUploadId(uploadId, role);
   }
 
   /**

@@ -1,7 +1,13 @@
 import { SQL } from 'sql-template-strings';
 import z from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
+import { Artifact } from '../../models/artifact';
+import {
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact,
+  UploadArtifactRoleEnum
+} from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
 export class UploadArtifactRepository extends BaseRepository {
@@ -69,6 +75,38 @@ export class UploadArtifactRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
+    return response.rows;
+  }
+
+  /**
+   * List active artifacts for an upload and role.
+   *
+   * @param {string} uploadId - Upload session UUID.
+   * @param {UploadArtifactRoleEnum} role - Upload artifact role.
+   * @returns {Promise<Artifact[]>} Active artifacts linked to the upload and role.
+   * @memberof UploadArtifactRepository
+   */
+  async getArtifactsByUploadId(uploadId: string, role: UploadArtifactRoleEnum): Promise<Artifact[]> {
+    const sqlStatement = SQL`
+      SELECT
+        a.artifact_id,
+        a.artifact_status,
+        a.bucket,
+        a.object_key,
+        a.byte_size,
+        a.checksum_sha256,
+        a.uploaded_at,
+        a.format
+      FROM upload_artifact ua
+      JOIN artifact a
+        ON a.artifact_id = ua.artifact_id
+      WHERE ua.upload_id = ${uploadId}
+        AND ua.role = ${role}::upload_artifact_role
+        AND ua.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, Artifact);
+
     return response.rows;
   }
 

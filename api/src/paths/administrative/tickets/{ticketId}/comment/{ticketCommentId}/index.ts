@@ -12,24 +12,26 @@ import { getLogger } from '../../../../../../utils/logger';
 const defaultLog = getLogger('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}');
 
 export const PUT: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [
+  authorizeRequestHandler((req) => ({
+    or: [
       {
         validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
-      }
+      },
+      { discriminator: 'Team', entity: 'ticket', ticketId: req.params.ticketId }
     ]
   })),
   updateTicketComment()
 ];
 
 export const DELETE: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [
+  authorizeRequestHandler((req) => ({
+    or: [
       {
         validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
-      }
+      },
+      { discriminator: 'Team', entity: 'ticket', ticketId: req.params.ticketId }
     ]
   })),
   deleteTicketComment()

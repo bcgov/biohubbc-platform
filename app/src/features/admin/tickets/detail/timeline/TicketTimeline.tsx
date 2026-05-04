@@ -15,13 +15,14 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
 import {
   CommentEvent,
   DataRequestEvent,
-  StatusEvent,
   ITicketTimelineProps,
+  StatusEvent,
   TimelineEvent
 } from './TicketTimeline.interface';
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
@@ -114,6 +115,37 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
       });
     } finally {
       setUpdatingDataRequestId(null);
+    }
+  };
+
+  const handleTicketArtifactDownload = async (artifact: ITicketArtifact) => {
+    const artifactWindow = window.open('', '_blank');
+
+    if (artifactWindow) {
+      artifactWindow.opener = null;
+    }
+
+    try {
+      const response = await api.tickets.getTicketArtifactDownloadUrl(ticket.ticket_id, artifact.ticket_artifact_id);
+
+      if (!artifactWindow) {
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: 'Unable to open attachment. Please allow pop-ups for this site.'
+        });
+        return;
+      }
+
+      artifactWindow.location.href = response.signed_url;
+    } catch (error) {
+      artifactWindow?.close();
+
+      const apiError = error as APIError;
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message || 'Failed to download attachment.'
+      });
     }
   };
 
@@ -328,6 +360,8 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
             <TicketCommentTimelineItem
               author={item.user_identifier}
               comment={item.comment}
+              artifacts={ticket.artifacts}
+              onArtifactLinkClick={handleTicketArtifactDownload}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {
                   maxRelativeDays: 30,

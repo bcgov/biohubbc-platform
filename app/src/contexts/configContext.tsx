@@ -17,6 +17,7 @@ export interface IConfig {
   MAX_UPLOAD_NUM_FILES: number;
   MAX_UPLOAD_FILE_SIZE: number;
   MAX_UPLOAD_TARBALL_SIZE: number;
+  MAX_TICKET_ATTACHMENT_FILE_SIZE: number;
 }
 
 export const ConfigContext = React.createContext<IConfig | undefined>({
@@ -33,7 +34,8 @@ export const ConfigContext = React.createContext<IConfig | undefined>({
   SITEMINDER_LOGOUT_URL: '',
   MAX_UPLOAD_NUM_FILES: 10,
   MAX_UPLOAD_FILE_SIZE: 52428800,
-  MAX_UPLOAD_TARBALL_SIZE: 10737418240
+  MAX_UPLOAD_TARBALL_SIZE: 10737418240,
+  MAX_TICKET_ATTACHMENT_FILE_SIZE: 15728640
 });
 
 /**
@@ -61,7 +63,8 @@ const getLocalConfig = (): IConfig => {
     SITEMINDER_LOGOUT_URL: import.meta.env.VITE_SITEMINDER_LOGOUT_URL || '',
     MAX_UPLOAD_NUM_FILES: Number(import.meta.env.VITE_MAX_UPLOAD_NUM_FILES) || 10,
     MAX_UPLOAD_FILE_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_FILE_SIZE) || 52428800,
-    MAX_UPLOAD_TARBALL_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_TARBALL_SIZE) || 10737418240
+    MAX_UPLOAD_TARBALL_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_TARBALL_SIZE) || 10737418240,
+    MAX_TICKET_ATTACHMENT_FILE_SIZE: Number(import.meta.env.VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE) || 15728640
   };
 };
 

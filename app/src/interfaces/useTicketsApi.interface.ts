@@ -32,6 +32,15 @@ export interface ITicketCommentLog {
   comment: string;
 }
 
+export interface ITicketArtifact {
+  ticket_artifact_id: string;
+  ticket_id: string;
+  artifact_id: string;
+  record_end_date: string | null;
+  create_date: string;
+  key: string;
+}
+
 export type TicketRelationshipType =
   | 'blocks'
   | 'blocked_by'
@@ -70,6 +79,7 @@ export interface ITicketSystemUser {
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
+  artifacts: ITicketArtifact[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
   ticket_system_users: ITicketSystemUser[];
@@ -91,6 +101,25 @@ export interface IUpdateTicketRequest {
 
 export interface ICreateTicketCommentRequest {
   comment: string;
+}
+
+export interface ICreateTicketUploadRequest {
+  file_name: string;
+  byte_size: number;
+  content_type?: string;
+}
+
+export interface ICreateTicketUploadResponse {
+  upload_id: string;
+  presigned_upload_url: string;
+}
+
+export interface ICompleteTicketUploadRequest {
+  status: 'uploaded';
+}
+
+export interface ITicketArtifactDownloadResponse {
+  signed_url: string;
 }
 
 export interface ICreateTicketReference {

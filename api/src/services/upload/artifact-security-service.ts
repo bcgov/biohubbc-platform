@@ -1,5 +1,6 @@
 import { HeadObjectCommandOutput } from '@aws-sdk/client-s3';
 import { IDBConnection } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { ClamAvScanValidationError } from '../../errors/clamav-errors';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
@@ -20,6 +21,11 @@ import { UploadArchiveService } from './upload-archive-service';
 
 export class ArtifactSecurityService extends DBService {
   uploadArtifactSecurityRepository: ArtifactSecurityRepository;
+  artifactService: ArtifactService;
+  artifactSecurityScanService: ArtifactSecurityScanService;
+  objectStorageService: ObjectStorageService;
+  submissionUploadService: SubmissionUploadService;
+  uploadArchiveService: UploadArchiveService;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -30,7 +36,7 @@ export class ArtifactSecurityService extends DBService {
   };
 
   /**
-   * Initialize the artifact security service and its repository dependency.
+   * Initialize the artifact security service and its dependencies.
    *
    * @param {IDBConnection} connection - Active database connection for service operations.
    * @returns {void}
@@ -38,6 +44,11 @@ export class ArtifactSecurityService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.uploadArtifactSecurityRepository = new ArtifactSecurityRepository(connection);
+    this.artifactService = new ArtifactService(connection);
+    this.artifactSecurityScanService = new ArtifactSecurityScanService(connection);
+    this.objectStorageService = new ObjectStorageService();
+    this.submissionUploadService = new SubmissionUploadService(connection);
+    this.uploadArchiveService = new UploadArchiveService(connection);
   }
 
   /**
@@ -48,6 +59,19 @@ export class ArtifactSecurityService extends DBService {
    */
   async getArtifactSecurity(securityId: string): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.getArtifactSecurity(securityId);
+  }
+
+  /**
+   * Find the latest active security record for an artifact.
+   *
+   * Returns null when the artifact has not been scanned or queued.
+   *
+   * @param {string} artifactId - Artifact UUID.
+   * @returns {Promise<ArtifactSecurity | null>} Latest active security row, or null when absent.
+   * @memberof ArtifactSecurityService
+   */
+  async findLatestArtifactSecurityByArtifactId(artifactId: string): Promise<ArtifactSecurity | null> {
+    return this.uploadArtifactSecurityRepository.findLatestArtifactSecurityByArtifactId(artifactId);
   }
 
   /**
@@ -98,16 +122,27 @@ export class ArtifactSecurityService extends DBService {
    * is possible (security=CLEAN but archive=BLOCKED). Fixing that tail requires a transactional outbox or
    * similar structural change.
    *
-   * @param {UploadArchive} uploadArchive - The already-looked-up archive record for the artifact.
+   * @param {UploadArchive | null} uploadArchive - The already-looked-up archive record for the artifact, if one exists.
+   * @param {string} artifactId - Artifact record to mark as promoted after the copy succeeds.
    * @param {string} objectKey - S3 object key to promote from security to main bucket.
    * @returns {Promise<void>}
    */
-  async handleCleanScanResult(uploadArchive: UploadArchive, objectKey: string): Promise<void> {
-    const storageService = new ObjectStorageService();
-    await storageService.promoteFromSecurity(objectKey);
+  async handleCleanScanResult(
+    uploadArchive: UploadArchive | null,
+    artifactId: string,
+    objectKey: string
+  ): Promise<void> {
+    await this.objectStorageService.promoteFromSecurity(objectKey);
 
-    const uploadArchiveService = new UploadArchiveService(this.connection);
-    await uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
+    await this.artifactService.updateArtifact(artifactId, {
+      bucket: getObjectStoreBucketName()
+    });
+
+    if (!uploadArchive) {
+      return;
+    }
+
+    await this.uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
       archive_status: ProcessStatusStatusEnum.PENDING
     });
   }
@@ -119,8 +154,7 @@ export class ArtifactSecurityService extends DBService {
    * @returns {Promise<void>} Resolves once the downstream job is published.
    */
   async publishNextPipelineStep(uploadArchive: UploadArchive): Promise<void> {
-    const submissionUploadService = new SubmissionUploadService(this.connection);
-    const submissionUpload = await submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
+    const submissionUpload = await this.submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
 
     await ArtifactSecurityService.dependencies.publishProcessSubmissionFeaturesJob(this.connection, submissionUpload);
   }
@@ -135,12 +169,9 @@ export class ArtifactSecurityService extends DBService {
    * @returns {Promise<ScanExecutionResult>} Final scan execution result summary.
    */
   async executeScan(artifactSecurityId: string): Promise<ScanExecutionResult> {
-    const artifactService = new ArtifactService(this.connection);
-    const artifactSecurityScanService = new ArtifactSecurityScanService(this.connection);
-
     // 1. Get artifact info and validate
     const securityRecord = await this.getArtifactSecurity(artifactSecurityId);
-    const artifact = await artifactService.getArtifact(securityRecord.artifact_id);
+    const artifact = await this.artifactService.getArtifact(securityRecord.artifact_id);
 
     // Already processed - return existing result (idempotent)
     if (securityRecord.security !== SecurityStatusEnum.PENDING) {
@@ -165,7 +196,7 @@ export class ArtifactSecurityService extends DBService {
     }
 
     // 2. Create scan record (PENDING)
-    const { artifact_security_scan_id } = await artifactSecurityScanService.insertArtifactSecurityScan({
+    const { artifact_security_scan_id } = await this.artifactSecurityScanService.insertArtifactSecurityScan({
       artifact_security_id: artifactSecurityId,
       scan_status: ProcessStatusStatusEnum.PENDING,
       scanner_version: null,
@@ -178,7 +209,7 @@ export class ArtifactSecurityService extends DBService {
       const scanOutcome = await this.scanArtifactObject(artifact.bucket, artifact.object_key);
 
       // 4. Update scan record with results
-      await artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
+      await this.artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
         scan_status: scanOutcome.scanStatus,
         scanner_version: scanOutcome.scannerVersion,
         scanned_at: scanOutcome.scannedAt,
@@ -197,17 +228,25 @@ export class ArtifactSecurityService extends DBService {
         // still reads `security = PENDING`, so `executeScan` re-runs the full flow and
         // converges. Without this ordering, a queue outage at this step leaves a clean
         // artifact with no downstream submission-processing job.
-        const uploadArchiveService = new UploadArchiveService(this.connection);
-        const uploadArchive = await uploadArchiveService.getUploadArchiveByArtifactId(artifact.artifact_id);
+        let uploadArchive: UploadArchive | null = null;
+        try {
+          uploadArchive = await this.uploadArchiveService.getUploadArchiveByArtifactId(artifact.artifact_id);
+        } catch (error) {
+          if (!(error instanceof ApiNotFoundError)) {
+            throw error;
+          }
+        }
 
-        await this.publishNextPipelineStep(uploadArchive);
+        if (uploadArchive) {
+          await this.publishNextPipelineStep(uploadArchive);
+        }
 
         // Point-of-no-return: publish succeeded; now commit the CLEAN state and
         // the irreversible S3 + archive writes.
         await this.updateArtifactSecurity(artifactSecurityId, {
           security: SecurityStatusEnum.CLEAN
         });
-        await this.handleCleanScanResult(uploadArchive, artifact.object_key);
+        await this.handleCleanScanResult(uploadArchive, artifact.artifact_id, artifact.object_key);
       } else {
         // INFECTED / ERROR / SKIPPED: no publish, no S3 promote, no archive unblock.
         // Write the security status directly — no orphan risk on this branch.
@@ -225,7 +264,7 @@ export class ArtifactSecurityService extends DBService {
       const results = error instanceof Error ? sanitizeJsonbValue({ error: error.message }) : 'Unknown error';
 
       // Update scan record to FAILED
-      await artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
+      await this.artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
         scan_status: ProcessStatusStatusEnum.FAILED,
         scanned_at: new Date().toISOString(),
         results
@@ -321,12 +360,11 @@ export class ArtifactSecurityService extends DBService {
   private async scanArtifactObject(bucketName: string, objectKey: string): Promise<ScanOutcome> {
     const scannedAt = new Date().toISOString();
 
-    const storageService = new ObjectStorageService();
     const bucketType = this.getBucketTypeForArtifact(bucketName);
-    const metadata = await storageService.getMetadata(bucketType, objectKey);
+    const metadata = await this.objectStorageService.getMetadata(bucketType, objectKey);
     this.validateObjectBeforeScan(objectKey, metadata);
 
-    const fileStream = await storageService.getFileStream(bucketType, objectKey);
+    const fileStream = await this.objectStorageService.getFileStream(bucketType, objectKey);
 
     const clamAvScanner = await ArtifactSecurityService.dependencies.getClamAvScanner();
     const clamavScanResult = await clamAvScanner.scanStream(fileStream);
