@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import {
   CreateDownload,
   DownloadArtifactInfo,
@@ -822,11 +823,35 @@ export class DownloadRepository extends BaseRepository {
                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
                 WHERE p.submission_feature_id = ANY($1)`,
-      datetime: `SELECT p.submission_feature_id, fp.name, p.value
+      // `datetime` emits up to two synthetic rows per source row, with the
+      // property name suffixed `_date` / `_time`. A row with both components
+      // populated produces two rows; a partial-component row produces one.
+      // The Parquet schema/writer and CSV writer expand each `datetime`
+      // property into matching `<prop>_date` / `<prop>_time` columns, so
+      // `assembleFeatureData` merges these synthetic rows under the same
+      // suffixed keys without special-casing.
+      //
+      // Two columns rather than one combined `TIMESTAMP_MILLIS` because
+      // Parquet/CSV are query substrates: partial components must remain
+      // first-class for predicate pushdown (DuckDB filters by date-of or
+      // time-of without parsing a string). The DB schema split into
+      // `date_value` / `time_value` was driven by the same first-class-
+      // partials rule on the read side.
+      //
+      // Suffix constants live in `models/datetime-column.ts` and are shared
+      // with `parquet-utils.ts`. The two sites must produce identical column
+      // names — drift silently nulls cells.
+      datetime: `SELECT p.submission_feature_id, fp.name || '${DATETIME_DATE_SUFFIX}' AS name, to_char(p.date_value, 'YYYY-MM-DD') AS value
                  FROM submission_feature_property_timestamp p
                  INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
                  INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-                 WHERE p.submission_feature_id = ANY($1)`,
+                 WHERE p.submission_feature_id = ANY($1) AND p.date_value IS NOT NULL
+                 UNION ALL
+                 SELECT p.submission_feature_id, fp.name || '${DATETIME_TIME_SUFFIX}' AS name, to_char(p.time_value, 'HH24:MI:SS') AS value
+                 FROM submission_feature_property_timestamp p
+                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 WHERE p.submission_feature_id = ANY($1) AND p.time_value IS NOT NULL`,
       code: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
              FROM submission_feature_property_code p
              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id

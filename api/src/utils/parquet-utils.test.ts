@@ -7,10 +7,13 @@ import { CsvPropertyDefinition } from './csv-utils';
 import {
   buildGeoParquetMetadata,
   buildParquetSchema,
+  dateStringToParquet,
+  expandPropertyToColumns,
   extractGeoJsonGeometry,
   featureToRow,
   geoJsonToWkb,
-  propertyTypeToParquetType
+  propertyTypeToParquetType,
+  timeStringToMillis
 } from './parquet-utils';
 
 describe('parquet-utils', () => {
@@ -27,8 +30,13 @@ describe('parquet-utils', () => {
       expect(propertyTypeToParquetType('boolean')).to.equal('BOOLEAN');
     });
 
-    it('should map datetime to TIMESTAMP_MILLIS', () => {
-      expect(propertyTypeToParquetType('datetime')).to.equal('TIMESTAMP_MILLIS');
+    it('should throw for datetime because the helper must be used (DATE + TIME_MILLIS expansion)', () => {
+      // `datetime` cannot map to a single Parquet primitive — `expandPropertyToColumns`
+      // splits it into two columns (DATE + TIME_MILLIS) before the writer asks for a
+      // type. Reaching this case means a caller bypassed the helper; failing loud
+      // points the bug at the caller instead of letting UTF8 silently land in the
+      // Parquet footer.
+      expect(() => propertyTypeToParquetType('datetime')).to.throw(/datetime/);
     });
 
     it('should map code to UTF8 (resolved label is a string)', () => {
@@ -57,6 +65,81 @@ describe('parquet-utils', () => {
 
     it('should default unknown types to UTF8', () => {
       expect(propertyTypeToParquetType('unknown_type')).to.equal('UTF8');
+    });
+  });
+
+  describe('expandPropertyToColumns', () => {
+    it('should return one spec for a string property', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'site_name',
+        feature_property_type_name: 'string'
+      });
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.deep.equal({ name: 'site_name', parquetType: 'UTF8' });
+    });
+
+    it('should return one spec for a number property', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'count',
+        feature_property_type_name: 'number'
+      });
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.deep.equal({ name: 'count', parquetType: 'DOUBLE' });
+    });
+
+    it('should expand a datetime property into native DATE and TIME_MILLIS specs', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'observed_at',
+        feature_property_type_name: 'datetime'
+      });
+
+      expect(result).to.have.length(2);
+      expect(result[0]).to.deep.equal({ name: 'observed_at_date', parquetType: 'DATE' });
+      expect(result[1]).to.deep.equal({ name: 'observed_at_time', parquetType: 'TIME_MILLIS' });
+    });
+
+    it('should preserve property name for spatial', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'geometry',
+        feature_property_type_name: 'spatial'
+      });
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.deep.equal({ name: 'geometry', parquetType: 'BYTE_ARRAY' });
+    });
+  });
+
+  describe('dateStringToParquet', () => {
+    it('should convert YYYY-MM-DD to a Date at UTC midnight', () => {
+      const d = dateStringToParquet('2024-06-15');
+      expect(d).to.be.instanceOf(Date);
+      expect(d.toISOString()).to.equal('2024-06-15T00:00:00.000Z');
+    });
+  });
+
+  describe('timeStringToMillis', () => {
+    it('should convert HH:MM:SS to milliseconds-since-midnight', () => {
+      // 13:45:00 → (13*3600 + 45*60 + 0) * 1000 = 49_500_000.
+      expect(timeStringToMillis('13:45:00')).to.equal(49_500_000);
+    });
+
+    it('should produce 0 for midnight', () => {
+      expect(timeStringToMillis('00:00:00')).to.equal(0);
+    });
+
+    it('should produce a value within INT32 range for the last second of the day', () => {
+      // 23:59:59 → 86_399_000; INT32 ceiling is ~2.14e9 so we have plenty of headroom.
+      expect(timeStringToMillis('23:59:59')).to.equal(86_399_000);
+    });
+
+    it('should clamp Postgres end-of-day 24:00:00 to 86_399_999', () => {
+      // Postgres `time` accepts '24:00:00' as ISO 8601 nominal end-of-day, but
+      // Parquet TIME_MILLIS doesn't define 86_400_000 and downstream readers
+      // disagree on how to handle it. The clamp keeps the cell in the de facto
+      // 0..86_399_999 range at a 1 ms cost, preferable to wrapping to 00:00:00.
+      expect(timeStringToMillis('24:00:00')).to.equal(86_399_999);
     });
   });
 
@@ -120,12 +203,31 @@ describe('parquet-utils', () => {
       expect(schema.fields['title']).to.exist;
       expect(schema.fields['value']).to.exist;
       expect(schema.fields['active']).to.exist;
-      expect(schema.fields['created']).to.exist;
+      // datetime expands into two native columns (DATE + TIME_MILLIS); the bare `created` field is gone.
+      expect(schema.fields['created']).to.not.exist;
+      expect(schema.fields['created_date']).to.exist;
+      expect(schema.fields['created_time']).to.exist;
       expect(schema.fields['status']).to.exist;
       expect(schema.fields['species']).to.exist;
       expect(schema.fields['tags']).to.exist;
       expect(schema.fields['meta']).to.exist;
       expect(schema.fields['file']).to.exist;
+    });
+
+    it('should expand a datetime property into native DATE and TIME_MILLIS columns', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const schema = buildParquetSchema(properties);
+
+      expect(schema.fields['observed_at']).to.not.exist;
+      expect(schema.fields['observed_at_date']).to.exist;
+      expect(schema.fields['observed_at_time']).to.exist;
+      // DATE → INT32 days-since-epoch; TIME_MILLIS → INT32 ms-since-midnight.
+      expect(schema.fields['observed_at_date'].primitiveType).to.equal('INT32');
+      expect(schema.fields['observed_at_date'].originalType).to.equal('DATE');
+      expect(schema.fields['observed_at_time'].primitiveType).to.equal('INT32');
+      expect(schema.fields['observed_at_time'].originalType).to.equal('TIME_MILLIS');
     });
 
     it('should always include submission_feature_id as a NOT NULL INT64 column', () => {
@@ -136,6 +238,17 @@ describe('parquet-utils', () => {
       expect(sfid.primitiveType).to.equal('INT64');
       // optional=false in @dsnp/parquetjs surfaces as REQUIRED on the schema field.
       expect(sfid.repetitionType).to.equal('REQUIRED');
+    });
+
+    it('should throw when a datetime expansion collides with a sibling property name', () => {
+      // Schema-build is the gate for collision detection; downstream consumers
+      // (hydrator, writer) trust the validated list.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observation', feature_property_type_name: 'datetime' },
+        { feature_property_name: 'observation_date', feature_property_type_name: 'string' }
+      ];
+
+      expect(() => buildParquetSchema(properties)).to.throw(/observation_date/);
     });
   });
 
@@ -203,27 +316,42 @@ describe('parquet-utils', () => {
       expect(row['active']).to.equal(true);
     });
 
-    it('should convert datetime strings to Date for parquet TIMESTAMP_MILLIS encoding', () => {
-      // pg returns TIMESTAMP / TIMESTAMPTZ as strings (db.ts type parsers). parquetjs
-      // needs Date instances — its TIMESTAMP_MILLIS writer falls back to parseInt()
-      // on strings and eats only the leading year digits.
+    it('should convert the two datetime cells to native primitives for the Parquet writer', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'created', feature_property_type_name: 'datetime' }
       ];
-      const row = featureToRow(makeFeature({ created: '2024-01-01T00:00:00Z' }), properties);
+      const row = featureToRow(makeFeature({ created_date: '2024-06-15', created_time: '13:45:00' }), properties);
 
-      expect(row['created']).to.be.instanceOf(Date);
-      expect((row['created'] as Date).getTime()).to.equal(new Date('2024-01-01T00:00:00Z').getTime());
+      // DATE column: a Date instance at UTC midnight (the writer encodes
+      // `getTime() / 86_400_000` to days-since-epoch INT32).
+      expect(row['created_date']).to.be.instanceOf(Date);
+      expect((row['created_date'] as Date).toISOString()).to.equal('2024-06-15T00:00:00.000Z');
+      // TIME_MILLIS column: ms-since-midnight INT32.
+      // 13:45:00 → (13*3600 + 45*60) * 1000 = 49_500_000.
+      expect(row['created_time']).to.equal(49_500_000);
+      // The bare property name must not appear — Parquet schema expects only the suffixed pair.
+      expect(row).to.not.have.property('created');
     });
 
-    it('should pass datetime Date instances through unchanged', () => {
+    it('should write null for the missing component of a date-only datetime', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'created', feature_property_type_name: 'datetime' }
       ];
-      const date = new Date('2024-06-15T12:30:00Z');
-      const row = featureToRow(makeFeature({ created: date }), properties);
+      const row = featureToRow(makeFeature({ created_date: '2024-06-15' }), properties);
 
-      expect(row['created']).to.equal(date);
+      expect(row['created_date']).to.be.instanceOf(Date);
+      expect((row['created_date'] as Date).toISOString()).to.equal('2024-06-15T00:00:00.000Z');
+      expect(row['created_time']).to.be.null;
+    });
+
+    it('should write null for the missing component of a time-only datetime', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'created', feature_property_type_name: 'datetime' }
+      ];
+      const row = featureToRow(makeFeature({ created_time: '13:45:00' }), properties);
+
+      expect(row['created_date']).to.be.null;
+      expect(row['created_time']).to.equal(49_500_000);
     });
 
     it('should pass through code values directly (pre-resolved label)', () => {

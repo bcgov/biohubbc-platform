@@ -9,8 +9,113 @@
  */
 import { ParquetSchema, type FieldDefinition, type SchemaDefinition } from '@dsnp/parquetjs';
 
+import {
+  assertNoDatetimeColumnCollisions,
+  DATETIME_DATE_SUFFIX,
+  DATETIME_TIME_SUFFIX
+} from '../models/datetime-column';
 import { ParquetFeatureData } from '../models/download';
-import { CsvPropertyDefinition } from './csv-utils';
+import type { CsvPropertyDefinition } from './csv-utils';
+
+/**
+ * Output column spec produced by expanding a single feature property definition.
+ *
+ * Most property types map 1:1 (one property -> one column). `datetime`
+ * expands to two — see {@link expandPropertyToColumns}.
+ */
+export interface FeatureColumnSpec {
+  name: string;
+  parquetType: FieldDefinition['type'];
+}
+
+/**
+ * Expand a feature property definition into one or more output column specs.
+ *
+ * Most property types map 1:1 to a single output column. `datetime` is the
+ * exception: it expands into `<name>_date` (Parquet `DATE` — INT32 days-since-
+ * epoch) and `<name>_time` (Parquet `TIME_MILLIS` — INT32 ms-since-midnight)
+ * so partial-component values (date-only, time-only, or both) round-trip
+ * losslessly and remain filterable as native columnar predicates in DuckDB,
+ * pandas, and GIS tools.
+ *
+ * Parquet/CSV are themselves query substrates: a single combined ISO string
+ * would force every consumer to parse before filtering, defeating columnar
+ * query plans and discarding partial-component data that the underlying DB
+ * stores as first-class (the `submission_feature_property_timestamp` table
+ * holds nullable `date_value` / `time_value` columns with a CHECK that at
+ * least one is set). UTF8 strings would force per-row CAST in DuckDB and
+ * break per-row-group min/max predicate pushdown — choosing native logical
+ * types preserves both. CSV remains UTF8 because CSV is untyped at the
+ * format level.
+ *
+ * The `_date` / `_time` suffixes are imported from `models/datetime-column`
+ * and shared with the SQL projection in `download-repository.ts`. The two
+ * sites must produce identical names for the same input property — a drift
+ * silently nulls cells. Conversion from the SQL projection's ISO strings to
+ * the writer's expected primitives happens in `featureToRow` via
+ * `dateStringToParquet` and `timeStringToMillis`.
+ *
+ * @param prop - Feature property definition (name + type).
+ * @returns Array of column specs. Single-element for non-datetime types;
+ *   two-element (`<name>_date`, `<name>_time`) for datetime.
+ */
+export function expandPropertyToColumns(prop: CsvPropertyDefinition): FeatureColumnSpec[] {
+  if (prop.feature_property_type_name === 'datetime') {
+    // Native Parquet logical types — DATE (INT32 days-since-epoch) and TIME_MILLIS
+    // (INT32 ms-since-midnight). DuckDB / pandas / arrow read these as native
+    // `date` / `time` columns with predicate pushdown via per-row-group min/max
+    // statistics. UTF8 strings would force consumers to CAST per row and break
+    // statistics-driven row-group skipping (the whole point of Parquet as a
+    // query substrate). Conversion from the SQL projection's ISO strings happens
+    // in `featureToRow` via `dateStringToParquet` / `timeStringToMillis`.
+    return [
+      { name: `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`, parquetType: 'DATE' },
+      { name: `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`, parquetType: 'TIME_MILLIS' }
+    ];
+  }
+  return [
+    {
+      name: prop.feature_property_name,
+      parquetType: propertyTypeToParquetType(prop.feature_property_type_name)
+    }
+  ];
+}
+
+/**
+ * Convert a `'YYYY-MM-DD'` string to a `Date` instance for `@dsnp/parquetjs`'s
+ * DATE writer. The library accepts a `Date` and converts internally to days-
+ * since-epoch (`getTime() / 86_400_000`). Constructed at UTC midnight so the
+ * conversion is deterministic regardless of host timezone.
+ *
+ * @param s ISO date string in `'YYYY-MM-DD'` format, exactly as the SQL
+ *   projection emits via `to_char(date_value, 'YYYY-MM-DD')`.
+ * @returns A `Date` at the corresponding UTC midnight.
+ */
+export function dateStringToParquet(s: string): Date {
+  return new Date(`${s}T00:00:00Z`);
+}
+
+/**
+ * Convert a `'HH:MM:SS'` string to milliseconds-since-midnight for
+ * `@dsnp/parquetjs`'s TIME_MILLIS writer (INT32, valid range 0–86_399_999).
+ *
+ * Postgres `time without time zone` accepts the literal `'24:00:00'` as ISO
+ * 8601 nominal end-of-day. The Parquet TIME_MILLIS spec doesn't define a
+ * value at exactly 86_400_000 ms, and downstream readers (DuckDB, Arrow,
+ * pandas) handle the boundary inconsistently — accept, clip, or throw.
+ * We clamp at `86_399_999` so the cell stays in the de facto valid range.
+ * The 1 ms loss preserves "near end of day" semantics rather than wrapping
+ * to `00:00:00`, and the source Postgres value is unaffected.
+ *
+ * @param s 24-hour time string in `'HH:MM:SS'` format, exactly as the SQL
+ *   projection emits via `to_char(time_value, 'HH24:MI:SS')`.
+ * @returns Milliseconds since midnight, clamped to `86_399_999`.
+ */
+export function timeStringToMillis(s: string): number {
+  const [hh, mm, ss] = s.split(':').map(Number);
+  const ms = (hh * 3600 + mm * 60 + ss) * 1000;
+  return Math.min(ms, 86_399_999);
+}
 
 /**
  * Maps a feature property type name to a Parquet field type.
@@ -35,7 +140,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
     case 'boolean':
       return 'BOOLEAN';
     case 'datetime':
-      return 'TIMESTAMP_MILLIS';
+      // `datetime` cannot map to a single primitive — it splits into two columns
+      // (DATE + TIME_MILLIS) via `expandPropertyToColumns`. Reaching this case is
+      // a programming error: a caller bypassed the helper and asked for a single
+      // type. Fail loudly so the wrong column shape doesn't quietly land in the
+      // Parquet footer as UTF8.
+      throw new Error(
+        `propertyTypeToParquetType: 'datetime' has no single Parquet type — use expandPropertyToColumns to get DATE + TIME_MILLIS`
+      );
     case 'code':
       // Code properties arrive pre-resolved: the cursor JOIN resolves FK -> display label
       return 'UTF8';
@@ -75,6 +187,8 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * @returns A ParquetSchema instance ready for writer construction.
  */
 export function buildParquetSchema(properties: CsvPropertyDefinition[]): ParquetSchema {
+  assertNoDatetimeColumnCollisions(properties);
+
   const fields: SchemaDefinition = {};
 
   // Every Parquet file includes the feature UUID for cross-file joins
@@ -94,10 +208,9 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
   fields['submission_feature_id'] = { type: 'INT64', optional: false };
 
   for (const prop of properties) {
-    fields[prop.feature_property_name] = {
-      type: propertyTypeToParquetType(prop.feature_property_type_name),
-      optional: true
-    };
+    for (const col of expandPropertyToColumns(prop)) {
+      fields[col.name] = { type: col.parquetType, optional: true };
+    }
   }
 
   return new ParquetSchema(fields);
@@ -128,41 +241,42 @@ export function featureToRow(
   row['submission_feature_id'] = feature.submission_feature_id;
 
   for (const prop of properties) {
-    const value = feature.data[prop.feature_property_name];
-
-    if (value == null) {
-      row[prop.feature_property_name] = null;
+    if (prop.feature_property_type_name === 'datetime') {
+      // `datetime` expands into two native Parquet columns: DATE (INT32 days-
+      // since-epoch) and TIME_MILLIS (INT32 ms-since-midnight). The hydrator
+      // wrote canonical ISO strings under `<prop>_date` / `<prop>_time` keys
+      // (one or both may be null per the DB CHECK); convert each non-null
+      // string to the writer's expected primitive. See `expandPropertyToColumns`
+      // for why this is two columns rather than one combined timestamp.
+      const dateKey = `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`;
+      const timeKey = `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`;
+      const dateStr = feature.data[dateKey];
+      const timeStr = feature.data[timeKey];
+      row[dateKey] = typeof dateStr === 'string' ? dateStringToParquet(dateStr) : null;
+      row[timeKey] = typeof timeStr === 'string' ? timeStringToMillis(timeStr) : null;
       continue;
     }
 
-    switch (prop.feature_property_type_name) {
-      case 'spatial': {
-        const geometry = extractGeoJsonGeometry(value);
-        row[prop.feature_property_name] = geometry ? geoJsonToWkb(geometry) : null;
-        break;
-      }
-      case 'array':
-        row[prop.feature_property_name] = JSON.stringify(value);
-        break;
-      case 'object':
-        row[prop.feature_property_name] = JSON.stringify(value);
-        break;
-      case 'datetime':
-        // db.ts installs a global pg type parser that returns TIMESTAMP / TIMESTAMPTZ
-        // as raw strings rather than Date objects. @dsnp/parquetjs's
-        // toPrimitive_TIMESTAMP_MILLIS hits its `string` branch and calls parseInt,
-        // which eats only the leading year digits (e.g. "2024-01-01..." → 2024 ms).
-        // Converting to a Date here lets the writer use its Date branch (getTime()).
-        row[prop.feature_property_name] = value instanceof Date ? value : new Date(value as string);
-        break;
-      default:
-        // string, number, boolean, code, taxon, artifact_key — pass through directly
-        row[prop.feature_property_name] = value;
-        break;
-    }
+    const value = feature.data[prop.feature_property_name];
+    row[prop.feature_property_name] = value == null ? null : encodePropertyValue(prop, value);
   }
 
   return row;
+}
+
+function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unknown {
+  switch (prop.feature_property_type_name) {
+    case 'spatial': {
+      const geometry = extractGeoJsonGeometry(value);
+      return geometry ? geoJsonToWkb(geometry) : null;
+    }
+    case 'array':
+    case 'object':
+      return JSON.stringify(value);
+    default:
+      // string, number, boolean, code, taxon, artifact_key — pass through directly
+      return value;
+  }
 }
 
 /**

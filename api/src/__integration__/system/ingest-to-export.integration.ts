@@ -102,9 +102,16 @@ describe('Ingest → Download → Export (system integration)', function () {
         (${submissionFeatureId}, ${dopId}, ${data.dop}, ${systemUserId}),
         (${submissionFeatureId}, ${elevationId}, ${data.elevation}, ${systemUserId});
     `);
+    // The timestamp table stores partial-component datetimes — split the ISO
+    // string into date + time at the call site (the boundary that has the
+    // intent context). The repo doesn't coerce; the DB CHECK enforces
+    // at-least-one-non-null.
+    const dateValue = data.timestamp.slice(0, 10);
+    const timeValue = data.timestamp.slice(11, 19);
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${timestampId}, ${data.timestamp}, ${systemUserId});
+      INSERT INTO submission_feature_property_timestamp
+        (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
+      VALUES (${submissionFeatureId}, ${timestampId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
     `);
     // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
     const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
@@ -199,7 +206,10 @@ describe('Ingest → Download → Export (system integration)', function () {
     // System columns lead so consumers can join cross-file (uuid, parent_uuid)
     // and trace back to the platform UI (submission_feature_id).
     expect(header).to.include.members(['submission_feature_id', 'uuid', 'parent_uuid']);
-    expect(header).to.include.members(['dop', 'elevation', 'timestamp', 'geometry']);
+    // `datetime` properties expand into two output columns (`<prop>_date`,
+    // `<prop>_time`) so partial-component values remain first-class for
+    // columnar predicate pushdown.
+    expect(header).to.include.members(['dop', 'elevation', 'timestamp_date', 'timestamp_time', 'geometry']);
 
     const row = lines[1].split(',');
     const col = (name: string): string => row[header.indexOf(name)];
@@ -213,7 +223,10 @@ describe('Ingest → Download → Export (system integration)', function () {
 
     expect(col('dop'), 'dop should round-trip the ingested number').to.equal('4.2');
     expect(col('elevation'), 'elevation should round-trip the ingested number').to.equal('1234.5');
-    expect(col('timestamp'), 'timestamp should round-trip the ingested ISO string').to.contain('2026-04-24T12:34:56');
+    expect(col('timestamp_date'), 'timestamp_date should round-trip the ingested date component').to.equal(
+      '2026-04-24'
+    );
+    expect(col('timestamp_time'), 'timestamp_time should round-trip the ingested time component').to.equal('12:34:56');
     // Geometry is emitted as a single WKT column (per Phase 5 of plan-review-fixes).
     expect(col('geometry'), 'geometry should be a Point WKT').to.match(/^POINT\(-123\.1234\s+49\.5678\)$/);
   });
