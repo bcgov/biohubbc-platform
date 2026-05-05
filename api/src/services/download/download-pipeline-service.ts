@@ -205,39 +205,11 @@ export class DownloadPipelineService extends DBService {
     const schema = buildParquetSchema(properties);
     const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
 
-    // Pipeline: Parquet writer → passThrough → hash+count transform → S3 multipart upload
-    const passThrough = new PassThrough();
-    const { transform: hashCountTransform, getResult } = createHashCountStream();
-    passThrough.pipe(hashCountTransform);
-
-    const objectStorageService = new ObjectStorageService();
-    const uploadPromise = objectStorageService.uploadStream(
-      BucketType.MAIN,
-      hashCountTransform,
-      'application/octet-stream',
-      s3Key
-    );
-
-    // PassThrough implements write()/end() but @dsnp/parquetjs types expect fs.WriteStream.
-    // The runtime only calls write() and end() — safe to cast.
-    const writer = await ParquetWriter.openStream(schema, passThrough as any);
-
-    // GeoParquet 1.0 metadata must be attached via setMetadata(), not the openStream
-    // options bag: @dsnp/parquetjs silently discards `opts.metadata` — the writer
-    // constructor initializes `userMetadata = {}` without reading the option (see
-    // node_modules/@dsnp/parquetjs/dist/lib/writer.js:107). setMetadata() writes to
-    // userMetadata, which is emitted to the footer on close(). Without this call,
-    // GeoParquet-aware readers (DuckDB spatial, GeoPandas, ogr2ogr) cannot detect
-    // the geometry column, CRS, or WKB encoding.
-    if (spatialColumns.length > 0) {
-      writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
-    }
-
-    // Build the feature-id subquery for this statement: an expression-tree
-    // projection when the statement links to one, otherwise a broad projection
-    // over the whole feature type. Either way, the security filter inside the
-    // subquery is the gate that enforces what the policy creator can see at
-    // export time.
+    // Resolve every precondition (expression read, semantic validation, subquery
+    // build, cursor setup) BEFORE starting the S3 multipart upload. The upload
+    // holds an open multipart context; if any of these throw after upload startup,
+    // the abort path can't run and the upload either hangs or leaks. Building the
+    // cursor descriptor is cheap and side-effect-free until the stream is iterated.
     //
     // The expression evaluator consumes the *normalized* internal tree shape
     // (predicates carry resolved property type metadata). `readExpressionTree`
@@ -265,18 +237,46 @@ export class DownloadPipelineService extends DBService {
       featureTypeName
     );
 
-    // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
+    // Pipeline: Parquet writer → passThrough → hash+count transform → S3 multipart upload.
     //
-    // Wrapped so a partial failure does not leak the multipart upload or leave
-    // the PassThrough → hashCountTransform pipe alive holding worker memory.
-    // On failure: destroy the input stream (which cascades into an Upload abort),
-    // then await + swallow the now-rejected uploadPromise so the original error
-    // surfaces unobscured. Without this, a thrown `appendRow`/`hydrateFeatureBatch`
-    // returns control to the caller before S3 sees end-of-stream and the multipart
-    // upload either hangs until network timeout or surfaces as an unhandled
-    // rejection.
+    // Wrapped so a partial failure does not leak the multipart upload or leave the
+    // PassThrough → hashCountTransform pipe alive holding worker memory. On failure:
+    // destroy the input stream (which cascades into an Upload abort), then await +
+    // swallow the now-rejected uploadPromise so the original error surfaces
+    // unobscured. Without this, a thrown `appendRow`/`hydrateFeatureBatch` (or any
+    // earlier set-up failure inside this block) returns control to the caller before
+    // S3 sees end-of-stream and the multipart upload either hangs until network
+    // timeout or surfaces as an unhandled rejection.
+    const passThrough = new PassThrough();
+    const { transform: hashCountTransform, getResult } = createHashCountStream();
+    passThrough.pipe(hashCountTransform);
+
+    const objectStorageService = new ObjectStorageService();
+    const uploadPromise = objectStorageService.uploadStream(
+      BucketType.MAIN,
+      hashCountTransform,
+      'application/octet-stream',
+      s3Key
+    );
+
     let streamingSucceeded = false;
     try {
+      // PassThrough implements write()/end() but @dsnp/parquetjs types expect
+      // fs.WriteStream. The runtime only calls write() and end() — safe to cast.
+      const writer = await ParquetWriter.openStream(schema, passThrough as any);
+
+      // GeoParquet 1.0 metadata must be attached via setMetadata(), not the openStream
+      // options bag: @dsnp/parquetjs silently discards `opts.metadata` — the writer
+      // constructor initializes `userMetadata = {}` without reading the option (see
+      // node_modules/@dsnp/parquetjs/dist/lib/writer.js:107). setMetadata() writes to
+      // userMetadata, which is emitted to the footer on close(). Without this call,
+      // GeoParquet-aware readers (DuckDB spatial, GeoPandas, ogr2ogr) cannot detect
+      // the geometry column, CRS, or WKB encoding.
+      if (spatialColumns.length > 0) {
+        writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
+      }
+
+      // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
       for await (const baseBatch of cursor) {
         const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
         for (const feature of hydrated) {

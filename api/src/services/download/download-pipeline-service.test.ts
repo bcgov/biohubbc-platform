@@ -524,6 +524,76 @@ describe('DownloadPipelineService', () => {
       expect(uploadStub).to.have.been.calledOnce;
     });
 
+    it('aborts the multipart upload when ParquetWriter setup throws AFTER upload startup', async () => {
+      // Pre-loop throw point regression (Codex re-eval): ParquetWriter.openStream
+      // runs after uploadPromise has been created but inside the try block. The
+      // catch must still tear down the upload; without the fix this would leak the
+      // S3 multipart context.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const writerError = new Error('parquet writer init failed');
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').rejects(writerError);
+
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .rejects(new Error('S3 upload aborted by caller'));
+
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      // The original writer-init error wins; upload-abort rejection is swallowed.
+      expect(caught).to.equal(writerError);
+      expect(uploadStub).to.have.been.calledOnce;
+    });
+
+    it('does not start the upload when readExpressionTree fails before upload setup', async () => {
+      // The stricter form of the same fix: every cheap precondition that *can* throw
+      // (expression read, semantic validation, subquery build) runs BEFORE upload
+      // creation, so a thrown precondition leaves the worker with zero S3 state to
+      // clean up. This test pins that ordering — uploadStream is never called.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const treeError = new Error('expression tree gone');
+      sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').rejects(treeError);
+
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream');
+      sinon.stub(parquetjs.ParquetWriter, 'openStream');
+      sinon.stub(ExpressionEvaluationRepository.prototype, 'buildExpressionTreeFeatureIdsSubquery');
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', '44444444-4444-4444-4444-444444444444')
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).to.equal(treeError);
+      expect(uploadStub).to.not.have.been.called;
+    });
+
     it('inserts the download_artifact link after the artifact row is created', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
