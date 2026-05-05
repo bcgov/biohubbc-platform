@@ -804,6 +804,31 @@ describe('DownloadRepository', () => {
       expect(taxonQuery).to.not.be.undefined;
     });
 
+    it('expands datetime into UNION ALL of _date and _time arms over the timestamp table', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      await repo.fetchTypedPropertyRows([1], ['datetime']);
+
+      const datetimeQuery = queryStub
+        .getCalls()
+        .map((c) => String(c.args[0]))
+        .find((sql) => sql.includes('submission_feature_property_timestamp'));
+      expect(datetimeQuery, 'expected datetime branch query').to.not.be.undefined;
+      // The split read projection: each component is filtered to non-null and aliased
+      // with the suffixed name. Two arms joined by UNION ALL preserve partial-component data.
+      expect(datetimeQuery).to.include('date_value');
+      expect(datetimeQuery).to.include('time_value');
+      expect(datetimeQuery).to.include('_date');
+      expect(datetimeQuery).to.include('_time');
+      expect(datetimeQuery).to.include('UNION ALL');
+      // The old `p.value` reference must be gone — the timestamp table no longer has that column.
+      expect(/\bp\.value\b/.test(datetimeQuery!), 'datetime SQL must not reference p.value').to.be.false;
+    });
+
     it('uses ST_AsGeoJSON for spatial properties', async () => {
       const queryStub = sinon.stub();
       const geoJson = { type: 'Point', coordinates: [-123.5, 48.4] };

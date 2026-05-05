@@ -5,6 +5,12 @@
  */
 import wkx from 'wkx';
 
+import {
+  assertNoDatetimeColumnCollisions,
+  DATETIME_DATE_SUFFIX,
+  DATETIME_TIME_SUFFIX
+} from '../models/datetime-column';
+
 export interface CsvPropertyDefinition {
   feature_property_name: string;
   feature_property_type_name: string;
@@ -17,15 +23,28 @@ export interface CsvPropertyDefinition {
  * the cell value is WKT (decoded from the Parquet WKB buffer at flatten
  * time). artifact_key properties map to a single `filePath` column.
  *
+ * `datetime` properties emit two columns (`<prop>_date`, `<prop>_time`) so
+ * partial-component data (date-only, time-only, or both) round-trips
+ * losslessly and remains queryable as native columnar predicates. The
+ * suffix convention is shared with the SQL projection and the Parquet
+ * column expansion — all three sites must agree on the names.
+ *
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
  * @returns {string[]} Ordered header names.
  */
 export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[] {
+  assertNoDatetimeColumnCollisions(properties);
+
   const headers: string[] = [];
 
   for (const prop of properties) {
     if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
+    } else if (prop.feature_property_type_name === 'datetime') {
+      headers.push(
+        `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`,
+        `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`
+      );
     } else {
       headers.push(prop.feature_property_name);
     }
@@ -96,7 +115,11 @@ export function flattenFeatureWithParent(
  * Flatten a feature's JSONB data using schema-defined property types.
  *
  * Type-aware rules:
- * - string, number, datetime, boolean → String(value)
+ * - string, number, boolean → String(value)
+ * - datetime → expands to two cells (`<prop>_date`, `<prop>_time`); each
+ *   pulled directly from the matching key on `data`. Partial-component data
+ *   round-trips losslessly: a null component produces an empty cell while
+ *   the other carries its ISO string. See {@link buildSchemaHeaders}.
  * - spatial → decode WKB Buffer (as produced by the Parquet writer) → single
  *   column under the property's own name, value is WKT
  * - array → delegate to flattenArray()
@@ -119,6 +142,22 @@ export function flattenFeatureBySchema(
   const result: Record<string, string> = {};
 
   for (const prop of properties) {
+    if (prop.feature_property_type_name === 'datetime') {
+      // The CSV is written from rows the Parquet reader returns. parquetjs reads
+      // `DATE` columns as JS `Date` objects (UTC midnight on the stored day) and
+      // `TIME_MILLIS` columns as raw millisecond integers. Both must be
+      // formatted back into the canonical `'YYYY-MM-DD'` / `'HH:MM:SS'` strings
+      // the SQL projection produced — otherwise the generic `toStringOrEmpty`
+      // path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`)
+      // and render the raw ms count for time. Strings still pass through
+      // unchanged for callers that haven't gone through Parquet.
+      const dateKey = `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`;
+      const timeKey = `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`;
+      result[dateKey] = formatDatetimeDateCell(data[dateKey]);
+      result[timeKey] = formatDatetimeTimeCell(data[timeKey]);
+      continue;
+    }
+
     const value = data[prop.feature_property_name];
 
     switch (prop.feature_property_type_name) {
@@ -141,6 +180,51 @@ export function flattenFeatureBySchema(
   }
 
   return result;
+}
+
+/**
+ * Format a `<prop>_date` cell value for CSV output. parquetjs hands back a
+ * `Date` (UTC midnight) for native `DATE` columns; the SQL projection emits a
+ * `'YYYY-MM-DD'` string when CSV is fed directly without a Parquet round-trip.
+ * Either form normalizes to the canonical date string. Null/undefined → empty.
+ *
+ * The Date branch matches the original SQL projection's
+ * `to_char(date_value, 'YYYY-MM-DD')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`).
+ */
+function formatDatetimeDateCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * Format a `<prop>_time` cell value for CSV output. parquetjs hands back a
+ * raw millisecond integer for native `TIME_MILLIS` columns; the SQL projection
+ * emits a `'HH:MM:SS'` string when CSV is fed directly. Either form normalizes
+ * to the canonical time string. Null/undefined → empty.
+ *
+ * The number branch matches the original SQL projection's
+ * `to_char(time_value, 'HH24:MI:SS')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would render the raw integer count
+ * (e.g. `'45296000'`).
+ */
+function formatDatetimeTimeCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'number') {
+    const totalSeconds = Math.floor(value / 1000);
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  }
+  return typeof value === 'string' ? value : '';
 }
 
 /**

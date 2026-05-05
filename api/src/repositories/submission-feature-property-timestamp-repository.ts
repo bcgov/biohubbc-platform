@@ -11,6 +11,10 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
   /**
    * Insert a submission_feature_property_timestamp row.
    *
+   * Caller is responsible for splitting any JS `Date` / `dayjs` value into the two component
+   * fields before calling. The DB CHECK constraint enforces "at least one component non-null" —
+   * if both are null the SQL surfaces the error; the repository does not pre-check.
+   *
    * @param {CreateSubmissionFeaturePropertyTimestamp} payload
    * @return {Promise<SubmissionFeaturePropertyTimestamp>}
    * @memberof SubmissionFeaturePropertyTimestampRepository
@@ -25,7 +29,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
@@ -56,7 +61,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_property_timestamp_id', submissionFeaturePropertyTimestampId);
 
@@ -95,7 +101,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_id', submissionFeatureId);
 
@@ -120,7 +127,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('feature_type_property_id', featureTypePropertyId);
 

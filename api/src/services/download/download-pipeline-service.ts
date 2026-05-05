@@ -3,6 +3,7 @@ import { PassThrough } from 'node:stream';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
+import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
@@ -320,6 +321,18 @@ export class DownloadPipelineService extends DBService {
         if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
           // Array/object/artifact_key: fall back to JSONB data.properties
           data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        } else if (prop.feature_property_type_name === 'datetime') {
+          // `datetime` properties are projected as two synthetic rows by
+          // `fetchTypedPropertyRows` with suffixed `name` values
+          // (`<prop>_date`, `<prop>_time`). The hydrator mirrors that
+          // expansion: each datetime property writes two `data` keys, one or
+          // both of which may be null for partial-component rows. Suffix
+          // constants live in `models/datetime-column.ts`; the SQL projection
+          // uses the same constants — drift silently nulls cells.
+          const dateKey = `${propName}${DATETIME_DATE_SUFFIX}`;
+          const timeKey = `${propName}${DATETIME_TIME_SUFFIX}`;
+          data[dateKey] = typedProps[dateKey] ?? null;
+          data[timeKey] = typedProps[timeKey] ?? null;
         } else if (propName in typedProps) {
           data[propName] = typedProps[propName];
         } else {

@@ -19,6 +19,7 @@ import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
+import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
@@ -63,6 +64,13 @@ function assembleFeatureData(
       const propName = prop.feature_property_name;
       if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
         data[propName] = baseRow.data?.properties?.[propName] ?? null;
+      } else if (prop.feature_property_type_name === 'datetime') {
+        // Mirror production hydrator: datetime properties are projected as two
+        // synthetic rows (`<prop>_date`, `<prop>_time`); write both keys.
+        const dateKey = `${propName}${DATETIME_DATE_SUFFIX}`;
+        const timeKey = `${propName}${DATETIME_TIME_SUFFIX}`;
+        data[dateKey] = typedProps[dateKey] ?? null;
+        data[timeKey] = typedProps[timeKey] ?? null;
       } else if (propName in typedProps) {
         data[propName] = typedProps[propName];
       } else {
@@ -177,8 +185,16 @@ describe('Download Parquet pipeline (integration)', function () {
          VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
         [submissionFeatureId, featureTypePropertyId, value as string, systemUserId]
       );
+    } else if (tableName === 'submission_feature_property_timestamp') {
+      const ts = value as { date_value: string | null; time_value: string | null };
+      await connection.query(
+        `INSERT INTO submission_feature_property_timestamp
+           (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [submissionFeatureId, featureTypePropertyId, ts.date_value, ts.time_value, systemUserId]
+      );
     } else {
-      // string, number, boolean, timestamp — all use a `value` column
+      // string, number, boolean — all use a `value` column
       await connection.query(
         `INSERT INTO ${tableName} (submission_feature_id, feature_type_property_id, value, create_user)
          VALUES ($1, $2, $3, $4)`,
@@ -455,12 +471,10 @@ describe('Download Parquet pipeline (integration)', function () {
 
       // Insert typed property rows for capture
       await insertTypedPropertyRow('submission_feature_property_string', captureFeatureId, 62, 'Test comment value');
-      await insertTypedPropertyRow(
-        'submission_feature_property_timestamp',
-        captureFeatureId,
-        51,
-        '2024-06-15T10:30:00Z'
-      );
+      await insertTypedPropertyRow('submission_feature_property_timestamp', captureFeatureId, 51, {
+        date_value: '2024-06-15',
+        time_value: '10:30:00'
+      });
 
       // Insert typed property row for measurement
       await insertTypedPropertyRow('submission_feature_property_number', measurementFeatureId, 29, 42.5);
@@ -475,7 +489,8 @@ describe('Download Parquet pipeline (integration)', function () {
       const captureRows = await streamAndHydrate(captureCartId, 'capture', captureProperties);
       expect(captureRows).to.have.length(1);
       expect(captureRows[0].data.comment).to.equal('Test comment value');
-      expect(captureRows[0].data.timestamp).to.not.be.null;
+      expect(captureRows[0].data.timestamp_date).to.equal('2024-06-15');
+      expect(captureRows[0].data.timestamp_time).to.equal('10:30:00');
 
       // Stream and hydrate measurement
       const measurementCartId = await createCartWithFeatures([measurementFeatureId]);
@@ -487,6 +502,45 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(measurementRows).to.have.length(1);
       // NUMERIC comes back as JS number due to custom parser
       expect(Number(measurementRows[0].data.measurement_value)).to.equal(42.5);
+    });
+
+    it('hydrates a date-only timestamp into <prop>_date with <prop>_time null', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'date-only' });
+      await insertTypedPropertyRow('submission_feature_property_timestamp', captureFeatureId, 51, {
+        date_value: '2024-06-15',
+        time_value: null
+      });
+
+      const cartId = await createCartWithFeatures([captureFeatureId]);
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
+      ];
+      const rows = await streamAndHydrate(cartId, 'capture', properties);
+
+      expect(rows).to.have.length(1);
+      expect(rows[0].data.timestamp_date).to.equal('2024-06-15');
+      // timestamp_time may be null (set by hydrator) or undefined (key never written) — accept both
+      expect(rows[0].data.timestamp_time ?? null).to.be.null;
+    });
+
+    it('hydrates a time-only timestamp into <prop>_time with <prop>_date null', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'time-only' });
+      await insertTypedPropertyRow('submission_feature_property_timestamp', captureFeatureId, 51, {
+        date_value: null,
+        time_value: '10:30:00'
+      });
+
+      const cartId = await createCartWithFeatures([captureFeatureId]);
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
+      ];
+      const rows = await streamAndHydrate(cartId, 'capture', properties);
+
+      expect(rows).to.have.length(1);
+      expect(rows[0].data.timestamp_date ?? null).to.be.null;
+      expect(rows[0].data.timestamp_time).to.equal('10:30:00');
     });
 
     it('should resolve code property to contributor_codeset_code.label', async () => {
@@ -626,7 +680,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const rows = await streamAndHydrate(cartId, 'capture', properties);
       expect(rows).to.have.length(1);
       expect(rows[0].data.comment).to.equal('Partial data');
-      expect(rows[0].data.timestamp).to.be.null;
+      // datetime expands to two keys; both null when no typed row exists
+      expect(rows[0].data.timestamp_date).to.be.null;
+      expect(rows[0].data.timestamp_time).to.be.null;
     });
 
     it('should fall back to JSONB for array properties', async () => {
