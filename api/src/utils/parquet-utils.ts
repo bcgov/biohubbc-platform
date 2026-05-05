@@ -139,10 +139,15 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       return 'DOUBLE';
     case 'boolean':
       return 'BOOLEAN';
-    // `datetime` is intentionally absent: it is handled upstream by
-    // `expandPropertyToColumns`, which returns two columns (DATE + TIME_MILLIS)
-    // rather than a single primitive. Any direct caller passing 'datetime' here
-    // gets the default UTF8 fallback, which is wrong — go through the helper.
+    case 'datetime':
+      // `datetime` cannot map to a single primitive — it splits into two columns
+      // (DATE + TIME_MILLIS) via `expandPropertyToColumns`. Reaching this case is
+      // a programming error: a caller bypassed the helper and asked for a single
+      // type. Fail loudly so the wrong column shape doesn't quietly land in the
+      // Parquet footer as UTF8.
+      throw new Error(
+        `propertyTypeToParquetType: 'datetime' has no single Parquet type — use expandPropertyToColumns to get DATE + TIME_MILLIS`
+      );
     case 'code':
       // Code properties arrive pre-resolved: the cursor JOIN resolves FK -> display label
       return 'UTF8';

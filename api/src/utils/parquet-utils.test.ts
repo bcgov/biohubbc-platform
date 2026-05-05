@@ -30,13 +30,13 @@ describe('parquet-utils', () => {
       expect(propertyTypeToParquetType('boolean')).to.equal('BOOLEAN');
     });
 
-    it('should default datetime to UTF8 because expansion is handled upstream', () => {
-      // `datetime` is intentionally absent from the propertyTypeToParquetType
-      // switch — expandPropertyToColumns short-circuits and emits two columns
-      // (DATE + TIME_MILLIS) before this function is consulted. Direct callers
-      // hitting 'datetime' fall through to the default UTF8, which is wrong;
-      // the test pins the behavior so the absence is intentional, not a bug.
-      expect(propertyTypeToParquetType('datetime')).to.equal('UTF8');
+    it('should throw for datetime because the helper must be used (DATE + TIME_MILLIS expansion)', () => {
+      // `datetime` cannot map to a single Parquet primitive — `expandPropertyToColumns`
+      // splits it into two columns (DATE + TIME_MILLIS) before the writer asks for a
+      // type. Reaching this case means a caller bypassed the helper; failing loud
+      // points the bug at the caller instead of letting UTF8 silently land in the
+      // Parquet footer.
+      expect(() => propertyTypeToParquetType('datetime')).to.throw(/datetime/);
     });
 
     it('should map code to UTF8 (resolved label is a string)', () => {
