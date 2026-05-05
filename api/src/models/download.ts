@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
+import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
@@ -82,6 +83,27 @@ export const CreateDownload = z.object({
   format: z.string()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
+
+/**
+ * HTTP request body for `POST /api/download`.
+ *
+ * `name` is capped at 100 to match the underlying `biohub.policy.name varchar(100)`
+ * column — the route boundary rejects too-long names rather than letting the DB
+ * surface the violation as a 500.
+ *
+ * `.strict()` rejects unknown keys: silent acceptance of `ui_id` and similar
+ * leakage masks frontend decoder bugs. Failing fast at the boundary points the
+ * FE at its own bug rather than letting bad data flow into a policy.
+ */
+export const CreateDownloadRequestBody = z
+  .object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(1000).nullable().optional(),
+    featureTypes: z.array(z.string()).min(1),
+    expression: ExpressionTree.nullable()
+  })
+  .strict();
+export type CreateDownloadRequestBody = z.infer<typeof CreateDownloadRequestBody>;
 
 export const IsAuthorized = z.object({ authorized: z.boolean() });
 export type IsAuthorized = z.infer<typeof IsAuthorized>;

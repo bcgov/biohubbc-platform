@@ -1,9 +1,8 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { z } from 'zod';
 import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
-import { ExpressionTree } from '../../models/expression-tree';
+import { CreateDownloadRequestBody } from '../../models/download';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
 import { featureSearchExpressionTreeSchema } from '../../openapi/schemas/search/search-feature';
@@ -158,25 +157,6 @@ export function getDownloads(): RequestHandler {
     }
   };
 }
-
-/**
- * Request body for `POST /api/download`.
- *
- * `.strict()` rejects unknown keys to surface frontend decoder bugs (e.g. stale `ui_id`
- * leaking through) at the boundary instead of silently letting bad data flow into a
- * download policy.
- */
-const CreateDownloadRequestBody = z
-  .object({
-    // 100 matches the underlying `biohub.policy.name varchar(100)` column. Keep both
-    // in sync so a too-long name is rejected at the route boundary, not by a 500
-    // from the DB layer.
-    name: z.string().min(1).max(100),
-    description: z.string().max(1000).nullable().optional(),
-    featureTypes: z.array(z.string()).min(1),
-    expression: ExpressionTree.nullable()
-  })
-  .strict();
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
