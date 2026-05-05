@@ -306,4 +306,34 @@ describe('ExpressionEvaluationRepository', () => {
       expect(sql).to.include('"ft"."name" = \'species_observation\'');
     });
   });
+
+  describe('buildBroadFeatureTypeSubquery', () => {
+    it('emits SQL projecting submission_feature_id with the feature-type filter and security filter for an authenticated user', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+
+      const sql = repository.buildBroadFeatureTypeSubquery('fish', 42).toString();
+
+      expect(sql).to.include('"sf"."submission_feature_id"');
+      expect(sql).to.include('from "submission_feature" as "sf"');
+      expect(sql).to.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('"ft"."name" = \'fish\'');
+      expect(sql).to.include('"sf"."record_end_date" is null');
+      expect(sql).to.include('"ft"."record_end_date" is null');
+      // Authenticated path uses isAccessibleToUser → security_scope_anchor + bound user id
+      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('team_security_scope');
+      expect(sql).to.include('42');
+    });
+
+    it('emits the anonymous-only NOT-secured filter when systemUserId is null', () => {
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+
+      const sql = repository.buildBroadFeatureTypeSubquery('fish', null).toString();
+
+      expect(sql).to.include('"ft"."name" = \'fish\'');
+      // Anonymous: emits NOT EXISTS (uppercase, raw SQL fragment) with no scope-anchor branch
+      expect(sql.toLowerCase()).to.include('not exists');
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+  });
 });

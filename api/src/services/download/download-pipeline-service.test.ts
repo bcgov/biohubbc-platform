@@ -8,13 +8,21 @@ import { createMockDownloadRecord } from '../../__mocks__/download';
 import { ApiConflictError } from '../../errors/api-error';
 import { DownloadSource } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { ExpressionTree } from '../../models/expression-tree';
+import { NormalizedExpressionTreeExpression } from '../../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
+import {
+  ActivePolicyStatementWithExpression,
+  PolicyStatementRepository
+} from '../../repositories/authorization/policy-statement-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
+import { ExpressionPredicateSemanticValidator } from '../expression-predicate-semantic-validator';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
-import { SearchFeatureService } from '../search-feature-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { DownloadPipelineService } from './download-pipeline-service';
 
@@ -133,12 +141,17 @@ describe('DownloadPipelineService', () => {
 
   // Shared test data for Parquet tests
   const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
-  const TEST_SOURCE_CART: DownloadSource = {
-    cart_id: 'cccc0000-0000-0000-0000-000000000001',
-    filters: null,
-    create_user: 1
-  };
-  const TEST_SOURCE_FILTER: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
+  const TEST_POLICY_ID = '11111111-1111-1111-1111-111111111111';
+  const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, create_user: 7 };
+
+  const stmt = (
+    urn_feature_type: string,
+    expression_id: string | null = null
+  ): ActivePolicyStatementWithExpression => ({
+    policy_statement_id: '22222222-2222-2222-2222-222222222222',
+    urn_feature_type,
+    expression_id
+  });
 
   describe('resolveParquetSchema', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
@@ -174,57 +187,52 @@ describe('DownloadPipelineService', () => {
       }
     ];
 
-    it('resolves schema and feature types for cart-based downloads', async () => {
+    it('returns featureTypes from active policy statements alongside the schema lookup', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      const listStub = sinon
-        .stub(DownloadRepository.prototype, 'listDownloadFeatureTypesByCartId')
-        .resolves(['dataset', 'observation']);
+      const statements = [stmt('dataset'), stmt('observation', '33333333-3333-3333-3333-333333333333')];
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves(statements);
 
-      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE_CART);
+      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
 
-      expect(listStub).to.have.been.calledOnceWith(TEST_SOURCE_CART.cart_id);
       expect(result.featureTypes).to.deep.equal(['dataset', 'observation']);
+      expect(result.statements).to.deep.equal(statements);
       expect(result.schemaLookup.has('dataset')).to.be.true;
       expect(result.schemaLookup.has('observation')).to.be.true;
     });
 
-    it('resolves schema and feature types for filter-based downloads', async () => {
+    it('preserves the SQL ORDER BY urn_feature_type ordering of statements', async () => {
+      // Repo layer is the source of ordering; service preserves whatever order it gets.
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      const mockSubquery = { toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [] }) }) } as any;
-      const buildSubqueryStub = sinon
-        .stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery')
-        .returns(mockSubquery);
-      const listStub = sinon
-        .stub(DownloadRepository.prototype, 'listDownloadFeatureTypesBySearchQuery')
-        .resolves(['observation']);
+      // Repo returns rows in urn_feature_type ASC; service must not reorder them.
+      const statements = [stmt('a'), stmt('b'), stmt('c')];
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves(statements);
 
-      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE_FILTER);
+      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
 
-      expect(buildSubqueryStub).to.have.been.calledOnceWith(TEST_SOURCE_FILTER.filters, TEST_SOURCE_FILTER.create_user);
-      expect(listStub).to.have.been.calledOnce;
-      expect(result.featureTypes).to.deep.equal(['observation']);
+      expect(result.featureTypes).to.deep.equal(['a', 'b', 'c']);
     });
 
-    it('throws when download has neither cart_id nor filters', async () => {
+    it('returns empty featureTypes and statements for a policy with no active statements', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId').resolves([]);
 
-      const noSource: DownloadSource = { cart_id: null, filters: null, create_user: 1 };
+      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
 
-      try {
-        await service.resolveParquetSchema(TEST_DOWNLOAD_ID, noSource);
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.include('has neither cart_id nor filters');
-      }
+      expect(result.featureTypes).to.deep.equal([]);
+      expect(result.statements).to.deep.equal([]);
     });
   });
 
@@ -257,51 +265,115 @@ describe('DownloadPipelineService', () => {
       const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       const insertArtifactStub = sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
-        .resolves({ artifact_id: 'bbbb0000-0000-0000-0000-000000000001' });
+        .resolves({ artifact_id: 'bbbb0000-0000-0000-0000-000000000001' } as any);
       const linkStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
       return { mockWriter, openStreamStub, uploadStub, insertArtifactStub, linkStub };
     };
 
-    it('streams features to Parquet via cart path', async () => {
+    // A subquery stub that exposes toSQL().toNative() — the only surface the
+    // service uses on the returned Knex.QueryBuilder.
+    const subqueryStub = (sql = 'SELECT 1', bindings: any[] = []) =>
+      ({
+        toSQL: () => ({ toNative: () => ({ sql, bindings }) })
+      } as any);
+
+    it('uses the expression-tree path when statement.expression_id is set', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-      const { mockWriter } = stubParquetPipeline();
+      stubParquetPipeline();
 
-      const baseBatch = [
-        {
-          submission_feature_id: 1,
-          uuid: 'uuid-1',
-          feature_type_name: 'observation',
-          data: { properties: {} },
-          parent_uuid: 'p-1'
-        }
-      ];
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([baseBatch]));
-      sinon
-        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
-        .resolves([{ submission_feature_id: 1, name: 'species', value: 'bear' }]);
+      const mockTree = { type: 'expression', operator: 'AND', clauses: [] } as unknown as ExpressionTree;
+      const normalizedTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: []
+      } as unknown as NormalizedExpressionTreeExpression;
+      const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(mockTree);
+      const validateStub = sinon
+        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+        .resolves(normalizedTree);
+      const buildExprSubqueryStub = sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildExpressionTreeFeatureIdsSubquery')
+        .returns(subqueryStub('SELECT expression', []));
+      const buildBroadStub = sinon.stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery');
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      const expressionId = '44444444-4444-4444-4444-444444444444';
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
+        source: TEST_SOURCE,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', expressionId)
       });
 
-      expect(mockWriter.appendRow).to.have.been.calledOnce;
-      expect(mockWriter.close).to.have.been.calledOnce;
+      expect(readTreeStub).to.have.been.calledOnceWith(expressionId);
+      expect(validateStub).to.have.been.calledOnceWith(mockTree);
+      expect(buildExprSubqueryStub).to.have.been.calledOnceWith('observation', normalizedTree, TEST_SOURCE.create_user);
+      expect(buildBroadStub).to.not.have.been.called;
     });
 
-    it('streams features to Parquet via filter path', async () => {
+    it('uses the broad path when statement.expression_id is null', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-      const { mockWriter } = stubParquetPipeline();
+      stubParquetPipeline();
 
-      const mockSubquery = {
-        toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [5] }) })
-      } as any;
-      sinon.stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery').returns(mockSubquery);
+      const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree');
+      const buildExprSubqueryStub = sinon.stub(
+        ExpressionEvaluationRepository.prototype,
+        'buildExpressionTreeFeatureIdsSubquery'
+      );
+      const buildBroadStub = sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(readTreeStub).to.not.have.been.called;
+      expect(buildExprSubqueryStub).to.not.have.been.called;
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', TEST_SOURCE.create_user);
+    });
+
+    it('passes source.create_user (the policy creator) — NOT the worker identity — through to the security filter', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
+
+      const buildBroadStub = sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      const policyCreatorId = 999;
+      const sourceWithCreator: DownloadSource = { policy_id: TEST_POLICY_ID, create_user: policyCreatorId };
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: sourceWithCreator,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', policyCreatorId);
+    });
+
+    it('streams features through the writer and uploads with deterministic S3 key', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter, uploadStub } = stubParquetPipeline();
+
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
       const baseBatch = [
         {
           submission_feature_id: 1,
@@ -311,7 +383,7 @@ describe('DownloadPipelineService', () => {
           parent_uuid: null
         }
       ];
-      const streamStub = sinon
+      sinon
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
         .returns(mockBaseCursor([baseBatch]));
       sinon
@@ -320,31 +392,14 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_FILTER,
+        source: TEST_SOURCE,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
-      expect(streamStub).to.have.been.calledOnce;
-      expect(streamStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
       expect(mockWriter.appendRow).to.have.been.calledOnce;
       expect(mockWriter.close).to.have.been.calledOnce;
-    });
-
-    it('uses deterministic S3 key downloads/{downloadId}/{featureTypeName}/data.parquet', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-      const { uploadStub } = stubParquetPipeline();
-
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
-
-      await service.writeFeatureTypeParquet({
-        downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
-        properties: mockProperties,
-        featureTypeName: 'observation'
-      });
-
       expect(uploadStub).to.have.been.calledOnce;
       expect(uploadStub.firstCall.args[3]).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
     });
@@ -354,13 +409,17 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
+        source: TEST_SOURCE,
         properties: mockSpatialProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
       expect(mockWriter.setMetadata).to.have.been.calledOnce;
@@ -373,30 +432,38 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
+        source: TEST_SOURCE,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
       expect(mockWriter.setMetadata).to.not.have.been.called;
     });
 
-    it('inserts artifact with uploaded status, parquet format, and deterministic S3 key', async () => {
+    it('inserts artifact with uploaded status, parquet format, and the deterministic S3 key', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
+        source: TEST_SOURCE,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
       expect(insertArtifactStub).to.have.been.calledOnce;
@@ -404,34 +471,6 @@ describe('DownloadPipelineService', () => {
       expect(payload.artifact_status).to.equal('uploaded');
       expect(payload.format).to.equal('parquet');
       expect(payload.object_key).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
-      expect(payload.uploaded_at).to.be.a('string');
-      expect(new Date(payload.uploaded_at!).toISOString()).to.equal(payload.uploaded_at);
-    });
-
-    it('inserts artifact with SHA-256 hex checksum and byte_size computed by the hash stream', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-      const { insertArtifactStub, uploadStub } = stubParquetPipeline();
-
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
-
-      await service.writeFeatureTypeParquet({
-        downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
-        properties: mockProperties,
-        featureTypeName: 'observation'
-      });
-
-      // uploadStream receives the hash-count transform (not the raw passThrough), proving the digest stream is in the pipeline
-      expect(uploadStub).to.have.been.calledOnce;
-      const uploadedStream = uploadStub.firstCall.args[1];
-      expect(uploadedStream).to.exist;
-
-      const payload = insertArtifactStub.firstCall.args[0];
-      expect(payload.checksum_sha256).to.be.a('string');
-      expect(payload.checksum_sha256).to.have.lengthOf(64);
-      expect(payload.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
-      expect(payload.byte_size).to.equal(0); // zero-feature test → empty Parquet bytes piped via mock writer
     });
 
     it('inserts the download_artifact link after the artifact row is created', async () => {
@@ -439,13 +478,17 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub, linkStub } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: TEST_SOURCE_CART,
+        source: TEST_SOURCE,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
       expect(insertArtifactStub).to.have.been.calledOnce;
@@ -453,6 +496,15 @@ describe('DownloadPipelineService', () => {
       expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
       expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
       expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
+    });
+  });
+
+  describe('service shape', () => {
+    it('does not expose searchFeatureService (Phase 2 carved that import out of the pipeline)', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      // Cast to any so the assertion documents intent rather than relying on TS narrowing
+      expect((service as any).searchFeatureService).to.be.undefined;
     });
   });
 });

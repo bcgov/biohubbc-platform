@@ -816,6 +816,12 @@ describe('Download Parquet pipeline (integration)', function () {
     // an empty property list is safe and minimizes test surface area.
     const emptyProperties: CsvPropertyDefinition[] = [];
 
+    const stubStatement = (urn_feature_type: string) => ({
+      policy_statement_id: '00000000-0000-0000-0000-000000000001',
+      urn_feature_type,
+      expression_id: null
+    });
+
     it('inserts one artifact + one download_artifact row for a single feature type', async () => {
       stubParquetAndUpload();
 
@@ -828,7 +834,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset'
+        featureTypeName: 'dataset',
+        statement: stubStatement('dataset')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -879,7 +886,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset'
+        featureTypeName: 'dataset',
+        statement: stubStatement('dataset')
       });
 
       const afterFirst = await connection.sql(SQL`
@@ -899,7 +907,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset'
+        featureTypeName: 'dataset',
+        statement: stubStatement('dataset')
       });
 
       const afterSecond = await connection.sql(SQL`
@@ -929,13 +938,15 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset'
+        featureTypeName: 'dataset',
+        statement: stubStatement('dataset')
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'capture'
+        featureTypeName: 'capture',
+        statement: stubStatement('capture')
       });
 
       const artifactRows = await connection.sql(SQL`

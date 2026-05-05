@@ -52,6 +52,37 @@ export class ExpressionEvaluationRepository extends BaseRepository {
   }
 
   /**
+   * Build a Knex subquery that returns every active submission_feature_id for the given
+   * feature type, with the security filter applied for the given user — the broad,
+   * no-expression-filter projection used when a policy statement carries no expression
+   * link.
+   *
+   * Counterpart to `buildExpressionTreeFeatureIdsSubquery` for the broad path. The
+   * security filter is the only gate against a runaway export when no expression is
+   * present, so it must always be composed in.
+   *
+   * @param {string} featureTypeName - The feature type name to project.
+   * @param {number | null} systemUserId - Security context (null = anonymous, only unsecured features).
+   * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows.
+   */
+  buildBroadFeatureTypeSubquery(featureTypeName: string, systemUserId: number | null): Knex.QueryBuilder {
+    const knex = getKnex();
+    let query = knex('submission_feature as sf')
+      .select('sf.submission_feature_id')
+      .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('ft.name', featureTypeName)
+      .whereNull('sf.record_end_date')
+      .whereNull('ft.record_end_date');
+
+    const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
+    if (securityFilter) {
+      query = query.whereRaw(securityFilter);
+    }
+
+    return query;
+  }
+
+  /**
    * Recursively builds a target submission_feature_id query for an expression-tree clause.
    *
    * Every child query returns target feature IDs for the route feature type. Predicate clauses first find evidence

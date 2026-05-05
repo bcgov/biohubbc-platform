@@ -1,4 +1,5 @@
 import { ParquetWriter } from '@dsnp/parquetjs';
+import { Knex } from 'knex';
 import { PassThrough } from 'node:stream';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
@@ -6,15 +7,18 @@ import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
+import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { SearchFeatureService } from '../search-feature-service';
 import { ArtifactService } from '../upload/artifact-service';
 
 /**
@@ -32,13 +36,17 @@ import { ArtifactService } from '../upload/artifact-service';
  */
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
-  searchFeatureService: SearchFeatureService;
+  expressionEvaluationRepository: ExpressionEvaluationRepository;
+  expressionTreeService: ExpressionTreeService;
+  policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.searchFeatureService = new SearchFeatureService(connection);
+    this.expressionEvaluationRepository = new ExpressionEvaluationRepository(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
   }
 
@@ -110,37 +118,36 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Build schema lookup and list feature types for a Parquet download.
+   * Resolve the per-feature-type schema and the active policy statements that drive
+   * a Parquet download.
    *
-   * The schema lookup maps feature type names to their property definitions.
-   * The feature type list drives the per-type Parquet file generation loop.
+   * The download's policy is the single source of truth for both the list of feature
+   * types to export and (per type) whether to filter by an expression tree or to
+   * project the broad feature-type set. Returning the full statements list alongside
+   * the schema lookup keeps the caller's per-type loop to a single fetch — the
+   * matching statement is threaded into `writeFeatureTypeParquet` instead of being
+   * re-queried per type.
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadSource} source - The download source (cart or filters).
-   * @return {Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[] }>}
+   * Feature types come back in `urn_feature_type` ASC order so the downstream loop
+   * produces a stable, alphabetic sequence of Parquet files.
+   *
+   * @param {string} _downloadId - The download ID (kept for future diagnostics; unused today).
+   * @param {DownloadSource} source - The download source (policy_id + create_user).
+   * @return {Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[]; statements: ActivePolicyStatementWithExpression[] }>}
    * @memberof DownloadPipelineService
    */
   async resolveParquetSchema(
-    downloadId: string,
+    _downloadId: string,
     source: DownloadSource
-  ): Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[] }> {
+  ): Promise<{
+    schemaLookup: Map<string, CsvPropertyDefinition[]>;
+    featureTypes: string[];
+    statements: ActivePolicyStatementWithExpression[];
+  }> {
     const schemaLookup = await this.buildSchemaLookup();
-
-    let featureTypes: string[];
-
-    if (source.cart_id) {
-      featureTypes = await this.downloadRepository.listDownloadFeatureTypesByCartId(source.cart_id);
-    } else if (source.filters) {
-      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
-        source.filters,
-        source.create_user
-      );
-      featureTypes = await this.downloadRepository.listDownloadFeatureTypesBySearchQuery(searchSubquery);
-    } else {
-      throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
-    }
-
-    return { schemaLookup, featureTypes };
+    const statements = await this.policyStatementService.getActiveStatementsWithExpressionByPolicyId(source.policy_id);
+    const featureTypes = statements.map((statement) => statement.urn_feature_type);
+    return { schemaLookup, featureTypes, statements };
   }
 
   /**
@@ -167,11 +174,19 @@ export class DownloadPipelineService extends DBService {
    *
    * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
    *
+   * Per-statement evaluation: `payload.statement` is the resolved policy statement
+   * for this feature type. When `expression_id` is set, the expression tree drives
+   * the feature-id subquery; when null, a broad subquery over the whole feature
+   * type is used. In both branches the security filter is applied for
+   * `source.create_user` so visibility is judged at export time against the policy
+   * creator's authorization scope.
+   *
    * @param {object} payload
    * @param {string} payload.downloadId - The download ID.
-   * @param {DownloadSource} payload.source - The download source (cart or filters).
+   * @param {DownloadSource} payload.source - The download source (policy_id + create_user).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
+   * @param {ActivePolicyStatementWithExpression} payload.statement - The active policy statement for this feature type.
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
@@ -180,8 +195,9 @@ export class DownloadPipelineService extends DBService {
     source: DownloadSource;
     properties: CsvPropertyDefinition[];
     featureTypeName: string;
+    statement: ActivePolicyStatementWithExpression;
   }): Promise<void> {
-    const { downloadId, source, properties, featureTypeName } = payload;
+    const { downloadId, source, properties, featureTypeName, statement } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
@@ -217,25 +233,37 @@ export class DownloadPipelineService extends DBService {
       writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
     }
 
-    // Open cursor for the appropriate source (cart or search filters)
-    let cursor: AsyncGenerator<any[]>;
-    if (source.cart_id) {
-      cursor = this.downloadRepository.streamFeatureBaseByCartIdAndType(source.cart_id, featureTypeName);
-    } else if (source.filters) {
-      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
-        source.filters,
+    // Build the feature-id subquery for this statement: an expression-tree
+    // projection when the statement links to one, otherwise a broad projection
+    // over the whole feature type. Either way, the security filter inside the
+    // subquery is the gate that enforces what the policy creator can see at
+    // export time.
+    //
+    // The expression evaluator consumes the *normalized* internal tree shape
+    // (predicates carry resolved property type metadata). `readExpressionTree`
+    // returns the public API tree, so we re-normalize through the same semantic
+    // validator the search path uses — keeping read-time SQL semantics identical
+    // for the two consumers of the evaluator.
+    let subquery: Knex.QueryBuilder;
+    if (statement.expression_id !== null) {
+      const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
+      const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
+      subquery = this.expressionEvaluationRepository.buildExpressionTreeFeatureIdsSubquery(
+        featureTypeName,
+        normalizedTree,
         source.create_user
       );
-      const { sql, bindings } = searchSubquery.toSQL().toNative();
-      cursor = this.downloadRepository.streamFeatureBaseBySearchQueryAndType(
-        downloadId,
-        sql,
-        bindings as any[],
-        featureTypeName
-      );
     } else {
-      throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
+      subquery = this.expressionEvaluationRepository.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
     }
+
+    const { sql, bindings } = subquery.toSQL().toNative();
+    const cursor = this.downloadRepository.streamFeatureBaseBySearchQueryAndType(
+      downloadId,
+      sql,
+      bindings as any[],
+      featureTypeName
+    );
 
     // Stream: cursor → hydrate typed properties → convert to Parquet row → write
     for await (const baseBatch of cursor) {
