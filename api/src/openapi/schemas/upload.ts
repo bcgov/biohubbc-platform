@@ -213,6 +213,74 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
   }
 };
 
+export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'submission_upload_review_id',
+    'submission_upload_id',
+    'scope',
+    'status',
+    'requested_by',
+    'requested_at',
+    'assigned_to',
+    'started_at',
+    'completed_by',
+    'completed_at',
+    'note',
+    'metadata',
+    'create_date',
+    'create_user',
+    'update_date',
+    'update_user',
+    'revision_count',
+    'record_end_date'
+  ],
+  properties: {
+    submission_upload_review_id: { type: 'integer', minimum: 1 },
+    submission_upload_id: { type: 'string', format: 'uuid' },
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: { type: 'string', enum: ['requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled'] },
+    requested_by: { type: 'integer', minimum: 1, nullable: true },
+    requested_at: { type: 'string', format: 'date-time' },
+    assigned_to: { type: 'integer', minimum: 1, nullable: true },
+    started_at: { type: 'string', format: 'date-time', nullable: true },
+    completed_by: { type: 'integer', minimum: 1, nullable: true },
+    completed_at: { type: 'string', format: 'date-time', nullable: true },
+    note: { type: 'string', nullable: true },
+    metadata: { type: 'object', nullable: true, additionalProperties: true },
+    create_date: { type: 'string', format: 'date-time' },
+    create_user: { type: 'integer' },
+    update_date: { type: 'string', format: 'date-time', nullable: true },
+    update_user: { type: 'integer', nullable: true },
+    revision_count: { type: 'integer' },
+    record_end_date: { type: 'string', format: 'date-time', nullable: true }
+  }
+};
+
+export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['scope'],
+  properties: {
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    note: { type: 'string' },
+    metadata: { type: 'object', additionalProperties: true }
+  }
+};
+
+export const UpdateSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: { type: 'string', enum: ['requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled'] },
+    assigned_to: { type: 'integer', minimum: 1, nullable: true },
+    note: { type: 'string', nullable: true },
+    metadata: { type: 'object', nullable: true, additionalProperties: true }
+  }
+};
+
 export const CompleteMultipartUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,

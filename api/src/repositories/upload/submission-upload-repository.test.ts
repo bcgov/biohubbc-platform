@@ -202,7 +202,8 @@ describe('SubmissionUploadRepository', () => {
         submission_id: 123,
         upload_id: 'a-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'uploaded'
+        status: 'uploaded',
+        comment: 'Upload-specific note'
       };
 
       try {

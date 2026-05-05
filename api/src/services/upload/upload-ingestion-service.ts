@@ -65,9 +65,13 @@ export class UploadIngestionService extends DBService {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submission_id);
     const submissionUuidFromTable = submissionRecord.uuid;
 
-    return this._startArchiveUploadForSubmission(bytes, submission_id, submissionUuidFromTable, [
-      submission.system_user_id
-    ]);
+    return this._startArchiveUploadForSubmission(
+      bytes,
+      submission_id,
+      submissionUuidFromTable,
+      [submission.system_user_id],
+      submission.comment
+    );
   }
 
   /**
@@ -85,9 +89,13 @@ export class UploadIngestionService extends DBService {
   ): Promise<PresignedUploadUrlResponse> {
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
-    return this._startArchiveUploadForSubmission(bytes, byUuid.submission_id, submissionRecord.uuid, [
-      submissionRecord.system_user_id
-    ]);
+    return this._startArchiveUploadForSubmission(
+      bytes,
+      byUuid.submission_id,
+      submissionRecord.uuid,
+      [submissionRecord.system_user_id],
+      submissionRecord.comment ?? null
+    );
   }
 
   /**
@@ -103,7 +111,8 @@ export class UploadIngestionService extends DBService {
     bytes: number,
     submissionId: number,
     submissionUuid: string,
-    systemUserIds: number[]
+    systemUserIds: number[],
+    comment?: string | null
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
@@ -125,7 +134,8 @@ export class UploadIngestionService extends DBService {
       submission_id: submissionId,
       upload_id,
       ticket_id: ticket.ticket_id,
-      status: 'uploaded'
+      status: 'uploaded',
+      comment: comment ?? null
     });
 
     // 4. Create initial review status (submitted = unreviewed)

@@ -26,7 +26,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -69,7 +70,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -116,6 +118,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.status,
         su.ticket_id,
+        su.comment,
         su.record_end_date
       FROM
         submission_upload su
@@ -165,7 +168,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_id',
         'submission_upload.upload_id',
         'submission_upload.status',
-        'submission_upload.ticket_id'
+        'submission_upload.ticket_id',
+        'submission_upload.comment'
       )
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
@@ -198,12 +202,14 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         ticket_id,
-        status
+        status,
+        comment
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
         ${submissionUpload.ticket_id},
-        ${submissionUpload.status}
+        ${submissionUpload.status},
+        ${submissionUpload.comment ?? null}
       )
       RETURNING submission_upload_id;
     `;
@@ -239,13 +245,15 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         ticket_id,
-        status
+        status,
+        comment
       )
       SELECT
         ${submissionId},
         ua.upload_id,
         ${ticketId},
-        'uploaded'::submission_upload_job_status
+        'uploaded'::submission_upload_job_status,
+        NULL
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
         AND ua.record_end_date IS NULL
@@ -284,7 +292,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
         status = COALESCE(${submissionUpload.status}, status),
-        ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
+        ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id),
+        comment = COALESCE(${submissionUpload.comment}, comment)
       WHERE
         submission_upload_id = ${submissionUploadId}
       RETURNING submission_upload_id;
@@ -317,7 +326,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE

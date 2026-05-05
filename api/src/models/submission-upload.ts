@@ -22,6 +22,7 @@ export const SubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
   ticket_id: z.string().uuid(),
+  comment: z.string().nullable().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
@@ -33,7 +34,8 @@ export const CreateSubmissionUpload = z.object({
   submission_id: z.number(),
   upload_id: z.string().uuid(),
   ticket_id: z.string().uuid(),
-  status: SubmissionUploadJobStatus
+  status: SubmissionUploadJobStatus,
+  comment: z.string().nullable().optional()
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
 
@@ -44,7 +46,8 @@ export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
   upload_id: z.string().uuid().optional(),
   status: SubmissionUploadJobStatus.optional(),
-  ticket_id: z.string().uuid().optional()
+  ticket_id: z.string().uuid().optional(),
+  comment: z.string().nullable().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 

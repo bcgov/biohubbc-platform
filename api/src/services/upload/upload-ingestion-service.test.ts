@@ -65,7 +65,7 @@ describe('UploadIngestionService', () => {
       const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
         ticket_id: '11111111-1111-1111-1111-111111111111'
       } as any);
-      sinon
+      const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
       sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
@@ -98,6 +98,15 @@ describe('UploadIngestionService', () => {
           priority: 'medium',
           description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
           systemUserIds: [mockSubmission.system_user_id]
+        })
+      );
+      expect(insertSubmissionUploadStub).to.have.been.calledWith(
+        sinon.match({
+          submission_id: mockSubmissionId,
+          upload_id: mockUploadId,
+          ticket_id: '11111111-1111-1111-1111-111111111111',
+          status: 'uploaded',
+          comment: mockSubmission.comment
         })
       );
       expect(result.submissionId).to.equal(mockSubmission.uuid);
@@ -216,13 +225,14 @@ describe('UploadIngestionService', () => {
         .resolves({ submission_id: existingSubmissionId });
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
         uuid: submissionUuid,
-        system_user_id: ownerSystemUserId
+        system_user_id: ownerSystemUserId,
+        comment: 'Append upload comment'
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
       const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
         ticket_id: '22222222-2222-2222-2222-222222222222'
       } as any);
-      sinon
+      const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-append-1' });
       sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
@@ -249,6 +259,15 @@ describe('UploadIngestionService', () => {
           priority: 'medium',
           description: `Submission ID: ${existingSubmissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${mockUploadId}`,
           systemUserIds: [ownerSystemUserId]
+        })
+      );
+      expect(insertSubmissionUploadStub).to.have.been.calledWith(
+        sinon.match({
+          submission_id: existingSubmissionId,
+          upload_id: mockUploadId,
+          ticket_id: '22222222-2222-2222-2222-222222222222',
+          status: 'uploaded',
+          comment: 'Append upload comment'
         })
       );
       expect(result.submissionId).to.equal(submissionUuid);
