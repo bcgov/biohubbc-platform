@@ -16,7 +16,7 @@
 
 import * as parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -144,7 +144,7 @@ describe('Download Parquet pipeline (integration)', function () {
    */
   async function createPolicyDownload(featureTypes: string[]): Promise<string> {
     const { policy_id } = await policyService.createDownloadPolicy({
-      name: `pq-pipeline-test-${Date.now()}-${Math.random()}`,
+      name: `pq-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
       featureTypes,
       expressionId: null

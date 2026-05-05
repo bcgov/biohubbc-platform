@@ -14,6 +14,7 @@
 import * as parquetjs from '@dsnp/parquetjs';
 import archiver from 'archiver';
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
@@ -137,7 +138,7 @@ describe('Download Export pipeline (integration)', function () {
     }
 
     const { policy_id } = await policyService.createDownloadPolicy({
-      name: `export-pipeline-test-${Date.now()}-${Math.random()}`,
+      name: `export-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
       featureTypes: featureTypeNames,
       expressionId: null

@@ -14,6 +14,7 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
@@ -61,7 +62,7 @@ describe('Download services (integration)', function () {
     featureTypes?: string[];
   }): Promise<{ download_id: string; policy_id: string }> {
     const { policy_id } = await policyService.createDownloadPolicy({
-      name: opts?.name ?? `Test policy ${Date.now()}-${Math.random()}`,
+      name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
       featureTypes: opts?.featureTypes ?? ['dataset'],
       expressionId: null

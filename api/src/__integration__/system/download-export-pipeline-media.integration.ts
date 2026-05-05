@@ -13,6 +13,7 @@
 import * as parquetjs from '@dsnp/parquetjs';
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
@@ -243,7 +244,7 @@ describe('Download Export pipeline — media (system)', function () {
     // policy itself can be a broad-path policy on `file` and the file
     // submission_feature rows above are just for breadcrumb purposes.
     const { policy_id } = await policyService.createDownloadPolicy({
-      name: `media-export-test-${Date.now()}-${Math.random()}`,
+      name: `media-export-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
       featureTypes: ['file'],
       expressionId: null
@@ -472,7 +473,7 @@ describe('Download Export pipeline — media (system)', function () {
     });
 
     const { policy_id } = await policyService.createDownloadPolicy({
-      name: `media-oom-test-${Date.now()}-${Math.random()}`,
+      name: `media-oom-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
       featureTypes: ['dataset'],
       expressionId: null

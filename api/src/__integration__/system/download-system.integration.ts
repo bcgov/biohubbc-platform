@@ -7,7 +7,7 @@
 import { ParquetReader } from '@dsnp/parquetjs';
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
@@ -253,7 +253,7 @@ describe('Download Worker', function () {
     // Create the owning policy (status='approved' so the row is treated as live).
     const [policy] = await db('biohub.policy')
       .insert({
-        name: `${TEST_PREFIX} download policy ${Date.now()}-${Math.random()}`,
+        name: `${TEST_PREFIX} download policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Integration test policy',
         status: 'approved',
         create_user: SYSTEM_USER_ID
