@@ -265,16 +265,44 @@ export class DownloadPipelineService extends DBService {
       featureTypeName
     );
 
-    // Stream: cursor → hydrate typed properties → convert to Parquet row → write
-    for await (const baseBatch of cursor) {
-      const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
-      for (const feature of hydrated) {
-        await writer.appendRow(featureToRow(feature, properties));
+    // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
+    //
+    // Wrapped so a partial failure does not leak the multipart upload or leave
+    // the PassThrough → hashCountTransform pipe alive holding worker memory.
+    // On failure: destroy the input stream (which cascades into an Upload abort),
+    // then await + swallow the now-rejected uploadPromise so the original error
+    // surfaces unobscured. Without this, a thrown `appendRow`/`hydrateFeatureBatch`
+    // returns control to the caller before S3 sees end-of-stream and the multipart
+    // upload either hangs until network timeout or surfaces as an unhandled
+    // rejection.
+    let streamingSucceeded = false;
+    try {
+      for await (const baseBatch of cursor) {
+        const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
+        for (const feature of hydrated) {
+          await writer.appendRow(featureToRow(feature, properties));
+        }
+      }
+
+      await writer.close();
+      await uploadPromise;
+      streamingSucceeded = true;
+    } finally {
+      if (!streamingSucceeded) {
+        // The upload consumer sees abort via the rejected uploadPromise. The
+        // source PassThrough has no other consumer, so its `error` event would
+        // otherwise go uncaught and crash the worker — register a no-op
+        // listener before tearing down.
+        passThrough.on('error', () => undefined);
+        passThrough.destroy(new Error(`writeFeatureTypeParquet aborted for ${downloadId}/${featureTypeName}`));
+        try {
+          await uploadPromise;
+        } catch {
+          // Upload abort surfaces as a rejection here — expected; the original
+          // error from the try block is what callers should see.
+        }
       }
     }
-
-    await writer.close();
-    await uploadPromise;
 
     const { sha256Hex, byteCount } = getResult();
 

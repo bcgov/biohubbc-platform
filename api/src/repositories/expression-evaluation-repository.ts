@@ -163,7 +163,7 @@ export class ExpressionEvaluationRepository extends BaseRepository {
     systemUserId?: number | null
   ): Knex.QueryBuilder {
     const evidenceQuery = this.buildPredicateEvidenceIdsQuery(clause, knex, systemUserId);
-    return this.projectEvidenceToTargetIdsQuery(anchorFeatureType, evidenceQuery, knex);
+    return this.projectEvidenceToTargetIdsQuery(anchorFeatureType, evidenceQuery, knex, systemUserId);
   }
 
   /**
@@ -231,17 +231,25 @@ export class ExpressionEvaluationRepository extends BaseRepository {
    * the traversal. path prevents cycles. The route anchor feature type is applied after traversal so every predicate
    * leaf contributes a target set, not an evidence set.
    *
+   * The security filter is applied a second time to the projected target rows. Filtering only the evidence is not
+   * sufficient: graph traversal can reach a secured target feature from an unsecured evidence feature, which would
+   * leak the target id to any consumer that uses this subquery directly (e.g. the download pipeline). The search
+   * wrapper used to bear this responsibility alone via a final outer-query filter; landing it here ensures every
+   * consumer of the subquery sees the same target-level security boundary.
+   *
    * @param {string} anchorFeatureType - Route anchor/result feature type
    * @param {Knex.QueryBuilder} evidenceQuery - Query returning evidence submission_feature_id
    * @param {Knex} knex - Knex instance
+   * @param {number | null} [systemUserId] - Security context for target features
    * @return {Knex.QueryBuilder} Knex query builder returning target submission_feature_id
    */
   private projectEvidenceToTargetIdsQuery(
     anchorFeatureType: string,
     evidenceQuery: Knex.QueryBuilder,
-    knex: Knex
+    knex: Knex,
+    systemUserId?: number | null
   ): Knex.QueryBuilder {
-    return knex
+    const query = knex
       .queryBuilder()
       .with('evidence', evidenceQuery.clone())
       .with('edges', (qb) => {
@@ -277,6 +285,13 @@ export class ExpressionEvaluationRepository extends BaseRepository {
       .where('ft.name', anchorFeatureType)
       .whereNull('sf.record_end_date')
       .whereNull('ft.record_end_date');
+
+    const targetSecurityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
+    if (targetSecurityFilter) {
+      query.whereRaw(targetSecurityFilter);
+    }
+
+    return query;
   }
 
   /**

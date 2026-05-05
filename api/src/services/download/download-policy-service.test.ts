@@ -5,10 +5,12 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { Policy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
+import { HTTP400 } from '../../errors/http-error';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 // Imported only for AC #5 boundary check - the production service must NOT touch
 // access-grant primitives. These stubs assert on absence of calls.
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { SecurityScopeService } from '../access-policy/security-scope-service';
@@ -23,6 +25,12 @@ describe('DownloadPolicyService', () => {
   beforeEach(() => {
     mockDBConnection = getMockDBConnection();
     downloadPolicyService = new DownloadPolicyService(mockDBConnection);
+    // Default: every feature type used in this suite ('a', 'b') is treated as known.
+    // Tests that exercise the unknown-name path replace this stub.
+    sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves([
+      { feature_type_id: 1, name: 'a' },
+      { feature_type_id: 2, name: 'b' }
+    ]);
   });
 
   afterEach(() => {
@@ -207,6 +215,30 @@ describe('DownloadPolicyService', () => {
       });
 
       expect(insertPolicyStub.getCall(1).args[0].description).to.equal('My download');
+    });
+
+    it('throws HTTP400 when any featureType is unknown (AC #7)', async () => {
+      // Replace the default `getActiveFeatureTypeMap` stub: 'a' is known, 'not_a_real_type' is not.
+      sinon.restore();
+      sinon
+        .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
+        .resolves([{ feature_type_id: 1, name: 'a' }]);
+      const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy');
+
+      try {
+        await downloadPolicyService.createDownloadPolicy({
+          name: 'Bad types',
+          description: null,
+          featureTypes: ['a', 'not_a_real_type'],
+          expressionId: null
+        });
+        expect.fail('expected HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+      }
+
+      // No policy was inserted — validation runs before any write.
+      expect(insertPolicyStub).to.not.have.been.called;
     });
 
     it('returns the policy_id from insertPolicy', async () => {

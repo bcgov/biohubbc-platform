@@ -225,5 +225,47 @@ describe('ExpressionEvaluationRepository (integration)', function () {
       expect(ids.has(open)).to.equal(true);
       expect(ids.has(secured)).to.equal(false);
     });
+
+    it('security filter excludes secured target features even when reached from unsecured evidence (defense in depth)', async () => {
+      // Regression test for the leak path the download pipeline previously had:
+      // evidence-side filtering let the predicate see an unsecured row, then graph traversal
+      // projected to a related SECURED target row. With only evidence-side filtering, the
+      // secured target id flowed out of the subquery to any consumer that bypassed the search
+      // wrapper's outer filter (e.g. the download cursor). The fix re-applies the security
+      // filter at the projected target level.
+      const submission = await createTestSubmission(connection);
+
+      // Evidence row — anonymous callers can read it; carries the predicate match.
+      const evidence = await createTestFeature(connection, submission, 'sample_site', { name: 'evidence-row' });
+      await indexNameProperty(evidence, 'evidence-row');
+
+      // Target row — same anchor type, parent of evidence so the parent-child graph edge
+      // bridges them. SECURED, so anonymous callers must NOT see it.
+      const securedTarget = await createTestFeature(
+        connection,
+        submission,
+        'sample_site',
+        { name: 'secured-target' },
+        evidence
+      );
+      const systemUserId = connection.systemUserId();
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+        VALUES (${securedTarget}, 1, ${systemUserId});
+      `);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('evidence-row')]
+      };
+      const subquery = repo.buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
+      const ids = await runSubquery(subquery);
+
+      // Evidence is unsecured and matches the predicate — keep it.
+      expect(ids.has(evidence)).to.equal(true);
+      // Secured target is reachable via the graph from `evidence` — must NOT leak through.
+      expect(ids.has(securedTarget)).to.equal(false);
+    });
   });
 });

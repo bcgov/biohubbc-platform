@@ -473,6 +473,57 @@ describe('DownloadPipelineService', () => {
       expect(payload.object_key).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
     });
 
+    it('aborts the multipart upload and surfaces the original error when row hydration throws mid-stream', async () => {
+      // Regression test for the stream-lifecycle gap Codex flagged: a throw inside the
+      // cursor → hydrate → appendRow loop must rethrow the original error AND tear
+      // down the in-flight upload, not leave it hanging or surface as an unhandled
+      // rejection. Here the upload stub rejects with an upload-side error to
+      // simulate an S3 abort propagating back through `uploadPromise`; the original
+      // hydration error must still be the one thrown to the caller.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
+      };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+
+      // Upload that immediately rejects to simulate an S3 multipart abort cascading
+      // back into the await — the catch in writeFeatureTypeParquet must swallow this
+      // so the original `hydrateError` is what surfaces.
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .rejects(new Error('S3 upload aborted by caller'));
+
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
+      const hydrateError = new Error('hydration blew up');
+      sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      // Original error wins; upload-abort rejection is swallowed.
+      expect(caught).to.equal(hydrateError);
+      expect(uploadStub).to.have.been.calledOnce;
+    });
+
     it('inserts the download_artifact link after the artifact row is created', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);

@@ -228,6 +228,27 @@ describe('DownloadPolicyService (integration)', function () {
       }
     });
 
+    it('rejects unknown feature types with HTTP400 before any DB write (AC #7)', async () => {
+      const before = await connection.sql(SQL`SELECT count(*)::int AS n FROM policy;`);
+      const beforeCount = before.rows[0].n as number;
+
+      try {
+        await policyService.createDownloadPolicy({
+          name: 'Should Reject',
+          description: null,
+          featureTypes: ['dataset', 'definitely_not_a_real_feature_type'],
+          expressionId: null
+        });
+        expect.fail('Expected HTTP400 for unknown feature type');
+      } catch (error: any) {
+        // HTTP400 surfaces a `status` of 400.
+        expect(error.status).to.equal(400);
+      }
+
+      const after = await connection.sql(SQL`SELECT count(*)::int AS n FROM policy;`);
+      expect(after.rows[0].n as number).to.equal(beforeCount);
+    });
+
     it('throws foreign_key_violation when deleting a policy that still has a referencing download', async () => {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'FK Guard',

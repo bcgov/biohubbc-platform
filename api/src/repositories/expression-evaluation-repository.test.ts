@@ -104,6 +104,32 @@ describe('ExpressionEvaluationRepository', () => {
       expect(sql).to.include('42');
     });
 
+    it('should also apply security filtering to projected target features (defense in depth)', () => {
+      // Filtering only the predicate evidence is not enough: graph traversal can reach a secured
+      // *target* feature from an unsecured evidence feature, so consumers that use the subquery
+      // directly (e.g. the download pipeline cursor) would otherwise leak that target id.
+      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
+      const expressionTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            ...normalizedPredicate(10, null, {
+              type: 'number',
+              operator: 'Exists'
+            })
+          }
+        ]
+      };
+
+      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+
+      // The target-side filter is keyed on `sf.submission_feature_id`, distinct from the
+      // evidence-side filter on `p.submission_feature_id`.
+      expect(sql).to.include('"sf"."submission_feature_id"');
+      expect(sql).to.match(/security_scope_anchor[\s\S]*"sf"\."submission_feature_id"/);
+    });
+
     it('should narrow predicate evidence by feature_type_property_id when provided', () => {
       const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {

@@ -1,7 +1,9 @@
 import { IDBConnection } from '../../database/db';
+import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { DBService } from '../db-service';
@@ -17,6 +19,7 @@ export class DownloadPolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
   policyStatementExpressionService: PolicyStatementExpressionService;
+  featureIngestionRepository: FeatureIngestionRepository;
 
   /**
    * Build a download-policy service.
@@ -28,6 +31,7 @@ export class DownloadPolicyService extends DBService {
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**
@@ -48,6 +52,17 @@ export class DownloadPolicyService extends DBService {
    * @memberof DownloadPolicyService
    */
   async createDownloadPolicy(payload: CreateDownloadPolicyPayload): Promise<{ policy_id: string }> {
+    // Reject unknown feature type names up front so a typo or stale FE id doesn't silently
+    // produce a download with empty Parquet files. The check is per-create rather than at
+    // app start because feature_type rows can be added/retired between deploys; one extra
+    // SELECT per request is cheap (~10 rows in seed; bounded by domain size).
+    const activeFeatureTypes = await this.featureIngestionRepository.getActiveFeatureTypeMap();
+    const knownNames = new Set(activeFeatureTypes.map((row) => row.name));
+    const unknown = payload.featureTypes.filter((name) => !knownNames.has(name));
+    if (unknown.length > 0) {
+      throw new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes: unknown }]);
+    }
+
     const policyData: CreatePolicy = {
       name: payload.name,
       description: payload.description ?? undefined,

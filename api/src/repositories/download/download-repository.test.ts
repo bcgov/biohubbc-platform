@@ -296,66 +296,6 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('getDownloadTotalSizeByCartId', () => {
-    it('returns aggregate row with total', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [{ total: 15000 }]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadTotalSizeByCartId('cccc0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal({ total: 15000 });
-    });
-
-    it('returns row with null total when cart has no features', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [{ total: null }]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadTotalSizeByCartId('cccc0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal({ total: null });
-    });
-  });
-
-  describe('getDownloadTotalSizeBySearchQuery', () => {
-    it('returns aggregate row with total', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [{ total: 25000 }]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadTotalSizeBySearchQuery(mockSubquery);
-
-      expect(result).to.deep.equal({ total: 25000 });
-    });
-
-    it('returns row with null total when no features match', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [{ total: null }]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadTotalSizeBySearchQuery(mockSubquery);
-
-      expect(result).to.deep.equal({ total: null });
-    });
-  });
-
   describe('isUserAuthorizedForDownload', () => {
     it('checks authorization via download_team and team_member', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([{ authorized: true }], 1));

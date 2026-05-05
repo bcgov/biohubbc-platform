@@ -294,7 +294,7 @@ describe('DownloadService', () => {
       expect(linkStub).to.have.been.calledOnceWith(
         'aaaa0000-0000-0000-0000-000000000042',
         42,
-        'Team for cart aaaa0000-0000-0000-0000-000000000042',
+        'Team for download aaaa0000-0000-0000-0000-000000000042',
         'Team created when claiming anonymous download'
       );
     });

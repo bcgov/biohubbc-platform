@@ -247,7 +247,7 @@ export class DownloadService extends DBService {
     await this.linkDownloadToNewTeam(
       downloadId,
       systemUserId,
-      `Team for cart ${downloadId}`,
+      `Team for download ${downloadId}`,
       'Team created when claiming anonymous download'
     );
   }

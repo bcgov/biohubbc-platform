@@ -59,14 +59,6 @@ export const DownloadFeatureData = z.object({
 });
 export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
 
-export const DownloadFeatureSummary = z.object({
-  submission_feature_id: z.number(),
-  submission_id: z.number(),
-  feature_type_name: z.string(),
-  estimated_byte_size: z.string()
-});
-export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;
-
 /**
  * Minimal projection of a download record for export-time pipeline evaluation.
  *
@@ -90,9 +82,6 @@ export const CreateDownload = z.object({
   format: z.string()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
-
-export const DownloadTotalSize = z.object({ total: z.number().nullable() });
-export type DownloadTotalSize = z.infer<typeof DownloadTotalSize>;
 
 export const IsAuthorized = z.object({ authorized: z.boolean() });
 export type IsAuthorized = z.infer<typeof IsAuthorized>;

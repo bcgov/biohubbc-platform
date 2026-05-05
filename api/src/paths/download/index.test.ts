@@ -123,6 +123,42 @@ describe('paths/download/index', () => {
       }
     });
 
+    it('returns 400 when featureTypes contains an unknown name (AC #7)', async () => {
+      const rollbackStub = sinon.stub();
+      const releaseStub = sinon.stub();
+      const dbConnectionObj = getMockDBConnection({
+        systemUserId: () => 20,
+        rollback: rollbackStub,
+        release: releaseStub
+      });
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      // Surface the validation error from the service via a stub: this isolates
+      // the route's behavior on a thrown HTTP400 from the service implementation.
+      sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .rejects(new HTTP400('Unknown feature type(s)'));
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      // Use the broad-path body (expression: null) to bypass writeExpressionTree —
+      // the validation under test runs inside createDownloadPolicy, before any
+      // expression handling.
+      mockReq.body = validBody({ featureTypes: ['definitely_not_a_real_feature_type'], expression: null });
+
+      const requestHandler = createDownload();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error) {
+        expect((error as HTTPError).status).to.equal(400);
+        expect(error).to.be.instanceOf(HTTP400);
+        expect(rollbackStub).to.have.been.calledOnce;
+        expect(releaseStub).to.have.been.calledOnce;
+      }
+    });
+
     it('propagates a 400 thrown by writeExpressionTree (semantic validation)', async () => {
       const rollbackStub = sinon.stub();
       const releaseStub = sinon.stub();
