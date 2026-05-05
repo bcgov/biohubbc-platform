@@ -107,9 +107,7 @@ describe('Download Worker', function () {
       // 1b. Delete policy_statement_expression (no statements should have any here, but be defensive),
       //     then policy_statement, then the owning policies — children first to satisfy FK.
       if (createdPolicyStatementIds.length > 0) {
-        await db('biohub.policy_statement_expression')
-          .whereIn('policy_statement_id', createdPolicyStatementIds)
-          .del();
+        await db('biohub.policy_statement_expression').whereIn('policy_statement_id', createdPolicyStatementIds).del();
         await db('biohub.policy_statement').whereIn('policy_statement_id', createdPolicyStatementIds).del();
       }
       if (createdPolicyIds.length > 0) {

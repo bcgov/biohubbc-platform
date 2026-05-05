@@ -543,7 +543,9 @@ describe('DownloadPipelineService', () => {
       sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
 
       // Upload that never settles — simulates the sticky-multipart-upload case.
-      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').returns(new Promise<void>(() => undefined));
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .returns(new Promise<void>(() => undefined));
 
       sinon
         .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')

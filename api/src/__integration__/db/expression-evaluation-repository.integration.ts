@@ -15,7 +15,10 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { NormalizedExpressionTreeExpression, NormalizedExpressionTreePredicate } from '../../models/expression-tree-internal';
+import {
+  NormalizedExpressionTreeExpression,
+  NormalizedExpressionTreePredicate
+} from '../../models/expression-tree-internal';
 import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -204,7 +207,9 @@ describe('ExpressionEvaluationRepository (integration)', function () {
       await indexNameProperty(open, 'Open-secfilter');
 
       const submissionSecured = await createTestSubmission(connection);
-      const secured = await createTestFeature(connection, submissionSecured, 'sample_site', { name: 'Secured-secfilter' });
+      const secured = await createTestFeature(connection, submissionSecured, 'sample_site', {
+        name: 'Secured-secfilter'
+      });
       await indexNameProperty(secured, 'Secured-secfilter');
 
       // Apply a security rule. Anonymous callers see only unsecured features.

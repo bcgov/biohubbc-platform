@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { HTTP400 } from '../../errors/http-error';
 import { Policy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
-import { HTTP400 } from '../../errors/http-error';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 // Imported only for AC #5 boundary check - the production service must NOT touch
 // access-grant primitives. These stubs assert on absence of calls.
