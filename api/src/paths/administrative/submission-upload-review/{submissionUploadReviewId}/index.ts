@@ -68,16 +68,12 @@ export function updateSubmissionUploadReview(): RequestHandler {
       await connection.open();
 
       const { submissionUploadReviewId } = req.params;
-      const { status, assigned_to, note, metadata } = req.body;
+      const { status } = req.body;
 
       const reviewService = new SubmissionUploadReviewService(connection);
       const result = await reviewService.updateReviewStatus({
         submissionUploadReviewId: Number(submissionUploadReviewId),
-        status: status as SubmissionUploadReviewStatus,
-        userId: connection.systemUserId(),
-        assignedTo: assigned_to,
-        note,
-        metadata
+        status: status as SubmissionUploadReviewStatus
       });
 
       await connection.commit();

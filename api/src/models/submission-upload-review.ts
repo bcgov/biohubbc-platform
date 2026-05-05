@@ -17,19 +17,17 @@ export enum SubmissionUploadReviewStatus {
 export const SubmissionUploadReviewScopeSchema = z.nativeEnum(SubmissionUploadReviewScope);
 export const SubmissionUploadReviewStatusSchema = z.nativeEnum(SubmissionUploadReviewStatus);
 
+export interface SubmissionUploadReviewFilters {
+  scope?: SubmissionUploadReviewScope;
+  status?: SubmissionUploadReviewStatus;
+}
+
 export const SubmissionUploadReview = z.object({
   submission_upload_review_id: z.number().int().positive(),
   submission_upload_id: z.string().uuid(),
   scope: SubmissionUploadReviewScopeSchema,
   status: SubmissionUploadReviewStatusSchema,
   requested_by: z.number().int().positive().nullable(),
-  requested_at: z.string(),
-  assigned_to: z.number().int().positive().nullable(),
-  started_at: z.string().nullable(),
-  completed_by: z.number().int().positive().nullable(),
-  completed_at: z.string().nullable(),
-  note: z.string().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
   create_date: z.string(),
   create_user: z.number().int(),
   update_date: z.string().nullable(),
@@ -39,18 +37,14 @@ export const SubmissionUploadReview = z.object({
 });
 export type SubmissionUploadReview = z.infer<typeof SubmissionUploadReview>;
 
-export const SubmissionUploadReviewCreate = z.object({
+export const CreateSubmissionUploadReview = z.object({
   submission_upload_id: z.string().uuid(),
   scope: SubmissionUploadReviewScopeSchema,
-  note: z.string().optional(),
-  metadata: z.record(z.unknown()).optional()
+  requested_by: z.number().int().positive().nullable()
 });
-export type SubmissionUploadReviewCreate = z.infer<typeof SubmissionUploadReviewCreate>;
+export type CreateSubmissionUploadReview = z.infer<typeof CreateSubmissionUploadReview>;
 
 export const SubmissionUploadReviewUpdate = z.object({
-  status: SubmissionUploadReviewStatusSchema,
-  assigned_to: z.number().int().positive().nullable().optional(),
-  note: z.string().nullable().optional(),
-  metadata: z.record(z.unknown()).nullable().optional()
+  status: SubmissionUploadReviewStatusSchema
 });
 export type SubmissionUploadReviewUpdate = z.infer<typeof SubmissionUploadReviewUpdate>;

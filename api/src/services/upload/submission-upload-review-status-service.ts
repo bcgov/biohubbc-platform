@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { HTTP400 } from '../../errors/http-error';
 import {
   CreateSubmissionUploadReviewStatus,
   SubmissionUploadReviewStatus,
@@ -7,6 +8,8 @@ import {
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
+import { SubmissionValidationService } from '../submission-validation-service';
+import { SubmissionUploadReviewService } from './submission-upload-review-service';
 
 export interface SubmissionHistoryResponse {
   submissionId: number;
@@ -60,7 +63,36 @@ export class SubmissionUploadReviewStatusService extends DBService {
     submissionUploadId: string,
     data: UpdateSubmissionUploadReviewStatus
   ): Promise<SubmissionUploadReviewStatus> {
+    if (data.status === 'approved') {
+      await this.assertSubmissionUploadCanBeApproved(submissionUploadId);
+    }
+
     return this.submissionUploadReviewStatusRepository.updateSubmissionUploadReviewStatus(submissionUploadId, data);
+  }
+
+  /**
+   * Assert that a submission upload has completed all required validation and review gates for approval.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<void>}
+   * @throws {HTTP400} If automated validation or required scoped reviews are unresolved.
+   */
+  async assertSubmissionUploadCanBeApproved(submissionUploadId: string): Promise<void> {
+    const submissionValidationService = new SubmissionValidationService(this.connection);
+    const validation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
+      submissionUploadId
+    );
+
+    if (validation?.status !== 'completed') {
+      throw new HTTP400('Submission upload validation must be completed before approval');
+    }
+
+    const uploadReviewService = new SubmissionUploadReviewService(this.connection);
+    const hasUnresolvedRequiredReviews = await uploadReviewService.hasUnresolvedRequiredReviews(submissionUploadId);
+
+    if (hasUnresolvedRequiredReviews) {
+      throw new HTTP400('Submission upload has unresolved required reviews');
+    }
   }
 
   /**

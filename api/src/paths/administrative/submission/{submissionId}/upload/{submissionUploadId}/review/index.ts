@@ -10,7 +10,6 @@ import {
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
 import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
-import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review');
@@ -24,7 +23,7 @@ export const POST: Operation = [
       }
     ]
   })),
-  requestSubmissionUploadReview()
+  insertSubmissionUploadReview()
 ];
 
 POST.apiDoc = {
@@ -68,26 +67,21 @@ POST.apiDoc = {
   }
 };
 
-export function requestSubmissionUploadReview(): RequestHandler {
+export function insertSubmissionUploadReview(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
-      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
-      const { scope, note, metadata } = req.body;
+      const { submissionUploadId } = req.params;
+      const { scope }: { scope: SubmissionUploadReviewScope } = req.body;
 
-      const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
-
-      const reviewService = new SubmissionUploadReviewService(connection);
-      const result = await reviewService.requestReview({
-        submissionUploadId,
-        scope: scope as SubmissionUploadReviewScope,
-        requestedBy: connection.systemUserId(),
-        note,
-        metadata
+      const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
+      const result = await submissionUploadReviewService.insertSubmissionUploadReview({
+        submission_upload_id: submissionUploadId,
+        scope: scope,
+        requested_by: connection.systemUserId()
       });
 
       await connection.commit();
@@ -95,7 +89,7 @@ export function requestSubmissionUploadReview(): RequestHandler {
       return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({
-        label: 'requestSubmissionUploadReview',
+        label: 'insertSubmissionUploadReview',
         message: 'error requesting submission upload review',
         error
       });

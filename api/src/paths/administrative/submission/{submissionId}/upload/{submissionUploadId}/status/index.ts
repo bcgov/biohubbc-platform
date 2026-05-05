@@ -2,17 +2,13 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
-import { HTTP400 } from '../../../../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
   SubmissionUploadReviewStatusResponseSchema,
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SubmissionValidationService } from '../../../../../../../services/submission-validation-service';
-import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
 import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
-import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');
@@ -94,25 +90,8 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
+      const { submissionUploadId } = req.params;
       const { status } = req.body;
-
-      const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
-
-      if (status === 'approved') {
-        const submissionValidationService = new SubmissionValidationService(connection);
-        const validation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
-          submissionUploadId
-        );
-
-        if (validation?.status !== 'completed') {
-          throw new HTTP400('Submission upload validation must be completed before approval');
-        }
-
-        const uploadReviewService = new SubmissionUploadReviewService(connection);
-        await uploadReviewService.assertRequiredReviewsResolvedForApproval(submissionUploadId);
-      }
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });

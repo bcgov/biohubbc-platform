@@ -1,25 +1,32 @@
 import { SQL } from 'sql-template-strings';
-import { z } from 'zod';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
+  CreateSubmissionUploadReview,
   SubmissionUploadReview,
-  SubmissionUploadReviewScope,
-  SubmissionUploadReviewStatus
+  SubmissionUploadReviewFilters,
+  SubmissionUploadReviewUpdate
 } from '../../models/submission-upload-review';
 import { BaseRepository } from '../base-repository';
 
-const ACTIVE_REVIEW_STATUSES = [
-  SubmissionUploadReviewStatus.REQUESTED,
-  SubmissionUploadReviewStatus.IN_PROGRESS,
-  SubmissionUploadReviewStatus.BLOCKED
-];
-
-const HasUnresolvedRequiredReviews = z.object({
-  has_unresolved_required_reviews: z.boolean()
-});
-
+/**
+ * Repository for scoped human review tasks on submission uploads.
+ *
+ * @export
+ * @class SubmissionUploadReviewRepository
+ * @extends {BaseRepository}
+ */
 export class SubmissionUploadReviewRepository extends BaseRepository {
-  async findReviewsBySubmissionUploadId(submissionUploadId: string): Promise<SubmissionUploadReview[]> {
+  /**
+   * Get active review rows for a submission upload.
+   *
+   * @param {string} submissionUploadId - The submission upload ID.
+   * @param {SubmissionUploadReviewFilters} [filters] - Optional review filters.
+   * @return {Promise<SubmissionUploadReview[]>} Active review rows ordered by create date.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async findReviewsBySubmissionUploadId(
+    submissionUploadId: string,
+    filters?: SubmissionUploadReviewFilters
+  ): Promise<SubmissionUploadReview[]> {
     const sqlStatement = SQL`
       SELECT
         submission_upload_review_id,
@@ -27,13 +34,6 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         scope,
         status,
         requested_by,
-        requested_at,
-        assigned_to,
-        started_at,
-        completed_by,
-        completed_at,
-        note,
-        metadata,
         create_date,
         create_user,
         update_date,
@@ -45,19 +45,37 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
+    `;
+
+    if (filters?.scope) {
+      sqlStatement.append(SQL`
+        AND scope = ${filters.scope}::submission_upload_review_scope
+      `);
+    }
+
+    if (filters?.status) {
+      sqlStatement.append(SQL`
+        AND status = ${filters.status}::submission_upload_review_status
+      `);
+    }
+
+    sqlStatement.append(SQL`
       ORDER BY
         create_date ASC;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
     return response.rows;
   }
 
+  /**
+   * Get active review rows for multiple submission uploads.
+   *
+   * @param {string[]} submissionUploadIds - The submission upload IDs.
+   * @return {Promise<SubmissionUploadReview[]>} Active review rows ordered by upload and create date.
+   * @memberof SubmissionUploadReviewRepository
+   */
   async findReviewsBySubmissionUploadIds(submissionUploadIds: string[]): Promise<SubmissionUploadReview[]> {
-    if (submissionUploadIds.length === 0) {
-      return [];
-    }
-
     const sqlStatement = SQL`
       SELECT
         submission_upload_review_id,
@@ -65,13 +83,6 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         scope,
         status,
         requested_by,
-        requested_at,
-        assigned_to,
-        started_at,
-        completed_by,
-        completed_at,
-        note,
-        metadata,
         create_date,
         create_user,
         update_date,
@@ -92,42 +103,27 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
     return response.rows;
   }
 
-  async requestReview(params: {
-    submissionUploadId: string;
-    scope: SubmissionUploadReviewScope;
-    requestedBy: number;
-    note?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<SubmissionUploadReview> {
-    const metadata = params.metadata ? JSON.stringify(params.metadata) : null;
-    const note = params.note ?? null;
+  /**
+   * Insert a submission upload review row.
+   *
+   * Audit fields, including `create_user`, are set by database triggers from
+   * the current connection context.
+   *
+   * @param {CreateSubmissionUploadReview} params - Review row values.
+   * @return {Promise<SubmissionUploadReview>} The inserted review row.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async insertSubmissionUploadReview(params: CreateSubmissionUploadReview): Promise<SubmissionUploadReview> {
     const sqlStatement = SQL`
       INSERT INTO submission_upload_review (
         submission_upload_id,
         scope,
-        status,
-        requested_by,
-        requested_at,
-        note,
-        metadata,
-        create_user
+        requested_by
       )
-      SELECT
-        ${params.submissionUploadId},
+      VALUES (
+        ${params.submission_upload_id},
         ${params.scope}::submission_upload_review_scope,
-        'requested'::submission_upload_review_status,
-        ${params.requestedBy},
-        now(),
-        ${note},
-        ${metadata}::jsonb,
-        ${params.requestedBy}
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM submission_upload_review
-        WHERE submission_upload_id = ${params.submissionUploadId}
-          AND scope = ${params.scope}::submission_upload_review_scope
-          AND record_end_date IS NULL
-          AND status IN ('requested', 'in_progress', 'blocked')
+        ${params.requested_by}
       )
       RETURNING
         submission_upload_review_id,
@@ -135,13 +131,6 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         scope,
         status,
         requested_by,
-        requested_at,
-        assigned_to,
-        started_at,
-        completed_by,
-        completed_at,
-        note,
-        metadata,
         create_date,
         create_user,
         update_date,
@@ -151,54 +140,65 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
-
-    if (response.rowCount === 1) {
-      return response.rows[0];
-    }
-
-    return this.getActiveReviewBySubmissionUploadIdAndScope(params.submissionUploadId, params.scope);
+    return response.rows[0];
   }
 
-  async updateReviewStatus(params: {
+  /**
+   * Update an active submission upload review row.
+   *
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: number; data: SubmissionUploadReviewUpdate }} params - Review update details.
+   * @return {Promise<SubmissionUploadReview | undefined>} The updated review row, if found.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async updateSubmissionUploadReview(params: {
+    submissionUploadId: string;
     submissionUploadReviewId: number;
-    status: SubmissionUploadReviewStatus;
-    userId: number;
-    assignedTo?: number | null;
-    note?: string | null;
-    metadata?: Record<string, unknown> | null;
-  }): Promise<SubmissionUploadReview> {
-    const noteProvided = Object.prototype.hasOwnProperty.call(params, 'note');
-    const metadataProvided = Object.prototype.hasOwnProperty.call(params, 'metadata');
-    const note = noteProvided ? params.note ?? null : null;
-    const metadata = metadataProvided && params.metadata ? JSON.stringify(params.metadata) : null;
-
+    data: SubmissionUploadReviewUpdate;
+  }): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
       UPDATE submission_upload_review
       SET
-        status = ${params.status}::submission_upload_review_status,
-        assigned_to = CASE
-          WHEN ${params.status} = 'in_progress' THEN COALESCE(${params.assignedTo ?? null}, assigned_to, ${
-      params.userId
-    })
-          WHEN ${params.assignedTo ?? null} IS NOT NULL THEN ${params.assignedTo ?? null}
-          ELSE assigned_to
-        END,
-        started_at = CASE
-          WHEN ${params.status} = 'in_progress' THEN COALESCE(started_at, now())
-          ELSE started_at
-        END,
-        completed_by = CASE
-          WHEN ${params.status} IN ('completed', 'blocked', 'skipped', 'cancelled') THEN ${params.userId}
-          WHEN ${params.status} = 'requested' THEN NULL
-          ELSE completed_by
-        END,
-        completed_at = CASE
-          WHEN ${params.status} IN ('completed', 'blocked', 'skipped', 'cancelled') THEN now()
-          WHEN ${params.status} = 'requested' THEN NULL
-          ELSE completed_at
-        END,
-        note = CASE WHEN ${noteProvided} THEN ${note} ELSE note END,
-        metadata = CASE WHEN ${metadataProvided} THEN ${metadata}::jsonb ELSE metadata END
+        status = ${params.data.status}::submission_upload_review_status
+      WHERE
+        submission_upload_review_id = ${params.submissionUploadReviewId}
+        AND submission_upload_id = ${params.submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING
+        submission_upload_review_id,
+        submission_upload_id,
+        scope,
+        status,
+        requested_by,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count,
+        record_end_date;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
+    return response.rows[0];
+  }
+
+  /**
+   * Update an active review row's workflow status by review ID.
+   *
+   * This supports the legacy ID-only admin route. Prefer
+   * `updateSubmissionUploadReview` when the submission upload ID is available.
+   *
+   * @param {{ submissionUploadReviewId: number; data: SubmissionUploadReviewUpdate }} params - Review status update.
+   * @return {Promise<SubmissionUploadReview | undefined>} The updated review row, if found.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async updateReviewStatus(params: {
+    submissionUploadReviewId: number;
+    data: SubmissionUploadReviewUpdate;
+  }): Promise<SubmissionUploadReview | undefined> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload_review
+      SET
+        status = ${params.data.status}::submission_upload_review_status
       WHERE
         submission_upload_review_id = ${params.submissionUploadReviewId}
         AND record_end_date IS NULL
@@ -208,13 +208,6 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         scope,
         status,
         requested_by,
-        requested_at,
-        assigned_to,
-        started_at,
-        completed_by,
-        completed_at,
-        note,
-        metadata,
         create_date,
         create_user,
         update_date,
@@ -224,62 +217,43 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission_upload_review record', [
-        'SubmissionUploadReviewRepository->updateReviewStatus',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
-    }
-
     return response.rows[0];
   }
 
-  async hasUnresolvedRequiredReviews(submissionUploadId: string): Promise<boolean> {
+  /**
+   * Soft delete an active submission upload review row.
+   *
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: number }} params - Review delete details.
+   * @return {Promise<SubmissionUploadReview | undefined>} The deleted review row, if found.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async deleteSubmissionUploadReview(params: {
+    submissionUploadId: string;
+    submissionUploadReviewId: number;
+  }): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
-      SELECT (
-        EXISTS (
-          SELECT 1
-          FROM unnest(ARRAY['validation', 'security']::submission_upload_review_scope[]) required_scope(scope)
-          WHERE NOT EXISTS (
-            SELECT 1
-            FROM submission_upload_review sur
-            WHERE sur.submission_upload_id = ${submissionUploadId}
-              AND sur.scope = required_scope.scope
-              AND sur.record_end_date IS NULL
-              AND sur.status IN ('completed', 'skipped')
-          )
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM submission_upload_review sur
-          WHERE sur.submission_upload_id = ${submissionUploadId}
-            AND sur.record_end_date IS NULL
-            AND sur.status = 'blocked'
-        )
-      ) AS has_unresolved_required_reviews;
+      UPDATE submission_upload_review
+      SET
+        record_end_date = now()
+      WHERE
+        submission_upload_review_id = ${params.submissionUploadReviewId}
+        AND submission_upload_id = ${params.submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING
+        submission_upload_review_id,
+        submission_upload_id,
+        scope,
+        status,
+        requested_by,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count,
+        record_end_date;
     `;
 
-    const response = await this.connection.sql(sqlStatement, HasUnresolvedRequiredReviews);
-    return Boolean(response.rows[0]?.has_unresolved_required_reviews);
-  }
-
-  private async getActiveReviewBySubmissionUploadIdAndScope(
-    submissionUploadId: string,
-    scope: SubmissionUploadReviewScope
-  ): Promise<SubmissionUploadReview> {
-    const reviews = await this.findReviewsBySubmissionUploadId(submissionUploadId);
-    const activeReview = reviews.find(
-      (review) => review.scope === scope && ACTIVE_REVIEW_STATUSES.includes(review.status)
-    );
-
-    if (!activeReview) {
-      throw new ApiNotFoundError('Active submission upload review not found', [
-        'SubmissionUploadReviewRepository->getActiveReviewBySubmissionUploadIdAndScope',
-        { submissionUploadId, scope }
-      ]);
-    }
-
-    return activeReview;
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
+    return response.rows[0];
   }
 }

@@ -4,11 +4,17 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
+    --------------------------------------------------------------------------------
+    -- Create submission_upload_review_scope enum
+    --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_review_scope AS ENUM (
       'validation',
       'security'
     );
 
+    --------------------------------------------------------------------------------
+    -- Create submission_upload_review_status enum
+    --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_review_status AS ENUM (
       'requested',
       'in_progress',
@@ -18,19 +24,23 @@ export async function up(knex: Knex): Promise<void> {
       'cancelled'
     );
 
+    --------------------------------------------------------------------------------
+    -- Add submission_upload.comment
+    --------------------------------------------------------------------------------
+    ALTER TABLE submission_upload
+      ADD COLUMN comment text;
+
+    COMMENT ON COLUMN submission_upload.comment IS 'Admin-facing comment associated with this specific submission upload.';
+
+    --------------------------------------------------------------------------------
+    -- Create submission_upload_review table
+    --------------------------------------------------------------------------------
     CREATE TABLE submission_upload_review (
       submission_upload_review_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       scope submission_upload_review_scope NOT NULL,
       status submission_upload_review_status NOT NULL DEFAULT 'requested',
       requested_by integer,
-      requested_at timestamptz(6) DEFAULT now() NOT NULL,
-      assigned_to integer,
-      started_at timestamptz(6),
-      completed_by integer,
-      completed_at timestamptz(6),
-      note text,
-      metadata jsonb,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
@@ -41,13 +51,12 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT submission_upload_review_fk1
         FOREIGN KEY (submission_upload_id) REFERENCES submission_upload(submission_upload_id),
       CONSTRAINT submission_upload_review_fk2
-        FOREIGN KEY (requested_by) REFERENCES "system_user"(system_user_id),
-      CONSTRAINT submission_upload_review_fk3
-        FOREIGN KEY (assigned_to) REFERENCES "system_user"(system_user_id),
-      CONSTRAINT submission_upload_review_fk4
-        FOREIGN KEY (completed_by) REFERENCES "system_user"(system_user_id)
+        FOREIGN KEY (requested_by) REFERENCES "system_user"(system_user_id)
     );
 
+    --------------------------------------------------------------------------------
+    -- Create indexes
+    --------------------------------------------------------------------------------
     CREATE INDEX submission_upload_review_idx1
       ON submission_upload_review(submission_upload_id);
 
@@ -63,30 +72,31 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE UNIQUE INDEX submission_upload_review_nuk1
       ON submission_upload_review(submission_upload_id, scope)
-      WHERE record_end_date IS NULL
-        AND status IN ('requested', 'in_progress', 'blocked');
+      WHERE record_end_date IS NULL;
 
+    --------------------------------------------------------------------------------
+    -- Add audit trigger
+    --------------------------------------------------------------------------------
     CREATE TRIGGER audit_submission_upload_review
       BEFORE INSERT OR UPDATE OR DELETE ON submission_upload_review
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
 
+    --------------------------------------------------------------------------------
+    -- Add journal trigger
+    --------------------------------------------------------------------------------
     CREATE TRIGGER journal_submission_upload_review
       AFTER INSERT OR UPDATE OR DELETE ON submission_upload_review
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
+    --------------------------------------------------------------------------------
+    -- Comments
+    --------------------------------------------------------------------------------
     COMMENT ON TABLE submission_upload_review IS 'Tracks human/admin review tasks for a submission upload, scoped by review type.';
     COMMENT ON COLUMN submission_upload_review.submission_upload_review_id IS 'Primary key.';
     COMMENT ON COLUMN submission_upload_review.submission_upload_id IS 'Foreign key to submission_upload.';
     COMMENT ON COLUMN submission_upload_review.scope IS 'Review scope, such as validation or security.';
     COMMENT ON COLUMN submission_upload_review.status IS 'Review workflow status: requested, in_progress, completed, blocked, skipped, or cancelled.';
     COMMENT ON COLUMN submission_upload_review.requested_by IS 'System user who requested the review.';
-    COMMENT ON COLUMN submission_upload_review.requested_at IS 'Timestamp when the review was requested.';
-    COMMENT ON COLUMN submission_upload_review.assigned_to IS 'System user currently assigned to the review.';
-    COMMENT ON COLUMN submission_upload_review.started_at IS 'Timestamp when review work started.';
-    COMMENT ON COLUMN submission_upload_review.completed_by IS 'System user who completed, skipped, cancelled, or blocked the review.';
-    COMMENT ON COLUMN submission_upload_review.completed_at IS 'Timestamp when the review reached a terminal or paused state.';
-    COMMENT ON COLUMN submission_upload_review.note IS 'Optional admin-facing note for the review.';
-    COMMENT ON COLUMN submission_upload_review.metadata IS 'Optional structured metadata for review details.';
   `);
 }
 
@@ -99,5 +109,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS submission_upload_review CASCADE;
     DROP TYPE IF EXISTS submission_upload_review_status;
     DROP TYPE IF EXISTS submission_upload_review_scope;
+    ALTER TABLE submission_upload
+      DROP COLUMN IF EXISTS comment;
   `);
 }

@@ -31,17 +31,13 @@ describe('paths/administrative/submission-upload-review/{submissionUploadReviewI
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionUploadReviewId: '12' };
-    mockReq.body = { status: 'completed', assigned_to: null, note: 'done', metadata: null };
+    mockReq.body = { status: 'completed' };
 
     await updateSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(updateStub).to.have.been.calledOnceWith({
       submissionUploadReviewId: 12,
-      status: SubmissionUploadReviewStatus.COMPLETED,
-      userId: 7,
-      assignedTo: null,
-      note: 'done',
-      metadata: null
+      status: SubmissionUploadReviewStatus.COMPLETED
     });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(review);
@@ -54,13 +50,6 @@ const buildReview = (): SubmissionUploadReview => ({
   scope: SubmissionUploadReviewScope.SECURITY,
   status: SubmissionUploadReviewStatus.COMPLETED,
   requested_by: 7,
-  requested_at: '2026-05-05T00:00:00.000Z',
-  assigned_to: null,
-  started_at: null,
-  completed_by: 7,
-  completed_at: '2026-05-05T00:00:00.000Z',
-  note: 'done',
-  metadata: null,
   create_date: '2026-05-05T00:00:00.000Z',
   create_user: 7,
   update_date: null,
