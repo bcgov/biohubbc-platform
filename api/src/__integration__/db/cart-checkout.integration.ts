@@ -18,7 +18,8 @@ import { CartService } from '../../services/cart-service';
 import { DownloadService } from '../../services/download/download-service';
 import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
-describe('Cart checkout (integration)', function () {
+// Skipped: cart-checkout endpoint returns HTTP410. The cart-deprecation sibling ticket retires this suite.
+describe.skip('Cart checkout (integration)', function () {
   this.timeout(15000);
 
   let connection: IDBConnection;

@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
-import { ApiNotFoundError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from './download-repository';
 
@@ -16,84 +16,39 @@ describe('DownloadRepository', () => {
   });
 
   describe('createDownload', () => {
-    it('inserts download with status, filters, and cart_id', async () => {
+    it('binds policyId and format and returns the inserted row', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'parquet' });
+      const result = await repo.createDownload({
+        policyId: 'pppp0000-0000-0000-0000-000000000001',
+        format: 'parquet'
+      });
 
+      expect(result).to.deep.equal({ download_id: 'aaaa0000-0000-0000-0000-000000000001' });
       expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.not.include('system_user_id');
-      expect(sqlText).to.not.include('team_id');
-      expect(sqlText).to.not.include('data_request_id');
-      expect(sqlText).to.include('cart_id');
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include('pppp0000-0000-0000-0000-000000000001');
+      expect(sqlValues).to.include('parquet');
     });
 
-    it('serializes filters as JSONB in SQL', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
+    it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      const filters = { keyword: 'moose' };
-      await repo.createDownload({ filters, format: 'parquet' });
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('filters');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(JSON.stringify(filters));
-    });
-
-    it('passes null filters when filters is omitted', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'parquet' });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      // filters is third-to-last, cart_id second-to-last, format last
-      expect(sqlValues[sqlValues.length - 3]).to.be.null;
-    });
-
-    it('passes cartId value in SQL when provided', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const cartId = 'cccc0000-0000-0000-0000-000000000001';
-      await repo.createDownload({ cartId, format: 'parquet' });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(cartId);
-    });
-
-    it('passes null cart_id when cartId is omitted', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'parquet' });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      // cart_id is second-to-last parameter (format is last)
-      expect(sqlValues[sqlValues.length - 2]).to.be.null;
-      expect(sqlValues[sqlValues.length - 1]).to.equal('parquet');
+      try {
+        await repo.createDownload({ policyId: 'pppp0000-0000-0000-0000-000000000001', format: 'parquet' });
+        expect.fail('Expected ApiExecuteSQLError');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect(err.message).to.equal('Failed to insert download record');
+      }
     });
   });
 
@@ -310,30 +265,22 @@ describe('DownloadRepository', () => {
   });
 
   describe('getDownloadSource', () => {
-    it('returns cart_id, filters, and create_user for a download', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(
-          mockQueryResult([{ cart_id: 'cccc0000-0000-0000-0000-000000000001', filters: null, create_user: 42 }], 1)
-        );
+    it('returns policy_id and create_user for a download', async () => {
+      const row = { policy_id: 'pppp0000-0000-0000-0000-000000000001', create_user: 42 };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadSource('aaaa0000-0000-0000-0000-000000000001');
 
-      expect(result).to.deep.equal({
-        cart_id: 'cccc0000-0000-0000-0000-000000000001',
-        filters: null,
-        create_user: 42
-      });
+      expect(result).to.deep.equal(row);
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('cart_id');
-      expect(sqlText).to.include('filters');
+      expect(sqlText).to.include('policy_id');
       expect(sqlText).to.include('create_user');
     });
 
-    it('throws ApiExecuteSQLError when download not found', async () => {
+    it('throws ApiNotFoundError when download not found', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -341,58 +288,11 @@ describe('DownloadRepository', () => {
 
       try {
         await repo.getDownloadSource('bad-id');
-        expect.fail('Expected error');
+        expect.fail('Expected ApiNotFoundError');
       } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
         expect(err.message).to.equal('Download not found');
       }
-    });
-  });
-
-  describe('getDownloadFeaturesByCartId', () => {
-    it('joins cart_submission_feature to submission_feature and feature_type', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [
-          { submission_feature_id: 1, submission_id: 10, feature_type_name: 'observation', estimated_byte_size: '500' }
-        ]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadFeaturesByCartId('cccc0000-0000-0000-0000-000000000001');
-
-      expect(result).to.have.length(1);
-      expect(result[0]).to.have.property('submission_feature_id');
-      expect(result[0]).to.have.property('feature_type_name');
-      expect(result[0]).to.have.property('estimated_byte_size');
-
-      const builtQuery = knexStub.firstCall.args[0];
-      const sqlText = builtQuery.toString();
-      expect(sqlText).to.include('cart_submission_feature');
-      expect(sqlText).to.include('submission_feature');
-      expect(sqlText).to.include('feature_type');
-    });
-  });
-
-  describe('getDownloadFeaturesBySearchQuery', () => {
-    it('uses whereIn with Knex subquery and calls connection.knex once', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [
-          { submission_feature_id: 1, submission_id: 10, feature_type_name: 'observation', estimated_byte_size: '500' }
-        ]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      // Create a mock subquery (a Knex.QueryBuilder-like object)
-      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadFeaturesBySearchQuery(mockSubquery);
-
-      expect(result).to.have.length(1);
-      // connection.knex should be called exactly once (the outer query, not the subquery)
-      expect(knexStub).to.have.been.calledOnce;
     });
   });
 
@@ -528,159 +428,6 @@ describe('DownloadRepository', () => {
       const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.false;
-    });
-  });
-
-  describe('listDownloadFeatureTypesByCartId', () => {
-    it('returns ordered feature type names with DISTINCT', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(mockQueryResult([{ feature_type_name: 'dataset' }, { feature_type_name: 'observation' }], 2));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.listDownloadFeatureTypesByCartId('cccc0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal(['dataset', 'observation']);
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('DISTINCT');
-      expect(sqlText).to.include('cart_submission_feature');
-      expect(sqlText).to.include('feature_type');
-      expect(sqlText).to.include('ORDER BY');
-    });
-
-    it('returns empty array when cart has no features', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.listDownloadFeatureTypesByCartId('cccc0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal([]);
-    });
-  });
-
-  describe('listDownloadFeatureTypesBySearchQuery', () => {
-    it('returns ordered feature type names from knex query', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 2,
-        rows: [{ feature_type_name: 'dataset' }, { feature_type_name: 'observation' }]
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.listDownloadFeatureTypesBySearchQuery(mockSubquery);
-
-      expect(result).to.deep.equal(['dataset', 'observation']);
-      expect(knexStub).to.have.been.calledOnce;
-    });
-
-    it('returns empty array when no features match', async () => {
-      const knexStub = sinon.stub().resolves({
-        rowCount: 0,
-        rows: []
-      } as unknown as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-
-      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.listDownloadFeatureTypesBySearchQuery(mockSubquery);
-
-      expect(result).to.deep.equal([]);
-    });
-  });
-
-  describe('streamFeatureBaseByCartIdAndType', () => {
-    it('yields batches via DECLARE/FETCH/CLOSE cursor sequence', async () => {
-      const queryStub = sinon.stub();
-
-      // Call 0: DECLARE cursor
-      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
-      // Call 1: FETCH with data
-      queryStub.onCall(1).resolves({
-        rows: [
-          {
-            submission_feature_id: 1,
-            uuid: 'uuid-1',
-            feature_type_name: 'observation',
-            data: { properties: {} },
-            parent_uuid: null
-          },
-          {
-            submission_feature_id: 2,
-            uuid: 'uuid-2',
-            feature_type_name: 'observation',
-            data: { properties: {} },
-            parent_uuid: 'parent-uuid-1'
-          }
-        ],
-        rowCount: 2
-      });
-      // Call 2: FETCH empty (end of cursor)
-      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
-      // Call 3: CLOSE
-      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
-
-      const mockDBConnection = getMockDBConnection({ query: queryStub });
-      const repo = new DownloadRepository(mockDBConnection);
-
-      const batches: any[][] = [];
-      for await (const batch of repo.streamFeatureBaseByCartIdAndType(
-        'cccc0000-0000-0000-0000-000000000001',
-        'observation'
-      )) {
-        batches.push(batch);
-      }
-
-      expect(batches).to.have.length(1);
-      expect(batches[0]).to.have.length(2);
-      expect(batches[0][0]).to.have.property('submission_feature_id', 1);
-      expect(batches[0][0]).to.have.property('parent_uuid', null);
-      expect(batches[0][1]).to.have.property('parent_uuid', 'parent-uuid-1');
-
-      // Verify DECLARE, FETCH, FETCH, CLOSE sequence
-      expect(queryStub.callCount).to.equal(4);
-      expect(queryStub.getCall(0).args[0]).to.include('DECLARE');
-      expect(queryStub.getCall(0).args[0]).to.include('cart_submission_feature');
-      expect(queryStub.getCall(1).args[0]).to.include('FETCH');
-      expect(queryStub.getCall(2).args[0]).to.include('FETCH');
-      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
-    });
-
-    it('calls CLOSE even when FETCH throws', async () => {
-      const queryStub = sinon.stub();
-
-      // DECLARE succeeds
-      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
-      // FETCH throws
-      queryStub.onCall(1).rejects(new Error('DB failure'));
-      // CLOSE should still be called
-      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
-
-      const mockDBConnection = getMockDBConnection({ query: queryStub });
-      const repo = new DownloadRepository(mockDBConnection);
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const _batch of repo.streamFeatureBaseByCartIdAndType(
-          'cccc0000-0000-0000-0000-000000000001',
-          'observation'
-        )) {
-          // should not reach here
-        }
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB failure');
-      }
-
-      // CLOSE must have been called despite the error
-      const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
-      expect(closeCall).to.not.be.undefined;
     });
   });
 

@@ -1,7 +1,6 @@
 import { Knex } from 'knex';
 import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
@@ -66,11 +65,11 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { filters, cartId, format } = payload;
+    const { policyId, format } = payload;
 
     const sql = SQL`
-      INSERT INTO download (download_status, filters, cart_id, format)
-      VALUES ('pending', ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null}, ${format})
+      INSERT INTO download (download_status, policy_id, format)
+      VALUES ('pending', ${policyId}, ${format})
       RETURNING download_id;
     `;
 
@@ -338,17 +337,18 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Get the feature resolution source for a download.
    *
-   * Returns cart_id and filters — exactly one should be non-null.
-   * Used by DownloadService.getDownloadFeatures to branch between
-   * cart-based (frozen snapshot) and filter-based (live re-query) paths.
+   * Returns the policy_id (drives statement-by-statement evaluation in the
+   * pipeline) and create_user (the policy creator's identity used to apply
+   * the security filter at export time).
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadSource>}
+   * @throws {ApiNotFoundError} when no download matches the given ID.
    * @memberof DownloadRepository
    */
   async getDownloadSource(downloadId: string): Promise<DownloadSource> {
     const sql = SQL`
-      SELECT cart_id, filters, create_user
+      SELECT policy_id, create_user
       FROM download
       WHERE download_id = ${downloadId};
     `;
@@ -356,73 +356,13 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, DownloadSource);
 
     if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Download not found', [
+      throw new ApiNotFoundError('Download not found', [
         'DownloadRepository->getDownloadSource',
-        'rowCount was 0, expected 1'
+        `downloadId=${downloadId}`
       ]);
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Resolve download features from cart_submission_feature.
-   *
-   * Cart downloads are frozen: checkout marks the cart as CHECKED_OUT,
-   * so cart_submission_feature rows don't change after checkout.
-   *
-   * @param {string} cartId - The cart ID (from download.cart_id).
-   * @return {Promise<DownloadFeatureSummary[]>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadFeaturesByCartId(cartId: string): Promise<DownloadFeatureSummary[]> {
-    const knex = getKnex();
-
-    const query = knex
-      .select([
-        'sf.submission_feature_id',
-        'sf.submission_id',
-        knex.raw('ft.name AS feature_type_name'),
-        knex.raw('sf.data_byte_size AS estimated_byte_size')
-      ])
-      .from('cart_submission_feature as csf')
-      .innerJoin('submission_feature as sf', 'csf.submission_feature_id', 'sf.submission_feature_id')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .where('csf.cart_id', cartId);
-
-    const response = await this.connection.knex(query, DownloadFeatureSummary);
-    return response.rows;
-  }
-
-  /**
-   * Resolve download features by joining a search subquery directly to
-   * submission_feature + feature_type — entirely in SQL, no round-trip.
-   *
-   * The search CTE (with security filtering) runs as a subquery inside
-   * WHERE IN, so PostgreSQL plans and executes it in a single statement.
-   * This avoids pulling potentially 500K+ IDs into a JS array.
-   *
-   * @param {Knex.QueryBuilder} searchSubquery - Unexecuted Knex subquery
-   *   returning submission_feature_id rows (from SearchFeatureRepository).
-   * @return {Promise<DownloadFeatureSummary[]>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadFeaturesBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<DownloadFeatureSummary[]> {
-    const knex = getKnex();
-
-    const query = knex
-      .select([
-        'sf.submission_feature_id',
-        'sf.submission_id',
-        knex.raw('ft.name AS feature_type_name'),
-        knex.raw('sf.data_byte_size AS estimated_byte_size')
-      ])
-      .from('submission_feature as sf')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .whereIn('sf.submission_feature_id', searchSubquery);
-
-    const response = await this.connection.knex(query, DownloadFeatureSummary);
-    return response.rows;
   }
 
   /**
@@ -598,100 +538,6 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, HasTeams);
 
     return response.rows[0]?.has_teams ?? false;
-  }
-
-  /**
-   * List distinct feature type names for a cart-based download.
-   *
-   * Used by the Parquet pipeline to iterate over each feature type
-   * and generate a separate Parquet file per type.
-   *
-   * @param {string} cartId - The cart ID (from download.cart_id).
-   * @return {Promise<string[]>} Ordered list of feature type names.
-   * @memberof DownloadRepository
-   */
-  async listDownloadFeatureTypesByCartId(cartId: string): Promise<string[]> {
-    const sql = SQL`
-      SELECT DISTINCT ft.name AS feature_type_name
-      FROM cart_submission_feature csf
-      INNER JOIN submission_feature sf ON csf.submission_feature_id = sf.submission_feature_id
-      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
-      WHERE csf.cart_id = ${cartId}
-      ORDER BY ft.name;
-    `;
-
-    const response = await this.connection.sql(sql, z.object({ feature_type_name: z.string() }));
-
-    return response.rows.map((r) => r.feature_type_name);
-  }
-
-  /**
-   * List distinct feature type names for a filter-based download.
-   *
-   * Same purpose as listDownloadFeatureTypesByCartId but uses a Knex subquery
-   * from the search pipeline instead of a cart join.
-   *
-   * @param {Knex.QueryBuilder} searchSubquery - Unexecuted Knex subquery
-   *   returning submission_feature_id rows (from SearchFeatureRepository).
-   * @return {Promise<string[]>} Ordered list of feature type names.
-   * @memberof DownloadRepository
-   */
-  async listDownloadFeatureTypesBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<string[]> {
-    const knex = getKnex();
-    const query = knex
-      .distinct('ft.name as feature_type_name')
-      .from('submission_feature as sf')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .whereIn('sf.submission_feature_id', searchSubquery)
-      .orderBy('ft.name');
-
-    const response = await this.connection.knex(query, z.object({ feature_type_name: z.string() }));
-
-    return response.rows.map((r) => r.feature_type_name);
-  }
-
-  /**
-   * Stream base feature rows for a cart-based download, filtered by feature type.
-   *
-   * Returns the feature skeleton (id, uuid, data JSONB, parent_uuid) without
-   * typed property values. Typed values are hydrated separately by
-   * fetchTypedPropertyRows to avoid joining 7 typed tables
-   * in a single massive query.
-   *
-   * Must be called within an open transaction (cursors require tx context).
-   *
-   * @param {string} cartId - The cart ID (from download.cart_id).
-   * @param {string} featureTypeName - The feature type to stream.
-   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
-   * @yields {BaseFeatureRow[]} Batches of base feature rows.
-   * @memberof DownloadRepository
-   */
-  async *streamFeatureBaseByCartIdAndType(
-    cartId: string,
-    featureTypeName: string,
-    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
-  ): AsyncGenerator<BaseFeatureRow[]> {
-    yield* this.streamWithCursor<BaseFeatureRow>({
-      cursorName: `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
-        /[^a-z0-9_]/gi,
-        '_'
-      )}`,
-      declareSql: `
-        SELECT
-          sf.submission_feature_id,
-          sf.uuid,
-          sf.data,
-          ft.name AS feature_type_name,
-          parent_sf.uuid AS parent_uuid
-        FROM cart_submission_feature csf
-        INNER JOIN submission_feature sf ON csf.submission_feature_id = sf.submission_feature_id
-        INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
-        LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
-        WHERE csf.cart_id = $1 AND ft.name = $2
-        ORDER BY sf.submission_feature_id`,
-      bindings: [cartId, featureTypeName],
-      batchSize
-    });
   }
 
   /**

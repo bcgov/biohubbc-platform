@@ -1,19 +1,12 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import {
-  CreateDownload,
-  DownloadFeatureSummary,
-  DownloadId,
-  DownloadListRecord,
-  DownloadRecord
-} from '../../models/download';
+import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
-import { SearchFeatureService } from '../search-feature-service';
 
 /**
  * Request-time service for downloads.
@@ -39,14 +32,12 @@ export class DownloadService extends DBService {
    */
   downloadExportRepository: DownloadExportRepository;
   teamService: TeamService;
-  searchFeatureService: SearchFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
     this.teamService = new TeamService(connection);
-    this.searchFeatureService = new SearchFeatureService(connection);
   }
 
   /**
@@ -136,44 +127,6 @@ export class DownloadService extends DBService {
    */
   async createDownloadTeam(downloadId: string, teamId: string): Promise<void> {
     return this.downloadRepository.createDownloadTeam(downloadId, teamId);
-  }
-
-  /**
-   * Resolve all features included in a download.
-   *
-   * Branches based on the download's feature source:
-   * - **Cart-based** (cart_id set): features resolved from cart_submission_feature.
-   *   Cart downloads are frozen — checkout marks the cart as CHECKED_OUT, so
-   *   cart_submission_feature rows don't change post-checkout.
-   * - **Filter-based** (filters set): re-runs the search query at pipeline time,
-   *   intentionally picking up newly ingested data matching the filters.
-   *   The creator's security scope is recovered from `create_user` (set
-   *   automatically by `tr_audit_trigger` on INSERT). The search CTE runs as
-   *   a subquery inside the summary JOIN, keeping feature resolution in SQL
-   *   and avoiding a 500K+ ID round-trip through JS.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} All features for this download.
-   * @memberof DownloadService
-   */
-  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    const source = await this.downloadRepository.getDownloadSource(downloadId);
-
-    if (source.cart_id) {
-      return this.downloadRepository.getDownloadFeaturesByCartId(source.cart_id);
-    }
-
-    if (source.filters) {
-      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
-        source.filters,
-        source.create_user
-      );
-
-      return this.downloadRepository.getDownloadFeaturesBySearchQuery(searchSubquery);
-    }
-
-    // CHECK constraint prevents this, but guard defensively
-    throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
   }
 
   /**
