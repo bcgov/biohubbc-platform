@@ -217,7 +217,9 @@ export class DownloadPipelineService extends DBService {
     // validator the search path uses — keeping read-time SQL semantics identical
     // for the two consumers of the evaluator.
     let subquery: Knex.QueryBuilder;
-    if (statement.expression_id !== null) {
+    if (statement.expression_id === null) {
+      subquery = this.expressionEvaluationRepository.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
+    } else {
       const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
       const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
       subquery = this.expressionEvaluationRepository.buildExpressionTreeFeatureIdsSubquery(
@@ -225,8 +227,6 @@ export class DownloadPipelineService extends DBService {
         normalizedTree,
         source.create_user
       );
-    } else {
-      subquery = this.expressionEvaluationRepository.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
     }
 
     const { sql, bindings } = subquery.toSQL().toNative();

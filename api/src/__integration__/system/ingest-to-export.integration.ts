@@ -222,7 +222,10 @@ describe('Ingest → Download → Export (system integration)', function () {
     expect(header).to.include.members(['dop', 'elevation', 'timestamp_date', 'timestamp_time', 'geometry']);
 
     const featureIdIdx = header.indexOf('submission_feature_id');
-    const dataRow = lines.slice(1).map((line) => line.split(',')).find((cells) => cells[featureIdIdx] === String(featureId));
+    const dataRow = lines
+      .slice(1)
+      .map((line) => line.split(','))
+      .find((cells) => cells[featureIdIdx] === String(featureId));
     expect(dataRow, `expected a data row for submission_feature_id=${featureId}`).to.not.be.undefined;
     const row = dataRow!;
     const col = (name: string): string => row[header.indexOf(name)];
