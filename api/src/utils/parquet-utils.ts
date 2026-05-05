@@ -258,32 +258,25 @@ export function featureToRow(
     }
 
     const value = feature.data[prop.feature_property_name];
-
-    if (value == null) {
-      row[prop.feature_property_name] = null;
-      continue;
-    }
-
-    switch (prop.feature_property_type_name) {
-      case 'spatial': {
-        const geometry = extractGeoJsonGeometry(value);
-        row[prop.feature_property_name] = geometry ? geoJsonToWkb(geometry) : null;
-        break;
-      }
-      case 'array':
-        row[prop.feature_property_name] = JSON.stringify(value);
-        break;
-      case 'object':
-        row[prop.feature_property_name] = JSON.stringify(value);
-        break;
-      default:
-        // string, number, boolean, code, taxon, artifact_key — pass through directly
-        row[prop.feature_property_name] = value;
-        break;
-    }
+    row[prop.feature_property_name] = value == null ? null : encodePropertyValue(prop, value);
   }
 
   return row;
+}
+
+function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unknown {
+  switch (prop.feature_property_type_name) {
+    case 'spatial': {
+      const geometry = extractGeoJsonGeometry(value);
+      return geometry ? geoJsonToWkb(geometry) : null;
+    }
+    case 'array':
+    case 'object':
+      return JSON.stringify(value);
+    default:
+      // string, number, boolean, code, taxon, artifact_key — pass through directly
+      return value;
+  }
 }
 
 /**

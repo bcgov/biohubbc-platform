@@ -41,8 +41,10 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
     if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
     } else if (prop.feature_property_type_name === 'datetime') {
-      headers.push(`${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`);
-      headers.push(`${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`);
+      headers.push(
+        `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`,
+        `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`
+      );
     } else {
       headers.push(prop.feature_property_name);
     }
@@ -197,7 +199,7 @@ function formatDatetimeDateCell(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10);
   }
-  return String(value);
+  return typeof value === 'string' ? value : '';
 }
 
 /**
@@ -222,7 +224,7 @@ function formatDatetimeTimeCell(value: unknown): string {
     const ss = totalSeconds % 60;
     return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   }
-  return String(value);
+  return typeof value === 'string' ? value : '';
 }
 
 /**

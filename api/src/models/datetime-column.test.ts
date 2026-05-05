@@ -33,11 +33,7 @@ describe('datetime-column', () => {
         { feature_property_name: 'observation_date', feature_property_type_name: 'string' }
       ];
 
-      expect(() => assertNoDatetimeColumnCollisions(properties))
-        .to.throw(Error)
-        .with.property('message')
-        .that.matches(/observation/)
-        .and.matches(/observation_date/);
+      expect(() => assertNoDatetimeColumnCollisions(properties)).to.throw(/observation_date/);
     });
 
     it('should throw when a datetime expansion collides with a sibling _time property', () => {
