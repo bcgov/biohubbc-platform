@@ -110,6 +110,39 @@ describe('ExpressionEvaluationRepository (integration)', function () {
       expect(ids.has(b)).to.equal(true);
       expect(ids.has(decoy)).to.equal(false);
     });
+
+    it('partial-access export: types with no readable features return an empty set without error', async () => {
+      // Edge Case #8 from spec.md — a download with N feature types where the policy creator
+      // can read some but not others. Per-statement evaluation returns the readable rows for
+      // the accessible type and an empty set for the inaccessible type. The pipeline still
+      // completes (one Parquet per statement, some empty) — "5 in, 5 files, 1 empty" is a
+      // valid, deliberate outcome, not a failure.
+      const submissionAccessible = await createTestSubmission(connection);
+      const accessible = await createTestFeature(connection, submissionAccessible, 'sample_site', { name: 'visible' });
+
+      const submissionRestricted = await createTestSubmission(connection);
+      const restricted = await createTestFeature(connection, submissionRestricted, 'capture', { comment: 'hidden' });
+
+      // Apply a security rule. With systemUserId=null (anonymous), the security filter
+      // strips any secured feature — the same mechanism that strips features from a
+      // statement whose policy creator lacks the matching team grant.
+      const systemUserId = connection.systemUserId();
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+        VALUES (${restricted}, 1, ${systemUserId});
+      `);
+
+      // Per-statement subquery for the type the user CAN see → returns the row.
+      const accessibleIds = await runSubquery(repo.buildBroadFeatureTypeSubquery('sample_site', null));
+      expect(accessibleIds.has(accessible)).to.equal(true);
+
+      // Per-statement subquery for the type the user CAN'T see → returns nothing
+      // and crucially does not throw. At pipeline level this is what produces an
+      // empty Parquet file rather than a failed download.
+      const restrictedIds = await runSubquery(repo.buildBroadFeatureTypeSubquery('capture', null));
+      expect(restrictedIds.has(restricted)).to.equal(false);
+      expect(restrictedIds.size).to.equal(0);
+    });
   });
 
   describe('buildExpressionTreeFeatureIdsSubquery', () => {
