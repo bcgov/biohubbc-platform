@@ -1,14 +1,18 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
+import { z } from 'zod';
+import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
+import { ExpressionTree } from '../../models/expression-tree';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
+import { featureSearchExpressionTreeSchema } from '../../openapi/schemas/search/search-feature';
 import { publishProcessDownloadJob } from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
-import { SearchFeatureService } from '../../services/search-feature-service';
-import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
+import { ExpressionTreeService } from '../../services/expression-tree-service';
+import { getApiBaseUrl } from '../../utils/api-url';
 import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
@@ -19,7 +23,6 @@ const defaultLog = getLogger('paths/download');
  */
 export const downloadPathDependencies = {
   getDBConnection,
-  getAPIUserDBConnection,
   publishProcessDownloadJob
 };
 
@@ -156,15 +159,34 @@ export function getDownloads(): RequestHandler {
   };
 }
 
-export const POST: Operation = [createDownload()];
+/**
+ * Request body for `POST /api/download`.
+ *
+ * `.strict()` rejects unknown keys to surface frontend decoder bugs (e.g. stale `ui_id`
+ * leaking through) at the boundary instead of silently letting bad data flow into a
+ * download policy.
+ */
+const CreateDownloadRequestBody = z
+  .object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(1000).nullable().optional(),
+    featureTypes: z.array(z.string()).min(1),
+    expression: ExpressionTree.nullable()
+  })
+  .strict();
+
+export const POST: Operation = [
+  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
+  createDownload()
+];
 
 POST.apiDoc = {
   description:
-    'Create a download from search filters. Resolves filters to feature IDs server-side and creates a download record.',
+    'Create a download request from a name, target feature types, and an optional expression tree. Returns a download id and a URL the caller can poll for status.',
   tags: ['download'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   requestBody: {
@@ -173,18 +195,13 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['filters'],
+          additionalProperties: false,
+          required: ['name', 'featureTypes', 'expression'],
           properties: {
-            filters: {
-              type: 'object',
-              description: 'Search filters — same schema as POST /api/search/feature',
-              properties: {
-                keyword: { type: 'string' },
-                feature_types: { type: 'array', items: { type: 'string' } },
-                species: { type: 'array', items: { type: 'string' } },
-                properties: { type: 'array', items: { type: 'object' } }
-              }
-            }
+            name: { type: 'string', minLength: 1, maxLength: 200 },
+            description: { type: 'string', maxLength: 1000, nullable: true },
+            featureTypes: { type: 'array', items: { type: 'string' }, minItems: 1 },
+            expression: { ...featureSearchExpressionTreeSchema, nullable: true }
           }
         }
       }
@@ -205,7 +222,7 @@ POST.apiDoc = {
               },
               download_url: {
                 type: 'string',
-                description: 'Relative API path to check download status'
+                description: 'Fully-qualified API URL the caller can poll for status'
               }
             }
           }
@@ -217,70 +234,71 @@ POST.apiDoc = {
 };
 
 /**
- * Create a download from search filters.
+ * Create a download request.
  *
- * Bulk download bypasses the shopping cart — search filters are resolved to feature IDs
- * server-side, then a download record is created with all matching features linked.
- * Original filters are stored in `download.filters` for traceability (ticket requirement).
- * Uses a dedicated column instead of `metadata` which gets overwritten by the pipeline.
+ * Persists the optional expression tree, creates the owning download policy, creates the
+ * download record, links a fresh team to the download for the requesting user, and queues
+ * the worker job — all inside one transaction so a mid-flow failure leaves no orphan rows.
  *
- * OptionalBearer: anonymous users get a download with no team associations
- * (UUID is the credential). Authenticated users get a team created and linked
- * via download_team — all download access flows through team membership.
+ * Authorization is enforced at export time, not create time. The user's authorization is
+ * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
+ * create-time would let users export data they no longer have access to by simply queuing
+ * a download earlier.
+ *
+ * Reject unknown request-body keys (Zod `.strict()`). Silent acceptance of unknown keys
+ * masks frontend decoder bugs. Failing fast on `ui_id` and similar leakage points the FE
+ * at its own bug rather than letting bad data flow into a policy.
+ *
+ * @return {RequestHandler}
  */
 export function createDownload(): RequestHandler {
   return async (req, res) => {
-    const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated
-      ? downloadPathDependencies.getDBConnection(req.keycloak_token)
-      : downloadPathDependencies.getAPIUserDBConnection();
+    const parseResult = CreateDownloadRequestBody.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new HTTP400('Invalid request body', parseResult.error.issues);
+    }
+    const { name, description, featureTypes, expression } = parseResult.data;
+
+    const connection = downloadPathDependencies.getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
-      const filters: ISearchFeaturesFilters = req.body.filters;
+      const systemUserId = connection.systemUserId();
 
-      const searchFeatureService = new SearchFeatureService(connection);
+      const expressionTreeService = new ExpressionTreeService(connection);
+      const downloadPolicyService = new DownloadPolicyService(connection);
       const downloadService = new DownloadService(connection);
 
-      // Count-only validation — no ID materialization.
-      // Security filtering happens in SQL via buildSecurityFilter:
-      // - systemUserId === null → anonymous, exclude secured features
-      // - systemUserId === number → authenticated, include unsecured + scope-granted
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const matchCount = await searchFeatureService.getSearchFeaturesCount(filters, systemUserId);
-
-      if (matchCount === 0) {
-        throw new HTTP400('No features match the filter criteria');
+      let expressionId: string | null = null;
+      if (expression !== null) {
+        const result = await expressionTreeService.writeExpressionTree(expression);
+        expressionId = result.expression_id;
       }
 
-      // Store filters on download — features re-derived at pipeline time via search re-run
-      const downloadId = await downloadService.createDownload({ filters, format: 'parquet' });
+      const { policy_id } = await downloadPolicyService.createDownloadPolicy({
+        name,
+        description: description ?? null,
+        featureTypes,
+        expressionId
+      });
 
-      // Link download to a new team for authenticated users.
-      // Anonymous downloads have no download_team rows — UUID is the credential.
-      if (isAuthenticated) {
-        const systemUserId = connection.systemUserId();
-        await downloadService.linkDownloadToNewTeam(
-          downloadId.download_id,
-          systemUserId,
-          `Team for bulk ${downloadId.download_id}`,
-          'Team automatically created for download'
-        );
-      }
+      const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
 
-      // Publish async processing job within the transaction
-      await downloadPathDependencies.publishProcessDownloadJob(connection, { downloadId: downloadId.download_id });
+      await downloadService.linkDownloadToNewTeam(
+        download_id,
+        systemUserId,
+        `Team for download ${download_id}`,
+        'Team automatically created for download'
+      );
+
+      await downloadPathDependencies.publishProcessDownloadJob(connection, { downloadId: download_id });
 
       await connection.commit();
 
-      const apiHost = process.env.API_HOST || 'localhost';
-      const apiPort = process.env.API_PORT || '6100';
-      const baseUrl = apiHost === 'localhost' ? `http://${apiHost}:${apiPort}` : `https://${apiHost}`;
-
       return res.status(201).json({
-        download_id: downloadId.download_id,
-        download_url: `${baseUrl}/api/download/${downloadId.download_id}`
+        download_id,
+        download_url: `${getApiBaseUrl()}/api/download/${download_id}`
       });
     } catch (error) {
       defaultLog.error({ label: 'createDownload', message: 'error', error });
