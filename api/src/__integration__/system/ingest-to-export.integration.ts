@@ -207,7 +207,10 @@ describe('Ingest → Download → Export (system integration)', function () {
     expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 
     const lines = csv.trim().split('\n');
-    expect(lines).to.have.lengthOf(2, 'expected header + 1 data row');
+    // The broad-path policy projects every active telemetry feature, so the CSV
+    // may also contain rows from seed data — assert this test's row is present
+    // rather than asserting exclusivity.
+    expect(lines.length, 'expected header + at least the test data row').to.be.greaterThan(1);
 
     const header = lines[0].split(',');
     // System columns lead so consumers can join cross-file (uuid, parent_uuid)
@@ -218,7 +221,10 @@ describe('Ingest → Download → Export (system integration)', function () {
     // columnar predicate pushdown.
     expect(header).to.include.members(['dop', 'elevation', 'timestamp_date', 'timestamp_time', 'geometry']);
 
-    const row = lines[1].split(',');
+    const featureIdIdx = header.indexOf('submission_feature_id');
+    const dataRow = lines.slice(1).map((line) => line.split(',')).find((cells) => cells[featureIdIdx] === String(featureId));
+    expect(dataRow, `expected a data row for submission_feature_id=${featureId}`).to.not.be.undefined;
+    const row = dataRow!;
     const col = (name: string): string => row[header.indexOf(name)];
 
     expect(col('submission_feature_id')).to.equal(String(featureId));

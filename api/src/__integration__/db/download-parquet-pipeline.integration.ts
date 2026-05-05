@@ -393,7 +393,8 @@ describe('Download Parquet pipeline (integration)', function () {
       });
 
       const captureProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'comment', feature_property_type_name: 'string' }
+        { feature_property_name: 'comment', feature_property_type_name: 'string' },
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
       ];
 
       const captureRows = await streamAndHydrateBySubmission(

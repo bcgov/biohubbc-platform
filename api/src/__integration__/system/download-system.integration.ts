@@ -475,14 +475,17 @@ describe('Download Worker', function () {
         expect(fields.uuid.originalType).to.equal('UTF8');
         expect(fields.parent_uuid.originalType).to.equal('UTF8');
 
-        // Collect rows
+        // Collect rows. The broad-path policy projects every active feature of
+        // the type, so the file may also contain features from seed data —
+        // assert this submission's feature is present rather than asserting
+        // exclusivity.
         const cursor = reader.getCursor();
         const rows: any[] = [];
         let next: any;
         while ((next = await cursor.next())) {
           rows.push(next);
         }
-        expect(rows).to.have.lengthOf(1);
+        expect(rows.length, 'expected at least the test feature row').to.be.greaterThan(0);
 
         // GeoParquet metadata + row assertions per feature type. Spatial types carry
         // a `geo` key in the Parquet footer per GeoParquet 1.0; non-spatial types must not.
@@ -498,21 +501,27 @@ describe('Download Worker', function () {
           expect(geo.columns.geometry.crs.id.code).to.equal(4326);
         };
 
+        const findRow = (expectedUuid: string): Record<string, unknown> => {
+          const match = rows.find((r) => r.uuid === expectedUuid);
+          expect(match, `expected a row for uuid ${expectedUuid}`).to.not.be.undefined;
+          return match as Record<string, unknown>;
+        };
+
         // Per seed data: sample_site.geometry is feature_property_type_name='spatial',
         // dataset has no spatial-typed property. The `geo` footer key follows the producer's
         // spatial-column detection, so only sample_site carries it.
         if (s3Key === sampleSiteKey) {
-          expect(rows[0].uuid).to.equal(sampleSiteUuid);
+          findRow(sampleSiteUuid);
           expectGeoShape();
         } else if (s3Key === datasetKey) {
-          expect(rows[0].uuid).to.equal(datasetUuid);
+          findRow(datasetUuid);
           expect(geoEntry, 'dataset has no spatial-typed property, must NOT carry geo metadata').to.be.undefined;
         } else {
           // file (non-spatial + artifact_key) — must NOT carry geo metadata.
-          expect(rows[0].uuid).to.equal(fileUuid);
+          const fileRow = findRow(fileUuid);
           expect(geoEntry, 'file should NOT have geo metadata').to.be.undefined;
           // artifact_key column round-trip — parquet UTF8 strings come back as Buffers
-          const rawArtifactKey = rows[0].artifact_key;
+          const rawArtifactKey = fileRow.artifact_key;
           const stringified = Buffer.isBuffer(rawArtifactKey) ? rawArtifactKey.toString('utf-8') : rawArtifactKey;
           expect(stringified).to.equal(artifactSourceKey);
         }
