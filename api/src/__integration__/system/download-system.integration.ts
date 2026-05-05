@@ -59,7 +59,8 @@ describe('Download Worker', function () {
   let db: Knex;
   let storageService: ObjectStorageService;
   const createdDownloadIds: number[] = [];
-  const createdCartIds: string[] = [];
+  const createdPolicyIds: string[] = [];
+  const createdPolicyStatementIds: string[] = [];
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionUploadIds: string[] = [];
   const createdSubmissionIds: number[] = [];
@@ -99,12 +100,20 @@ describe('Download Worker', function () {
           await db('biohub.download_artifact').whereIn('download_id', createdDownloadIds).del();
           await db('biohub.artifact').whereIn('artifact_id', workerArtifactIds).del();
         }
+        await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
         await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
       }
 
-      // 1b. Delete carts (cascades to cart_submission_feature)
-      if (createdCartIds.length > 0) {
-        await db('biohub.cart').whereIn('cart_id', createdCartIds).del();
+      // 1b. Delete policy_statement_expression (no statements should have any here, but be defensive),
+      //     then policy_statement, then the owning policies — children first to satisfy FK.
+      if (createdPolicyStatementIds.length > 0) {
+        await db('biohub.policy_statement_expression')
+          .whereIn('policy_statement_id', createdPolicyStatementIds)
+          .del();
+        await db('biohub.policy_statement').whereIn('policy_statement_id', createdPolicyStatementIds).del();
+      }
+      if (createdPolicyIds.length > 0) {
+        await db('biohub.policy').whereIn('policy_id', createdPolicyIds).del();
       }
 
       // 2. Delete submission features
@@ -227,44 +236,52 @@ describe('Download Worker', function () {
   }
 
   /**
-   * Create a cart-backed download, publish the job to pg-boss, and wait for completion.
-   * Features are resolved at pipeline time from cart_submission_feature via download.cart_id.
+   * Create a policy-backed download, publish the job to pg-boss, and wait for completion.
+   *
+   * Features are resolved at pipeline time by evaluating each `policy_statement` against
+   * the database. With `expression_id IS NULL` the broad path picks every active feature
+   * of the named type — same selection model as the route handler.
    *
    * The worker is the single owner of artifact writes — for parquet it creates one
    * `artifact` + `download_artifact` pair per feature type at write-time with the real
    * checksum + byte size. No request-time stub artifacts are created here.
    */
   async function createDownloadAndProcess(
-    featureIds: number[],
+    featureTypeNames: string[],
     downloadOverrides?: Record<string, unknown>
   ): Promise<{ downloadId: number }> {
-    // Create a cart and link features (raw Knex — system tests don't use IDBConnection)
-    const [cart] = await db('biohub.cart')
+    // Create the owning policy (status='approved' so the row is treated as live).
+    const [policy] = await db('biohub.policy')
       .insert({
-        system_user_id: SYSTEM_USER_ID,
-        cart_status: 'checked_out',
+        name: `${TEST_PREFIX} download policy ${Date.now()}-${Math.random()}`,
+        description: 'Integration test policy',
+        status: 'approved',
         create_user: SYSTEM_USER_ID
       })
-      .returning('cart_id');
-    createdCartIds.push(cart.cart_id);
+      .returning('policy_id');
+    createdPolicyIds.push(policy.policy_id);
 
-    if (featureIds.length > 0) {
-      await db('biohub.cart_submission_feature').insert(
-        featureIds.map((id) => ({
-          cart_id: cart.cart_id,
-          submission_feature_id: id,
+    // One ALLOW statement per feature type — the broad-path projection at write-time
+    // picks every active submission_feature of the type for the policy creator's
+    // visibility scope.
+    for (const featureTypeName of featureTypeNames) {
+      const [statement] = await db('biohub.policy_statement')
+        .insert({
+          policy_id: policy.policy_id,
+          effect: 'allow',
+          submission_feature_urn: `urn:*:${featureTypeName}:*`,
           create_user: SYSTEM_USER_ID
-        }))
-      );
+        })
+        .returning('policy_statement_id');
+      createdPolicyStatementIds.push(statement.policy_statement_id);
     }
 
     const format = (downloadOverrides?.format as string) ?? 'csv';
 
-    // Create download with cart_id FK — pipeline resolves features from cart_submission_feature
     const [download] = await db('biohub.download')
       .insert({
         download_status: 'pending',
-        cart_id: cart.cart_id,
+        policy_id: policy.policy_id,
         format,
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
@@ -375,9 +392,16 @@ describe('Download Worker', function () {
     const fileUuid = uuidBySubmissionFeatureId.get(fileFeatureId)!;
 
     // 2. Create parquet download, publish job, and wait for completion
-    const { downloadId } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId], {
+    // The policy projects every active feature of the named types — a single test
+    // submission owns the only matching rows, so the broad path returns exactly the
+    // features seeded above.
+    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
+    // featureIds remain useful breadcrumbs in failure messages.
+    expect(datasetFeatureId).to.be.a('number');
+    expect(sampleSiteFeatureId).to.be.a('number');
+    expect(fileFeatureId).to.be.a('number');
 
     // 3. Verify download status transitions completed
     const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
@@ -528,9 +552,16 @@ describe('Download Worker', function () {
     });
 
     // Run 1
-    const { downloadId } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId], {
+    // The policy projects every active feature of the named types — a single test
+    // submission owns the only matching rows, so the broad path returns exactly the
+    // features seeded above.
+    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
+    // featureIds remain useful breadcrumbs in failure messages.
+    expect(datasetFeatureId).to.be.a('number');
+    expect(sampleSiteFeatureId).to.be.a('number');
+    expect(fileFeatureId).to.be.a('number');
 
     // Track per-type S3 keys for cleanup (same set expected after both runs)
     const run1DatasetKey = `downloads/${downloadId}/dataset/data.parquet`;

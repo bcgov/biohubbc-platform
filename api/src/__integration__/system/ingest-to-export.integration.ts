@@ -15,10 +15,10 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { CartService } from '../../services/cart-service';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -144,16 +144,21 @@ describe('Ingest → Download → Export (system integration)', function () {
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
     await indexTelemetryProperties(featureId, telemetryData);
 
-    // Build a cart + download via the real services. Authenticated path so the
-    // download is owned by a single-member team — the cart's scope-check sees
-    // the feature regardless of any inherited security on its ancestors.
+    // Build a download policy + download via the real services. Broad-path
+    // policy on the telemetry feature type — at export time the security
+    // filter is applied for the policy creator's authorization scope.
     const systemUserId = connection.systemUserId();
-    const cartService = new CartService(connection);
-    const { cart } = await cartService.createCart(systemUserId, [featureId]);
+    const policyService = new DownloadPolicyService(connection);
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: 'ingest-to-export integration test',
+      description: null,
+      featureTypes: ['telemetry'],
+      expressionId: null
+    });
 
     const downloadService = new DownloadService(connection);
     const { download_id: downloadId } = await downloadService.createDownload({
-      cartId: cart.cart_id,
+      policyId: policy_id,
       format: 'parquet'
     });
 

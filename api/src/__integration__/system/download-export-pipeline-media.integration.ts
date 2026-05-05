@@ -20,8 +20,8 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { CartService } from '../../services/cart-service';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
@@ -144,7 +144,7 @@ describe('Download Export pipeline — media (system)', function () {
   let downloadRepo: DownloadRepository;
   let pipelineService: DownloadExportPipelineService;
   let downloadService: DownloadService;
-  let cartService: CartService;
+  let policyService: DownloadPolicyService;
   let artifactService: ArtifactService;
   const storageService = new ObjectStorageService();
   const s3KeysToCleanup: string[] = [];
@@ -160,7 +160,7 @@ describe('Download Export pipeline — media (system)', function () {
     downloadRepo = new DownloadRepository(connection);
     pipelineService = new DownloadExportPipelineService(connection);
     downloadService = new DownloadService(connection);
-    cartService = new CartService(connection);
+    policyService = new DownloadPolicyService(connection);
     artifactService = new ArtifactService(connection);
   });
 
@@ -238,10 +238,18 @@ describe('Download Export pipeline — media (system)', function () {
       submissionFeatureIds.push(featureId);
     }
 
-    const systemUserId = connection.systemUserId();
-    const cartResponse = await cartService.createCart(systemUserId, submissionFeatureIds);
+    // The export pipeline doesn't read submission_feature rows for binary
+    // copying — it pulls everything from the stubbed Parquet reader — so the
+    // policy itself can be a broad-path policy on `file` and the file
+    // submission_feature rows above are just for breadcrumb purposes.
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: `media-export-test-${Date.now()}-${Math.random()}`,
+      description: null,
+      featureTypes: ['file'],
+      expressionId: null
+    });
     const { download_id: downloadId } = await downloadService.createDownload({
-      cartId: cartResponse.cart.cart_id,
+      policyId: policy_id,
       format: 'parquet'
     });
 
@@ -459,14 +467,18 @@ describe('Download Export pipeline — media (system)', function () {
     // must exist in seed data — 'dataset' is a root type already used by the
     // sibling integration tests.
     const submissionId = await createTestSubmission(connection);
-    const featureId = await createTestFeature(connection, submissionId, 'dataset', {
+    await createTestFeature(connection, submissionId, 'dataset', {
       name: 'oom-seed'
     });
 
-    const systemUserId = connection.systemUserId();
-    const cartResponse = await cartService.createCart(systemUserId, [featureId]);
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: `media-oom-test-${Date.now()}-${Math.random()}`,
+      description: null,
+      featureTypes: ['dataset'],
+      expressionId: null
+    });
     const { download_id: downloadId } = await downloadService.createDownload({
-      cartId: cartResponse.cart.cart_id,
+      policyId: policy_id,
       format: 'parquet'
     });
 

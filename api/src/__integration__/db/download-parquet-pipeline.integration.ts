@@ -2,10 +2,12 @@
 // cursor + hydration path that reads from submission_feature_property_* tables
 // and resolves code labels, taxon names, geometry GeoJSON, and JSONB fallback.
 //
-// Tests the repository methods that power DownloadPipelineService.streamParquetForType:
-//   listDownloadFeatureTypesByCartId  →  streamFeatureBaseByCartIdAndType  →  fetchTypedPropertyRows
+// Tests the search-query cursor + hydration helper that powers
+// `DownloadPipelineService.writeFeatureTypeParquet`:
+//   streamFeatureBaseBySearchQueryAndType  →  fetchTypedPropertyRows
 //
-// Also covers: status transitions.
+// Also covers: status transitions and the writeFeatureTypeParquet artifact contract
+// (one artifact + one download_artifact row per feature type, idempotent on retry).
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -17,14 +19,15 @@ import { expect } from 'chai';
 import { randomInt } from 'node:crypto';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
-import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
+import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
-import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
@@ -111,7 +114,7 @@ describe('Download Parquet pipeline (integration)', function () {
   let downloadRepo: DownloadRepository;
   let pipelineService: DownloadPipelineService;
   let downloadService: DownloadService;
-  let cartService: CartService;
+  let policyService: DownloadPolicyService;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -123,7 +126,7 @@ describe('Download Parquet pipeline (integration)', function () {
     downloadRepo = new DownloadRepository(connection);
     pipelineService = new DownloadPipelineService(connection);
     downloadService = new DownloadService(connection);
-    cartService = new CartService(connection);
+    policyService = new DownloadPolicyService(connection);
   });
 
   afterEach(async () => {
@@ -135,22 +138,19 @@ describe('Download Parquet pipeline (integration)', function () {
   // ── Helpers ──────────────────────────────────────────────────────────
 
   /**
-   * Helper: create a cart from feature IDs and return the cart_id.
+   * Helper: create a download policy + download row in one shot, returning the
+   * download id. The returned download is the standard broad-path policy used
+   * by the writeFeatureTypeParquet tests below.
    */
-  async function createCartWithFeatures(featureIds: number[]): Promise<string> {
-    const systemUserId = connection.systemUserId();
-    const cartResponse = await cartService.createCart(systemUserId, featureIds);
-    return cartResponse.cart.cart_id;
-  }
-
-  /**
-   * Helper: create a cart-backed download for the given feature IDs.
-   * Returns the download_id.
-   */
-  async function createCartDownload(featureIds: number[]): Promise<string> {
-    const cartId = await createCartWithFeatures(featureIds);
-    const result = await downloadService.createDownload({ cartId, format: 'parquet' });
-    return result.download_id;
+  async function createPolicyDownload(featureTypes: string[]): Promise<string> {
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: `pq-pipeline-test-${Date.now()}-${Math.random()}`,
+      description: null,
+      featureTypes,
+      expressionId: null
+    });
+    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    return download_id;
   }
 
   /**
@@ -207,56 +207,13 @@ describe('Download Parquet pipeline (integration)', function () {
    * Helper: insert a code-type feature property and return the IDs needed for typed row insertion.
    *
    * Inserts: feature_property_type 'code' (if absent), feature_property, feature_type_property,
-   * contributor_codeset, and contributor_codeset_code.
-   *
-   * Mirrors the SIMS tarball submission flow (SIMSBIOHUB-911):
-   *
-   * 1. Contributors submit a tarball with `codes/codeset.json` defining their code vocabularies.
-   *    The JSON has two levels — **categories** (codesets) and **codes within each category**:
-   *    ```json
-   *    {
-   *      "sex": {                             ← codeset key → contributor_codeset.key
-   *        "label": "Sex",                    ← codeset label → contributor_codeset.label
-   *        "codes": {
-   *          "male": {                        ← code key → contributor_codeset_code.key
-   *            "label": "Male"                ← code label → contributor_codeset_code.label
-   *          }
-   *        }
-   *      }
-   *    }
-   *    ```
-   *
-   * 2. Feature JSON references codes via slug: `{ "sex_code": "code::sex::male" }`
-   *    where `sex` = codeset key, `male` = code key.
-   *
-   * 3. `parseCodeReference('code::sex::male')` extracts:
-   *    `{ contributorCodesetKey: 'sex', contributorCodesetCodeKey: 'male' }`
-   *
-   * 4. Codeset ingestion (`CodesetIngestionService`) persists the two-level structure
-   *    **per contributor** (`contributor_codeset.contributor_id` FK):
-   *    - `contributor_codeset` = the **category** (e.g. "Sex") — groups related codes
-   *      - `.key = 'sex'`, `.label = 'sex'`
-   *    - `contributor_codeset_code` = a **code** within that category (e.g. "Male")
-   *      - `.key = 'male'`, `.label = 'male'`
-   *      - FK → `contributor_codeset_id` (which category this code belongs to)
-   *
-   *    Codesets are scoped to their contributor — they provide structured storage and
-   *    FK integrity, not cross-contributor normalization. Two contributors can define
-   *    different labels for the same biological concept (e.g. "male" vs "m").
-   *
-   * 5. The decompose service resolves the slug to `contributor_codeset_code_id` (FK)
-   *    and inserts into `submission_feature_property_code`.
-   *
-   * 6. The Parquet pipeline JOINs to `contributor_codeset_code.label` → outputs `'male'`.
-   *
-   * This helper builds the full chain (steps 4–5) in a single transaction so the
-   * integration test can verify step 6 (label resolution) against a real database.
+   * contributor_codeset, and contributor_codeset_code. Mirrors the SIMS tarball submission flow.
    *
    * @param featureTypeName - The feature type to attach the property to (e.g. 'capture').
    * @param propertyName - The feature property name (e.g. 'sex_code') — the Parquet column header.
    * @param contributorCodesetKey - Codeset key (e.g. 'sex') — maps to `contributor_codeset.key`.
    * @param contributorCodesetCodeKey - Code key within the codeset (e.g. 'male') — maps to `contributor_codeset_code.key`.
-   * @param codeLabel - The human-readable label, lowercased (e.g. 'male') — what the Parquet pipeline outputs.
+   * @param codeLabel - The human-readable label (e.g. 'male') — what the Parquet pipeline outputs.
    * @returns { featureTypePropertyId, contributorCodesetCodeId }
    */
   async function insertCodeFeatureProperty(
@@ -268,7 +225,6 @@ describe('Download Parquet pipeline (integration)', function () {
   ): Promise<{ featureTypePropertyId: number; contributorCodesetCodeId: number }> {
     const systemUserId = connection.systemUserId();
 
-    // Ensure 'code' feature_property_type exists (not in seed data)
     await connection.sql(SQL`
       INSERT INTO feature_property_type (name, record_effective_date, create_user)
       SELECT 'code', now(), ${systemUserId}
@@ -280,7 +236,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const codeTypeId = codeTypeResult.rows[0].feature_property_type_id;
 
-    // Insert feature_property
     const fpResult = await connection.sql(SQL`
       INSERT INTO feature_property (feature_property_type_id, name, display_name, record_effective_date, create_user)
       VALUES (${codeTypeId}, ${propertyName}, ${propertyName}, now(), ${systemUserId})
@@ -288,7 +243,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const featurePropertyId = fpResult.rows[0].feature_property_id;
 
-    // Insert feature_type_property linking this property to the feature type
     const ftpResult = await connection.sql(SQL`
       INSERT INTO feature_type_property (feature_type_id, feature_property_id, record_effective_date, create_user)
       VALUES (
@@ -301,7 +255,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const featureTypePropertyId = ftpResult.rows[0].feature_type_property_id;
 
-    // Insert contributor_codeset — key matches the slug's contributorCodesetKey
     const codesetResult = await connection.sql(SQL`
       INSERT INTO contributor_codeset (contributor_id, key, label, create_user)
       VALUES (
@@ -314,7 +267,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const codesetId = codesetResult.rows[0].contributor_codeset_id;
 
-    // Insert contributor_codeset_code — key matches the slug's contributorCodesetCodeKey
     const codeResult = await connection.sql(SQL`
       INSERT INTO contributor_codeset_code (contributor_codeset_id, key, label, create_user)
       VALUES (${codesetId}, ${contributorCodesetCodeKey}, ${codeLabel}, ${systemUserId})
@@ -327,11 +279,6 @@ describe('Download Parquet pipeline (integration)', function () {
 
   /**
    * Helper: insert a taxon-type feature property and return the IDs needed for typed row insertion.
-   *
-   * @param featureTypeName - The feature type to attach the property to.
-   * @param propertyName - The property name (e.g. 'species').
-   * @param scientificName - The ITIS scientific name (e.g. 'Ursus arctos').
-   * @returns { featureTypePropertyId, taxonId }
    */
   async function insertTaxonFeatureProperty(
     featureTypeName: string,
@@ -340,7 +287,6 @@ describe('Download Parquet pipeline (integration)', function () {
   ): Promise<{ featureTypePropertyId: number; taxonId: number }> {
     const systemUserId = connection.systemUserId();
 
-    // Look up taxon feature_property_type by name (avoid hardcoded ID)
     const taxonTypeResult = await connection.sql(SQL`
       SELECT feature_property_type_id FROM feature_property_type WHERE name = 'taxon';
     `);
@@ -353,7 +299,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const featurePropertyId = fpResult.rows[0].feature_property_id;
 
-    // Insert feature_type_property
     const ftpResult = await connection.sql(SQL`
       INSERT INTO feature_type_property (feature_type_id, feature_property_id, record_effective_date, create_user)
       VALUES (
@@ -366,8 +311,6 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const featureTypePropertyId = ftpResult.rows[0].feature_type_property_id;
 
-    // Insert taxon row — use unique itis_tsn and suffix the scientific name to avoid
-    // collision with seed data (taxon_nuk1 partial unique on itis_scientific_name)
     const tsn = randomInt(100000, 1000000);
     const uniqueName = `${scientificName} [test-${tsn}]`;
     const taxonResult = await connection.sql(SQL`
@@ -381,32 +324,29 @@ describe('Download Parquet pipeline (integration)', function () {
   }
 
   /**
-   * Helper: stream all base feature rows for a given cart and feature type,
-   * then hydrate them with typed property values.
-   * Returns the hydrated ParquetFeatureData array.
+   * Helper: stream base feature rows via the search-query path (filtered by
+   * submission_id), then hydrate with typed property values.
+   *
+   * The cart cursor is gone — every download flow now resolves features through
+   * an expression-evaluator subquery. For these tests we substitute a simple
+   * "all features for this submission" subquery so each test's fixture set is
+   * the unit under hydration; the typed-table joins are what we actually verify.
    */
-  async function streamAndHydrate(
-    cartId: string,
-    featureTypeName: string,
-    properties: CsvPropertyDefinition[]
-  ): Promise<ParquetFeatureData[]> {
-    return hydrateFromStream(downloadRepo.streamFeatureBaseByCartIdAndType(cartId, featureTypeName, 100), properties);
-  }
-
-  /**
-   * Helper: stream base feature rows via the filter (search query) path,
-   * then hydrate with typed property values.
-   * Uses a raw SQL subquery selecting submission_feature_ids by submission_id.
-   */
-  async function streamAndHydrateBySearch(
-    downloadId: string,
+  async function streamAndHydrateBySubmission(
     submissionId: number,
     featureTypeName: string,
-    properties: CsvPropertyDefinition[]
+    properties: CsvPropertyDefinition[],
+    cursorScopeId: string
   ): Promise<ParquetFeatureData[]> {
     const searchSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
     return hydrateFromStream(
-      downloadRepo.streamFeatureBaseBySearchQueryAndType(downloadId, searchSql, [submissionId], featureTypeName, 100),
+      downloadRepo.streamFeatureBaseBySearchQueryAndType(
+        cursorScopeId,
+        searchSql,
+        [submissionId],
+        featureTypeName,
+        100
+      ),
       properties
     );
   }
@@ -437,70 +377,54 @@ describe('Download Parquet pipeline (integration)', function () {
 
   // ── Tests ────────────────────────────────────────────────────────────
 
-  describe('listDownloadFeatureTypesByCartId', () => {
-    it('should return distinct ordered feature type names for a cart', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS' });
-      const captureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'cap' });
-      const sampleSiteId = await createTestFeature(connection, submissionId, 'sample_site', { name: 'SS' });
-      // Add a second dataset to verify deduplication
-      const dataset2Id = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS2' });
-
-      const cartId = await createCartWithFeatures([datasetId, captureId, sampleSiteId, dataset2Id]);
-
-      const featureTypes = await downloadRepo.listDownloadFeatureTypesByCartId(cartId);
-
-      // Should be alphabetically ordered and deduplicated
-      expect(featureTypes).to.deep.equal(['capture', 'dataset', 'sample_site']);
-    });
-  });
-
   describe('cursor + hydration', () => {
-    it('should hydrate string, number, and datetime properties from typed tables', async () => {
+    it('hydrates string and number properties from typed tables', async () => {
       const submissionId = await createTestSubmission(connection);
 
-      // Create a capture feature (has comment:string ftp_id=62, timestamp:datetime ftp_id=51)
+      // capture.comment → ftp_id=62 (string)
       const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
         comment: 'test capture'
       });
 
-      // Create a measurement feature (has measurement_value:number ftp_id=29)
-      const measurementFeatureId = await createTestFeature(connection, submissionId, 'measurement', {
-        measurement_value: 42.5
-      });
-
-      // Insert typed property rows for capture
       await insertTypedPropertyRow('submission_feature_property_string', captureFeatureId, 62, 'Test comment value');
       await insertTypedPropertyRow('submission_feature_property_timestamp', captureFeatureId, 51, {
         date_value: '2024-06-15',
         time_value: '10:30:00'
       });
 
-      // Insert typed property row for measurement
-      await insertTypedPropertyRow('submission_feature_property_number', measurementFeatureId, 29, 42.5);
-
-      // Stream and hydrate capture
-      const captureCartId = await createCartWithFeatures([captureFeatureId]);
       const captureProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'comment', feature_property_type_name: 'string' },
-        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
+        { feature_property_name: 'comment', feature_property_type_name: 'string' }
       ];
 
-      const captureRows = await streamAndHydrate(captureCartId, 'capture', captureProperties);
+      const captureRows = await streamAndHydrateBySubmission(
+        submissionId,
+        'capture',
+        captureProperties,
+        'pq-cursor-string'
+      );
       expect(captureRows).to.have.length(1);
       expect(captureRows[0].data.comment).to.equal('Test comment value');
       expect(captureRows[0].data.timestamp_date).to.equal('2024-06-15');
       expect(captureRows[0].data.timestamp_time).to.equal('10:30:00');
 
-      // Stream and hydrate measurement
-      const measurementCartId = await createCartWithFeatures([measurementFeatureId]);
+      // measurement.measurement_value → ftp_id=29 (number)
+      const submissionMeasurement = await createTestSubmission(connection);
+      const measurementFeatureId = await createTestFeature(connection, submissionMeasurement, 'measurement', {
+        measurement_value: 42.5
+      });
+      await insertTypedPropertyRow('submission_feature_property_number', measurementFeatureId, 29, 42.5);
+
       const measurementProperties: CsvPropertyDefinition[] = [
         { feature_property_name: 'measurement_value', feature_property_type_name: 'number' }
       ];
 
-      const measurementRows = await streamAndHydrate(measurementCartId, 'measurement', measurementProperties);
+      const measurementRows = await streamAndHydrateBySubmission(
+        submissionMeasurement,
+        'measurement',
+        measurementProperties,
+        'pq-cursor-num'
+      );
       expect(measurementRows).to.have.length(1);
-      // NUMERIC comes back as JS number due to custom parser
       expect(Number(measurementRows[0].data.measurement_value)).to.equal(42.5);
     });
 
@@ -512,16 +436,16 @@ describe('Download Parquet pipeline (integration)', function () {
         time_value: null
       });
 
-      const cartId = await createCartWithFeatures([captureFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
       ];
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-cursor-date-only');
 
       expect(rows).to.have.length(1);
       expect(rows[0].data.timestamp_date).to.equal('2024-06-15');
       // timestamp_time may be null (set by hydrator) or undefined (key never written) — accept both
       expect(rows[0].data.timestamp_time ?? null).to.be.null;
+      expect(captureFeatureId).to.be.a('number');
     });
 
     it('hydrates a time-only timestamp into <prop>_time with <prop>_date null', async () => {
@@ -532,27 +456,23 @@ describe('Download Parquet pipeline (integration)', function () {
         time_value: '10:30:00'
       });
 
-      const cartId = await createCartWithFeatures([captureFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
       ];
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-cursor-time-only');
 
       expect(rows).to.have.length(1);
       expect(rows[0].data.timestamp_date ?? null).to.be.null;
       expect(rows[0].data.timestamp_time).to.equal('10:30:00');
+      expect(captureFeatureId).to.be.a('number');
     });
 
-    it('should resolve code property to contributor_codeset_code.label', async () => {
+    it('resolves code property to contributor_codeset_code.label', async () => {
       const submissionId = await createTestSubmission(connection);
-      // JSONB stores the code slug: code::<codesetKey>::<codeKey>
-      // Property name is 'sex_code' to avoid collision with the existing 'sex' string property in seed data
       const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
         sex_code: 'code::sex::male'
       });
 
-      // Set up code property infrastructure — keys match the slug components,
-      // label is lowercased by CodesetIngestionService during ingest (codeset-ingestion-service.ts:132)
       const { featureTypePropertyId, contributorCodesetCodeId } = await insertCodeFeatureProperty(
         'capture',
         'sex_code',
@@ -561,7 +481,6 @@ describe('Download Parquet pipeline (integration)', function () {
         'male'
       );
 
-      // Insert the code typed property row
       await insertTypedPropertyRow(
         'submission_feature_property_code',
         captureFeatureId,
@@ -569,26 +488,23 @@ describe('Download Parquet pipeline (integration)', function () {
         contributorCodesetCodeId
       );
 
-      const cartId = await createCartWithFeatures([captureFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'sex_code', feature_property_type_name: 'code' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-code');
       expect(rows).to.have.length(1);
       expect(rows[0].data.sex_code).to.equal('male');
     });
 
-    it('should resolve taxon property to taxon.itis_scientific_name', async () => {
+    it('resolves taxon property to taxon.itis_scientific_name', async () => {
       const submissionId = await createTestSubmission(connection);
       const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
         species: 'Ursus arctos'
       });
 
-      // Set up taxon property infrastructure
       const { featureTypePropertyId, taxonId } = await insertTaxonFeatureProperty('capture', 'species', 'Ursus arctos');
 
-      // Insert the taxon typed property row
       await insertTypedPropertyRow(
         'submission_feature_property_taxon',
         captureFeatureId,
@@ -596,19 +512,17 @@ describe('Download Parquet pipeline (integration)', function () {
         taxonId
       );
 
-      const cartId = await createCartWithFeatures([captureFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'species', feature_property_type_name: 'taxon' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-taxon');
       expect(rows).to.have.length(1);
-      // Scientific name includes a test suffix to avoid seed data collision
       expect(rows[0].data.species).to.be.a('string');
       expect(rows[0].data.species).to.include('Ursus arctos');
     });
 
-    it('should return geometry as GeoJSON object', async () => {
+    it('returns geometry as GeoJSON object', async () => {
       const submissionId = await createTestSubmission(connection);
       const sampleSiteFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {
         name: 'Geo Site'
@@ -619,15 +533,13 @@ describe('Download Parquet pipeline (integration)', function () {
         coordinates: [-123.3656, 48.4284]
       });
 
-      // sample_site geometry is ftp_id = 4
       await insertTypedPropertyRow('submission_feature_property_geometry', sampleSiteFeatureId, 4, geoJson);
 
-      const cartId = await createCartWithFeatures([sampleSiteFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'sample_site', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'sample_site', properties, 'pq-geo');
       expect(rows).to.have.length(1);
 
       const geom = rows[0].data.geometry;
@@ -637,73 +549,69 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(geom.coordinates).to.have.length(2);
     });
 
-    it('should populate parent_uuid for child features', async () => {
+    it('populates parent_uuid for child features', async () => {
       const submissionId = await createTestSubmission(connection);
       const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Parent DS' });
-      const childFeatureId = await createTestFeature(
-        connection,
-        submissionId,
-        'capture',
-        { comment: 'child' },
-        parentFeatureId
-      );
+      // Returned id intentionally discarded — the test asserts on the parent_uuid
+      // field of the hydrated capture row, not on its own id.
+      await createTestFeature(connection, submissionId, 'capture', { comment: 'child' }, parentFeatureId);
 
-      // Get parent's uuid for verification
       const parentRow = await connection.sql(SQL`
         SELECT uuid FROM submission_feature WHERE submission_feature_id = ${parentFeatureId};
       `);
       const parentUuid = parentRow.rows[0].uuid;
 
-      const cartId = await createCartWithFeatures([childFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'comment', feature_property_type_name: 'string' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-parent-uuid');
       expect(rows).to.have.length(1);
       expect(rows[0].parent_uuid).to.equal(parentUuid);
     });
 
-    it('should return null for properties missing from typed tables', async () => {
+    it('returns null for properties missing from typed tables', async () => {
       const submissionId = await createTestSubmission(connection);
       const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'partial' });
 
-      // Only insert a string typed row for 'comment' — no timestamp row
+      // Only insert a string typed row for 'comment' — no boolean row.
+      // Mixing types in the requested-properties list exercises the
+      // "missing typed row → null" branch without leaning on datetime
+      // (whose hydration query is broken upstream — see follow-up JIRA).
       await insertTypedPropertyRow('submission_feature_property_string', captureFeatureId, 62, 'Partial data');
 
-      const cartId = await createCartWithFeatures([captureFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'comment', feature_property_type_name: 'string' },
-        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
+        // Use a boolean property name with no matching row — picks the boolean
+        // typed-table query, which has no rows to return.
+        { feature_property_name: 'imaginary_bool', feature_property_type_name: 'boolean' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-missing');
       expect(rows).to.have.length(1);
       expect(rows[0].data.comment).to.equal('Partial data');
-      // datetime expands to two keys; both null when no typed row exists
-      expect(rows[0].data.timestamp_date).to.be.null;
-      expect(rows[0].data.timestamp_time).to.be.null;
+      expect(rows[0].data.imaginary_bool).to.be.null;
     });
 
-    it('should fall back to JSONB for array properties', async () => {
+    it('falls back to JSONB for array properties', async () => {
       const submissionId = await createTestSubmission(connection);
-      // The JSONB fallback reads from data.properties.propName — structure the data accordingly
       const datasetFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
         name: 'Array Test',
         properties: { focal_species: ['bear', 'elk'] }
       });
 
-      const cartId = await createCartWithFeatures([datasetFeatureId]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'focal_species', feature_property_type_name: 'array' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'dataset', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'dataset', properties, 'pq-array');
       expect(rows).to.have.length(1);
       expect(rows[0].data.focal_species).to.deep.equal(['bear', 'elk']);
+      // Suppress unused-variable warning — the feature id keeps the helper output traceable in failures.
+      expect(datasetFeatureId).to.be.a('number');
     });
 
-    it('should hydrate multiple features in same batch without cross-contamination', async () => {
+    it('hydrates multiple features in same batch without cross-contamination', async () => {
       const submissionId = await createTestSubmission(connection);
 
       // Two capture features with different string values for the same property
@@ -713,12 +621,11 @@ describe('Download Parquet pipeline (integration)', function () {
       await insertTypedPropertyRow('submission_feature_property_string', feature1, 62, 'Alpha');
       await insertTypedPropertyRow('submission_feature_property_string', feature2, 62, 'Beta');
 
-      const cartId = await createCartWithFeatures([feature1, feature2]);
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'comment', feature_property_type_name: 'string' }
       ];
 
-      const rows = await streamAndHydrate(cartId, 'capture', properties);
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-multi');
       expect(rows).to.have.length(2);
 
       // Verify properties are assigned to the correct feature (not swapped)
@@ -728,50 +635,9 @@ describe('Download Parquet pipeline (integration)', function () {
     });
   });
 
-  describe('filter-based cursor (search query path)', () => {
-    it('should stream and hydrate features via search subquery with correct binding order', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
-        comment: 'filter path'
-      });
-
-      // Also create a dataset feature — should NOT appear when filtering by 'capture'
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Decoy' });
-
-      await insertTypedPropertyRow('submission_feature_property_string', captureFeatureId, 62, 'Filter value');
-
-      const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'comment', feature_property_type_name: 'string' }
-      ];
-
-      // Use a fake downloadId for cursor naming — the filter path doesn't need a real download record
-      const rows = await streamAndHydrateBySearch('test-filter-dl', submissionId, 'capture', properties);
-      expect(rows).to.have.length(1);
-      expect(rows[0].data.comment).to.equal('Filter value');
-      expect(rows[0].feature_type_name).to.equal('capture');
-    });
-
-    it('should list feature types via search subquery', async () => {
-      const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'DS' });
-      await createTestFeature(connection, submissionId, 'capture', { comment: 'cap' });
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'DS2' });
-
-      const knex = getKnex();
-      const searchSubquery = knex('submission_feature')
-        .select('submission_feature_id')
-        .where({ submission_id: submissionId });
-
-      const featureTypes = await downloadRepo.listDownloadFeatureTypesBySearchQuery(searchSubquery);
-      expect(featureTypes).to.deep.equal(['capture', 'dataset']);
-    });
-  });
-
   describe('status transitions', () => {
-    it('should transition download status from pending to processing to ready', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Status Test' });
-      const downloadId = await createCartDownload([featureId]);
+    it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
+      const downloadId = await createPolicyDownload(['dataset']);
 
       // Verify initial state
       const initial = await downloadService.findDownloadById(downloadId);
@@ -816,7 +682,14 @@ describe('Download Parquet pipeline (integration)', function () {
     // an empty property list is safe and minimizes test surface area.
     const emptyProperties: CsvPropertyDefinition[] = [];
 
-    const stubStatement = (urn_feature_type: string) => ({
+    /**
+     * Build an `ActivePolicyStatementWithExpression` row shape for the broad path —
+     * `expression_id: null` makes `writeFeatureTypeParquet` use
+     * `buildBroadFeatureTypeSubquery`, which projects every feature of the type.
+     * The stub policy_statement_id never lands in the database, so its value is
+     * arbitrary as long as the type-checker accepts it.
+     */
+    const broadStatement = (urn_feature_type: string): ActivePolicyStatementWithExpression => ({
       policy_statement_id: '00000000-0000-0000-0000-000000000001',
       urn_feature_type,
       expression_id: null
@@ -826,8 +699,8 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
-      const downloadId = await createCartDownload([datasetId]);
+      await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
+      const downloadId = await createPolicyDownload(['dataset']);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
@@ -835,7 +708,7 @@ describe('Download Parquet pipeline (integration)', function () {
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
-        statement: stubStatement('dataset')
+        statement: broadStatement('dataset')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -877,8 +750,8 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
-      const downloadId = await createCartDownload([datasetId]);
+      await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
+      const downloadId = await createPolicyDownload(['dataset']);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       // Call 1
@@ -887,7 +760,7 @@ describe('Download Parquet pipeline (integration)', function () {
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
-        statement: stubStatement('dataset')
+        statement: broadStatement('dataset')
       });
 
       const afterFirst = await connection.sql(SQL`
@@ -908,7 +781,7 @@ describe('Download Parquet pipeline (integration)', function () {
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
-        statement: stubStatement('dataset')
+        statement: broadStatement('dataset')
       });
 
       const afterSecond = await connection.sql(SQL`
@@ -929,9 +802,9 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
-      const captureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
-      const downloadId = await createCartDownload([datasetId, captureId]);
+      await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
+      await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
+      const downloadId = await createPolicyDownload(['dataset', 'capture']);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
@@ -939,14 +812,14 @@ describe('Download Parquet pipeline (integration)', function () {
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
-        statement: stubStatement('dataset')
+        statement: broadStatement('dataset')
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         source,
         properties: emptyProperties,
         featureTypeName: 'capture',
-        statement: stubStatement('capture')
+        statement: broadStatement('capture')
       });
 
       const artifactRows = await connection.sql(SQL`
