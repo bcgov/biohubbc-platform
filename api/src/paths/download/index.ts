@@ -168,7 +168,10 @@ export function getDownloads(): RequestHandler {
  */
 const CreateDownloadRequestBody = z
   .object({
-    name: z.string().min(1).max(200),
+    // 100 matches the underlying `biohub.policy.name varchar(100)` column. Keep both
+    // in sync so a too-long name is rejected at the route boundary, not by a 500
+    // from the DB layer.
+    name: z.string().min(1).max(100),
     description: z.string().max(1000).nullable().optional(),
     featureTypes: z.array(z.string()).min(1),
     expression: ExpressionTree.nullable()
@@ -198,7 +201,7 @@ POST.apiDoc = {
           additionalProperties: false,
           required: ['name', 'featureTypes', 'expression'],
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 200 },
+            name: { type: 'string', minLength: 1, maxLength: 100 },
             description: { type: 'string', maxLength: 1000, nullable: true },
             featureTypes: { type: 'array', items: { type: 'string' }, minItems: 1 },
             expression: { ...featureSearchExpressionTreeSchema, nullable: true }
