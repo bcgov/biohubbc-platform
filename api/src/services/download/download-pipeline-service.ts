@@ -292,15 +292,27 @@ export class DownloadPipelineService extends DBService {
         // The upload consumer sees abort via the rejected uploadPromise. The
         // source PassThrough has no other consumer, so its `error` event would
         // otherwise go uncaught and crash the worker — register a no-op
-        // listener before tearing down.
+        // listener before tearing down. Same for the upload promise itself: it
+        // will eventually settle (reject) and we don't want an unhandled
+        // rejection if we move on without awaiting.
         passThrough.on('error', () => undefined);
+        uploadPromise.catch(() => undefined);
         passThrough.destroy(new Error(`writeFeatureTypeParquet aborted for ${downloadId}/${featureTypeName}`));
-        try {
-          await uploadPromise;
-        } catch {
-          // Upload abort surfaces as a rejection here — expected; the original
-          // error from the try block is what callers should see.
-        }
+
+        // Bounded wait for the upload to abort cleanly — gives the AWS SDK a
+        // chance to settle so the surrounding transaction can rollback against
+        // a clean connection. Some implementations (real S3 multipart uploads
+        // mid-buffer) do not promptly observe the source destroy; we cap the
+        // wait so a sticky upload can't deadlock the worker. The original error
+        // from the try block surfaces immediately when the race resolves.
+        const abortDeadlineMs = 5000;
+        await Promise.race([
+          uploadPromise.then(
+            () => undefined,
+            () => undefined
+          ),
+          new Promise<void>((resolve) => setTimeout(resolve, abortDeadlineMs))
+        ]);
       }
     }
 

@@ -524,6 +524,60 @@ describe('DownloadPipelineService', () => {
       expect(uploadStub).to.have.been.calledOnce;
     });
 
+    it('does NOT deadlock when the upload promise never settles after a hydrate error (sticky-upload guard)', async () => {
+      // Real S3/MinIO multipart uploads can swallow `passThrough.destroy(...)` and
+      // leave `uploadPromise` pending indefinitely if the SDK has buffered bytes
+      // mid-flight. Without the bounded race in finally, the worker hangs in the
+      // try/finally → withConnection never rolls back → connection state is stuck
+      // in "idle in transaction (aborted)" → pg-boss never sees a terminal state.
+      // This test pins that the cleanup completes in bounded time even when the
+      // upload promise is permanently pending.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
+      };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+
+      // Upload that never settles — simulates the sticky-multipart-upload case.
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').returns(new Promise<void>(() => undefined));
+
+      sinon
+        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
+      const hydrateError = new Error('hydration blew up');
+      sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
+
+      // Cap the test at well below the cleanup race deadline (5s) plus a safety
+      // margin — the assertion is "the call returns within bounded time", not
+      // "the call returns instantly".
+      const start = Date.now();
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+      const elapsed = Date.now() - start;
+
+      expect(caught).to.equal(hydrateError);
+      expect(uploadStub).to.have.been.calledOnce;
+      // Cleanup race deadline is 5s; allow 2s margin for slow CI.
+      expect(elapsed).to.be.lessThan(7000);
+    }).timeout(8000);
+
     it('aborts the multipart upload when ParquetWriter setup throws AFTER upload startup', async () => {
       // Pre-loop throw point regression (Codex re-eval): ParquetWriter.openStream
       // runs after uploadPromise has been created but inside the try block. The
