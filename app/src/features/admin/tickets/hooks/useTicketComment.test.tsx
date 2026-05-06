@@ -38,6 +38,7 @@ const makeTicket = (): ITicketExtended => ({
   artifacts: [],
   references: [],
   data_requests: [],
+  submission_uploads: [],
   ticket_system_users: []
 });
 

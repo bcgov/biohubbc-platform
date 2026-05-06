@@ -4,10 +4,11 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { DropdownButton, IDropdownButtonItemGroup } from 'components/DropdownButton';
+import { DropdownButton } from 'components/DropdownButton';
+import { IDropdownButtonItemGroup } from 'components/DropdownButton.interface';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
-export interface ITicketSystemUserCardProps {
+interface ITicketSystemUserCardProps {
   systemUserId: number;
   userIdentifier: string;
   status: TicketSystemUserStatus;

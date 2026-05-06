@@ -17,6 +17,7 @@ import {
   ITicketReference,
   ITicketStatusLog,
   ITicketSystemUser,
+  TicketSubmissionUploadReviewResponse,
   IUpdateTicketRequest,
   IUpdateTicketSystemUserStatusRequest
 } from 'interfaces/useTicketsApi.interface';
@@ -73,6 +74,7 @@ describe('useTicketsApi', () => {
       artifacts: [],
       references,
       data_requests: [],
+      submission_uploads: [],
       ticket_system_users: []
     };
 
@@ -220,6 +222,66 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(response);
   });
 
+  it('updateSubmissionUploadReviewStatus patches the final upload disposition endpoint', async () => {
+    const submissionUuid = '11111111-1111-1111-1111-111111111111';
+    const submissionUploadId = '22222222-2222-4222-8222-222222222222';
+    const payload = { status: 'approved' as const };
+
+    mock
+      .onPatch(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`, payload)
+      .reply(204);
+
+    await expect(
+      useTicketsApi(axios).updateSubmissionUploadReviewStatus(submissionUuid, submissionUploadId, payload)
+    ).resolves.toBeUndefined();
+  });
+
+  it('insertSubmissionUploadReview posts a scoped upload review task', async () => {
+    const submissionUploadId = '22222222-2222-4222-8222-222222222222';
+    const payload = { scope: 'security' as const };
+    const response: TicketSubmissionUploadReviewResponse = {
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      submission_upload_id: submissionUploadId,
+      scope: 'security',
+      status: 'requested',
+      requested_by: 7
+    };
+
+    mock.onPost(`/api/administrative/submission-upload/${submissionUploadId}/review`, payload).reply(200, response);
+
+    const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionUploadId, payload);
+
+    expect(result).toEqual(response);
+  });
+
+  it('updateSubmissionUploadReview patches a scoped upload review task', async () => {
+    const submissionUploadId = '22222222-2222-4222-8222-222222222222';
+    const submissionUploadReviewId = '11111111-1111-4111-8111-111111111111';
+    const payload = { status: 'completed' as const };
+    const response: TicketSubmissionUploadReviewResponse = {
+      submission_upload_review_id: submissionUploadReviewId,
+      submission_upload_id: submissionUploadId,
+      scope: 'security',
+      status: 'completed',
+      requested_by: 7
+    };
+
+    mock
+      .onPatch(
+        `/api/administrative/submission-upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+        payload
+      )
+      .reply(200, response);
+
+    const result = await useTicketsApi(axios).updateSubmissionUploadReview(
+      submissionUploadId,
+      submissionUploadReviewId,
+      payload
+    );
+
+    expect(result).toEqual(response);
+  });
+
   it('createTicketReference posts payload and returns reference row', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
     const payload: ICreateTicketReferenceRequest = {
@@ -306,6 +368,7 @@ describe('useTicketsApi', () => {
       artifacts: [],
       references: [],
       data_requests: [],
+      submission_uploads: [],
       ticket_system_users: []
     };
 
