@@ -8,8 +8,8 @@ import {
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
+import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');

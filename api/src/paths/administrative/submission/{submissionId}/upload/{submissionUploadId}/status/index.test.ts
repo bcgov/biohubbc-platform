@@ -3,8 +3,8 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../__mocks__/db';
 import * as db from '../../../../../../../database/db';
-import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
+import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { updateSubmissionUploadReviewStatus } from './index';
 
 chai.use(sinonChai);
