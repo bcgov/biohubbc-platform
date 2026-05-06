@@ -184,7 +184,11 @@ export class SearchFeatureRepository extends BaseRepository {
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree, systemUserId ?? null)
+      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+          anchorFeatureType,
+          expressionTree,
+          systemUserId ?? null
+        )
       : null;
 
     let query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
@@ -222,7 +226,11 @@ export class SearchFeatureRepository extends BaseRepository {
   ): Promise<number> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree, systemUserId ?? null)
+      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+          anchorFeatureType,
+          expressionTree,
+          systemUserId ?? null
+        )
       : null;
 
     const query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);

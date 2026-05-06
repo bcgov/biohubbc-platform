@@ -320,10 +320,7 @@ describe('DownloadPipelineService', () => {
       stubParquetPipeline();
 
       const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree');
-      const buildExprSubqueryStub = sinon.stub(
-        expressionEvaluation,
-        'buildExpressionTreeFeatureIdsSubquery'
-      );
+      const buildExprSubqueryStub = sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
       const buildBroadStub = sinon
         .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
@@ -371,9 +368,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter, uploadStub } = stubParquetPipeline();
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       const baseBatch = [
         {
           submission_feature_id: 1,
@@ -409,9 +404,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
@@ -432,9 +425,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
@@ -453,9 +444,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub } = stubParquetPipeline();
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
@@ -497,9 +486,7 @@ describe('DownloadPipelineService', () => {
         .stub(ObjectStorageService.prototype, 'uploadStream')
         .rejects(new Error('S3 upload aborted by caller'));
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
         .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
@@ -547,9 +534,7 @@ describe('DownloadPipelineService', () => {
         .stub(ObjectStorageService.prototype, 'uploadStream')
         .returns(new Promise<void>(() => undefined));
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
         .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
@@ -595,9 +580,7 @@ describe('DownloadPipelineService', () => {
         .stub(ObjectStorageService.prototype, 'uploadStream')
         .rejects(new Error('S3 upload aborted by caller'));
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       let caught: unknown;
@@ -655,9 +638,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub, linkStub } = stubParquetPipeline();
 
-      sinon
-        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({

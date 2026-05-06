@@ -1,10 +1,7 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
-import {
-  buildBroadFeatureTypeSubquery,
-  buildExpressionTreeFeatureIdsSubquery
-} from './expression-evaluation';
+import { buildBroadFeatureTypeSubquery, buildExpressionTreeFeatureIdsSubquery } from './expression-evaluation';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -216,8 +213,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
-        .toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include(' union ');
       expect(sql).to.not.include(' intersect ');
@@ -259,8 +255,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
-        .toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include(' intersect ');
       expect(sql).to.include(' union ');
@@ -282,8 +277,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
-        .toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include('from "submission_feature_property_string" as "p"');
       expect(sql).to.include('not exists');
@@ -307,8 +301,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
-        .toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
@@ -323,7 +316,6 @@ describe('expression-evaluation', () => {
 
   describe('buildBroadFeatureTypeSubquery', () => {
     it('emits SQL projecting submission_feature_id with the feature-type filter and security filter for an authenticated user', () => {
-
       const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
 
       expect(sql).to.include('"sf"."submission_feature_id"');
@@ -339,7 +331,6 @@ describe('expression-evaluation', () => {
     });
 
     it('emits the anonymous-only NOT-secured filter when systemUserId is null', () => {
-
       const sql = buildBroadFeatureTypeSubquery('fish', null).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
