@@ -79,7 +79,8 @@ export const SubmissionFeaturePage = () => {
           feature_description: null,
           submission_name: feature.submission_name,
           is_secured: feature.secured,
-          relevancy_score: 0
+          relevancy_score: 0,
+          create_date: ''
         }
       ]);
     }
@@ -92,7 +93,7 @@ export const SubmissionFeaturePage = () => {
       relatedFeatures={relatedFeatures ?? []}
       submissionId={submissionId}
       rootBreadcrumbLabel="Search"
-      rootBreadcrumbTo={`/search/list${location.search}`}
+      rootBreadcrumbTo={`/search/${location.search}`}
       submissionDetailBasePath="/submission"
       featureRouteBasePath="/submission"
       queryString={location.search}

@@ -2,6 +2,7 @@ import { Box, ClickAwayListener, Stack } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
 import { SearchInput } from 'components/search/SearchInput';
+import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { URL_PARAMS } from 'constants/query-params';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -11,7 +12,7 @@ import { debounce } from 'lodash-es';
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-import { buildSearchQuery } from 'utils/search';
+import { buildSearchFeatureTypePath } from 'utils/routes';
 import { SearchListbox } from './listbox/SearchListbox';
 import { SearchTabs } from './tab/SearchTabs';
 import { ISearchContainerLink } from './tab/SearchTabs.interface';
@@ -24,6 +25,18 @@ interface ISearchContainerProps {
   isLoading?: boolean;
 }
 
+/**
+ * Search landing-page controller with debounced preview results.
+ *
+ * Use this component on the root search page. It owns the search input text,
+ * preview-result dropdown, initial summary load, and keyboard navigation into
+ * the listbox. Selecting a preview row or pressing Enter navigates to the
+ * feature-type result route; the result page then takes over expression-based
+ * searching.
+ *
+ * @param {ISearchContainerProps} props - Feature-type quick links and loading state.
+ * @returns {JSX.Element} Search landing UI with tabs and preview listbox.
+ */
 export const SearchContainer = ({ links, isLoading = false }: ISearchContainerProps) => {
   const api = useApi();
   const navigate = useNavigate();
@@ -95,7 +108,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
         e.preventDefault();
         debouncedSearch.cancel();
         navigate(
-          buildSearchQuery('list', {
+          buildSearchFeatureTypePath(PRIORITY_FEATURE_TYPE.SPECIES_OBSERVATION, {
             [URL_PARAMS.SEARCH_QUERY]: searchValue
           })
         );
@@ -133,7 +146,13 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
 
           {shouldShowDropdown && (
             <Box position="absolute" top="100%" left={0} right={0} mt={1} zIndex={9999}>
-              <SearchListbox searchTerm={searchValue} records={records} summary={summary} isLoading={showLoading} />
+              <SearchListbox
+                searchTerm={searchValue}
+                records={records}
+                summary={summary}
+                defaultFeatureTypeName={PRIORITY_FEATURE_TYPE.SPECIES_OBSERVATION}
+                isLoading={showLoading}
+              />
             </Box>
           )}
         </Box>
