@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { HTTP410 } from '../errors/http-error';
+import { HTTP400 } from '../errors/http-error';
 import { Cart, CartFeatureListResponse, CartStatus, CartSubmissionFeature, UpdateCart } from '../models/cart';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -239,7 +239,7 @@ describe('CartService', () => {
   });
 
   describe('checkoutCart', () => {
-    it('throws HTTP410 immediately and does not invoke any downstream method', async () => {
+    it('throws HTTP400 immediately and does not invoke any downstream method', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -255,10 +255,10 @@ describe('CartService', () => {
 
       try {
         await service.checkoutCart('cart-1', null);
-        expect.fail('Expected HTTP410');
+        expect.fail('Expected HTTP400');
       } catch (err: any) {
-        expect(err).to.be.instanceOf(HTTP410);
-        expect(err.status).to.equal(410);
+        expect(err).to.be.instanceOf(HTTP400);
+        expect(err.status).to.equal(400);
       }
 
       expect(getIdsStub).to.not.have.been.called;

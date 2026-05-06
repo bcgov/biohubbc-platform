@@ -6,7 +6,7 @@ import { checkoutCart } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
-import { HTTP410 } from '../../../../errors/http-error';
+import { HTTP400 } from '../../../../errors/http-error';
 import { CartService } from '../../../../services/cart-service';
 
 chai.use(sinonChai);
@@ -41,7 +41,7 @@ describe('cart/{cartId}/checkout', () => {
       }
     });
 
-    it('rolls back and rethrows HTTP410 from CartService.checkoutCart', async () => {
+    it('rolls back and rethrows HTTP400 from CartService.checkoutCart', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -52,7 +52,7 @@ describe('cart/{cartId}/checkout', () => {
 
       const checkoutCartStub = sinon
         .stub(CartService.prototype, 'checkoutCart')
-        .rejects(new HTTP410('The cart-as-download-source model is being retired.'));
+        .rejects(new HTTP400('Cart checkout is being retired.'));
 
       const requestHandler = checkoutCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -61,10 +61,10 @@ describe('cart/{cartId}/checkout', () => {
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail('Expected handler to throw HTTP410');
+        expect.fail('Expected handler to throw HTTP400');
       } catch (error) {
-        expect(error).to.be.instanceOf(HTTP410);
-        expect((error as HTTP410).status).to.equal(410);
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).status).to.equal(400);
       }
 
       expect(checkoutCartStub).to.have.been.calledOnceWith('cart-uuid-5678', 42);
@@ -73,7 +73,7 @@ describe('cart/{cartId}/checkout', () => {
       expect(mockDBConnection.release).to.have.been.calledOnce;
     });
 
-    it('rolls back and rethrows HTTP410 for anonymous user', async () => {
+    it('rolls back and rethrows HTTP400 for anonymous user', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -83,7 +83,7 @@ describe('cart/{cartId}/checkout', () => {
 
       const checkoutCartStub = sinon
         .stub(CartService.prototype, 'checkoutCart')
-        .rejects(new HTTP410('The cart-as-download-source model is being retired.'));
+        .rejects(new HTTP400('Cart checkout is being retired.'));
 
       const requestHandler = checkoutCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -92,9 +92,9 @@ describe('cart/{cartId}/checkout', () => {
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail('Expected handler to throw HTTP410');
+        expect.fail('Expected handler to throw HTTP400');
       } catch (error) {
-        expect(error).to.be.instanceOf(HTTP410);
+        expect(error).to.be.instanceOf(HTTP400);
       }
 
       expect(apiDBStub).to.have.been.calledOnce;

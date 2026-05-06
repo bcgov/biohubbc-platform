@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { HTTP410 } from '../errors/http-error';
+import { HTTP400 } from '../errors/http-error';
 import { Cart, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
 import { DownloadId } from '../models/download';
 import { publishProcessDownloadJob } from '../queue/publisher';
@@ -131,23 +131,14 @@ export class CartService extends DBService {
   }
 
   /**
-   * Soft-deprecated: cart checkout no longer creates downloads.
+   * Soft-deprecated: cart checkout no longer creates downloads. The sibling
+   * cart-deprecation ticket removes this method and its endpoint entirely.
    *
-   * The cart-as-download-source model has been retired in favour of policy-driven
-   * downloads (`POST /api/download` with an expression). All callers receive an
-   * `HTTP410 Gone` response so the deprecation is observable in API logs and
-   * client error handling. The cart-deprecation sibling ticket fully removes
-   * this endpoint and the cart-checkout flow.
-   *
-   * @param {string} _cartId - Unused; kept for signature compatibility.
-   * @param {number | null} _systemUserId - Unused; kept for signature compatibility.
-   * @throws {HTTP410} Always.
    * @memberof CartService
    */
-
   async checkoutCart(_cartId: string, _systemUserId: number | null): Promise<DownloadId> {
-    throw new HTTP410(
-      'The cart-as-download-source model is being retired. Use POST /api/download with an expression instead.'
+    throw new HTTP400(
+      'Cart checkout is being retired. Use POST /api/download with an expression instead.'
     );
   }
 

@@ -8,7 +8,6 @@ export enum HTTPErrorType {
   FORBIDDEN = 'Forbidden',
   NOT_FOUND = 'Not Found',
   CONFLICT = 'Conflict',
-  GONE = 'Gone',
   INTERNAL_SERVER_ERROR = 'Internal Server Error'
 }
 
@@ -126,25 +125,6 @@ export class HTTP409 extends HTTPError {
 
   static fromApiError(apiError: ApiError) {
     return new HTTP409(apiError.message, apiError.errors, apiError.stack);
-  }
-}
-
-/**
- * HTTP `410 Gone` error.
- *
- * @export
- * @class HTTP410
- * @extends {HTTPError}
- */
-export class HTTP410 extends HTTPError {
-  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP410');
-
-  constructor(message: string, errors?: (string | object)[], stack?: string) {
-    super(HTTPErrorType.GONE, 410, message, errors, stack);
-  }
-
-  static fromApiError(apiError: ApiError) {
-    return new HTTP410(apiError.message, apiError.errors, apiError.stack);
   }
 }
 
