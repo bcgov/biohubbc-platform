@@ -8,8 +8,8 @@ import {
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
+import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');
@@ -27,8 +27,7 @@ export const PATCH: Operation = [
 ];
 
 PATCH.apiDoc = {
-  description:
-    'Update the review status of a submission upload to approved or denied. Only system administrators may perform this action.',
+  description: 'Update the review status of a submission upload. Only system administrators may perform this action.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -79,7 +78,7 @@ PATCH.apiDoc = {
 };
 
 /**
- * Updates the review status (approved or denied) for a submission upload.
+ * Updates the review status for a submission upload.
  * Only system administrators are authorized to call this endpoint.
  *
  * @returns {RequestHandler}

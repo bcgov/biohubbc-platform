@@ -28,6 +28,17 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
+   * Publish active features from a submission upload by setting record_effective_date.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureService
+   */
+  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionFeatureUuid

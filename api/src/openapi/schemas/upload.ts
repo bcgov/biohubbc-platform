@@ -213,6 +213,37 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
   }
 };
 
+export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
+  properties: {
+    submission_upload_review_id: { type: 'string', format: 'uuid' },
+    submission_upload_id: { type: 'string', format: 'uuid' },
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: { type: 'string', enum: ['requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled'] },
+    requested_by: { type: 'integer', minimum: 1, nullable: true }
+  }
+};
+
+export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['scope'],
+  properties: {
+    scope: { type: 'string', enum: ['validation', 'security'] }
+  }
+};
+
+export const UpdateSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: { type: 'string', enum: ['requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled'] }
+  }
+};
+
 export const CompleteMultipartUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,

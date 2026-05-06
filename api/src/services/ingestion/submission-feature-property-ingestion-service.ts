@@ -5,6 +5,7 @@ import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
+import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
@@ -14,6 +15,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionRepository: SubmissionRepository;
   featureIngestionRepository: FeatureIngestionRepository;
   contributorService: ContributorService;
+  submissionUploadReviewService: SubmissionUploadReviewService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -22,6 +24,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     this.submissionRepository = new SubmissionRepository(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
     this.contributorService = new ContributorService(connection);
+    this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
   }
 
   /**
@@ -291,6 +294,11 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
         submissionUploadId
       );
+
+      await this.submissionUploadReviewService.requestDefaultReviewsForUpload({
+        submissionUploadId,
+        requestedBy: this.connection.systemUserId()
+      });
 
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
