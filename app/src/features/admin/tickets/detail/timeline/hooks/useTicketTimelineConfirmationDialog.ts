@@ -2,8 +2,10 @@ import { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
 import { useDialogContext } from 'hooks/useContext';
 import { useCallback } from 'react';
 
-interface ITicketTimelineConfirmationDialogProps
-  extends Pick<IYesNoDialogProps, 'dialogTitle' | 'dialogText' | 'yesButtonLabel' | 'noButtonLabel'> {
+interface ITicketTimelineConfirmationDialogProps extends Pick<
+  IYesNoDialogProps,
+  'dialogTitle' | 'dialogText' | 'yesButtonLabel' | 'noButtonLabel'
+> {
   onConfirm: () => Promise<void> | void;
 }
 

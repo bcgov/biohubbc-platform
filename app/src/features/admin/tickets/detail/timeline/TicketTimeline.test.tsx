@@ -133,6 +133,45 @@ describe('TicketTimeline', () => {
     });
   });
 
+  it('ignores duplicate edit saves while save is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveUpdate: (updatedComment: ITicketExtended['comments'][number]) => void = vi.fn();
+    const ticket = makeTicket();
+    const updatedComment = {
+      ...ticket.comments[0],
+      comment: 'Updated comment'
+    };
+    updateTicketComment.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      })
+    );
+
+    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+
+    await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+
+    const commentInput = screen.getByPlaceholderText('Type your comment...');
+    fireEvent.change(commentInput, { target: { value: 'Updated comment' } });
+
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(updateTicketComment).toHaveBeenCalledTimes(1);
+    });
+
+    resolveUpdate(updatedComment);
+    await waitFor(() => {
+      expect(setData).toHaveBeenCalledWith({
+        ...ticket,
+        comments: [updatedComment]
+      });
+    });
+  });
+
   it('deletes a comment and removes it from cached ticket data', async () => {
     const user = userEvent.setup();
     const ticket = makeTicket();

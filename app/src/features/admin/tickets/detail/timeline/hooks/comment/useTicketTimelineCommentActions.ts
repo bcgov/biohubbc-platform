@@ -31,6 +31,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   const [selectedComment, setSelectedComment] = useState<ITicketCommentLog | null>(null);
   const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const isSavingCommentRef = useRef(false);
   const isDeletingCommentRef = useRef(false);
 
   /**
@@ -135,7 +136,8 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
    * Persist the edited comment body from the edit-comment dialog.
    *
    * The dialog calls this on save with Formik values. Empty submissions are ignored, successful saves replace the cached
-   * comment, and failures keep the dialog open with the user's current form value.
+   * comment, and failures keep the dialog open with the user's current form value. The ref guard prevents duplicate save
+   * callbacks from issuing multiple update requests while the first request is still in flight.
    *
    * @param {ITicketCommentEditFormValues} values Current Formik values from the edit-comment dialog.
    * @returns {Promise<void>} Resolves after the save attempt has completed.
@@ -143,11 +145,12 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   const handleSaveEditedComment = async (values: ITicketCommentEditFormValues) => {
     const trimmedComment = values.comment.trim();
 
-    if (!selectedComment || !trimmedComment) {
+    if (!selectedComment || !trimmedComment || isSavingCommentRef.current) {
       return;
     }
 
     try {
+      isSavingCommentRef.current = true;
       setIsSavingComment(true);
       const updatedComment = await api.tickets.updateTicketComment(
         ticket.ticket_id,
@@ -168,6 +171,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
         snackbarMessage: apiError.message
       });
     } finally {
+      isSavingCommentRef.current = false;
       setIsSavingComment(false);
     }
   };
