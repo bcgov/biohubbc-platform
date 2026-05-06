@@ -58,12 +58,16 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
     presigned_upload_url: 'https://object-store.example/upload'
   });
   const completeTicketUpload = vi.fn().mockResolvedValue(ticketArtifact);
+  const uploadFileToUrl = vi.fn().mockResolvedValue(undefined);
 
   (useApi as Mock).mockReturnValue({
     tickets: {
       createTicketComment: vi.fn(),
       createTicketUpload,
       completeTicketUpload
+    },
+    objectStorage: {
+      uploadFileToUrl
     }
   });
   (useAuthStateContext as Mock).mockReturnValue({
@@ -91,18 +95,12 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
     }
   });
 
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true
-    })
-  );
-
   return {
     completeTicketUpload,
     createTicketUpload,
     setData,
-    setSnackbar
+    setSnackbar,
+    uploadFileToUrl
   };
 };
 
@@ -113,7 +111,7 @@ describe('useTicketComment', () => {
   });
 
   it('appends image markdown for files with image MIME types', async () => {
-    setupUploadHook(makeTicketArtifact('diagram.png'));
+    const { uploadFileToUrl } = setupUploadHook(makeTicketArtifact('diagram.png'));
     const { result } = renderHook(() => useTicketComment());
     const file = new File(['image'], 'diagram.png', { type: 'image/png' });
 
@@ -122,6 +120,11 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`![diagram.png](/artifact/${ticketArtifactId})`);
+    expect(uploadFileToUrl).toHaveBeenCalledWith({
+      url: 'https://object-store.example/upload',
+      file,
+      contentType: 'image/png'
+    });
   });
 
   it('falls back to image markdown for known image extensions without MIME types', async () => {
@@ -165,7 +168,9 @@ describe('useTicketComment', () => {
   });
 
   it('rejects attachments larger than the API limit before starting upload', async () => {
-    const { completeTicketUpload, createTicketUpload, setSnackbar } = setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { completeTicketUpload, createTicketUpload, setSnackbar, uploadFileToUrl } = setupUploadHook(
+      makeTicketArtifact('notes.pdf')
+    );
     const { result } = renderHook(() => useTicketComment());
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
@@ -180,7 +185,7 @@ describe('useTicketComment', () => {
       snackbarMessage: 'Attachment exceeds the 15 MB limit.'
     });
     expect(createTicketUpload).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(uploadFileToUrl).not.toHaveBeenCalled();
     expect(completeTicketUpload).not.toHaveBeenCalled();
     expect(result.current.isUploadingAttachment).toBe(false);
   });

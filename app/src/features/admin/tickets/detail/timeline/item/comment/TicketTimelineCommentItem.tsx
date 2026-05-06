@@ -4,9 +4,9 @@ import Box from '@mui/material/Box';
 import { ContextMenuButton } from 'components/ContextMenuButton';
 import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
-import { TicketTimelineItem } from './TicketTimelineItem';
+import { TicketTimelineItem } from '../layout/TicketTimelineItem';
 
-interface ITicketCommentTimelineItemProps {
+interface ITicketTimelineCommentItemProps {
   ticketCommentId: string;
   author: string;
   comment: string;
@@ -20,10 +20,10 @@ interface ITicketCommentTimelineItemProps {
 /**
  * Ticket timeline event card for comments.
  *
- * @param {ITicketCommentTimelineItemProps} props
+ * @param {ITicketTimelineCommentItemProps} props
  * @return {*}
  */
-export const TicketCommentTimelineItem = (props: ITicketCommentTimelineItemProps) => {
+export const TicketTimelineCommentItem = (props: ITicketTimelineCommentItemProps) => {
   const { ticketCommentId, author, comment, artifacts, dateLabel, onArtifactLinkClick, onEdit, onDelete } = props;
 
   return (

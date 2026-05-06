@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
@@ -84,6 +84,9 @@ describe('TicketTimeline', () => {
         updatePolicyStatus: vi.fn(),
         getPolicy: vi.fn(),
         updatePolicy: vi.fn()
+      },
+      objectStorage: {
+        uploadFileToUrl: vi.fn()
       }
     });
     (useConfigContext as Mock).mockReturnValue({
@@ -118,8 +121,7 @@ describe('TicketTimeline', () => {
     const commentInput = screen.getByPlaceholderText('Type your comment...');
     expect(commentInput).toHaveValue('Original comment');
 
-    await user.clear(commentInput);
-    await user.type(commentInput, 'Updated comment');
+    fireEvent.change(commentInput, { target: { value: 'Updated comment' } });
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
@@ -162,6 +164,30 @@ describe('TicketTimeline', () => {
       ...ticket,
       comments: []
     });
+  });
+
+  it('ignores duplicate delete confirmations while delete is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveDelete: () => void = vi.fn();
+    deleteTicketComment.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+
+    render(<TicketTimeline ticket={makeTicket()} isLoading={false} />);
+
+    await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+    const confirmationConfig = setYesNoDialog.mock.calls[0][0];
+    const firstDelete = confirmationConfig.onYes();
+    await confirmationConfig.onYes();
+
+    expect(deleteTicketComment).toHaveBeenCalledTimes(1);
+
+    resolveDelete();
+    await firstDelete;
   });
 
   it('shows snackbar and preserves cache when delete fails', async () => {

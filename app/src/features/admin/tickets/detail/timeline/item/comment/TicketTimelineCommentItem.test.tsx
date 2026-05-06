@@ -2,9 +2,9 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
-import { TicketCommentTimelineItem } from './TicketCommentTimelineItem';
+import { TicketTimelineCommentItem } from './TicketTimelineCommentItem';
 
-describe('TicketCommentTimelineItem', () => {
+describe('TicketTimelineCommentItem', () => {
   it('renders comment markdown using shared markdown renderer', () => {
     const artifacts: ITicketArtifact[] = [
       {
@@ -18,7 +18,7 @@ describe('TicketCommentTimelineItem', () => {
     ];
 
     render(
-      <TicketCommentTimelineItem
+      <TicketTimelineCommentItem
         ticketCommentId="comment-1"
         author="Sarah"
         comment={
@@ -45,7 +45,7 @@ describe('TicketCommentTimelineItem', () => {
     const onDelete = vi.fn();
 
     render(
-      <TicketCommentTimelineItem
+      <TicketTimelineCommentItem
         ticketCommentId="comment-1"
         author="Sarah"
         comment="A comment"
