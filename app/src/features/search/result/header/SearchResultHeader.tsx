@@ -1,4 +1,4 @@
-import { Button, ClickAwayListener, Paper, Popper, Stack } from '@mui/material';
+import { ClickAwayListener, Paper, Popper, Stack } from '@mui/material';
 import { SearchInput } from 'components/search/SearchInput';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 
@@ -99,9 +99,6 @@ export const SearchResultHeader = (props: PropsWithChildren<SearchResultHeaderPr
             onClear={onClear}
           />
         </Stack>
-        <Button variant="contained" onClick={() => onFilterPanelOpenChange(true)}>
-          Search
-        </Button>
       </Stack>
 
       <Popper

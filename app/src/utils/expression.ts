@@ -419,7 +419,7 @@ export const getDefaultValueForPredicateType = (type: ExpressionPropertyType): u
     case 'code':
       return '';
     case 'boolean':
-      return true;
+      return undefined;
     case 'datetime':
       return { date_value: '' };
     case 'spatial':

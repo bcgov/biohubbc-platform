@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { URL_PARAMS } from 'constants/query-params';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useSearchQueryParams } from 'hooks/useSearchQuery';
@@ -60,6 +61,7 @@ describe('useSearchResults', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -125,5 +127,50 @@ describe('useSearchResults', () => {
     expect(setSearchParams).toHaveBeenCalledTimes(1);
     expect(setSearchParams.mock.calls[0][0].getAll('species')).toEqual(['123']);
     expect(setSearchParams.mock.calls[0][0].get('page')).toBe('1');
+  });
+
+  it('does not issue a redundant immediate refresh after setter-driven URL updates', async () => {
+    vi.useFakeTimers();
+
+    let currentSearchParams = new URLSearchParams('page=2&limit=25');
+    const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
+      currentSearchParams = nextSearchParams;
+    });
+
+    (useSearchQueryParams as Mock).mockImplementation(() => ({
+      searchParams: currentSearchParams,
+      setSearchParams
+    }));
+
+    const { result, rerender } = renderHook(() => useSearchResults('species_observation', true, null));
+
+    expect(mockSearchFeatures).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '3' });
+    });
+    rerender();
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith('species_observation', null, {
+      page: 3,
+      limit: 25,
+      sort: undefined,
+      order: undefined
+    });
   });
 });

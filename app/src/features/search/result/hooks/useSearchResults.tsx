@@ -127,11 +127,10 @@ export const useSearchResults = (
 
   /** Low-level URL param updater */
   const updateParams = useCallback(
-    (newParams: TypedURLSearchParams, nextExpressionTree: ExpressionTreeExpression | null = expressionTree) => {
+    (newParams: TypedURLSearchParams) => {
       setRawSearchParams(newParams);
-      debouncedRefreshRef({ params: newParams, expressionTree: nextExpressionTree, featureTypeName });
     },
-    [setRawSearchParams, debouncedRefreshRef, expressionTree, featureTypeName]
+    [setRawSearchParams]
   );
 
   /**
@@ -139,14 +138,9 @@ export const useSearchResults = (
    *
    * @param updates key-value pairs to set (keys and values will be normalized to lowercase)
    * @param replace If true, replace existing values; if false, append (multi-value)
-   * @param nextExpressionTree Expression tree to use for the immediate result refresh
    */
   const setSearchParams = useCallback(
-    (
-      updates: Partial<Record<UrlParamKey, string>>,
-      replace: boolean = true,
-      nextExpressionTree: ExpressionTreeExpression | null = expressionTree
-    ) => {
+    (updates: Partial<Record<UrlParamKey, string>>, replace: boolean = true) => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
@@ -171,9 +165,9 @@ export const useSearchResults = (
         newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
       }
 
-      updateParams(newParams, nextExpressionTree);
+      updateParams(newParams);
     },
-    [expressionTree, searchParams, updateParams]
+    [searchParams, updateParams]
   );
 
   const removeSearchParam = useCallback(
@@ -206,9 +200,10 @@ export const useSearchResults = (
       return;
     }
 
-    searchDataLoader.refresh({ params: searchParams, expressionTree, featureTypeName });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, expressionTree, featureTypeName, enabled]);
+    debouncedRefreshRef({ params: searchParams, expressionTree, featureTypeName });
+  }, [searchParams, expressionTree, featureTypeName, enabled, debouncedRefreshRef]);
+
+  useEffect(() => () => debouncedRefreshRef.cancel(), [debouncedRefreshRef]);
 
   return {
     rows: searchDataLoader.data?.features ?? [],

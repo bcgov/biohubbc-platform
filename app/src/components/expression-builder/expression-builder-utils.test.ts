@@ -130,6 +130,37 @@ describe('expression-builder-utils', () => {
     });
   });
 
+  it('defaults boolean predicate values to unset so the user must choose true or false', () => {
+    const property: ExpressionBuilderProperty = {
+      feature_property_id: 3,
+      feature_type_property_id: null,
+      label: 'Is sensitive',
+      property_name: 'is_sensitive',
+      property_display_name: 'Is sensitive',
+      predicate_type: 'boolean',
+      operators: ['Equals', 'Exists']
+    };
+    const root: BuilderExpressionNode = {
+      ui_id: 'root',
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        condition({
+          feature_property_id: property.feature_property_id,
+          feature_type_property_id: property.feature_type_property_id,
+          predicate: createPredicateDraft(property)
+        })
+      ]
+    };
+
+    expect(createPredicateDraft(property)).toEqual({
+      type: 'boolean',
+      operator: 'Equals',
+      value: undefined
+    });
+    expect(validateBuilderExpression(root).isValid).toBe(false);
+  });
+
   it('collects selected property keys from nested expression trees', () => {
     const root: BuilderExpressionNode = {
       ui_id: 'root',

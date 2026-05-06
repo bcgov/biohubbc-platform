@@ -125,14 +125,6 @@ describe('SearchResultSearch', () => {
     });
   });
 
-  it('opens the expression builder from the search action button without submitting results', async () => {
-    render(<SearchResultSearch {...defaultProps} searchTerm="elk" />);
-
-    await user.click(screen.getAllByRole('button', { name: 'Search' })[0]);
-
-    expect(screen.getByTestId('expression-builder')).toBeVisible();
-  });
-
   it('does not submit results when enter is pressed in the search input', async () => {
     render(<SearchResultSearch {...defaultProps} searchTerm="elk" />);
 

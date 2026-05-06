@@ -246,11 +246,13 @@ export const ExpressionBuilderPredicateToken = ({
     if (property.predicate_type === 'boolean') {
       // Boolean predicates use a select so users choose an actual boolean value
       // instead of typing strings that would need coercion.
-      const booleanValue = typeof predicate.value === 'boolean' ? predicate.value : true;
+      const hasBooleanValue = typeof predicate.value === 'boolean';
+      const booleanValue = hasBooleanValue ? String(predicate.value) : '';
 
       return (
         <InlineSelect
           ariaLabel="Value"
+          placeholder="Value"
           sx={{
             flex: '1 1 180px',
             minWidth: 0,
@@ -261,12 +263,12 @@ export const ExpressionBuilderPredicateToken = ({
               transition: 'box-shadow 120ms ease'
             }
           }}
-          value={booleanValue ? 'true' : 'false'}
           options={[
             { value: 'true', label: 'true' },
             { value: 'false', label: 'false' }
           ]}
-          onChange={(value) => onValueChange(node.ui_id, value === 'true')}
+          value={booleanValue}
+          onChange={(value) => onValueChange(node.ui_id, value === '' ? undefined : value === 'true')}
         />
       );
     }

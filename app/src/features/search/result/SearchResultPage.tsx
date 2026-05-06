@@ -7,6 +7,7 @@ import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
@@ -106,6 +107,14 @@ export const SearchResultPage = () => {
       return;
     }
 
+    const propertyFilters: ISearchPropertyFilters = {
+      feature_types: selectedFeatureType ? [selectedFeatureType] : undefined
+    };
+
+    if (searchQuery) {
+      propertyFilters.keyword = searchQuery;
+    }
+
     const recommendedFiltersInput: RecommendedFiltersInput = {
       species: searchQuery,
       feature_types: {
@@ -113,10 +122,7 @@ export const SearchResultPage = () => {
         allFeatureTypes
       },
       properties: {
-        filters: {
-          feature_types: selectedFeatureType ? [selectedFeatureType] : undefined,
-          ...(searchQuery ? { keyword: searchQuery } : {})
-        },
+        filters: propertyFilters,
         pagination: { page: 1, limit: 2 }
       }
     };
@@ -128,14 +134,17 @@ export const SearchResultPage = () => {
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
       setExpressionTree(nextExpressionTree);
-      setSearchParams(
-        {
-          [URL_PARAMS.PAGE]: '1',
-          ...(nextExpressionTree === null ? { [URL_PARAMS.SORT]: '', [URL_PARAMS.ORDER]: '' } : {})
-        },
-        true,
-        nextExpressionTree
-      );
+
+      const nextParams: Partial<Record<UrlParamKey, string>> = {
+        [URL_PARAMS.PAGE]: '1'
+      };
+
+      if (nextExpressionTree === null) {
+        nextParams[URL_PARAMS.SORT] = '';
+        nextParams[URL_PARAMS.ORDER] = '';
+      }
+
+      setSearchParams(nextParams);
     },
     [setSearchParams]
   );

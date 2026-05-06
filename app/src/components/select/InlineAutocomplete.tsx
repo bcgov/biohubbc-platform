@@ -46,39 +46,46 @@ export const InlineAutocomplete = <T,>({
       disablePortal
       {...props}
       value={selectedValue ?? null}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          aria-label={ariaLabel}
-          variant={variant}
-          placeholder={placeholder}
-          error={error}
-          InputProps={{
-            ...params.InputProps,
-            ...(variant === 'standard' ? { disableUnderline: true } : {}),
-            startAdornment: (
-              <>
-                {startAdornment}
-                {params.InputProps.startAdornment}
-              </>
-            )
-          }}
-          sx={{
-            '& .MuiInputBase-root': {
-              p: 0
-            },
-            '& .MuiInputBase-input': {
-              px: 0.5,
-              py: 0.75
-            },
-            ...textFieldSx
-          }}
-          inputProps={{
-            ...params.inputProps,
-            'aria-label': ariaLabel ?? params.inputProps['aria-label']
-          }}
-        />
-      )}
+      renderInput={(params) => {
+        const textFieldInputProps: typeof params.InputProps & { disableUnderline?: boolean } = {
+          ...params.InputProps,
+          startAdornment: (
+            <>
+              {startAdornment}
+              {params.InputProps.startAdornment}
+            </>
+          )
+        };
+
+        if (variant === 'standard') {
+          textFieldInputProps.disableUnderline = true;
+        }
+
+        return (
+          <TextField
+            {...params}
+            aria-label={ariaLabel}
+            variant={variant}
+            placeholder={placeholder}
+            error={error}
+            InputProps={textFieldInputProps}
+            sx={{
+              '& .MuiInputBase-root': {
+                p: 0
+              },
+              '& .MuiInputBase-input': {
+                px: 0.5,
+                py: 0.75
+              },
+              ...textFieldSx
+            }}
+            inputProps={{
+              ...params.inputProps,
+              'aria-label': ariaLabel ?? params.inputProps['aria-label']
+            }}
+          />
+        );
+      }}
     />
   );
 };
