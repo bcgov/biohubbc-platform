@@ -1,4 +1,5 @@
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
+import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 /** Generic paginated result */
@@ -13,55 +14,7 @@ export interface ISearchAllFilters {
   feature_type_name?: string;
 }
 
-/** Supported comparison operators for property filters */
-export type SearchComparisonOperator =
-  | 'eq'
-  | 'neq'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'contains'
-  | 'starts_with'
-  | 'ends_with'
-  | 'in'
-  | 'not_in'
-  | 'exists';
-
-/** Allowed property value types */
-export type SearchPropertyValue = string | number | boolean | Array<string | number>;
-
-/** A single property condition in a filter group */
-export interface ISearchFeaturePropertyCondition {
-  /** Property name (e.g., body_weight, sex, species) */
-  name: string;
-
-  /** Comparison operator */
-  operator: SearchComparisonOperator;
-
-  /** Value(s) to compare against */
-  value?: SearchPropertyValue;
-}
-
-/** A group of property conditions combined by a logical operand */
-export interface ISearchFeaturePropertyGroup {
-  /** Logical operand: 'and' or 'or' */
-  operand: 'and' | 'or';
-
-  /** Conditions in this group */
-  conditions: ISearchFeaturePropertyCondition[];
-}
-
-/**
- * Response from POST /api/download — a download created directly from search filters.
- * Bypasses the shopping cart; the download UUID is the access credential for anonymous users.
- */
-export interface CreateDownloadResponse {
-  download_id: string;
-  download_url: string;
-}
-
-/** Request parameters for advanced feature search */
+/** Request parameters for legacy filter-based feature download creation */
 export interface ISearchFeaturesFilters {
   /** Free-text keyword search across all searchable properties */
   keyword?: string;
@@ -71,15 +24,18 @@ export interface ISearchFeaturesFilters {
 
   /** Filter results by one or more species */
   species?: number[];
+}
 
-  /** Structured property filters grouped by logical operand */
-  properties?: ISearchFeaturePropertyGroup[];
+export interface CreateDownloadResponse {
+  download_id: string;
+  download_url: string;
 }
 
 /** Feature search result (for combined search) */
 export interface SearchFeatureResult {
   submission_feature_id: number;
   feature_type_id: number;
+  feature_type_name: string;
   label: string;
 }
 
@@ -100,6 +56,7 @@ export interface SearchFeatureResultWithRelevancy {
   submission_name: string;
   is_secured: boolean;
   relevancy_score: number;
+  create_date: string;
 }
 
 /** Submission search result */
@@ -160,8 +117,13 @@ export interface ISearchPropertyFilters {
 export interface SearchPropertyResult {
   feature_property_id: number;
   property_name: string;
+  property_display_name: string;
+  feature_property_type: SearchPropertyType;
+  operators: ExpressionPredicateOperator[];
   relevancy_score: number;
 }
+
+export type SearchPropertyType = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'spatial' | 'code';
 
 /**
  * Grouped property results organized by value type
@@ -169,8 +131,11 @@ export interface SearchPropertyResult {
 export interface GroupedPropertyResults {
   string: SearchPropertyResult[];
   number: SearchPropertyResult[];
+  boolean: SearchPropertyResult[];
   datetime: SearchPropertyResult[];
+  taxon: SearchPropertyResult[];
   spatial: SearchPropertyResult[];
+  code: SearchPropertyResult[];
 }
 
 /**
@@ -179,14 +144,4 @@ export interface GroupedPropertyResults {
 export interface SearchPropertyResponse {
   properties: GroupedPropertyResults;
   pagination: ApiPaginationResponseParams;
-}
-
-/**
- * Filter criteria for property search
- */
-export interface ISearchPropertyFilters {
-  /** Free-text search term for properties (e.g., 'weight') */
-  keyword?: string;
-  /** Optional feature types to narrow the property search (e.g., ['species_observation']) */
-  feature_types?: string[];
 }

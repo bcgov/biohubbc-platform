@@ -8,10 +8,17 @@ import { pluralize } from 'utils/Utils';
 
 export interface SearchSummarySectionProps {
   results: SearchSummaryResponse;
-  onItemSelect: (query: string) => void;
+  searchTerm: string;
+  defaultFeatureTypeName: string;
+  onItemSelect: (query: string, featureTypeName: string) => void;
 }
 
-export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySectionProps) => {
+export const SearchSummarySection = ({
+  results,
+  searchTerm,
+  defaultFeatureTypeName,
+  onItemSelect
+}: SearchSummarySectionProps) => {
   const hasFeatureResults = results.features.length > 0;
   const hasTaxonomyResults = results.taxonomy?.total > 0;
 
@@ -29,7 +36,7 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
         label,
         count: feature.total,
         countLabel,
-        query: feature.feature_type_name
+        featureTypeName: feature.feature_type_name
       });
     });
 
@@ -41,12 +48,12 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
         label: 'Species',
         count: results.taxonomy.total,
         countLabel,
-        query: 'species'
+        featureTypeName: defaultFeatureTypeName
       });
     }
 
     return items;
-  }, [results.features, hasTaxonomyResults, results.taxonomy]);
+  }, [defaultFeatureTypeName, results.features, hasTaxonomyResults, results.taxonomy]);
 
   if (!hasFeatureResults && !hasTaxonomyResults) {
     return null;
@@ -58,7 +65,7 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
         <ListItemButton
           role="option"
           key={item.key}
-          onClick={() => onItemSelect(item.query)}
+          onClick={() => onItemSelect(searchTerm, item.featureTypeName)}
           data-search-item
           sx={{ borderRadius: 1 }}>
           <ListItemIcon>
