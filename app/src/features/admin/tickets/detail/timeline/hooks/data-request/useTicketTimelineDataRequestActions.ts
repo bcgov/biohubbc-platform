@@ -5,6 +5,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
+import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 
 /**
  * Data-request status and policy dialog handlers for the ticket timeline.
@@ -14,6 +15,7 @@ import { useState } from 'react';
 export const useTicketTimelineDataRequestActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
+  const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const { ticketDataLoader } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
@@ -23,18 +25,6 @@ export const useTicketTimelineDataRequestActions = () => {
   const [viewPolicy, setViewPolicy] = useState<IPolicy | null>(null);
   const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
-
-  /**
-   * Close the global confirmation dialog used by data-request status actions.
-   *
-   * Status approval, denial, and reset flows all use the shared yes/no dialog; this handler resets that global dialog
-   * state for cancel, close, and confirmed paths.
-   *
-   * @returns {void}
-   */
-  const closeConfirmationDialog = () => {
-    dialogContext.setYesNoDialog({ open: false });
-  };
 
   /**
    * Persist a data-request policy status transition and patch the cached ticket.
@@ -114,16 +104,11 @@ export const useTicketTimelineDataRequestActions = () => {
         break;
     }
 
-    dialogContext.setYesNoDialog({
-      open: true,
+    openConfirmationDialog({
       dialogTitle,
       dialogText,
       yesButtonLabel,
-      noButtonLabel: 'Cancel',
-      onClose: closeConfirmationDialog,
-      onNo: closeConfirmationDialog,
-      onYes: async () => {
-        closeConfirmationDialog();
+      onConfirm: async () => {
         await handleDataRequestStatusUpdate(dataRequestId, policyId, policyStatus);
       }
     });
@@ -143,16 +128,11 @@ export const useTicketTimelineDataRequestActions = () => {
   const handleConfirmResetToReviewed = (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => {
     const currentStatusLabel = `${currentStatus.charAt(0).toUpperCase()}${currentStatus.slice(1)}`;
 
-    dialogContext.setYesNoDialog({
-      open: true,
+    openConfirmationDialog({
       dialogTitle: `Reset ${currentStatusLabel} to Reviewed`,
       dialogText: `Are you sure you want to change this status from ${currentStatusLabel} back to Reviewed?`,
       yesButtonLabel: 'Yes',
-      noButtonLabel: 'Cancel',
-      onClose: closeConfirmationDialog,
-      onNo: closeConfirmationDialog,
-      onYes: async () => {
-        closeConfirmationDialog();
+      onConfirm: async () => {
         await handleDataRequestStatusUpdate(dataRequestId, policyId, PolicyStatus.REVIEWED);
       }
     });

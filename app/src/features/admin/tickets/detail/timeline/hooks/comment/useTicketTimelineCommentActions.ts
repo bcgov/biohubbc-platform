@@ -1,11 +1,13 @@
 import { getArtifactMarkdownByMimeType } from 'features/admin/tickets/utils/ticketArtifactMarkdown';
 import { useTicketAttachmentUpload } from 'features/admin/tickets/hooks/useTicketAttachmentUpload';
+import { useTicketCommentCache } from 'features/admin/tickets/hooks/useTicketCommentCache';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useDialogContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useRef, useState } from 'react';
-import { ITicketCommentEditFormValues } from './edit/TicketCommentEditForm.interface';
+import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
+import { ITicketCommentEditFormValues } from '../../comment/edit/TicketCommentEditForm.interface';
 
 interface IUseTicketTimelineCommentActionsProps {
   ticket: ITicketExtended;
@@ -21,7 +23,8 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   const { ticket } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
+  const { removeCachedComment, replaceCachedComment } = useTicketCommentCache();
   const { isUploadingAttachment: isUploadingCommentAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({
     ticketId: ticket.ticket_id
   });
@@ -29,18 +32,6 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const isDeletingCommentRef = useRef(false);
-
-  /**
-   * Close the global confirmation dialog used by comment delete actions.
-   *
-   * The dialog context owns the rendered modal; this handler is reused for close, cancel, and confirmed paths so all
-   * exits reset the same global dialog state.
-   *
-   * @returns {void}
-   */
-  const closeConfirmationDialog = () => {
-    dialogContext.setYesNoDialog({ open: false });
-  };
 
   /**
    * Open a ticket attachment in a new browser tab.
@@ -141,50 +132,6 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   };
 
   /**
-   * Replace an edited comment in the cached ticket details with the API response.
-   *
-   * This keeps the timeline synchronized immediately after a successful PUT without requiring a full ticket refresh.
-   *
-   * @param {ITicketCommentLog} updatedComment Comment row returned by the update endpoint.
-   * @returns {void}
-   */
-  const replaceCachedComment = (updatedComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.map((comment) =>
-        comment.ticket_comment_id === updatedComment.ticket_comment_id ? updatedComment : comment
-      )
-    });
-  };
-
-  /**
-   * Remove a deleted comment from the cached ticket details.
-   *
-   * This is called only after the DELETE endpoint succeeds, so local state reflects persisted server state.
-   *
-   * @param {string} ticketCommentId Identifier of the comment removed by the API.
-   * @returns {void}
-   */
-  const removeCachedComment = (ticketCommentId: string) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
-    });
-  };
-
-  /**
    * Persist the edited comment body from the edit-comment dialog.
    *
    * The dialog calls this on save with Formik values. Empty submissions are ignored, successful saves replace the cached
@@ -210,7 +157,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
         }
       );
 
-      replaceCachedComment(updatedComment);
+      replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
 
       setIsEditCommentDialogOpen(false);
       setSelectedComment(null);
@@ -264,16 +211,11 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
    * @returns {void}
    */
   const handleConfirmDeleteComment = (ticketCommentId: string) => {
-    dialogContext.setYesNoDialog({
-      open: true,
+    openConfirmationDialog({
       dialogTitle: 'Delete Comment',
       dialogText: 'Are you sure you want to delete this comment?',
       yesButtonLabel: 'Delete',
-      noButtonLabel: 'Cancel',
-      onClose: closeConfirmationDialog,
-      onNo: closeConfirmationDialog,
-      onYes: async () => {
-        closeConfirmationDialog();
+      onConfirm: async () => {
         await handleDeleteComment(ticketCommentId);
       }
     });

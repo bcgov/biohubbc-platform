@@ -1,11 +1,11 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
 import { ViewPolicyDialog } from 'features/admin/policies/components/ViewPolicyDialog';
-import { useTicketTimelineCommentActions } from './comment/useTicketTimelineCommentActions';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
 import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditForm.interface';
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
-import { useTicketTimelineDataRequestActions } from './data-request/useTicketTimelineDataRequestActions';
+import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
+import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 

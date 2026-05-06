@@ -6,6 +6,7 @@ import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useTicketAttachmentUpload } from './useTicketAttachmentUpload';
+import { useTicketCommentCache } from './useTicketCommentCache';
 
 /**
  * Comment state and submit behavior for ticket details.
@@ -18,94 +19,10 @@ export const useTicketComment = () => {
   const authStateContext = useAuthStateContext();
   const dialogContext = useDialogContext();
   const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({ ticketId });
+  const { appendCachedComment, removeCachedComment, replaceCachedComment } = useTicketCommentCache();
 
   const [comment, setComment] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
-
-  /**
-   * Append a newly created comment to the locally cached ticket details.
-   *
-   * Used by optimistic comment creation so the UI can show a submitted comment
-   * immediately before the API request resolves. If the ticket details have not
-   * loaded yet, the cache is left unchanged.
-   *
-   * @param {ITicketCommentLog} newComment Comment to append to the cache.
-   * @returns {void}
-   */
-  const appendComment = (newComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: [...latestTicket.comments, newComment]
-    });
-  };
-
-  /**
-   * Remove a comment from the locally cached ticket details by identifier.
-   *
-   * Used to roll back an optimistic comment when the create request fails or
-   * returns no persisted comment. If the ticket details have not loaded yet, the
-   * cache is left unchanged.
-   *
-   * @param {string} ticketCommentId Comment identifier to remove.
-   * @returns {void}
-   */
-  const removeCommentById = (ticketCommentId: string) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.filter((existingComment) => existingComment.ticket_comment_id !== ticketCommentId)
-    });
-  };
-
-  /**
-   * Replace an optimistic cached comment with the API-persisted comment.
-   *
-   * When the optimistic comment is still present, this updates it in place so
-   * comment order remains stable. If the optimistic comment is missing, the
-   * persisted comment is appended so the cache still reflects the successful API
-   * response.
-   *
-   * @param {string} ticketCommentId Optimistic comment identifier to replace.
-   * @param {ITicketCommentLog} replacementComment Persisted comment returned by the API.
-   * @returns {void}
-   */
-  const replaceCommentById = (ticketCommentId: string, replacementComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    const hasOptimisticComment = latestTicket.comments.some(
-      (existingComment) => existingComment.ticket_comment_id === ticketCommentId
-    );
-
-    if (!hasOptimisticComment) {
-      ticketDataLoader.setData({
-        ...latestTicket,
-        comments: [...latestTicket.comments, replacementComment]
-      });
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.map((existingComment) =>
-        existingComment.ticket_comment_id === ticketCommentId ? replacementComment : existingComment
-      )
-    });
-  };
 
   /**
    * Submit the current comment draft for the active ticket.
@@ -140,14 +57,14 @@ export const useTicketComment = () => {
 
     try {
       setIsSavingComment(true);
-      appendComment(optimisticComment);
+      appendCachedComment(optimisticComment);
 
       const createdComment = await api.tickets.createTicketComment(ticketId, {
         comment: trimmedComment
       });
 
       if (!createdComment) {
-        removeCommentById(optimisticCommentId);
+        removeCachedComment(optimisticCommentId);
         throw new Error('Failed to add comment.');
       }
 
@@ -159,11 +76,11 @@ export const useTicketComment = () => {
         comment: createdComment.comment ?? trimmedComment
       };
 
-      replaceCommentById(optimisticCommentId, persistedComment);
+      replaceCachedComment(optimisticCommentId, persistedComment);
 
       setComment('');
     } catch (caughtError) {
-      removeCommentById(optimisticCommentId);
+      removeCachedComment(optimisticCommentId);
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
         open: true,
