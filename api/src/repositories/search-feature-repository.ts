@@ -23,7 +23,7 @@ import { normalizeSearchValue } from '../utils/normalize';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { ExpressionEvaluationRepository } from './expression-evaluation-repository';
+import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
 
 /**
@@ -184,11 +184,7 @@ export class SearchFeatureRepository extends BaseRepository {
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
-      ? new ExpressionEvaluationRepository(this.connection).buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
+      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree, systemUserId ?? null)
       : null;
 
     let query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
@@ -226,11 +222,7 @@ export class SearchFeatureRepository extends BaseRepository {
   ): Promise<number> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
-      ? new ExpressionEvaluationRepository(this.connection).buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
+      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree, systemUserId ?? null)
       : null;
 
     const query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
@@ -724,7 +716,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * Builds the hydrated expression-tree search projection.
    *
    * Hydrates anchor-type feature rows scoped (when provided) by a precomputed expression-tree
-   * subquery from `ExpressionEvaluationRepository.buildExpressionTreeFeatureIdsSubquery`.
+   * subquery from `expression-evaluation.buildExpressionTreeFeatureIdsSubquery`.
    * Adds the `is_secured` projection and applies the security WHERE filter.
    *
    * Pagination is applied separately by `applyExpressionSearchPagination` so the count wrapper

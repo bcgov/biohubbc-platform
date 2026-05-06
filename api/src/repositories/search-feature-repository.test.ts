@@ -13,7 +13,7 @@ import {
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
-import { ExpressionEvaluationRepository } from './expression-evaluation-repository';
+import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
 
 const normalizedPredicate = (
@@ -743,15 +743,14 @@ describe('SearchFeatureRepository', () => {
   });
 
   describe('searchFeaturesByExpressionTree (wrapper relay)', () => {
-    it('should call ExpressionEvaluationRepository with relayed args and thread the subquery via whereIn', async () => {
+    it('should call buildExpressionTreeFeatureIdsSubquery with relayed args and thread the subquery via whereIn', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const subqueryStub = Sinon.stub(
-        ExpressionEvaluationRepository.prototype,
-        'buildExpressionTreeFeatureIdsSubquery'
-      ).returns(getKnex()('any_table').select('submission_feature_id'));
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
 
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -782,10 +781,9 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const subqueryStub = Sinon.stub(
-        ExpressionEvaluationRepository.prototype,
-        'buildExpressionTreeFeatureIdsSubquery'
-      ).returns(getKnex()('any_table').select('submission_feature_id'));
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
 
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -806,15 +804,12 @@ describe('SearchFeatureRepository', () => {
       expect(subqueryStub.getCall(0).args[2]).to.equal(null);
     });
 
-    it('should NOT call ExpressionEvaluationRepository when expressionTree is undefined and fall back to anchor-only path', async () => {
+    it('should NOT call buildExpressionTreeFeatureIdsSubquery when expressionTree is undefined and fall back to anchor-only path', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const subqueryStub = Sinon.stub(
-        ExpressionEvaluationRepository.prototype,
-        'buildExpressionTreeFeatureIdsSubquery'
-      );
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
       await repository.searchFeaturesByExpressionTree('telemetry', undefined, { page: 1, limit: 25 }, null);
 
@@ -834,10 +829,9 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const subqueryStub = Sinon.stub(
-        ExpressionEvaluationRepository.prototype,
-        'buildExpressionTreeFeatureIdsSubquery'
-      ).returns(getKnex()('any_table').select('submission_feature_id'));
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
 
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',

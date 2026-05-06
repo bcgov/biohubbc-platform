@@ -1,4 +1,4 @@
-// Integration test for ExpressionEvaluationRepository — verifies that the
+// Integration test for expression-evaluation — verifies that the
 // emitted SQL (recursive expression-tree evaluator + broad feature-type
 // projection) returns the expected submission_feature_id sets against a real
 // schema, including the security filter applied for an authenticated user.
@@ -19,7 +19,10 @@ import {
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../../models/expression-tree-internal';
-import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
+import {
+  buildBroadFeatureTypeSubquery,
+  buildExpressionTreeFeatureIdsSubquery
+} from '../../repositories/expression-evaluation';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -49,11 +52,10 @@ function namePredicate(value: string): NormalizedExpressionTreePredicate {
   } as unknown as NormalizedExpressionTreePredicate;
 }
 
-describe('ExpressionEvaluationRepository (integration)', function () {
+describe('expression-evaluation (integration)', function () {
   this.timeout(15000);
 
   let connection: IDBConnection;
-  let repo: ExpressionEvaluationRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -62,7 +64,6 @@ describe('ExpressionEvaluationRepository (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    repo = new ExpressionEvaluationRepository(connection);
   });
 
   afterEach(async () => {
@@ -106,7 +107,7 @@ describe('ExpressionEvaluationRepository (integration)', function () {
       // Decoy of a different feature type — must not appear.
       const decoy = await createTestFeature(connection, submissionId, 'capture', { comment: 'cap' });
 
-      const subquery = repo.buildBroadFeatureTypeSubquery('sample_site', connection.systemUserId());
+      const subquery = buildBroadFeatureTypeSubquery('sample_site', connection.systemUserId());
       const ids = await runSubquery(subquery);
 
       expect(ids.has(a)).to.equal(true);
@@ -136,13 +137,13 @@ describe('ExpressionEvaluationRepository (integration)', function () {
       `);
 
       // Per-statement subquery for the type the user CAN see → returns the row.
-      const accessibleIds = await runSubquery(repo.buildBroadFeatureTypeSubquery('sample_site', null));
+      const accessibleIds = await runSubquery(buildBroadFeatureTypeSubquery('sample_site', null));
       expect(accessibleIds.has(accessible)).to.equal(true);
 
       // Per-statement subquery for the type the user CAN'T see → returns nothing
       // and crucially does not throw. At pipeline level this is what produces an
       // empty Parquet file rather than a failed download.
-      const restrictedIds = await runSubquery(repo.buildBroadFeatureTypeSubquery('capture', null));
+      const restrictedIds = await runSubquery(buildBroadFeatureTypeSubquery('capture', null));
       expect(restrictedIds.has(restricted)).to.equal(false);
       expect(restrictedIds.size).to.equal(0);
     });
@@ -166,7 +167,7 @@ describe('ExpressionEvaluationRepository (integration)', function () {
         clauses: [namePredicate('AND-target')]
       };
 
-      const subquery = repo.buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
+      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
       const ids = await runSubquery(subquery);
 
       expect(ids.has(target)).to.equal(true);
@@ -193,7 +194,7 @@ describe('ExpressionEvaluationRepository (integration)', function () {
         clauses: [namePredicate('OR-A'), namePredicate('OR-B')]
       };
 
-      const subquery = repo.buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
+      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
       const ids = await runSubquery(subquery);
 
       expect(ids.has(a)).to.equal(true);
@@ -224,7 +225,7 @@ describe('ExpressionEvaluationRepository (integration)', function () {
         operator: 'OR',
         clauses: [namePredicate('Open-secfilter'), namePredicate('Secured-secfilter')]
       };
-      const subquery = repo.buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
+      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
       const ids = await runSubquery(subquery);
 
       expect(ids.has(open)).to.equal(true);
@@ -264,7 +265,7 @@ describe('ExpressionEvaluationRepository (integration)', function () {
         operator: 'AND',
         clauses: [namePredicate('evidence-row')]
       };
-      const subquery = repo.buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
+      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
       const ids = await runSubquery(subquery);
 
       // Evidence is unsecured and matches the predicate — keep it.

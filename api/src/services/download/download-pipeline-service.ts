@@ -9,7 +9,7 @@ import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
-import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
+import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
@@ -36,7 +36,6 @@ import { ArtifactService } from '../upload/artifact-service';
  */
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
-  expressionEvaluationRepository: ExpressionEvaluationRepository;
   expressionTreeService: ExpressionTreeService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
@@ -44,7 +43,6 @@ export class DownloadPipelineService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.expressionEvaluationRepository = new ExpressionEvaluationRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
@@ -218,11 +216,11 @@ export class DownloadPipelineService extends DBService {
     // for the two consumers of the evaluator.
     let subquery: Knex.QueryBuilder;
     if (statement.expression_id === null) {
-      subquery = this.expressionEvaluationRepository.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
+      subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
     } else {
       const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
       const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
-      subquery = this.expressionEvaluationRepository.buildExpressionTreeFeatureIdsSubquery(
+      subquery = expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
         featureTypeName,
         normalizedTree,
         source.create_user

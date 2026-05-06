@@ -17,7 +17,7 @@ import {
   PolicyStatementRepository
 } from '../../repositories/authorization/policy-statement-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { ExpressionEvaluationRepository } from '../../repositories/expression-evaluation-repository';
+import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
 import { ExpressionPredicateSemanticValidator } from '../expression-predicate-semantic-validator';
@@ -293,9 +293,9 @@ describe('DownloadPipelineService', () => {
         .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
         .resolves(normalizedTree);
       const buildExprSubqueryStub = sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildExpressionTreeFeatureIdsSubquery')
+        .stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery')
         .returns(subqueryStub('SELECT expression', []));
-      const buildBroadStub = sinon.stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery');
+      const buildBroadStub = sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery');
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
       const expressionId = '44444444-4444-4444-4444-444444444444';
@@ -321,11 +321,11 @@ describe('DownloadPipelineService', () => {
 
       const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree');
       const buildExprSubqueryStub = sinon.stub(
-        ExpressionEvaluationRepository.prototype,
+        expressionEvaluation,
         'buildExpressionTreeFeatureIdsSubquery'
       );
       const buildBroadStub = sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -348,7 +348,7 @@ describe('DownloadPipelineService', () => {
       stubParquetPipeline();
 
       const buildBroadStub = sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -372,7 +372,7 @@ describe('DownloadPipelineService', () => {
       const { mockWriter, uploadStub } = stubParquetPipeline();
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       const baseBatch = [
         {
@@ -410,7 +410,7 @@ describe('DownloadPipelineService', () => {
       const { mockWriter } = stubParquetPipeline();
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -433,7 +433,7 @@ describe('DownloadPipelineService', () => {
       const { mockWriter } = stubParquetPipeline();
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -454,7 +454,7 @@ describe('DownloadPipelineService', () => {
       const { insertArtifactStub } = stubParquetPipeline();
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -498,7 +498,7 @@ describe('DownloadPipelineService', () => {
         .rejects(new Error('S3 upload aborted by caller'));
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
@@ -548,7 +548,7 @@ describe('DownloadPipelineService', () => {
         .returns(new Promise<void>(() => undefined));
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
@@ -596,7 +596,7 @@ describe('DownloadPipelineService', () => {
         .rejects(new Error('S3 upload aborted by caller'));
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
@@ -631,7 +631,7 @@ describe('DownloadPipelineService', () => {
 
       const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream');
       sinon.stub(parquetjs.ParquetWriter, 'openStream');
-      sinon.stub(ExpressionEvaluationRepository.prototype, 'buildExpressionTreeFeatureIdsSubquery');
+      sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
       let caught: unknown;
       try {
@@ -656,7 +656,7 @@ describe('DownloadPipelineService', () => {
       const { insertArtifactStub, linkStub } = stubParquetPipeline();
 
       sinon
-        .stub(ExpressionEvaluationRepository.prototype, 'buildBroadFeatureTypeSubquery')
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 

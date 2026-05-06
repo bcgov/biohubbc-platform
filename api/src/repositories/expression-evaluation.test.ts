@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
-import { getMockDBConnection } from '../__mocks__/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
-import { ExpressionEvaluationRepository } from './expression-evaluation-repository';
+import {
+  buildBroadFeatureTypeSubquery,
+  buildExpressionTreeFeatureIdsSubquery
+} from './expression-evaluation';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -19,14 +21,13 @@ const normalizedPredicate = (
   internal_predicate
 });
 
-describe('ExpressionEvaluationRepository', () => {
+describe('expression-evaluation', () => {
   afterEach(() => {
     Sinon.restore();
   });
 
   describe('buildExpressionTreeFeatureIdsSubquery', () => {
     it('should build typed property SQL that matches shared properties through feature_type_property', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -48,7 +49,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('submission_feature_property_string');
@@ -61,7 +62,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should apply anonymous security filtering to predicate evidence', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -75,14 +75,13 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
 
       expect(sql).to.include('p"."submission_feature_id');
       expect(sql).to.not.include('security_scope_anchor');
     });
 
     it('should apply authenticated security filtering to predicate evidence', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -96,7 +95,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
 
       expect(sql).to.include('p"."submission_feature_id');
       expect(sql).to.include('security_scope_anchor');
@@ -108,7 +107,6 @@ describe('ExpressionEvaluationRepository', () => {
       // Filtering only the predicate evidence is not enough: graph traversal can reach a secured
       // *target* feature from an unsecured evidence feature, so consumers that use the subquery
       // directly (e.g. the download pipeline cursor) would otherwise leak that target id.
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -122,7 +120,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
 
       // The target-side filter is keyed on `sf.submission_feature_id`, distinct from the
       // evidence-side filter on `p.submission_feature_id`.
@@ -131,7 +129,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should narrow predicate evidence by feature_type_property_id when provided', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -146,14 +143,13 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
 
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
       expect(sql).to.include('"p"."feature_type_property_id" = 123');
     });
 
     it('should project related predicate evidence to anchor feature ids through bounded graph traversal', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -168,7 +164,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository.buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_taxon');
       expect(sql).to.include('with recursive "evidence"');
@@ -199,7 +195,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should union child target sets for OR expressions', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'OR',
@@ -221,8 +216,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository
-        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
         .toString();
 
       expect(sql).to.include(' union ');
@@ -231,7 +225,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should recursively compose nested expression target sets', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -266,8 +259,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository
-        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
         .toString();
 
       expect(sql).to.include(' intersect ');
@@ -276,7 +268,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should use feature-level NotEquals evidence semantics for multi-value properties', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -291,8 +282,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository
-        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
         .toString();
 
       expect(sql).to.include('from "submission_feature_property_string" as "p"');
@@ -303,7 +293,6 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('should project parent dataset evidence to species observation targets through hierarchy edges', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -318,8 +307,7 @@ describe('ExpressionEvaluationRepository', () => {
         ]
       };
 
-      const sql = repository
-        .buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null)
         .toString();
 
       expect(sql).to.include('submission_feature_property_string');
@@ -335,9 +323,8 @@ describe('ExpressionEvaluationRepository', () => {
 
   describe('buildBroadFeatureTypeSubquery', () => {
     it('emits SQL projecting submission_feature_id with the feature-type filter and security filter for an authenticated user', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
 
-      const sql = repository.buildBroadFeatureTypeSubquery('fish', 42).toString();
+      const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
 
       expect(sql).to.include('"sf"."submission_feature_id"');
       expect(sql).to.include('from "submission_feature" as "sf"');
@@ -352,9 +339,8 @@ describe('ExpressionEvaluationRepository', () => {
     });
 
     it('emits the anonymous-only NOT-secured filter when systemUserId is null', () => {
-      const repository = new ExpressionEvaluationRepository(getMockDBConnection());
 
-      const sql = repository.buildBroadFeatureTypeSubquery('fish', null).toString();
+      const sql = buildBroadFeatureTypeSubquery('fish', null).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
       // Anonymous: emits NOT EXISTS (uppercase, raw SQL fragment) with no scope-anchor branch

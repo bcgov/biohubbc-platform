@@ -137,9 +137,7 @@ export class CartService extends DBService {
    * @memberof CartService
    */
   async checkoutCart(_cartId: string, _systemUserId: number | null): Promise<DownloadId> {
-    throw new HTTP400(
-      'Cart checkout is being retired. Use POST /api/download with an expression instead.'
-    );
+    throw new HTTP400('Cart checkout is being retired. Use POST /api/download with an expression instead.');
   }
 
   /**
