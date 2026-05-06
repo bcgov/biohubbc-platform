@@ -4,9 +4,9 @@ import { mdiDatabase, mdiFileOutline, mdiMapMarker, mdiWifiMarker } from '@mdi/j
  * Significant feature types that are preferentially displayed in search results
  */
 export enum PRIORITY_FEATURE_TYPE {
-  DATASET = 'dataset',
   SPECIES_OBSERVATION = 'species_observation',
   TELEMETRY = 'telemetry',
+  DATASET = 'dataset',
   REPORT = 'report'
 }
 

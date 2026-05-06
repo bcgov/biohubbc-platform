@@ -7,25 +7,24 @@ import { Knex } from 'knex';
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
 const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISSIONS || 0);
 const CONTRIBUTOR_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
+let activeTaxonTsnsPromise: Promise<number[]> | null = null;
 
 /**
- * Search query for performance testing.
+ * Expression search query shape for performance testing.
  *
  * -- Select feature_submissions on multiple conditions (AND)
  * SELECT * FROM submission_feature WHERE submission_feature_id IN (
  *     SELECT DISTINCT t1.submission_feature_id FROM submission_feature t1
  *     WHERE EXISTS (
- *         SELECT 1 FROM search_string t3 WHERE t3.submission_feature_id = t1.submission_feature_id AND t3.value LIKE '%cor%'
+ *         SELECT 1 FROM submission_feature_property_string t3 WHERE t3.submission_feature_id = t1.submission_feature_id AND t3.value ILIKE '%cor%'
  *     ) AND EXISTS (
- *         SELECT 1 FROM search_string t4 WHERE t4.submission_feature_id = t1.submission_feature_id AND t4.value LIKE '%arx%'
+ *         SELECT 1 FROM submission_feature_property_string t4 WHERE t4.submission_feature_id = t1.submission_feature_id AND t4.value ILIKE '%arx%'
  *     ) AND EXISTS (
- *         SELECT 1 FROM search_number t5 WHERE t5.submission_feature_id = t1.submission_feature_id AND t5.feature_property_id = (SELECT feature_property_id FROM feature_property fp WHERE fp.name = 'count') AND t5.value > 40 AND t5.value < 50
+ *         SELECT 1 FROM submission_feature_property_number t5 WHERE t5.submission_feature_id = t1.submission_feature_id AND t5.value > 40 AND t5.value < 50
  *     ) AND EXISTS (
- *         SELECT 1 FROM search_datetime t7 WHERE t7.submission_feature_id = t1.submission_feature_id AND t7.value > '2023-08-01' AND t7.value < '2024-04-01' AND t7.feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'start_date')
+ *         SELECT 1 FROM submission_feature_property_timestamp t7 WHERE t7.submission_feature_id = t1.submission_feature_id AND t7.date_value > '2023-08-01'
  *     ) AND EXISTS (
- *         SELECT 1 FROM search_datetime t8 WHERE t8.submission_feature_id = t1.submission_feature_id AND t8.value > '2023-08-01' AND t8.value < '2024-04-01' AND t8.feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'end_date')
- *     ) AND EXISTS (
- *         SELECT 1 FROM search_spatial t9 WHERE t9.submission_feature_id = t1.submission_feature_id AND public.ST_INTERSECTS(t9.value, public.ST_GeomFromGeoJSON('{"coordinates":[[[-128.12596524778567,50.90095573861839],[-128.6951954392062,50.75063500834236],[-127.71373499792975,49.63640480052965],[-125.38308025753057,48.53083459202276],[-123.3647465830768,48.15806226354249],[-122.94623399379441,48.36504151433127],[-123.37439502763095,49.13209156231335],[-124.66835857611437,49.81654191782255],[-126.6572708981094,50.607171392416745],[-127.89342678974776,50.9888374217299],[-128.12596524778567,50.90095573861839]]],"type":"Polygon"}'))
+ *         SELECT 1 FROM submission_feature_property_geometry t9 WHERE t9.submission_feature_id = t1.submission_feature_id AND public.ST_INTERSECTS(t9.value, public.ST_GeomFromGeoJSON('{"coordinates":[[[-128.12596524778567,50.90095573861839],[-128.6951954392062,50.75063500834236],[-127.71373499792975,49.63640480052965],[-125.38308025753057,48.53083459202276],[-123.3647465830768,48.15806226354249],[-122.94623399379441,48.36504151433127],[-123.37439502763095,49.13209156231335],[-124.66835857611437,49.81654191782255],[-126.6572708981094,50.607171392416745],[-127.89342678974776,50.9888374217299],[-128.12596524778567,50.90095573861839]]],"type":"Polygon"}'))
  *     )
  * );
  */
@@ -134,6 +133,9 @@ export const insertDatasetRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string }
 ): Promise<number> => {
+  const name = `Survey ${faker.animal.type()} ${faker.commerce.department()}`;
+  const description = faker.lorem.sentence({ min: 5, max: 15 });
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -141,8 +143,8 @@ export const insertDatasetRecord = async (
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
-        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}`,
-        description: faker.lorem.sentence({ min: 5, max: 15 }),
+        name,
+        description,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         // Full FeatureCollection matches the ingest contract (see
@@ -156,20 +158,13 @@ export const insertDatasetRecord = async (
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'name', value: name })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'description', value: description })}`);
 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-
-  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
-  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
-  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -301,6 +296,9 @@ export const insertSampleSiteRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const name = `Sample Site ${faker.lorem.words(3)}`;
+  const description = faker.lorem.words({ min: 5, max: 100 });
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -308,8 +306,8 @@ export const insertSampleSiteRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'sample_site',
       data: {
-        name: `Sample Site ${faker.lorem.words(3)}`,
-        description: faker.lorem.words({ min: 5, max: 100 }),
+        name,
+        description,
         // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
           1, // number of features in feature collection
@@ -320,8 +318,8 @@ export const insertSampleSiteRecord = async (
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'name', value: name })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'description', value: description })}`);
 
   await knex.raw(`${insertSpatialPolygon({ submission_feature_id })}`);
 
@@ -332,6 +330,8 @@ export const insertObservationRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const taxonTsn = await getRandomActiveTaxonTsn(knex);
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -339,7 +339,6 @@ export const insertObservationRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'species_observation',
       data: {
-        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
           1, // number of features in feature collection
@@ -351,18 +350,14 @@ export const insertObservationRecord = async (
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  if (taxonTsn) {
+    await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn })}`);
+  }
 
   //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -376,6 +371,9 @@ const insertAnimalRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const taxonTsn = await getRandomActiveTaxonTsn(knex);
+  const species = faker.animal.type();
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -383,9 +381,8 @@ const insertAnimalRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'animal',
       data: {
-        species: faker.animal.type(),
+        species,
         count: faker.number.int({ min: 0, max: 100 }),
-        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }
@@ -393,18 +390,16 @@ const insertAnimalRecord = async (
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'species', value: species })}`);
 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  if (taxonTsn) {
+    await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn })}`);
+  }
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -491,7 +486,7 @@ export const insertSubmissionFeature = (options: {
     RETURNING submission_feature_id;
 `;
 
-const insertSearchString = (options: { submission_feature_id: number }) => `
+const insertSearchString = (options: { submission_feature_id: number; property_name: string; value: string }) => `
     INSERT INTO submission_feature_property_string
     (
         submission_feature_id,
@@ -502,14 +497,23 @@ const insertSearchString = (options: { submission_feature_id: number }) => `
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
-        $$${faker.lorem.words(3)}$$,
+        LEFT($$${options.value}$$, 250),
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id AND fpt.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
-      AND fp.name = 'name'
+      AND fpt.name = 'string'
+      AND fp.name = '${options.property_name}'
+      AND NOT EXISTS (
+          SELECT 1
+          FROM submission_feature_property_string existing
+          WHERE existing.submission_feature_id = sf.submission_feature_id
+            AND existing.feature_type_property_id = ftp.feature_type_property_id
+      )
+    ORDER BY ftp.feature_type_property_id
     LIMIT 1;
 `;
 
@@ -535,7 +539,7 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     LIMIT 1;
 `;
 
-const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) => `
+const insertSearchStringTaxonomy = (options: { submission_feature_id: number; taxonTsn: number }) => `
     INSERT INTO submission_feature_property_taxon
     (
         submission_feature_id,
@@ -551,11 +555,12 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) 
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
-    JOIN taxon t ON TRUE
+    JOIN taxon t
+      ON t.itis_tsn = ${options.taxonTsn}
+     AND t.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'taxon_id'
-    ORDER BY random()
     LIMIT 1;
 `;
 
@@ -679,6 +684,53 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
 
 const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
+};
+
+/**
+ * Loads active ITIS TSNs for mock feature seeding.
+ *
+ * Use this helper before seeding any mock typed taxon property row. The seeded
+ * value must be an existing public ITIS TSN so `insertSearchStringTaxonomy` can
+ * resolve it to the internal `taxon.taxon_id` and write a valid
+ * `submission_feature_property_taxon` row.
+ *
+ * The result is cached as a promise for the lifetime of this seed module. Mock
+ * animal and observation inserts run concurrently, so caching the in-flight
+ * lookup prevents repeated full-table taxonomy reads during a single seed run.
+ *
+ * @param {Knex} knex - Knex connection or transaction used by the seed.
+ * @returns {Promise<number[]>} Active `taxon.itis_tsn` values available for mock taxonomy properties.
+ */
+const getActiveTaxonTsns = async (knex: Knex): Promise<number[]> => {
+  activeTaxonTsnsPromise ??= knex('taxon')
+    .select<{ itis_tsn: number }[]>('itis_tsn')
+    .whereNull('record_end_date')
+    .then((taxa) => taxa.map((taxon) => taxon.itis_tsn).filter((itisTsn) => Number.isFinite(itisTsn)));
+
+  return activeTaxonTsnsPromise;
+};
+
+/**
+ * Picks one active ITIS TSN for a mock feature.
+ *
+ * Use this when building mock feature `data` for feature types that include a
+ * taxonomy property. It delegates loading and caching to `getActiveTaxonTsns`,
+ * then chooses a random TSN in memory. This avoids database-side
+ * `ORDER BY random()` work for every seeded feature while still distributing
+ * mock records across available active taxa. If no active taxa are available,
+ * return undefined so mock feature seeding can continue without taxonomy rows.
+ *
+ * @param {Knex} knex - Knex connection or transaction used by the seed.
+ * @returns {Promise<number | undefined>} Random active `taxon.itis_tsn` value, or undefined when taxonomy is unavailable.
+ */
+const getRandomActiveTaxonTsn = async (knex: Knex): Promise<number | undefined> => {
+  const activeTaxonTsns = await getActiveTaxonTsns(knex);
+
+  if (activeTaxonTsns.length === 0) {
+    return undefined;
+  }
+
+  return activeTaxonTsns[randomIntFromInterval(0, activeTaxonTsns.length - 1)];
 };
 
 export const insertTelemetryRecord = async (
