@@ -3,21 +3,31 @@ import Box from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { EditDialog } from 'components/dialog/EditDialog';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
+import {
+  TICKET_ATTACHMENT_IMAGE_FILE_EXTENSIONS,
+  TICKET_ATTACHMENT_MARKDOWN_FORMATTERS,
+  TICKET_ATTACHMENT_MARKDOWN_TYPE_BY_MEDIA_TYPE,
+  TicketAttachmentMarkdownType
+} from 'constants/ticket';
 import { IAddPolicyFormValues } from 'features/admin/policies/components/AddPolicyForm';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
 import { ViewPolicyDialog } from 'features/admin/policies/components/ViewPolicyDialog';
 import { transformPolicyJsonToApi } from 'features/admin/policies/utils/policyTransform';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
-import { useState } from 'react';
+import { ITicketArtifact, ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
+import { useFormikContext } from 'formik';
+import { useRef, useState } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
+import * as yup from 'yup';
+import { TicketCommentForm } from '../comment/TicketCommentForm';
 import {
   CommentEvent,
   DataRequestEvent,
@@ -28,6 +38,64 @@ import {
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
 import { TicketDataRequestTimelineItem } from './item/TicketDataRequestTimelineItem';
 
+interface ITicketCommentEditFormValues {
+  comment: string;
+}
+
+const TicketCommentEditFormYupSchema = yup.object().shape({
+  comment: yup.string().trim().required('Comment is required').max(3000, 'Comment must be 3000 characters or less')
+});
+
+interface ITicketCommentEditFormProps {
+  artifacts: ITicketArtifact[];
+  isSaving: boolean;
+  isUploadingAttachment: boolean;
+  onUploadAttachment: (file: File, appendMarkdownLink: (markdownLink: string) => void) => Promise<void>;
+}
+
+/**
+ * Formik adapter for the shared ticket comment editor body.
+ *
+ * @param {ITicketCommentEditFormProps} props
+ * @return {*}
+ */
+const TicketCommentEditForm = (props: ITicketCommentEditFormProps) => {
+  const { artifacts, isSaving, isUploadingAttachment, onUploadAttachment } = props;
+  const { values, setFieldValue } = useFormikContext<ITicketCommentEditFormValues>();
+  const commentRef = useRef(values.comment);
+  commentRef.current = values.comment;
+
+  /**
+   * Append attachment markdown returned by the upload flow to the current Formik comment field.
+   *
+   * This callback is passed into the timeline-level upload handler so that the shared upload logic can add the
+   * generated `/artifact/{ticketArtifactId}` markdown reference after the attachment has been persisted. A ref mirrors
+   * the current Formik value so multiple attachment uploads append to the latest comment text even when uploads resolve
+   * asynchronously.
+   *
+   * @param {string} markdownLink Markdown image or link syntax for the uploaded ticket artifact.
+   * @returns {void}
+   */
+  const appendMarkdownLink = (markdownLink: string) => {
+    const previousComment = commentRef.current;
+    const separator = previousComment && !/\s$/.test(previousComment) ? ' ' : '';
+    const nextComment = `${previousComment}${separator}${markdownLink}`;
+    commentRef.current = nextComment;
+    setFieldValue('comment', nextComment);
+  };
+
+  return (
+    <TicketCommentForm
+      comment={values.comment}
+      artifacts={artifacts}
+      setComment={(comment) => setFieldValue('comment', comment)}
+      isSaving={isSaving}
+      isUploadingAttachment={isUploadingAttachment}
+      onUploadAttachment={(file) => onUploadAttachment(file, appendMarkdownLink)}
+    />
+  );
+};
+
 /**
  * Renders the timeline section for a ticket.
  *
@@ -37,6 +105,7 @@ import { TicketDataRequestTimelineItem } from './item/TicketDataRequestTimelineI
 export const TicketTimeline = (props: ITicketTimelineProps) => {
   const { ticket, isLoading } = props;
   const api = useApi();
+  const config = useConfigContext();
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
@@ -47,6 +116,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const [viewPolicy, setViewPolicy] = useState<IPolicy | null>(null);
   const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
+  const [selectedComment, setSelectedComment] = useState<ITicketCommentLog | null>(null);
+  const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
+  const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isUploadingCommentAttachment, setIsUploadingCommentAttachment] = useState(false);
 
   const closeDataRequestStatusConfirmationDialog = () => {
     dialogContext.setYesNoDialog({ open: false });
@@ -147,6 +220,310 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         snackbarMessage: apiError.message || 'Failed to download attachment.'
       });
     }
+  };
+
+  /**
+   * Resolve the markdown rendering type to use for an attachment selected while editing a timeline comment.
+   *
+   * The browser-provided MIME type is preferred because it is available before the file is uploaded. When a browser or
+   * operating system provides no MIME type, the file extension is used as a fallback for common image formats. Unknown
+   * files are rendered as standard markdown links.
+   *
+   * @param {File} file File selected from the edit-comment attachment input.
+   * @returns {TicketAttachmentMarkdownType} Markdown formatter key used to generate image or link syntax.
+   */
+  const getAttachmentMarkdownType = (file: File): TicketAttachmentMarkdownType => {
+    const mediaType = file.type.split('/')[0]?.toLowerCase();
+    const markdownType = mediaType ? TICKET_ATTACHMENT_MARKDOWN_TYPE_BY_MEDIA_TYPE[mediaType] : undefined;
+
+    if (markdownType) {
+      return markdownType;
+    }
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    return extension && TICKET_ATTACHMENT_IMAGE_FILE_EXTENSIONS.has(extension) ? 'image' : 'link';
+  };
+
+  /**
+   * Build the markdown reference inserted into the edit-comment form for an uploaded ticket artifact.
+   *
+   * The returned markdown uses the stable `ticket_artifact_id` path expected by `TicketMarkdownContent`, allowing edited
+   * comments to preview and later render attachments the same way newly-created comments do.
+   *
+   * @param {File} file Original selected file, used for the markdown label and type detection.
+   * @param {string} ticketArtifactId Stable ticket artifact identifier returned after upload completion.
+   * @returns {string} Markdown image or link syntax pointing at `/artifact/{ticketArtifactId}`.
+   */
+  const getArtifactMarkdownByMimeType = (file: File, ticketArtifactId: string) => {
+    const href = `/artifact/${ticketArtifactId}`;
+    const markdownType = getAttachmentMarkdownType(file);
+
+    return TICKET_ATTACHMENT_MARKDOWN_FORMATTERS[markdownType](file.name, href);
+  };
+
+  /**
+   * Upload an attachment selected from the edit-comment dialog and append its markdown reference to the form.
+   *
+   * This mirrors the new-comment upload flow: validate the configured file-size limit, initialize a ticket upload,
+   * stream the file to the presigned object-store URL, complete the upload, update cached ticket artifacts if the
+   * artifact is new, then call `appendMarkdownLink` so the edit form includes the uploaded attachment. Failures are
+   * surfaced through the shared snackbar and leave the comment body unchanged.
+   *
+   * @param {File} file File selected by the user in the edit-comment dialog.
+   * @param {(markdownLink: string) => void} appendMarkdownLink Callback that inserts the generated artifact markdown
+   * into the Formik-backed edit-comment field.
+   * @returns {Promise<void>} Resolves when the upload attempt and form insertion have completed.
+   */
+  const handleEditCommentUploadAttachment = async (file: File, appendMarkdownLink: (markdownLink: string) => void) => {
+    const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
+
+    if (file.size > maxTicketAttachmentFileSize) {
+      const maxTicketAttachmentFileSizeMB = Math.round(maxTicketAttachmentFileSize / 1024 / 1024);
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: `Attachment exceeds the ${maxTicketAttachmentFileSizeMB} MB limit.`
+      });
+      return;
+    }
+
+    try {
+      setIsUploadingCommentAttachment(true);
+
+      const initializedUpload = await api.tickets.createTicketUpload(ticket.ticket_id, {
+        file_name: file.name,
+        byte_size: file.size,
+        content_type: file.type || 'application/octet-stream'
+      });
+
+      const uploadResponse = await fetch(initializedUpload.presigned_upload_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload attachment.');
+      }
+
+      const ticketArtifact = await api.tickets.completeTicketUpload(ticket.ticket_id, initializedUpload.upload_id, {
+        status: 'uploaded'
+      });
+      const markdownLink = getArtifactMarkdownByMimeType(file, ticketArtifact.ticket_artifact_id);
+
+      const latestTicket = ticketDataLoader.data;
+      if (latestTicket) {
+        ticketDataLoader.setData({
+          ...latestTicket,
+          artifacts: latestTicket.artifacts.some(
+            (artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id
+          )
+            ? latestTicket.artifacts
+            : [...latestTicket.artifacts, ticketArtifact]
+        });
+      }
+
+      appendMarkdownLink(markdownLink);
+    } catch (caughtError) {
+      const apiError = caughtError as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message || 'Failed to upload attachment.'
+      });
+    } finally {
+      setIsUploadingCommentAttachment(false);
+    }
+  };
+
+  /**
+   * Open the edit-comment dialog for the selected timeline comment.
+   *
+   * The timeline item only passes `ticketCommentId`; this handler resolves the full comment from the currently rendered
+   * ticket data and stores it as dialog state. If the comment is no longer present in the ticket cache, the click is
+   * ignored because there is no reliable initial value for the edit form.
+   *
+   * @param {string} ticketCommentId Timeline comment identifier selected from the comment context menu.
+   * @returns {void}
+   */
+  const handleOpenEditCommentDialog = (ticketCommentId: string) => {
+    const comment = ticket.comments.find((ticketComment) => ticketComment.ticket_comment_id === ticketCommentId);
+
+    if (!comment) {
+      return;
+    }
+
+    setSelectedComment(comment);
+    setIsEditCommentDialogOpen(true);
+  };
+
+  /**
+   * Close the edit-comment dialog and clear the selected comment state.
+   *
+   * The dialog remains open while a save or attachment upload is in progress so the user cannot dismiss the form while
+   * an API call is mutating the comment or inserting an attachment reference.
+   *
+   * @returns {void}
+   */
+  const handleCloseEditCommentDialog = () => {
+    if (isSavingComment || isUploadingCommentAttachment) {
+      return;
+    }
+
+    setIsEditCommentDialogOpen(false);
+    setSelectedComment(null);
+  };
+
+  /**
+   * Close the delete-comment confirmation dialog.
+   *
+   * This handler is shared by the confirmation dialog close and cancel actions so the global dialog context is reset
+   * without mutating ticket comment state.
+   *
+   * @returns {void}
+   */
+  const closeDeleteCommentConfirmationDialog = () => {
+    dialogContext.setYesNoDialog({ open: false });
+  };
+
+  /**
+   * Replace an edited comment in the cached ticket details with the API response.
+   *
+   * This keeps the timeline synchronized immediately after a successful PUT without requiring a full ticket refresh.
+   * If the ticket data is not currently available, no cache mutation is attempted.
+   *
+   * @param {ITicketCommentLog} updatedComment Comment row returned by the update endpoint.
+   * @returns {void}
+   */
+  const replaceCachedComment = (updatedComment: ITicketCommentLog) => {
+    const latestTicket = ticketDataLoader.data;
+
+    if (!latestTicket) {
+      return;
+    }
+
+    ticketDataLoader.setData({
+      ...latestTicket,
+      comments: latestTicket.comments.map((comment) =>
+        comment.ticket_comment_id === updatedComment.ticket_comment_id ? updatedComment : comment
+      )
+    });
+  };
+
+  /**
+   * Remove a deleted comment from the cached ticket details.
+   *
+   * This is called only after the DELETE endpoint succeeds, so the cache reflects persisted server state. If the ticket
+   * data has not loaded, the function exits without changing local state.
+   *
+   * @param {string} ticketCommentId Identifier of the comment removed by the API.
+   * @returns {void}
+   */
+  const removeCachedComment = (ticketCommentId: string) => {
+    const latestTicket = ticketDataLoader.data;
+
+    if (!latestTicket) {
+      return;
+    }
+
+    ticketDataLoader.setData({
+      ...latestTicket,
+      comments: latestTicket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
+    });
+  };
+
+  /**
+   * Persist the edited comment body from the `EditDialog` form.
+   *
+   * Formik supplies the current form values when the dialog save button is clicked. The handler trims the comment,
+   * ignores invalid empty submissions, calls the administrative PUT endpoint scoped by ticket and comment id, replaces
+   * the cached timeline comment with the API response, and closes the dialog. API errors are shown through the shared
+   * snackbar and leave the dialog open with the user's current form value.
+   *
+   * @param {ITicketCommentEditFormValues} values Current Formik values from the edit-comment dialog.
+   * @returns {Promise<void>} Resolves after the save attempt has completed.
+   */
+  const handleSaveEditedComment = async (values: ITicketCommentEditFormValues) => {
+    const trimmedComment = values.comment.trim();
+
+    if (!selectedComment || !trimmedComment) {
+      return;
+    }
+
+    try {
+      setIsSavingComment(true);
+      const updatedComment = await api.tickets.updateTicketComment(
+        ticket.ticket_id,
+        selectedComment.ticket_comment_id,
+        {
+          comment: trimmedComment
+        }
+      );
+
+      replaceCachedComment(updatedComment);
+
+      setIsEditCommentDialogOpen(false);
+      setSelectedComment(null);
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setIsSavingComment(false);
+    }
+  };
+
+  /**
+   * Delete a timeline comment after the user confirms the destructive action.
+   *
+   * This calls the administrative DELETE endpoint with the current ticket id and selected `ticket_comment_id`. The API
+   * soft deletes the `ticket_comment` row by setting `record_end_date`; after it succeeds, the comment is removed from
+   * the cached timeline so the UI reflects the active server rows. Failures are surfaced through the shared snackbar and
+   * the cached timeline remains unchanged.
+   *
+   * @param {string} ticketCommentId Identifier of the comment selected for deletion.
+   * @returns {Promise<void>} Resolves after the delete attempt has completed.
+   */
+  const handleDeleteComment = async (ticketCommentId: string) => {
+    try {
+      await api.tickets.deleteTicketComment(ticket.ticket_id, ticketCommentId);
+      removeCachedComment(ticketCommentId);
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    }
+  };
+
+  /**
+   * Open a confirmation dialog before deleting a timeline comment.
+   *
+   * The comment context menu calls this handler instead of deleting immediately. Confirming closes the dialog and then
+   * delegates to `handleDeleteComment`; canceling or closing only resets the global confirmation dialog state.
+   *
+   * @param {string} ticketCommentId Identifier of the comment selected from the context menu.
+   * @returns {void}
+   */
+  const handleConfirmDeleteComment = (ticketCommentId: string) => {
+    dialogContext.setYesNoDialog({
+      open: true,
+      dialogTitle: 'Delete Comment',
+      dialogText: 'Are you sure you want to delete this comment?',
+      yesButtonLabel: 'Delete',
+      noButtonLabel: 'Cancel',
+      onClose: closeDeleteCommentConfirmationDialog,
+      onNo: closeDeleteCommentConfirmationDialog,
+      onYes: async () => {
+        closeDeleteCommentConfirmationDialog();
+        await handleDeleteComment(ticketCommentId);
+      }
+    });
   };
 
   const handleConfirmDataRequestStatusUpdate = (
@@ -358,10 +735,13 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           icon: <Icon path={TICKET_TIMELINE_ICONS.comment} size={0.75} />,
           children: (
             <TicketCommentTimelineItem
+              ticketCommentId={item.id}
               author={item.user_identifier}
               comment={item.comment}
               artifacts={ticket.artifacts}
               onArtifactLinkClick={handleTicketArtifactDownload}
+              onEdit={handleOpenEditCommentDialog}
+              onDelete={handleConfirmDeleteComment}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {
                   maxRelativeDays: 30,
@@ -428,6 +808,32 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
 
       {viewPolicy && (
         <ViewPolicyDialog open={isViewPolicyDialogOpen} policy={viewPolicy} onClose={handleCloseViewPolicyDialog} />
+      )}
+
+      {selectedComment && (
+        <EditDialog<ITicketCommentEditFormValues>
+          open={isEditCommentDialogOpen}
+          dialogTitle="Edit Comment"
+          dialogSaveButtonLabel="Save"
+          isLoading={isSavingComment}
+          maxWidth="md"
+          component={{
+            element: (
+              <TicketCommentEditForm
+                artifacts={ticket.artifacts}
+                isSaving={isSavingComment}
+                isUploadingAttachment={isUploadingCommentAttachment}
+                onUploadAttachment={handleEditCommentUploadAttachment}
+              />
+            ),
+            initialValues: {
+              comment: selectedComment.comment
+            },
+            validationSchema: TicketCommentEditFormYupSchema
+          }}
+          onCancel={handleCloseEditCommentDialog}
+          onSave={handleSaveEditedComment}
+        />
       )}
     </>
   );

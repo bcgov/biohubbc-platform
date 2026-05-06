@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { TicketCommentTimelineItem } from './TicketCommentTimelineItem';
@@ -18,6 +19,7 @@ describe('TicketCommentTimelineItem', () => {
 
     render(
       <TicketCommentTimelineItem
+        ticketCommentId="comment-1"
         author="Sarah"
         comment={
           '# Update\n\n**Done** with `step-1`. Look at [the script](/artifact/05c4063e-a344-42a6-89f8-b15161789cda).'
@@ -35,5 +37,35 @@ describe('TicketCommentTimelineItem', () => {
     expect(screen.getByRole('button', { name: 'generate.py' })).not.toHaveAttribute('href');
     expect(screen.queryByLabelText('Remove staged artifact generate.py')).not.toBeInTheDocument();
     expect(screen.queryByText('# Update')).not.toBeInTheDocument();
+  });
+
+  it('renders edit and delete context menu actions', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <TicketCommentTimelineItem
+        ticketCommentId="comment-1"
+        author="Sarah"
+        comment="A comment"
+        artifacts={[]}
+        dateLabel="1 minute ago"
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'ticket-comment-comment-1-menu' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith('comment-1');
+
+    await user.click(screen.getByRole('button', { name: 'ticket-comment-comment-1-menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(onDelete).toHaveBeenCalledWith('comment-1');
   });
 });
