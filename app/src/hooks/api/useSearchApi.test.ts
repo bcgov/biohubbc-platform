@@ -14,6 +14,19 @@ import { useSearchApi } from './useSearchApi';
 
 describe('useSearchApi', () => {
   let mock: MockAdapter;
+  const expressionTree = {
+    type: 'expression' as const,
+    operator: 'AND' as const,
+    clauses: [
+      {
+        type: 'predicate' as const,
+        feature_property_id: 1,
+        feature_type_property_id: null,
+        operator: 'Contains' as const,
+        value: 'moose'
+      }
+    ]
+  };
 
   beforeEach(() => {
     mock = new MockAdapter(axios);
@@ -24,7 +37,7 @@ describe('useSearchApi', () => {
   });
 
   describe('searchFeatures', () => {
-    it('should make POST request to /api/search/feature with keyword', async () => {
+    it('should make POST request to /api/search/feature/:featureType with an expression tree', async () => {
       const mockResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
@@ -36,7 +49,8 @@ describe('useSearchApi', () => {
           feature_description: 'A study of moose habitat',
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 0.75
+          relevancy_score: 0.75,
+          create_date: '2026-05-01T12:00:00.000Z'
         }
       ];
 
@@ -52,20 +66,20 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures({ keyword: 'moose' });
+      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree);
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
         JSON.stringify({
-          filters: { keyword: 'moose' },
+          expression: expressionTree,
           pagination: undefined
         })
       );
     });
 
-    it('should make POST request with filters and pagination', async () => {
+    it('should make POST request with an expression tree and pagination', async () => {
       const mockResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 2,
@@ -77,7 +91,8 @@ describe('useSearchApi', () => {
           feature_description: null,
           submission_name: 'Species Census',
           is_secured: true,
-          relevancy_score: 0.6
+          relevancy_score: 0.6,
+          create_date: '2026-05-01T12:00:00.000Z'
         }
       ];
 
@@ -93,24 +108,40 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures(
-        {
-          feature_types: ['observation'],
-          species: [1]
-        },
-        { page: 1, limit: 10 }
-      );
+      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree, { page: 1, limit: 10 });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
         JSON.stringify({
-          filters: {
-            feature_types: ['observation'],
-            species: [1]
-          },
+          expression: expressionTree,
           pagination: { page: 1, limit: 10 }
+        })
+      );
+    });
+
+    it('should make paginated POST request without an expression tree', async () => {
+      const mockResponse: SearchFeatureResponse = {
+        features: [],
+        pagination: {
+          total: 0,
+          per_page: 25,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        }
+      };
+
+      mock.onPost('/api/search/feature/telemetry').reply(200, mockResponse);
+
+      const result = await useSearchApi(axios).searchFeatures('telemetry', null, { page: 1, limit: 25 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.post[0].data).toEqual(
+        JSON.stringify({
+          pagination: { page: 1, limit: 25 }
         })
       );
     });
@@ -128,9 +159,9 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures({ keyword: 'nonexistent' });
+      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree);
 
       expect(result.features).toEqual([]);
       expect(result.pagination.total).toEqual(0);
@@ -140,10 +171,31 @@ describe('useSearchApi', () => {
   describe('searchProperties', () => {
     it('should make POST request to /api/search/property with filters', async () => {
       const mockGroupedResults: GroupedPropertyResults = {
-        string: [{ feature_property_id: 1, property_name: 'species', relevancy_score: 0.9 }],
-        number: [{ feature_property_id: 2, property_name: 'body_weight', relevancy_score: 0.8 }],
+        string: [
+          {
+            feature_property_id: 1,
+            property_name: 'species',
+            property_display_name: 'Species',
+            feature_property_type: 'string',
+            operators: ['Equals', 'ILike', 'Exists'],
+            relevancy_score: 0.9
+          }
+        ],
+        number: [
+          {
+            feature_property_id: 2,
+            property_name: 'body_weight',
+            property_display_name: 'Body weight',
+            feature_property_type: 'number',
+            operators: ['Equals', 'GreaterThan', 'Exists'],
+            relevancy_score: 0.8
+          }
+        ],
+        boolean: [],
         datetime: [],
-        spatial: []
+        taxon: [],
+        spatial: [],
+        code: []
       };
 
       const mockResponse: SearchPropertyResponse = {
@@ -185,8 +237,11 @@ describe('useSearchApi', () => {
         properties: {
           string: [],
           number: [],
+          boolean: [],
           datetime: [],
-          spatial: []
+          taxon: [],
+          spatial: [],
+          code: []
         },
         pagination: {
           total: 0,
@@ -211,7 +266,10 @@ describe('useSearchApi', () => {
   describe('searchAll', () => {
     it('should make GET request to /api/search with query params', async () => {
       const mockResponse: SearchResponse = {
-        features: { data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1 }], total: 5000 },
+        features: {
+          data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1, feature_type_name: 'dataset' }],
+          total: 5000
+        },
         submissions: { data: [], total: 1 },
         taxonomy: { data: [], total: 0 }
       };
