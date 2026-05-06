@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketContext } from 'contexts/ticketContext';
 import { useTicketContext } from 'hooks/useContext';
@@ -18,7 +18,27 @@ vi.mock('./hooks/useTicketComment', () => ({
 }));
 
 vi.mock('./detail/header/TicketHeader', () => ({
-  TicketHeader: ({ ticket }: { ticket: ITicketExtended }) => <div data-testid="ticket-header">{ticket.ticket_slug}</div>
+  TicketHeader: ({
+    ticket,
+    activeTab,
+    onTabChange
+  }: {
+    ticket: ITicketExtended;
+    activeTab: 'timeline' | 'artifacts';
+    onTabChange: (tab: 'timeline' | 'artifacts') => void;
+  }) => (
+    <div data-testid="ticket-header" data-active-tab={activeTab}>
+      {ticket.ticket_slug}
+      <button onClick={() => onTabChange('timeline')}>Timeline</button>
+      <button onClick={() => onTabChange('artifacts')}>Files</button>
+    </div>
+  )
+}));
+
+vi.mock('./detail/artifacts/TicketArtifacts', () => ({
+  TicketArtifacts: ({ ticket }: { ticket: ITicketExtended }) => (
+    <div data-testid="ticket-artifacts" data-artifact-count={String(ticket.artifacts.length)} />
+  )
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
@@ -248,5 +268,33 @@ describe('TicketDetailPage', () => {
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Hook comment');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-saving', 'true');
     expect(screen.getByTestId('ticket-timeline')).toHaveAttribute('data-loading', 'false');
+  });
+
+  it('switches from timeline to artifacts tab content', async () => {
+    mockUseTicketContext.mockReturnValue(
+      makeTicketContext({
+        ...baseTicket,
+        artifacts: [
+          {
+            ticket_artifact_id: '55555555-5555-4555-8555-555555555555',
+            ticket_id: baseTicket.ticket_id,
+            artifact_id: '66666666-6666-4666-8666-666666666666',
+            record_end_date: null,
+            create_date: '2026-02-26T00:00:00.000Z',
+            key: 'tickets/test/file.txt'
+          }
+        ]
+      })
+    );
+
+    render(<TicketDetailPage />);
+
+    expect(screen.getByTestId('ticket-timeline')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+
+    expect(screen.getByTestId('ticket-header')).toHaveAttribute('data-active-tab', 'artifacts');
+    expect(screen.getByTestId('ticket-artifacts')).toHaveAttribute('data-artifact-count', '1');
+    expect(screen.queryByTestId('ticket-timeline')).not.toBeInTheDocument();
   });
 });

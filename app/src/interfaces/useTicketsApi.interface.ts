@@ -145,6 +145,11 @@ export interface IGetTicketsResponse {
   pagination: ApiPaginationResponseParams;
 }
 
+export interface IGetTicketArtifactsResponse {
+  artifacts: ITicketArtifact[];
+  pagination: ApiPaginationResponseParams;
+}
+
 export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {
   status?: TicketStatus;
   search?: string;

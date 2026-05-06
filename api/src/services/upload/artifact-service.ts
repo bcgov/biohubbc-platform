@@ -1,14 +1,17 @@
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
-import { HTTP401 } from '../../errors/http-error';
+import { HTTP401, HTTP409 } from '../../errors/http-error';
 import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { getObjectStoreBucketName, getSecurityObjectStoreBucketName } from '../../utils/file-utils';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
+  artifactSecurityRepository: ArtifactSecurityRepository;
   objectStorageService: ObjectStorageService;
 
   /**
@@ -20,6 +23,7 @@ export class ArtifactService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.artifactRepository = new ArtifactRepository(connection);
+    this.artifactSecurityRepository = new ArtifactSecurityRepository(connection);
     this.objectStorageService = new ObjectStorageService();
   }
 
@@ -60,6 +64,19 @@ export class ArtifactService extends DBService {
     }
 
     const artifact = await this.getArtifact(artifactId);
+    const latestSecurity = await this.artifactSecurityRepository.findLatestArtifactSecurityByArtifactId(artifactId);
+
+    if (!latestSecurity || latestSecurity.security === SecurityStatusEnum.PENDING) {
+      throw new HTTP409('Attachment is not ready for download yet. It is pending security scan.');
+    }
+
+    if (latestSecurity.security !== SecurityStatusEnum.CLEAN) {
+      throw new HTTP409('Attachment is not available for download because it failed security validation.');
+    }
+
+    if (artifact.bucket !== getObjectStoreBucketName()) {
+      throw new HTTP409('Attachment is not ready for download yet. It is pending promotion.');
+    }
 
     return this.objectStorageService.getSignedUrl(this.getBucketTypeForArtifact(artifact.bucket), artifact.object_key);
   }

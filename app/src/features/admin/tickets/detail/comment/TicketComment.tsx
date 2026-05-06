@@ -1,8 +1,6 @@
 import { mdiAttachmentRemove } from '@mdi/js';
-import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
@@ -10,9 +8,9 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ToggleButtons, ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
-import { useConfigContext, useDialogContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
-import { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useState } from 'react';
+import { TicketCommentArtifactUpload } from './TicketCommentArtifactUpload';
 
 interface ITicketCommentProps {
   comment: string;
@@ -32,32 +30,16 @@ interface ITicketCommentProps {
  */
 export const TicketComment = (props: ITicketCommentProps) => {
   const { comment, artifacts, setComment, isSaving, isUploadingAttachment, onAddComment, onUploadAttachment } = props;
-  const config = useConfigContext();
-  const dialogContext = useDialogContext();
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write');
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const viewOptions: ToggleButtonView<'write' | 'preview'>[] = [
     { value: 'write', label: 'Write' },
     { value: 'preview', label: 'Preview' }
   ];
 
-  const handleAttachmentSelection = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-
-    if (files.length > config.MAX_UPLOAD_NUM_FILES) {
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: 'Number of files uploaded at once exceeds maximum'
-      });
-      event.target.value = '';
-      return;
-    }
-
+  const handleAttachmentSelection = async (files: File[]) => {
     for (const file of files) {
       await onUploadAttachment(file);
     }
-
-    event.target.value = '';
   };
 
   return (
@@ -79,27 +61,16 @@ export const TicketComment = (props: ITicketCommentProps) => {
               onViewChange={setActiveTab}
               orientation="horizontal"
             />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {isUploadingAttachment && <CircularProgress size={14} />}
-              <Button
-                aria-label="Attach file"
-                size="small"
-                onClick={() => {
-                  attachmentInputRef.current?.click();
-                }}
-                disabled={isSaving || isUploadingAttachment}
-                startIcon={<Icon path={mdiAttachmentRemove} size={0.75} style={{ transform: 'rotate(-45deg)' }} />}>
-                Attach
-              </Button>
-              <input
-                ref={attachmentInputRef}
-                type="file"
-                multiple
-                hidden
-                onChange={handleAttachmentSelection}
-                aria-label="Attach file input"
-              />
-            </Box>
+            <TicketCommentArtifactUpload
+              label="Attach"
+              buttonAriaLabel="Attach file"
+              inputAriaLabel="Attach file input"
+              iconPath={mdiAttachmentRemove}
+              iconStyle={{ transform: 'rotate(-45deg)' }}
+              isUploading={isUploadingAttachment}
+              buttonProps={{ size: 'small' }}
+              onArtifactsSelected={handleAttachmentSelection}
+            />
           </Box>
         </Box>
 

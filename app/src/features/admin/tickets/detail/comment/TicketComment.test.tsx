@@ -170,7 +170,7 @@ describe('TicketComment', () => {
 
     expect(setSnackbar).toHaveBeenCalledWith({
       open: true,
-      snackbarMessage: 'Number of files uploaded at once exceeds maximum'
+      snackbarMessage: 'Number of artifacts selected at once exceeds maximum'
     });
     expect(onUploadAttachment).not.toHaveBeenCalled();
   });

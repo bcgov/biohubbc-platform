@@ -48,6 +48,29 @@ describe('TicketArtifactService', () => {
     expect(result).to.eql(artifacts);
   });
 
+  it('passes optional pagination through ticket artifact lookup', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const service = new TicketArtifactService(mockDBConnection);
+    const pagination = { page: 1, limit: 10, sort: 'create_date', order: 'desc' as const };
+    const getStub = sinon.stub(TicketArtifactRepository.prototype, 'getTicketArtifacts').resolves(artifacts);
+
+    const result = await service.getTicketArtifacts(ticketId, pagination);
+
+    expect(getStub).to.have.been.calledOnceWith(ticketId, pagination);
+    expect(result).to.eql(artifacts);
+  });
+
+  it('delegates ticket artifact count to the repository', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const service = new TicketArtifactService(mockDBConnection);
+    const getStub = sinon.stub(TicketArtifactRepository.prototype, 'getTicketArtifactsCount').resolves(1);
+
+    const result = await service.getTicketArtifactsCount(ticketId);
+
+    expect(getStub).to.have.been.calledOnceWith(ticketId);
+    expect(result).to.equal(1);
+  });
+
   it('delegates single ticket artifact lookup to the repository', async () => {
     const mockDBConnection = getMockDBConnection();
     const service = new TicketArtifactService(mockDBConnection);

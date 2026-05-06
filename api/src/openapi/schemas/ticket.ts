@@ -252,3 +252,15 @@ export const TicketListResponseSchema: OpenAPIV3.SchemaObject = {
     pagination: paginationResponseSchema
   }
 };
+
+export const TicketArtifactListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['artifacts', 'pagination'],
+  properties: {
+    artifacts: {
+      type: 'array',
+      items: TicketArtifactSchema
+    },
+    pagination: paginationResponseSchema
+  }
+};

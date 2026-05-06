@@ -1,11 +1,78 @@
+import { Knex } from 'knex';
 import { SQL } from 'sql-template-strings';
+import { getKnex } from '../database/db';
 import { TicketArtifact } from '../models/ticket-artifact';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 /**
  * Repository for ticket attachment links.
  */
 export class TicketArtifactRepository extends BaseRepository {
+  /**
+   * Build the base active ticket artifact query.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Knex.QueryBuilder}
+   * @memberof TicketArtifactRepository
+   */
+  private getTicketArtifactsBaseQuery(ticketId: string): Knex.QueryBuilder {
+    const knex = getKnex();
+
+    return knex
+      .table('ticket_artifact as ta')
+      .select([
+        'ta.ticket_artifact_id',
+        'ta.ticket_id',
+        'ta.artifact_id',
+        'ta.record_end_date',
+        'ta.create_date',
+        'a.object_key as key'
+      ])
+      .join('artifact as a', 'a.artifact_id', 'ta.artifact_id')
+      .where('ta.ticket_id', ticketId)
+      .whereNull('ta.record_end_date');
+  }
+
+  /**
+   * Apply pagination and supported sorting to a ticket artifact query.
+   *
+   * @param {Knex.QueryBuilder} query
+   * @param {ApiPaginationOptions} [pagination]
+   * @returns {Knex.QueryBuilder}
+   * @memberof TicketArtifactRepository
+   */
+  private applyTicketArtifactPagination(
+    query: Knex.QueryBuilder,
+    pagination?: ApiPaginationOptions
+  ): Knex.QueryBuilder {
+    if (!pagination) {
+      return query.orderBy('ta.create_date', 'asc');
+    }
+
+    if (pagination.limit) {
+      query.limit(pagination.limit);
+    }
+
+    if (pagination.page && pagination.limit) {
+      query.offset((pagination.page - 1) * pagination.limit);
+    }
+
+    const sortColumns: Record<string, string> = {
+      ticket_artifact_id: 'ta.ticket_artifact_id',
+      key: 'a.object_key',
+      create_date: 'ta.create_date'
+    };
+
+    if (pagination.sort && pagination.order && sortColumns[pagination.sort]) {
+      query.orderBy(sortColumns[pagination.sort], pagination.order);
+    } else {
+      query.orderBy('ta.create_date', 'asc');
+    }
+
+    return query;
+  }
+
   /**
    * Insert active ticket attachment associations.
    *
@@ -115,28 +182,35 @@ export class TicketArtifactRepository extends BaseRepository {
    * List active ticket attachments.
    *
    * @param {string} ticketId - Ticket UUID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @returns {Promise<TicketArtifact[]>} Active attachments ordered by creation time.
    * @memberof TicketArtifactRepository
    */
-  async getTicketArtifacts(ticketId: string): Promise<TicketArtifact[]> {
-    const sqlStatement = SQL`
-      SELECT
-        ta.ticket_artifact_id,
-        ta.ticket_id,
-        ta.artifact_id,
-        ta.record_end_date,
-        ta.create_date,
-        a.object_key AS key
-      FROM ticket_artifact ta
-      JOIN artifact a
-        ON a.artifact_id = ta.artifact_id
-      WHERE ta.ticket_id = ${ticketId}
-        AND ta.record_end_date IS NULL
-      ORDER BY ta.create_date ASC;
-    `;
+  async getTicketArtifacts(ticketId: string, pagination?: ApiPaginationOptions): Promise<TicketArtifact[]> {
+    const query = this.applyTicketArtifactPagination(this.getTicketArtifactsBaseQuery(ticketId), pagination);
 
-    const response = await this.connection.sql(sqlStatement, TicketArtifact);
+    const response = await this.connection.knex(query, TicketArtifact);
 
     return response.rows;
+  }
+
+  /**
+   * Count active ticket attachments.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<number>} Active ticket attachment count.
+   * @memberof TicketArtifactRepository
+   */
+  async getTicketArtifactsCount(ticketId: string): Promise<number> {
+    const knex = getKnex();
+    const query = knex
+      .table('ticket_artifact as ta')
+      .where('ta.ticket_id', ticketId)
+      .whereNull('ta.record_end_date')
+      .select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 }

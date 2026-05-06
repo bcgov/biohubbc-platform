@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { TicketArtifact } from '../models/ticket-artifact';
 import { TicketArtifactRepository } from '../repositories/ticket-artifact-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -57,7 +58,18 @@ export class TicketArtifactService extends DBService {
    * @returns {Promise<TicketArtifact[]>} Active attachments with display object keys.
    * @memberof TicketArtifactService
    */
-  async getTicketArtifacts(ticketId: string): Promise<TicketArtifact[]> {
-    return this.ticketArtifactRepository.getTicketArtifacts(ticketId);
+  async getTicketArtifacts(ticketId: string, pagination?: ApiPaginationOptions): Promise<TicketArtifact[]> {
+    return this.ticketArtifactRepository.getTicketArtifacts(ticketId, pagination);
+  }
+
+  /**
+   * Count active attachments for a ticket.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<number>} Active attachment count.
+   * @memberof TicketArtifactService
+   */
+  async getTicketArtifactsCount(ticketId: string): Promise<number> {
+    return this.ticketArtifactRepository.getTicketArtifactsCount(ticketId);
   }
 }
