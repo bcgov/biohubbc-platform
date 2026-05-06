@@ -21,7 +21,7 @@ describe('SubmissionUploadReviewService', () => {
   describe('insertSubmissionUploadReview', () => {
     it('inserts a requested review row when no active review exists for the scope', async () => {
       const review = buildReview({
-        submission_upload_review_id: 1,
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.SECURITY
       });
       const findReviewsStub = sinon
@@ -30,6 +30,34 @@ describe('SubmissionUploadReviewService', () => {
       const insertStub = sinon
         .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
         .resolves(review);
+
+      const service = new SubmissionUploadReviewService(getMockDBConnection());
+      const result = await service.insertSubmissionUploadReview({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        scope: SubmissionUploadReviewScope.SECURITY,
+        requested_by: 7
+      });
+
+      expect(result).to.eql(review);
+      expect(findReviewsStub).not.to.have.been.called;
+      expect(insertStub).to.have.been.calledOnceWith({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        scope: SubmissionUploadReviewScope.SECURITY,
+        requested_by: 7
+      });
+    });
+
+    it('returns the existing active review when one already exists for the scope', async () => {
+      const review = buildReview({
+        submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
+        scope: SubmissionUploadReviewScope.SECURITY
+      });
+      const insertStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
+        .resolves(undefined);
+      const findReviewsStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
+        .resolves([review]);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
       const result = await service.insertSubmissionUploadReview({
@@ -49,39 +77,36 @@ describe('SubmissionUploadReviewService', () => {
       });
     });
 
-    it('returns the existing active review when one already exists for the scope', async () => {
-      const review = buildReview({
-        submission_upload_review_id: 2,
-        scope: SubmissionUploadReviewScope.SECURITY
-      });
-      const findReviewsStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
-        .resolves([review]);
-      const insertStub = sinon.stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview');
+    it('throws when a conflict insert returns no row and the existing review cannot be found', async () => {
+      sinon.stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview').resolves(undefined);
+      sinon.stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId').resolves([]);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.insertSubmissionUploadReview({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.SECURITY,
-        requested_by: 7
-      });
 
-      expect(result).to.eql(review);
-      expect(findReviewsStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', {
-        scope: SubmissionUploadReviewScope.SECURITY
-      });
-      expect(insertStub).not.to.have.been.called;
+      try {
+        await service.insertSubmissionUploadReview({
+          submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+          scope: SubmissionUploadReviewScope.SECURITY,
+          requested_by: 7
+        });
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal(
+          'Submission upload review not found after insert conflict'
+        );
+      }
     });
   });
 
   describe('requestDefaultReviewsForUpload', () => {
     it('requests validation and security reviews for an upload', async () => {
       const validationReview = buildReview({
-        submission_upload_review_id: 1,
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.VALIDATION
       });
       const securityReview = buildReview({
-        submission_upload_review_id: 2,
+        submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
         scope: SubmissionUploadReviewScope.SECURITY
       });
       const insertSubmissionUploadReviewStub = sinon
@@ -119,7 +144,7 @@ describe('SubmissionUploadReviewService', () => {
 
       try {
         await service.updateReviewStatus({
-          submissionUploadReviewId: 1,
+          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
           status: SubmissionUploadReviewStatus.COMPLETED
         });
         expect.fail('Expected ApiNotFoundError');
@@ -133,7 +158,7 @@ describe('SubmissionUploadReviewService', () => {
   describe('updateSubmissionUploadReview', () => {
     it('updates a review for a submission upload', async () => {
       const review = buildReview({
-        submission_upload_review_id: 1,
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.SECURITY,
         status: SubmissionUploadReviewStatus.IN_PROGRESS
       });
@@ -144,14 +169,14 @@ describe('SubmissionUploadReviewService', () => {
       const service = new SubmissionUploadReviewService(getMockDBConnection());
       const result = await service.updateSubmissionUploadReview({
         submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: 1,
+        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
         data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
       });
 
       expect(result).to.eql(review);
       expect(updateStub).to.have.been.calledOnceWith({
         submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: 1,
+        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
         data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
       });
     });
@@ -164,7 +189,7 @@ describe('SubmissionUploadReviewService', () => {
       try {
         await service.updateSubmissionUploadReview({
           submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: 1,
+          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
           data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
         });
         expect.fail('Expected ApiNotFoundError');
@@ -178,7 +203,7 @@ describe('SubmissionUploadReviewService', () => {
   describe('deleteSubmissionUploadReview', () => {
     it('soft deletes a review for a submission upload', async () => {
       const review = buildReview({
-        submission_upload_review_id: 1,
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.SECURITY
       });
       const deleteStub = sinon
@@ -188,13 +213,13 @@ describe('SubmissionUploadReviewService', () => {
       const service = new SubmissionUploadReviewService(getMockDBConnection());
       const result = await service.deleteSubmissionUploadReview({
         submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: 1
+        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
       });
 
       expect(result).to.eql(review);
       expect(deleteStub).to.have.been.calledOnceWith({
         submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: 1
+        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
       });
     });
 
@@ -206,7 +231,7 @@ describe('SubmissionUploadReviewService', () => {
       try {
         await service.deleteSubmissionUploadReview({
           submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: 1
+          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
         });
         expect.fail('Expected ApiNotFoundError');
       } catch (error) {
@@ -215,70 +240,10 @@ describe('SubmissionUploadReviewService', () => {
       }
     });
   });
-
-  describe('hasUnresolvedRequiredReviews', () => {
-    it('returns true when a required review scope is not resolved', async () => {
-      const findReviewsStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
-        .resolves([
-          buildReview({
-            submission_upload_review_id: 1,
-            scope: SubmissionUploadReviewScope.VALIDATION,
-            status: SubmissionUploadReviewStatus.COMPLETED
-          })
-        ]);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.hasUnresolvedRequiredReviews('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(result).to.equal(true);
-      expect(findReviewsStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
-    });
-
-    it('returns false when validation and security reviews are resolved', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId').resolves([
-        buildReview({
-          submission_upload_review_id: 1,
-          scope: SubmissionUploadReviewScope.VALIDATION,
-          status: SubmissionUploadReviewStatus.COMPLETED
-        }),
-        buildReview({
-          submission_upload_review_id: 2,
-          scope: SubmissionUploadReviewScope.SECURITY,
-          status: SubmissionUploadReviewStatus.SKIPPED
-        })
-      ]);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.hasUnresolvedRequiredReviews('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(result).to.equal(false);
-    });
-
-    it('returns true when any review is blocked', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId').resolves([
-        buildReview({
-          submission_upload_review_id: 1,
-          scope: SubmissionUploadReviewScope.VALIDATION,
-          status: SubmissionUploadReviewStatus.COMPLETED
-        }),
-        buildReview({
-          submission_upload_review_id: 2,
-          scope: SubmissionUploadReviewScope.SECURITY,
-          status: SubmissionUploadReviewStatus.BLOCKED
-        })
-      ]);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.hasUnresolvedRequiredReviews('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(result).to.equal(true);
-    });
-  });
 });
 
 const buildReview = (params: {
-  submission_upload_review_id: number;
+  submission_upload_review_id: string;
   scope: SubmissionUploadReviewScope;
   status?: SubmissionUploadReviewStatus;
 }): SubmissionUploadReview => ({

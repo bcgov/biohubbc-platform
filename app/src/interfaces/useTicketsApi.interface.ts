@@ -95,7 +95,7 @@ export interface ITicketSystemUser {
 }
 
 export interface TicketSubmissionUploadReviewResponse {
-  submission_upload_review_id: number;
+  submission_upload_review_id: string;
   submission_upload_id: string;
   scope: SubmissionUploadReviewScope;
   status: SubmissionUploadReviewTaskStatus;

@@ -30,13 +30,13 @@ describe('paths/administrative/submission-upload-review/{submissionUploadReviewI
     const updateStub = sinon.stub(SubmissionUploadReviewService.prototype, 'updateReviewStatus').resolves(review);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUploadReviewId: '12' };
+    mockReq.params = { submissionUploadReviewId: '11111111-1111-4111-8111-111111111111' };
     mockReq.body = { status: 'completed' };
 
     await updateSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(updateStub).to.have.been.calledOnceWith({
-      submissionUploadReviewId: 12,
+      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
       status: SubmissionUploadReviewStatus.COMPLETED
     });
     expect(mockRes.statusValue).to.equal(200);
@@ -45,15 +45,9 @@ describe('paths/administrative/submission-upload-review/{submissionUploadReviewI
 });
 
 const buildReview = (): SubmissionUploadReview => ({
-  submission_upload_review_id: 12,
+  submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
   scope: SubmissionUploadReviewScope.SECURITY,
   status: SubmissionUploadReviewStatus.COMPLETED,
-  requested_by: 7,
-  create_date: '2026-05-05T00:00:00.000Z',
-  create_user: 7,
-  update_date: null,
-  update_user: null,
-  revision_count: 0,
-  record_end_date: null
+  requested_by: 7
 });

@@ -20,7 +20,10 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review', (
 
   it('GET returns active scoped upload reviews', async () => {
     registerConnection();
-    const review = buildReview({ submission_upload_review_id: 1, scope: SubmissionUploadReviewScope.SECURITY });
+    const review = buildReview({
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      scope: SubmissionUploadReviewScope.SECURITY
+    });
     const findStub = sinon
       .stub(SubmissionUploadReviewService.prototype, 'findReviewsBySubmissionUploadId')
       .resolves([review]);
@@ -37,7 +40,10 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review', (
 
   it('POST inserts a scoped upload review', async () => {
     registerConnection();
-    const review = buildReview({ submission_upload_review_id: 1, scope: SubmissionUploadReviewScope.SECURITY });
+    const review = buildReview({
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      scope: SubmissionUploadReviewScope.SECURITY
+    });
     const insertStub = sinon
       .stub(SubmissionUploadReviewService.prototype, 'insertSubmissionUploadReview')
       .resolves(review);
@@ -69,7 +75,7 @@ const registerConnection = () => {
 };
 
 const buildReview = (params: {
-  submission_upload_review_id: number;
+  submission_upload_review_id: string;
   scope: SubmissionUploadReviewScope;
 }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,

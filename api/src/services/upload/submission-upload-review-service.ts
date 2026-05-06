@@ -23,9 +23,8 @@ import { DBService } from '../db-service';
  *   (`submitted`, `approved`, `denied`, `deleted`).
  *
  * This service owns the review business rules: creating idempotent scoped
- * reviews, creating the default validation/security tasks after successful
- * ingestion, and checking whether required reviews still block approval.
- * Repository methods remain row-oriented CRUD helpers.
+ * reviews and creating the default validation/security tasks after successful
+ * ingestion. Repository methods remain row-oriented CRUD helpers.
  *
  * @export
  * @class SubmissionUploadReviewService
@@ -84,8 +83,9 @@ export class SubmissionUploadReviewService extends DBService {
    * Insert a scoped review for a submission upload.
    *
    * This method is intentionally idempotent for callers that request default
-   * workflow tasks from retryable jobs. If an active row already exists for the
-   * upload/scope pair, it is returned instead of attempting a duplicate insert.
+   * workflow tasks from retryable jobs. The repository insert is conflict-safe;
+   * if an active row already exists for the upload/scope pair, this method
+   * fetches and returns that existing row.
    *
    * New rows always start in `requested`; status transitions happen through
    * `updateReviewStatus`.
@@ -95,21 +95,30 @@ export class SubmissionUploadReviewService extends DBService {
    * @memberof SubmissionUploadReviewService
    */
   async insertSubmissionUploadReview(params: CreateSubmissionUploadReview): Promise<SubmissionUploadReview> {
+    const insertedReview = await this.submissionUploadReviewRepository.insertSubmissionUploadReview({
+      submission_upload_id: params.submission_upload_id,
+      scope: params.scope,
+      requested_by: params.requested_by
+    });
+
+    if (insertedReview) {
+      return insertedReview;
+    }
+
     const existingReviews = await this.submissionUploadReviewRepository.findReviewsBySubmissionUploadId(
       params.submission_upload_id,
       { scope: params.scope }
     );
     const existingReview = existingReviews[0];
 
-    if (existingReview) {
-      return existingReview;
+    if (!existingReview) {
+      throw new ApiNotFoundError('Submission upload review not found after insert conflict', [
+        'SubmissionUploadReviewService->insertSubmissionUploadReview',
+        { submissionUploadId: params.submission_upload_id, scope: params.scope }
+      ]);
     }
 
-    return this.submissionUploadReviewRepository.insertSubmissionUploadReview({
-      submission_upload_id: params.submission_upload_id,
-      scope: params.scope,
-      requested_by: params.requested_by
-    });
+    return existingReview;
   }
 
   /**
@@ -152,14 +161,14 @@ export class SubmissionUploadReviewService extends DBService {
    * deny the upload; final disposition remains owned by
    * `SubmissionUploadReviewStatusService`.
    *
-   * @param {{ submissionUploadId: string; submissionUploadReviewId: number; data: SubmissionUploadReviewUpdate }} params - Review update details.
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: string; data: SubmissionUploadReviewUpdate }} params - Review update details.
    * @return {Promise<SubmissionUploadReview>} The updated review row.
    * @throws {ApiNotFoundError} When no active review row exists for the ID.
    * @memberof SubmissionUploadReviewService
    */
   async updateSubmissionUploadReview(params: {
     submissionUploadId: string;
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
     data: SubmissionUploadReviewUpdate;
   }): Promise<SubmissionUploadReview> {
     const review = await this.submissionUploadReviewRepository.updateSubmissionUploadReview(params);
@@ -177,16 +186,16 @@ export class SubmissionUploadReviewService extends DBService {
   /**
    * Update an active review row's workflow status.
    *
-   * This compatibility helper is used by the legacy ID-only route. New REST
-   * endpoints should call `updateSubmissionUploadReview` with the upload ID.
+   * This helper is used by the ID-only admin update route when the caller does
+   * not need to validate the parent upload path parameter.
    *
-   * @param {{ submissionUploadReviewId: number; status: SubmissionUploadReviewStatus }} params - Review status update.
+   * @param {{ submissionUploadReviewId: string; status: SubmissionUploadReviewStatus }} params - Review status update.
    * @return {Promise<SubmissionUploadReview>} The updated review row.
    * @throws {ApiNotFoundError} When no active review row exists for the ID.
    * @memberof SubmissionUploadReviewService
    */
   async updateReviewStatus(params: {
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
     status: SubmissionUploadReviewStatus;
   }): Promise<SubmissionUploadReview> {
     const review = await this.submissionUploadReviewRepository.updateReviewStatus({
@@ -210,14 +219,14 @@ export class SubmissionUploadReviewService extends DBService {
    * Deletes are historical: the row remains in the database with
    * `record_end_date` set, and active queries no longer return it.
    *
-   * @param {{ submissionUploadId: string; submissionUploadReviewId: number }} params - Review delete details.
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: string }} params - Review delete details.
    * @return {Promise<SubmissionUploadReview>} The soft-deleted review row.
    * @throws {ApiNotFoundError} When no active review row exists for the upload and ID.
    * @memberof SubmissionUploadReviewService
    */
   async deleteSubmissionUploadReview(params: {
     submissionUploadId: string;
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
   }): Promise<SubmissionUploadReview> {
     const review = await this.submissionUploadReviewRepository.deleteSubmissionUploadReview(params);
 
@@ -229,33 +238,5 @@ export class SubmissionUploadReviewService extends DBService {
     }
 
     return review;
-  }
-
-  /**
-   * Check whether required review rows are unresolved.
-   *
-   * Approval requires both validation and security review scopes to be resolved.
-   * A scope is resolved when it has an active review row with status
-   * `completed` or `skipped`. Any active `blocked` review also blocks approval,
-   * even if another required scope is already resolved.
-   *
-   * This helper is used by `SubmissionUploadReviewStatusService` before it
-   * changes final disposition to `approved`.
-   *
-   * @param {string} submissionUploadId - The submission upload ID.
-   * @return {Promise<boolean>} True when required reviews are unresolved.
-   * @memberof SubmissionUploadReviewService
-   */
-  async hasUnresolvedRequiredReviews(submissionUploadId: string): Promise<boolean> {
-    const reviews = await this.submissionUploadReviewRepository.findReviewsBySubmissionUploadId(submissionUploadId);
-    const requiredScopes = [SubmissionUploadReviewScope.VALIDATION, SubmissionUploadReviewScope.SECURITY];
-    const resolvedStatuses = [SubmissionUploadReviewStatus.COMPLETED, SubmissionUploadReviewStatus.SKIPPED];
-
-    const hasBlockedReview = reviews.some((review) => review.status === SubmissionUploadReviewStatus.BLOCKED);
-    const hasUnresolvedRequiredReview = requiredScopes.some(
-      (scope) => !reviews.some((review) => review.scope === scope && resolvedStatuses.includes(review.status))
-    );
-
-    return hasBlockedReview || hasUnresolvedRequiredReview;
   }
 }

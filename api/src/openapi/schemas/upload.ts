@@ -218,7 +218,7 @@ export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
   properties: {
-    submission_upload_review_id: { type: 'integer', minimum: 1 },
+    submission_upload_review_id: { type: 'string', format: 'uuid' },
     submission_upload_id: { type: 'string', format: 'uuid' },
     scope: { type: 'string', enum: ['validation', 'security'] },
     status: { type: 'string', enum: ['requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled'] },

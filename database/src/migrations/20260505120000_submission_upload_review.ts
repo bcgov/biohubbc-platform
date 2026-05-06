@@ -36,7 +36,7 @@ export async function up(knex: Knex): Promise<void> {
     -- Create submission_upload_review table
     --------------------------------------------------------------------------------
     CREATE TABLE submission_upload_review (
-      submission_upload_review_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      submission_upload_review_id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       scope submission_upload_review_scope NOT NULL,
       status submission_upload_review_status NOT NULL DEFAULT 'requested',
@@ -57,19 +57,14 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- Create indexes
     --------------------------------------------------------------------------------
+    -- Supports listing active reviews for one upload, the ticket-detail lateral
+    -- aggregation, and multi-upload review fetches ordered by create_date.
     CREATE INDEX submission_upload_review_idx1
-      ON submission_upload_review(submission_upload_id);
-
-    CREATE INDEX submission_upload_review_idx2
-      ON submission_upload_review(scope);
-
-    CREATE INDEX submission_upload_review_idx3
-      ON submission_upload_review(status);
-
-    CREATE INDEX submission_upload_review_idx4
-      ON submission_upload_review(submission_upload_id, scope, status)
+      ON submission_upload_review(submission_upload_id, create_date)
       WHERE record_end_date IS NULL;
 
+    -- Prevents duplicate active review tasks for the same upload/scope and
+    -- supports idempotent lookup before inserting default/manual reviews.
     CREATE UNIQUE INDEX submission_upload_review_nuk1
       ON submission_upload_review(submission_upload_id, scope)
       WHERE record_end_date IS NULL;

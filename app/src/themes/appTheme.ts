@@ -118,6 +118,11 @@ const appTheme = createTheme({
           '&.Mui-focusVisible': {
             outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
             outlineOffset: '2px'
+          },
+          '&.DropdownButton-root.Mui-disabled': {
+            color: theme.palette.action.disabled,
+            backgroundColor: theme.palette.action.disabledBackground,
+            borderColor: theme.palette.action.disabledBackground
           }
         }),
         startIcon: ({ theme }) => ({
@@ -204,6 +209,27 @@ const appTheme = createTheme({
     MuiButtonBase: {
       defaultProps: {
         disableRipple: true
+      }
+    },
+    MuiButtonGroup: {
+      defaultProps: {
+        disableElevation: true,
+        disableRipple: true
+      },
+      styleOverrides: {
+        root: {
+          boxShadow: 'none',
+          '& .MuiButtonGroup-grouped': {
+            boxShadow: 'none',
+            borderColor: 'transparent',
+            minWidth: 'auto',
+            paddingLeft: 12,
+            paddingRight: 12
+          },
+          '& .MuiButtonGroup-grouped:not(:last-of-type)': {
+            borderRightColor: 'transparent'
+          }
+        }
       }
     },
     MuiCardHeader: {

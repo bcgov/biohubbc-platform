@@ -17,6 +17,30 @@ import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } 
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
+   * Set record_effective_date for active features from a submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_effective_date = now()
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      AND
+        record_effective_date IS NULL
+      AND
+        record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionUuid

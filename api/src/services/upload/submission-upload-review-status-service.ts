@@ -7,9 +7,10 @@ import {
 } from '../../models/submission-upload-review-status';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { DBService } from '../db-service';
+import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
-import { SubmissionUploadReviewService } from './submission-upload-review-service';
+import { SubmissionUploadService } from './submission-upload-service';
 
 export interface SubmissionHistoryResponse {
   submissionId: number;
@@ -63,19 +64,52 @@ export class SubmissionUploadReviewStatusService extends DBService {
     submissionUploadId: string,
     data: UpdateSubmissionUploadReviewStatus
   ): Promise<SubmissionUploadReviewStatus> {
+    await this.assertSubmissionUploadReviewStatusCanBeFinalized(submissionUploadId);
+
     if (data.status === 'approved') {
       await this.assertSubmissionUploadCanBeApproved(submissionUploadId);
+      await this.publishApprovedSubmissionUpload(submissionUploadId);
     }
 
     return this.submissionUploadReviewStatusRepository.updateSubmissionUploadReviewStatus(submissionUploadId, data);
   }
 
   /**
-   * Assert that a submission upload has completed all required validation and review gates for approval.
+   * Assert that the upload final disposition has not already been set.
    *
    * @param {string} submissionUploadId
    * @returns {Promise<void>}
-   * @throws {HTTP400} If automated validation or required scoped reviews are unresolved.
+   * @throws {HTTP400} If the upload has already been approved, denied, or deleted.
+   */
+  async assertSubmissionUploadReviewStatusCanBeFinalized(submissionUploadId: string): Promise<void> {
+    const reviewStatus = await this.getSubmissionUploadReviewStatus(submissionUploadId);
+
+    if (reviewStatus.status !== 'submitted') {
+      throw new HTTP400('Submission upload final decision has already been set');
+    }
+  }
+
+  /**
+   * Publish approved upload features and move the upload lifecycle to indexed.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>}
+   * @memberof SubmissionUploadReviewStatusService
+   */
+  async publishApprovedSubmissionUpload(submissionUploadId: string): Promise<void> {
+    const submissionFeatureService = new SubmissionFeatureService(this.connection);
+    await submissionFeatureService.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
+
+    const submissionUploadService = new SubmissionUploadService(this.connection);
+    await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+  }
+
+  /**
+   * Assert that a submission upload has completed automated validation for approval.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<void>}
+   * @throws {HTTP400} If automated validation is unresolved.
    */
   async assertSubmissionUploadCanBeApproved(submissionUploadId: string): Promise<void> {
     const submissionValidationService = new SubmissionValidationService(this.connection);
@@ -85,13 +119,6 @@ export class SubmissionUploadReviewStatusService extends DBService {
 
     if (validation?.status !== 'completed') {
       throw new HTTP400('Submission upload validation must be completed before approval');
-    }
-
-    const uploadReviewService = new SubmissionUploadReviewService(this.connection);
-    const hasUnresolvedRequiredReviews = await uploadReviewService.hasUnresolvedRequiredReviews(submissionUploadId);
-
-    if (hasUnresolvedRequiredReviews) {
-      throw new HTTP400('Submission upload has unresolved required reviews');
     }
   }
 

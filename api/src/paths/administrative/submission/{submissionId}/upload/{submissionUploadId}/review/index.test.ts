@@ -27,7 +27,10 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const submissionUploadId = '550e8400-e29b-41d4-a716-446655440000';
-    const review = buildReview({ submission_upload_review_id: 1, scope: SubmissionUploadReviewScope.SECURITY });
+    const review = buildReview({
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      scope: SubmissionUploadReviewScope.SECURITY
+    });
     const insertSubmissionUploadReviewStub = sinon
       .stub(SubmissionUploadReviewService.prototype, 'insertSubmissionUploadReview')
       .resolves(review);
@@ -49,18 +52,12 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
 });
 
 const buildReview = (params: {
-  submission_upload_review_id: number;
+  submission_upload_review_id: string;
   scope: SubmissionUploadReviewScope;
 }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
   scope: params.scope,
   status: SubmissionUploadReviewStatus.REQUESTED,
-  requested_by: 7,
-  create_date: '2026-05-05T00:00:00.000Z',
-  create_user: 7,
-  update_date: null,
-  update_user: null,
-  revision_count: 0,
-  record_end_date: null
+  requested_by: 7
 });

@@ -23,7 +23,7 @@ export interface SubmissionUploadReviewFilters {
 }
 
 export const SubmissionUploadReview = z.object({
-  submission_upload_review_id: z.number().int().positive(),
+  submission_upload_review_id: z.string().uuid(),
   submission_upload_id: z.string().uuid(),
   scope: SubmissionUploadReviewScopeSchema,
   status: SubmissionUploadReviewStatusSchema,

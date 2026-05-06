@@ -16,7 +16,7 @@ describe('SubmissionUploadReviewRepository', () => {
 
   describe('insertSubmissionUploadReview', () => {
     it('returns the inserted review row', async () => {
-      const review = buildReview({ submission_upload_review_id: 1 });
+      const review = buildReview({ submission_upload_review_id: '11111111-1111-4111-8111-111111111111' });
       const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
@@ -27,6 +27,21 @@ describe('SubmissionUploadReviewRepository', () => {
       });
 
       expect(result).to.eql(review);
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('ON CONFLICT');
+    });
+
+    it('returns undefined when an active review already exists for the upload and scope', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<SubmissionUploadReview>);
+      const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.insertSubmissionUploadReview({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        scope: SubmissionUploadReviewScope.SECURITY,
+        requested_by: 7
+      });
+
+      expect(result).to.equal(undefined);
       expect(sqlStub.calledOnce).to.equal(true);
     });
   });
@@ -40,7 +55,7 @@ describe('SubmissionUploadReviewRepository', () => {
       );
 
       const result = await repository.updateReviewStatus({
-        submissionUploadReviewId: 1,
+        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
         data: { status: SubmissionUploadReviewStatus.COMPLETED }
       });
 
@@ -49,7 +64,7 @@ describe('SubmissionUploadReviewRepository', () => {
   });
 });
 
-const buildReview = (params: { submission_upload_review_id: number }): SubmissionUploadReview => ({
+const buildReview = (params: { submission_upload_review_id: string }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
   scope: SubmissionUploadReviewScope.SECURITY,

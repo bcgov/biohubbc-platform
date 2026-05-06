@@ -50,7 +50,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
-  const [updatingUploadId, setUpdatingUploadId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [isViewPolicyDialogOpen, setIsViewPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
@@ -184,15 +183,14 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     nextStatus: SubmissionUploadFinalDecision
   ) => {
     try {
-      setUpdatingUploadId(upload.submission_upload_id);
-
       await api.tickets.updateSubmissionUploadReviewStatus(upload.submission_uuid, upload.submission_upload_id, {
         status: nextStatus
       });
 
       patchTicketUpload(upload.submission_upload_id, (currentUpload) => ({
         ...currentUpload,
-        review_status: nextStatus
+        review_status: nextStatus,
+        upload_status: nextStatus === 'approved' ? 'indexed' : currentUpload.upload_status
       }));
     } catch (error) {
       const apiError = error as APIError;
@@ -200,8 +198,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         open: true,
         snackbarMessage: apiError.message
       });
-    } finally {
-      setUpdatingUploadId(null);
     }
   };
 
@@ -211,8 +207,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     nextStatus: SubmissionUploadReviewTaskStatus
   ) => {
     try {
-      setUpdatingUploadId(upload.submission_upload_id);
-
       const existingReview = upload.reviews.find((review) => review.scope === scope);
       let updatedReview: TicketSubmissionUploadReviewResponse;
 
@@ -242,8 +236,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         open: true,
         snackbarMessage: apiError.message
       });
-    } finally {
-      setUpdatingUploadId(null);
     }
   };
 
@@ -517,7 +509,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
-              isUpdating={updatingUploadId === item.upload.submission_upload_id}
               onUpdateReview={handleSubmissionUploadReviewUpdate}
               onAccept={(upload) => handleConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
               onReject={(upload) => handleConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}

@@ -21,7 +21,7 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
   it('PATCH updates a scoped upload review', async () => {
     registerConnection();
     const review = buildReview({
-      submission_upload_review_id: 1,
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
       scope: SubmissionUploadReviewScope.SECURITY,
       status: SubmissionUploadReviewStatus.IN_PROGRESS
     });
@@ -32,7 +32,7 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: '1'
+      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
     mockReq.body = { status: 'in_progress' };
 
@@ -40,7 +40,7 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
 
     expect(updateStub).to.have.been.calledOnceWith({
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: 1,
+      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
       data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
     });
     expect(mockRes.statusValue).to.equal(200);
@@ -49,21 +49,24 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
 
   it('DELETE soft deletes a scoped upload review', async () => {
     registerConnection();
-    const deleteStub = sinon
-      .stub(SubmissionUploadReviewService.prototype, 'deleteSubmissionUploadReview')
-      .resolves(buildReview({ submission_upload_review_id: 1, scope: SubmissionUploadReviewScope.SECURITY }));
+    const deleteStub = sinon.stub(SubmissionUploadReviewService.prototype, 'deleteSubmissionUploadReview').resolves(
+      buildReview({
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+        scope: SubmissionUploadReviewScope.SECURITY
+      })
+    );
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: '1'
+      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
 
     await deleteSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(deleteStub).to.have.been.calledOnceWith({
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: 1
+      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     });
     expect(mockRes.statusValue).to.equal(204);
   });
@@ -79,7 +82,7 @@ const registerConnection = () => {
 };
 
 const buildReview = (params: {
-  submission_upload_review_id: number;
+  submission_upload_review_id: string;
   scope: SubmissionUploadReviewScope;
   status?: SubmissionUploadReviewStatus;
 }): SubmissionUploadReview => ({

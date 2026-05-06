@@ -39,7 +39,7 @@ PATCH.apiDoc = {
       description: 'Submission upload review ID.',
       in: 'path',
       name: 'submissionUploadReviewId',
-      schema: { type: 'integer', minimum: 1 },
+      schema: { type: 'string', format: 'uuid' },
       required: true
     }
   ],
@@ -87,7 +87,7 @@ DELETE.apiDoc = {
       description: 'Submission upload review ID.',
       in: 'path',
       name: 'submissionUploadReviewId',
-      schema: { type: 'integer', minimum: 1 },
+      schema: { type: 'string', format: 'uuid' },
       required: true
     }
   ],
@@ -112,7 +112,7 @@ export function updateSubmissionUploadReview(): RequestHandler {
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       const result = await submissionUploadReviewService.updateSubmissionUploadReview({
         submissionUploadId,
-        submissionUploadReviewId: Number(submissionUploadReviewId),
+        submissionUploadReviewId,
         data: { status }
       });
 
@@ -145,7 +145,7 @@ export function deleteSubmissionUploadReview(): RequestHandler {
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       await submissionUploadReviewService.deleteSubmissionUploadReview({
         submissionUploadId,
-        submissionUploadReviewId: Number(submissionUploadReviewId)
+        submissionUploadReviewId
       });
 
       await connection.commit();

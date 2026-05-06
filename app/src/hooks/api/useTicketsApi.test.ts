@@ -240,7 +240,7 @@ describe('useTicketsApi', () => {
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const payload = { scope: 'security' as const };
     const response: TicketSubmissionUploadReviewResponse = {
-      submission_upload_review_id: 1,
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
       submission_upload_id: submissionUploadId,
       scope: 'security',
       status: 'requested',
@@ -256,7 +256,7 @@ describe('useTicketsApi', () => {
 
   it('updateSubmissionUploadReview patches a scoped upload review task', async () => {
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
-    const submissionUploadReviewId = 1;
+    const submissionUploadReviewId = '11111111-1111-4111-8111-111111111111';
     const payload = { status: 'completed' as const };
     const response: TicketSubmissionUploadReviewResponse = {
       submission_upload_review_id: submissionUploadReviewId,

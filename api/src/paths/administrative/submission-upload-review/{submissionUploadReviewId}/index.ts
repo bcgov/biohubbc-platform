@@ -35,7 +35,7 @@ PATCH.apiDoc = {
       description: 'Submission upload review ID.',
       in: 'path',
       name: 'submissionUploadReviewId',
-      schema: { type: 'integer', minimum: 1 },
+      schema: { type: 'string', format: 'uuid' },
       required: true
     }
   ],
@@ -72,7 +72,7 @@ export function updateSubmissionUploadReview(): RequestHandler {
 
       const reviewService = new SubmissionUploadReviewService(connection);
       const result = await reviewService.updateReviewStatus({
-        submissionUploadReviewId: Number(submissionUploadReviewId),
+        submissionUploadReviewId,
         status: status as SubmissionUploadReviewStatus
       });
 

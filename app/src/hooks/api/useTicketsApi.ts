@@ -194,13 +194,13 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Update a scoped submission upload review task.
    *
    * @param {string} submissionUploadId
-   * @param {number} submissionUploadReviewId
+   * @param {string} submissionUploadReviewId
    * @param {IUpdateSubmissionUploadReviewRequest} payload
    * @return {Promise<TicketSubmissionUploadReviewResponse>}
    */
   const updateSubmissionUploadReview = async (
     submissionUploadId: string,
-    submissionUploadReviewId: number,
+    submissionUploadReviewId: string,
     payload: IUpdateSubmissionUploadReviewRequest
   ): Promise<TicketSubmissionUploadReviewResponse> => {
     const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(

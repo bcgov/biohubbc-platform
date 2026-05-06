@@ -33,13 +33,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date
+        requested_by
       FROM
         submission_upload_review
       WHERE
@@ -82,13 +76,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date
+        requested_by
       FROM
         submission_upload_review
       WHERE
@@ -110,10 +98,12 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
    * the current connection context.
    *
    * @param {CreateSubmissionUploadReview} params - Review row values.
-   * @return {Promise<SubmissionUploadReview>} The inserted review row.
+   * @return {Promise<SubmissionUploadReview | undefined>} The inserted review row, if one was inserted.
    * @memberof SubmissionUploadReviewRepository
    */
-  async insertSubmissionUploadReview(params: CreateSubmissionUploadReview): Promise<SubmissionUploadReview> {
+  async insertSubmissionUploadReview(
+    params: CreateSubmissionUploadReview
+  ): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
       INSERT INTO submission_upload_review (
         submission_upload_id,
@@ -125,18 +115,15 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         ${params.scope}::submission_upload_review_scope,
         ${params.requested_by}
       )
+      ON CONFLICT (submission_upload_id, scope)
+      WHERE record_end_date IS NULL
+      DO NOTHING
       RETURNING
         submission_upload_review_id,
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date;
+        requested_by;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
@@ -146,13 +133,13 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
   /**
    * Update an active submission upload review row.
    *
-   * @param {{ submissionUploadId: string; submissionUploadReviewId: number; data: SubmissionUploadReviewUpdate }} params - Review update details.
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: string; data: SubmissionUploadReviewUpdate }} params - Review update details.
    * @return {Promise<SubmissionUploadReview | undefined>} The updated review row, if found.
    * @memberof SubmissionUploadReviewRepository
    */
   async updateSubmissionUploadReview(params: {
     submissionUploadId: string;
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
     data: SubmissionUploadReviewUpdate;
   }): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
@@ -168,13 +155,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date;
+        requested_by;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
@@ -184,15 +165,14 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
   /**
    * Update an active review row's workflow status by review ID.
    *
-   * This supports the legacy ID-only admin route. Prefer
-   * `updateSubmissionUploadReview` when the submission upload ID is available.
+   * This supports the ID-only admin update route.
    *
-   * @param {{ submissionUploadReviewId: number; data: SubmissionUploadReviewUpdate }} params - Review status update.
+   * @param {{ submissionUploadReviewId: string; data: SubmissionUploadReviewUpdate }} params - Review status update.
    * @return {Promise<SubmissionUploadReview | undefined>} The updated review row, if found.
    * @memberof SubmissionUploadReviewRepository
    */
   async updateReviewStatus(params: {
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
     data: SubmissionUploadReviewUpdate;
   }): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
@@ -207,13 +187,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date;
+        requested_by;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
@@ -223,13 +197,13 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
   /**
    * Soft delete an active submission upload review row.
    *
-   * @param {{ submissionUploadId: string; submissionUploadReviewId: number }} params - Review delete details.
+   * @param {{ submissionUploadId: string; submissionUploadReviewId: string }} params - Review delete details.
    * @return {Promise<SubmissionUploadReview | undefined>} The deleted review row, if found.
    * @memberof SubmissionUploadReviewRepository
    */
   async deleteSubmissionUploadReview(params: {
     submissionUploadId: string;
-    submissionUploadReviewId: number;
+    submissionUploadReviewId: string;
   }): Promise<SubmissionUploadReview | undefined> {
     const sqlStatement = SQL`
       UPDATE submission_upload_review
@@ -244,13 +218,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
         submission_upload_id,
         scope,
         status,
-        requested_by,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count,
-        record_end_date;
+        requested_by;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
