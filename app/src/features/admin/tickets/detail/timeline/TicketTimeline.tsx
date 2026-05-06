@@ -15,7 +15,13 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
+import {
+  ITicketArtifact,
+  SubmissionUploadReviewScope,
+  SubmissionUploadReviewTaskStatus,
+  TicketSubmissionUploadResponse,
+  TicketSubmissionUploadReviewResponse
+} from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
 import {
@@ -23,10 +29,14 @@ import {
   DataRequestEvent,
   ITicketTimelineProps,
   StatusEvent,
-  TimelineEvent
+  TimelineEvent,
+  UploadEvent
 } from './TicketTimeline.interface';
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
 import { TicketDataRequestTimelineItem } from './item/TicketDataRequestTimelineItem';
+import { TicketUploadTimelineItem } from './item/TicketUploadTimelineItem';
+
+type SubmissionUploadFinalDecision = 'approved' | 'denied';
 
 /**
  * Renders the timeline section for a ticket.
@@ -40,6 +50,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
+  const [updatingUploadId, setUpdatingUploadId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [isViewPolicyDialogOpen, setIsViewPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
@@ -49,6 +60,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
   const closeDataRequestStatusConfirmationDialog = () => {
+    dialogContext.setYesNoDialog({ open: false });
+  };
+
+  const closeUploadStatusConfirmationDialog = () => {
     dialogContext.setYesNoDialog({ open: false });
   };
 
@@ -77,6 +92,14 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         id: dataRequest.data_request_id,
         create_date: dataRequest.create_date ?? '',
         data_request: dataRequest
+      })
+    ),
+    ...ticket.submission_uploads.map(
+      (upload): UploadEvent => ({
+        kind: 'upload',
+        id: upload.submission_upload_id,
+        create_date: upload.create_date,
+        upload
       })
     )
   ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime());
@@ -115,6 +138,112 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
       });
     } finally {
       setUpdatingDataRequestId(null);
+    }
+  };
+
+  const patchTicketUpload = (
+    submissionUploadId: string,
+    patch: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
+  ) => {
+    const latestTicket = ticketDataLoader.data;
+
+    if (!latestTicket) {
+      return;
+    }
+
+    ticketDataLoader.setData({
+      ...latestTicket,
+      submission_uploads: latestTicket.submission_uploads.map((upload) =>
+        upload.submission_upload_id === submissionUploadId ? patch(upload) : upload
+      )
+    });
+  };
+
+  const patchTicketUploadReview = (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse
+  ) => {
+    patchTicketUpload(upload.submission_upload_id, (currentUpload) => {
+      const existingReview = currentUpload.reviews.find(
+        (item) => item.submission_upload_review_id === review.submission_upload_review_id
+      );
+
+      return {
+        ...currentUpload,
+        reviews: existingReview
+          ? currentUpload.reviews.map((item) =>
+              item.submission_upload_review_id === review.submission_upload_review_id ? review : item
+            )
+          : [...currentUpload.reviews, review]
+      };
+    });
+  };
+
+  const handleSubmissionUploadReviewStatusUpdate = async (
+    upload: TicketSubmissionUploadResponse,
+    nextStatus: SubmissionUploadFinalDecision
+  ) => {
+    try {
+      setUpdatingUploadId(upload.submission_upload_id);
+
+      await api.tickets.updateSubmissionUploadReviewStatus(upload.submission_uuid, upload.submission_upload_id, {
+        status: nextStatus
+      });
+
+      patchTicketUpload(upload.submission_upload_id, (currentUpload) => ({
+        ...currentUpload,
+        review_status: nextStatus
+      }));
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setUpdatingUploadId(null);
+    }
+  };
+
+  const handleSubmissionUploadReviewUpdate = async (
+    upload: TicketSubmissionUploadResponse,
+    scope: SubmissionUploadReviewScope,
+    nextStatus: SubmissionUploadReviewTaskStatus
+  ) => {
+    try {
+      setUpdatingUploadId(upload.submission_upload_id);
+
+      const existingReview = upload.reviews.find((review) => review.scope === scope);
+      let updatedReview: TicketSubmissionUploadReviewResponse;
+
+      if (existingReview) {
+        updatedReview = await api.tickets.updateSubmissionUploadReview(
+          upload.submission_upload_id,
+          existingReview.submission_upload_review_id,
+          { status: nextStatus }
+        );
+      } else {
+        const insertedReview = await api.tickets.insertSubmissionUploadReview(upload.submission_upload_id, { scope });
+
+        updatedReview =
+          nextStatus === insertedReview.status
+            ? insertedReview
+            : await api.tickets.updateSubmissionUploadReview(
+                upload.submission_upload_id,
+                insertedReview.submission_upload_review_id,
+                { status: nextStatus }
+              );
+      }
+
+      patchTicketUploadReview(upload, updatedReview);
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setUpdatingUploadId(null);
     }
   };
 
@@ -205,6 +334,29 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
       onYes: async () => {
         closeDataRequestStatusConfirmationDialog();
         await handleDataRequestStatusUpdate(dataRequestId, policyId, PolicyStatus.REVIEWED);
+      }
+    });
+  };
+
+  const handleConfirmSubmissionUploadReviewStatusUpdate = (
+    upload: TicketSubmissionUploadResponse,
+    nextStatus: SubmissionUploadFinalDecision
+  ) => {
+    const isApproval = nextStatus === 'approved';
+
+    dialogContext.setYesNoDialog({
+      open: true,
+      dialogTitle: isApproval ? 'Confirm Acceptance' : 'Confirm Rejection',
+      dialogText: isApproval
+        ? 'Are you sure you want to accept this submission upload?'
+        : 'Are you sure you want to reject this submission upload?',
+      yesButtonLabel: isApproval ? 'Accept' : 'Reject',
+      noButtonLabel: 'Cancel',
+      onClose: closeUploadStatusConfirmationDialog,
+      onNo: closeUploadStatusConfirmationDialog,
+      onYes: async () => {
+        closeUploadStatusConfirmationDialog();
+        await handleSubmissionUploadReviewStatusUpdate(upload, nextStatus);
       }
     });
   };
@@ -348,6 +500,27 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
               onResetToReviewed={(dataRequestId) =>
                 handleConfirmResetToReviewed(dataRequestId, item.data_request.policy_id, item.data_request.status)
               }
+            />
+          )
+        };
+
+      case 'upload':
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS.upload} size={0.75} />,
+          children: (
+            <TicketUploadTimelineItem
+              upload={item.upload}
+              dateLabel={
+                getRelativeTimeLabel(item.create_date, {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                }) ?? ''
+              }
+              isUpdating={updatingUploadId === item.upload.submission_upload_id}
+              onUpdateReview={handleSubmissionUploadReviewUpdate}
+              onAccept={(upload) => handleConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
+              onReject={(upload) => handleConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}
             />
           )
         };

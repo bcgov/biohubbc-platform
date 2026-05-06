@@ -5,6 +5,7 @@ import {
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
@@ -186,6 +187,98 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, SubmissionUpload);
 
+    return response.rows;
+  }
+
+  /**
+   * Find ticket-scoped submission upload timeline records.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<TicketSubmissionUpload[]>}
+   */
+  async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        su.submission_id,
+        s.uuid AS submission_uuid,
+        su.upload_id,
+        su.ticket_id,
+        su.create_date,
+        s.name AS submission_name,
+        s.description AS submission_description,
+        su.comment AS submission_comment,
+        submitter.user_identifier AS submitted_by_identifier,
+        su.status AS upload_status,
+        sus.status AS review_status,
+        json_build_object(
+          'submission_validation_id', sv.submission_validation_id,
+          'job_id', sv.job_id,
+          'status', sv.status,
+          'metadata', sv.metadata,
+          'started_at', sv.started_at,
+          'ended_at', sv.ended_at,
+          'create_date', sv.create_date
+        ) AS validation,
+        COALESCE(reviews.reviews, '[]'::json) AS reviews
+      FROM
+        submission_upload su
+      INNER JOIN
+        submission s
+      ON
+        s.submission_id = su.submission_id
+      LEFT JOIN
+        "system_user" submitter
+      ON
+        submitter.system_user_id = s.system_user_id
+      INNER JOIN
+        submission_upload_status sus
+      ON
+        sus.submission_upload_id = su.submission_upload_id
+      LEFT JOIN LATERAL (
+        SELECT
+          sv.submission_validation_id,
+          sv.job_id,
+          sv.status,
+          sv.metadata,
+          sv.started_at,
+          sv.ended_at,
+          sv.create_date
+        FROM
+          submission_validation sv
+        WHERE
+          sv.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sv.create_date DESC
+        LIMIT 1
+      ) sv ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          json_agg(
+              json_build_object(
+                'submission_upload_review_id', sur.submission_upload_review_id,
+                'submission_upload_id', sur.submission_upload_id,
+                'scope', sur.scope,
+                'status', sur.status,
+                'requested_by', sur.requested_by
+              )
+              ORDER BY sur.create_date ASC
+            ) AS reviews
+        FROM
+          submission_upload_review sur
+        WHERE
+          sur.submission_upload_id = su.submission_upload_id
+          AND sur.record_end_date IS NULL
+      ) reviews ON TRUE
+      WHERE
+        su.ticket_id = ${ticketId}
+        AND su.record_end_date IS NULL
+        AND s.record_end_date IS NULL
+      ORDER BY
+        su.create_date ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketSubmissionUpload);
     return response.rows;
   }
 

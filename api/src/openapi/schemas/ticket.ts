@@ -96,6 +96,7 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'artifacts',
     'references',
     'data_requests',
+    'submission_uploads',
     'ticket_system_users'
   ],
   properties: {
@@ -138,6 +139,13 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     data_requests: {
       type: 'array',
       items: DataRequestResponseSchema
+    },
+    submission_uploads: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: true
+      }
     },
     ticket_system_users: {
       type: 'array',

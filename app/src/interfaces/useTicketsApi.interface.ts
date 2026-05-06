@@ -4,6 +4,24 @@ import { DataRequestResponse } from './useDataRequestApi.interface';
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TicketSystemUserStatus = 'requested' | 'started' | 'blocked' | 'resolved';
+export type SubmissionUploadJobStatus =
+  | 'uploaded'
+  | 'ingesting'
+  | 'ingested'
+  | 'indexing'
+  | 'indexed'
+  | 'invalid'
+  | 'failed';
+export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | 'invalid' | 'failed';
+export type SubmissionUploadReviewStatus = 'submitted' | 'approved' | 'denied' | 'deleted';
+export type SubmissionUploadReviewScope = 'validation' | 'security';
+export type SubmissionUploadReviewTaskStatus =
+  | 'requested'
+  | 'in_progress'
+  | 'completed'
+  | 'blocked'
+  | 'skipped'
+  | 'cancelled';
 
 export interface ITicket {
   ticket_id: string;
@@ -76,12 +94,46 @@ export interface ITicketSystemUser {
   };
 }
 
+export interface TicketSubmissionUploadReviewResponse {
+  submission_upload_review_id: number;
+  submission_upload_id: string;
+  scope: SubmissionUploadReviewScope;
+  status: SubmissionUploadReviewTaskStatus;
+  requested_by: number | null;
+}
+
+export interface TicketSubmissionUploadResponse {
+  submission_upload_id: string;
+  submission_id: number;
+  submission_uuid: string;
+  upload_id: string;
+  ticket_id: string;
+  create_date: string;
+  submission_name: string | null;
+  submission_description: string | null;
+  submission_comment: string | null;
+  submitted_by_identifier: string | null;
+  upload_status: SubmissionUploadJobStatus;
+  review_status: SubmissionUploadReviewStatus;
+  validation: {
+    submission_validation_id: number | null;
+    job_id: string | null;
+    status: SubmissionValidationStatus | null;
+    metadata: Record<string, unknown> | null;
+    started_at: string | null;
+    ended_at: string | null;
+    create_date: string | null;
+  };
+  reviews: TicketSubmissionUploadReviewResponse[];
+}
+
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
   artifacts: ITicketArtifact[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
+  submission_uploads: TicketSubmissionUploadResponse[];
   ticket_system_users: ITicketSystemUser[];
 }
 
@@ -120,6 +172,18 @@ export interface ICompleteTicketUploadRequest {
 
 export interface ITicketArtifactDownloadResponse {
   signed_url: string;
+}
+
+export interface IUpdateSubmissionUploadReviewStatusRequest {
+  status: 'approved' | 'denied';
+}
+
+export interface IUpdateSubmissionUploadReviewRequest {
+  status: SubmissionUploadReviewTaskStatus;
+}
+
+export interface ICreateSubmissionUploadReviewRequest {
+  scope: SubmissionUploadReviewScope;
 }
 
 export interface ICreateTicketReference {

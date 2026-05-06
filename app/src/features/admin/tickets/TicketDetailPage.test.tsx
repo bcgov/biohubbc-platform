@@ -155,7 +155,8 @@ const baseTicket: ITicketExtended = {
       status: PolicyStatus.REQUESTED,
       create_date: '2026-02-24T10:00:00.000Z'
     }
-  ]
+  ],
+  submission_uploads: []
 };
 
 const setComment = vi.fn();

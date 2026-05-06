@@ -27,13 +27,7 @@ export const SubmissionUploadReview = z.object({
   submission_upload_id: z.string().uuid(),
   scope: SubmissionUploadReviewScopeSchema,
   status: SubmissionUploadReviewStatusSchema,
-  requested_by: z.number().int().positive().nullable(),
-  create_date: z.string(),
-  create_user: z.number().int(),
-  update_date: z.string().nullable(),
-  update_user: z.number().int().nullable(),
-  revision_count: z.number().int(),
-  record_end_date: z.string().nullable()
+  requested_by: z.number().int().positive().nullable()
 });
 export type SubmissionUploadReview = z.infer<typeof SubmissionUploadReview>;
 

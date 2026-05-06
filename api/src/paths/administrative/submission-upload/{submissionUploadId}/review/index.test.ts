@@ -76,11 +76,5 @@ const buildReview = (params: {
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
   scope: params.scope,
   status: SubmissionUploadReviewStatus.REQUESTED,
-  requested_by: 7,
-  create_date: '2026-05-05T00:00:00.000Z',
-  create_user: 7,
-  update_date: null,
-  update_user: null,
-  revision_count: 0,
-  record_end_date: null
+  requested_by: 7
 });
