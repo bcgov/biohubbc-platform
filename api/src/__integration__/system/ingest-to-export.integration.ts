@@ -168,7 +168,7 @@ describe('Ingest → Download → Export (system integration)', function () {
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
-    const { schemaLookup, statements } = await pipelineService.resolveParquetSchema(downloadId, source);
+    const { schemaLookup, statements } = await pipelineService.resolveParquetSchema(source);
     for (const statement of statements) {
       const featureTypeName = statement.urn_feature_type;
       await pipelineService.writeFeatureTypeParquet({

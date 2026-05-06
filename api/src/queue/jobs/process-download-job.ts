@@ -100,7 +100,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       );
 
       const { schemaLookup, statements } = await withConnection(async (connection) =>
-        new DownloadPipelineService(connection).resolveParquetSchema(downloadId, source)
+        new DownloadPipelineService(connection).resolveParquetSchema(source)
       );
 
       // Write one Parquet file per active policy statement. Each write runs in its own

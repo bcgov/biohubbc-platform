@@ -197,7 +197,7 @@ describe('DownloadPipelineService', () => {
         .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
         .resolves(statements);
 
-      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
 
       expect(result.featureTypes).to.deep.equal(['dataset', 'observation']);
       expect(result.statements).to.deep.equal(statements);
@@ -217,7 +217,7 @@ describe('DownloadPipelineService', () => {
         .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
         .resolves(statements);
 
-      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
 
       expect(result.featureTypes).to.deep.equal(['a', 'b', 'c']);
     });
@@ -229,7 +229,7 @@ describe('DownloadPipelineService', () => {
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
       sinon.stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId').resolves([]);
 
-      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE);
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
 
       expect(result.featureTypes).to.deep.equal([]);
       expect(result.statements).to.deep.equal([]);

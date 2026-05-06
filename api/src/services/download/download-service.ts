@@ -2,11 +2,23 @@ import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
+import { ExpressionTree } from '../../models/expression-tree';
+import { publishProcessDownloadJob } from '../../queue/publisher';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
+import { ExpressionTreeService } from '../expression-tree-service';
+import { DownloadPolicyService } from './download-policy-service';
+
+export interface CreateDownloadRequestPayload {
+  name: string;
+  description: string | null;
+  featureTypes: string[];
+  expression: ExpressionTree | null;
+  systemUserId: number;
+}
 
 /**
  * Request-time service for downloads.
@@ -32,12 +44,29 @@ export class DownloadService extends DBService {
    */
   downloadExportRepository: DownloadExportRepository;
   teamService: TeamService;
+  expressionTreeService: ExpressionTreeService;
+  downloadPolicyService: DownloadPolicyService;
+
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   *
+   * Wrapped in a thunk because `queue/publisher` imports `DownloadService` back, so a direct
+   * function reference here would be in TDZ when the module cycle resolves through publisher
+   * first. Resolving at call time sidesteps the cycle.
+   */
+  static readonly dependencies = {
+    publishProcessDownloadJob: (
+      ...args: Parameters<typeof publishProcessDownloadJob>
+    ): ReturnType<typeof publishProcessDownloadJob> => publishProcessDownloadJob(...args)
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
     this.teamService = new TeamService(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
+    this.downloadPolicyService = new DownloadPolicyService(connection);
   }
 
   /**
@@ -60,6 +89,51 @@ export class DownloadService extends DBService {
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
     return this.downloadRepository.createDownload(payload);
+  }
+
+  /**
+   * Create a download request end-to-end for an authenticated user.
+   *
+   * Persists the optional expression tree, creates the owning download policy, creates the
+   * download record, links a fresh team to the download for the requesting user, and queues
+   * the worker job. The caller (route handler) wraps this in a single transaction so a
+   * mid-flow failure leaves no orphan rows.
+   *
+   * Authorization is enforced at export time, not create time. The user's authorization is
+   * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
+   * create-time would let users export data they no longer have access to by simply queuing
+   * a download earlier.
+   *
+   * @param {CreateDownloadRequestPayload} payload - Request payload.
+   * @return {Promise<DownloadId>} The created download identifier.
+   * @memberof DownloadService
+   */
+  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<DownloadId> {
+    let expressionId: string | null = null;
+    if (payload.expression !== null) {
+      const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
+      expressionId = result.expression_id;
+    }
+
+    const { policy_id } = await this.downloadPolicyService.createDownloadPolicy({
+      name: payload.name,
+      description: payload.description,
+      featureTypes: payload.featureTypes,
+      expressionId
+    });
+
+    const { download_id } = await this.createDownload({ policyId: policy_id, format: 'parquet' });
+
+    await this.linkDownloadToNewTeam(
+      download_id,
+      payload.systemUserId,
+      `Team for download ${download_id}`,
+      'Team automatically created for download'
+    );
+
+    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
+
+    return { download_id };
   }
 
   /**

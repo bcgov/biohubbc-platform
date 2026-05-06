@@ -129,15 +129,11 @@ export class DownloadPipelineService extends DBService {
    * Feature types come back in `urn_feature_type` ASC order so the downstream loop
    * produces a stable, alphabetic sequence of Parquet files.
    *
-   * @param {string} _downloadId - The download ID (kept for future diagnostics; unused today).
    * @param {DownloadSource} source - The download source (policy_id + create_user).
    * @return {Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[]; statements: ActivePolicyStatementWithExpression[] }>}
    * @memberof DownloadPipelineService
    */
-  async resolveParquetSchema(
-    _downloadId: string,
-    source: DownloadSource
-  ): Promise<{
+  async resolveParquetSchema(source: DownloadSource): Promise<{
     schemaLookup: Map<string, CsvPropertyDefinition[]>;
     featureTypes: string[];
     statements: ActivePolicyStatementWithExpression[];

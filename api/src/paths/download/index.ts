@@ -6,24 +6,13 @@ import { CreateDownloadRequestBody } from '../../models/download';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
 import { featureSearchExpressionTreeSchema } from '../../openapi/schemas/search/search-feature';
-import { publishProcessDownloadJob } from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
-import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { getApiBaseUrl } from '../../utils/api-url';
 import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/download');
-
-/**
- * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
- */
-export const downloadPathDependencies = {
-  getDBConnection,
-  publishProcessDownloadJob
-};
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -133,7 +122,7 @@ GET.apiDoc = {
  */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {
-    const connection = downloadPathDependencies.getDBConnection(req.keycloak_token);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
@@ -219,63 +208,43 @@ POST.apiDoc = {
 /**
  * Create a download request.
  *
- * Persists the optional expression tree, creates the owning download policy, creates the
- * download record, links a fresh team to the download for the requesting user, and queues
- * the worker job — all inside one transaction so a mid-flow failure leaves no orphan rows.
+ * Delegates the business orchestration (expression tree → policy → download → team link →
+ * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing,
+ * the transaction boundary, and response shaping.
  *
  * Authorization is enforced at export time, not create time. The user's authorization is
  * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
  * create-time would let users export data they no longer have access to by simply queuing
  * a download earlier.
  *
- * Reject unknown request-body keys (Zod `.strict()`). Silent acceptance of unknown keys
- * masks frontend decoder bugs. Failing fast on `ui_id` and similar leakage points the FE
- * at its own bug rather than letting bad data flow into a policy.
- *
  * @return {RequestHandler}
  */
 export function createDownload(): RequestHandler {
   return async (req, res) => {
+    // Validate with Zod rather than relying on the openapi schema. The expression tree is
+    // a recursive discriminated union which openapi cannot fully express; Zod also rejects
+    // unknown keys via `.strict()` so a stray `ui_id` from the frontend fails fast at the
+    // boundary instead of flowing into a policy. Do not delete this in favour of openapi.
     const parseResult = CreateDownloadRequestBody.safeParse(req.body);
     if (!parseResult.success) {
       throw new HTTP400('Invalid request body', parseResult.error.issues);
     }
     const { name, description, featureTypes, expression } = parseResult.data;
 
-    const connection = downloadPathDependencies.getDBConnection(req.keycloak_token);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
-
-      const expressionTreeService = new ExpressionTreeService(connection);
-      const downloadPolicyService = new DownloadPolicyService(connection);
       const downloadService = new DownloadService(connection);
 
-      let expressionId: string | null = null;
-      if (expression !== null) {
-        const result = await expressionTreeService.writeExpressionTree(expression);
-        expressionId = result.expression_id;
-      }
-
-      const { policy_id } = await downloadPolicyService.createDownloadPolicy({
+      const { download_id } = await downloadService.createDownloadRequest({
         name,
         description: description ?? null,
         featureTypes,
-        expressionId
+        expression,
+        systemUserId: connection.systemUserId()
       });
-
-      const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
-
-      await downloadService.linkDownloadToNewTeam(
-        download_id,
-        systemUserId,
-        `Team for download ${download_id}`,
-        'Team automatically created for download'
-      );
-
-      await downloadPathDependencies.publishProcessDownloadJob(connection, { downloadId: download_id });
 
       await connection.commit();
 

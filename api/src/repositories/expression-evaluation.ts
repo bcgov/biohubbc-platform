@@ -690,6 +690,12 @@ function buildTaxonDescendantExistsQuery(
 
 /**
  * Applies a geometry expression operator.
+ *
+ * @param {Knex.QueryBuilder} query - The query to apply the operator to.
+ * @param {string} column - The geometry column reference (e.g. `p.value`).
+ * @param {InternalTypedPredicate['operator']} operator - The geometry operator (`Within`, `Intersects`, `Contains`).
+ * @param {unknown} value - GeoJSON geometry value to compare against.
+ * @return {Knex.QueryBuilder} The query with the geometry predicate applied.
  */
 function applyGeometryExpressionOperator(
   query: Knex.QueryBuilder,

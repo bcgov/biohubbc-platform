@@ -2,15 +2,12 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as path from '.';
 import { createDownload, getDownloads } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { HTTP400, HTTPError } from '../../errors/http-error';
 import { DownloadListRecord } from '../../models/download';
-import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
-import { ExpressionTreeService } from '../../services/expression-tree-service';
 
 chai.use(sinonChai);
 
@@ -123,7 +120,60 @@ describe('paths/download/index', () => {
       }
     });
 
-    it('returns 400 when featureTypes contains an unknown name (AC #7)', async () => {
+    it('returns 201 with download_id and download_url on the happy path', async () => {
+      const commitStub = sinon.stub();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42, commit: commitStub });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-1' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody();
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(createDownloadRequestStub).to.have.been.calledOnce;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.eql({
+        name: 'My download',
+        description: 'A description',
+        featureTypes: ['observation'],
+        expression: validExpression,
+        systemUserId: 42
+      });
+      expect(commitStub).to.have.been.calledOnce;
+
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-1');
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
+    });
+
+    it('passes through a null expression to the service', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-2' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({ expression: null });
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ expression: null });
+      expect(mockRes.statusValue).to.equal(201);
+    });
+
+    it('rolls back, releases, and propagates when the service throws', async () => {
       const rollbackStub = sinon.stub();
       const releaseStub = sinon.stub();
       const dbConnectionObj = getMockDBConnection({
@@ -133,18 +183,11 @@ describe('paths/download/index', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      // Surface the validation error from the service via a stub: this isolates
-      // the route's behavior on a thrown HTTP400 from the service implementation.
-      sinon
-        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
-        .rejects(new HTTP400('Unknown feature type(s)'));
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').rejects(new HTTP400('Unknown feature type(s)'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
-      // Use the broad-path body (expression: null) to bypass writeExpressionTree —
-      // the validation under test runs inside createDownloadPolicy, before any
-      // expression handling.
-      mockReq.body = validBody({ featureTypes: ['definitely_not_a_real_feature_type'], expression: null });
+      mockReq.body = validBody();
 
       const requestHandler = createDownload();
 
@@ -156,167 +199,6 @@ describe('paths/download/index', () => {
         expect(error).to.be.instanceOf(HTTP400);
         expect(rollbackStub).to.have.been.calledOnce;
         expect(releaseStub).to.have.been.calledOnce;
-      }
-    });
-
-    it('propagates a 400 thrown by writeExpressionTree (semantic validation)', async () => {
-      const rollbackStub = sinon.stub();
-      const releaseStub = sinon.stub();
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 20,
-        rollback: rollbackStub,
-        release: releaseStub
-      });
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon
-        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
-        .rejects(new HTTP400('Invalid predicate value for property'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody();
-
-      const requestHandler = createDownload();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(rollbackStub).to.have.been.calledOnce;
-        expect(releaseStub).to.have.been.calledOnce;
-      }
-    });
-
-    it('returns 201 on the happy path with an expression and calls services in order', async () => {
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const writeExpressionTreeStub = sinon
-        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
-        .resolves({ expression_id: 'expr-uuid-1' });
-      const createDownloadPolicyStub = sinon
-        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
-        .resolves({ policy_id: 'policy-uuid-1' });
-      const createDownloadServiceStub = sinon
-        .stub(DownloadService.prototype, 'createDownload')
-        .resolves({ download_id: 'download-uuid-1' });
-      const linkDownloadToNewTeamStub = sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
-      const publishStub = sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody();
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(writeExpressionTreeStub).to.have.been.calledOnce;
-      expect(writeExpressionTreeStub.firstCall.args[0]).to.eql(validExpression);
-
-      expect(createDownloadPolicyStub).to.have.been.calledOnce;
-      expect(createDownloadPolicyStub.firstCall.args[0]).to.eql({
-        name: 'My download',
-        description: 'A description',
-        featureTypes: ['observation'],
-        expressionId: 'expr-uuid-1'
-      });
-
-      expect(createDownloadServiceStub).to.have.been.calledOnce;
-      expect(createDownloadServiceStub.firstCall.args[0]).to.eql({
-        policyId: 'policy-uuid-1',
-        format: 'parquet'
-      });
-
-      expect(linkDownloadToNewTeamStub).to.have.been.calledOnce;
-      expect(linkDownloadToNewTeamStub.firstCall.args[0]).to.equal('download-uuid-1');
-      expect(linkDownloadToNewTeamStub.firstCall.args[1]).to.equal(42);
-
-      expect(publishStub).to.have.been.calledOnce;
-      expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
-
-      expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
-      expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadServiceStub);
-      expect(createDownloadServiceStub).to.have.been.calledBefore(linkDownloadToNewTeamStub);
-      expect(linkDownloadToNewTeamStub).to.have.been.calledBefore(publishStub);
-
-      expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-1');
-      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
-      expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
-    });
-
-    it('returns 201 on the broad path: expression null skips writeExpressionTree', async () => {
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const writeExpressionTreeStub = sinon
-        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
-        .resolves({ expression_id: 'should-not-be-called' });
-      const createDownloadPolicyStub = sinon
-        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
-        .resolves({ policy_id: 'policy-uuid-2' });
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'download-uuid-2' });
-      sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-2' });
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody({ expression: null });
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(writeExpressionTreeStub).to.not.have.been.called;
-      expect(createDownloadPolicyStub).to.have.been.calledOnce;
-      expect(createDownloadPolicyStub.firstCall.args[0]).to.eql({
-        name: 'My download',
-        description: 'A description',
-        featureTypes: ['observation'],
-        expressionId: null
-      });
-      expect(mockRes.statusValue).to.equal(201);
-    });
-
-    it('rolls back and releases when DownloadService.createDownload throws mid-flow', async () => {
-      const rollbackStub = sinon.stub();
-      const releaseStub = sinon.stub();
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 20,
-        rollback: rollbackStub,
-        release: releaseStub
-      });
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid' });
-      sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid' });
-      sinon.stub(DownloadService.prototype, 'createDownload').rejects(new Error('Download creation failed'));
-
-      const linkStub = sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
-      const publishStub = sinon.stub(path.downloadPathDependencies, 'publishProcessDownloadJob');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody();
-
-      const requestHandler = createDownload();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as Error).message).to.equal('Download creation failed');
-        expect(rollbackStub).to.have.been.calledOnce;
-        expect(releaseStub).to.have.been.calledOnce;
-        expect(linkStub).to.not.have.been.called;
-        expect(publishStub).to.not.have.been.called;
       }
     });
   });
