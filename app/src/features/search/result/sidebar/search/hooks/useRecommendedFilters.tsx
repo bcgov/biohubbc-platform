@@ -93,10 +93,10 @@ export const useRecommendedFilters = () => {
         // Properties: API fetch
         if (input.properties) {
           try {
-            const res = await api.search.searchProperties(input.properties.filters);
-            const allProps = [...(res.properties.string ?? []), ...(res.properties.number ?? [])];
+            const res = await api.search.searchProperties(input.properties.filters, input.properties.pagination);
+            const allProps = Object.values(res.properties).flat();
             newData.properties = allProps.map((p) => ({
-              label: p.property_name,
+              label: p.property_display_name,
               value: p.feature_property_id
             }));
           } catch (err) {

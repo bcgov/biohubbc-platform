@@ -69,7 +69,7 @@ export const SubmissionDetailPage = () => {
       submission={submission}
       breadcrumbs={
         <Breadcrumbs aria-label="breadcrumb">
-          <Link component={RouterLink} to={`/search/list${location.search}`} underline="hover" color="inherit">
+          <Link component={RouterLink} to={`/search/${location.search}`} underline="hover" color="inherit">
             Search
           </Link>
           <Typography color="text.primary">{submission?.name}</Typography>
