@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { DropdownButton } from 'components/DropdownButton';
-import { IDropdownButtonItemGroup } from 'components/DropdownButton.interface';
+import { IDropdownMenuItemGroup } from 'components/menu/DropdownMenu.interface';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketSystemUserCardProps {
@@ -34,7 +34,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
     onChangeStatus,
     onRemoveTicketSystemUser
   } = props;
-  const statusOptionGroups: IDropdownButtonItemGroup[] = [
+  const statusOptionGroups: IDropdownMenuItemGroup[] = [
     {
       groupId: 'status-options',
       items: statusOptions.map((statusOption) => ({
