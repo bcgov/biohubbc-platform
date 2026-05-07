@@ -89,6 +89,36 @@ describe('searchFeatures', () => {
     });
   });
 
+  it('should normalize the requested feature type before searching', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { feature_type: '  DATASET  ' };
+    mockReq.body = {
+      expression: expressionTree,
+      pagination: {
+        page: '1',
+        limit: '10'
+      }
+    };
+
+    const searchStub = sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
+      .resolves({ features: [], count: 0 });
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(mockRes.statusValue).to.equal(200);
+  });
+
   it('should return expression search results for secured features visible to the caller', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub().resolves(),

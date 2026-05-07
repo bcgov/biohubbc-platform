@@ -25,6 +25,8 @@ interface SearchResultsLoaderInput {
   featureTypeName: string;
 }
 
+type SearchPagination = ApiPaginationRequestOptions;
+
 /**
  * Loads feature-search results from URL pagination/sort params and an expression tree.
  *
@@ -48,23 +50,19 @@ export const useSearchResults = (
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
 
-  const buildPagination = (
-    params: URLSearchParams
-  ): ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' } => ({
+  const buildPagination = (params: URLSearchParams): SearchPagination => ({
     page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
     limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
     sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
     order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
   });
 
-  const buildEmptyResponse = (
-    pagination: ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' }
-  ): SearchFeatureResponse => ({
+  const buildEmptyResponse = (pagination: SearchPagination): SearchFeatureResponse => ({
     features: [],
     pagination: {
       total: 0,
-      per_page: pagination.limit ?? 10,
-      current_page: pagination.page ?? 1,
+      per_page: pagination.limit,
+      current_page: pagination.page,
       last_page: 1,
       sort: pagination.sort,
       order: pagination.order
@@ -170,30 +168,6 @@ export const useSearchResults = (
     [searchParams, updateParams]
   );
 
-  const removeSearchParam = useCallback(
-    (key: UrlParamKey, value?: string | number) => {
-      const normalizedKey = key.toLowerCase() as UrlParamKey;
-      const newParams = new TypedURLSearchParams(searchParams.toString());
-
-      if (value !== undefined && value !== null) {
-        const normalizedValue = normalizeQueryParam(value);
-        const remaining = newParams.getAll(normalizedKey).filter((existingValue) => existingValue !== normalizedValue);
-
-        newParams.delete(normalizedKey);
-        remaining.forEach((existingValue) => newParams.append(normalizedKey, existingValue));
-      } else {
-        newParams.delete(normalizedKey);
-      }
-
-      if (normalizedKey !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
-      }
-
-      updateParams(newParams);
-    },
-    [searchParams, updateParams]
-  );
-
   // Refresh when the route, URL params, or applied expression changes.
   useEffect(() => {
     if (!enabled) {
@@ -210,7 +184,6 @@ export const useSearchResults = (
     isLoading: searchDataLoader.isLoading,
     searchParams,
     setSearchParams,
-    removeSearchParam,
     pagination: searchDataLoader.data?.pagination,
     filters: buildDownloadFilters(searchParams, featureTypeName)
   };

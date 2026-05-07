@@ -1,6 +1,6 @@
 import { TeamForm } from 'components/form/TeamForm';
 import { OkDialog } from 'components/dialog/OkDialog';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -56,7 +56,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   }, 300);
 
   const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
-  const userOptions = useMemo<SidebarOption[]>(
+  const userOptions = useMemo<SearchOption[]>(
     () =>
       availableUsers.map((user) => ({
         value: user.system_user_id,
@@ -68,7 +68,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   const memberSystemUserIds = useMemo(() => new Set(members.map((member) => member.system_user_id)), [members]);
 
   const handleSelectUser = useCallback(
-    async (option: SidebarOption | null) => {
+    async (option: SearchOption | null) => {
       if (!option) {
         return;
       }

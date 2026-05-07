@@ -6,7 +6,6 @@ interface SearchResultCardLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
-  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
 }
@@ -15,7 +14,6 @@ export const SearchResultCardLayout = ({
   results,
   cartFeatureIds,
   onClick,
-  onDownload,
   onAddToCart,
   onRemoveFromCart
 }: SearchResultCardLayoutProps) => {
@@ -27,7 +25,6 @@ export const SearchResultCardLayout = ({
           result={result}
           isInCart={cartFeatureIds.has(result.submission_feature_id)}
           onClick={onClick}
-          onDownload={onDownload}
           onAddToCart={onAddToCart}
           onRemoveFromCart={onRemoveFromCart}
         />

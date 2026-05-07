@@ -109,26 +109,6 @@ describe('useSearchResults', () => {
     });
   });
 
-  it('removes a specific zero-valued query param', async () => {
-    const setSearchParams = vi.fn();
-    (useSearchQueryParams as Mock).mockReturnValue({
-      searchParams: new URLSearchParams('species=0&species=123&page=2'),
-      setSearchParams
-    });
-
-    const { result } = renderHook(() => useSearchResults('species_observation', true, null));
-
-    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalled());
-
-    act(() => {
-      result.current.removeSearchParam('species', 0);
-    });
-
-    expect(setSearchParams).toHaveBeenCalledTimes(1);
-    expect(setSearchParams.mock.calls[0][0].getAll('species')).toEqual(['123']);
-    expect(setSearchParams.mock.calls[0][0].get('page')).toBe('1');
-  });
-
   it('does not issue a redundant immediate refresh after setter-driven URL updates', async () => {
     vi.useFakeTimers();
 

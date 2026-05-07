@@ -1,5 +1,5 @@
 import { EditDialog } from 'components/dialog/EditDialog';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
@@ -122,7 +122,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
   }, [open, availableUsersLoader]);
 
   const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
-  const options = useMemo<SidebarOption[]>(
+  const options = useMemo<SearchOption[]>(
     () =>
       availableUsers.map((user) => ({
         value: user.system_user_id,

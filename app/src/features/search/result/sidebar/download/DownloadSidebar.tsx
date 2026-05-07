@@ -3,26 +3,25 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
+import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { CartContextFeature } from 'contexts/cartContext.interface';
 import { DownloadSidebarCart } from './cart/DownloadSidebarCart';
 import { DownloadSidebarDownloads } from './downloads/DownloadSidebarDownloads';
-import { DOWNLOAD_SIDEBAR_VIEW, DownloadSidebarToolbar } from './toolbar/DownloadSidebarToolbar';
+import { DownloadSidebarToolbar } from './toolbar/DownloadSidebarToolbar';
 
 interface DownloadSidebarProps {
-  features: CartContextFeature[];
-  itemCount: number;
+  cart: {
+    features: CartContextFeature[];
+    itemCount: number;
+  };
   activeView: DOWNLOAD_SIDEBAR_VIEW;
   onViewChange: (view: DOWNLOAD_SIDEBAR_VIEW) => void;
   onDownload?: () => void;
 }
 
-export const DownloadSidebar = ({
-  features,
-  itemCount,
-  activeView,
-  onViewChange,
-  onDownload
-}: DownloadSidebarProps) => {
+export const DownloadSidebar = ({ cart, activeView, onViewChange, onDownload }: DownloadSidebarProps) => {
+  const { features, itemCount } = cart;
+
   return (
     <Stack direction="column" height="100%" boxSizing="border-box" sx={{ display: 'flex' }}>
       <Box pb={1}>

@@ -1,18 +1,27 @@
-import { Box, Divider, Paper } from '@mui/material';
+import { mdiLock } from '@mdi/js';
+import Icon from '@mdi/react';
+import { AlertTitle, Box, Container, Divider, Typography } from '@mui/material';
+import Button from '@mui/material/Button';
 import { PageHeader } from 'components/header/PageHeader';
+import { AlertBanner } from 'components/notifications/AlertBanner';
 import { CustomPagination } from 'components/pagination/CustomPagination';
+import { PageSection } from 'components/section/PageSection';
+import { TabGroup } from 'components/tabs/TabGroup';
+import { ToggleButtons } from 'components/toggle-button/ToggleButtons';
+import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
+import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { useCallback, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { normalizeQueryParam } from 'utils/query-param';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
+import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
@@ -20,18 +29,6 @@ import { SearchResultSearch } from './header/SearchResultSearch';
 import { useSearchResults } from './hooks/useSearchResults';
 import { ResultPageContainer } from './layout/ResultPageContainer';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
-import { DOWNLOAD_SIDEBAR_VIEW } from './sidebar/download/toolbar/DownloadSidebarToolbar';
-import { SearchSidebar } from './sidebar/search/SearchSidebar';
-import {
-  OmitListedRecommendedState,
-  RecommendedFiltersInput,
-  useRecommendedFilters
-} from './sidebar/search/hooks/useRecommendedFilters';
-
-export enum SEARCH_RESULT_OPTION_VIEW {
-  LIST = 'list',
-  TABLE = 'table'
-}
 
 /**
  * Feature search results page for expression-based searching.
@@ -55,81 +52,23 @@ export const SearchResultPage = () => {
   const dialogContext = useDialogContext();
 
   const [expressionTree, setExpressionTree] = useState<ExpressionTreeExpression | null>(null);
-  const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
+  const [view, setView] = useState<SEARCH_RESULT_VIEW>(SEARCH_RESULT_VIEW.TABLE);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
-  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
+  const { rows, isLoading, searchParams, setSearchParams, pagination, filters } = useSearchResults(
     routeConfig?.featureTypeName ?? '',
     !!routeConfig,
     expressionTree
   );
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || undefined;
-  const selectedFeatureType = searchParams.get(URL_PARAMS.FEATURE_TYPE) || routeConfig?.featureTypeName;
-  const allFeatureTypes = useMemo(
-    () => codesDataLoader.data?.feature_type_with_properties.map((ft) => ft.feature_type.display_name) ?? [],
-    [codesDataLoader.data]
+  const hasSecuredResults = rows.some((row) => row.is_secured);
+  const featureTypeLinks = useMemo(
+    () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
+    [codesDataLoader.data?.feature_type_with_properties]
   );
-  const featureTypes = useMemo(() => {
-    const types = codesDataLoader.data?.feature_type_with_properties ?? [];
-
-    return {
-      options: types.map((type) => ({
-        label: type.feature_type.name,
-        value: type.feature_type.name
-      }))
-    };
-  }, [codesDataLoader.data]);
-  const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
-  const [omitListedRecommended, setOmitListedRecommended] = useState<OmitListedRecommendedState>({
-    species: new Set(),
-    feature_types: new Set(),
-    properties: new Set()
-  });
-
-  const computedOmitList = useMemo<OmitListedRecommendedState>(() => {
-    const omit: OmitListedRecommendedState = {
-      species: new Set(omitListedRecommended.species),
-      feature_types: new Set(omitListedRecommended.feature_types),
-      properties: new Set(omitListedRecommended.properties)
-    };
-
-    searchParams.getAll(URL_PARAMS.SPECIES).forEach((value) => omit.species.add(normalizeQueryParam(value)));
-    searchParams.getAll(URL_PARAMS.FEATURE_TYPE).forEach((value) => omit.feature_types.add(normalizeQueryParam(value)));
-
-    return omit;
-  }, [omitListedRecommended, searchParams]);
-
-  useEffect(() => {
-    if (!allFeatureTypes.length) {
-      return;
-    }
-
-    const propertyFilters: ISearchPropertyFilters = {
-      feature_types: selectedFeatureType ? [selectedFeatureType] : undefined
-    };
-
-    if (searchQuery) {
-      propertyFilters.keyword = searchQuery;
-    }
-
-    const recommendedFiltersInput: RecommendedFiltersInput = {
-      species: searchQuery,
-      feature_types: {
-        filters: { feature_type: searchQuery },
-        allFeatureTypes
-      },
-      properties: {
-        filters: propertyFilters,
-        pagination: { page: 1, limit: 2 }
-      }
-    };
-
-    refreshRecommended(recommendedFiltersInput);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedFeatureType, allFeatureTypes]);
 
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
@@ -149,43 +88,6 @@ export const SearchResultPage = () => {
     [setSearchParams]
   );
 
-  const handleFilterChange = useCallback(
-    ({ param, value, replace }: { param: UrlParamKey; value: string; replace?: boolean }) => {
-      const normalizedValue = normalizeQueryParam(value);
-      const currentValues = searchParams.getAll(param).map((currentValue) => normalizeQueryParam(currentValue));
-
-      if (currentValues.includes(normalizedValue)) {
-        removeSearchParam(param, normalizedValue);
-      } else {
-        setSearchParams({ [param]: normalizedValue }, replace);
-      }
-    },
-    [removeSearchParam, searchParams, setSearchParams]
-  );
-
-  const omitRecommended = useCallback(
-    (type: keyof OmitListedRecommendedState, id: string | number) => {
-      const normalized = normalizeQueryParam(id);
-
-      const paramMap: Record<keyof OmitListedRecommendedState, UrlParamKey> = {
-        species: URL_PARAMS.SPECIES,
-        feature_types: URL_PARAMS.FEATURE_TYPE,
-        properties: URL_PARAMS.FEATURE_TYPE
-      };
-
-      const param = paramMap[type];
-      if (searchParams.has(param, normalized)) {
-        removeSearchParam(param, normalized);
-      }
-
-      setOmitListedRecommended((prev) => ({
-        ...prev,
-        [type]: new Set(prev[type]).add(normalized)
-      }));
-    },
-    [removeSearchParam, searchParams]
-  );
-
   const activeSort = pagination?.sort ?? 'relevancy_score';
   const sortOrder = pagination?.order ?? 'desc';
 
@@ -199,14 +101,10 @@ export const SearchResultPage = () => {
   );
 
   const handleSortChange = useCallback(
-    (sort: string) => {
-      if (sort === activeSort) {
-        setSearchParams({ [URL_PARAMS.ORDER]: sortOrder === 'asc' ? 'desc' : 'asc' }, true);
-      } else {
-        setSearchParams({ [URL_PARAMS.SORT]: sort, [URL_PARAMS.ORDER]: 'desc' }, true);
-      }
+    (sort: string, direction: 'asc' | 'desc') => {
+      setSearchParams({ [URL_PARAMS.SORT]: sort, [URL_PARAMS.ORDER]: direction }, true);
     },
-    [activeSort, sortOrder, setSearchParams]
+    [setSearchParams]
   );
 
   const handleAddAllToCart = useCallback(async () => {
@@ -273,6 +171,28 @@ export const SearchResultPage = () => {
     }
   }, [checkout, dialogContext]);
 
+  const handleResultClick = useCallback(
+    (result: SearchFeatureResultWithRelevancy) => {
+      navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`);
+    },
+    [location.search, navigate]
+  );
+
+  const handleFeatureTypeTabChange = useCallback(
+    (nextFeatureTypeName: string) => {
+      const nextLink = featureTypeLinks.find((link) => link.value === nextFeatureTypeName);
+
+      if (nextLink) {
+        const nextSearchParams = new URLSearchParams(location.search);
+        nextSearchParams.delete(URL_PARAMS.FEATURE_TYPE);
+        nextSearchParams.delete(URL_PARAMS.PAGE);
+        const nextSearch = nextSearchParams.toString();
+        navigate(nextSearch ? `${nextLink.to}?${nextSearch}` : nextLink.to);
+      }
+    },
+    [featureTypeLinks, location.search, navigate]
+  );
+
   if (!codesDataLoader.isReady) {
     return null;
   }
@@ -284,76 +204,109 @@ export const SearchResultPage = () => {
   return (
     <ResultPageContainer
       rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
-      leftSidebar={
-        <SearchSidebar
-          recommended={recommended}
-          featureTypeOptions={featureTypes.options}
-          queryParams={searchParams}
-          omitListedRecommended={computedOmitList}
-          onFilterChange={handleFilterChange}
-          onOmitListRecommended={omitRecommended}
-        />
-      }
       rightSidebar={
         <DownloadSidebar
-          features={features}
-          itemCount={cartPagination?.total ?? 0}
+          cart={{ features, itemCount: cartPagination?.total ?? 0 }}
           activeView={downloadView}
           onViewChange={setDownloadView}
           onDownload={handleCheckout}
         />
       }>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        <PageHeader>
-          <SearchResultSearch
-            searchTerm={searchQuery ?? ''}
-            expressionTree={expressionTree}
-            onExpressionApply={handleExpressionApply}
-          />
-        </PageHeader>
-
-        <Paper sx={{ borderRadius: 0, flex: 1, display: 'flex', flexDirection: 'column', m: 1, minHeight: 0 }}>
-          <Box sx={{ px: 2, py: 1 }}>
-            <SearchResultToolbar
-              view={view}
-              onViewChange={setView}
-              sortOptions={sortOptions}
-              activeSort={activeSort}
-              onSortChange={handleSortChange}
-              handleAddAllToCart={handleAddAllToCart}
-              handleDownloadAll={handleDownloadAll}
-              isDownloading={isDownloading}
+        <PageHeader
+          maxWidth="md"
+          subheader={
+            <SearchResultSearch
+              searchTerm={searchQuery ?? ''}
+              expressionTree={expressionTree}
+              onExpressionApply={handleExpressionApply}
             />
-          </Box>
+          }
+          tabs={
+            featureTypeLinks.length > 0 ? (
+              <TabGroup
+                value={routeConfig.featureTypeName}
+                onChange={handleFeatureTypeTabChange}
+                ariaLabel="Search feature types"
+                tabs={featureTypeLinks}
+              />
+            ) : undefined
+          }
+        />
 
-          <Divider />
+        {hasSecuredResults && (
+          <Container maxWidth="md" sx={{ pt: 2 }}>
+            <AlertBanner
+              variant="standard"
+              icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}
+              action={
+                <Button color="inherit" size="small" onClick={() => navigate('/portal/ticket')}>
+                  Request Access
+                </Button>
+              }>
+              <AlertTitle sx={{ mb: 0 }}>Sensitive results are hidden</AlertTitle>
+              <Typography fontSize="0.8rem">
+                Some data are secured under the Species and Ecosystems Data & Information Security Policy.
+              </Typography>
+            </AlertBanner>
+          </Container>
+        )}
 
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <SearchResultOptions
-              rows={rows}
-              isLoading={isLoading}
-              view={view}
-              onClick={(result) =>
-                navigate(
-                  `/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`
-                )
+        <Container maxWidth="md" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, py: 2 }}>
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              '& > .MuiPaper-root': {
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                minHeight: 0
               }
-            />
-          </Box>
+            }}>
+            <PageSection
+              id="search-results"
+              label="Results"
+              headerContent={
+                <ToggleButtons
+                  views={SEARCH_RESULT_VIEW_OPTIONS}
+                  activeView={view}
+                  onViewChange={setView}
+                  orientation="horizontal"
+                />
+              }>
+              <Box sx={{ px: 2, py: 1 }}>
+                <SearchResultToolbar
+                  sortOptions={sortOptions}
+                  activeSort={activeSort}
+                  onSortChange={handleSortChange}
+                  onAddAllToCart={handleAddAllToCart}
+                  onDownloadAll={handleDownloadAll}
+                  isDownloading={isDownloading}
+                />
+              </Box>
 
-          <Divider />
+              <Divider />
 
-          <Box sx={{ px: 2, py: 1 }}>
-            <CustomPagination
-              currentPage={pagination?.current_page ?? 1}
-              pageSize={pagination?.per_page ?? 10}
-              totalCount={pagination?.total ?? 0}
-              lastPage={pagination?.last_page ?? 1}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
-            />
+              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                <SearchResultOptions rows={rows} isLoading={isLoading} view={view} onClick={handleResultClick} />
+              </Box>
+
+              <Divider />
+
+              <Box sx={{ px: 2, py: 1 }}>
+                <CustomPagination
+                  currentPage={pagination?.current_page ?? 1}
+                  pageSize={pagination?.per_page ?? 10}
+                  totalCount={pagination?.total ?? 0}
+                  lastPage={pagination?.last_page ?? 1}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </Box>
+            </PageSection>
           </Box>
-        </Paper>
+        </Container>
         <PageTitle title={`Search Results - ${routeConfig.title}`} description={`List of ${routeConfig.title}`} />
       </Box>
     </ResultPageContainer>

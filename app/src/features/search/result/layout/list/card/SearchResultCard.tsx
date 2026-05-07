@@ -17,7 +17,6 @@ interface SearchResultCardProps {
   result: SearchFeatureResultWithRelevancy;
   isInCart: boolean;
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
-  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
 }

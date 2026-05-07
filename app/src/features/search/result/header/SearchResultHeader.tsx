@@ -1,4 +1,4 @@
-import { ClickAwayListener, Paper, Popper, Stack } from '@mui/material';
+import { Box, ClickAwayListener, Paper, Popper } from '@mui/material';
 import { SearchInput } from 'components/search/SearchInput';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 
@@ -82,24 +82,15 @@ export const SearchResultHeader = (props: PropsWithChildren<SearchResultHeaderPr
   };
 
   return (
-    <Stack sx={{ width: '100%' }}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        gap={1}
-        alignItems="center"
-        justifyContent="center"
-        sx={{ width: '100%' }}>
-        <Stack ref={searchInputAnchorRef} sx={{ width: '100%', maxWidth: 640 }}>
-          <SearchInput
-            size="small"
-            value={searchTerm}
-            placeholder="Search..."
-            onFocus={() => onFilterPanelOpenChange(true)}
-            onChange={(event) => onSearchTermChange(event.target.value)}
-            onClear={onClear}
-          />
-        </Stack>
-      </Stack>
+    <Box ref={searchInputAnchorRef} sx={{ display: 'flex', width: '100%' }}>
+      <SearchInput
+        size="small"
+        value={searchTerm}
+        placeholder="Search..."
+        onFocus={() => onFilterPanelOpenChange(true)}
+        onChange={(event) => onSearchTermChange(event.target.value)}
+        onClear={onClear}
+      />
 
       <Popper
         open={isFilterPanelOpen}
@@ -132,6 +123,6 @@ export const SearchResultHeader = (props: PropsWithChildren<SearchResultHeaderPr
           </Paper>
         </ClickAwayListener>
       </Popper>
-    </Stack>
+    </Box>
   );
 };

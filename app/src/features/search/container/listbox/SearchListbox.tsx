@@ -41,13 +41,14 @@ export const SearchListbox = ({
   const navigate = useNavigate();
 
   const navigateWithQuery = useCallback(
-    (value: string | number, featureTypeName: string) => {
-      const query = { [URL_PARAMS.SEARCH_QUERY]: value };
-      const path = buildSearchFeatureTypePath(featureTypeName, query);
+    (value: string | number, featureTypeName?: string) => {
+      const query = { [URL_PARAMS.SEARCH_QUERY]: searchTerm || value };
+      const targetFeatureTypeName = featureTypeName ?? defaultFeatureTypeName;
+      const path = buildSearchFeatureTypePath(targetFeatureTypeName, query);
 
       navigate(path);
     },
-    [navigate]
+    [defaultFeatureTypeName, navigate, searchTerm]
   );
 
   const hasResults = Boolean(searchTerm || summary || records);

@@ -1,4 +1,15 @@
 import { ChipProps } from '@mui/material';
+import { ToggleButtonView } from 'components/toggle-button/ToggleButtons';
+
+export enum DOWNLOAD_SIDEBAR_VIEW {
+  CART = 'cart',
+  DOWNLOADS = 'downloads'
+}
+
+export const DOWNLOAD_SIDEBAR_VIEWS: ToggleButtonView<DOWNLOAD_SIDEBAR_VIEW>[] = [
+  { value: DOWNLOAD_SIDEBAR_VIEW.CART, label: 'Cart' },
+  { value: DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS, label: 'Downloads' }
+];
 
 export const DOWNLOAD_STATUS_CHIP_PROPS: Record<string, { color: ChipProps['color']; label: string }> = {
   pending: { color: 'default', label: 'Pending' },
