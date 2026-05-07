@@ -186,6 +186,38 @@ describe('SearchResultPage — Create Download flow', () => {
     );
   });
 
+  it('does not fire createDownload twice when the save button is double-clicked while in flight', async () => {
+    let resolveCreate: (value: { download_id: string; download_url: string }) => void = () => undefined;
+    mockCreateDownload.mockImplementation(
+      () =>
+        new Promise<{ download_id: string; download_url: string }>((resolve) => {
+          resolveCreate = resolve;
+        })
+    );
+
+    const { getByRole, getByLabelText, getByTestId } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    const saveButton = getByTestId('edit-dialog-save-button');
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
+
+    resolveCreate({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
+
+    await waitFor(() =>
+      expect(mockSetSnackbar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
+        })
+      )
+    );
+    expect(mockCreateDownload).toHaveBeenCalledTimes(1);
+  });
+
   it('surfaces the API error message in a snackbar when submit fails', async () => {
     mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
 

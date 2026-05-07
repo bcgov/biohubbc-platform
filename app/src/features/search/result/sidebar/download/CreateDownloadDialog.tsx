@@ -1,7 +1,7 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
+import { CreateDownloadDialogYup } from './CreateDownloadDialogYup';
 import { CreateDownloadForm, ICreateDownloadFormValues } from './CreateDownloadForm';
-import { CreateDownloadFormYup } from './CreateDownloadFormYup';
 
 interface ICreateDownloadDialogProps {
   open: boolean;
@@ -39,7 +39,7 @@ export const CreateDownloadDialog = (props: ICreateDownloadDialogProps) => {
       component={{
         element: <CreateDownloadForm featureTypeOptions={featureTypeOptions} />,
         initialValues,
-        validationSchema: CreateDownloadFormYup
+        validationSchema: CreateDownloadDialogYup
       }}
       onCancel={onCancel}
       onSave={onSave}

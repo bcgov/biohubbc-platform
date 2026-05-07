@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { CreateDownloadResponse } from 'interfaces/useDownloadApi.interface';
 import {
-  CreateDownloadResponse,
   ISearchAllFilters,
   ISearchFeaturesFilters,
   ISearchPropertyFilters,
@@ -13,10 +13,10 @@ import {
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
-// `createDownload` and `CreateDownloadResponse` here are the legacy filter-based variant kept
-// alive only for the anonymous Bulk Download branch on `SearchResultPage`. The authenticated
-// flow uses `useDownloadApi.createDownload`. The anonymous branch is broken end-to-end against
-// the merged backend; both will be removed when the anonymous flow is reconciled.
+// `createDownload` here is the legacy filter-based variant kept alive only for the anonymous
+// Bulk Download branch on `SearchResultPage`. The authenticated flow uses
+// `useDownloadApi.createDownload`. The anonymous branch is broken end-to-end against the merged
+// backend; this will be removed when the anonymous flow is reconciled.
 
 /**
  * Returns API methods for searching features.

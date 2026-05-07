@@ -1,8 +1,8 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
+import { CreateDownloadResponse } from 'interfaces/useDownloadApi.interface';
 import {
-  CreateDownloadResponse,
   GroupedPropertyResults,
   SearchFeatureResponse,
   SearchFeatureResultWithRelevancy,

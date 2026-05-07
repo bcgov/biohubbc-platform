@@ -8,7 +8,7 @@ import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { normalizeQueryParam } from 'utils/query-param';
@@ -61,6 +61,9 @@ export const SearchResultPage = () => {
   const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
   const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
   const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
+  // Synchronous mutex for createDownload to close the gap between click and the React re-render
+  // that disables the EditDialog save button. Refs update synchronously; state does not.
+  const isSubmittingDownloadRef = useRef(false);
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
@@ -228,7 +231,12 @@ export const SearchResultPage = () => {
    * but kept in place until a separate ticket reconciles it.
    */
   const handleAnonymousDownloadAll = useCallback(async () => {
+    if (isSubmittingDownloadRef.current) {
+      return;
+    }
+    isSubmittingDownloadRef.current = true;
     try {
+      setIsSubmittingDownload(true);
       const { download_url: downloadUrl } = await api.search.createDownload(filters);
 
       dialogContext.setOkDialog({
@@ -241,6 +249,9 @@ export const SearchResultPage = () => {
       });
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+    } finally {
+      setIsSubmittingDownload(false);
+      isSubmittingDownloadRef.current = false;
     }
   }, [filters, api.search, dialogContext]);
 
@@ -282,6 +293,10 @@ export const SearchResultPage = () => {
    */
   const handleCreateDownload = useCallback(
     async (values: ICreateDownloadFormValues) => {
+      if (isSubmittingDownloadRef.current) {
+        return;
+      }
+      isSubmittingDownloadRef.current = true;
       try {
         setIsSubmittingDownload(true);
         await api.download.createDownload({
@@ -303,6 +318,7 @@ export const SearchResultPage = () => {
         });
       } finally {
         setIsSubmittingDownload(false);
+        isSubmittingDownloadRef.current = false;
       }
     },
     [api.download, dialogContext, expressionTree]
@@ -380,6 +396,7 @@ export const SearchResultPage = () => {
               onSortChange={handleSortChange}
               handleAddAllToCart={handleAddAllToCart}
               onCreateDownloadClick={handleOpenCreateDownload}
+              isCreateDownloadDisabled={isSubmittingDownload}
             />
           </Box>
 

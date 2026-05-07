@@ -80,23 +80,16 @@ describe('useDownloadApi', () => {
       expect(JSON.parse(mock.history.post[0].data)).toEqual(mockRequest);
     });
 
-    it('should resolve with parsed response body', async () => {
+    it('should propagate rejection on server error', async () => {
       const mockRequest: CreateDownloadRequest = {
         name: 'All datasets',
         featureTypes: ['dataset'],
         expression: null
       };
-      const mockResponse: CreateDownloadResponse = {
-        download_id: 'uuid-abc-123',
-        download_url: 'https://localhost/api/download/uuid-abc-123'
-      };
 
-      mock.onPost('/api/download').reply(201, mockResponse);
+      mock.onPost('/api/download').reply(400, { message: 'Validation failed' });
 
-      const result = await useDownloadApi(axios).createDownload(mockRequest);
-
-      expect(result.download_id).toBe('uuid-abc-123');
-      expect(result.download_url).toBe('https://localhost/api/download/uuid-abc-123');
+      await expect(useDownloadApi(axios).createDownload(mockRequest)).rejects.toThrow();
     });
   });
 });

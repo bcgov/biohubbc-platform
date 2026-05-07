@@ -26,11 +26,6 @@ export interface ISearchFeaturesFilters {
   species?: number[];
 }
 
-export interface CreateDownloadResponse {
-  download_id: string;
-  download_url: string;
-}
-
 /** Feature search result (for combined search) */
 export interface SearchFeatureResult {
   submission_feature_id: number;
