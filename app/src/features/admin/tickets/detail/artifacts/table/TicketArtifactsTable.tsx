@@ -7,8 +7,9 @@ import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import dayjs from 'dayjs';
+import { getTicketArtifactFileName } from 'features/admin/tickets/utils/ticketArtifactMarkdown';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
 
 interface ITicketArtifactsTableProps extends IServerPaginationProps {
@@ -39,11 +40,6 @@ export const TicketArtifactsTable = (props: ITicketArtifactsTableProps) => {
     onCopy
   } = props;
 
-  const getArtifactFileName = useCallback(
-    (artifact: ITicketArtifact) => artifact.key.split('/').pop() || artifact.key,
-    []
-  );
-
   const columns: GridColDef<ITicketArtifact>[] = useMemo(
     () => [
       { field: 'ticket_artifact_id', headerName: 'Ticket Artifact ID', flex: 1, minWidth: 260 },
@@ -61,7 +57,7 @@ export const TicketArtifactsTable = (props: ITicketArtifactsTableProps) => {
               event.stopPropagation();
               onDownload(params.row);
             }}>
-            {getArtifactFileName(params.row)}
+            {getTicketArtifactFileName(params.row)}
           </Link>
         )
       },
@@ -84,13 +80,13 @@ export const TicketArtifactsTable = (props: ITicketArtifactsTableProps) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} onClick={(event) => event.stopPropagation()}>
             <IconButton
               size="small"
-              aria-label={`Download ${getArtifactFileName(params.row)}`}
+              aria-label={`Download ${getTicketArtifactFileName(params.row)}`}
               onClick={() => onDownload(params.row)}>
               <Icon path={mdiDownload} size={0.75} />
             </IconButton>
             <IconButton
               size="small"
-              aria-label={`Copy markdown for ${getArtifactFileName(params.row)}`}
+              aria-label={`Copy markdown for ${getTicketArtifactFileName(params.row)}`}
               onClick={() => onCopy(params.row)}>
               <Icon path={mdiContentCopy} size={0.75} />
             </IconButton>
@@ -98,7 +94,7 @@ export const TicketArtifactsTable = (props: ITicketArtifactsTableProps) => {
         )
       }
     ],
-    [getArtifactFileName, onCopy, onDownload]
+    [onCopy, onDownload]
   );
 
   return (

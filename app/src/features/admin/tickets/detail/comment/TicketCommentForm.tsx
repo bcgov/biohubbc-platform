@@ -8,7 +8,7 @@ import { ToggleButtons, ToggleButtonView } from 'components/toggle-button/Toggle
 import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
-import { TicketCommentArtifactUpload } from './TicketCommentArtifactUpload';
+import { TicketArtifactUpload } from '../TicketArtifactUpload';
 
 type TicketCommentFormView = 'write' | 'preview';
 
@@ -51,7 +51,7 @@ export const TicketCommentForm = (props: ITicketCommentFormProps) => {
             onViewChange={setActiveTab}
             orientation="horizontal"
           />
-          <TicketCommentArtifactUpload
+          <TicketArtifactUpload
             label="Attach"
             buttonAriaLabel="Attach file"
             inputAriaLabel="Attach file input"

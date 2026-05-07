@@ -5,7 +5,7 @@ import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '.
 import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
-import { getObjectStoreBucketName, getSecurityObjectStoreBucketName } from '../../utils/file-utils';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
@@ -78,7 +78,7 @@ export class ArtifactService extends DBService {
       throw new HTTP409('Attachment is not ready for download yet. It is pending promotion.');
     }
 
-    return this.objectStorageService.getSignedUrl(this.getBucketTypeForArtifact(artifact.bucket), artifact.object_key);
+    return this.objectStorageService.getSignedUrl(BucketType.MAIN, artifact.object_key);
   }
 
   /**
@@ -180,27 +180,5 @@ export class ArtifactService extends DBService {
    */
   async deleteArtifact(artifactId: string): Promise<void> {
     return this.artifactRepository.deleteArtifact(artifactId);
-  }
-
-  /**
-   * Map a stored bucket name to the object-storage bucket type.
-   *
-   * Unsupported bucket names fail before storage code is called.
-   *
-   * @private
-   * @param {string} bucketName
-   * @returns {BucketType}
-   * @memberof ArtifactService
-   */
-  private getBucketTypeForArtifact(bucketName: string): BucketType {
-    if (bucketName === getObjectStoreBucketName()) {
-      return BucketType.MAIN;
-    }
-
-    if (bucketName === getSecurityObjectStoreBucketName()) {
-      return BucketType.QUARANTINE;
-    }
-
-    throw new Error(`Unsupported artifact bucket: ${bucketName}`);
   }
 }

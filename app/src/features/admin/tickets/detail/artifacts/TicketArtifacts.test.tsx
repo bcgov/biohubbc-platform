@@ -1,6 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import axios from 'axios';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
@@ -11,12 +10,6 @@ import { TicketArtifacts } from './TicketArtifacts';
 
 vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
-}));
-
-vi.mock('axios', () => ({
-  default: {
-    put: vi.fn()
-  }
 }));
 
 vi.mock('hooks/useContext', () => ({
@@ -72,7 +65,7 @@ const ticketArtifact: ITicketArtifact = {
   ticket_id: '11111111-1111-4111-8111-111111111111',
   artifact_id: '66666666-6666-4666-8666-666666666666',
   record_end_date: null,
-  create_date: '2026-02-26T00:00:00.000Z',
+  create_date: '2026-02-25T12:00:00.000Z',
   key: 'tickets/test/file.txt'
 };
 
@@ -98,13 +91,14 @@ describe('TicketArtifacts', () => {
   const completeTicketUpload = vi.fn();
   const getTicketArtifacts = vi.fn();
   const getTicketArtifactDownloadUrl = vi.fn();
-  const refreshTicket = vi.fn();
+  const uploadFileToUrl = vi.fn();
+  const setTicketData = vi.fn();
   const setSnackbar = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
-    vi.mocked(axios.put).mockResolvedValue({ status: 200 });
+    uploadFileToUrl.mockResolvedValue(undefined);
 
     (useApi as Mock).mockReturnValue({
       tickets: {
@@ -112,6 +106,9 @@ describe('TicketArtifacts', () => {
         completeTicketUpload,
         getTicketArtifacts,
         getTicketArtifactDownloadUrl
+      },
+      objectStorage: {
+        uploadFileToUrl
       }
     });
     (useConfigContext as Mock).mockReturnValue({
@@ -124,7 +121,7 @@ describe('TicketArtifacts', () => {
     (useTicketContext as Mock).mockReturnValue({
       ticketDataLoader: {
         data: ticket,
-        refresh: refreshTicket
+        setData: setTicketData
       }
     });
     getTicketArtifacts.mockResolvedValue({
@@ -191,12 +188,15 @@ describe('TicketArtifacts', () => {
     expect(completeTicketUpload).toHaveBeenCalledWith(ticket.ticket_id, '99999999-9999-4999-8999-999999999999', {
       status: 'uploaded'
     });
-    expect(axios.put).toHaveBeenCalledWith('https://object-store.example/upload', expect.any(File), {
-      headers: {
-        'Content-Type': 'text/plain'
-      }
+    expect(uploadFileToUrl).toHaveBeenCalledWith({
+      url: 'https://object-store.example/upload',
+      file: expect.any(File),
+      contentType: 'text/plain'
     });
-    expect(refreshTicket).toHaveBeenCalledWith(ticket.ticket_id);
+    expect(setTicketData).toHaveBeenCalledWith({
+      ...ticket,
+      artifacts: [...ticket.artifacts, uploadedTicketArtifact]
+    });
     expect(getTicketArtifacts).toHaveBeenCalledTimes(2);
   });
 

@@ -4,7 +4,7 @@ import Button, { ButtonProps } from '@mui/material/Button';
 import { useConfigContext, useDialogContext } from 'hooks/useContext';
 import { ChangeEvent, CSSProperties, useRef } from 'react';
 
-interface ITicketCommentArtifactUploadProps {
+interface ITicketArtifactUploadProps {
   label: string;
   buttonAriaLabel: string;
   inputAriaLabel: string;
@@ -22,10 +22,10 @@ interface ITicketCommentArtifactUploadProps {
  * Renders the upload/attach button, validates selected artifact count against configuration, resets the file input after
  * each selection, and delegates selected artifacts to the caller for the context-specific upload behavior.
  *
- * @param {ITicketCommentArtifactUploadProps} props
+ * @param {ITicketArtifactUploadProps} props
  * @return {*}
  */
-export const TicketCommentArtifactUpload = (props: ITicketCommentArtifactUploadProps) => {
+export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
   const {
     label,
     buttonAriaLabel,
