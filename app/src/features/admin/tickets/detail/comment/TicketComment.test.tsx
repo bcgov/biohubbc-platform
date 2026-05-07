@@ -36,6 +36,7 @@ describe('TicketComment', () => {
   it('defaults to Write tab and shows multiline text field', () => {
     render(<TicketComment {...baseProps} comment="Draft comment" />);
 
+    expect(screen.getByText('New Comment')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Write' })).toBeVisible();
     expect(screen.getByPlaceholderText('Type your comment...')).toBeVisible();
   });

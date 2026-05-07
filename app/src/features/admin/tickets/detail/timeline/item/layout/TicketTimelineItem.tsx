@@ -47,7 +47,7 @@ export const TicketTimelineItem = (props: PropsWithChildren<ITicketTimelineItemP
           ) : null}
         </Box>
         {dateLabel ? (
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+          <Typography component="div" variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
             {dateLabel}
           </Typography>
         ) : null}

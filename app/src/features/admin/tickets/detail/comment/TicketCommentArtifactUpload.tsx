@@ -12,7 +12,7 @@ interface ITicketCommentArtifactUploadProps {
   iconSize?: number;
   iconStyle?: CSSProperties;
   isUploading: boolean;
-  buttonProps?: Pick<ButtonProps, 'color' | 'size' | 'variant'>;
+  buttonProps?: Pick<ButtonProps, 'color' | 'disabled' | 'size' | 'variant'>;
   onArtifactsSelected: (artifacts: File[]) => Promise<void> | void;
 }
 

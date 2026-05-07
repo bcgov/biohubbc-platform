@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { render } from 'test-helpers/test-utils';
-import { TicketDataRequestTimelineItem } from './TicketDataRequestTimelineItem';
+import { TicketTimelineDataRequestItem } from './TicketTimelineDataRequestItem';
 
 const baseDataRequest = {
   data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -22,7 +22,7 @@ const renderComponent = (status: PolicyStatus, isUpdating = false) => {
   const onResetToReviewed = vi.fn();
 
   render(
-    <TicketDataRequestTimelineItem
+    <TicketTimelineDataRequestItem
       dataRequest={{ ...baseDataRequest, status }}
       dateLabel="a few seconds ago"
       isUpdating={isUpdating}
@@ -37,7 +37,7 @@ const renderComponent = (status: PolicyStatus, isUpdating = false) => {
   return { onViewPolicy, onViewFinalizedPolicy, onApprove, onDeny, onResetToReviewed };
 };
 
-describe('TicketDataRequestTimelineItem', () => {
+describe('TicketTimelineDataRequestItem', () => {
   it('shows only Review Policy when status is requested', () => {
     renderComponent(PolicyStatus.REQUESTED);
 
@@ -74,7 +74,7 @@ describe('TicketDataRequestTimelineItem', () => {
       [PolicyStatus.DENIED, 'Denied']
     ] as const) {
       const { unmount } = render(
-        <TicketDataRequestTimelineItem
+        <TicketTimelineDataRequestItem
           dataRequest={{ ...baseDataRequest, status }}
           dateLabel="a few seconds ago"
           isUpdating={false}
