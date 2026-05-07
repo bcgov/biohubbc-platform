@@ -75,6 +75,31 @@ describe('PolicyStatementService', () => {
     });
   });
 
+  describe('getActiveStatementsWithExpressionByPolicyId', () => {
+    it('passes through to the repository and returns the result unchanged', async () => {
+      const mockRows = [
+        {
+          policy_statement_id: '11111111-1111-1111-1111-111111111111',
+          urn_feature_type: 'dataset',
+          expression_id: null
+        },
+        {
+          policy_statement_id: '22222222-2222-2222-2222-222222222222',
+          urn_feature_type: 'observation',
+          expression_id: '33333333-3333-3333-3333-333333333333'
+        }
+      ];
+      const stub = sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves(mockRows);
+
+      const result = await service.getActiveStatementsWithExpressionByPolicyId('44444444-4444-4444-4444-444444444444');
+
+      expect(stub).to.have.been.calledOnceWith('44444444-4444-4444-4444-444444444444');
+      expect(result).to.eql(mockRows);
+    });
+  });
+
   describe('updatePolicyStatement', () => {
     it('should call repository.updatePolicyStatement and return the updated record', async () => {
       const mockStatement: PolicyStatement = {

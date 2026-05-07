@@ -138,6 +138,53 @@ describe('PolicyStatementRepository', () => {
     });
   });
 
+  describe('getActiveStatementsWithExpressionByPolicyId', () => {
+    it('returns rows joined to optional expression links', async () => {
+      const mockRows = [
+        {
+          policy_statement_id: '11111111-1111-1111-1111-111111111111',
+          urn_feature_type: 'dataset',
+          expression_id: null
+        },
+        {
+          policy_statement_id: '22222222-2222-2222-2222-222222222222',
+          urn_feature_type: 'observation',
+          expression_id: '33333333-3333-3333-3333-333333333333'
+        }
+      ];
+      const mockResponse = { rowCount: 2, rows: mockRows } as unknown as Promise<QueryResult<any>>;
+
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new PolicyStatementRepository(mockDBConnection);
+      const result = await repository.getActiveStatementsWithExpressionByPolicyId('policy-1');
+
+      expect(result).to.eql(mockRows);
+      expect(knexStub).to.have.been.calledOnce;
+
+      // Sanity-check the emitted SQL: ORDER BY urn_feature_type, LEFT JOIN with
+      // record_end_date guard, and ps.policy_id filter.
+      const queryArg = knexStub.firstCall.args[0];
+      const sql = queryArg.toString();
+      expect(sql).to.include('left join "policy_statement_expression"');
+      expect(sql).to.include('"pse"."record_end_date" is null');
+      expect(sql).to.include('"ps"."policy_id" = \'policy-1\'');
+      expect(sql).to.include('"ps"."record_end_date" is null');
+      expect(sql).to.include('order by "ps"."urn_feature_type"');
+    });
+
+    it('returns [] for a policy with no active statements (does NOT throw)', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new PolicyStatementRepository(mockDBConnection);
+      const result = await repository.getActiveStatementsWithExpressionByPolicyId('policy-empty');
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('updatePolicyStatement', () => {
     it('returns updated policy statement record', async () => {
       const mockRows = [

@@ -4,12 +4,14 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
-import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
+import { ExpressionTree } from '../../models/expression-tree';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { TeamService } from '../access-policy/team-service';
+import { ExpressionTreeService } from '../expression-tree-service';
+import { DownloadPolicyService } from './download-policy-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
 chai.use(sinonChai);
@@ -154,7 +156,7 @@ describe('DownloadService', () => {
 
   describe('createDownload', () => {
     const mockPayload: CreateDownload = {
-      cartId: 'aaaa0000-0000-0000-0000-000000000001',
+      policyId: 'pppp0000-0000-0000-0000-000000000001',
       format: 'parquet'
     };
 
@@ -171,17 +173,135 @@ describe('DownloadService', () => {
       expect(result).to.deep.equal({ download_id: 'dl-uuid-1' });
       expect(createDownloadStub).to.have.been.calledOnceWith(mockPayload);
     });
+  });
 
-    it('does not create an artifact at request time', async () => {
+  describe('createDownloadRequest', () => {
+    const validExpression: ExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 1,
+          feature_type_property_id: 2,
+          operator: 'Equals',
+          value: 'moose'
+        }
+      ]
+    };
+
+    const basePayload = (overrides: Partial<Parameters<DownloadService['createDownloadRequest']>[0]> = {}) => ({
+      name: 'My download',
+      description: 'A description',
+      featureTypes: ['observation'],
+      expression: validExpression,
+      systemUserId: 42,
+      ...overrides
+    });
+
+    it('orchestrates expression → policy → download → team link → publish in order', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
-      const createDownloadArtifactSpy = sinon.spy(DownloadRepository.prototype, 'createDownloadArtifact');
+      const writeExpressionTreeStub = sinon
+        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
+        .resolves({ expression_id: 'expr-uuid-1' });
+      const createDownloadPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-1' });
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'download-uuid-1' });
+      const linkStub = sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
 
-      await service.createDownload(mockPayload);
+      const result = await service.createDownloadRequest(basePayload());
 
-      expect(createDownloadArtifactSpy).to.not.have.been.called;
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
+
+      expect(writeExpressionTreeStub).to.have.been.calledOnceWith(validExpression);
+      expect(createDownloadPolicyStub).to.have.been.calledOnceWith({
+        name: 'My download',
+        description: 'A description',
+        featureTypes: ['observation'],
+        expressionId: 'expr-uuid-1'
+      });
+      expect(createDownloadStub).to.have.been.calledOnceWith({ policyId: 'policy-uuid-1', format: 'parquet' });
+      expect(linkStub).to.have.been.calledOnce;
+      expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
+      expect(linkStub.firstCall.args[1]).to.equal(42);
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
+
+      expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
+      expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
+      expect(createDownloadStub).to.have.been.calledBefore(linkStub);
+      expect(linkStub).to.have.been.calledBefore(publishStub);
+    });
+
+    it('skips writeExpressionTree and passes expressionId=null when expression is null', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const writeExpressionTreeStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
+      const createDownloadPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-2' });
+      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-2' });
+      sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-2'
+      });
+
+      await service.createDownloadRequest(basePayload({ expression: null }));
+
+      expect(writeExpressionTreeStub).to.not.have.been.called;
+      expect(createDownloadPolicyStub.firstCall.args[0]).to.include({ expressionId: null });
+    });
+
+    it('propagates HTTP400 from createDownloadPolicy without queuing the job', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid' });
+      sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .rejects(new HTTP400('Unknown feature type(s)'));
+      const createDownloadStub = sinon.stub(DownloadRepository.prototype, 'createDownload');
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob');
+
+      try {
+        await service.createDownloadRequest(basePayload());
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect(createDownloadStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      }
+    });
+
+    it('propagates errors from createDownload without linking a team or queuing the job', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid' });
+      sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid' });
+      sinon.stub(DownloadRepository.prototype, 'createDownload').rejects(new Error('Download creation failed'));
+      const linkStub = sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob');
+
+      try {
+        await service.createDownloadRequest(basePayload());
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Download creation failed');
+        expect(linkStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      }
     });
   });
 
@@ -307,7 +427,7 @@ describe('DownloadService', () => {
       expect(linkStub).to.have.been.calledOnceWith(
         'aaaa0000-0000-0000-0000-000000000042',
         42,
-        'Team for cart aaaa0000-0000-0000-0000-000000000042',
+        'Team for download aaaa0000-0000-0000-0000-000000000042',
         'Team created when claiming anonymous download'
       );
     });
@@ -338,74 +458,6 @@ describe('DownloadService', () => {
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
-      }
-    });
-  });
-
-  describe('getDownloadFeatures', () => {
-    it('resolves features from cart when cart_id is set', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const features = [
-        { submission_feature_id: 1, submission_id: 100, feature_type_name: 'dataset', estimated_byte_size: '500' },
-        { submission_feature_id: 2, submission_id: 100, feature_type_name: 'observation', estimated_byte_size: '300' }
-      ];
-
-      sinon
-        .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: 'cart-uuid', filters: null, create_user: 1 });
-      const cartStub = sinon.stub(DownloadRepository.prototype, 'getDownloadFeaturesByCartId').resolves(features);
-      const searchStub = sinon.stub(DownloadRepository.prototype, 'getDownloadFeaturesBySearchQuery');
-
-      const result = await service.getDownloadFeatures('dl-1');
-
-      expect(result).to.have.length(2);
-      expect(cartStub).to.have.been.calledOnceWith('cart-uuid');
-      expect(searchStub).to.not.have.been.called;
-    });
-
-    it('resolves features from search query when filters are set', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const features = [
-        { submission_feature_id: 3, submission_id: 200, feature_type_name: 'observation', estimated_byte_size: '100' }
-      ];
-
-      sinon
-        .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: null, filters: { keyword: 'moose' }, create_user: 5 });
-      const mockSubquery = {} as any;
-      const buildStub = sinon
-        .stub(SearchFeatureRepository.prototype, 'buildSearchFeatureIdsSubquery')
-        .returns(mockSubquery);
-      const searchStub = sinon
-        .stub(DownloadRepository.prototype, 'getDownloadFeaturesBySearchQuery')
-        .resolves(features);
-      const cartStub = sinon.stub(DownloadRepository.prototype, 'getDownloadFeaturesByCartId');
-
-      const result = await service.getDownloadFeatures('dl-1');
-
-      expect(result).to.have.length(1);
-      expect(buildStub).to.have.been.calledOnceWith({ keyword: 'moose' }, 5);
-      expect(searchStub).to.have.been.calledOnceWith(mockSubquery);
-      expect(cartStub).to.not.have.been.called;
-    });
-
-    it('throws when download has neither cart_id nor filters', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon
-        .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: null, filters: null, create_user: 1 });
-
-      try {
-        await service.getDownloadFeatures('dl-1');
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.include('has neither cart_id nor filters');
       }
     });
   });
