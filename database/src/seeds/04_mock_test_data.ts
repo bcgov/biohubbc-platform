@@ -510,7 +510,7 @@ export const insertObservationRecord = async (
       data: {
         taxon_id: taxonId,
         geometry: random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])['features'][0]['geometry'],
-        count: faker.number.int({ min: 0, max: 100 }),
+        count: faker.number.int({ min: 1, max: 100 }),
         timestamp: faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString(),
         sign: faker.helpers.arrayElement(['tracks', 'scat', 'sighting', 'other']),
         life_stage: faker.number.int({ min: 1, max: 6 }),
