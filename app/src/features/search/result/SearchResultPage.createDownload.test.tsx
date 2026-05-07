@@ -1,0 +1,209 @@
+import { fireEvent, waitFor } from '@testing-library/react';
+import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { render } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
+import { SearchResultPage } from './SearchResultPage';
+
+const mockNavigate = vi.fn();
+const mockUseParams = vi.fn(() => ({ featureType: 'dataset' }));
+const mockUseLocation = vi.fn(() => ({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' }));
+const mockSetSearchParams = vi.fn();
+const mockSearchParams = new URLSearchParams();
+
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useParams: () => mockUseParams(),
+    useLocation: () => mockUseLocation(),
+    useSearchParams: () => [mockSearchParams, mockSetSearchParams]
+  };
+});
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate
+  };
+});
+
+vi.mock('hooks/useApi');
+vi.mock('hooks/useAuthStateContext');
+vi.mock('hooks/useContext');
+vi.mock('./hooks/useSearchResults');
+vi.mock('./sidebar/search/hooks/useRecommendedFilters');
+
+import { useRecommendedFilters } from './sidebar/search/hooks/useRecommendedFilters';
+import { useSearchResults } from './hooks/useSearchResults';
+
+const mockUseApi = useApi as Mock;
+const mockUseAuthStateContext = useAuthStateContext as Mock;
+const mockUseCodesContext = useCodesContext as Mock;
+const mockUseCartContext = useCartContext as Mock;
+const mockUseDialogContext = useDialogContext as Mock;
+const mockUseSearchResults = useSearchResults as Mock;
+const mockUseRecommendedFilters = useRecommendedFilters as Mock;
+
+const mockCreateDownload = vi.fn();
+const mockSearchCreateDownload = vi.fn();
+const mockSetSnackbar = vi.fn();
+const mockSetOkDialog = vi.fn();
+
+const codesPayload = {
+  feature_type_with_properties: [
+    { feature_type: { name: 'dataset', display_name: 'Dataset' }, properties: [] },
+    { feature_type: { name: 'observation', display_name: 'Observation' }, properties: [] }
+  ]
+};
+
+const renderPage = () => render(<SearchResultPage />);
+
+describe('SearchResultPage — Create Download flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockUseApi.mockReturnValue({
+      search: { createDownload: mockSearchCreateDownload },
+      download: { createDownload: mockCreateDownload }
+    });
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
+    mockUseCodesContext.mockReturnValue({
+      codesDataLoader: { isReady: true, data: codesPayload }
+    });
+    mockUseCartContext.mockReturnValue({
+      features: [],
+      pagination: { total: 0 },
+      addToCart: vi.fn(),
+      checkout: vi.fn()
+    });
+    mockUseDialogContext.mockReturnValue({
+      setSnackbar: mockSetSnackbar,
+      setOkDialog: mockSetOkDialog
+    });
+    mockUseRecommendedFilters.mockReturnValue({
+      recommended: { species: [], feature_types: [], properties: [] },
+      handleRefresh: vi.fn()
+    });
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ submission_feature_id: 1 }],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      removeSearchParam: vi.fn(),
+      pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 },
+      filters: {}
+    });
+  });
+
+  it('renders the toolbar with the "Create Download" label (not "Download All")', () => {
+    const { getByRole, queryByRole } = renderPage();
+
+    expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
+    expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
+  });
+
+  it('opens an OkDialog when an authenticated user clicks Create Download with zero results', () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      removeSearchParam: vi.fn(),
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 },
+      filters: {}
+    });
+
+    const { getByRole, queryByRole } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    expect(mockSetOkDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        dialogTitle: 'Create Download',
+        dialogText: expect.stringMatching(/no features matching/i)
+      })
+    );
+    expect(queryByRole('heading', { level: 2, name: /^create download$/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the form dialog when an authenticated user clicks Create Download with results', async () => {
+    const { getByRole, getByLabelText } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => {
+      expect(getByLabelText(/Name/i)).toBeInTheDocument();
+    });
+    expect(mockSetOkDialog).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the legacy anonymous flow when an unauthenticated user clicks Create Download', async () => {
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
+    mockSearchCreateDownload.mockResolvedValue({
+      download_id: 'anon-uuid',
+      download_url: 'https://example/anon-uuid'
+    });
+
+    const { getByRole } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => {
+      expect(mockSearchCreateDownload).toHaveBeenCalledTimes(1);
+    });
+    expect(mockCreateDownload).not.toHaveBeenCalled();
+  });
+
+  it('submits the create-download dialog with expression: null when no expression is applied', async () => {
+    mockCreateDownload.mockResolvedValue({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
+
+    const { getByRole, getByLabelText, getByTestId } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
+    expect(mockCreateDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: expect.stringMatching(/ download$/),
+        featureTypes: ['dataset'],
+        expression: null
+      })
+    );
+    expect(mockSetSnackbar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
+      })
+    );
+  });
+
+  it('surfaces the API error message in a snackbar when submit fails', async () => {
+    mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
+
+    const { getByRole, getByLabelText, getByTestId } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockSetSnackbar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          open: true,
+          snackbarMessage: 'Server exploded'
+        })
+      )
+    );
+  });
+});

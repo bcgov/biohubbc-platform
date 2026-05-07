@@ -19,6 +19,8 @@ import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultSearch } from './header/SearchResultSearch';
 import { useSearchResults } from './hooks/useSearchResults';
 import { ResultPageContainer } from './layout/ResultPageContainer';
+import { CreateDownloadDialog } from './sidebar/download/CreateDownloadDialog';
+import { ICreateDownloadFormValues } from './sidebar/download/CreateDownloadForm';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
 import { DOWNLOAD_SIDEBAR_VIEW } from './sidebar/download/toolbar/DownloadSidebarToolbar';
 import { SearchSidebar } from './sidebar/search/SearchSidebar';
@@ -56,8 +58,9 @@ export const SearchResultPage = () => {
 
   const [expressionTree, setExpressionTree] = useState<ExpressionTreeExpression | null>(null);
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
+  const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
+  const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
@@ -218,37 +221,92 @@ export const SearchResultPage = () => {
   }, [rows, addToCart, dialogContext]);
 
   /**
-   * Download all features matching the legacy filter params.
+   * Anonymous Bulk Download. Preserved verbatim from the prior `handleDownloadAll` auth branch.
    *
-   * Downloading expression results is intentionally outside this branch's scope,
-   * so this preserves the pre-existing filter-based download behavior.
+   * The current `POST /api/download` body schema requires authenticated session metadata that the
+   * anonymous path does not produce, so this flow is broken end-to-end against the merged backend
+   * but kept in place until a separate ticket reconciles it.
    */
-  const handleDownloadAll = useCallback(async () => {
+  const handleAnonymousDownloadAll = useCallback(async () => {
     try {
-      setIsDownloading(true);
       const { download_url: downloadUrl } = await api.search.createDownload(filters);
 
-      if (auth.isAuthenticated) {
-        dialogContext.setSnackbar({
-          snackbarMessage: 'Download started. You can track its progress in your downloads.',
-          open: true
-        });
-      } else {
-        dialogContext.setOkDialog({
-          dialogTitle: 'Download Started',
-          dialogText:
-            'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-          dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
-          open: true,
-          onClose: () => dialogContext.setOkDialog({ open: false })
-        });
-      }
+      dialogContext.setOkDialog({
+        dialogTitle: 'Download Started',
+        dialogText:
+          'Your download is being prepared. Use this URL to check its status and get download links when ready.',
+        dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
+        open: true,
+        onClose: () => dialogContext.setOkDialog({ open: false })
+      });
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-    } finally {
-      setIsDownloading(false);
     }
-  }, [filters, api.search, dialogContext, auth.isAuthenticated]);
+  }, [filters, api.search, dialogContext]);
+
+  /**
+   * Resolve the toolbar `Create Download` click. Anonymous users still hit the legacy URL-display
+   * flow; authenticated users with at least one matching feature open the create-download dialog.
+   * Authenticated users whose current search has zero results see an OkDialog instead — sparing
+   * them from filling in metadata for an empty download.
+   */
+  const handleOpenCreateDownload = useCallback(() => {
+    if (!auth.isAuthenticated) {
+      handleAnonymousDownloadAll();
+      return;
+    }
+
+    if ((pagination?.total ?? 0) === 0) {
+      dialogContext.setOkDialog({
+        open: true,
+        dialogTitle: 'Create Download',
+        dialogText: 'There are no features matching your current search to download.',
+        onClose: () => dialogContext.setOkDialog({ open: false })
+      });
+      return;
+    }
+
+    setIsCreateDownloadDialogOpen(true);
+  }, [auth.isAuthenticated, pagination?.total, dialogContext, handleAnonymousDownloadAll]);
+
+  /**
+   * Submit handler for the create-download dialog. Posts the form values plus the page-level
+   * expression tree as a single `CreateDownloadRequest`, then switches the right sidebar to the
+   * Downloads view so the user can watch the new job progress.
+   *
+   * `expression` is forwarded as the literal page state. The expression-builder popover already
+   * strips builder-only `ui_id` fields at apply time, so the page state is wire-clean by
+   * construction; a second sanitizer here would duplicate the contract guarantee. The key must
+   * be present (the backend uses `.nullable()`, not `.optional()`); when no expression is
+   * applied, the page state is `null` and is sent as `null`.
+   */
+  const handleCreateDownload = useCallback(
+    async (values: ICreateDownloadFormValues) => {
+      try {
+        setIsSubmittingDownload(true);
+        await api.download.createDownload({
+          name: values.name,
+          description: values.description,
+          featureTypes: values.featureTypes,
+          expression: expressionTree
+        });
+        setIsCreateDownloadDialogOpen(false);
+        setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
+        });
+      } catch (error) {
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: (error as APIError).message
+        });
+      } finally {
+        setIsSubmittingDownload(false);
+      }
+    },
+    [api.download, dialogContext, expressionTree]
+  );
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -321,8 +379,7 @@ export const SearchResultPage = () => {
               activeSort={activeSort}
               onSortChange={handleSortChange}
               handleAddAllToCart={handleAddAllToCart}
-              handleDownloadAll={handleDownloadAll}
-              isDownloading={isDownloading}
+              onCreateDownloadClick={handleOpenCreateDownload}
             />
           </Box>
 
@@ -356,6 +413,15 @@ export const SearchResultPage = () => {
         </Paper>
         <PageTitle title={`Search Results - ${routeConfig.title}`} description={`List of ${routeConfig.title}`} />
       </Box>
+      <CreateDownloadDialog
+        open={isCreateDownloadDialogOpen}
+        isSubmitting={isSubmittingDownload}
+        defaultName={`${routeConfig.title} download`}
+        defaultFeatureType={routeConfig.featureTypeName}
+        featureTypeOptions={featureTypes.options}
+        onCancel={() => setIsCreateDownloadDialogOpen(false)}
+        onSave={handleCreateDownload}
+      />
     </ResultPageContainer>
   );
 };

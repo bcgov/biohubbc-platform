@@ -23,7 +23,7 @@ const defaultProps = {
   activeSort: 'relevancy_score',
   onSortChange: vi.fn(),
   handleAddAllToCart: vi.fn(),
-  handleDownloadAll: vi.fn()
+  onCreateDownloadClick: vi.fn()
 };
 
 describe('SearchResultToolbar', () => {
@@ -35,42 +35,21 @@ describe('SearchResultToolbar', () => {
     cleanup();
   });
 
-  it('renders Download All button alongside Add All to Cart', () => {
+  it('renders Create Download button alongside Add All to Cart', () => {
     const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
 
-    expect(getByRole('button', { name: /download all/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
     expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
   });
 
-  it('disables Download All button when isDownloading is true', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} isDownloading={true} />);
-
-    expect(getByRole('button', { name: /download all/i })).toBeDisabled();
-  });
-
-  it('enables Download All button when isDownloading is not provided', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
-
-    expect(getByRole('button', { name: /download all/i })).not.toBeDisabled();
-  });
-
-  it('calls handleDownloadAll on click', () => {
-    const handleDownloadAll = vi.fn();
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} />);
-
-    fireEvent.click(getByRole('button', { name: /download all/i }));
-
-    expect(handleDownloadAll).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call handleDownloadAll when disabled', () => {
-    const handleDownloadAll = vi.fn();
+  it('calls onCreateDownloadClick on click', () => {
+    const onCreateDownloadClick = vi.fn();
     const { getByRole } = render(
-      <SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} isDownloading={true} />
+      <SearchResultToolbar {...defaultProps} onCreateDownloadClick={onCreateDownloadClick} />
     );
 
-    fireEvent.click(getByRole('button', { name: /download all/i }));
+    fireEvent.click(getByRole('button', { name: /create download/i }));
 
-    expect(handleDownloadAll).not.toHaveBeenCalled();
+    expect(onCreateDownloadClick).toHaveBeenCalledTimes(1);
   });
 });

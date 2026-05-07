@@ -19,8 +19,7 @@ interface SearchResultToolbarProps {
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
   viewOptions?: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[];
   handleAddAllToCart: () => void;
-  handleDownloadAll: () => void;
-  isDownloading?: boolean;
+  onCreateDownloadClick: () => void;
 }
 
 export const SearchResultToolbar = ({
@@ -31,8 +30,7 @@ export const SearchResultToolbar = ({
   onSortChange,
   viewOptions,
   handleAddAllToCart,
-  handleDownloadAll,
-  isDownloading
+  onCreateDownloadClick
 }: SearchResultToolbarProps) => {
   const defaultViews: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[] = [
     { value: SEARCH_RESULT_OPTION_VIEW.TABLE, label: 'Table' },
@@ -70,11 +68,10 @@ export const SearchResultToolbar = ({
         <Button
           size="small"
           color="primary"
-          onClick={handleDownloadAll}
-          disabled={isDownloading}
+          onClick={onCreateDownloadClick}
           startIcon={<Icon path={mdiDownload} size={0.8} />}
           sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Download All
+          Create Download
         </Button>
         <Button
           size="small"
