@@ -99,21 +99,25 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         new DownloadRepository(connection).getDownloadSource(downloadId)
       );
 
-      const { schemaLookup, featureTypes } = await withConnection(async (connection) =>
-        new DownloadPipelineService(connection).resolveParquetSchema(downloadId, source)
+      const { schemaLookup, statements } = await withConnection(async (connection) =>
+        new DownloadPipelineService(connection).resolveParquetSchema(source)
       );
 
-      // Write one Parquet file per feature type. Each write runs in its own transaction
-      // so completed types survive retries — S3 overwrites are idempotent, and the
-      // artifact + download_artifact inserts use ON CONFLICT DO NOTHING.
-      for (const featureTypeName of featureTypes) {
+      // Write one Parquet file per active policy statement. Each write runs in its own
+      // transaction so completed types survive retries — S3 overwrites are idempotent,
+      // and the artifact + download_artifact inserts use ON CONFLICT DO NOTHING. The
+      // statement is threaded in so the per-type evaluator (expression vs broad) is
+      // resolved up front and not re-queried per type.
+      for (const statement of statements) {
         await withConnection(async (connection) => {
+          const featureTypeName = statement.urn_feature_type;
           const properties = schemaLookup.get(featureTypeName) ?? [];
           await new DownloadPipelineService(connection).writeFeatureTypeParquet({
             downloadId,
             source,
             properties,
-            featureTypeName
+            featureTypeName,
+            statement
           });
         });
       }

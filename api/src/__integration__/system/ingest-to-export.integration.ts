@@ -15,10 +15,10 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { CartService } from '../../services/cart-service';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -144,16 +144,21 @@ describe('Ingest → Download → Export (system integration)', function () {
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
     await indexTelemetryProperties(featureId, telemetryData);
 
-    // Build a cart + download via the real services. Authenticated path so the
-    // download is owned by a single-member team — the cart's scope-check sees
-    // the feature regardless of any inherited security on its ancestors.
+    // Build a download policy + download via the real services. Broad-path
+    // policy on the telemetry feature type — at export time the security
+    // filter is applied for the policy creator's authorization scope.
     const systemUserId = connection.systemUserId();
-    const cartService = new CartService(connection);
-    const { cart } = await cartService.createCart(systemUserId, [featureId]);
+    const policyService = new DownloadPolicyService(connection);
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: 'ingest-to-export integration test',
+      description: null,
+      featureTypes: ['telemetry'],
+      expressionId: null
+    });
 
     const downloadService = new DownloadService(connection);
     const { download_id: downloadId } = await downloadService.createDownload({
-      cartId: cart.cart_id,
+      policyId: policy_id,
       format: 'parquet'
     });
 
@@ -163,13 +168,15 @@ describe('Ingest → Download → Export (system integration)', function () {
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
-    const { schemaLookup, featureTypes } = await pipelineService.resolveParquetSchema(downloadId, source);
-    for (const featureTypeName of featureTypes) {
+    const { schemaLookup, statements } = await pipelineService.resolveParquetSchema(source);
+    for (const statement of statements) {
+      const featureTypeName = statement.urn_feature_type;
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         source,
         properties: schemaLookup.get(featureTypeName) ?? [],
-        featureTypeName
+        featureTypeName,
+        statement
       });
     }
     await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
@@ -200,7 +207,10 @@ describe('Ingest → Download → Export (system integration)', function () {
     expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 
     const lines = csv.trim().split('\n');
-    expect(lines).to.have.lengthOf(2, 'expected header + 1 data row');
+    // The broad-path policy projects every active telemetry feature, so the CSV
+    // may also contain rows from seed data — assert this test's row is present
+    // rather than asserting exclusivity.
+    expect(lines.length, 'expected header + at least the test data row').to.be.greaterThan(1);
 
     const header = lines[0].split(',');
     // System columns lead so consumers can join cross-file (uuid, parent_uuid)
@@ -211,7 +221,13 @@ describe('Ingest → Download → Export (system integration)', function () {
     // columnar predicate pushdown.
     expect(header).to.include.members(['dop', 'elevation', 'timestamp_date', 'timestamp_time', 'geometry']);
 
-    const row = lines[1].split(',');
+    const featureIdIdx = header.indexOf('submission_feature_id');
+    const dataRow = lines
+      .slice(1)
+      .map((line) => line.split(','))
+      .find((cells) => cells[featureIdIdx] === String(featureId));
+    expect(dataRow, `expected a data row for submission_feature_id=${featureId}`).to.not.be.undefined;
+    const row = dataRow!;
     const col = (name: string): string => row[header.indexOf(name)];
 
     expect(col('submission_feature_id')).to.equal(String(featureId));

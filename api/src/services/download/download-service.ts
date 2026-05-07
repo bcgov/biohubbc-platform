@@ -1,19 +1,24 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import {
-  CreateDownload,
-  DownloadFeatureSummary,
-  DownloadId,
-  DownloadListRecord,
-  DownloadRecord
-} from '../../models/download';
+import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
+import { ExpressionTree } from '../../models/expression-tree';
+import { publishProcessDownloadJob } from '../../queue/publisher';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
-import { SearchFeatureService } from '../search-feature-service';
+import { ExpressionTreeService } from '../expression-tree-service';
+import { DownloadPolicyService } from './download-policy-service';
+
+export interface CreateDownloadRequestPayload {
+  name: string;
+  description: string | null;
+  featureTypes: string[];
+  expression: ExpressionTree | null;
+  systemUserId: number;
+}
 
 /**
  * Request-time service for downloads.
@@ -39,14 +44,29 @@ export class DownloadService extends DBService {
    */
   downloadExportRepository: DownloadExportRepository;
   teamService: TeamService;
-  searchFeatureService: SearchFeatureService;
+  expressionTreeService: ExpressionTreeService;
+  downloadPolicyService: DownloadPolicyService;
+
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   *
+   * Wrapped in a thunk because `queue/publisher` imports `DownloadService` back, so a direct
+   * function reference here would be in TDZ when the module cycle resolves through publisher
+   * first. Resolving at call time sidesteps the cycle.
+   */
+  static readonly dependencies = {
+    publishProcessDownloadJob: (
+      ...args: Parameters<typeof publishProcessDownloadJob>
+    ): ReturnType<typeof publishProcessDownloadJob> => publishProcessDownloadJob(...args)
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
     this.teamService = new TeamService(connection);
-    this.searchFeatureService = new SearchFeatureService(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
+    this.downloadPolicyService = new DownloadPolicyService(connection);
   }
 
   /**
@@ -69,6 +89,51 @@ export class DownloadService extends DBService {
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
     return this.downloadRepository.createDownload(payload);
+  }
+
+  /**
+   * Create a download request end-to-end for an authenticated user.
+   *
+   * Persists the optional expression tree, creates the owning download policy, creates the
+   * download record, links a fresh team to the download for the requesting user, and queues
+   * the worker job. The caller (route handler) wraps this in a single transaction so a
+   * mid-flow failure leaves no orphan rows.
+   *
+   * Authorization is enforced at export time, not create time. The user's authorization is
+   * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
+   * create-time would let users export data they no longer have access to by simply queuing
+   * a download earlier.
+   *
+   * @param {CreateDownloadRequestPayload} payload - Request payload.
+   * @return {Promise<DownloadId>} The created download identifier.
+   * @memberof DownloadService
+   */
+  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<DownloadId> {
+    let expressionId: string | null = null;
+    if (payload.expression !== null) {
+      const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
+      expressionId = result.expression_id;
+    }
+
+    const { policy_id } = await this.downloadPolicyService.createDownloadPolicy({
+      name: payload.name,
+      description: payload.description,
+      featureTypes: payload.featureTypes,
+      expressionId
+    });
+
+    const { download_id } = await this.createDownload({ policyId: policy_id, format: 'parquet' });
+
+    await this.linkDownloadToNewTeam(
+      download_id,
+      payload.systemUserId,
+      `Team for download ${download_id}`,
+      'Team automatically created for download'
+    );
+
+    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
+
+    return { download_id };
   }
 
   /**
@@ -136,44 +201,6 @@ export class DownloadService extends DBService {
    */
   async createDownloadTeam(downloadId: string, teamId: string): Promise<void> {
     return this.downloadRepository.createDownloadTeam(downloadId, teamId);
-  }
-
-  /**
-   * Resolve all features included in a download.
-   *
-   * Branches based on the download's feature source:
-   * - **Cart-based** (cart_id set): features resolved from cart_submission_feature.
-   *   Cart downloads are frozen — checkout marks the cart as CHECKED_OUT, so
-   *   cart_submission_feature rows don't change post-checkout.
-   * - **Filter-based** (filters set): re-runs the search query at pipeline time,
-   *   intentionally picking up newly ingested data matching the filters.
-   *   The creator's security scope is recovered from `create_user` (set
-   *   automatically by `tr_audit_trigger` on INSERT). The search CTE runs as
-   *   a subquery inside the summary JOIN, keeping feature resolution in SQL
-   *   and avoiding a 500K+ ID round-trip through JS.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} All features for this download.
-   * @memberof DownloadService
-   */
-  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    const source = await this.downloadRepository.getDownloadSource(downloadId);
-
-    if (source.cart_id) {
-      return this.downloadRepository.getDownloadFeaturesByCartId(source.cart_id);
-    }
-
-    if (source.filters) {
-      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
-        source.filters,
-        source.create_user
-      );
-
-      return this.downloadRepository.getDownloadFeaturesBySearchQuery(searchSubquery);
-    }
-
-    // CHECK constraint prevents this, but guard defensively
-    throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
   }
 
   /**
@@ -294,7 +321,7 @@ export class DownloadService extends DBService {
     await this.linkDownloadToNewTeam(
       downloadId,
       systemUserId,
-      `Team for cart ${downloadId}`,
+      `Team for download ${downloadId}`,
       'Team created when claiming anonymous download'
     );
   }

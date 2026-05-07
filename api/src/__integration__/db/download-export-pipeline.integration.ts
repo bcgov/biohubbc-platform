@@ -14,6 +14,7 @@
 import * as parquetjs from '@dsnp/parquetjs';
 import archiver from 'archiver';
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
@@ -22,8 +23,8 @@ import { ApiConflictError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { CartService } from '../../services/cart-service';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
@@ -91,7 +92,7 @@ describe('Download Export pipeline (integration)', function () {
   let downloadRepo: DownloadRepository;
   let pipelineService: DownloadExportPipelineService;
   let downloadService: DownloadService;
-  let cartService: CartService;
+  let policyService: DownloadPolicyService;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -104,7 +105,7 @@ describe('Download Export pipeline (integration)', function () {
     downloadRepo = new DownloadRepository(connection);
     pipelineService = new DownloadExportPipelineService(connection);
     downloadService = new DownloadService(connection);
-    cartService = new CartService(connection);
+    policyService = new DownloadPolicyService(connection);
   });
 
   afterEach(async () => {
@@ -128,20 +129,22 @@ describe('Download Export pipeline (integration)', function () {
     featureTypeNames: string[]
   ): Promise<{ downloadId: string; artifactIds: string[] }> {
     const submissionId = await createTestSubmission(connection);
-    // One feature per type so the cart is well-formed; content isn't read by the export pipeline
+    // One feature per type so the policy has matching data; content isn't read by the export pipeline
     // (rows come from the stubbed ParquetReader, not the submission_feature table).
-    const featureIds: number[] = [];
     for (const featureTypeName of featureTypeNames) {
-      const id = await createTestFeature(connection, submissionId, featureTypeName, {
+      await createTestFeature(connection, submissionId, featureTypeName, {
         name: `${featureTypeName}-seed`
       });
-      featureIds.push(id);
     }
 
-    const systemUserId = connection.systemUserId();
-    const cartResponse = await cartService.createCart(systemUserId, featureIds);
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: `export-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      description: null,
+      featureTypes: featureTypeNames,
+      expressionId: null
+    });
     const { download_id: downloadId } = await downloadService.createDownload({
-      cartId: cartResponse.cart.cart_id,
+      policyId: policy_id,
       format: 'parquet'
     });
 
