@@ -68,7 +68,8 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         id: comment.ticket_comment_id,
         create_date: comment.create_date,
         user_identifier: comment.user_identifier,
-        comment: comment.comment
+        comment: comment.comment,
+        artifacts: comment.artifacts
       })
     ),
     ...ticket.data_requests.map(
@@ -360,7 +361,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
             <TicketCommentTimelineItem
               author={item.user_identifier}
               comment={item.comment}
-              artifacts={ticket.artifacts}
+              artifacts={item.artifacts}
               onArtifactLinkClick={handleTicketArtifactDownload}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {

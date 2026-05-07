@@ -30,6 +30,7 @@ export interface ITicketCommentLog {
   user_identifier: string;
   create_date: string;
   comment: string;
+  artifacts: ITicketArtifact[];
 }
 
 export interface ITicketArtifact {

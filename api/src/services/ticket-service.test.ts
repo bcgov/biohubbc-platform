@@ -166,7 +166,8 @@ describe('TicketService', () => {
           ticket_id: mockTicket.ticket_id,
           user_identifier: 'Bob',
           create_date: '2026-02-25T01:00:00.000Z',
-          comment: 'New comment'
+          comment: 'New comment',
+          artifacts: []
         }
       ];
       const artifactLog: TicketArtifact[] = [

@@ -126,7 +126,8 @@ const baseTicket: ITicketExtended = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       user_identifier: 'Sarah',
       create_date: '2026-02-24T12:00:00.000Z',
-      comment: 'New comment'
+      comment: 'New comment',
+      artifacts: []
     }
   ],
   references: [

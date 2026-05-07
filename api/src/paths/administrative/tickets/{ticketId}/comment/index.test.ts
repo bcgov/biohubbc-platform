@@ -22,7 +22,8 @@ describe('paths/administrative/tickets/{ticketId}/comment', () => {
       ticket_id: ticketId,
       user_identifier: 'Sarah',
       create_date: '2026-02-25T00:00:00.000Z',
-      comment: 'A comment'
+      comment: 'A comment',
+      artifacts: []
     };
 
     const mockDBConnection = getMockDBConnection({

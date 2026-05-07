@@ -6,21 +6,6 @@ import { TicketSystemUserWithUserSchema } from './ticket-system-user';
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
 
-export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['ticket_comment_id', 'ticket_id', 'user_identifier', 'create_date', 'comment'],
-  properties: {
-    ticket_comment_id: { type: 'string', format: 'uuid' },
-    ticket_id: { type: 'string', format: 'uuid' },
-    user_identifier: { type: 'string' },
-    create_date: { type: 'string', format: 'date-time' },
-    comment: {
-      type: 'string',
-      description: 'Markdown-formatted comment text'
-    }
-  }
-};
-
 export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
@@ -32,6 +17,26 @@ export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
     record_end_date: { type: 'string', format: 'date-time', nullable: true },
     create_date: { type: 'string', format: 'date-time' },
     key: { type: 'string', description: 'Artifact object storage key.' }
+  }
+};
+
+export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['ticket_comment_id', 'ticket_id', 'user_identifier', 'create_date', 'comment', 'artifacts'],
+  properties: {
+    ticket_comment_id: { type: 'string', format: 'uuid' },
+    ticket_id: { type: 'string', format: 'uuid' },
+    user_identifier: { type: 'string' },
+    create_date: { type: 'string', format: 'date-time' },
+    comment: {
+      type: 'string',
+      description: 'Markdown-formatted comment text'
+    },
+    artifacts: {
+      type: 'array',
+      description: 'Active ticket artifacts referenced by this comment markdown.',
+      items: TicketArtifactSchema
+    }
   }
 };
 

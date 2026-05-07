@@ -187,7 +187,8 @@ export const useTicketComment = () => {
       ticket_id: currentTicket.ticket_id,
       user_identifier: authStateContext.biohubUserWrapper.userIdentifier ?? 'unknown',
       create_date: new Date().toISOString(),
-      comment: trimmedComment
+      comment: trimmedComment,
+      artifacts: []
     };
 
     try {
@@ -208,7 +209,8 @@ export const useTicketComment = () => {
         ticket_id: createdComment.ticket_id,
         user_identifier: createdComment.user_identifier ?? optimisticComment.user_identifier,
         create_date: createdComment.create_date ?? optimisticComment.create_date,
-        comment: createdComment.comment ?? trimmedComment
+        comment: createdComment.comment ?? trimmedComment,
+        artifacts: createdComment.artifacts ?? []
       };
 
       replaceCommentById(optimisticCommentId, persistedComment);

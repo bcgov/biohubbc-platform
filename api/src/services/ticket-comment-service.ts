@@ -2,7 +2,9 @@ import { IDBConnection } from '../database/db';
 import { CreateTicketComment, TicketComment, UpdateTicketComment } from '../models/ticket-comment';
 import { CommentRepository } from '../repositories/comment-repository';
 import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
+import { getTicketArtifactIdsFromMarkdown } from '../utils/ticket-markdown-utils';
 import { DBService } from './db-service';
+import { TicketCommentArtifactService } from './ticket-comment-artifact-service';
 
 /**
  * Service for ticket_comment operations.
@@ -10,6 +12,7 @@ import { DBService } from './db-service';
 export class TicketCommentService extends DBService {
   commentRepository: CommentRepository;
   ticketCommentRepository: TicketCommentRepository;
+  ticketCommentArtifactService: TicketCommentArtifactService;
 
   /**
    * Creates an instance of TicketCommentService.
@@ -21,6 +24,7 @@ export class TicketCommentService extends DBService {
     super(connection);
     this.commentRepository = new CommentRepository(connection);
     this.ticketCommentRepository = new TicketCommentRepository(connection);
+    this.ticketCommentArtifactService = new TicketCommentArtifactService(connection);
   }
 
   /**
@@ -38,6 +42,12 @@ export class TicketCommentService extends DBService {
       payload.ticketId,
       comment.comment_id
     );
+    await this.ticketCommentArtifactService.replaceTicketCommentArtifacts(
+      payload.ticketId,
+      insertedTicketComment.ticket_comment_id,
+      getTicketArtifactIdsFromMarkdown(payload.comment)
+    );
+
     return this.ticketCommentRepository.getTicketCommentById(payload.ticketId, insertedTicketComment.ticket_comment_id);
   }
 
@@ -50,6 +60,7 @@ export class TicketCommentService extends DBService {
    */
   async deleteTicketComment(ticketId: string, ticketCommentId: string): Promise<void> {
     await this.ticketCommentRepository.deleteTicketComment(ticketId, ticketCommentId);
+    await this.ticketCommentArtifactService.deleteTicketCommentArtifacts(ticketCommentId);
   }
 
   /**
@@ -61,6 +72,11 @@ export class TicketCommentService extends DBService {
    */
   async updateTicketComment(payload: UpdateTicketComment): Promise<TicketComment> {
     await this.ticketCommentRepository.updateTicketComment(payload.ticketId, payload.ticketCommentId, payload.comment);
+    await this.ticketCommentArtifactService.replaceTicketCommentArtifacts(
+      payload.ticketId,
+      payload.ticketCommentId,
+      getTicketArtifactIdsFromMarkdown(payload.comment)
+    );
 
     return this.ticketCommentRepository.getTicketCommentById(payload.ticketId, payload.ticketCommentId);
   }
@@ -75,7 +91,10 @@ export class TicketCommentService extends DBService {
    */
   async deleteTicketCommentByTicketId(ticketId: string, ticketCommentId: string): Promise<void> {
     await this.ticketCommentRepository.getTicketCommentById(ticketId, ticketCommentId);
-    await this.ticketCommentRepository.deleteTicketComment(ticketId, ticketCommentId);
+    await Promise.all([
+      this.ticketCommentRepository.deleteTicketComment(ticketId, ticketCommentId),
+      this.ticketCommentArtifactService.deleteTicketCommentArtifacts(ticketCommentId)
+    ]);
   }
 
   /**
