@@ -1,6 +1,10 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { DownloadListResponse } from 'interfaces/useDownloadApi.interface';
+import {
+  CreateDownloadRequest,
+  CreateDownloadResponse,
+  DownloadListResponse
+} from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
 
 describe('useDownloadApi', () => {
@@ -51,6 +55,48 @@ describe('useDownloadApi', () => {
       await useDownloadApi(axios).getDownloads({ page: 2, limit: 10 });
 
       expect(mock.history.get[0].params).toEqual({ page: 2, limit: 10 });
+    });
+  });
+
+  describe('createDownload', () => {
+    it('should POST payload to /api/download and return response', async () => {
+      const mockRequest: CreateDownloadRequest = {
+        name: 'Moose download',
+        description: 'Moose observations in the Skeena',
+        featureTypes: ['dataset'],
+        expression: null
+      };
+      const mockResponse: CreateDownloadResponse = {
+        download_id: '550e8400-e29b-41d4-a716-446655440099',
+        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099'
+      };
+
+      mock.onPost('/api/download').reply(201, mockResponse);
+
+      const result = await useDownloadApi(axios).createDownload(mockRequest);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.post[0].url).toBe('/api/download');
+      expect(JSON.parse(mock.history.post[0].data)).toEqual(mockRequest);
+    });
+
+    it('should resolve with parsed response body', async () => {
+      const mockRequest: CreateDownloadRequest = {
+        name: 'All datasets',
+        featureTypes: ['dataset'],
+        expression: null
+      };
+      const mockResponse: CreateDownloadResponse = {
+        download_id: 'uuid-abc-123',
+        download_url: 'https://localhost/api/download/uuid-abc-123'
+      };
+
+      mock.onPost('/api/download').reply(201, mockResponse);
+
+      const result = await useDownloadApi(axios).createDownload(mockRequest);
+
+      expect(result.download_id).toBe('uuid-abc-123');
+      expect(result.download_url).toBe('https://localhost/api/download/uuid-abc-123');
     });
   });
 });
