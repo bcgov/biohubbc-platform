@@ -4,17 +4,16 @@ import { CustomPagination } from 'components/pagination/CustomPagination';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { normalizeQueryParam } from 'utils/query-param';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
-import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultSearch } from './header/SearchResultSearch';
@@ -51,7 +50,6 @@ export const SearchResultPage = () => {
   const location = useLocation();
   const { featureType } = useParams<{ featureType: string }>();
   const api = useApi();
-  const { auth } = useAuthStateContext();
 
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
@@ -65,16 +63,10 @@ export const SearchResultPage = () => {
   const { runSerialized } = useSerializedAsync();
   // Suppress post-await state updates if the user navigates away mid-submit; otherwise the global
   // dialog/snackbar context fires on the next page.
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  const isMounted = useIsMounted();
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
-  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
+  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults(
     routeConfig?.featureTypeName ?? '',
     !!routeConfig,
     expressionTree
@@ -240,48 +232,8 @@ export const SearchResultPage = () => {
   }, [rows, addToCart, dialogContext]);
 
   /**
-   * Anonymous Bulk Download. Preserved verbatim from the prior `handleDownloadAll` auth branch.
-   *
-   * The current `POST /api/download` body schema requires authenticated session metadata that the
-   * anonymous path does not produce, so this flow is broken end-to-end against the merged backend
-   * but kept in place until a separate ticket reconciles it.
-   */
-  const handleAnonymousDownloadAll = useCallback(
-    () =>
-      runSerialized(async () => {
-        setIsSubmittingDownload(true);
-        try {
-          const { download_url: downloadUrl } = await api.search.createDownload(filters);
-
-          if (!isMountedRef.current) {
-            return;
-          }
-          dialogContext.setOkDialog({
-            dialogTitle: 'Download Started',
-            dialogText:
-              'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-            dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
-            open: true,
-            onClose: () => dialogContext.setOkDialog({ open: false })
-          });
-        } catch (error) {
-          if (!isMountedRef.current) {
-            return;
-          }
-          dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-        } finally {
-          if (isMountedRef.current) {
-            setIsSubmittingDownload(false);
-          }
-        }
-      }),
-    [filters, api.search, dialogContext, runSerialized]
-  );
-
-  /**
-   * Resolve the toolbar `Create Download` click. Anonymous users still hit the legacy URL-display
-   * flow; authenticated users with at least one matching feature open the create-download dialog.
-   * Authenticated users whose current search has zero results see an OkDialog instead — sparing
+   * Resolve the toolbar `Create Download` click. Authenticated users with at least one matching
+   * feature open the create-download dialog. Zero-result searches see an OkDialog instead — sparing
    * them from filling in metadata for an empty download.
    *
    * Pagination undefined means results are still loading. The button is also disabled in that
@@ -289,11 +241,6 @@ export const SearchResultPage = () => {
    * surface the "nothing to download" dialog before results arrived.
    */
   const handleOpenCreateDownload = useCallback(() => {
-    if (!auth.isAuthenticated) {
-      handleAnonymousDownloadAll();
-      return;
-    }
-
     if (pagination === undefined) {
       return;
     }
@@ -309,7 +256,7 @@ export const SearchResultPage = () => {
     }
 
     setIsCreateDownloadDialogOpen(true);
-  }, [auth.isAuthenticated, pagination, dialogContext, handleAnonymousDownloadAll]);
+  }, [pagination, dialogContext]);
 
   /**
    * Submit handler for the create-download dialog. Posts the form values plus the page-level
@@ -333,7 +280,7 @@ export const SearchResultPage = () => {
             featureTypes: values.featureTypes,
             expression: expressionTree
           });
-          if (!isMountedRef.current) {
+          if (!isMounted()) {
             return;
           }
           setIsCreateDownloadDialogOpen(false);
@@ -343,7 +290,7 @@ export const SearchResultPage = () => {
             snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
           });
         } catch (error) {
-          if (!isMountedRef.current) {
+          if (!isMounted()) {
             return;
           }
           dialogContext.setSnackbar({
@@ -351,12 +298,12 @@ export const SearchResultPage = () => {
             snackbarMessage: (error as APIError).message
           });
         } finally {
-          if (isMountedRef.current) {
+          if (isMounted()) {
             setIsSubmittingDownload(false);
           }
         }
       }),
-    [api.download, dialogContext, expressionTree, runSerialized]
+    [api.download, dialogContext, expressionTree, runSerialized, isMounted]
   );
 
   const handlePageChange = useCallback(

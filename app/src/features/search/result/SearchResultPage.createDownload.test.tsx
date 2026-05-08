@@ -49,7 +49,6 @@ const mockUseSearchResults = useSearchResults as Mock;
 const mockUseRecommendedFilters = useRecommendedFilters as Mock;
 
 const mockCreateDownload = vi.fn();
-const mockSearchCreateDownload = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
 
@@ -67,7 +66,6 @@ describe('SearchResultPage — Create Download flow', () => {
     vi.clearAllMocks();
 
     mockUseApi.mockReturnValue({
-      search: { createDownload: mockSearchCreateDownload },
       download: { createDownload: mockCreateDownload }
     });
     mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
@@ -94,8 +92,7 @@ describe('SearchResultPage — Create Download flow', () => {
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
       removeSearchParam: vi.fn(),
-      pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 },
-      filters: {}
+      pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
 
@@ -113,8 +110,7 @@ describe('SearchResultPage — Create Download flow', () => {
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
       removeSearchParam: vi.fn(),
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 },
-      filters: {}
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
     });
 
     const { getByRole, queryByRole } = renderPage();
@@ -142,20 +138,12 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
-  it('falls back to the legacy anonymous flow when an unauthenticated user clicks Create Download', async () => {
+  it('hides the Create Download button entirely for unauthenticated users', () => {
     mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
-    mockSearchCreateDownload.mockResolvedValue({
-      download_id: 'anon-uuid',
-      download_url: 'https://example/anon-uuid'
-    });
 
-    const { getByRole } = renderPage();
+    const { queryByRole } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
-
-    await waitFor(() => {
-      expect(mockSearchCreateDownload).toHaveBeenCalledTimes(1);
-    });
+    expect(queryByRole('button', { name: /create download/i })).not.toBeInTheDocument();
     expect(mockCreateDownload).not.toHaveBeenCalled();
   });
 
@@ -225,8 +213,7 @@ describe('SearchResultPage — Create Download flow', () => {
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
       removeSearchParam: vi.fn(),
-      pagination: undefined,
-      filters: {}
+      pagination: undefined
     });
 
     const { getByRole } = renderPage();

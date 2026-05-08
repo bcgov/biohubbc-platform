@@ -1,6 +1,7 @@
 import { cleanup, fireEvent } from '@testing-library/react';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { render } from 'test-helpers/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 import { SearchResultToolbar } from './SearchResultToolbar';
 
@@ -16,6 +17,10 @@ vi.mock('components/toggle-button/ToggleButtons', () => ({
   ToggleButtons: () => <div data-testid="toggle-buttons" />
 }));
 
+vi.mock('hooks/useAuthStateContext');
+
+const mockUseAuthStateContext = useAuthStateContext as Mock;
+
 const defaultProps = {
   view: SEARCH_RESULT_OPTION_VIEW.LIST,
   onViewChange: vi.fn(),
@@ -29,16 +34,26 @@ const defaultProps = {
 describe('SearchResultToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders Create Download button alongside Add All to Cart', () => {
+  it('renders Create Download button alongside Add All to Cart for authenticated users', () => {
     const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
 
     expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
+  });
+
+  it('hides the Create Download button for anonymous users', () => {
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
+
+    const { queryByRole, getByRole } = render(<SearchResultToolbar {...defaultProps} />);
+
+    expect(queryByRole('button', { name: /create download/i })).not.toBeInTheDocument();
     expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
   });
 

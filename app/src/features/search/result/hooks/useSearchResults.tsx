@@ -4,7 +4,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ISearchFeaturesFilters, SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -70,36 +70,6 @@ export const useSearchResults = (
       order: pagination.order
     }
   });
-
-  const buildDownloadFilters = (params: URLSearchParams, featureTypeName: string): ISearchFeaturesFilters => {
-    const filters: ISearchFeaturesFilters = {};
-
-    const featureTypes = params.getAll(URL_PARAMS.FEATURE_TYPE.toLowerCase());
-
-    if (featureTypes.length > 0) {
-      filters.feature_types = featureTypes;
-    } else if (featureTypeName) {
-      filters.feature_types = [featureTypeName];
-    }
-
-    params.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-
-      switch (lowerKey) {
-        case URL_PARAMS.SPECIES.toLowerCase():
-          filters.species = filters.species ?? [];
-          filters.species.push(Number(value));
-          break;
-        case URL_PARAMS.SEARCH_QUERY.toLowerCase():
-          filters.keyword = value;
-          break;
-        default:
-          break;
-      }
-    });
-
-    return filters;
-  };
 
   /** Data loader for search results */
   const searchDataLoader = useDataLoader(
@@ -211,7 +181,6 @@ export const useSearchResults = (
     searchParams,
     setSearchParams,
     removeSearchParam,
-    pagination: searchDataLoader.data?.pagination,
-    filters: buildDownloadFilters(searchParams, featureTypeName)
+    pagination: searchDataLoader.data?.pagination
   };
 };

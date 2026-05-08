@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Button, Stack } from '@mui/material';
 import { SortButton } from 'components/button/SortButton';
 import { ToggleButtonView, ToggleButtons } from 'components/toggle-button/ToggleButtons';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 
 interface SortOption {
@@ -34,6 +35,10 @@ export const SearchResultToolbar = ({
   onCreateDownloadClick,
   isCreateDownloadDisabled
 }: SearchResultToolbarProps) => {
+  // Create Download requires authentication — anonymous downloads are deprecated and will be
+  // re-introduced via curated download packages.
+  const { auth } = useAuthStateContext();
+
   const defaultViews: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[] = [
     { value: SEARCH_RESULT_OPTION_VIEW.TABLE, label: 'Table' },
     { value: SEARCH_RESULT_OPTION_VIEW.LIST, label: 'List' }
@@ -67,15 +72,17 @@ export const SearchResultToolbar = ({
 
       {/* Right: Actions + View */}
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Button
-          size="small"
-          color="primary"
-          onClick={onCreateDownloadClick}
-          disabled={isCreateDownloadDisabled}
-          startIcon={<Icon path={mdiDownload} size={0.8} />}
-          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Create Download
-        </Button>
+        {auth.isAuthenticated && (
+          <Button
+            size="small"
+            color="primary"
+            onClick={onCreateDownloadClick}
+            disabled={isCreateDownloadDisabled}
+            startIcon={<Icon path={mdiDownload} size={0.8} />}
+            sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+            Create Download
+          </Button>
+        )}
         <Button
           size="small"
           color="primary"

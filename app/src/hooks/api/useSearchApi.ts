@@ -1,9 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { CreateDownloadResponse } from 'interfaces/useDownloadApi.interface';
 import {
   ISearchAllFilters,
-  ISearchFeaturesFilters,
   ISearchPropertyFilters,
   SearchFeatureResponse,
   SearchPropertyResponse,
@@ -12,11 +10,6 @@ import {
 } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-
-// `createDownload` here is the legacy filter-based variant kept alive only for the anonymous
-// Bulk Download branch on `SearchResultPage`. The authenticated flow uses
-// `useDownloadApi.createDownload`. The anonymous branch is broken end-to-end against the merged
-// backend; this will be removed when the anonymous flow is reconciled.
 
 /**
  * Returns API methods for searching features.
@@ -96,22 +89,10 @@ export const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  /**
-   * Create a download from search filters.
-   * Bypasses the shopping cart — sends current search filters to the server which resolves
-   * them to feature IDs and creates a download record. The download UUID is the access
-   * credential for anonymous users; authenticated users get it linked to their account.
-   */
-  const createDownload = async (filters: ISearchFeaturesFilters): Promise<CreateDownloadResponse> => {
-    const { data } = await axios.post<CreateDownloadResponse>('/api/download', { filters });
-    return data;
-  };
-
   return {
     searchFeatures,
     searchAll,
     searchProperties,
-    searchSummary,
-    createDownload
+    searchSummary
   };
 };
