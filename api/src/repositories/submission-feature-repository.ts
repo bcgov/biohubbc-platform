@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { SubmissionFeatureProperty } from '../models/feature-property';
-import { SubmissionFeaturePropertyFilters, SubmissionFeatureSignedUrlPayload } from '../models/submission-feature';
+import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
@@ -199,73 +199,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
     }
 
     return response.rows[0].count;
-  }
-
-  /**
-   * Retrieves submission feature (artifact) key from data column key value pair.
-   * Checks submission feature is not secure.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @returns {Promise<string>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND NOT EXISTS (
-      SELECT NULL
-      FROM submission_feature_security sfs
-      WHERE sfs.submission_feature_id = ss.submission_feature_id
-    )
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key}
-    RETURNING ss.value;`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `submissionFeature is secure or matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionFeatureRepository->getSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
-  }
-
-  /**
-   * Retrieves submission feature (artifact) key from data column key value pair. Skips security checks.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @returns {Promise<string>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getAdminSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key};`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionFeatureRepository->getAdminSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
   }
 
   /**

@@ -120,13 +120,6 @@ export interface IGetDownloadSubmissionResponse {
   level: number;
 }
 
-export type SubmissionFeatureSignedUrlPayload = {
-  submissionId: number;
-  submissionFeatureId: number;
-  submissionFeatureKey: string;
-  submissionFeatureValue: string;
-};
-
 export interface PresignedUrl {
   partNumber: number;
   url: string;
