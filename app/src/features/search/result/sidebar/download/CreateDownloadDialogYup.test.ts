@@ -36,6 +36,8 @@ describe('CreateDownloadDialogYup', () => {
 
   it('accepts valid values (with null description)', async () => {
     const valuesWithNullDescription = { ...validValues, description: null };
-    await expect(CreateDownloadDialogYup.validate(valuesWithNullDescription)).resolves.toEqual(valuesWithNullDescription);
+    await expect(CreateDownloadDialogYup.validate(valuesWithNullDescription)).resolves.toEqual(
+      valuesWithNullDescription
+    );
   });
 });

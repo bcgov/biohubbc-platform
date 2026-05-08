@@ -6,6 +6,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -61,9 +62,16 @@ export const SearchResultPage = () => {
   const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
   const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
   const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
-  // Synchronous mutex for createDownload to close the gap between click and the React re-render
-  // that disables the EditDialog save button. Refs update synchronously; state does not.
-  const isSubmittingDownloadRef = useRef(false);
+  const { runSerialized } = useSerializedAsync();
+  // Suppress post-await state updates if the user navigates away mid-submit; otherwise the global
+  // dialog/snackbar context fires on the next page.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
@@ -136,6 +144,14 @@ export const SearchResultPage = () => {
     refreshRecommended(recommendedFiltersInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedFeatureType, allFeatureTypes]);
+
+  // React Router reuses this component across `/search/:featureType` segments. Without an explicit
+  // reset, an expression tree applied on one feature type follows the user to another and would be
+  // POSTed alongside the new route's `featureTypeName` — producing a mismatched download.
+  useEffect(() => {
+    setExpressionTree(null);
+    setIsCreateDownloadDialogOpen(false);
+  }, [featureType]);
 
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
@@ -230,36 +246,47 @@ export const SearchResultPage = () => {
    * anonymous path does not produce, so this flow is broken end-to-end against the merged backend
    * but kept in place until a separate ticket reconciles it.
    */
-  const handleAnonymousDownloadAll = useCallback(async () => {
-    if (isSubmittingDownloadRef.current) {
-      return;
-    }
-    isSubmittingDownloadRef.current = true;
-    try {
-      setIsSubmittingDownload(true);
-      const { download_url: downloadUrl } = await api.search.createDownload(filters);
+  const handleAnonymousDownloadAll = useCallback(
+    () =>
+      runSerialized(async () => {
+        setIsSubmittingDownload(true);
+        try {
+          const { download_url: downloadUrl } = await api.search.createDownload(filters);
 
-      dialogContext.setOkDialog({
-        dialogTitle: 'Download Started',
-        dialogText:
-          'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-        dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
-        open: true,
-        onClose: () => dialogContext.setOkDialog({ open: false })
-      });
-    } catch (error) {
-      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-    } finally {
-      setIsSubmittingDownload(false);
-      isSubmittingDownloadRef.current = false;
-    }
-  }, [filters, api.search, dialogContext]);
+          if (!isMountedRef.current) {
+            return;
+          }
+          dialogContext.setOkDialog({
+            dialogTitle: 'Download Started',
+            dialogText:
+              'Your download is being prepared. Use this URL to check its status and get download links when ready.',
+            dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
+            open: true,
+            onClose: () => dialogContext.setOkDialog({ open: false })
+          });
+        } catch (error) {
+          if (!isMountedRef.current) {
+            return;
+          }
+          dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+        } finally {
+          if (isMountedRef.current) {
+            setIsSubmittingDownload(false);
+          }
+        }
+      }),
+    [filters, api.search, dialogContext, runSerialized]
+  );
 
   /**
    * Resolve the toolbar `Create Download` click. Anonymous users still hit the legacy URL-display
    * flow; authenticated users with at least one matching feature open the create-download dialog.
    * Authenticated users whose current search has zero results see an OkDialog instead — sparing
    * them from filling in metadata for an empty download.
+   *
+   * Pagination undefined means results are still loading. The button is also disabled in that
+   * window, but guard the handler too — without it, the click would coerce undefined → 0 and
+   * surface the "nothing to download" dialog before results arrived.
    */
   const handleOpenCreateDownload = useCallback(() => {
     if (!auth.isAuthenticated) {
@@ -267,7 +294,11 @@ export const SearchResultPage = () => {
       return;
     }
 
-    if ((pagination?.total ?? 0) === 0) {
+    if (pagination === undefined) {
+      return;
+    }
+
+    if (pagination.total === 0) {
       dialogContext.setOkDialog({
         open: true,
         dialogTitle: 'Create Download',
@@ -278,7 +309,7 @@ export const SearchResultPage = () => {
     }
 
     setIsCreateDownloadDialogOpen(true);
-  }, [auth.isAuthenticated, pagination?.total, dialogContext, handleAnonymousDownloadAll]);
+  }, [auth.isAuthenticated, pagination, dialogContext, handleAnonymousDownloadAll]);
 
   /**
    * Submit handler for the create-download dialog. Posts the form values plus the page-level
@@ -292,36 +323,40 @@ export const SearchResultPage = () => {
    * applied, the page state is `null` and is sent as `null`.
    */
   const handleCreateDownload = useCallback(
-    async (values: ICreateDownloadFormValues) => {
-      if (isSubmittingDownloadRef.current) {
-        return;
-      }
-      isSubmittingDownloadRef.current = true;
-      try {
+    (values: ICreateDownloadFormValues) =>
+      runSerialized(async () => {
         setIsSubmittingDownload(true);
-        await api.download.createDownload({
-          name: values.name,
-          description: values.description,
-          featureTypes: values.featureTypes,
-          expression: expressionTree
-        });
-        setIsCreateDownloadDialogOpen(false);
-        setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
-        });
-      } catch (error) {
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: (error as APIError).message
-        });
-      } finally {
-        setIsSubmittingDownload(false);
-        isSubmittingDownloadRef.current = false;
-      }
-    },
-    [api.download, dialogContext, expressionTree]
+        try {
+          await api.download.createDownload({
+            name: values.name,
+            description: values.description,
+            featureTypes: values.featureTypes,
+            expression: expressionTree
+          });
+          if (!isMountedRef.current) {
+            return;
+          }
+          setIsCreateDownloadDialogOpen(false);
+          setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
+          });
+        } catch (error) {
+          if (!isMountedRef.current) {
+            return;
+          }
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: (error as APIError).message
+          });
+        } finally {
+          if (isMountedRef.current) {
+            setIsSubmittingDownload(false);
+          }
+        }
+      }),
+    [api.download, dialogContext, expressionTree, runSerialized]
   );
 
   const handlePageChange = useCallback(
@@ -396,7 +431,7 @@ export const SearchResultPage = () => {
               onSortChange={handleSortChange}
               handleAddAllToCart={handleAddAllToCart}
               onCreateDownloadClick={handleOpenCreateDownload}
-              isCreateDownloadDisabled={isSubmittingDownload}
+              isCreateDownloadDisabled={isSubmittingDownload || pagination === undefined}
             />
           </Box>
 

@@ -218,6 +218,38 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(mockCreateDownload).toHaveBeenCalledTimes(1);
   });
 
+  it('disables Create Download while pagination is still loading (undefined → not zero)', () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [],
+      isLoading: true,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      removeSearchParam: vi.fn(),
+      pagination: undefined,
+      filters: {}
+    });
+
+    const { getByRole } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    expect(getByRole('button', { name: /create download/i })).toBeDisabled();
+    expect(mockSetOkDialog).not.toHaveBeenCalled();
+    expect(mockCreateDownload).not.toHaveBeenCalled();
+  });
+
+  it('closes the open create-download dialog when the URL :featureType changes', async () => {
+    const { getByRole, getByLabelText, queryByLabelText, rerender } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    mockUseParams.mockReturnValue({ featureType: 'observation' });
+    rerender(<SearchResultPage />);
+
+    await waitFor(() => expect(queryByLabelText(/Name/i)).not.toBeInTheDocument());
+  });
+
   it('surfaces the API error message in a snackbar when submit fails', async () => {
     mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
 
