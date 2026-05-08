@@ -5,17 +5,9 @@ import { SearchFeatureRepository } from '../repositories/search-feature-reposito
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
-import {
-  InsertDatetimeSearchableRecord,
-  InsertNumberSearchableRecord,
-  InsertSpatialSearchableRecord,
-  InsertStringSearchableRecord,
-  ISearchFeaturesFilters,
-  SearchFeatureResultWithRelevancy
-} from './search-feature-service.interface';
+import { ISearchFeaturesFilters, SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 
 const defaultLog = getLogger('services/search-feature-service');
 
@@ -199,112 +191,5 @@ export class SearchFeatureService extends DBService {
    */
   buildSearchFeatureIdsSubquery(filters: ISearchFeaturesFilters, systemUserId?: number | null): Knex.QueryBuilder {
     return this.searchFeatureRepository.buildSearchFeatureIdsSubquery(filters, systemUserId);
-  }
-
-  /**
-   * Creates search indexes for datetime, number, spatial and string properties belonging to
-   * all features found for the given submission.
-   *
-   * Deletes existing search records first for idempotency — job retries and manual re-indexing
-   * can run this multiple times for the same submission. Without delete-before-insert, duplicate
-   * records accumulate because the search tables have no unique constraint on
-   * (submission_feature_id, feature_property_id). Upsert was rejected because it can't clean up
-   * orphaned rows when properties are removed between runs.
-   *
-   * @param {number} submissionId
-   * @return {Promise<void>}
-   */
-  async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
-    defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });
-
-    // Delete existing search records for idempotency (safe for retries and manual re-indexing)
-    await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
-
-    const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
-    const numberRecords: InsertNumberSearchableRecord[] = [];
-    const spatialRecords: InsertSpatialSearchableRecord[] = [];
-    const stringRecords: InsertStringSearchableRecord[] = [];
-
-    const submissionRepository = new SubmissionRepository(this.connection);
-    const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
-
-    const codeService = new CodeService(this.connection);
-    const allFeatureTypePropertyCodes = await codeService.getFeatureTypePropertyCodes();
-
-    for (const currentFeature of allFeatures) {
-      const currentFeatureProperties = Object.entries(currentFeature.data);
-
-      const applicableFeatureTypePropertyCodes = allFeatureTypePropertyCodes.find(
-        (item) => item.feature_type.feature_type_id === currentFeature.feature_type_id
-      );
-
-      if (!applicableFeatureTypePropertyCodes) {
-        continue;
-      }
-
-      for (const [currentFeaturePropertyName, currentFeaturePropertyValue] of currentFeatureProperties) {
-        const matchingFeatureProperty = applicableFeatureTypePropertyCodes.properties.find(
-          (item) => item.name === currentFeaturePropertyName
-        );
-
-        if (!matchingFeatureProperty || !currentFeaturePropertyValue) {
-          continue;
-        }
-
-        switch (matchingFeatureProperty.type_name) {
-          case 'datetime':
-            datetimeRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentFeaturePropertyValue as string
-            });
-            break;
-
-          case 'number':
-            numberRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentFeaturePropertyValue as number
-            });
-            break;
-
-          case 'spatial':
-            spatialRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentFeaturePropertyValue
-            });
-            break;
-
-          case 'string':
-            stringRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentFeaturePropertyValue as string
-            });
-            break;
-        }
-      }
-    }
-
-    const promises: Promise<any>[] = [];
-
-    if (datetimeRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableDatetimeRecords(datetimeRecords));
-    }
-
-    if (numberRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableNumberRecords(numberRecords));
-    }
-
-    if (spatialRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableSpatialRecords(spatialRecords));
-    }
-
-    if (stringRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableStringRecords(stringRecords));
-    }
-
-    await Promise.all(promises);
   }
 }
