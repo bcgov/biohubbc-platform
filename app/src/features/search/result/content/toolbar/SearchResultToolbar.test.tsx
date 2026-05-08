@@ -27,7 +27,7 @@ const defaultProps = {
   sortOptions: [{ label: 'Relevance', value: 'relevancy_score', direction: 'desc' as const }],
   activeSort: 'relevancy_score',
   onSortChange: vi.fn(),
-  handleAddAllToCart: vi.fn(),
+  onAddAllToCart: vi.fn(),
   onCreateDownloadClick: vi.fn()
 };
 

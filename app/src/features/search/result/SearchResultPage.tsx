@@ -376,7 +376,7 @@ export const SearchResultPage = () => {
               sortOptions={sortOptions}
               activeSort={activeSort}
               onSortChange={handleSortChange}
-              handleAddAllToCart={handleAddAllToCart}
+              onAddAllToCart={handleAddAllToCart}
               onCreateDownloadClick={handleOpenCreateDownload}
               isCreateDownloadDisabled={isSubmittingDownload || pagination === undefined}
             />

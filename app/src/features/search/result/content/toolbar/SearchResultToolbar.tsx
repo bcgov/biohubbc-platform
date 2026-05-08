@@ -19,7 +19,7 @@ interface SearchResultToolbarProps {
   activeSort: string;
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
   viewOptions?: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[];
-  handleAddAllToCart: () => void;
+  onAddAllToCart: () => void;
   onCreateDownloadClick: () => void;
   isCreateDownloadDisabled?: boolean;
 }
@@ -31,7 +31,7 @@ export const SearchResultToolbar = ({
   activeSort,
   onSortChange,
   viewOptions,
-  handleAddAllToCart,
+  onAddAllToCart,
   onCreateDownloadClick,
   isCreateDownloadDisabled
 }: SearchResultToolbarProps) => {
@@ -86,7 +86,7 @@ export const SearchResultToolbar = ({
         <Button
           size="small"
           color="primary"
-          onClick={handleAddAllToCart}
+          onClick={onAddAllToCart}
           startIcon={<Icon path={mdiPlus} size={0.8} />}
           sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
           Add All to Cart
