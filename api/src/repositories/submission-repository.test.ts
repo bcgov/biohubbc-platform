@@ -1164,8 +1164,50 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
+    it('should set record effective dates for submission features from an upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = now()');
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
+    });
+
+    it('should set record end dates for submission features from an upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.setRecordEndDateBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
+    });
+
     it('should clear record dates for submission features from an upload', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
@@ -1176,6 +1218,8 @@ describe('SubmissionRepository', () => {
       expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = NULL');
       expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
       expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
     });
 
     it('should throw when no rows are updated', async () => {

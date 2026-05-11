@@ -295,13 +295,52 @@ describe('SubmissionUploadRepository', () => {
     });
 
     it('succeeds if soft delete affects one row', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
       const result = await repo.deleteSubmissionUpload('id-1');
 
       expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUpload', () => {
+    it('succeeds if soft delete affects one row and returns the updated row id', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUpload('id-1');
+
+      expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUploadsBySubmissionId', () => {
+    it('returns the number of soft-deleted rows and returns row ids from SQL', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ submission_upload_id: 'id-1' }, { submission_upload_id: 'id-2' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUploadsBySubmissionId(123);
+
+      expect(result).to.equal(2);
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
     });
   });
 });

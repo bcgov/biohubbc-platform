@@ -457,7 +457,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -481,7 +482,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -500,7 +502,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);

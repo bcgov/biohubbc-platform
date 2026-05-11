@@ -31,7 +31,9 @@ export class SubmissionFeatureRepository extends BaseRepository {
         record_effective_date = now(),
         record_end_date = NULL
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -58,7 +60,9 @@ export class SubmissionFeatureRepository extends BaseRepository {
       SET
         record_end_date = now()
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -86,7 +90,9 @@ export class SubmissionFeatureRepository extends BaseRepository {
         record_effective_date = NULL,
         record_end_date = NULL
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
