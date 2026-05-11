@@ -61,9 +61,9 @@ app:
   # Ingestion pipeline — queue memory and DB-write tuning knobs
   ingestion:
     featureBatchSize: "10000" # INGESTION_FEATURE_BATCH_SIZE: features buffered per archive ingest batch
-    contributorCodeBatchSize: "" # INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE: contributor codes per DB insert batch
-    mediaBatchBytes: "" # INGESTION_MEDIA_BATCH_BYTES: max buffered media bytes before flush
-    mediaBatchFiles: "" # INGESTION_MEDIA_BATCH_FILES: max buffered media files before flush
+    contributorCodeBatchSize: null # INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE: contributor codes per DB insert batch (optional, omitted when unset)
+    mediaBatchBytes: null # INGESTION_MEDIA_BATCH_BYTES: max buffered media bytes before flush (optional, omitted when unset)
+    mediaBatchFiles: null # INGESTION_MEDIA_BATCH_FILES: max buffered media files before flush (optional, omitted when unset)
 
   # Security scope anchor maintenance
   security:
@@ -72,8 +72,8 @@ app:
   # Upload pipeline — archive ingest controls (queue-consumed)
   uploadIngestion:
     featureBatchMaxBytes: "52428800" # UPLOAD_FEATURE_BATCH_MAX_BYTES: heap bound for feature batch buffering
-    mediaConcurrency: "" # UPLOAD_ARCHIVE_MEDIA_CONCURRENCY: concurrent media uploads while streaming one archive
-    jobBatchSize: "" # UPLOAD_JOB_BATCH_SIZE: jobs fetched per worker polling cycle
+    mediaConcurrency: null # UPLOAD_ARCHIVE_MEDIA_CONCURRENCY: concurrent media uploads while streaming one archive (optional, omitted when unset)
+    jobBatchSize: null # UPLOAD_JOB_BATCH_SIZE: jobs fetched per worker polling cycle (optional, omitted when unset)
     jsonFileMaxBytes: "104857600" # UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES: max bytes per features/codes JSON entry
 
   # Download pipeline — memory-impacting tuning knobs (DOWNLOAD_* prefix)
