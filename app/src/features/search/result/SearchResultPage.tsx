@@ -236,12 +236,13 @@ export const SearchResultPage = () => {
    * feature open the create-download dialog. Zero-result searches see an OkDialog instead — sparing
    * them from filling in metadata for an empty download.
    *
-   * Pagination undefined means results are still loading. The button is also disabled in that
-   * window, but guard the handler too — without it, the click would coerce undefined → 0 and
-   * surface the "nothing to download" dialog before results arrived.
+   * Pagination undefined or a refresh in flight means results are still loading. The button is
+   * also disabled in that window, but guard the handler too — without it, a click would either
+   * coerce undefined → 0 and surface the "nothing to download" dialog before results arrived, or
+   * open the dialog against a stale `pagination.total` from the previous query.
    */
   const handleOpenCreateDownload = useCallback(() => {
-    if (pagination === undefined) {
+    if (isLoading || pagination === undefined) {
       return;
     }
 
@@ -256,7 +257,7 @@ export const SearchResultPage = () => {
     }
 
     setIsCreateDownloadDialogOpen(true);
-  }, [pagination, dialogContext]);
+  }, [isLoading, pagination, dialogContext]);
 
   /**
    * Submit handler for the create-download dialog. Posts the form values plus the page-level
@@ -378,7 +379,7 @@ export const SearchResultPage = () => {
               onSortChange={handleSortChange}
               onAddAllToCart={handleAddAllToCart}
               onCreateDownloadClick={handleOpenCreateDownload}
-              isCreateDownloadDisabled={isSubmittingDownload || pagination === undefined}
+              isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
             />
           </Box>
 
