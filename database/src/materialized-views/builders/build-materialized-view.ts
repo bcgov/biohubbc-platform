@@ -1,6 +1,8 @@
 import { OBSERVATIONS_BASE_QUERY } from '../sql/observations.sql';
 import { TELEMETRY_BASE_QUERY } from '../sql/telemetry.sql';
 import { MaterializedViewDefinition } from '../types';
+import { buildSecurityFilter } from './build-security';
+import { SECURITY_CONFIG } from '../config/mv.security';
 
 export function buildMaterializedViewSQL(definition: MaterializedViewDefinition): string {
   const { schema, name, columns, securityMode } = definition;
@@ -38,16 +40,7 @@ export function buildMaterializedViewSQL(definition: MaterializedViewDefinition)
   }
 
   // Apply security filter
-  let securityFilter = '';
-  if (securityMode === 'public') {
-    securityFilter =
-      'AND sf.submission_feature_id NOT IN (SELECT submission_feature_id FROM biohub.submission_feature_security)';
-  } else if (securityMode === 'all') {
-    // No filter for 'all'
-  } else if (securityMode === 'secured') {
-    // TODO: Implement secured whitelist logic
-    securityFilter = 'AND 1=0'; // Default to no results until whitelist is implemented
-  }
+  const securityFilter = buildSecurityFilter(securityMode, SECURITY_CONFIG);
 
   // Apply site filter for observations vs incidental
   let siteFilter = '';
