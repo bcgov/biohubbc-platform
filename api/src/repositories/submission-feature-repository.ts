@@ -17,6 +17,95 @@ import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } 
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
+   * Set record_effective_date for active features from a submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_effective_date = now(),
+        record_end_date = NULL
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record effective dates', [
+        'SubmissionFeatureRepository->setRecordEffectiveDateBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Set record_end_date for features from a rejected submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async setRecordEndDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_end_date = now()
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record end dates', [
+        'SubmissionFeatureRepository->setRecordEndDateBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Clear publication and rejection dates for features from a submitted upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async unsetRecordDatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_effective_date = NULL,
+        record_end_date = NULL
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to unset submission feature record dates', [
+        'SubmissionFeatureRepository->unsetRecordDatesBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionUuid

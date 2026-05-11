@@ -5,6 +5,7 @@ import {
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
@@ -26,7 +27,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -69,7 +71,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -116,6 +119,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.status,
         su.ticket_id,
+        su.comment,
         su.record_end_date
       FROM
         submission_upload su
@@ -165,7 +169,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_id',
         'submission_upload.upload_id',
         'submission_upload.status',
-        'submission_upload.ticket_id'
+        'submission_upload.ticket_id',
+        'submission_upload.comment'
       )
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
@@ -186,6 +191,98 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Find ticket-scoped submission upload timeline records.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<TicketSubmissionUpload[]>}
+   */
+  async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        s.uuid AS submission_uuid,
+        su.upload_id,
+        su.create_date,
+        s.name AS submission_name,
+        s.description AS submission_description,
+        su.comment AS submission_comment,
+        submitter.user_identifier AS submitted_by_identifier,
+        su.status AS upload_status,
+        sus.status AS review_status,
+        validation.validation,
+        COALESCE(reviews.reviews, '[]'::json) AS reviews
+      FROM
+        submission_upload su
+      INNER JOIN
+        submission s
+      ON
+        s.submission_id = su.submission_id
+      LEFT JOIN
+        "system_user" submitter
+      ON
+        submitter.system_user_id = s.system_user_id
+      INNER JOIN LATERAL (
+        SELECT
+          sus.status
+        FROM
+          submission_upload_status sus
+        WHERE
+          sus.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sus.create_date DESC,
+          sus.submission_upload_status_id DESC
+        LIMIT 1
+      ) sus ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          json_build_object(
+            'submission_validation_id', sv.submission_validation_id,
+            'job_id', sv.job_id,
+            'status', sv.status,
+            'metadata', sv.metadata,
+            'started_at', sv.started_at,
+            'ended_at', sv.ended_at,
+            'create_date', sv.create_date
+          ) AS validation
+        FROM
+          submission_validation sv
+        WHERE
+          sv.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sv.create_date DESC
+        LIMIT 1
+      ) sv ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          json_agg(
+            json_build_object(
+              'submission_upload_review_id', sur.submission_upload_review_id,
+              'submission_upload_id', sur.submission_upload_id,
+              'scope', sur.scope,
+              'status', sur.status,
+              'requested_by', sur.requested_by
+            )
+            ORDER BY sur.create_date ASC
+          ) AS reviews
+        FROM
+          submission_upload_review sur
+        WHERE
+          sur.submission_upload_id = su.submission_upload_id
+          AND sur.record_end_date IS NULL
+      ) reviews ON TRUE
+      WHERE
+        su.ticket_id = ${ticketId}
+        AND su.record_end_date IS NULL
+        AND s.record_end_date IS NULL
+      ORDER BY
+        su.create_date ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketSubmissionUpload);
+    return response.rows;
+  }
+
+  /**
    * Insert a new submission_upload record.
    *
    * @param {CreateSubmissionUpload} submissionUpload - The data to create a new submission_upload.
@@ -198,12 +295,14 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         ticket_id,
-        status
+        status,
+        comment
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
         ${submissionUpload.ticket_id},
-        ${submissionUpload.status}
+        ${submissionUpload.status},
+        ${submissionUpload.comment ?? null}
       )
       RETURNING submission_upload_id;
     `;
@@ -239,13 +338,15 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         ticket_id,
-        status
+        status,
+        comment
       )
       SELECT
         ${submissionId},
         ua.upload_id,
         ${ticketId},
-        'uploaded'::submission_upload_job_status
+        'uploaded'::submission_upload_job_status,
+        NULL
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
         AND ua.record_end_date IS NULL
@@ -317,7 +418,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id,
         upload_id,
         status,
-        ticket_id
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -355,7 +457,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -379,7 +482,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -398,7 +502,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
