@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { TicketTimelineItem } from './TicketTimelineItem';
+import { TicketTimelineItem } from './layout/TicketTimelineItem';
 import { TicketUploadDecisionRow } from './upload/decision/TicketUploadDecisionRow';
 import { TicketUploadReviewRow } from './upload/review/TicketUploadReviewRow';
 import { TicketUploadStatusRow } from './upload/status/TicketUploadStatusRow';

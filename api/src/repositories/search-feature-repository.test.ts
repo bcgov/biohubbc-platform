@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import {
@@ -12,6 +13,7 @@ import {
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
+import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
 
 const normalizedPredicate = (
@@ -740,100 +742,25 @@ describe('SearchFeatureRepository', () => {
     });
   });
 
-  describe('searchFeaturesByExpressionTree', () => {
-    it('should build typed property SQL that matches shared properties through feature_type_property', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
+  describe('searchFeaturesByExpressionTree (wrapper relay)', () => {
+    it('should call buildExpressionTreeFeatureIdsSubquery with relayed args and thread the subquery via whereIn', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
+
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
         clauses: [
-          {
-            ...normalizedPredicate(47, null, {
-              type: 'number',
-              operator: 'GreaterThan',
-              value: 5
-            })
-          },
           {
             ...normalizedPredicate(46, null, {
               type: 'string',
-              operator: 'Contains',
-              value: 'wetland'
-            })
-          }
-        ]
-      };
-
-      await repository.searchFeaturesByExpressionTree('dataset', expressionTree);
-
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('submission_feature_property_number');
-      expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('inner join "feature_type_property" as "ftp"');
-      expect(sql).to.include('"ftp"."feature_property_id"');
-      expect(sql).to.include('"ft"."name" = \'dataset\'');
-      expect(sql).to.include('from (with recursive "evidence"');
-      expect(sql).to.include('intersect');
-      expect(sql).to.include('feature_property_id');
-    });
-
-    it('should apply anonymous security filtering for expression tree searches', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            ...normalizedPredicate(10, null, {
-              type: 'number',
-              operator: 'Exists'
-            })
-          }
-        ]
-      };
-
-      await repository.searchFeaturesByExpressionTree('dataset', expressionTree, undefined, null);
-
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('is_secured');
-      expect(sql).to.include('p"."submission_feature_id');
-      expect(sql).to.not.include('security_scope_anchor');
-    });
-
-    it('should apply authenticated security filtering to predicate evidence and final targets', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            ...normalizedPredicate(10, null, {
-              type: 'number',
-              operator: 'Exists'
+              operator: 'Equals',
+              value: 'moose'
             })
           }
         ]
@@ -841,31 +768,32 @@ describe('SearchFeatureRepository', () => {
 
       await repository.searchFeaturesByExpressionTree('dataset', expressionTree, undefined, 42);
 
+      expect(subqueryStub.calledOnce).to.equal(true);
+      expect(subqueryStub.getCall(0).args).to.deep.equal(['dataset', expressionTree, 42]);
+
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('p"."submission_feature_id');
-      expect(sql).to.include('expression_results.submission_feature_id');
-      expect(sql).to.include('security_scope_anchor');
-      expect(sql).to.include('team_security_scope');
-      expect(sql).to.include('42');
+      expect(sql).to.include('"sf"."submission_feature_id" in');
+      expect(sql).to.include('any_table');
     });
 
-    it('should narrow predicate evidence by feature_type_property_id when provided', async () => {
+    it('should default systemUserId to null when omitted', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
+
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
         clauses: [
           {
-            ...normalizedPredicate(46, 123, {
+            ...normalizedPredicate(46, null, {
               type: 'string',
-              operator: 'Contains',
-              value: 'wetland'
+              operator: 'Equals',
+              value: 'moose'
             })
           }
         ]
@@ -873,137 +801,38 @@ describe('SearchFeatureRepository', () => {
 
       await repository.searchFeaturesByExpressionTree('dataset', expressionTree);
 
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('"p"."feature_type_property_id" = 123');
+      expect(subqueryStub.getCall(0).args[2]).to.equal(null);
     });
 
-    it('should list anchor feature ids without an expression tree', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
+    it('should NOT call buildExpressionTreeFeatureIdsSubquery when expressionTree is undefined and fall back to anchor-only path', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
       await repository.searchFeaturesByExpressionTree('telemetry', undefined, { page: 1, limit: 25 }, null);
 
+      expect(subqueryStub.notCalled).to.equal(true);
+
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
-      expect(sql).to.not.include('submission_feature_property_taxon');
-      expect(sql).to.not.include('submission_feature_feature');
-      expect(sql).to.not.include('where "sf"."submission_feature_id" in');
+      expect(sql).to.not.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('order by "submission_feature_id" asc');
       expect(sql).to.include('limit 25');
     });
+  });
 
-    it('should project related predicate evidence to anchor feature ids through bounded graph traversal', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
+  describe('searchFeaturesByExpressionTreeCount (wrapper relay)', () => {
+    it('should layer count(*) over the subquery construction', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ count: 7 }] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            ...normalizedPredicate(99, null, {
-              type: 'taxon',
-              operator: 'Equals',
-              value: 456
-            })
-          }
-        ]
-      };
 
-      await repository.searchFeaturesByExpressionTree('telemetry', expressionTree);
+      const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery').returns(
+        getKnex()('any_table').select('submission_feature_id')
+      );
 
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('submission_feature_property_taxon');
-      expect(sql).to.include('with recursive "evidence"');
-      expect(sql).to.include('"connected_features" as');
-      expect(sql).to.include('as "graph_edges"');
-      expect(sql).to.include('"evidence"."submission_feature_id" as "root_feature_id"');
-      expect(sql).to.include('"evidence"."submission_feature_id" as "connected_feature_id"');
-      expect(sql).to.include('0 as depth');
-      expect(sql).to.include('from "submission_feature_feature"');
-      expect(sql).to.include('inner join "submission_feature" as "source_sf"');
-      expect(sql).to.include('inner join "submission_feature" as "target_sf"');
-      expect(sql).to.include('"source_sf"."record_end_date" is null');
-      expect(sql).to.include('"target_sf"."record_end_date" is null');
-      expect(sql).to.include('"source_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"target_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"target_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"source_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"parent_submission_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
-      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
-      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"connected_features"."depth" < 6');
-      expect(sql).to.include('NOT edges.to_feature_id = ANY(connected_features.path)');
-      expect(sql).to.include('"ft"."name" = \'telemetry\'');
-      expect(sql).to.include('"sf"."record_end_date" is null');
-    });
-
-    it('should union child target sets for OR expressions', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'OR',
-        clauses: [
-          {
-            ...normalizedPredicate(46, null, {
-              type: 'string',
-              operator: 'Equals',
-              value: 'moose'
-            })
-          },
-          {
-            ...normalizedPredicate(47, null, {
-              type: 'string',
-              operator: 'Equals',
-              value: 'feeding'
-            })
-          }
-        ]
-      };
-
-      await repository.searchFeaturesByExpressionTree('species_observation', expressionTree);
-
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include(' union ');
-      expect(sql).to.not.include(' intersect ');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
-    });
-
-    it('should recursively compose nested expression target sets', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -1014,107 +843,19 @@ describe('SearchFeatureRepository', () => {
               operator: 'Equals',
               value: 'moose'
             })
-          },
-          {
-            type: 'expression',
-            operator: 'OR',
-            clauses: [
-              {
-                ...normalizedPredicate(47, null, {
-                  type: 'string',
-                  operator: 'Equals',
-                  value: 'feeding'
-                })
-              },
-              {
-                ...normalizedPredicate(47, null, {
-                  type: 'string',
-                  operator: 'Equals',
-                  value: 'resting'
-                })
-              }
-            ]
           }
         ]
       };
 
-      await repository.searchFeaturesByExpressionTree('species_observation', expressionTree);
+      const count = await repository.searchFeaturesByExpressionTreeCount('dataset', expressionTree, 42);
+
+      expect(count).to.equal(7);
+      expect(subqueryStub.calledOnce).to.equal(true);
+      expect(subqueryStub.getCall(0).args).to.deep.equal(['dataset', expressionTree, 42]);
 
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include(' intersect ');
-      expect(sql).to.include(' union ');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
-    });
-
-    it('should use feature-level NotEquals evidence semantics for multi-value properties', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            ...normalizedPredicate(48, null, {
-              type: 'string',
-              operator: 'NotEquals',
-              value: 'red'
-            })
-          }
-        ]
-      };
-
-      await repository.searchFeaturesByExpressionTree('species_observation', expressionTree);
-
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('from "submission_feature_property_string" as "p"');
-      expect(sql).to.include('not exists');
-      expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
-      expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
-      expect(sql).to.include('"p_not_equals"."value" = \'red\'');
-    });
-
-    it('should project parent dataset evidence to species observation targets through hierarchy edges', async () => {
-      const knexSpy = Sinon.stub();
-      knexSpy.onCall(0).resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
-      knexSpy.onCall(1).resolves({ rowCount: 0, rows: [] });
-
-      const mockDBConnection = getMockDBConnection({
-        knex: knexSpy
-      });
-
-      const repository = new SearchFeatureRepository(mockDBConnection);
-      const expressionTree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            ...normalizedPredicate(46, null, {
-              type: 'string',
-              operator: 'Equals',
-              value: 'X'
-            })
-          }
-        ]
-      };
-
-      await repository.searchFeaturesByExpressionTree('species_observation', expressionTree);
-
-      const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('from "submission_feature"');
-      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
-      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+      expect(sql).to.include('count(*)::integer as count');
+      expect(sql).to.include('"sf"."submission_feature_id" in');
     });
   });
 

@@ -22,6 +22,7 @@ import {
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
   TicketSubmissionUploadReviewResponse,
+  IUpdateTicketCommentRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
@@ -122,6 +123,35 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/comment`, payload);
 
     return data;
+  };
+
+  /**
+   * Update a ticket timeline comment.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketCommentId
+   * @param {IUpdateTicketCommentRequest} payload
+   * @return {*} {Promise<ITicketCommentLog>}
+   */
+  const updateTicketComment = async (
+    ticketId: string,
+    ticketCommentId: string,
+    payload: IUpdateTicketCommentRequest
+  ): Promise<ITicketCommentLog> => {
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/comment/${ticketCommentId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Remove a ticket timeline comment.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketCommentId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTicketComment = async (ticketId: string, ticketCommentId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/tickets/${ticketId}/comment/${ticketCommentId}`);
   };
 
   /**
@@ -337,6 +367,8 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicket,
     updateTicketStatus,
     createTicketComment,
+    updateTicketComment,
+    deleteTicketComment,
     createTicketUpload,
     completeTicketUpload,
     getTicketArtifactDownloadUrl,

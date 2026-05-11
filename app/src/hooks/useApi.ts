@@ -8,6 +8,7 @@ import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
+import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
@@ -65,6 +66,8 @@ export const useApi = () => {
 
   const dataRequest = useDataRequestApi(apiAxios);
 
+  const objectStorage = useObjectStorageApi();
+
   return {
     user,
     admin,
@@ -83,6 +86,7 @@ export const useApi = () => {
     downloadExport,
     teamPolicies,
     tickets,
-    dataRequest
+    dataRequest,
+    objectStorage
   };
 };
