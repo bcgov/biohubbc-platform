@@ -78,5 +78,4 @@ describe('useSubmissionApi', () => {
       expect(result).toEqual(mockResponse);
     });
   });
-
 });

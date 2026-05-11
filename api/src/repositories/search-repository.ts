@@ -21,7 +21,13 @@ export class SearchRepository extends BaseRepository {
    * Matches the keyword against any string property in submission_feature_property_string. The
    * returned `label` is the feature's display name (from sf.data->>'name'), so the FE dropdown
    * row and its click-through search query stay recognizable even when the keyword matched a
-   * description or other non-name property. Features with no name in sf.data are excluded.
+   * description or other non-name property.
+   *
+   * Feature types that don't declare a `name` property (e.g. species_observation, animal,
+   * capture, measurement, telemetry*) are intentionally excluded from this section — they
+   * surface via the Species/taxonomy section and the per-feature-type result page instead.
+   * The NULLIF guard also drops rows where `name` is present but empty so the click-through
+   * keyword is never blank.
    *
    * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding features
@@ -32,15 +38,16 @@ export class SearchRepository extends BaseRepository {
     return knex('submission_feature_property_string as sfps')
       .join('submission_feature as sf', 'sf.submission_feature_id', 'sfps.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .whereNull('sf.record_end_date')
+      .whereNull('ft.record_end_date')
       .whereILike('sfps.value', `%${keyword}%`)
-      .whereRaw(`sf.data->>'name' IS NOT NULL`)
-      .select(
+      .whereRaw(`NULLIF(sf.data->>'name', '') IS NOT NULL`)
+      .distinct(
         'sf.submission_feature_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
         knex.raw(`sf.data->>'name' as label`)
-      )
-      .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name', knex.raw(`sf.data->>'name'`));
+      );
   }
 
   /**
@@ -53,8 +60,11 @@ export class SearchRepository extends BaseRepository {
   private _makeFindSubmissionsQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
     return knex('submission as s')
-      .leftJoin('submission_feature as sf', 'sf.submission_id', 's.submission_id')
+      .leftJoin('submission_feature as sf', function () {
+        this.on('sf.submission_id', 's.submission_id').andOnNull('sf.record_end_date');
+      })
       .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
+      .whereNull('s.record_end_date')
       .where((qb) => {
         qb.whereILike('s.name', `%${keyword}%`).orWhereILike('sfps.value', `%${keyword}%`);
       })
@@ -197,9 +207,12 @@ export class SearchRepository extends BaseRepository {
         FROM submission_feature_property_string sfps
         JOIN submission_feature sf ON sfps.submission_feature_id = sf.submission_feature_id
         WHERE sfps.value ILIKE ${`%${params.keyword}%`}
+          AND sf.record_end_date IS NULL
       ),
       priority_types AS (
-        SELECT feature_type_id, name FROM feature_type WHERE name = ANY(${priorityTypes}::text[])
+        SELECT feature_type_id, name FROM feature_type
+        WHERE name = ANY(${priorityTypes}::text[])
+          AND record_end_date IS NULL
       )
       SELECT 
         pt.name as feature_type_name,
@@ -226,6 +239,7 @@ export class SearchRepository extends BaseRepository {
   async findSubmissionSummary(params: SearchParams): Promise<SearchSummarySubmission> {
     const knex = getKnex();
     const query = knex('submission as s')
+      .whereNull('s.record_end_date')
       .whereILike('s.name', `%${params.keyword}%`)
       .select(knex.raw('COUNT(*)::int as total'));
 
