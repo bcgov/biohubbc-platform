@@ -1,6 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -32,7 +31,6 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('hooks/useApi');
-vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 vi.mock('./hooks/useSearchResults');
 vi.mock('./header/SearchResultSearch', () => ({
@@ -67,7 +65,6 @@ vi.mock('./header/SearchResultSearch', () => ({
 import { useSearchResults } from './hooks/useSearchResults';
 
 const mockUseApi = useApi as Mock;
-const mockUseAuthStateContext = useAuthStateContext as Mock;
 const mockUseCodesContext = useCodesContext as Mock;
 const mockUseCartContext = useCartContext as Mock;
 const mockUseDialogContext = useDialogContext as Mock;
@@ -80,20 +77,19 @@ const mockSetOkDialog = vi.fn();
 const codesPayload = {
   feature_type_with_properties: [
     { feature_type: { name: 'dataset', display_name: 'Dataset' }, properties: [] },
-    { feature_type: { name: 'observation', display_name: 'Observation' }, properties: [] }
+    { feature_type: { name: 'telemetry', display_name: 'Telemetry' }, properties: [] }
   ]
 };
 
 const renderPage = () => render(<SearchResultPage />);
 
-describe('SearchResultPage — Create Download flow', () => {
+describe('SearchResultPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload }
     });
-    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseCodesContext.mockReturnValue({
       codesDataLoader: { isReady: true, data: codesPayload }
     });
@@ -124,7 +120,7 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
   });
 
-  it('opens an OkDialog when an authenticated user clicks Create Download with zero results', () => {
+  it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
       isLoading: false,
@@ -147,7 +143,7 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(queryByRole('heading', { level: 2, name: /^create download$/i })).not.toBeInTheDocument();
   });
 
-  it('opens the form dialog when an authenticated user clicks Create Download with results', async () => {
+  it('opens the form dialog when Create Download is clicked with results', async () => {
     const { getByRole, getByLabelText } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /create download/i }));
@@ -156,15 +152,6 @@ describe('SearchResultPage — Create Download flow', () => {
       expect(getByLabelText(/Name/i)).toBeInTheDocument();
     });
     expect(mockSetOkDialog).not.toHaveBeenCalled();
-  });
-
-  it('renders the Create Download button for unauthenticated users', () => {
-    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
-
-    const { getByRole } = renderPage();
-
-    expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
-    expect(mockCreateDownload).not.toHaveBeenCalled();
   });
 
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
@@ -250,7 +237,7 @@ describe('SearchResultPage — Create Download flow', () => {
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
-    mockUseParams.mockReturnValue({ featureType: 'observation' });
+    mockUseParams.mockReturnValue({ featureType: 'telemetry' });
     rerender(<SearchResultPage />);
 
     await waitFor(() => expect(queryByLabelText(/Name/i)).not.toBeInTheDocument());
@@ -273,12 +260,12 @@ describe('SearchResultPage — Create Download flow', () => {
       );
     });
 
-    mockUseParams.mockReturnValue({ featureType: 'observation' });
+    mockUseParams.mockReturnValue({ featureType: 'telemetry' });
     rerender(<SearchResultPage />);
 
     await waitFor(() => {
       expect(mockUseSearchResults).toHaveBeenLastCalledWith(
-        'observation',
+        'telemetry',
         true,
         expect.objectContaining({
           type: 'expression',

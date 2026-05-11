@@ -17,7 +17,7 @@ export const ResultPageContainer = ({
   rightSidebarTitle = 'Downloads',
   children
 }: ResultPageContainerProps) => {
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
 
   return (
     <Box sx={{ display: 'flex', height: '100%', maxHeight: '100%', overflow: 'hidden' }}>

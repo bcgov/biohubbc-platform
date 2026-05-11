@@ -1,30 +1,41 @@
-import { mdiDownload, mdiPlus } from '@mdi/js';
-import Icon from '@mdi/react';
-import { Button, Stack } from '@mui/material';
+import { Stack } from '@mui/material';
 import { SortButton } from 'components/button/SortButton';
+import { ToggleButtonView, ToggleButtons } from 'components/toggle-button/ToggleButtons';
+import { SEARCH_RESULT_VIEW } from 'constants/search';
 
-interface SortOption {
+/**
+ * Sort button configuration consumed by the search result toolbar and produced
+ * by `useSearchResultPagingSort`.
+ *
+ * Use this type anywhere result-toolbar sort options are passed between
+ * search-result hooks and presentational components so all callers share the
+ * same label/value/direction contract.
+ */
+export interface SearchResultSortOption {
+  /** Human-readable sort label shown in the toolbar. */
   label: string;
+  /** API/URL sort field value. */
   value: string;
+  /** Current direction for this sort field. */
   direction: 'asc' | 'desc';
 }
 
 interface SearchResultToolbarProps {
-  sortOptions: SortOption[];
+  sortOptions: SearchResultSortOption[];
   activeSort: string;
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
-  onAddAllToCart: () => void;
-  onCreateDownloadClick: () => void;
-  isCreateDownloadDisabled?: boolean;
+  view: SEARCH_RESULT_VIEW;
+  onViewChange: (view: SEARCH_RESULT_VIEW) => void;
+  viewOptions: ToggleButtonView<SEARCH_RESULT_VIEW>[];
 }
 
 export const SearchResultToolbar = ({
   sortOptions,
   activeSort,
   onSortChange,
-  onAddAllToCart,
-  onCreateDownloadClick,
-  isCreateDownloadDisabled
+  view,
+  onViewChange,
+  viewOptions
 }: SearchResultToolbarProps) => {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
@@ -50,23 +61,7 @@ export const SearchResultToolbar = ({
       </Stack>
 
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Button
-          size="small"
-          color="primary"
-          onClick={onCreateDownloadClick}
-          disabled={isCreateDownloadDisabled}
-          startIcon={<Icon path={mdiDownload} size={0.8} />}
-          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Create Download
-        </Button>
-        <Button
-          size="small"
-          color="primary"
-          onClick={onAddAllToCart}
-          startIcon={<Icon path={mdiPlus} size={0.8} />}
-          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Add All to Cart
-        </Button>
+        <ToggleButtons views={viewOptions} activeView={view} onViewChange={onViewChange} orientation="horizontal" />
       </Stack>
     </Stack>
   );
