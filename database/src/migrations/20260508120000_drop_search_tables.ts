@@ -34,14 +34,9 @@ export async function up(knex: Knex): Promise<void> {
     DROP FUNCTION IF EXISTS evaluate_security_spatial_condition(VARCHAR, integer);
 
     --------------------------------------------------------------------------------
-    -- Drop the FTS GIN index explicitly (CASCADE from DROP TABLE would do it,
-    -- but explicit drop surfaces failure if the schema diverges).
-    --------------------------------------------------------------------------------
-    DROP INDEX IF EXISTS search_string_fts_idx;
-
-    --------------------------------------------------------------------------------
     -- Drop the 4 search_* tables. CASCADE drops the FK constraints and indexes
-    -- against them. Production rows have full mirrors in submission_feature_property_*.
+    -- (including the FTS GIN index on search_string.value) against them.
+    -- Production rows have full mirrors in submission_feature_property_*.
     --------------------------------------------------------------------------------
     DROP TABLE IF EXISTS search_string  CASCADE;
     DROP TABLE IF EXISTS search_number  CASCADE;
