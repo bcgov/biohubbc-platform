@@ -207,7 +207,7 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
   properties: {
     status: {
       type: 'string',
-      enum: ['approved', 'denied'],
+      enum: ['submitted', 'approved', 'denied'],
       description: 'The new review status for the submission upload.'
     }
   }

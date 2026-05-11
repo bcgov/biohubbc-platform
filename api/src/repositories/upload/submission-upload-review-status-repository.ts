@@ -3,14 +3,13 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadReviewStatus,
   SubmissionUploadReviewStatus,
-  SubmissionUploadReviewStatusHistoryRow,
-  UpdateSubmissionUploadReviewStatus
+  SubmissionUploadReviewStatusHistoryRow
 } from '../../models/submission-upload-review-status';
 import { BaseRepository } from '../base-repository';
 
 /**
  * Repository for managing submission_upload_status records.
- * Tracks the admin review status (submitted, approved, denied) for each submission upload.
+ * Tracks immutable admin review status decisions for each submission upload.
  */
 export class SubmissionUploadReviewStatusRepository extends BaseRepository {
   /**
@@ -47,7 +46,7 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
   }
 
   /**
-   * Get the review status for a submission upload.
+   * Get the latest review status for a submission upload.
    *
    * @param {string} submissionUploadId - The submission_upload_id to look up.
    * @returns {Promise<SubmissionUploadReviewStatus>} - The status record.
@@ -63,7 +62,11 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
       FROM
         submission_upload_status
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+      ORDER BY
+        create_date DESC,
+        submission_upload_status_id DESC
+      LIMIT 1;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatus);
@@ -78,39 +81,6 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Unexpected row count', [
         'SubmissionUploadReviewStatusRepository->getSubmissionUploadReviewStatus',
         `expected rowCount=1, actual rowCount=${response.rowCount}`
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update the review status for a submission upload.
-   *
-   * @param {string} submissionUploadId - The submission_upload_id whose status should be updated.
-   * @param {UpdateSubmissionUploadReviewStatus} data - The new status value.
-   * @returns {Promise<SubmissionUploadReviewStatus>} - The updated status record.
-   * @throws {ApiExecuteSQLError} - If the update fails.
-   */
-  async updateSubmissionUploadReviewStatus(
-    submissionUploadId: string,
-    data: UpdateSubmissionUploadReviewStatus
-  ): Promise<SubmissionUploadReviewStatus> {
-    const sqlStatement = SQL`
-      UPDATE submission_upload_status
-      SET
-        status = ${data.status}
-      WHERE
-        submission_upload_id = ${submissionUploadId}
-      RETURNING submission_upload_status_id, submission_upload_id, status;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatus);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission_upload_status record', [
-        'SubmissionUploadReviewStatusRepository->updateSubmissionUploadReviewStatus',
-        `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
 
@@ -137,7 +107,8 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
       WHERE
         s.uuid = ${submissionUuid}
       ORDER BY
-        sus.create_date DESC;
+        sus.create_date DESC,
+        sus.submission_upload_status_id DESC;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatusHistoryRow);

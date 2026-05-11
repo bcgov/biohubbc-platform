@@ -39,6 +39,28 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
+   * Reject active features from a submission upload by setting record_end_date.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureService
+   */
+  async setRecordEndDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.setRecordEndDateBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Reset publication/rejection dates for features from a submitted upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureService
+   */
+  async unsetRecordDatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionFeatureUuid

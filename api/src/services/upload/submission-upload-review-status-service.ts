@@ -10,7 +10,6 @@ import { DBService } from '../db-service';
 import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
-import { SubmissionUploadService } from './submission-upload-service';
 
 export interface SubmissionHistoryResponse {
   submissionId: number;
@@ -23,10 +22,12 @@ export interface SubmissionHistoryResponse {
 
 export class SubmissionUploadReviewStatusService extends DBService {
   submissionUploadReviewStatusRepository: SubmissionUploadReviewStatusRepository;
+  submissionFeatureService: SubmissionFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadReviewStatusRepository = new SubmissionUploadReviewStatusRepository(connection);
+    this.submissionFeatureService = new SubmissionFeatureService(connection);
   }
 
   /**
@@ -53,7 +54,7 @@ export class SubmissionUploadReviewStatusService extends DBService {
   }
 
   /**
-   * Update the review status of a submission upload (approved or denied).
+   * Record a new review status decision for a submission upload.
    * Only callable by system administrators.
    *
    * @param {string} submissionUploadId
@@ -64,44 +65,23 @@ export class SubmissionUploadReviewStatusService extends DBService {
     submissionUploadId: string,
     data: UpdateSubmissionUploadReviewStatus
   ): Promise<SubmissionUploadReviewStatus> {
-    await this.assertSubmissionUploadReviewStatusCanBeFinalized(submissionUploadId);
-
     if (data.status === 'approved') {
       await this.assertSubmissionUploadCanBeApproved(submissionUploadId);
-      await this.publishApprovedSubmissionUpload(submissionUploadId);
+      await this.submissionFeatureService.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
     }
 
-    return this.submissionUploadReviewStatusRepository.updateSubmissionUploadReviewStatus(submissionUploadId, data);
-  }
-
-  /**
-   * Assert that the upload final disposition has not already been set.
-   *
-   * @param {string} submissionUploadId
-   * @returns {Promise<void>}
-   * @throws {HTTP400} If the upload has already been approved, denied, or deleted.
-   */
-  async assertSubmissionUploadReviewStatusCanBeFinalized(submissionUploadId: string): Promise<void> {
-    const reviewStatus = await this.getSubmissionUploadReviewStatus(submissionUploadId);
-
-    if (reviewStatus.status !== 'submitted') {
-      throw new HTTP400('Submission upload final decision has already been set');
+    if (data.status === 'denied') {
+      await this.submissionFeatureService.setRecordEndDateBySubmissionUploadId(submissionUploadId);
     }
-  }
 
-  /**
-   * Publish approved upload features and move the upload lifecycle to indexed.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<void>}
-   * @memberof SubmissionUploadReviewStatusService
-   */
-  async publishApprovedSubmissionUpload(submissionUploadId: string): Promise<void> {
-    const submissionFeatureService = new SubmissionFeatureService(this.connection);
-    await submissionFeatureService.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
+    if (data.status === 'submitted') {
+      await this.submissionFeatureService.unsetRecordDatesBySubmissionUploadId(submissionUploadId);
+    }
 
-    const submissionUploadService = new SubmissionUploadService(this.connection);
-    await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+    return this.submissionUploadReviewStatusRepository.insertSubmissionUploadReviewStatus({
+      submission_upload_id: submissionUploadId,
+      status: data.status
+    });
   }
 
   /**

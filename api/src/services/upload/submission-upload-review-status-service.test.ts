@@ -18,11 +18,6 @@ describe('SubmissionUploadReviewStatusService', () => {
 
   describe('updateSubmissionUploadReviewStatus', () => {
     it('blocks approval when automated validation is not completed', async () => {
-      sinon.stub(SubmissionUploadReviewStatusRepository.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        status: 'submitted'
-      });
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves({
         submission_validation_id: 1,
         job_id: 'job-1',
@@ -43,11 +38,6 @@ describe('SubmissionUploadReviewStatusService', () => {
     });
 
     it('updates approval when validation is completed', async () => {
-      sinon.stub(SubmissionUploadReviewStatusRepository.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        status: 'submitted'
-      });
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves({
         submission_validation_id: 1,
         job_id: 'job-1',
@@ -59,8 +49,8 @@ describe('SubmissionUploadReviewStatusService', () => {
       const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000'
       });
-      const updateStatusStub = sinon
-        .stub(SubmissionUploadReviewStatusRepository.prototype, 'updateSubmissionUploadReviewStatus')
+      const insertStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusRepository.prototype, 'insertSubmissionUploadReviewStatus')
         .resolves({
           submission_upload_status_id: 1,
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
@@ -74,31 +64,30 @@ describe('SubmissionUploadReviewStatusService', () => {
 
       expect(result.status).to.equal('approved');
       expect(publishFeaturesStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
-      expect(updateUploadStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', {
-        status: 'indexed'
-      });
-      expect(updateStatusStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', {
+      expect(updateUploadStub).not.to.have.been.called;
+      expect(insertStatusStub).to.have.been.calledOnceWith({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         status: 'approved'
       });
     });
 
-    it('updates denial without approval assertions', async () => {
-      sinon.stub(SubmissionUploadReviewStatusRepository.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        status: 'submitted'
-      });
+    it('updates rejection without approval assertions', async () => {
       const validationStub = sinon.stub(
         SubmissionValidationService.prototype,
         'getSubmissionValidationBySubmissionUploadId'
       );
-      const publishFeaturesStub = sinon.stub(
+      const acceptFeaturesStub = sinon.stub(
         SubmissionFeatureService.prototype,
         'setRecordEffectiveDateBySubmissionUploadId'
       );
-      const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload');
-      const updateStatusStub = sinon
-        .stub(SubmissionUploadReviewStatusRepository.prototype, 'updateSubmissionUploadReviewStatus')
+      const rejectFeaturesStub = sinon
+        .stub(SubmissionFeatureService.prototype, 'setRecordEndDateBySubmissionUploadId')
+        .resolves();
+      const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload').resolves({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000'
+      });
+      const insertStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusRepository.prototype, 'insertSubmissionUploadReviewStatus')
         .resolves({
           submission_upload_status_id: 1,
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
@@ -112,37 +101,84 @@ describe('SubmissionUploadReviewStatusService', () => {
 
       expect(result.status).to.equal('denied');
       expect(validationStub).not.to.have.been.called;
-      expect(publishFeaturesStub).not.to.have.been.called;
+      expect(acceptFeaturesStub).not.to.have.been.called;
+      expect(rejectFeaturesStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
       expect(updateUploadStub).not.to.have.been.called;
-      expect(updateStatusStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', {
+      expect(insertStatusStub).to.have.been.calledOnceWith({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         status: 'denied'
       });
     });
 
-    it('blocks final decision updates after the upload is already finalized', async () => {
-      sinon.stub(SubmissionUploadReviewStatusRepository.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        status: 'approved'
-      });
-      const updateStatusStub = sinon.stub(
-        SubmissionUploadReviewStatusRepository.prototype,
-        'updateSubmissionUploadReviewStatus'
+    it('updates deleted without patching upload or feature rows', async () => {
+      const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload');
+      const acceptFeaturesStub = sinon.stub(
+        SubmissionFeatureService.prototype,
+        'setRecordEffectiveDateBySubmissionUploadId'
       );
+      const rejectFeaturesStub = sinon.stub(SubmissionFeatureService.prototype, 'setRecordEndDateBySubmissionUploadId');
+      const resetFeaturesStub = sinon.stub(SubmissionFeatureService.prototype, 'unsetRecordDatesBySubmissionUploadId');
+      const insertStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusRepository.prototype, 'insertSubmissionUploadReviewStatus')
+        .resolves({
+          submission_upload_status_id: 1,
+          submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+          status: 'deleted'
+        });
 
       const service = new SubmissionUploadReviewStatusService(getMockDBConnection());
+      const result = await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
+        status: 'deleted'
+      });
 
-      try {
-        await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
-          status: 'denied'
+      expect(result.status).to.equal('deleted');
+      expect(updateUploadStub).not.to.have.been.called;
+      expect(acceptFeaturesStub).not.to.have.been.called;
+      expect(rejectFeaturesStub).not.to.have.been.called;
+      expect(resetFeaturesStub).not.to.have.been.called;
+      expect(insertStatusStub).to.have.been.calledOnceWith({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        status: 'deleted'
+      });
+    });
+
+    it('updates submitted by clearing feature record dates', async () => {
+      const validationStub = sinon.stub(
+        SubmissionValidationService.prototype,
+        'getSubmissionValidationBySubmissionUploadId'
+      );
+      const acceptFeaturesStub = sinon.stub(
+        SubmissionFeatureService.prototype,
+        'setRecordEffectiveDateBySubmissionUploadId'
+      );
+      const rejectFeaturesStub = sinon.stub(SubmissionFeatureService.prototype, 'setRecordEndDateBySubmissionUploadId');
+      const resetFeaturesStub = sinon
+        .stub(SubmissionFeatureService.prototype, 'unsetRecordDatesBySubmissionUploadId')
+        .resolves();
+      const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload');
+      const insertStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusRepository.prototype, 'insertSubmissionUploadReviewStatus')
+        .resolves({
+          submission_upload_status_id: 1,
+          submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+          status: 'submitted'
         });
-        expect.fail('Expected HTTP400');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP400);
-        expect((error as HTTP400).message).to.equal('Submission upload final decision has already been set');
-      }
 
-      expect(updateStatusStub).not.to.have.been.called;
+      const service = new SubmissionUploadReviewStatusService(getMockDBConnection());
+      const result = await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
+        status: 'submitted'
+      });
+
+      expect(result.status).to.equal('submitted');
+      expect(validationStub).not.to.have.been.called;
+      expect(updateUploadStub).not.to.have.been.called;
+      expect(acceptFeaturesStub).not.to.have.been.called;
+      expect(rejectFeaturesStub).not.to.have.been.called;
+      expect(resetFeaturesStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
+      expect(insertStatusStub).to.have.been.calledOnceWith({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        status: 'submitted'
+      });
     });
   });
 });

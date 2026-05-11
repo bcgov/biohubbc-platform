@@ -192,6 +192,24 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('findSubmissionUploadsByTicketId', () => {
+    it('uses the latest submission upload status row for each upload', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+    });
+  });
+
   describe('insertSubmissionUpload', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;

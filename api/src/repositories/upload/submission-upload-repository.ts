@@ -209,18 +209,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submitter.user_identifier AS submitted_by_identifier,
         su.status AS upload_status,
         sus.status AS review_status,
-        CASE
-          WHEN sv.submission_validation_id IS NULL THEN NULL
-          ELSE json_build_object(
-            'submission_validation_id', sv.submission_validation_id,
-            'job_id', sv.job_id,
-            'status', sv.status,
-            'metadata', sv.metadata,
-            'started_at', sv.started_at,
-            'ended_at', sv.ended_at,
-            'create_date', sv.create_date
-          )
-        END AS validation,
+        validation.validation,
         COALESCE(reviews.reviews, '[]'::json) AS reviews
       FROM
         submission_upload su
@@ -232,19 +221,29 @@ export class SubmissionUploadRepository extends BaseRepository {
         "system_user" submitter
       ON
         submitter.system_user_id = s.system_user_id
-      INNER JOIN
-        submission_upload_status sus
-      ON
-        sus.submission_upload_id = su.submission_upload_id
+      INNER JOIN LATERAL (
+        SELECT
+          sus.status
+        FROM
+          submission_upload_status sus
+        WHERE
+          sus.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sus.create_date DESC,
+          sus.submission_upload_status_id DESC
+        LIMIT 1
+      ) sus ON TRUE
       LEFT JOIN LATERAL (
         SELECT
-          sv.submission_validation_id,
-          sv.job_id,
-          sv.status,
-          sv.metadata,
-          sv.started_at,
-          sv.ended_at,
-          sv.create_date
+          json_build_object(
+            'submission_validation_id', sv.submission_validation_id,
+            'job_id', sv.job_id,
+            'status', sv.status,
+            'metadata', sv.metadata,
+            'started_at', sv.started_at,
+            'ended_at', sv.ended_at,
+            'create_date', sv.create_date
+          ) AS validation
         FROM
           submission_validation sv
         WHERE
