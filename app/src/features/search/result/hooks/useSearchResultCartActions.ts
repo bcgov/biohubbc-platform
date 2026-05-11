@@ -6,10 +6,8 @@ import { useCallback } from 'react';
 /**
  * Provides cart state and bulk cart actions for the search result page.
  *
- * Use this hook from `SearchResultPage` after rows have been loaded by
- * `useSearchResults`. It adapts the global cart context into the shape required
- * by `DownloadSidebar` and exposes a single "add current rows to cart" handler.
- * Errors from the cart mutation are surfaced through the global snackbar.
+ * Adapts the global cart context into `DownloadSidebar` data and exposes the
+ * bulk add-to-cart handler. Cart mutation errors surface through the snackbar.
  *
  * @param {SearchFeatureResultWithRelevancy[]} rows - Current search result rows to add when the bulk save action is triggered.
  * @returns Cart sidebar data and a handler for adding all current rows to the cart.
@@ -20,11 +18,7 @@ export const useSearchResultCartActions = (rows: SearchFeatureResultWithRelevanc
 
   /**
    * Adds every row currently rendered on the result page to the cart.
-   *
-   * Use this as the result panel's bulk "Add All to Cart" action. The cart context is
-   * responsible for deduplication and mutation serialization; this handler
-   * forwards the current rows and reports any cart API error through the global
-   * snackbar.
+   * Cart context handles deduplication and mutation serialization.
    */
   const handleAddAllToCart = useCallback(async () => {
     try {

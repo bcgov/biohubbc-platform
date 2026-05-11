@@ -26,9 +26,8 @@ interface DownloadSidebarProps {
 /**
  * Renders cart and download controls inside the result-page right sidebar.
  *
- * Use this component as the `ResultPageContainer` right sidebar. It keeps the
- * toolbar, active view content, and cart checkout footer together while the
- * page-level download hook owns mutations and selected view state.
+ * Keeps the toolbar, active view content, and cart checkout footer together.
+ * The page-level download hook owns mutations and selected view state.
  *
  * @param {DownloadSidebarProps} props - Cart state, selected view, and sidebar callbacks.
  * @returns {JSX.Element} Download/sidebar content for the result page.

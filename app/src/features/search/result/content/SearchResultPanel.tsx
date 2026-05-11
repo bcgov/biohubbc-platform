@@ -47,11 +47,9 @@ interface SearchResultPanelProps {
 /**
  * Renders the main result panel for the feature search page.
  *
- * Use this component inside `SearchResultPage` after route/search state has been
- * resolved. It owns only the result-panel layout: header actions, sort/view
- * toolbar, table/list result rendering, and pagination controls. Data loading,
- * navigation, cart mutation, and download mutation behavior are injected through
- * callbacks from the page-level hooks.
+ * Owns result-panel layout: header actions, sort/view toolbar, table/list
+ * rendering, and pagination controls. Page-level hooks inject data loading,
+ * navigation, cart, and download behavior.
  *
  * @param {SearchResultPanelProps} props - Result rows, pagination state, view/sort state, and action callbacks.
  * @returns {JSX.Element} Result panel with toolbar, result list/table, and pagination.

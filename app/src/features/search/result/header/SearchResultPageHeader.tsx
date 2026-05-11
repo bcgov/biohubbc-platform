@@ -22,9 +22,8 @@ interface SearchResultPageHeaderProps {
 /**
  * Renders the structured header for the feature search result page.
  *
- * Use this component as the top section of `SearchResultPage`. It combines the
- * expression-aware search input with feature-type tabs, while leaving the
- * expression apply behavior and tab navigation to page-level hooks.
+ * Combines the expression-aware search input with feature-type tabs. Page-level
+ * hooks own expression apply behavior and tab navigation.
  *
  * @param {SearchResultPageHeaderProps} props - Current feature type, search state, tab links, and header callbacks.
  * @returns {JSX.Element} Page header with search expression input and feature-type tabs.

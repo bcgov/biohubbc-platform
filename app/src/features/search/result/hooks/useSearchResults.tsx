@@ -53,10 +53,9 @@ const isAbortError = (error: unknown) => {
 /**
  * Loads feature-search results from URL pagination/sort params and an expression tree.
  *
- * Use this hook from result pages that need the current URL query params to be
- * the source of truth for pagination and sort state. It converts those params to
- * the search API pagination payload, calls `/api/search/feature/:featureType`,
- * and returns a typed param setter that keeps the URL and result loader in sync.
+ * Treats URL query params as the source of truth for pagination and sort state.
+ * Converts them to the search API pagination payload, calls
+ * `/api/search/feature/:featureType`, and returns a typed param setter.
  * Pass `enabled=false` until the route has resolved a valid feature type.
  *
  * @param {string | undefined} featureTypeName - API feature type route segment to search once route metadata resolves.
@@ -89,11 +88,8 @@ export const useSearchResults = (
 
   /**
    * Loads search results for a single prepared request.
-   *
-   * Use this only through `startSearch`, which supplies the abort signal and
-   * stale-request guard. This callback converts URL params into API pagination,
-   * passes the current expression tree to `searchFeatures`, ignores user-driven
-   * aborts, and reports real API errors through the snackbar.
+   * Converts URL params to API pagination, ignores user-driven aborts, and
+   * reports real API errors through the snackbar.
    *
    * @param {SearchResultsLoaderInput} input - URL params, expression, feature type, and abort signal for one request.
    * @returns Search response for the request, or `undefined` when the request was aborted or failed.
@@ -121,10 +117,7 @@ export const useSearchResults = (
 
   /**
    * Starts a latest-wins search request and aborts any active request first.
-   *
-   * Use this for both debounced URL refreshes and explicit Apply refreshes. It
-   * owns the `AbortController`, request id, loading state, and stale response
-   * guard so older aborted requests cannot overwrite the newest result data.
+   * Owns the `AbortController`, loading state, and stale response guard.
    *
    * @param {Omit<SearchResultsLoaderInput, 'signal'>} input - Request inputs before the hook adds an abort signal.
    */
@@ -160,9 +153,8 @@ export const useSearchResults = (
 
   /**
    * Writes normalized result query params to the router.
-   *
-   * Use this only through `setSearchParams`, which handles normalization,
-   * deletion, replacement, and pagination reset rules.
+   * `setSearchParams` owns normalization, deletion, replacement, and pagination
+   * reset rules.
    *
    * @param {TypedURLSearchParams} newParams - Complete next query param state for the result route.
    */

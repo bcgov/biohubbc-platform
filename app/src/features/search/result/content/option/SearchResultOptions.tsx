@@ -24,10 +24,8 @@ interface SearchResultOptionsProps {
 /**
  * Chooses the active result layout and wires per-row cart actions.
  *
- * Use this component inside `SearchResultPanel` where the page can provide rows,
- * loading state, and result navigation. It keeps cart membership and add/remove
- * error handling close to the rendered result controls while the parent remains
- * responsible for search state and pagination.
+ * Selects the active result layout and keeps cart membership/error handling near
+ * the rendered row controls. The parent owns search state and pagination.
  *
  * @param {SearchResultOptionsProps} props - Rows, loading state, selected view, and result-click callback.
  * @returns {JSX.Element} Loading, empty, table, or card result content.
@@ -44,10 +42,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchRe
 
   /**
    * Adds one rendered search result to the cart.
-   *
-   * Use this as the table/card row add action. The cart context owns optimistic
-   * updates and deduplication; this handler only forwards the selected result
-   * and reports add failures through the global snackbar.
+   * Add failures are reported through the global snackbar.
    *
    * @param {SearchFeatureResultWithRelevancy} result - Result row selected for cart addition.
    */
@@ -64,10 +59,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchRe
 
   /**
    * Removes one rendered search result from the cart.
-   *
-   * Use this as the table/card row remove action. The cart context owns
-   * optimistic updates and server reconciliation; this handler forwards the
-   * selected feature id and reports remove failures through the global snackbar.
+   * Remove failures are reported through the global snackbar.
    *
    * @param {number} featureId - Submission feature id to remove from the cart.
    */

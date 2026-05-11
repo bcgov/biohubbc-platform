@@ -29,9 +29,8 @@ interface SearchResultCardProps {
 /**
  * Displays a single search result in list/card mode.
  *
- * Use this component from `SearchResultCardLayout` for one result row. It shows
- * the result summary, secured indicator, feature-type chip, and the single
- * cart action that matches the row's current cart membership.
+ * Displays one result summary with secured state, feature-type chip, and the
+ * cart action matching current cart membership.
  *
  * @param {SearchResultCardProps} props - Result row, cart state, and card action callbacks.
  * @returns {JSX.Element} Search result card.

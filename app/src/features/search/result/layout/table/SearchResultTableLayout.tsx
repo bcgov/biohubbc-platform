@@ -22,9 +22,8 @@ interface SearchResultTableLayoutProps {
 /**
  * Renders search results in the table view.
  *
- * Use this layout when the result toolbar selects the table view. It derives
- * the grid columns from the current rows and cart state, then forwards row and
- * action clicks to callbacks supplied by `SearchResultOptions`.
+ * Table-view layout for result rows. Derives grid columns from current rows and
+ * cart state, then forwards row/action clicks to `SearchResultOptions`.
  *
  * @param {SearchResultTableLayoutProps} props - Results, cart ids, and optional row action callbacks.
  * @returns {JSX.Element} Search result data grid.

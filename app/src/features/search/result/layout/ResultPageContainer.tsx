@@ -18,10 +18,8 @@ interface ResultPageContainerProps {
 /**
  * Provides the two-column shell used by search result pages.
  *
- * Use this container around result-page content when a collapsible right sidebar
- * is needed. The right sidebar always initializes collapsed so entering the
- * result page prioritizes the result content and leaves cart/download controls
- * available on demand.
+ * Two-column result-page shell with a collapsible right sidebar. The sidebar
+ * always initializes collapsed so result content is prioritized on entry.
  *
  * @param {ResultPageContainerProps} props - Main content plus optional sidebar configuration.
  * @returns {JSX.Element} Result page shell with a collapsed-by-default right rail.

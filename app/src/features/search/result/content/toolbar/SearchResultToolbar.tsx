@@ -7,9 +7,7 @@ import { SEARCH_RESULT_VIEW } from 'constants/search';
  * Sort button configuration consumed by the search result toolbar and produced
  * by `useSearchResultPagingSort`.
  *
- * Use this type anywhere result-toolbar sort options are passed between
- * search-result hooks and presentational components so all callers share the
- * same label/value/direction contract.
+ * Shared label/value/direction contract for result-toolbar sort options.
  */
 export interface SearchResultSortOption {
   /** Human-readable sort label shown in the toolbar. */
@@ -38,9 +36,7 @@ interface SearchResultToolbarProps {
 /**
  * Renders sort and view controls for the search result panel.
  *
- * Use this component in the result panel header area after pagination and sort
- * state have been resolved by `useSearchResultPagingSort`. The toolbar is
- * intentionally layout-only: callers own URL updates and view state changes.
+ * Layout-only result controls. Callers own URL updates and view state changes.
  *
  * @param {SearchResultToolbarProps} props - Sort state, view state, and control callbacks.
  * @returns {JSX.Element} Compact result toolbar.

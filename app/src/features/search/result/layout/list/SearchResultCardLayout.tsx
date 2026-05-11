@@ -18,9 +18,8 @@ interface SearchResultCardLayoutProps {
 /**
  * Renders search results in a card list.
  *
- * Use this layout when the result toolbar selects the list view. It receives
- * cart membership as a set from `SearchResultOptions` and passes only the row
- * actions needed by each card.
+ * List-view layout for result cards. Receives cart membership as a set and
+ * passes row actions through to each card.
  *
  * @param {SearchResultCardLayoutProps} props - Results, cart ids, and row action callbacks.
  * @returns {JSX.Element} Stacked result cards.

@@ -23,11 +23,9 @@ interface UseSearchResultDownloadProps {
 /**
  * Owns download sidebar state and create-download lifecycle for search results.
  *
- * Use this hook from `SearchResultPage` to keep download-specific behavior out
- * of the route component. It manages the active sidebar tab, create-download
- * dialog open/submitting state, checkout behavior for the cart tab, and creation
- * of expression-backed downloads. It also guards against empty searches and
- * stale in-flight result state before opening the create-download dialog.
+ * Keeps download-specific behavior out of the route component: active sidebar
+ * tab, create-download dialog state, checkout, and expression-backed download
+ * creation. Guards against empty searches and stale in-flight result state.
  *
  * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and pagination state needed by download actions.
  * @returns Download sidebar state, create-download dialog state, and handlers for opening, saving, canceling, and checkout.
@@ -54,12 +52,8 @@ export const useSearchResultDownload = ({
 
   /**
    * Opens the create-download dialog for the currently applied search.
-   *
-   * Use this as the result panel's "Create Download" action. It intentionally
-   * does nothing while result pagination is still loading, because the page does
-   * not yet know whether there are downloadable features. If the current search
-   * has zero results, it shows an informational dialog instead of opening the
-   * form.
+   * Waits for pagination before deciding whether to open the form or show the
+   * zero-results dialog.
    */
   const handleOpenCreateDownload = useCallback(() => {
     if (isLoading || pagination === undefined) {
@@ -81,13 +75,9 @@ export const useSearchResultDownload = ({
 
   /**
    * Submits the create-download form for the current expression search.
-   *
-   * Use this as `CreateDownloadDialog.onSave`. The operation is serialized so a
-   * double-click or repeated submit cannot create duplicate downloads. On
-   * success it closes the dialog, switches the sidebar to the Downloads tab, and
-   * shows a snackbar. On failure it keeps the dialog open and surfaces the API
-   * error message. State updates are skipped if the component unmounts before
-   * the request resolves.
+   * Serialized to prevent duplicate downloads. Success closes the dialog and
+   * switches to Downloads; failure keeps the dialog open and shows the API
+   * error. State updates are skipped after unmount.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name, description, and feature types.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
@@ -131,10 +121,7 @@ export const useSearchResultDownload = ({
 
   /**
    * Checks out the current cart and moves the sidebar to the Downloads view.
-   *
-   * Use this as the download sidebar checkout action. Cart checkout owns the
-   * selected cart contents; this handler only coordinates the sidebar transition
-   * and snackbar error reporting for failed checkout attempts.
+   * Checkout failures are surfaced through the global snackbar.
    */
   const handleCheckout = useCallback(async () => {
     try {
@@ -147,10 +134,7 @@ export const useSearchResultDownload = ({
 
   /**
    * Closes the create-download dialog without submitting.
-   *
-   * Use this as `CreateDownloadDialog.onCancel`. It only updates local dialog
-   * state; it does not reset the current expression, sidebar tab, or result
-   * pagination.
+   * Does not reset expression, sidebar tab, or pagination state.
    */
   const handleCancelCreateDownload = useCallback(() => {
     setIsCreateDownloadDialogOpen(false);

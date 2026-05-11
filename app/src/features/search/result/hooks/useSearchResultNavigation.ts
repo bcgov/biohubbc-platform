@@ -7,10 +7,9 @@ import { ISearchContainerLink } from '../../container/tab/SearchTabs.interface';
 /**
  * Builds navigation handlers for search result interactions.
  *
- * Use this hook from `SearchResultPage` to keep router-specific behavior out of
- * presentational components. It navigates from a result row to feature detail,
- * switches feature-type tabs while preserving applicable query params, and opens
- * the portal ticket route for secured data access requests.
+ * Keeps router-specific behavior out of presentational components: result
+ * detail navigation, feature-type tab navigation, and secured-data access route
+ * changes.
  *
  * @param {ISearchContainerLink[]} featureTypeLinks - Current feature-type tab links, used to resolve tab values to routes.
  * @returns Handlers for result clicks, feature-type tab changes, and secured-data access requests.
@@ -21,10 +20,7 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
 
   /**
    * Opens the detail page for a selected search result.
-   *
-   * Use this as the table/card row click handler. It preserves the current query
-   * string so users can navigate back to the same filtered, sorted, and paged
-   * result context after viewing the feature detail.
+   * Preserves the current query string for back-navigation context.
    *
    * @param {SearchFeatureResultWithRelevancy} result - Result row selected by the user.
    */
@@ -37,10 +33,8 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
 
   /**
    * Navigates to another feature-type result tab.
-   *
-   * Use this as the feature-type tab group's change handler. It resolves the tab
-   * value to the configured route, preserves compatible query params, and drops
-   * route-specific feature type/page params that should not carry across tabs.
+   * Preserves compatible query params and drops route-specific feature type/page
+   * params that should not carry across tabs.
    *
    * @param {string} nextFeatureTypeName - Feature type value from the selected tab.
    */
@@ -61,9 +55,6 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
 
   /**
    * Opens the portal ticket flow for users requesting access to secured results.
-   *
-   * Use this as the secured-results alert action. The ticket route owns the
-   * request workflow; this handler only performs the route transition.
    */
   const handleRequestAccess = useCallback(() => {
     navigate('/portal/ticket');

@@ -13,10 +13,8 @@ interface SearchResultHeaderProps {
 /**
  * Search input and anchored filter popover for the search results page.
  *
- * Use this layout component when a results page needs a text search input with
- * a popover anchored to the input width. The parent owns `searchTerm` and the
- * open/closed state; this component only handles anchoring, resizing, click-away
- * behavior, and forwarding search input changes.
+ * The parent owns `searchTerm` and open/closed state; this component handles
+ * anchoring, resizing, click-away behavior, and search input changes.
  *
  * The click-away handler deliberately ignores MUI popper/menu/presentation
  * elements so nested controls inside `ExpressionBuilder` can open their own
@@ -64,11 +62,8 @@ export const SearchResultHeader = (props: PropsWithChildren<SearchResultHeaderPr
 
   /**
    * Closes the expression filter popover when focus moves outside it.
-   *
-   * Use this only as the `ClickAwayListener` callback for the anchored filter
-   * panel. It deliberately ignores clicks on the search input anchor and MUI
-   * popper/menu surfaces so autocomplete menus inside the expression builder do
-   * not close the parent filter panel.
+   * Ignores the search anchor and nested MUI popper/menu surfaces so expression
+   * builder autocomplete menus can stay open.
    *
    * @param {MouseEvent | TouchEvent} event - Click-away event emitted by MUI.
    */

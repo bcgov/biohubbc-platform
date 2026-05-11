@@ -7,11 +7,9 @@ import { normalizeQueryParam } from 'utils/query-param';
 /**
  * Manages the expression tree applied to feature search results.
  *
- * Use this hook from `SearchResultPage` to store the current expression payload
- * and trigger result refreshes when users apply either a non-empty expression or
- * clear all expression filters. It also resets URL pagination to page 1, and
- * clears sort/order query params when the expression is cleared so the result
- * list returns to the default unfiltered state.
+ * Stores the current expression payload and triggers result refreshes when users
+ * apply or clear filters. Also resets pagination and clears sort/order when the
+ * expression is cleared.
  *
  * @returns Current expression tree, an explicit refresh revision key, and an apply handler for the expression builder.
  */
@@ -22,12 +20,8 @@ export const useSearchResultExpression = () => {
 
   /**
    * Applies a new expression tree to the search result page.
-   *
-   * Use this as the expression builder's Apply action. It stores the expression,
-   * increments an explicit revision key so applying the same expression can still
-   * refresh results, and resets pagination to the first page. When the expression
-   * is cleared, it also removes sort/order params so the unfiltered result set
-   * returns to its default ordering.
+   * Increments the revision key so applying the same expression still refreshes
+   * results. Clearing the expression also removes sort/order params.
    *
    * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression to apply, or `null` to clear filters.
    */

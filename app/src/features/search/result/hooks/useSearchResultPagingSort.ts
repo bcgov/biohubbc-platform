@@ -13,10 +13,8 @@ interface UseSearchResultPagingSortProps {
 /**
  * Derives sort controls and pagination handlers for search results.
  *
- * Use this hook with `useSearchResults` so result paging and sort interactions
- * update the URL query string through the same normalized parameter setter used
- * by the result loader. The returned sort options are suitable for
- * `SearchResultToolbar`.
+ * Derives toolbar sort options and URL-backed paging callbacks from result
+ * pagination metadata.
  *
  * @param {UseSearchResultPagingSortProps} props - Current pagination metadata and URL-aware search-param setter.
  * @returns Active sort field, toolbar sort options, and handlers for sort, page, and page-size changes.
@@ -39,10 +37,7 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
 
   /**
    * Applies a new sort field and direction to the URL-backed result query.
-   *
-   * Use this as the toolbar sort-button callback. Updating sort/order through
-   * `setSearchParams` also resets pagination to page 1 through the shared search
-   * param setter, keeping sort changes and result loading on the same URL path.
+   * The shared param setter resets pagination to page 1.
    *
    * @param {string} sort - API sort field selected by the user.
    * @param {'asc' | 'desc'} direction - Sort direction selected by the user.
@@ -56,10 +51,7 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
 
   /**
    * Applies a new result page to the URL-backed result query.
-   *
-   * Use this as the pagination page-change callback. It updates only the page
-   * query param so existing search expression, sort, and page-size state remain
-   * intact.
+   * Preserves expression, sort, and page-size state.
    *
    * @param {number} page - One-based result page selected by the user.
    */
@@ -72,10 +64,7 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
 
   /**
    * Applies a new page size to the URL-backed result query.
-   *
-   * Use this as the pagination page-size callback. It stores the selected limit
-   * and explicitly resets the result page to 1 so the next request cannot ask
-   * for an out-of-range page under the new page size.
+   * Resets the result page to 1 to avoid requesting an out-of-range page.
    *
    * @param {number} limit - Number of rows to request per page.
    */
