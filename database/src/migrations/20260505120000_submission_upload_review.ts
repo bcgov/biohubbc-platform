@@ -16,6 +16,7 @@ export async function up(knex: Knex): Promise<void> {
     -- Create submission_upload_review_status enum
     --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_review_status AS ENUM (
+      'pending',
       'requested',
       'in_progress',
       'completed',
@@ -39,7 +40,7 @@ export async function up(knex: Knex): Promise<void> {
       submission_upload_review_id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
       submission_upload_id uuid NOT NULL,
       scope submission_upload_review_scope NOT NULL,
-      status submission_upload_review_status NOT NULL DEFAULT 'requested',
+      status submission_upload_review_status NOT NULL DEFAULT 'pending',
       requested_by integer,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
@@ -96,7 +97,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_upload_review.submission_upload_review_id IS 'Primary key.';
     COMMENT ON COLUMN submission_upload_review.submission_upload_id IS 'Foreign key to submission_upload.';
     COMMENT ON COLUMN submission_upload_review.scope IS 'Review scope, such as validation or security.';
-    COMMENT ON COLUMN submission_upload_review.status IS 'Review workflow status: requested, in_progress, completed, blocked, skipped, or cancelled.';
+    COMMENT ON COLUMN submission_upload_review.status IS 'Review workflow status: pending, requested, in_progress, completed, blocked, skipped, or cancelled.';
     COMMENT ON COLUMN submission_upload_review.requested_by IS 'System user who requested the review.';
   `);
 }

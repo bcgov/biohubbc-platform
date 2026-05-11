@@ -62,11 +62,13 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
       INSERT INTO submission_upload_review (
         submission_upload_id,
         scope,
+        status,
         requested_by
       )
       SELECT
         su.submission_upload_id,
         ${params.scope}::submission_upload_review_scope,
+        'requested'::submission_upload_review_status,
         ${params.requested_by}
       FROM
         submission_upload su
@@ -106,7 +108,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
   }
 
   /**
-   * Insert the default validation and security review rows for a submission upload.
+   * Insert pending default validation and security review rows for a submission upload.
    *
    * @param {number} submissionId - The submission ID.
    * @param {string} submissionUploadId - The submission upload ID.
@@ -128,11 +130,13 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
       INSERT INTO submission_upload_review (
         submission_upload_id,
         scope,
+        status,
         requested_by
       )
       SELECT
         su.submission_upload_id,
         rs.scope,
+        'pending'::submission_upload_review_status,
         ${requestedBy}
       FROM
         submission_upload su
@@ -164,6 +168,95 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
     if (response.rowCount !== 2) {
       throw new ApiExecuteSQLError('Failed to insert default submission_upload_review records', [
         'SubmissionUploadReviewRepository->insertDefaultSubmissionUploadReviews',
+        'rowCount was null or undefined, expected rowCount = 2'
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Mark default validation and security review rows requested for a submission upload.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission upload ID.
+   * @param {number} requestedBy - The system user ID requesting the reviews.
+   * @return {Promise<SubmissionUploadReview[]>} The requested review rows.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async requestDefaultSubmissionUploadReviews(
+    submissionId: number,
+    submissionUploadId: string,
+    requestedBy: number
+  ): Promise<SubmissionUploadReview[]> {
+    const sqlStatement = SQL`
+      WITH requested_scopes(scope, sort_order) AS (
+        VALUES
+          ('validation'::submission_upload_review_scope, 1),
+          ('security'::submission_upload_review_scope, 2)
+      ),
+      updated AS (
+        UPDATE submission_upload_review sur
+        SET
+          status = 'requested'::submission_upload_review_status,
+          requested_by = ${requestedBy}
+        FROM
+          submission_upload su
+        INNER JOIN
+          requested_scopes rs
+        ON
+          rs.scope = sur.scope
+        WHERE
+          sur.submission_upload_id = su.submission_upload_id
+          AND su.submission_id = ${submissionId}
+          AND su.submission_upload_id = ${submissionUploadId}
+          AND su.record_end_date IS NULL
+          AND sur.record_end_date IS NULL
+          AND sur.status = 'pending'
+        RETURNING
+          sur.submission_upload_review_id,
+          sur.submission_upload_id,
+          sur.scope,
+          sur.status,
+          sur.requested_by
+      )
+      SELECT
+        sur.submission_upload_review_id,
+        sur.submission_upload_id,
+        sur.scope,
+        sur.status,
+        sur.requested_by
+      FROM
+        submission_upload_review sur
+      INNER JOIN
+        submission_upload su
+      ON
+        su.submission_upload_id = sur.submission_upload_id
+      INNER JOIN
+        requested_scopes rs
+      ON
+        rs.scope = sur.scope
+      WHERE
+        su.submission_id = ${submissionId}
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND su.record_end_date IS NULL
+        AND sur.record_end_date IS NULL
+      ORDER BY
+        rs.sort_order ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload default reviews not found', [
+        'SubmissionUploadReviewRepository->requestDefaultSubmissionUploadReviews',
+        { submissionId, submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 2) {
+      throw new ApiExecuteSQLError('Failed to request default submission_upload_review records', [
+        'SubmissionUploadReviewRepository->requestDefaultSubmissionUploadReviews',
         'rowCount was null or undefined, expected rowCount = 2'
       ]);
     }

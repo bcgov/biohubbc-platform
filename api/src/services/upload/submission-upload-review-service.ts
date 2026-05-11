@@ -20,8 +20,8 @@ import { DBService } from '../db-service';
  *   (`submitted`, `approved`, `denied`, `deleted`).
  *
  * This service owns the review business rules: creating scoped reviews and
- * creating the default validation/security tasks after successful
- * ingestion. Repository methods remain row-oriented CRUD helpers.
+ * creating default validation/security task rows and requesting them after
+ * successful ingestion. Repository methods remain row-oriented CRUD helpers.
  *
  * @export
  * @class SubmissionUploadReviewService
@@ -86,11 +86,28 @@ export class SubmissionUploadReviewService extends DBService {
   }
 
   /**
-   * Request the default validation and security reviews for an upload.
+   * Create pending default validation and security reviews for an upload.
    *
-   * Call this only after the upload has successfully passed the ingestion phase
-   * that makes it reviewable. The property ingestion service calls this after
-   * canonical feature properties and relationships have been inserted.
+   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission upload ID.
+   * @param {number} requestedBy - The system user ID assigned as requester.
+   * @return {Promise<SubmissionUploadReview[]>} The pending validation and security review rows.
+   * @memberof SubmissionUploadReviewService
+   */
+  async createDefaultReviewsForUpload(
+    submissionId: number,
+    submissionUploadId: string,
+    requestedBy: number
+  ): Promise<SubmissionUploadReview[]> {
+    return this.submissionUploadReviewRepository.insertDefaultSubmissionUploadReviews(
+      submissionId,
+      submissionUploadId,
+      requestedBy
+    );
+  }
+
+  /**
+   * Promote pending default reviews to requested.
    *
    * @param {number} submissionId - The submission ID.
    * @param {string} submissionUploadId - The submission upload ID.
@@ -103,7 +120,7 @@ export class SubmissionUploadReviewService extends DBService {
     submissionUploadId: string,
     requestedBy: number
   ): Promise<SubmissionUploadReview[]> {
-    return this.submissionUploadReviewRepository.insertDefaultSubmissionUploadReviews(
+    return this.submissionUploadReviewRepository.requestDefaultSubmissionUploadReviews(
       submissionId,
       submissionUploadId,
       requestedBy

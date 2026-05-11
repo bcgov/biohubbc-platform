@@ -101,8 +101,36 @@ describe('SubmissionUploadReviewService', () => {
     });
   });
 
+  describe('createDefaultReviewsForUpload', () => {
+    it('creates pending validation and security reviews for an upload', async () => {
+      const validationReview = buildReview({
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+        scope: SubmissionUploadReviewScope.VALIDATION,
+        status: SubmissionUploadReviewStatus.PENDING
+      });
+      const securityReview = buildReview({
+        submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
+        scope: SubmissionUploadReviewScope.SECURITY,
+        status: SubmissionUploadReviewStatus.PENDING
+      });
+      const insertDefaultSubmissionUploadReviewsStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'insertDefaultSubmissionUploadReviews')
+        .resolves([validationReview, securityReview]);
+
+      const service = new SubmissionUploadReviewService(getMockDBConnection());
+      const result = await service.createDefaultReviewsForUpload(99, '550e8400-e29b-41d4-a716-446655440000', 7);
+
+      expect(result).to.eql([validationReview, securityReview]);
+      expect(insertDefaultSubmissionUploadReviewsStub).to.have.been.calledOnceWith(
+        99,
+        '550e8400-e29b-41d4-a716-446655440000',
+        7
+      );
+    });
+  });
+
   describe('requestDefaultReviewsForUpload', () => {
-    it('requests validation and security reviews for an upload', async () => {
+    it('marks validation and security reviews requested for an upload', async () => {
       const validationReview = buildReview({
         submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.VALIDATION
@@ -111,15 +139,15 @@ describe('SubmissionUploadReviewService', () => {
         submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
         scope: SubmissionUploadReviewScope.SECURITY
       });
-      const insertDefaultSubmissionUploadReviewsStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'insertDefaultSubmissionUploadReviews')
+      const requestDefaultSubmissionUploadReviewsStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'requestDefaultSubmissionUploadReviews')
         .resolves([validationReview, securityReview]);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
       const result = await service.requestDefaultReviewsForUpload(99, '550e8400-e29b-41d4-a716-446655440000', 7);
 
       expect(result).to.eql([validationReview, securityReview]);
-      expect(insertDefaultSubmissionUploadReviewsStub).to.have.been.calledOnceWith(
+      expect(requestDefaultSubmissionUploadReviewsStub).to.have.been.calledOnceWith(
         99,
         '550e8400-e29b-41d4-a716-446655440000',
         7

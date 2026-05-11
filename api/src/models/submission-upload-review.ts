@@ -6,6 +6,7 @@ export enum SubmissionUploadReviewScope {
 }
 
 export enum SubmissionUploadReviewStatus {
+  PENDING = 'pending',
   REQUESTED = 'requested',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',

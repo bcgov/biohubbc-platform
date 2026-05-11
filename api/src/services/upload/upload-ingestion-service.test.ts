@@ -18,6 +18,7 @@ import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadReviewService } from './submission-upload-review-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -42,6 +43,7 @@ describe('UploadIngestionService', () => {
   beforeEach(() => {
     mockConnection = getMockDBConnection({ systemUserId: () => 1 });
     service = new UploadIngestionService(mockConnection);
+    sinon.stub(SubmissionUploadReviewService.prototype, 'createDefaultReviewsForUpload').resolves([]);
   });
 
   afterEach(() => {
@@ -68,6 +70,8 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
+      const createDefaultReviewsStub = SubmissionUploadReviewService.prototype
+        .createDefaultReviewsForUpload as sinon.SinonStub;
       sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
         submission_upload_status_id: 1,
         submission_upload_id: 'submission-upload-id-1',
@@ -109,6 +113,7 @@ describe('UploadIngestionService', () => {
           comment: mockSubmission.comment
         })
       );
+      expect(createDefaultReviewsStub).to.have.been.calledOnceWith(mockSubmissionId, 'submission-upload-id-1', 1);
       expect(result.submissionId).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
       expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);

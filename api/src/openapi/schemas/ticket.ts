@@ -10,6 +10,7 @@ const SubmissionUploadReviewStatusEnum = ['submitted', 'approved', 'denied', 'de
 const SubmissionValidationStatusEnum = ['pending', 'started', 'completed', 'invalid', 'failed'];
 const SubmissionUploadReviewScopeEnum = ['validation', 'security'];
 const SubmissionUploadReviewTaskStatusEnum = [
+  'pending',
   'requested',
   'in_progress',
   'completed',
