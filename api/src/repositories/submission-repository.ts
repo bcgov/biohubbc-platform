@@ -141,6 +141,7 @@ export interface ISubmissionModel {
   submission_id?: number;
   uuid: string;
   system_user_id: number;
+  comment?: string | null;
   security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;

@@ -14,6 +14,7 @@ import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadReviewService } from './submission-upload-review-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -36,6 +37,7 @@ export class UploadIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
+  submissionUploadReviewService = new SubmissionUploadReviewService(this.connection);
   submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
@@ -65,9 +67,13 @@ export class UploadIngestionService extends DBService {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submission_id);
     const submissionUuidFromTable = submissionRecord.uuid;
 
-    return this._startArchiveUploadForSubmission(bytes, submission_id, submissionUuidFromTable, [
-      submission.system_user_id
-    ]);
+    return this._startArchiveUploadForSubmission(
+      bytes,
+      submission_id,
+      submissionUuidFromTable,
+      [submission.system_user_id],
+      submission.comment
+    );
   }
 
   /**
@@ -85,9 +91,13 @@ export class UploadIngestionService extends DBService {
   ): Promise<PresignedUploadUrlResponse> {
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
-    return this._startArchiveUploadForSubmission(bytes, byUuid.submission_id, submissionRecord.uuid, [
-      submissionRecord.system_user_id
-    ]);
+    return this._startArchiveUploadForSubmission(
+      bytes,
+      byUuid.submission_id,
+      submissionRecord.uuid,
+      [submissionRecord.system_user_id],
+      submissionRecord.comment ?? null
+    );
   }
 
   /**
@@ -103,7 +113,8 @@ export class UploadIngestionService extends DBService {
     bytes: number,
     submissionId: number,
     submissionUuid: string,
-    systemUserIds: number[]
+    systemUserIds: number[],
+    comment?: string | null
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
@@ -125,16 +136,24 @@ export class UploadIngestionService extends DBService {
       submission_id: submissionId,
       upload_id,
       ticket_id: ticket.ticket_id,
-      status: 'uploaded'
+      status: 'uploaded',
+      comment: comment ?? null
     });
 
-    // 4. Create initial review status (submitted = unreviewed)
+    // 4. Create pending validation/security review tasks for this upload
+    await this.submissionUploadReviewService.createDefaultReviewsForUpload(
+      submissionId,
+      submission_upload_id,
+      this.connection.systemUserId()
+    );
+
+    // 5. Create initial review status (submitted = unreviewed)
     await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
       submission_upload_id,
       status: 'submitted'
     });
 
-    // 5. Create placeholder artifact for archive
+    // 6. Create placeholder artifact for archive
     const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
@@ -146,14 +165,14 @@ export class UploadIngestionService extends DBService {
       format: 'tar'
     });
 
-    // 6. Create upload_archive metadata
+    // 7. Create upload_archive metadata
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
       archive_status: ProcessStatusStatusEnum.DRAFT
     });
 
-    // 7. Initialize multipart upload
+    // 8. Initialize multipart upload
     const {
       uploadId: s3UploadId,
       presignedUrls,
@@ -164,10 +183,10 @@ export class UploadIngestionService extends DBService {
       bytes
     });
 
-    // 8. Persist S3 upload ID
+    // 9. Persist S3 upload ID
     await this.uploadService.updateUpload(upload_id, { s3_upload_id: s3UploadId });
 
-    // 9. Response submissionId is the submission UUID (callers pass it for clarity; API returns it for client use).
+    // 10. Response submissionId is the submission UUID (callers pass it for clarity; API returns it for client use).
     return {
       submissionId: submissionUuid,
       submissionUploadId: submission_upload_id,
