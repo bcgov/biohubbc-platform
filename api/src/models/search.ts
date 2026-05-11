@@ -11,6 +11,7 @@ export type WithCount<T extends z.ZodTypeAny> = z.infer<ReturnType<typeof WithCo
 export const SearchFeatureResult = z.object({
   submission_feature_id: z.number().int().positive(),
   feature_type_id: z.number().int(),
+  feature_type_name: z.string(),
   label: z.string()
 });
 export type SearchFeatureResult = z.infer<typeof SearchFeatureResult>;

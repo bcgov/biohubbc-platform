@@ -17,7 +17,11 @@ import { BaseRepository } from './base-repository';
 export class SearchRepository extends BaseRepository {
   /**
    * Builds a query to find features matching a search term.
-   * Searches against the search_string table and joins related feature type data.
+   *
+   * Matches the keyword against any string property in submission_feature_property_string. The
+   * returned `label` is the feature's display name (from sf.data->>'name'), so the FE dropdown
+   * row and its click-through search query stay recognizable even when the keyword matched a
+   * description or other non-name property. Features with no name in sf.data are excluded.
    *
    * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding features
@@ -25,19 +29,22 @@ export class SearchRepository extends BaseRepository {
    */
   private _makeFindFeaturesQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
-    return knex('search_string as ss')
-      .join('feature_property as fp', 'fp.feature_property_id', 'ss.feature_property_id')
-      .join('submission_feature as sf', 'sf.submission_feature_id', 'ss.submission_feature_id')
+    return knex('submission_feature_property_string as sfps')
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'sfps.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .where('fp.name', 'name')
-      .andWhereILike('ss.value', `%${keyword}%`)
-      .select('sf.submission_feature_id', 'sf.feature_type_id', knex.raw('MIN(ss.value) as label'))
-      .groupBy('sf.submission_feature_id', 'sf.feature_type_id');
+      .whereILike('sfps.value', `%${keyword}%`)
+      .whereRaw(`sf.data->>'name' IS NOT NULL`)
+      .select(
+        'sf.submission_feature_id',
+        'sf.feature_type_id',
+        'ft.name as feature_type_name',
+        knex.raw(`sf.data->>'name' as label`)
+      )
+      .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name', knex.raw(`sf.data->>'name'`));
   }
 
   /**
    * Builds a query to find submissions matching a search term.
-   * Searches against both submission name and associated search strings.
    *
    * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding submissions
@@ -47,9 +54,9 @@ export class SearchRepository extends BaseRepository {
     const knex = getKnex();
     return knex('submission as s')
       .leftJoin('submission_feature as sf', 'sf.submission_id', 's.submission_id')
-      .leftJoin('search_string as ss', 'ss.submission_feature_id', 'sf.submission_feature_id')
+      .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
       .where((qb) => {
-        qb.whereILike('s.name', `%${keyword}%`).orWhereILike('ss.value', `%${keyword}%`);
+        qb.whereILike('s.name', `%${keyword}%`).orWhereILike('sfps.value', `%${keyword}%`);
       })
       .select('s.submission_id', 's.name', 's.description')
       .distinct();
@@ -127,7 +134,7 @@ export class SearchRepository extends BaseRepository {
       base.where('ft.name', params.feature_type_name);
     }
 
-    const jsonbObject = `jsonb_build_object('submission_feature_id', submission_feature_id, 'feature_type_id', feature_type_id, 'label', label)`;
+    const jsonbObject = `jsonb_build_object('submission_feature_id', submission_feature_id, 'feature_type_id', feature_type_id, 'feature_type_name', feature_type_name, 'label', label)`;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
 
     const result = await this.connection.knex(query);
@@ -187,9 +194,9 @@ export class SearchRepository extends BaseRepository {
     const query = SQL`
       WITH matching_features AS (
         SELECT DISTINCT sf.submission_feature_id, sf.feature_type_id
-        FROM search_string ss
-        JOIN submission_feature sf ON ss.submission_feature_id = sf.submission_feature_id
-        WHERE ss.value ILIKE ${`%${params.keyword}%`}
+        FROM submission_feature_property_string sfps
+        JOIN submission_feature sf ON sfps.submission_feature_id = sf.submission_feature_id
+        WHERE sfps.value ILIKE ${`%${params.keyword}%`}
       ),
       priority_types AS (
         SELECT feature_type_id, name FROM feature_type WHERE name = ANY(${priorityTypes}::text[])
