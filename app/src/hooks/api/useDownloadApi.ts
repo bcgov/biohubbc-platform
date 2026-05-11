@@ -1,5 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { DownloadListResponse } from 'interfaces/useDownloadApi.interface';
+import {
+  CreateDownloadRequest,
+  CreateDownloadResponse,
+  DownloadListResponse
+} from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
@@ -20,5 +24,16 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { getDownloads };
+  /**
+   * Create a new download job for the supplied search expression and feature-type set.
+   *
+   * @param {CreateDownloadRequest} payload
+   * @return {Promise<CreateDownloadResponse>}
+   */
+  const createDownload = async (payload: CreateDownloadRequest): Promise<CreateDownloadResponse> => {
+    const { data } = await axios.post<CreateDownloadResponse>('/api/download', payload);
+    return data;
+  };
+
+  return { getDownloads, createDownload };
 };

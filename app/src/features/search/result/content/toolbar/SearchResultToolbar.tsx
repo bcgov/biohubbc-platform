@@ -14,8 +14,8 @@ interface SearchResultToolbarProps {
   activeSort: string;
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
   onAddAllToCart: () => void;
-  onDownloadAll: () => void;
-  isDownloading?: boolean;
+  onCreateDownloadClick: () => void;
+  isCreateDownloadDisabled?: boolean;
 }
 
 export const SearchResultToolbar = ({
@@ -23,32 +23,42 @@ export const SearchResultToolbar = ({
   activeSort,
   onSortChange,
   onAddAllToCart,
-  onDownloadAll,
-  isDownloading = false
+  onCreateDownloadClick,
+  isCreateDownloadDisabled
 }: SearchResultToolbarProps) => {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-      <Stack direction="row" alignItems="center" spacing={0.5}>
-        {sortOptions.map((opt) => {
-          const isActive = activeSort === opt.value;
-          const newDirection = opt.direction === 'asc' ? 'desc' : 'asc';
-          return (
-            <SortButton
-              key={opt.value}
-              size="small"
-              direction={opt.direction}
-              selected={isActive}
-              onClick={() => {
-                const nextDirection = isActive ? newDirection : 'desc';
-                onSortChange(opt.value, nextDirection);
-              }}>
-              {opt.label}
-            </SortButton>
-          );
-        })}
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" spacing={0.5}>
+          {sortOptions.map((opt) => {
+            const isActive = activeSort === opt.value;
+            const newDirection = opt.direction === 'asc' ? 'desc' : 'asc';
+            return (
+              <SortButton
+                key={opt.value}
+                direction={opt.direction}
+                selected={isActive}
+                onClick={() => {
+                  const nextDirection = isActive ? newDirection : 'desc';
+                  onSortChange(opt.value, nextDirection);
+                }}>
+                {opt.label}
+              </SortButton>
+            );
+          })}
+        </Stack>
       </Stack>
 
       <Stack direction="row" alignItems="center" spacing={1}>
+        <Button
+          size="small"
+          color="primary"
+          onClick={onCreateDownloadClick}
+          disabled={isCreateDownloadDisabled}
+          startIcon={<Icon path={mdiDownload} size={0.8} />}
+          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+          Create Download
+        </Button>
         <Button
           size="small"
           color="primary"
@@ -56,15 +66,6 @@ export const SearchResultToolbar = ({
           startIcon={<Icon path={mdiPlus} size={0.8} />}
           sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
           Add All to Cart
-        </Button>
-        <Button
-          size="small"
-          color="primary"
-          onClick={onDownloadAll}
-          loading={isDownloading}
-          startIcon={<Icon path={mdiDownload} size={0.8} />}
-          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Download All
         </Button>
       </Stack>
     </Stack>

@@ -4,7 +4,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ISearchFeaturesFilters, SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -25,8 +25,6 @@ interface SearchResultsLoaderInput {
   featureTypeName: string;
 }
 
-type SearchPagination = ApiPaginationRequestOptions;
-
 /**
  * Loads feature-search results from URL pagination/sort params and an expression tree.
  *
@@ -44,60 +42,35 @@ type SearchPagination = ApiPaginationRequestOptions;
 export const useSearchResults = (
   featureTypeName: string,
   enabled = true,
-  expressionTree: ExpressionTreeExpression | null = null
+  expressionTree: ExpressionTreeExpression | null = null,
+  refreshKey = 0
 ) => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
 
-  const buildPagination = (params: URLSearchParams): SearchPagination => ({
+  const buildPagination = (
+    params: URLSearchParams
+  ): ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' } => ({
     page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
     limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
     sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
     order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
   });
 
-  const buildEmptyResponse = (pagination: SearchPagination): SearchFeatureResponse => ({
+  const buildEmptyResponse = (
+    pagination: ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' }
+  ): SearchFeatureResponse => ({
     features: [],
     pagination: {
       total: 0,
-      per_page: pagination.limit,
-      current_page: pagination.page,
+      per_page: pagination.limit ?? 10,
+      current_page: pagination.page ?? 1,
       last_page: 1,
       sort: pagination.sort,
       order: pagination.order
     }
   });
-
-  const buildDownloadFilters = (params: URLSearchParams, featureTypeName: string): ISearchFeaturesFilters => {
-    const filters: ISearchFeaturesFilters = {};
-
-    const featureTypes = params.getAll(URL_PARAMS.FEATURE_TYPE.toLowerCase());
-
-    if (featureTypes.length > 0) {
-      filters.feature_types = featureTypes;
-    } else if (featureTypeName) {
-      filters.feature_types = [featureTypeName];
-    }
-
-    params.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-
-      switch (lowerKey) {
-        case URL_PARAMS.SPECIES.toLowerCase():
-          filters.species = filters.species ?? [];
-          filters.species.push(Number(value));
-          break;
-        case URL_PARAMS.SEARCH_QUERY.toLowerCase():
-          filters.keyword = value;
-          break;
-        default:
-          break;
-      }
-    });
-
-    return filters;
-  };
 
   /** Data loader for search results */
   const searchDataLoader = useDataLoader(
@@ -160,7 +133,7 @@ export const useSearchResults = (
         (key) => key.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
+        newParams.set(URL_PARAMS.PAGE, '1');
       }
 
       updateParams(newParams);
@@ -168,14 +141,14 @@ export const useSearchResults = (
     [searchParams, updateParams]
   );
 
-  // Refresh when the route, URL params, or applied expression changes.
+  // Refresh when the route, URL params, applied expression, or explicit refresh key changes.
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
     debouncedRefreshRef({ params: searchParams, expressionTree, featureTypeName });
-  }, [searchParams, expressionTree, featureTypeName, enabled, debouncedRefreshRef]);
+  }, [searchParams, expressionTree, featureTypeName, enabled, refreshKey, debouncedRefreshRef]);
 
   useEffect(() => () => debouncedRefreshRef.cancel(), [debouncedRefreshRef]);
 
@@ -184,7 +157,6 @@ export const useSearchResults = (
     isLoading: searchDataLoader.isLoading,
     searchParams,
     setSearchParams,
-    pagination: searchDataLoader.data?.pagination,
-    filters: buildDownloadFilters(searchParams, featureTypeName)
+    pagination: searchDataLoader.data?.pagination
   };
 };

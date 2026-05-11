@@ -153,4 +153,34 @@ describe('useSearchResults', () => {
       order: undefined
     });
   });
+
+  it('refreshes with a null expression when the explicit refresh key changes', async () => {
+    vi.useFakeTimers();
+
+    const { rerender } = renderHook(({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey), {
+      initialProps: { refreshKey: 0 }
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+
+    rerender({ refreshKey: 1 });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith('species_observation', null, {
+      page: 2,
+      limit: 25,
+      sort: 'create_date',
+      order: 'asc'
+    });
+  });
 });
