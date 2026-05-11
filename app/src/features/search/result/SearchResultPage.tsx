@@ -4,8 +4,9 @@ import { CustomPagination } from 'components/pagination/CustomPagination';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import useIsMounted from 'hooks/useIsMounted';
+import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -13,12 +14,13 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { normalizeQueryParam } from 'utils/query-param';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
-import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultSearch } from './header/SearchResultSearch';
 import { useSearchResults } from './hooks/useSearchResults';
 import { ResultPageContainer } from './layout/ResultPageContainer';
+import { CreateDownloadDialog } from './sidebar/download/CreateDownloadDialog';
+import { ICreateDownloadFormValues } from './sidebar/download/CreateDownloadForm';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
 import { DOWNLOAD_SIDEBAR_VIEW } from './sidebar/download/toolbar/DownloadSidebarToolbar';
 import { SearchSidebar } from './sidebar/search/SearchSidebar';
@@ -48,7 +50,6 @@ export const SearchResultPage = () => {
   const location = useLocation();
   const { featureType } = useParams<{ featureType: string }>();
   const api = useApi();
-  const { auth } = useAuthStateContext();
 
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
@@ -56,11 +57,16 @@ export const SearchResultPage = () => {
 
   const [expressionTree, setExpressionTree] = useState<ExpressionTreeExpression | null>(null);
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
+  const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
+  const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
+  const { runSerialized } = useSerializedAsync();
+  // Suppress post-await state updates if the user navigates away mid-submit; otherwise the global
+  // dialog/snackbar context fires on the next page.
+  const isMounted = useIsMounted();
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
-  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults(
+  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults(
     routeConfig?.featureTypeName ?? '',
     !!routeConfig,
     expressionTree
@@ -130,6 +136,14 @@ export const SearchResultPage = () => {
     refreshRecommended(recommendedFiltersInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedFeatureType, allFeatureTypes]);
+
+  // React Router reuses this component across `/search/:featureType` segments. Without an explicit
+  // reset, an expression tree applied on one feature type follows the user to another and would be
+  // POSTed alongside the new route's `featureTypeName` — producing a mismatched download.
+  useEffect(() => {
+    setExpressionTree(null);
+    setIsCreateDownloadDialogOpen(false);
+  }, [featureType]);
 
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
@@ -218,37 +232,80 @@ export const SearchResultPage = () => {
   }, [rows, addToCart, dialogContext]);
 
   /**
-   * Download all features matching the legacy filter params.
+   * Resolve the toolbar `Create Download` click. Authenticated users with at least one matching
+   * feature open the create-download dialog. Zero-result searches see an OkDialog instead — sparing
+   * them from filling in metadata for an empty download.
    *
-   * Downloading expression results is intentionally outside this branch's scope,
-   * so this preserves the pre-existing filter-based download behavior.
+   * Pagination undefined or a refresh in flight means results are still loading. The button is
+   * also disabled in that window, but guard the handler too — without it, a click would either
+   * coerce undefined → 0 and surface the "nothing to download" dialog before results arrived, or
+   * open the dialog against a stale `pagination.total` from the previous query.
    */
-  const handleDownloadAll = useCallback(async () => {
-    try {
-      setIsDownloading(true);
-      const { download_url: downloadUrl } = await api.search.createDownload(filters);
-
-      if (auth.isAuthenticated) {
-        dialogContext.setSnackbar({
-          snackbarMessage: 'Download started. You can track its progress in your downloads.',
-          open: true
-        });
-      } else {
-        dialogContext.setOkDialog({
-          dialogTitle: 'Download Started',
-          dialogText:
-            'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-          dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
-          open: true,
-          onClose: () => dialogContext.setOkDialog({ open: false })
-        });
-      }
-    } catch (error) {
-      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-    } finally {
-      setIsDownloading(false);
+  const handleOpenCreateDownload = useCallback(() => {
+    if (isLoading || pagination === undefined) {
+      return;
     }
-  }, [filters, api.search, dialogContext, auth.isAuthenticated]);
+
+    if (pagination.total === 0) {
+      dialogContext.setOkDialog({
+        open: true,
+        dialogTitle: 'Create Download',
+        dialogText: 'There are no features matching your current search to download.',
+        onClose: () => dialogContext.setOkDialog({ open: false })
+      });
+      return;
+    }
+
+    setIsCreateDownloadDialogOpen(true);
+  }, [isLoading, pagination, dialogContext]);
+
+  /**
+   * Submit handler for the create-download dialog. Posts the form values plus the page-level
+   * expression tree as a single `CreateDownloadRequest`, then switches the right sidebar to the
+   * Downloads view so the user can watch the new job progress.
+   *
+   * `expression` is forwarded as the literal page state. The expression-builder popover already
+   * strips builder-only `ui_id` fields at apply time, so the page state is wire-clean by
+   * construction; a second sanitizer here would duplicate the contract guarantee. The key must
+   * be present (the backend uses `.nullable()`, not `.optional()`); when no expression is
+   * applied, the page state is `null` and is sent as `null`.
+   */
+  const handleCreateDownload = useCallback(
+    (values: ICreateDownloadFormValues) =>
+      runSerialized(async () => {
+        setIsSubmittingDownload(true);
+        try {
+          await api.download.createDownload({
+            name: values.name,
+            description: values.description,
+            featureTypes: values.featureTypes,
+            expression: expressionTree
+          });
+          if (!isMounted()) {
+            return;
+          }
+          setIsCreateDownloadDialogOpen(false);
+          setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
+          });
+        } catch (error) {
+          if (!isMounted()) {
+            return;
+          }
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: (error as APIError).message
+          });
+        } finally {
+          if (isMounted()) {
+            setIsSubmittingDownload(false);
+          }
+        }
+      }),
+    [api.download, dialogContext, expressionTree, runSerialized, isMounted]
+  );
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -320,9 +377,9 @@ export const SearchResultPage = () => {
               sortOptions={sortOptions}
               activeSort={activeSort}
               onSortChange={handleSortChange}
-              handleAddAllToCart={handleAddAllToCart}
-              handleDownloadAll={handleDownloadAll}
-              isDownloading={isDownloading}
+              onAddAllToCart={handleAddAllToCart}
+              onCreateDownloadClick={handleOpenCreateDownload}
+              isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
             />
           </Box>
 
@@ -356,6 +413,15 @@ export const SearchResultPage = () => {
         </Paper>
         <PageTitle title={`Search Results - ${routeConfig.title}`} description={`List of ${routeConfig.title}`} />
       </Box>
+      <CreateDownloadDialog
+        open={isCreateDownloadDialogOpen}
+        isSubmitting={isSubmittingDownload}
+        defaultName={`${routeConfig.title} download`}
+        defaultFeatureType={routeConfig.featureTypeName}
+        featureTypeOptions={featureTypes.options}
+        onCancel={() => setIsCreateDownloadDialogOpen(false)}
+        onSave={handleCreateDownload}
+      />
     </ResultPageContainer>
   );
 };
