@@ -14,8 +14,8 @@ describe('search', () => {
   const mockPaginationTotal = 1;
   const mockSubmissionRow = { name: 'name', submission_id: 1, description: null };
   const mockFeatureRows = [
-    { feature_type_id: 1, label: 'label', submission_feature_id: 1 },
-    { feature_type_id: 2, label: 'label2', submission_feature_id: 2 }
+    { feature_type_id: 1, feature_type_name: 'dataset', label: 'label', submission_feature_id: 1 },
+    { feature_type_id: 2, feature_type_name: 'observation', label: 'label2', submission_feature_id: 2 }
   ];
 
   const mockResultsWithData: SearchResponseWithCounts = {
