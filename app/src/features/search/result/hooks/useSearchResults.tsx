@@ -132,7 +132,7 @@ export const useSearchResults = (
         (key) => key.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
+        newParams.set(URL_PARAMS.PAGE, '1');
       }
 
       updateParams(newParams);
@@ -156,7 +156,7 @@ export const useSearchResults = (
       }
 
       if (normalizedKey !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
+        newParams.set(URL_PARAMS.PAGE, '1');
       }
 
       updateParams(newParams);
