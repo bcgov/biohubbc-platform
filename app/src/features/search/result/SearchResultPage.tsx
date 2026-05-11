@@ -8,8 +8,8 @@ import { Navigate, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
-import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPanel } from './content/SearchResultPanel';
+import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
 import { useSearchResultCartActions } from './hooks/useSearchResultCartActions';
 import { useSearchResultDownload } from './hooks/useSearchResultDownload';
@@ -72,14 +72,16 @@ export const SearchResultPage = () => {
     handleCheckout
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
 
+  if (codesDataLoader.isReady && !routeConfig) {
+    return <Navigate to="/page-not-found" replace />;
+  }
+
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   const hasSecuredResults = rows.some((row) => row.is_secured);
 
   return (
     <LoadingGuard isLoading={!codesDataLoader.isReady}>
-      {!routeConfig ? (
-        <Navigate to="/page-not-found" replace />
-      ) : (
+      {routeConfig && (
         <ResultPageContainer
           rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
           rightSidebar={
