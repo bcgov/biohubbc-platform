@@ -255,15 +255,15 @@ export class SubmissionUploadRepository extends BaseRepository {
       LEFT JOIN LATERAL (
         SELECT
           json_agg(
-              json_build_object(
-                'submission_upload_review_id', sur.submission_upload_review_id,
-                'submission_upload_id', sur.submission_upload_id,
-                'scope', sur.scope,
-                'status', sur.status,
-                'requested_by', sur.requested_by
-              )
-              ORDER BY sur.create_date ASC
-            ) AS reviews
+            json_build_object(
+              'submission_upload_review_id', sur.submission_upload_review_id,
+              'submission_upload_id', sur.submission_upload_id,
+              'scope', sur.scope,
+              'status', sur.status,
+              'requested_by', sur.requested_by
+            )
+            ORDER BY sur.create_date ASC
+          ) AS reviews
         FROM
           submission_upload_review sur
         WHERE

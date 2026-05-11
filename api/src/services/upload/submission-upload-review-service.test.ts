@@ -2,7 +2,6 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ApiNotFoundError } from '../../errors/api-error';
 import {
   SubmissionUploadReview,
   SubmissionUploadReviewScope,
@@ -24,9 +23,6 @@ describe('SubmissionUploadReviewService', () => {
         submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.SECURITY
       });
-      const findReviewsStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
-        .resolves([]);
       const insertStub = sinon
         .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
         .resolves(review);
@@ -39,7 +35,6 @@ describe('SubmissionUploadReviewService', () => {
       });
 
       expect(result).to.eql(review);
-      expect(findReviewsStub).not.to.have.been.called;
       expect(insertStub).to.have.been.calledOnceWith({
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
@@ -54,10 +49,7 @@ describe('SubmissionUploadReviewService', () => {
       });
       const insertStub = sinon
         .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
-        .resolves(undefined);
-      const findReviewsStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
-        .resolves([review]);
+        .resolves(review);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
       const result = await service.insertSubmissionUploadReview({
@@ -67,35 +59,11 @@ describe('SubmissionUploadReviewService', () => {
       });
 
       expect(result).to.eql(review);
-      expect(findReviewsStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000', {
-        scope: SubmissionUploadReviewScope.SECURITY
-      });
       expect(insertStub).to.have.been.calledOnceWith({
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
         requested_by: 7
       });
-    });
-
-    it('throws when a conflict insert returns no row and the existing review cannot be found', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview').resolves(undefined);
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId').resolves([]);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-
-      try {
-        await service.insertSubmissionUploadReview({
-          submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-          scope: SubmissionUploadReviewScope.SECURITY,
-          requested_by: 7
-        });
-        expect.fail('Expected ApiNotFoundError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-        expect((error as ApiNotFoundError).message).to.equal(
-          'Submission upload review not found after insert conflict'
-        );
-      }
     });
   });
 
@@ -136,25 +104,6 @@ describe('SubmissionUploadReviewService', () => {
     });
   });
 
-  describe('updateReviewStatus', () => {
-    it('throws when no active review row exists', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'updateReviewStatus').resolves(undefined);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-
-      try {
-        await service.updateReviewStatus({
-          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-          status: SubmissionUploadReviewStatus.COMPLETED
-        });
-        expect.fail('Expected ApiNotFoundError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-        expect((error as ApiNotFoundError).message).to.equal('Submission upload review not found');
-      }
-    });
-  });
-
   describe('updateSubmissionUploadReview', () => {
     it('updates a review for a submission upload', async () => {
       const review = buildReview({
@@ -180,24 +129,6 @@ describe('SubmissionUploadReviewService', () => {
         data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
       });
     });
-
-    it('throws when no active review row exists for the upload and ID', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'updateSubmissionUploadReview').resolves(undefined);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-
-      try {
-        await service.updateSubmissionUploadReview({
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-          data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
-        });
-        expect.fail('Expected ApiNotFoundError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-        expect((error as ApiNotFoundError).message).to.equal('Submission upload review not found');
-      }
-    });
   });
 
   describe('deleteSubmissionUploadReview', () => {
@@ -221,23 +152,6 @@ describe('SubmissionUploadReviewService', () => {
         submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
         submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
       });
-    });
-
-    it('throws when no active review row exists for delete', async () => {
-      sinon.stub(SubmissionUploadReviewRepository.prototype, 'deleteSubmissionUploadReview').resolves(undefined);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-
-      try {
-        await service.deleteSubmissionUploadReview({
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
-        });
-        expect.fail('Expected ApiNotFoundError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-        expect((error as ApiNotFoundError).message).to.equal('Submission upload review not found');
-      }
     });
   });
 });

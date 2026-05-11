@@ -85,7 +85,6 @@ export class SubmissionFeatureService extends DBService {
     pagination: ApiPaginationOptions,
     filters?: SubmissionFeaturePropertyFilters
   ): Promise<{ properties: SubmissionFeatureProperty[]; total: number }> {
-    await this.submissionFeatureRepository.getSubmissionFeatureById(submissionFeatureId);
     const [properties, total] = await Promise.all([
       this.submissionFeatureRepository.getSubmissionFeatureProperties(submissionFeatureId, pagination, filters),
       this.submissionFeatureRepository.getSubmissionFeaturePropertiesCount(submissionFeatureId, filters)

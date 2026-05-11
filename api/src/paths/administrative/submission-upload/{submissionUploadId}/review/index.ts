@@ -79,7 +79,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    200: {
+    201: {
       description: 'Submission upload review created successfully.',
       content: {
         'application/json': {
@@ -139,7 +139,7 @@ export function insertSubmissionUploadReview(): RequestHandler {
 
       await connection.commit();
 
-      return res.status(200).json(result);
+      return res.status(201).json(result);
     } catch (error) {
       defaultLog.error({
         label: 'insertSubmissionUploadReview',

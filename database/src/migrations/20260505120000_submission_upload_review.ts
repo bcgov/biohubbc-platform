@@ -63,6 +63,15 @@ export async function up(knex: Knex): Promise<void> {
       ON submission_upload_review(submission_upload_id, create_date)
       WHERE record_end_date IS NULL;
 
+    -- Supports ticket detail upload timelines ordered by upload create date.
+    CREATE INDEX submission_upload_idx2
+      ON submission_upload(ticket_id, create_date)
+      WHERE record_end_date IS NULL;
+
+    -- Supports fetching the latest validation row for each upload in ticket detail.
+    CREATE INDEX submission_validation_idx5
+      ON submission_validation(submission_upload_id, create_date DESC);
+
     -- Prevents duplicate active review tasks for the same upload/scope and
     -- supports idempotent lookup before inserting default/manual reviews.
     CREATE UNIQUE INDEX submission_upload_review_nuk1
@@ -99,6 +108,8 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
+    DROP INDEX IF EXISTS submission_validation_idx5;
+    DROP INDEX IF EXISTS submission_upload_idx2;
     DROP TRIGGER IF EXISTS journal_submission_upload_review ON submission_upload_review;
     DROP TRIGGER IF EXISTS audit_submission_upload_review ON submission_upload_review;
     DROP TABLE IF EXISTS submission_upload_review CASCADE;

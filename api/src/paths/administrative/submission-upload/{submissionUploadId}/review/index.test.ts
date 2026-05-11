@@ -59,7 +59,7 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review', (
       scope: SubmissionUploadReviewScope.SECURITY,
       requested_by: 7
     });
-    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.eql(review);
   });
 });

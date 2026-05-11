@@ -1,11 +1,9 @@
 import { IDBConnection } from '../../database/db';
-import { ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadReview,
   SubmissionUploadReview,
   SubmissionUploadReviewFilters,
   SubmissionUploadReviewScope,
-  SubmissionUploadReviewStatus,
   SubmissionUploadReviewUpdate
 } from '../../models/submission-upload-review';
 import { SubmissionUploadReviewRepository } from '../../repositories/upload/submission-upload-review-repository';
@@ -88,37 +86,18 @@ export class SubmissionUploadReviewService extends DBService {
    * fetches and returns that existing row.
    *
    * New rows always start in `requested`; status transitions happen through
-   * `updateReviewStatus`.
+   * `updateSubmissionUploadReview`.
    *
    * @param {CreateSubmissionUploadReview} params - Review insert details.
    * @return {Promise<SubmissionUploadReview>} The created or existing active review row.
    * @memberof SubmissionUploadReviewService
    */
   async insertSubmissionUploadReview(params: CreateSubmissionUploadReview): Promise<SubmissionUploadReview> {
-    const insertedReview = await this.submissionUploadReviewRepository.insertSubmissionUploadReview({
+    return this.submissionUploadReviewRepository.insertSubmissionUploadReview({
       submission_upload_id: params.submission_upload_id,
       scope: params.scope,
       requested_by: params.requested_by
     });
-
-    if (insertedReview) {
-      return insertedReview;
-    }
-
-    const existingReviews = await this.submissionUploadReviewRepository.findReviewsBySubmissionUploadId(
-      params.submission_upload_id,
-      { scope: params.scope }
-    );
-    const existingReview = existingReviews[0];
-
-    if (!existingReview) {
-      throw new ApiNotFoundError('Submission upload review not found after insert conflict', [
-        'SubmissionUploadReviewService->insertSubmissionUploadReview',
-        { submissionUploadId: params.submission_upload_id, scope: params.scope }
-      ]);
-    }
-
-    return existingReview;
   }
 
   /**
@@ -163,7 +142,6 @@ export class SubmissionUploadReviewService extends DBService {
    *
    * @param {{ submissionUploadId: string; submissionUploadReviewId: string; data: SubmissionUploadReviewUpdate }} params - Review update details.
    * @return {Promise<SubmissionUploadReview>} The updated review row.
-   * @throws {ApiNotFoundError} When no active review row exists for the ID.
    * @memberof SubmissionUploadReviewService
    */
   async updateSubmissionUploadReview(params: {
@@ -171,46 +149,7 @@ export class SubmissionUploadReviewService extends DBService {
     submissionUploadReviewId: string;
     data: SubmissionUploadReviewUpdate;
   }): Promise<SubmissionUploadReview> {
-    const review = await this.submissionUploadReviewRepository.updateSubmissionUploadReview(params);
-
-    if (!review) {
-      throw new ApiNotFoundError('Submission upload review not found', [
-        'SubmissionUploadReviewService->updateSubmissionUploadReview',
-        { submissionUploadId: params.submissionUploadId, submissionUploadReviewId: params.submissionUploadReviewId }
-      ]);
-    }
-
-    return review;
-  }
-
-  /**
-   * Update an active review row's workflow status.
-   *
-   * This helper is used by the ID-only admin update route when the caller does
-   * not need to validate the parent upload path parameter.
-   *
-   * @param {{ submissionUploadReviewId: string; status: SubmissionUploadReviewStatus }} params - Review status update.
-   * @return {Promise<SubmissionUploadReview>} The updated review row.
-   * @throws {ApiNotFoundError} When no active review row exists for the ID.
-   * @memberof SubmissionUploadReviewService
-   */
-  async updateReviewStatus(params: {
-    submissionUploadReviewId: string;
-    status: SubmissionUploadReviewStatus;
-  }): Promise<SubmissionUploadReview> {
-    const review = await this.submissionUploadReviewRepository.updateReviewStatus({
-      submissionUploadReviewId: params.submissionUploadReviewId,
-      data: { status: params.status }
-    });
-
-    if (!review) {
-      throw new ApiNotFoundError('Submission upload review not found', [
-        'SubmissionUploadReviewService->updateReviewStatus',
-        { submissionUploadReviewId: params.submissionUploadReviewId }
-      ]);
-    }
-
-    return review;
+    return this.submissionUploadReviewRepository.updateSubmissionUploadReview(params);
   }
 
   /**
@@ -221,22 +160,12 @@ export class SubmissionUploadReviewService extends DBService {
    *
    * @param {{ submissionUploadId: string; submissionUploadReviewId: string }} params - Review delete details.
    * @return {Promise<SubmissionUploadReview>} The soft-deleted review row.
-   * @throws {ApiNotFoundError} When no active review row exists for the upload and ID.
    * @memberof SubmissionUploadReviewService
    */
   async deleteSubmissionUploadReview(params: {
     submissionUploadId: string;
     submissionUploadReviewId: string;
   }): Promise<SubmissionUploadReview> {
-    const review = await this.submissionUploadReviewRepository.deleteSubmissionUploadReview(params);
-
-    if (!review) {
-      throw new ApiNotFoundError('Submission upload review not found', [
-        'SubmissionUploadReviewService->deleteSubmissionUploadReview',
-        { submissionUploadId: params.submissionUploadId, submissionUploadReviewId: params.submissionUploadReviewId }
-      ]);
-    }
-
-    return review;
+    return this.submissionUploadReviewRepository.deleteSubmissionUploadReview(params);
   }
 }
