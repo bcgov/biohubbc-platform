@@ -59,7 +59,8 @@ describe('SearchFeatureService', () => {
 
       const result = await service.searchFeaturesByExpressionTree('dataset', undefined, undefined, 42);
 
-      expect(repoStub).to.have.been.calledOnceWith('dataset', undefined, undefined, 42);
+      expect(repoStub).to.have.been.calledOnce;
+      expect(repoStub.firstCall.args).to.deep.equal(['dataset', undefined, undefined, 42]);
       expect(result).to.equal(mockFeatures);
     });
   });
@@ -87,7 +88,8 @@ describe('SearchFeatureService', () => {
       const result = await service.searchFeaturesByExpressionTreeWithCount('dataset', tree);
 
       expect(validateStub).to.have.been.calledOnceWith(tree);
-      expect(searchStub).to.have.been.calledOnceWith('dataset', normalized, undefined, undefined);
+      expect(searchStub).to.have.been.calledOnce;
+      expect(searchStub.firstCall.args).to.deep.equal(['dataset', normalized, undefined, undefined]);
       expect(countStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
       expect(result).to.deep.equal({ features: mockFeatures, count: 123 });
     });
@@ -104,7 +106,8 @@ describe('SearchFeatureService', () => {
 
       const result = await service.getSearchFeaturesCountByExpressionTree('dataset', undefined);
 
-      expect(countStub).to.have.been.calledOnceWith('dataset', undefined, undefined);
+      expect(countStub).to.have.been.calledOnce;
+      expect(countStub.firstCall.args).to.deep.equal(['dataset', undefined, undefined]);
       expect(result).to.equal(5);
     });
   });
