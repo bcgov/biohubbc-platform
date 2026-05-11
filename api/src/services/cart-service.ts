@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
-import { Cart, CartStatus, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
+import { Cart, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
 import { DownloadId } from '../models/download';
 import { publishProcessDownloadJob } from '../queue/publisher';
 import { CartRepository } from '../repositories/cart-repository';
@@ -131,56 +131,13 @@ export class CartService extends DBService {
   }
 
   /**
-   * Check out a cart: create a download record, link all cart features to it,
-   * and mark the cart as checked out.
+   * Soft-deprecated: cart checkout no longer creates downloads. The sibling
+   * cart-deprecation ticket removes this method and its endpoint entirely.
    *
-   * Checkout creates a download record, links features, marks the cart as checked out,
-   * then publishes a download job for async processing by the download pipeline.
-   * An empty cart checkout would create a useless download record, so the service
-   * validates this before creating any records.
-   *
-   * @param {string} cartId - The ID of the cart to check out
-   * @param {number | null} systemUserId - The authenticated user ID, or null for anonymous checkout
-   * @return {Promise<DownloadId>} The created download record ID
-   * @throws HTTP400 if the cart is empty (no features to download)
    * @memberof CartService
    */
-  async checkoutCart(cartId: string, systemUserId: number | null): Promise<DownloadId> {
-    const featureIds = await this.cartSubmissionFeatureService.getCartSubmissionFeatureIds(cartId);
-
-    if (featureIds.length === 0) {
-      throw new HTTP400('Cannot checkout an empty cart');
-    }
-
-    // Create download with cart_id FK — features resolved at pipeline time
-    // from cart_submission_feature via download.cart_id
-    const downloadId = await this.downloadService.createDownload({
-      cartId,
-      format: 'parquet'
-    });
-
-    // Create team and link to download for authenticated users.
-    // Anonymous checkouts have no download_team rows — UUID is the credential.
-    if (systemUserId !== null) {
-      const team = await this.teamService.createTeam({
-        name: `Team for cart ${cartId}`,
-        description: 'Team automatically created for cart checkout',
-        system_user_ids: [systemUserId]
-      });
-      await this.downloadService.createDownloadTeam(downloadId.download_id, team.team_id);
-    }
-
-    // Mark cart as checked out
-    await this.cartRepository.updateCart(cartId, {
-      cart_status: CartStatus.CHECKED_OUT,
-      checkout_date: new Date().toISOString(),
-      checkout_user: systemUserId
-    });
-
-    // Publish download job for async processing
-    await CartService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: downloadId.download_id });
-
-    return downloadId;
+  async checkoutCart(_cartId: string, _systemUserId: number | null): Promise<DownloadId> {
+    throw new HTTP400('Cart checkout is being retired. Use POST /api/download with an expression instead.');
   }
 
   /**

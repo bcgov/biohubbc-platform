@@ -56,6 +56,12 @@ describe('process-download-job', () => {
     ...overrides
   });
 
+  const createMockStatement = (urn_feature_type: string, expression_id: string | null = null) => ({
+    policy_statement_id: `psid-${urn_feature_type}`,
+    urn_feature_type,
+    expression_id
+  });
+
   describe('processDownloadJobHandler', () => {
     it('transitions pending → processing → ready for a download with 3 feature types', async () => {
       setupMockConnection();
@@ -63,7 +69,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
 
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
-      const source = { cart_id: 'cart-1', filters: null, create_user: 1 };
+      const source = { policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 };
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
@@ -71,9 +77,11 @@ describe('process-download-job', () => {
       schemaLookup.set('b', [{ feature_property_name: 'two', feature_property_type_name: 'string' }]);
       schemaLookup.set('c', [{ feature_property_name: 'three', feature_property_type_name: 'string' }]);
 
+      const statements = [createMockStatement('a'), createMockStatement('b'), createMockStatement('c')];
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
-        featureTypes: ['a', 'b', 'c']
+        featureTypes: ['a', 'b', 'c'],
+        statements
       });
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
@@ -93,22 +101,25 @@ describe('process-download-job', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
 
-      // writeFeatureTypeParquet called once per feature type, in order
+      // writeFeatureTypeParquet called once per statement, in statements order
       expect(writeStub).to.have.been.calledThrice;
       expect(writeStub.firstCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
         source,
-        featureTypeName: 'a'
+        featureTypeName: 'a',
+        statement: statements[0]
       });
       expect(writeStub.secondCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
         source,
-        featureTypeName: 'b'
+        featureTypeName: 'b',
+        statement: statements[1]
       });
       expect(writeStub.thirdCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
         source,
-        featureTypeName: 'c'
+        featureTypeName: 'c',
+        statement: statements[2]
       });
     });
 
@@ -119,7 +130,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
 
       const obsProps: CsvPropertyDefinition[] = [
         { feature_property_name: 'count', feature_property_type_name: 'number' }
@@ -134,7 +145,8 @@ describe('process-download-job', () => {
 
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
-        featureTypes: ['observation', 'survey']
+        featureTypes: ['observation', 'survey'],
+        statements: [createMockStatement('observation'), createMockStatement('survey')]
       });
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
@@ -155,10 +167,11 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
-        featureTypes: []
+        featureTypes: [],
+        statements: []
       });
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
@@ -183,10 +196,11 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
-        featureTypes: []
+        featureTypes: [],
+        statements: []
       });
 
       await processDownloadJobHandler([createMockJob('dl-1')]);
@@ -240,14 +254,15 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
       schemaLookup.set('a', []);
 
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
-        featureTypes: ['a']
+        featureTypes: ['a'],
+        statements: [createMockStatement('a')]
       });
 
       const testError = new Error('S3 upload failed');

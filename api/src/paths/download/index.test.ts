@@ -2,28 +2,36 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as path from '.';
 import { createDownload, getDownloads } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
-import { HTTPError } from '../../errors/http-error';
+import { HTTP400, HTTPError } from '../../errors/http-error';
 import { DownloadListRecord } from '../../models/download';
 import { DownloadService } from '../../services/download/download-service';
-import { SearchFeatureService } from '../../services/search-feature-service';
 
 chai.use(sinonChai);
 
-const stubPublishProcessDownloadJob = () =>
-  sinon.stub(path.downloadPathDependencies, 'publishProcessDownloadJob').resolves({
-    status: 'published',
-    jobId: 'job-1'
-  });
-
-const stubAnonymousCreateDownloadBase = (dbConnectionObj = getMockDBConnection(), matchingFeaturesCount = 1) => {
-  sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-  sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(matchingFeaturesCount);
-  return dbConnectionObj;
+const validExpression = {
+  type: 'expression' as const,
+  operator: 'AND' as const,
+  clauses: [
+    {
+      type: 'predicate' as const,
+      feature_property_id: 1,
+      feature_type_property_id: 2,
+      operator: 'Equals' as const,
+      value: 'moose'
+    }
+  ]
 };
+
+const validBody = (overrides: Record<string, unknown> = {}) => ({
+  name: 'My download',
+  description: 'A description',
+  featureTypes: ['observation'],
+  expression: validExpression,
+  ...overrides
+});
 
 describe('paths/download/index', () => {
   afterEach(() => {
@@ -31,13 +39,13 @@ describe('paths/download/index', () => {
   });
 
   describe('createDownload', () => {
-    it('should return 400 when no features match the filter criteria', async () => {
-      stubAnonymousCreateDownloadBase(getMockDBConnection(), 0);
+    it('returns 400 when featureTypes is empty', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'nonexistent' } };
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({ featureTypes: [] });
 
       const requestHandler = createDownload();
 
@@ -46,157 +54,140 @@ describe('paths/download/index', () => {
         expect.fail();
       } catch (error) {
         expect((error as HTTPError).status).to.equal(400);
-        expect((error as HTTPError).message).to.equal('No features match the filter criteria');
+        expect(error).to.be.instanceOf(HTTP400);
       }
     });
 
-    it('should return 201 with download_id on success', async () => {
-      stubAnonymousCreateDownloadBase(getMockDBConnection(), 3);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      stubPublishProcessDownloadJob();
+    it('returns 400 when featureTypes is omitted', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      const body = validBody();
+      delete (body as { featureTypes?: unknown }).featureTypes;
+      mockReq.body = body;
 
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
+      const requestHandler = createDownload();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error) {
+        expect((error as HTTPError).status).to.equal(400);
+      }
+    });
+
+    it('returns 400 on unknown body key', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({ ui_id: 'leaked-from-frontend' });
+
+      const requestHandler = createDownload();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error) {
+        expect((error as HTTPError).status).to.equal(400);
+      }
+    });
+
+    it('returns 400 when expression.clauses is empty', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({
+        expression: {
+          type: 'expression',
+          operator: 'AND',
+          clauses: []
+        }
+      });
+
+      const requestHandler = createDownload();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error) {
+        expect((error as HTTPError).status).to.equal(400);
+      }
+    });
+
+    it('returns 201 with download_id and download_url on the happy path', async () => {
+      const commitStub = sinon.stub();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42, commit: commitStub });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-1' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody();
 
       const requestHandler = createDownload();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      const apiHost = process.env.API_HOST || 'localhost';
-      const apiPort = process.env.API_PORT || '6100';
-      const baseUrl = apiHost === 'localhost' ? `http://${apiHost}:${apiPort}` : `https://${apiHost}`;
+      expect(createDownloadRequestStub).to.have.been.calledOnce;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.eql({
+        name: 'My download',
+        description: 'A description',
+        featureTypes: ['observation'],
+        expression: validExpression,
+        systemUserId: 42
+      });
+      expect(commitStub).to.have.been.calledOnce;
 
       expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.eql({
-        download_id: 'uuid-1',
-        download_url: `${baseUrl}/api/download/uuid-1`
-      });
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-1');
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
     });
 
-    it('should pass search filters to createDownload', async () => {
-      stubAnonymousCreateDownloadBase(getMockDBConnection(), 2);
-      const createDownloadStub = sinon
-        .stub(DownloadService.prototype, 'createDownload')
-        .resolves({ download_id: 'uuid-2' });
-      stubPublishProcessDownloadJob();
+    it('passes through a null expression to the service', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-2' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { feature_types: ['dataset'] } };
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({ expression: null });
 
       const requestHandler = createDownload();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(createDownloadStub.firstCall.args[0]).to.deep.equal({
-        filters: { feature_types: ['dataset'] },
-        format: 'parquet'
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ expression: null });
+      expect(mockRes.statusValue).to.equal(201);
+    });
+
+    it('rolls back, releases, and propagates when the service throws', async () => {
+      const rollbackStub = sinon.stub();
+      const releaseStub = sinon.stub();
+      const dbConnectionObj = getMockDBConnection({
+        systemUserId: () => 20,
+        rollback: rollbackStub,
+        release: releaseStub
       });
-    });
-
-    it('should pass null systemUserId to getSearchFeaturesCount for anonymous users', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      const getCountStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      stubPublishProcessDownloadJob();
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'elk' } };
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getCountStub).to.have.been.calledOnce;
-      expect(getCountStub.firstCall.args[0]).to.deep.equal({ keyword: 'elk' });
-      expect(getCountStub.firstCall.args[1]).to.be.null;
-    });
-
-    it('should pass systemUserId to getSearchFeaturesCount for authenticated users', async () => {
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      const getCountStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
-      sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').rejects(new HTTP400('Unknown feature type(s)'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
       mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getCountStub).to.have.been.calledOnce;
-      expect(getCountStub.firstCall.args[1]).to.equal(20);
-    });
-
-    it('should use getDBConnection when authenticated', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      stubPublishProcessDownloadJob();
-      sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getDBConnectionStub).to.have.been.calledWith('valid-token');
-    });
-
-    it('should use getAPIUserDBConnection when anonymous', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      const getAPIUserDBConnectionStub = sinon
-        .stub(db.dbDependencies, 'getAPIUserDBConnection')
-        .returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      stubPublishProcessDownloadJob();
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
-    });
-
-    it('should rollback and release on search error', async () => {
-      const rollbackStub = sinon.stub();
-      const releaseStub = sinon.stub();
-      const dbConnectionObj = getMockDBConnection({ rollback: rollbackStub, release: releaseStub });
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').rejects(new Error('Search failed'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
+      mockReq.body = validBody();
 
       const requestHandler = createDownload();
 
@@ -204,81 +195,8 @@ describe('paths/download/index', () => {
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('Search failed');
-        expect(rollbackStub).to.have.been.calledOnce;
-        expect(releaseStub).to.have.been.calledOnce;
-      }
-    });
-
-    it('should rollback and release on download creation error', async () => {
-      const rollbackStub = sinon.stub();
-      const releaseStub = sinon.stub();
-      const dbConnectionObj = getMockDBConnection({ rollback: rollbackStub, release: releaseStub });
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
-      sinon.stub(DownloadService.prototype, 'createDownload').rejects(new Error('Download creation failed'));
-
-      const publishStub = sinon.stub(path.downloadPathDependencies, 'publishProcessDownloadJob');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as Error).message).to.equal('Download creation failed');
-        expect(rollbackStub).to.have.been.calledOnce;
-        expect(releaseStub).to.have.been.calledOnce;
-        expect(publishStub).to.not.have.been.called;
-      }
-    });
-
-    it('should publish download job with download_id before commit', async () => {
-      stubAnonymousCreateDownloadBase(getMockDBConnection(), 3);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      const publishStub = stubPublishProcessDownloadJob();
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(publishStub).to.have.been.calledOnce;
-      expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'uuid-1' });
-    });
-
-    it('should rollback and release when publishProcessDownloadJob throws', async () => {
-      const rollbackStub = sinon.stub();
-      const releaseStub = sinon.stub();
-      const dbConnectionObj = getMockDBConnection({ rollback: rollbackStub, release: releaseStub });
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
-      sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon.stub(path.downloadPathDependencies, 'publishProcessDownloadJob').rejects(new Error('pg-boss unavailable'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.body = { filters: { keyword: 'moose' } };
-
-      const requestHandler = createDownload();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as Error).message).to.equal('pg-boss unavailable');
+        expect((error as HTTPError).status).to.equal(400);
+        expect(error).to.be.instanceOf(HTTP400);
         expect(rollbackStub).to.have.been.calledOnce;
         expect(releaseStub).to.have.been.calledOnce;
       }

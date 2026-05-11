@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { SearchFeatureFiltersSchema } from '../services/search-feature-service.interface';
 import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
+import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
@@ -60,45 +60,50 @@ export const DownloadFeatureData = z.object({
 });
 export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
 
-export const DownloadFeatureSummary = z.object({
-  submission_feature_id: z.number(),
-  submission_id: z.number(),
-  feature_type_name: z.string(),
-  estimated_byte_size: z.string()
-});
-export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;
-
 /**
- * Minimal projection of a download record for feature resolution.
- * Used by DownloadService.getDownloadFeatures to branch between
- * cart-based (frozen snapshot) and filter-based (live re-query) paths.
+ * Minimal projection of a download record for export-time pipeline evaluation.
  *
- * Includes create_user so the pipeline can recover the creator's security
- * context for filter-based re-queries without a separate round-trip.
+ * `policy_id` resolves to the policy whose statements drive what to export.
+ * `create_user` carries the policy creator's identity so the pipeline can
+ * apply the security filter at export time using the user's authorization
+ * scope at the moment of export — not at create time.
  */
 export const DownloadSource = z.object({
-  cart_id: z.string().uuid().nullable(),
-  filters: SearchFeatureFiltersSchema.nullable(),
+  policy_id: z.string().uuid(),
   create_user: z.number()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
 /**
- * Payload for creating a new download record.
- *
- * Every download must have a feature source: either cartId (cart-based, frozen
- * at checkout) or filters (filter-based, re-derived at pipeline time).
- * Team linking is handled separately via download_team.
+ * Payload for creating a new download record. The download's feature set is
+ * defined by the referenced policy; format is the export wire format.
  */
 export const CreateDownload = z.object({
-  filters: SearchFeatureFiltersSchema.optional(),
-  cartId: z.string().uuid().optional(),
+  policyId: z.string().uuid(),
   format: z.string()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
-export const DownloadTotalSize = z.object({ total: z.number().nullable() });
-export type DownloadTotalSize = z.infer<typeof DownloadTotalSize>;
+/**
+ * HTTP request body for `POST /api/download`.
+ *
+ * `name` is capped at 100 to match the underlying `biohub.policy.name varchar(100)`
+ * column — the route boundary rejects too-long names rather than letting the DB
+ * surface the violation as a 500.
+ *
+ * `.strict()` rejects unknown keys: silent acceptance of `ui_id` and similar
+ * leakage masks frontend decoder bugs. Failing fast at the boundary points the
+ * FE at its own bug rather than letting bad data flow into a policy.
+ */
+export const CreateDownloadRequestBody = z
+  .object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(1000).nullable().optional(),
+    featureTypes: z.array(z.string()).min(1),
+    expression: ExpressionTree.nullable()
+  })
+  .strict();
+export type CreateDownloadRequestBody = z.infer<typeof CreateDownloadRequestBody>;
 
 export const IsAuthorized = z.object({ authorized: z.boolean() });
 export type IsAuthorized = z.infer<typeof IsAuthorized>;
