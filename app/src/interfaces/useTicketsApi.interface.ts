@@ -103,6 +103,10 @@ export interface ICreateTicketCommentRequest {
   comment: string;
 }
 
+export interface IUpdateTicketCommentRequest {
+  comment: string;
+}
+
 export interface ICreateTicketUploadRequest {
   file_name: string;
   byte_size: number;
