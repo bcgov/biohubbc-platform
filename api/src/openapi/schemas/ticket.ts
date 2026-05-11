@@ -47,14 +47,14 @@ export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-export const TicketSubmissionValidationSchema: OpenAPIV3.SchemaObject = {
+const TicketSubmissionValidationSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: ['submission_validation_id', 'job_id', 'status', 'metadata', 'started_at', 'ended_at', 'create_date'],
   properties: {
-    submission_validation_id: { type: 'integer', nullable: true },
-    job_id: { type: 'string', nullable: true },
-    status: { type: 'string', enum: SubmissionValidationStatusEnum, nullable: true },
+    submission_validation_id: { type: 'integer' },
+    job_id: { type: 'string' },
+    status: { type: 'string', enum: SubmissionValidationStatusEnum },
     metadata: {
       type: 'object',
       nullable: true,
@@ -62,11 +62,11 @@ export const TicketSubmissionValidationSchema: OpenAPIV3.SchemaObject = {
     },
     started_at: { type: 'string', format: 'date-time', nullable: true },
     ended_at: { type: 'string', format: 'date-time', nullable: true },
-    create_date: { type: 'string', format: 'date-time', nullable: true }
+    create_date: { type: 'string', format: 'date-time' }
   }
 };
 
-export const TicketSubmissionUploadReviewSchema: OpenAPIV3.SchemaObject = {
+const TicketSubmissionUploadReviewSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
@@ -79,15 +79,13 @@ export const TicketSubmissionUploadReviewSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-export const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
+const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: [
     'submission_upload_id',
-    'submission_id',
     'submission_uuid',
     'upload_id',
-    'ticket_id',
     'create_date',
     'submission_name',
     'submission_description',
@@ -100,10 +98,8 @@ export const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
   ],
   properties: {
     submission_upload_id: { type: 'string', format: 'uuid' },
-    submission_id: { type: 'integer', minimum: 1 },
     submission_uuid: { type: 'string', format: 'uuid' },
     upload_id: { type: 'string', format: 'uuid' },
-    ticket_id: { type: 'string', format: 'uuid' },
     create_date: { type: 'string', format: 'date-time' },
     submission_name: { type: 'string', nullable: true },
     submission_description: { type: 'string', nullable: true },
@@ -111,7 +107,7 @@ export const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     submitted_by_identifier: { type: 'string', nullable: true },
     upload_status: { type: 'string', enum: SubmissionUploadJobStatusEnum },
     review_status: { type: 'string', enum: SubmissionUploadReviewStatusEnum },
-    validation: TicketSubmissionValidationSchema,
+    validation: { ...TicketSubmissionValidationSchema, nullable: true },
     reviews: {
       type: 'array',
       items: TicketSubmissionUploadReviewSchema

@@ -159,12 +159,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(insertTaxonStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertArtifactStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertReferencesStub.calledOnce).to.equal(true);
-    expect(
-      requestDefaultReviewsStub.calledOnceWith({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        requestedBy: 11
-      })
-    ).to.equal(true);
+    expect(requestDefaultReviewsStub.calledOnceWith(99, '550e8400-e29b-41d4-a716-446655440000', 11)).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
     expect(outcome).to.eql({ status: 'ok' });

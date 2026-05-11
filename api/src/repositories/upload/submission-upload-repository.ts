@@ -200,10 +200,8 @@ export class SubmissionUploadRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         su.submission_upload_id,
-        su.submission_id,
         s.uuid AS submission_uuid,
         su.upload_id,
-        su.ticket_id,
         su.create_date,
         s.name AS submission_name,
         s.description AS submission_description,
@@ -211,15 +209,18 @@ export class SubmissionUploadRepository extends BaseRepository {
         submitter.user_identifier AS submitted_by_identifier,
         su.status AS upload_status,
         sus.status AS review_status,
-        json_build_object(
-          'submission_validation_id', sv.submission_validation_id,
-          'job_id', sv.job_id,
-          'status', sv.status,
-          'metadata', sv.metadata,
-          'started_at', sv.started_at,
-          'ended_at', sv.ended_at,
-          'create_date', sv.create_date
-        ) AS validation,
+        CASE
+          WHEN sv.submission_validation_id IS NULL THEN NULL
+          ELSE json_build_object(
+            'submission_validation_id', sv.submission_validation_id,
+            'job_id', sv.job_id,
+            'status', sv.status,
+            'metadata', sv.metadata,
+            'started_at', sv.started_at,
+            'ended_at', sv.ended_at,
+            'create_date', sv.create_date
+          )
+        END AS validation,
         COALESCE(reviews.reviews, '[]'::json) AS reviews
       FROM
         submission_upload su
@@ -385,8 +386,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
         status = COALESCE(${submissionUpload.status}, status),
-        ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id),
-        comment = COALESCE(${submissionUpload.comment}, comment)
+        ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
       RETURNING submission_upload_id;

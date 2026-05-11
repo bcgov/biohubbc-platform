@@ -37,7 +37,14 @@ export class SubmissionFeatureRepository extends BaseRepository {
         record_end_date IS NULL;
     `;
 
-    await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record effective dates', [
+        'SubmissionFeatureRepository->setRecordEffectiveDateBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
   }
 
   /**

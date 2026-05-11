@@ -295,10 +295,11 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId
       );
 
-      await this.submissionUploadReviewService.requestDefaultReviewsForUpload({
+      await this.submissionUploadReviewService.requestDefaultReviewsForUpload(
+        submissionId,
         submissionUploadId,
-        requestedBy: this.connection.systemUserId()
-      });
+        this.connection.systemUserId()
+      );
 
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',

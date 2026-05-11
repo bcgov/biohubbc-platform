@@ -1,19 +1,19 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
-import * as db from '../../../../../database/db';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../__mocks__/db';
+import * as db from '../../../../../../../database/db';
 import {
   SubmissionUploadReview,
   SubmissionUploadReviewScope,
   SubmissionUploadReviewStatus
-} from '../../../../../models/submission-upload-review';
-import { SubmissionUploadReviewService } from '../../../../../services/upload/submission-upload-review-service';
+} from '../../../../../../../models/submission-upload-review';
+import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
 import { getSubmissionUploadReviews, insertSubmissionUploadReview } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission-upload/{submissionUploadId}/review', () => {
+describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -29,11 +29,17 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review', (
       .resolves([review]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUploadId: '550e8400-e29b-41d4-a716-446655440000' };
+    mockReq.params = {
+      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+    };
 
     await getSubmissionUploadReviews()(mockReq, mockRes, mockNext);
 
-    expect(findStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
+    expect(findStub).to.have.been.calledOnceWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([review]);
   });
@@ -49,12 +55,15 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review', (
       .resolves(review);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUploadId: '550e8400-e29b-41d4-a716-446655440000' };
+    mockReq.params = {
+      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+    };
     mockReq.body = { scope: 'security' };
 
     await insertSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
-    expect(insertStub).to.have.been.calledOnceWith({
+    expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       scope: SubmissionUploadReviewScope.SECURITY,
       requested_by: 7

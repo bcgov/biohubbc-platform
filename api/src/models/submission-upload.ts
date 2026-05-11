@@ -49,8 +49,7 @@ export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
   upload_id: z.string().uuid().optional(),
   status: SubmissionUploadJobStatus.optional(),
-  ticket_id: z.string().uuid().optional(),
-  comment: z.string().nullable().optional()
+  ticket_id: z.string().uuid().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 
@@ -60,10 +59,8 @@ export interface SubmissionUploadFilters {
 
 export const TicketSubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
-  submission_id: z.number().int().positive(),
   submission_uuid: z.string().uuid(),
   upload_id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
   create_date: z.string(),
   submission_name: z.string().nullable(),
   submission_description: z.string().nullable(),
@@ -71,7 +68,7 @@ export const TicketSubmissionUpload = z.object({
   submitted_by_identifier: z.string().nullable(),
   upload_status: SubmissionUploadJobStatus,
   review_status: SubmissionUploadStatusTypeEnum,
-  validation: TicketSubmissionValidation,
+  validation: TicketSubmissionValidation.nullable(),
   reviews: z.array(SubmissionUploadReview)
 });
 export type TicketSubmissionUpload = z.infer<typeof TicketSubmissionUpload>;

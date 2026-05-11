@@ -14,13 +14,8 @@ export enum SubmissionUploadReviewStatus {
   CANCELLED = 'cancelled'
 }
 
-export const SubmissionUploadReviewScopeSchema = z.nativeEnum(SubmissionUploadReviewScope);
-export const SubmissionUploadReviewStatusSchema = z.nativeEnum(SubmissionUploadReviewStatus);
-
-export interface SubmissionUploadReviewFilters {
-  scope?: SubmissionUploadReviewScope;
-  status?: SubmissionUploadReviewStatus;
-}
+const SubmissionUploadReviewScopeSchema = z.nativeEnum(SubmissionUploadReviewScope);
+const SubmissionUploadReviewStatusSchema = z.nativeEnum(SubmissionUploadReviewStatus);
 
 export const SubmissionUploadReview = z.object({
   submission_upload_review_id: z.string().uuid(),
@@ -38,7 +33,7 @@ export const CreateSubmissionUploadReview = z.object({
 });
 export type CreateSubmissionUploadReview = z.infer<typeof CreateSubmissionUploadReview>;
 
-export const SubmissionUploadReviewUpdate = z.object({
+export const UpdateSubmissionUploadReview = z.object({
   status: SubmissionUploadReviewStatusSchema
 });
-export type SubmissionUploadReviewUpdate = z.infer<typeof SubmissionUploadReviewUpdate>;
+export type UpdateSubmissionUploadReview = z.infer<typeof UpdateSubmissionUploadReview>;

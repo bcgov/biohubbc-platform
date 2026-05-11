@@ -57,8 +57,8 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- Create indexes
     --------------------------------------------------------------------------------
-    -- Supports listing active reviews for one upload, the ticket-detail lateral
-    -- aggregation, and multi-upload review fetches ordered by create_date.
+    -- Supports listing active reviews for one upload and the ticket-detail
+    -- lateral aggregation ordered by create_date.
     CREATE INDEX submission_upload_review_idx1
       ON submission_upload_review(submission_upload_id, create_date)
       WHERE record_end_date IS NULL;
@@ -72,8 +72,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_validation_idx5
       ON submission_validation(submission_upload_id, create_date DESC);
 
-    -- Prevents duplicate active review tasks for the same upload/scope and
-    -- supports idempotent lookup before inserting default/manual reviews.
+    -- Prevents duplicate active review tasks for the same upload/scope.
     CREATE UNIQUE INDEX submission_upload_review_nuk1
       ON submission_upload_review(submission_upload_id, scope)
       WHERE record_end_date IS NULL;

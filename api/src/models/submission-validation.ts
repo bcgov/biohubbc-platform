@@ -14,12 +14,12 @@ export const SubmissionValidationId = SubmissionValidationRecord.pick({ submissi
 export type SubmissionValidationId = z.infer<typeof SubmissionValidationId>;
 
 export const TicketSubmissionValidation = z.object({
-  submission_validation_id: z.number().nullable(),
-  job_id: z.string().nullable(),
-  status: SubmissionValidationStatus.nullable(),
+  submission_validation_id: z.number(),
+  job_id: z.string(),
+  status: SubmissionValidationStatus,
   metadata: z.record(z.unknown()).nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
-  create_date: z.string().nullable()
+  create_date: z.string()
 });
 export type TicketSubmissionValidation = z.infer<typeof TicketSubmissionValidation>;

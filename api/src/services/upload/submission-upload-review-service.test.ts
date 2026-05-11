@@ -2,11 +2,13 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import {
   SubmissionUploadReview,
   SubmissionUploadReviewScope,
   SubmissionUploadReviewStatus
 } from '../../models/submission-upload-review';
+import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { SubmissionUploadReviewRepository } from '../../repositories/upload/submission-upload-review-repository';
 import { SubmissionUploadReviewService } from './submission-upload-review-service';
 
@@ -15,6 +17,62 @@ chai.use(sinonChai);
 describe('SubmissionUploadReviewService', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('findReviewsBySubmissionUploadId', () => {
+    it('validates the upload belongs to the submission before finding reviews', async () => {
+      const review = buildReview({
+        submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+        scope: SubmissionUploadReviewScope.SECURITY
+      });
+      const getUploadStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .resolves({
+          submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+          submission_id: 99,
+          upload_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          status: 'uploaded',
+          ticket_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+        });
+      const findStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
+        .resolves([review]);
+
+      const service = new SubmissionUploadReviewService(getMockDBConnection());
+      const result = await service.findReviewsBySubmissionUploadId(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      expect(result).to.eql([review]);
+      expect(getUploadStub).to.have.been.calledOnceWith(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+      expect(findStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    it('throws when the upload does not belong to the submission', async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+      const findStub = sinon.stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId');
+
+      const service = new SubmissionUploadReviewService(getMockDBConnection());
+
+      try {
+        await service.findReviewsBySubmissionUploadId(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          '550e8400-e29b-41d4-a716-446655440000'
+        );
+
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(findStub).not.to.have.been.called;
+    });
   });
 
   describe('insertSubmissionUploadReview', () => {
@@ -28,38 +86,14 @@ describe('SubmissionUploadReviewService', () => {
         .resolves(review);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.insertSubmissionUploadReview({
+      const result = await service.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
         requested_by: 7
       });
 
       expect(result).to.eql(review);
-      expect(insertStub).to.have.been.calledOnceWith({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.SECURITY,
-        requested_by: 7
-      });
-    });
-
-    it('returns the existing active review when one already exists for the scope', async () => {
-      const review = buildReview({
-        submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
-        scope: SubmissionUploadReviewScope.SECURITY
-      });
-      const insertStub = sinon
-        .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
-        .resolves(review);
-
-      const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.insertSubmissionUploadReview({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.SECURITY,
-        requested_by: 7
-      });
-
-      expect(result).to.eql(review);
-      expect(insertStub).to.have.been.calledOnceWith({
+      expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
         requested_by: 7
@@ -77,30 +111,19 @@ describe('SubmissionUploadReviewService', () => {
         submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
         scope: SubmissionUploadReviewScope.SECURITY
       });
-      const insertSubmissionUploadReviewStub = sinon
-        .stub(SubmissionUploadReviewService.prototype, 'insertSubmissionUploadReview')
-        .onFirstCall()
-        .resolves(validationReview)
-        .onSecondCall()
-        .resolves(securityReview);
+      const insertDefaultSubmissionUploadReviewsStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'insertDefaultSubmissionUploadReviews')
+        .resolves([validationReview, securityReview]);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.requestDefaultReviewsForUpload({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        requestedBy: 7
-      });
+      const result = await service.requestDefaultReviewsForUpload(99, '550e8400-e29b-41d4-a716-446655440000', 7);
 
       expect(result).to.eql([validationReview, securityReview]);
-      expect(insertSubmissionUploadReviewStub.firstCall).to.have.been.calledWith({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.VALIDATION,
-        requested_by: 7
-      });
-      expect(insertSubmissionUploadReviewStub.secondCall).to.have.been.calledWith({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.SECURITY,
-        requested_by: 7
-      });
+      expect(insertDefaultSubmissionUploadReviewsStub).to.have.been.calledOnceWith(
+        99,
+        '550e8400-e29b-41d4-a716-446655440000',
+        7
+      );
     });
   });
 
@@ -116,18 +139,20 @@ describe('SubmissionUploadReviewService', () => {
         .resolves(review);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.updateSubmissionUploadReview({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-        data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
-      });
+      const result = await service.updateSubmissionUploadReview(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '11111111-1111-4111-8111-111111111111',
+        { status: SubmissionUploadReviewStatus.IN_PROGRESS }
+      );
 
       expect(result).to.eql(review);
-      expect(updateStub).to.have.been.calledOnceWith({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-        data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
-      });
+      expect(updateStub).to.have.been.calledOnceWith(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '11111111-1111-4111-8111-111111111111',
+        { status: SubmissionUploadReviewStatus.IN_PROGRESS }
+      );
     });
   });
 
@@ -142,16 +167,18 @@ describe('SubmissionUploadReviewService', () => {
         .resolves(review);
 
       const service = new SubmissionUploadReviewService(getMockDBConnection());
-      const result = await service.deleteSubmissionUploadReview({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
-      });
+      const result = await service.deleteSubmissionUploadReview(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '11111111-1111-4111-8111-111111111111'
+      );
 
       expect(result).to.eql(review);
-      expect(deleteStub).to.have.been.calledOnceWith({
-        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-        submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
-      });
+      expect(deleteStub).to.have.been.calledOnceWith(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '11111111-1111-4111-8111-111111111111'
+      );
     });
   });
 });

@@ -1,19 +1,19 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
-import * as db from '../../../../../../database/db';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../../__mocks__/db';
+import * as db from '../../../../../../../../database/db';
 import {
   SubmissionUploadReview,
   SubmissionUploadReviewScope,
   SubmissionUploadReviewStatus
-} from '../../../../../../models/submission-upload-review';
-import { SubmissionUploadReviewService } from '../../../../../../services/upload/submission-upload-review-service';
+} from '../../../../../../../../models/submission-upload-review';
+import { SubmissionUploadReviewService } from '../../../../../../../../services/upload/submission-upload-review-service';
 import { deleteSubmissionUploadReview, updateSubmissionUploadReview } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission-upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
+describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -31,6 +31,7 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
+      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
@@ -38,11 +39,12 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
 
     await updateSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
-    expect(updateStub).to.have.been.calledOnceWith({
-      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-      data: { status: SubmissionUploadReviewStatus.IN_PROGRESS }
-    });
+    expect(updateStub).to.have.been.calledOnceWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '550e8400-e29b-41d4-a716-446655440000',
+      '11111111-1111-4111-8111-111111111111',
+      { status: SubmissionUploadReviewStatus.IN_PROGRESS }
+    );
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(review);
   });
@@ -58,16 +60,18 @@ describe('paths/administrative/submission-upload/{submissionUploadId}/review/{su
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
+      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
 
     await deleteSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
-    expect(deleteStub).to.have.been.calledOnceWith({
-      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-      submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
-    });
+    expect(deleteStub).to.have.been.calledOnceWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '550e8400-e29b-41d4-a716-446655440000',
+      '11111111-1111-4111-8111-111111111111'
+    );
     expect(mockRes.statusValue).to.equal(204);
   });
 });

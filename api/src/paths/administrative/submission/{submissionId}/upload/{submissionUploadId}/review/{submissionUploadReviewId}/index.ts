@@ -1,19 +1,19 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../../constants/roles';
-import { getDBConnection } from '../../../../../../database/db';
-import { SubmissionUploadReviewStatus } from '../../../../../../models/submission-upload-review';
-import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
+import { SYSTEM_ROLE } from '../../../../../../../../constants/roles';
+import { getDBConnection } from '../../../../../../../../database/db';
+import { SubmissionUploadReviewStatus } from '../../../../../../../../models/submission-upload-review';
+import { defaultErrorResponses } from '../../../../../../../../openapi/schemas/http-responses';
 import {
   SubmissionUploadReviewResponseSchema,
   UpdateSubmissionUploadReviewRequestSchema
-} from '../../../../../../openapi/schemas/upload';
-import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewService } from '../../../../../../services/upload/submission-upload-review-service';
-import { getLogger } from '../../../../../../utils/logger';
+} from '../../../../../../../../openapi/schemas/upload';
+import { authorizeRequestHandler } from '../../../../../../../../request-handlers/security/authorization';
+import { SubmissionUploadReviewService } from '../../../../../../../../services/upload/submission-upload-review-service';
+import { getLogger } from '../../../../../../../../utils/logger';
 
 const defaultLog = getLogger(
-  'paths/administrative/submission-upload/{submissionUploadId}/review/{submissionUploadReviewId}'
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}'
 );
 
 export const PATCH: Operation = [
@@ -29,7 +29,14 @@ PATCH.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission Upload ID (UUID).',
+      description: 'Submission ID',
+      in: 'path',
+      name: 'submissionId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    },
+    {
+      description: 'Submission Upload ID',
       in: 'path',
       name: 'submissionUploadId',
       schema: { type: 'string', format: 'uuid' },
@@ -77,7 +84,14 @@ DELETE.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission Upload ID (UUID).',
+      description: 'Submission ID',
+      in: 'path',
+      name: 'submissionId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    },
+    {
+      description: 'Submission Upload ID',
       in: 'path',
       name: 'submissionUploadId',
       schema: { type: 'string', format: 'uuid' },
@@ -106,15 +120,16 @@ export function updateSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId, submissionUploadReviewId } = req.params;
+      const { submissionId, submissionUploadId, submissionUploadReviewId } = req.params;
       const { status }: { status: SubmissionUploadReviewStatus } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      const result = await submissionUploadReviewService.updateSubmissionUploadReview({
+      const result = await submissionUploadReviewService.updateSubmissionUploadReview(
+        submissionId,
         submissionUploadId,
         submissionUploadReviewId,
-        data: { status }
-      });
+        { status }
+      );
 
       await connection.commit();
 
@@ -140,13 +155,14 @@ export function deleteSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId, submissionUploadReviewId } = req.params;
+      const { submissionId, submissionUploadId, submissionUploadReviewId } = req.params;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      await submissionUploadReviewService.deleteSubmissionUploadReview({
+      await submissionUploadReviewService.deleteSubmissionUploadReview(
+        submissionId,
         submissionUploadId,
         submissionUploadReviewId
-      });
+      );
 
       await connection.commit();
 

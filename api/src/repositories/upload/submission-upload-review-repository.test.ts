@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   SubmissionUploadReview,
   SubmissionUploadReviewScope,
@@ -21,7 +21,7 @@ describe('SubmissionUploadReviewRepository', () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.insertSubmissionUploadReview({
+      const result = await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
         requested_by: 7
@@ -29,40 +29,24 @@ describe('SubmissionUploadReviewRepository', () => {
 
       expect(result).to.eql(review);
       expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('ON CONFLICT');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('ON CONFLICT');
     });
 
-    it('returns the existing review row when an active review already exists for the upload and scope', async () => {
-      const review = buildReview({ submission_upload_review_id: '22222222-2222-4222-8222-222222222222' });
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
-      const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
-
-      const result = await repository.insertSubmissionUploadReview({
-        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-        scope: SubmissionUploadReviewScope.SECURITY,
-        requested_by: 7
-      });
-
-      expect(result).to.eql(review);
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('UNION ALL');
-    });
-
-    it('throws ApiExecuteSQLError when the insert statement returns an unexpected row count', async () => {
+    it('throws ApiNotFoundError when the submission upload does not belong to the submission', async () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<SubmissionUploadReview>);
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
       try {
-        await repository.insertSubmissionUploadReview({
+        await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
           scope: SubmissionUploadReviewScope.SECURITY,
           requested_by: 7
         });
 
-        expect.fail('Expected ApiExecuteSQLError');
+        expect.fail('Expected ApiNotFoundError');
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert submission_upload_review record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
       }
 
       expect(sqlStub.calledOnce).to.equal(true);
@@ -78,11 +62,12 @@ describe('SubmissionUploadReviewRepository', () => {
       );
 
       try {
-        await repository.updateSubmissionUploadReview({
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111',
-          data: { status: SubmissionUploadReviewStatus.COMPLETED }
-        });
+        await repository.updateSubmissionUploadReview(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          '550e8400-e29b-41d4-a716-446655440000',
+          '11111111-1111-4111-8111-111111111111',
+          { status: SubmissionUploadReviewStatus.COMPLETED }
+        );
 
         expect.fail('Expected ApiExecuteSQLError');
       } catch (error) {
@@ -101,10 +86,11 @@ describe('SubmissionUploadReviewRepository', () => {
       );
 
       try {
-        await repository.deleteSubmissionUploadReview({
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
-        });
+        await repository.deleteSubmissionUploadReview(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          '550e8400-e29b-41d4-a716-446655440000',
+          '11111111-1111-4111-8111-111111111111'
+        );
 
         expect.fail('Expected ApiExecuteSQLError');
       } catch (error) {

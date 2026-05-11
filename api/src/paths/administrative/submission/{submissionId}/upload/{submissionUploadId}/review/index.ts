@@ -1,18 +1,18 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../constants/roles';
-import { getDBConnection } from '../../../../../database/db';
-import { SubmissionUploadReviewScope } from '../../../../../models/submission-upload-review';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
+import { getDBConnection } from '../../../../../../../database/db';
+import { SubmissionUploadReviewScope } from '../../../../../../../models/submission-upload-review';
+import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
   RequestSubmissionUploadReviewRequestSchema,
   SubmissionUploadReviewResponseSchema
-} from '../../../../../openapi/schemas/upload';
-import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewService } from '../../../../../services/upload/submission-upload-review-service';
-import { getLogger } from '../../../../../utils/logger';
+} from '../../../../../../../openapi/schemas/upload';
+import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
+import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
+import { getLogger } from '../../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission-upload/{submissionUploadId}/review');
+const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -27,7 +27,14 @@ GET.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission Upload ID (UUID).',
+      description: 'Submission ID',
+      in: 'path',
+      name: 'submissionId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    },
+    {
+      description: 'Submission Upload ID',
       in: 'path',
       name: 'submissionUploadId',
       schema: { type: 'string', format: 'uuid' },
@@ -63,7 +70,14 @@ POST.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission Upload ID (UUID).',
+      description: 'Submission ID',
+      in: 'path',
+      name: 'submissionId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    },
+    {
+      description: 'Submission Upload ID',
       in: 'path',
       name: 'submissionUploadId',
       schema: { type: 'string', format: 'uuid' },
@@ -98,10 +112,13 @@ export function getSubmissionUploadReviews(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId } = req.params;
+      const { submissionId, submissionUploadId } = req.params;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      const result = await submissionUploadReviewService.findReviewsBySubmissionUploadId(submissionUploadId);
+      const result = await submissionUploadReviewService.findReviewsBySubmissionUploadId(
+        submissionId,
+        submissionUploadId
+      );
 
       await connection.commit();
 
@@ -127,11 +144,11 @@ export function insertSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId } = req.params;
+      const { submissionId, submissionUploadId } = req.params;
       const { scope }: { scope: SubmissionUploadReviewScope } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      const result = await submissionUploadReviewService.insertSubmissionUploadReview({
+      const result = await submissionUploadReviewService.insertSubmissionUploadReview(submissionId, {
         submission_upload_id: submissionUploadId,
         scope,
         requested_by: connection.systemUserId()
