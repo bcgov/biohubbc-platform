@@ -72,16 +72,12 @@ export const SearchResultPage = () => {
     handleCheckout
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
 
-  if (codesDataLoader.isReady && !routeConfig) {
-    return <Navigate to="/page-not-found" replace />;
-  }
-
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   const hasSecuredResults = rows.some((row) => row.is_secured);
 
-  return (
-    <LoadingGuard isLoading={!codesDataLoader.isReady}>
-      {routeConfig && (
+  if (routeConfig) {
+    return (
+      <LoadingGuard>
         <ResultPageContainer
           rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
           rightSidebar={
@@ -133,7 +129,13 @@ export const SearchResultPage = () => {
             onSave={handleCreateDownload}
           />
         </ResultPageContainer>
-      )}
-    </LoadingGuard>
-  );
+      </LoadingGuard>
+    );
+  }
+
+  if (codesDataLoader.isReady) {
+    return <Navigate to="/page-not-found" replace />;
+  }
+
+  return <LoadingGuard isLoading />;
 };
