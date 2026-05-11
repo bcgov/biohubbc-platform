@@ -7,6 +7,7 @@ import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
+import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { DownloadFeatureCard } from '../feature/DownloadFeatureCard';
 
@@ -18,7 +19,7 @@ const PAGE_SIZE = 10;
  * terminal. Exported (not inlined) so the card can share the same definition via sibling
  * import.
  */
-export const isExportReady = (status: string): boolean => status === 'ready';
+export const isExportReady = (status: DownloadExportStatus): boolean => status === 'ready';
 
 /**
  * Inject a hidden iframe that triggers a browser download of the given URL, then clean it up
@@ -70,6 +71,12 @@ export const DownloadSidebarDownloads = () => {
    * Create a new CSV export for a ready download, then refresh the list. The refresh replays
    * the backend's pre-join (`download.exports`) — the new pending export row surfaces via that
    * refresh, so we need no separate cache or version bumper.
+   *
+   * Use this as the download card's Export menu action. It owns the create-export API call,
+   * refreshes the current downloads page after success, and opens a standard error dialog if
+   * export creation fails.
+   *
+   * @param {string} downloadId - Download request id to export.
    */
   const handleCreateExport = async (downloadId: string) => {
     try {
@@ -90,6 +97,16 @@ export const DownloadSidebarDownloads = () => {
    * Fetch the export detail, find the matching part-zip, and iframe-inject its presigned URL.
    * A missing part (should never happen — `part_count` is the source of truth) surfaces the
    * same "Download Error" dialog as any other failure.
+   */
+  /**
+   * Downloads a single export part by resolving a fresh presigned URL first.
+   *
+   * Use this as a card part-download action. It fetches export detail on demand,
+   * finds the requested chunk, and triggers the browser download through a hidden
+   * iframe. Errors are surfaced through the standard error dialog.
+   *
+   * @param {string} exportId - Export id containing the requested part.
+   * @param {number} chunkId - One-based part id to download.
    */
   const handleDownloadExportPart = async (exportId: string, chunkId: number) => {
     try {
@@ -114,6 +131,16 @@ export const DownloadSidebarDownloads = () => {
    * Download every part of a ready export. Makes ONE `getExport` call — the detail response
    * carries all part URLs — then iframe-injects each in order. N parts does not mean N round-
    * trips.
+   */
+  /**
+   * Downloads every part for a ready multi-part export.
+   *
+   * Use this as the card's "Download all" action. It fetches export detail once
+   * to get fresh presigned URLs, then triggers one iframe download per part in
+   * backend-provided order. Errors are surfaced through the standard error
+   * dialog and no iframe downloads are started on failure.
+   *
+   * @param {string} exportId - Export id whose parts should all be downloaded.
    */
   const handleDownloadExportAllParts = async (exportId: string) => {
     try {
@@ -142,6 +169,16 @@ export const DownloadSidebarDownloads = () => {
    *   `await downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });`
    * and the row transitions back through `pending → processing → ready` with fresh part-zips.
    * The card's rebuild branch does not change — only this handler grows.
+   */
+  /**
+   * Handles the rebuild affordance for ready exports with no available parts.
+   *
+   * Use this as the card's rebuild action for the zero-part ready state. The
+   * backend rebuild endpoint is not wired yet, so the current behavior is an
+   * explanatory dialog that keeps the UI surface stable for the future rebuild
+   * flow.
+   *
+   * @param {string} _exportId - Export id reserved for the future rebuild request.
    */
   const handleRebuildExport = async (_exportId: string) => {
     dialogContext.setErrorDialog({

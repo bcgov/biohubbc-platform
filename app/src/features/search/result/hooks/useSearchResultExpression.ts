@@ -20,6 +20,17 @@ export const useSearchResultExpression = () => {
   const [expressionTree, setExpressionTree] = useState<ExpressionTreeExpression | null>(null);
   const [expressionApplyRevision, setExpressionApplyRevision] = useState(0);
 
+  /**
+   * Applies a new expression tree to the search result page.
+   *
+   * Use this as the expression builder's Apply action. It stores the expression,
+   * increments an explicit revision key so applying the same expression can still
+   * refresh results, and resets pagination to the first page. When the expression
+   * is cleared, it also removes sort/order params so the unfiltered result set
+   * returns to its default ordering.
+   *
+   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression to apply, or `null` to clear filters.
+   */
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
       setExpressionTree(nextExpressionTree);

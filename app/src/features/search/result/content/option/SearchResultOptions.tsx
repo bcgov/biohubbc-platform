@@ -11,12 +11,27 @@ import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
 
 interface SearchResultOptionsProps {
+  /** Search result rows rendered by the active table or list layout. */
   rows: SearchFeatureResultWithRelevancy[];
+  /** Whether the result request is currently loading. */
   isLoading: boolean;
+  /** Active result layout selected in the toolbar. */
   view: SEARCH_RESULT_VIEW;
+  /** Opens the selected result's feature detail page. */
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
 }
 
+/**
+ * Chooses the active result layout and wires per-row cart actions.
+ *
+ * Use this component inside `SearchResultPanel` where the page can provide rows,
+ * loading state, and result navigation. It keeps cart membership and add/remove
+ * error handling close to the rendered result controls while the parent remains
+ * responsible for search state and pagination.
+ *
+ * @param {SearchResultOptionsProps} props - Rows, loading state, selected view, and result-click callback.
+ * @returns {JSX.Element} Loading, empty, table, or card result content.
+ */
 export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchResultOptionsProps) => {
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
@@ -27,6 +42,15 @@ export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchRe
     return new Set(features.map((f) => f.submission_feature_id));
   }, [features]);
 
+  /**
+   * Adds one rendered search result to the cart.
+   *
+   * Use this as the table/card row add action. The cart context owns optimistic
+   * updates and deduplication; this handler only forwards the selected result
+   * and reports add failures through the global snackbar.
+   *
+   * @param {SearchFeatureResultWithRelevancy} result - Result row selected for cart addition.
+   */
   const handleAddToCart = useCallback(
     async (result: SearchFeatureResultWithRelevancy) => {
       try {
@@ -38,6 +62,15 @@ export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchRe
     [addToCart, dialogContext]
   );
 
+  /**
+   * Removes one rendered search result from the cart.
+   *
+   * Use this as the table/card row remove action. The cart context owns
+   * optimistic updates and server reconciliation; this handler forwards the
+   * selected feature id and reports remove failures through the global snackbar.
+   *
+   * @param {number} featureId - Submission feature id to remove from the cart.
+   */
   const handleRemoveFromCart = useCallback(
     async (featureId: number) => {
       try {

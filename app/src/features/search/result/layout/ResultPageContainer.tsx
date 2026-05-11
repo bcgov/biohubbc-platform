@@ -5,12 +5,27 @@ import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
 interface ResultPageContainerProps {
+  /** Optional right rail content, such as the download/cart sidebar. */
   rightSidebar?: React.ReactNode;
+  /** Expanded right rail width in pixels. */
   rightSidebarWidth?: number;
+  /** Title shown when the right rail is expanded. */
   rightSidebarTitle?: string;
+  /** Main page content rendered beside the collapsible right rail. */
   children: React.ReactNode;
 }
 
+/**
+ * Provides the two-column shell used by search result pages.
+ *
+ * Use this container around result-page content when a collapsible right sidebar
+ * is needed. The right sidebar always initializes collapsed so entering the
+ * result page prioritizes the result content and leaves cart/download controls
+ * available on demand.
+ *
+ * @param {ResultPageContainerProps} props - Main content plus optional sidebar configuration.
+ * @returns {JSX.Element} Result page shell with a collapsed-by-default right rail.
+ */
 export const ResultPageContainer = ({
   rightSidebar,
   rightSidebarWidth = 350,
@@ -21,10 +36,8 @@ export const ResultPageContainer = ({
 
   return (
     <Box sx={{ display: 'flex', height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
-      {/* Main Content */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>{children}</Box>
 
-      {/* Right Sidebar */}
       <Box
         sx={{
           width: rightCollapsed ? 72 : rightSidebarWidth,
@@ -37,7 +50,6 @@ export const ResultPageContainer = ({
           transition: 'width 0.3s'
         }}>
         <Paper sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 0 }}>
-          {/* Header */}
           <Box sx={{ px: 2, pt: 2, flexShrink: 0 }}>
             {rightCollapsed ? (
               <IconButton size="small" onClick={() => setRightCollapsed(false)} sx={{ alignSelf: 'center' }}>
@@ -55,7 +67,6 @@ export const ResultPageContainer = ({
             )}
           </Box>
 
-          {/* Scrollable content */}
           {!rightCollapsed && <Box sx={{ flex: 1, overflow: 'auto', p: 2, minHeight: 0 }}>{rightSidebar}</Box>}
         </Paper>
       </Box>

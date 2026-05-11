@@ -35,6 +35,13 @@ interface DownloadFeatureCardProps {
   onRebuildExport: (exportId: string) => void;
 }
 
+interface ExportRowProps {
+  exportRecord: DownloadExport;
+  onDownloadPart: (exportId: string, chunkId: number) => void;
+  onDownloadAllParts: (exportId: string) => void;
+  onRebuild: (exportId: string) => void;
+}
+
 /**
  * Presentational card for a user's download request.
  *
@@ -49,10 +56,7 @@ interface DownloadFeatureCardProps {
 export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
   const { download, exports, onCreateExport, onDownloadExportPart, onDownloadExportAllParts, onRebuildExport } = props;
 
-  const chipProps = DOWNLOAD_STATUS_CHIP_PROPS[download.download_status] ?? {
-    color: 'default',
-    label: download.download_status
-  };
+  const chipProps = DOWNLOAD_STATUS_CHIP_PROPS[download.download_status];
 
   const canExport = download.download_status === 'ready';
 
@@ -107,13 +111,6 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
   );
 };
 
-interface ExportRowProps {
-  exportRecord: DownloadExport;
-  onDownloadPart: (exportId: string, chunkId: number) => void;
-  onDownloadAllParts: (exportId: string) => void;
-  onRebuild: (exportId: string) => void;
-}
-
 /**
  * One sub-row per `download_export`. Body varies by status:
  *   - `pending` / `processing`: no body — the status chip alone communicates in-flight state.
@@ -129,7 +126,7 @@ interface ExportRowProps {
 const ExportRow = (props: ExportRowProps) => {
   const { exportRecord, onDownloadPart, onDownloadAllParts, onRebuild } = props;
   const { download_export_id: exportId, status, started_at, completed_at, error_message, part_count } = exportRecord;
-  const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status] ?? { color: 'default', label: status };
+  const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status];
 
   const [partsOpen, setPartsOpen] = useState(false);
   const multiPart = isExportReady(status) && part_count > 1;

@@ -38,8 +38,8 @@ const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureR
   features: [],
   pagination: {
     total: 0,
-    per_page: pagination.limit ?? 10,
-    current_page: pagination.page ?? 1,
+    per_page: pagination.limit,
+    current_page: pagination.page,
     last_page: 1,
     sort: pagination.sort,
     order: pagination.order
@@ -59,14 +59,14 @@ const isAbortError = (error: unknown) => {
  * and returns a typed param setter that keeps the URL and result loader in sync.
  * Pass `enabled=false` until the route has resolved a valid feature type.
  *
- * @param {string} featureTypeName - API feature type route segment to search.
+ * @param {string | undefined} featureTypeName - API feature type route segment to search once route metadata resolves.
  * @param {boolean} enabled - Whether the route has enough context to issue requests.
  * @param {ExpressionTreeExpression | null} expressionTree - Applied expression tree, or null to list target features.
  * @param {number} refreshKey - Explicit apply counter; changes abort the active request and start the next one immediately.
  * @returns Search rows, pagination, loading state, current URL params, and URL-aware setter.
  */
 export const useSearchResults = (
-  featureTypeName: string,
+  featureTypeName: string | undefined,
   enabled = true,
   expressionTree: ExpressionTreeExpression | null = null,
   refreshKey = 0
@@ -87,16 +87,23 @@ export const useSearchResults = (
     dialogContextRef.current = dialogContext;
   }, [api.search, dialogContext]);
 
+  /**
+   * Loads search results for a single prepared request.
+   *
+   * Use this only through `startSearch`, which supplies the abort signal and
+   * stale-request guard. This callback converts URL params into API pagination,
+   * passes the current expression tree to `searchFeatures`, ignores user-driven
+   * aborts, and reports real API errors through the snackbar.
+   *
+   * @param {SearchResultsLoaderInput} input - URL params, expression, feature type, and abort signal for one request.
+   * @returns Search response for the request, or `undefined` when the request was aborted or failed.
+   */
   const loadSearchResults = useCallback(
     async ({ params, expressionTree, featureTypeName, signal }: SearchResultsLoaderInput) => {
       const pagination = buildPagination(params);
 
       try {
-        const nextData = featureTypeName
-          ? await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, { signal })
-          : buildEmptyResponse(pagination);
-
-        return nextData;
+        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, { signal });
       } catch (error) {
         if (isAbortError(error)) {
           return undefined;
@@ -112,6 +119,15 @@ export const useSearchResults = (
     []
   );
 
+  /**
+   * Starts a latest-wins search request and aborts any active request first.
+   *
+   * Use this for both debounced URL refreshes and explicit Apply refreshes. It
+   * owns the `AbortController`, request id, loading state, and stale response
+   * guard so older aborted requests cannot overwrite the newest result data.
+   *
+   * @param {Omit<SearchResultsLoaderInput, 'signal'>} input - Request inputs before the hook adds an abort signal.
+   */
   const startSearch = useCallback(
     async (input: Omit<SearchResultsLoaderInput, 'signal'>) => {
       abortControllerRef.current?.abort();
@@ -142,7 +158,14 @@ export const useSearchResults = (
 
   const debouncedRefresh = useMemo(() => debounce(startSearch, 300), [startSearch]);
 
-  /** Low-level URL param updater */
+  /**
+   * Writes normalized result query params to the router.
+   *
+   * Use this only through `setSearchParams`, which handles normalization,
+   * deletion, replacement, and pagination reset rules.
+   *
+   * @param {TypedURLSearchParams} newParams - Complete next query param state for the result route.
+   */
   const updateParams = useCallback(
     (newParams: TypedURLSearchParams) => {
       setRawSearchParams(newParams);
@@ -190,6 +213,16 @@ export const useSearchResults = (
   // Refresh when the route, URL params, applied expression, or explicit refresh key changes.
   useEffect(() => {
     if (!enabled) {
+      return;
+    }
+
+    const pagination = buildPagination(searchParams);
+
+    if (!featureTypeName) {
+      debouncedRefresh.cancel();
+      abortControllerRef.current?.abort();
+      setData(buildEmptyResponse(pagination));
+      setIsLoading(false);
       return;
     }
 

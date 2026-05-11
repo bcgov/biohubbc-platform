@@ -62,6 +62,16 @@ export const SearchResultHeader = (props: PropsWithChildren<SearchResultHeaderPr
     };
   }, [isFilterPanelOpen]);
 
+  /**
+   * Closes the expression filter popover when focus moves outside it.
+   *
+   * Use this only as the `ClickAwayListener` callback for the anchored filter
+   * panel. It deliberately ignores clicks on the search input anchor and MUI
+   * popper/menu surfaces so autocomplete menus inside the expression builder do
+   * not close the parent filter panel.
+   *
+   * @param {MouseEvent | TouchEvent} event - Click-away event emitted by MUI.
+   */
   const handleClickAway = (event: MouseEvent | TouchEvent) => {
     if (!isFilterPanelOpen) {
       return;

@@ -31,10 +31,26 @@ export const SearchResultSearch = (props: SearchResultSearchProps) => {
     setValue(searchTerm);
   }, [searchTerm]);
 
+  /**
+   * Clears the editable search text in the header input.
+   *
+   * Use this as the search input clear action. It only updates local input state;
+   * result data refreshes when the user applies or clears expression filters
+   * through the expression builder.
+   */
   const handleClear = () => {
     setValue('');
   };
 
+  /**
+   * Applies the expression builder value and closes the filter popover.
+   *
+   * Use this as `ExpressionBuilder.onApply`. The parent result page owns the
+   * actual expression state and search refresh; this handler coordinates the
+   * local popover state before forwarding the applied tree.
+   *
+   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression selected by the user, or `null` when filters are cleared.
+   */
   const handleExpressionApply = (nextExpressionTree: ExpressionTreeExpression | null) => {
     setIsFilterPanelOpen(false);
     onExpressionApply(nextExpressionTree);

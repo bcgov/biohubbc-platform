@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
@@ -9,7 +9,7 @@ import { PageTitle } from 'utils/RouteWithMeta';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
-import { SearchResultsSection } from './content/SearchResultsSection';
+import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
 import { useSearchResultCartActions } from './hooks/useSearchResultCartActions';
 import { useSearchResultDownload } from './hooks/useSearchResultDownload';
@@ -51,7 +51,7 @@ export const SearchResultPage = () => {
 
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
   const { rows, isLoading, searchParams, setSearchParams, pagination } = useSearchResults(
-    routeConfig?.featureTypeName ?? '',
+    routeConfig?.featureTypeName,
     Boolean(routeConfig),
     expressionTree,
     expressionApplyRevision
@@ -72,70 +72,66 @@ export const SearchResultPage = () => {
     handleCheckout
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
 
-  if (!codesDataLoader.isReady) {
-    return null;
-  }
-
-  if (!routeConfig) {
-    return <Navigate to="/page-not-found" replace />;
-  }
-
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   const hasSecuredResults = rows.some((row) => row.is_secured);
 
   return (
-    <ResultPageContainer
-      rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
-      rightSidebar={
-        <DownloadSidebar
-          cart={cart}
-          activeView={downloadView}
-          onViewChange={setDownloadView}
-          onDownload={handleCheckout}
-        />
-      }>
-      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        <SearchResultPageHeader
-          activeFeatureType={routeConfig.featureTypeName}
-          featureTypeLinks={featureTypeLinks}
-          searchTerm={searchQuery}
-          expressionTree={expressionTree}
-          onExpressionApply={handleExpressionApply}
-          onFeatureTypeChange={handleFeatureTypeTabChange}
-        />
+    <LoadingGuard isLoading={!codesDataLoader.isReady}>
+      {!routeConfig ? (
+        <Navigate to="/page-not-found" replace />
+      ) : (
+        <ResultPageContainer
+          rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
+          rightSidebar={
+            <DownloadSidebar
+              cart={cart}
+              activeView={downloadView}
+              onViewChange={setDownloadView}
+              onDownload={handleCheckout}
+            />
+          }>
+          <SearchResultPageHeader
+            activeFeatureType={routeConfig.featureTypeName}
+            featureTypeLinks={featureTypeLinks}
+            searchTerm={searchQuery}
+            expressionTree={expressionTree}
+            onExpressionApply={handleExpressionApply}
+            onFeatureTypeChange={handleFeatureTypeTabChange}
+          />
 
-        {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleRequestAccess} />}
+          {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleRequestAccess} />}
 
-        <SearchResultsSection
-          rows={rows}
-          isLoading={isLoading}
-          pagination={pagination}
-          sortOptions={sortOptions}
-          activeSort={activeSort}
-          view={view}
-          viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-          isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
-          onAddAllToCart={handleAddAllToCart}
-          onCreateDownloadClick={handleOpenCreateDownload}
-          onSortChange={handleSortChange}
-          onViewChange={setView}
-          onResultClick={handleResultClick}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-        />
+          <SearchResultPanel
+            rows={rows}
+            isLoading={isLoading}
+            pagination={pagination}
+            sortOptions={sortOptions}
+            activeSort={activeSort}
+            view={view}
+            viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
+            isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
+            onAddAllToCart={handleAddAllToCart}
+            onCreateDownloadClick={handleOpenCreateDownload}
+            onSortChange={handleSortChange}
+            onViewChange={setView}
+            onResultClick={handleResultClick}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
 
-        <PageTitle title={`Search Results - ${routeConfig.title}`} description={`List of ${routeConfig.title}`} />
-      </Box>
+          <PageTitle title={`Search Results - ${routeConfig.title}`} description={`List of ${routeConfig.title}`} />
 
-      <CreateDownloadDialog
-        open={isCreateDownloadDialogOpen}
-        isSubmitting={isSubmittingDownload}
-        defaultName={`${routeConfig.title} download`}
-        defaultFeatureType={routeConfig.featureTypeName}
-        featureTypeOptions={featureTypeOptions}
-        onCancel={handleCancelCreateDownload}
-        onSave={handleCreateDownload}
-      />
-    </ResultPageContainer>
+          <CreateDownloadDialog
+            open={isCreateDownloadDialogOpen}
+            isSubmitting={isSubmittingDownload}
+            defaultName={`${routeConfig.title} download`}
+            defaultFeatureType={routeConfig.featureTypeName}
+            featureTypeOptions={featureTypeOptions}
+            onCancel={handleCancelCreateDownload}
+            onSave={handleCreateDownload}
+          />
+        </ResultPageContainer>
+      )}
+    </LoadingGuard>
   );
 };

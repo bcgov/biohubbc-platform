@@ -10,35 +10,41 @@ import { DownloadSidebarDownloads } from './downloads/DownloadSidebarDownloads';
 import { DownloadSidebarToolbar } from './toolbar/DownloadSidebarToolbar';
 
 interface DownloadSidebarProps {
+  /** Cart state shown in the cart view and used to enable checkout. */
   cart: {
     features: CartContextFeature[];
     itemCount: number;
   };
+  /** Currently selected sidebar view. */
   activeView: DOWNLOAD_SIDEBAR_VIEW;
+  /** Switches between cart and downloads views. */
   onViewChange: (view: DOWNLOAD_SIDEBAR_VIEW) => void;
+  /** Starts checkout for the current cart contents. */
   onDownload?: () => void;
 }
 
+/**
+ * Renders cart and download controls inside the result-page right sidebar.
+ *
+ * Use this component as the `ResultPageContainer` right sidebar. It keeps the
+ * toolbar, active view content, and cart checkout footer together while the
+ * page-level download hook owns mutations and selected view state.
+ *
+ * @param {DownloadSidebarProps} props - Cart state, selected view, and sidebar callbacks.
+ * @returns {JSX.Element} Download/sidebar content for the result page.
+ */
 export const DownloadSidebar = ({ cart, activeView, onViewChange, onDownload }: DownloadSidebarProps) => {
   const { features, itemCount } = cart;
 
   return (
-    <Stack direction="column" height="100%" boxSizing="border-box" sx={{ display: 'flex' }}>
+    <Stack direction="column" height="100%" boxSizing="border-box">
       <Box pb={1}>
         <DownloadSidebarToolbar activeView={activeView} onViewChange={onViewChange} />
       </Box>
 
-      <Box py={1}>
-        <Divider flexItem />
-      </Box>
+      <Divider flexItem sx={{ my: 1 }} />
 
-      {/* Scrollable content */}
-      <Box
-        flex="1 1 auto"
-        overflow="auto"
-        sx={{
-          pb: 2
-        }}>
+      <Box flex="1 1 auto" overflow="auto" sx={{ pb: 2 }}>
         <ComponentSwitch<DOWNLOAD_SIDEBAR_VIEW>
           switch={activeView}
           components={{
@@ -48,7 +54,6 @@ export const DownloadSidebar = ({ cart, activeView, onViewChange, onDownload }: 
         />
       </Box>
 
-      {/* Fixed footer section — only visible on cart view */}
       {activeView === DOWNLOAD_SIDEBAR_VIEW.CART && (
         <Box
           sx={{

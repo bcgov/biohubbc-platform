@@ -7,13 +7,28 @@ import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interf
 import { useMemo } from 'react';
 
 interface SearchResultTableLayoutProps {
+  /** Result rows rendered in the data grid. */
   results: SearchFeatureResultWithRelevancy[];
+  /** Submission feature ids currently present in the cart. */
   cartFeatureIds: Set<number>;
+  /** Opens the selected result's feature detail page. */
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Adds the selected result to the cart. */
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Removes the selected feature id from the cart. */
   onRemoveFromCart?: (featureId: number) => void;
 }
 
+/**
+ * Renders search results in the table view.
+ *
+ * Use this layout when the result toolbar selects the table view. It derives
+ * the grid columns from the current rows and cart state, then forwards row and
+ * action clicks to callbacks supplied by `SearchResultOptions`.
+ *
+ * @param {SearchResultTableLayoutProps} props - Results, cart ids, and optional row action callbacks.
+ * @returns {JSX.Element} Search result data grid.
+ */
 export const SearchResultTableLayout = ({
   results,
   cartFeatureIds,

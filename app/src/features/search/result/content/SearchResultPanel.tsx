@@ -1,4 +1,4 @@
-import { mdiBookmarkOutline, mdiDownload } from '@mdi/js';
+import { mdiDownload, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Container, Divider } from '@mui/material';
 import Button from '@mui/material/Button';
@@ -11,7 +11,7 @@ import { ApiPaginationResponseParams } from 'types/pagination';
 import { SearchResultOptions } from './option/SearchResultOptions';
 import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchResultToolbar';
 
-interface SearchResultsSectionProps {
+interface SearchResultPanelProps {
   /** Search result rows returned by the feature search endpoint. */
   rows: SearchFeatureResultWithRelevancy[];
   /** Whether the result request is currently loading. */
@@ -45,7 +45,7 @@ interface SearchResultsSectionProps {
 }
 
 /**
- * Renders the main search-results panel for the feature search page.
+ * Renders the main result panel for the feature search page.
  *
  * Use this component inside `SearchResultPage` after route/search state has been
  * resolved. It owns only the result-panel layout: header actions, sort/view
@@ -53,10 +53,10 @@ interface SearchResultsSectionProps {
  * navigation, cart mutation, and download mutation behavior are injected through
  * callbacks from the page-level hooks.
  *
- * @param {SearchResultsSectionProps} props - Result rows, pagination state, view/sort state, and action callbacks.
- * @returns {JSX.Element} Results section with toolbar, result list/table, and pagination.
+ * @param {SearchResultPanelProps} props - Result rows, pagination state, view/sort state, and action callbacks.
+ * @returns {JSX.Element} Result panel with toolbar, result list/table, and pagination.
  */
-export const SearchResultsSection = ({
+export const SearchResultPanel = ({
   rows,
   isLoading,
   pagination,
@@ -72,75 +72,77 @@ export const SearchResultsSection = ({
   onResultClick,
   onPageChange,
   onPageSizeChange
-}: SearchResultsSectionProps) => {
+}: SearchResultPanelProps) => {
   return (
-    <Container maxWidth="md" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, py: 2 }}>
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          '& > .MuiPaper-root': {
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            minHeight: 0
-          }
-        }}>
-        <PageSection
-          id="search-results"
-          label="Results"
-          headerContent={
-            <>
-              <Button
-                size="small"
-                color="primary"
-                onClick={onAddAllToCart}
-                startIcon={<Icon path={mdiBookmarkOutline} size={0.8} />}
-                sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-                Save
-              </Button>
-              <Button
-                size="small"
-                color="primary"
-                onClick={onCreateDownloadClick}
-                disabled={isCreateDownloadDisabled}
-                startIcon={<Icon path={mdiDownload} size={0.8} />}
-                sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-                Create Download
-              </Button>
-            </>
-          }>
-          <Box sx={{ px: 2, py: 1 }}>
-            <SearchResultToolbar
-              sortOptions={sortOptions}
-              activeSort={activeSort}
-              onSortChange={onSortChange}
-              view={view}
-              onViewChange={onViewChange}
-              viewOptions={viewOptions}
-            />
-          </Box>
+    <Container
+      maxWidth="md"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
+        py: 2,
+        '& > .MuiPaper-root': {
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: 0
+        }
+      }}>
+      <PageSection
+        id="search-results"
+        label="Results"
+        headerContent={
+          <>
+            <Button
+              size="small"
+              color="primary"
+              onClick={onAddAllToCart}
+              startIcon={<Icon path={mdiPlus} size={0.8} />}
+              sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+              Add All to Cart
+            </Button>
+            <Button
+              size="small"
+              color="primary"
+              onClick={onCreateDownloadClick}
+              disabled={isCreateDownloadDisabled}
+              startIcon={<Icon path={mdiDownload} size={0.8} />}
+              sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+              Create Download
+            </Button>
+          </>
+        }>
+        <Box sx={{ px: 2, py: 1 }}>
+          <SearchResultToolbar
+            sortOptions={sortOptions}
+            activeSort={activeSort}
+            onSortChange={onSortChange}
+            view={view}
+            onViewChange={onViewChange}
+            viewOptions={viewOptions}
+          />
+        </Box>
 
-          <Divider />
+        <Divider />
 
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <SearchResultOptions rows={rows} isLoading={isLoading} view={view} onClick={onResultClick} />
-          </Box>
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <SearchResultOptions rows={rows} isLoading={isLoading} view={view} onClick={onResultClick} />
+        </Box>
 
-          <Divider />
+        <Divider />
 
-          <Box sx={{ px: 2, py: 1 }}>
-            <CustomPagination
-              currentPage={pagination?.current_page ?? 1}
-              pageSize={pagination?.per_page ?? 10}
-              totalCount={pagination?.total ?? 0}
-              lastPage={pagination?.last_page ?? 1}
-              onPageChange={onPageChange}
-              onPageSizeChange={onPageSizeChange}
-            />
-          </Box>
-        </PageSection>
-      </Box>
+        <Box sx={{ px: 2, py: 1 }}>
+          <CustomPagination
+            currentPage={pagination?.current_page ?? 1}
+            pageSize={pagination?.per_page ?? 10}
+            totalCount={pagination?.total ?? 0}
+            lastPage={pagination?.last_page ?? 1}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+        </Box>
+      </PageSection>
     </Container>
   );
 };

@@ -18,6 +18,14 @@ export const useSearchResultCartActions = (rows: SearchFeatureResultWithRelevanc
   const { features, pagination: cartPagination, addToCart } = useCartContext();
   const dialogContext = useDialogContext();
 
+  /**
+   * Adds every row currently rendered on the result page to the cart.
+   *
+   * Use this as the result panel's bulk "Add All to Cart" action. The cart context is
+   * responsible for deduplication and mutation serialization; this handler
+   * forwards the current rows and reports any cart API error through the global
+   * snackbar.
+   */
   const handleAddAllToCart = useCallback(async () => {
     try {
       await addToCart(rows);
