@@ -183,39 +183,49 @@ spec:
             - name: LOG_FILE_MAX_FILES
               value: {{ .Values.app.logging.fileMaxFiles | quote }}
             # Ingestion pipeline
+            {{- if .Values.app.ingestion.featureBatchSize }}
             - name: INGESTION_FEATURE_BATCH_SIZE
               value: {{ .Values.app.ingestion.featureBatchSize | quote }}
-            {{ if .Values.app.ingestion.contributorCodeBatchSize }}
+            {{- end }}
+            {{- if .Values.app.ingestion.contributorCodeBatchSize }}
             - name: INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE
               value: {{ .Values.app.ingestion.contributorCodeBatchSize | quote }}
-            {{ end }}
-            {{ if .Values.app.ingestion.mediaBatchBytes }}
+            {{- end }}
+            {{- if .Values.app.ingestion.mediaBatchBytes }}
             - name: INGESTION_MEDIA_BATCH_BYTES
               value: {{ .Values.app.ingestion.mediaBatchBytes | quote }}
-            {{ end }}
-            {{ if .Values.app.ingestion.mediaBatchFiles }}
+            {{- end }}
+            {{- if .Values.app.ingestion.mediaBatchFiles }}
             - name: INGESTION_MEDIA_BATCH_FILES
               value: {{ .Values.app.ingestion.mediaBatchFiles | quote }}
-            {{ end }}
+            {{- end }}
             # Security scope
+            {{- if .Values.app.security.scopeAnchorBatchSize }}
             - name: SECURITY_SCOPE_ANCHOR_BATCH_SIZE
               value: {{ .Values.app.security.scopeAnchorBatchSize | quote }}
+            {{- end }}
             # Upload pipeline (archive ingestion)
+            {{- if .Values.app.uploadIngestion.featureBatchMaxBytes }}
             - name: UPLOAD_FEATURE_BATCH_MAX_BYTES
               value: {{ .Values.app.uploadIngestion.featureBatchMaxBytes | quote }}
-            {{ if .Values.app.uploadIngestion.mediaConcurrency }}
+            {{- end }}
+            {{- if .Values.app.uploadIngestion.mediaConcurrency }}
             - name: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
               value: {{ .Values.app.uploadIngestion.mediaConcurrency | quote }}
-            {{ end }}
-            {{ if .Values.app.uploadIngestion.jobBatchSize }}
+            {{- end }}
+            {{- if .Values.app.uploadIngestion.jobBatchSize }}
             - name: UPLOAD_JOB_BATCH_SIZE
               value: {{ .Values.app.uploadIngestion.jobBatchSize | quote }}
-            {{ end }}
+            {{- end }}
+            {{- if .Values.app.uploadIngestion.jsonFileMaxBytes }}
             - name: UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES
               value: {{ .Values.app.uploadIngestion.jsonFileMaxBytes | quote }}
+            {{- end }}
             # Download pipeline
+            {{- if .Values.app.download.featureBatchSize }}
             - name: DOWNLOAD_FEATURE_BATCH_SIZE
               value: {{ .Values.app.download.featureBatchSize | quote }}
+            {{- end }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
           imagePullPolicy: Always
           resources:

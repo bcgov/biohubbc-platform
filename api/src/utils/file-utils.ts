@@ -18,23 +18,10 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import NodeClam from 'clamscan';
 import { Readable } from 'stream';
+import { getOptionalEnv } from './env-utils';
 import { getLogger } from './logger';
 
 const defaultLog = getLogger('/api/src/utils/file-utils');
-
-const getOptionalEnv = (key: string): string | undefined => {
-  const value = process.env[key];
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  if (!normalized || normalized === 'undefined' || normalized === 'null') {
-    return undefined;
-  }
-
-  return normalized;
-};
 
 export interface IDatasetS3FileKey {
   datasetUUID: string;
