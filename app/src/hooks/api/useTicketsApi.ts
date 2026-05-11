@@ -26,6 +26,7 @@ import {
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
+import { normalizeExtendedTicket } from 'utils/ticket';
 
 /**
  * Returns a set of supported api methods for working with tickets.
@@ -58,7 +59,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
     const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
 
-    return data;
+    return normalizeExtendedTicket(data);
   };
 
   /**
@@ -311,7 +312,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
     const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
 
-    return data;
+    return normalizeExtendedTicket(data);
   };
 
   /**

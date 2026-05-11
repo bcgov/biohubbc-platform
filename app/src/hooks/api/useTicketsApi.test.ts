@@ -85,6 +85,34 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(apiTicket);
   });
 
+  it('getTicketForAdmin defaults missing extended ticket collections', async () => {
+    const apiTicket = {
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      ticket_slug: '04900001',
+      subject: 'Test ticket',
+      description: null,
+      team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
+      priority: 'medium',
+      status: 'open'
+    } as ITicketExtended;
+
+    mock.onGet(`/api/administrative/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
+
+    const result = await useTicketsApi(axios).getTicketForAdmin(apiTicket.ticket_id);
+
+    expect(result).toEqual({
+      ...apiTicket,
+      statuses: [],
+      comments: [],
+      artifacts: [],
+      references: [],
+      data_requests: [],
+      submission_uploads: [],
+      ticket_system_users: []
+    });
+  });
+
   it('createTicket posts payload and returns ticket', async () => {
     const payload: ICreateTicketRequest = {
       subject: 'New ticket',
@@ -377,6 +405,34 @@ describe('useTicketsApi', () => {
     const result = await useTicketsApi(axios).getTicketForUser(ticketId);
 
     expect(result).toEqual(apiTicket);
+  });
+
+  it('getTicketForUser defaults missing extended ticket collections', async () => {
+    const apiTicket = {
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      ticket_slug: '04900001',
+      subject: 'Test ticket',
+      description: null,
+      team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
+      priority: 'medium',
+      status: 'open'
+    } as ITicketExtended;
+
+    mock.onGet(`/api/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
+
+    const result = await useTicketsApi(axios).getTicketForUser(apiTicket.ticket_id);
+
+    expect(result).toEqual({
+      ...apiTicket,
+      statuses: [],
+      comments: [],
+      artifacts: [],
+      references: [],
+      data_requests: [],
+      submission_uploads: [],
+      ticket_system_users: []
+    });
   });
 
   it('createTicketSystemUsers posts payload and returns ticket system users', async () => {

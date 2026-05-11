@@ -32,9 +32,11 @@ export const useTicketTimelineUploadActions = () => {
       return;
     }
 
+    const submissionUploads = latestTicket.submission_uploads ?? [];
+
     ticketDataLoader.setData({
       ...latestTicket,
-      submission_uploads: latestTicket.submission_uploads.map((upload) =>
+      submission_uploads: submissionUploads.map((upload) =>
         upload.submission_upload_id === submissionUploadId ? patch(upload) : upload
       )
     });
