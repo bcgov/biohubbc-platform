@@ -47,7 +47,7 @@ const makeTicketArtifact = (fileName: string): ITicketArtifact => ({
   artifact_id: '11111111-1111-4111-8111-111111111111',
   record_end_date: null,
   create_date: '2026-02-25T00:00:00.000Z',
-  key: `tickets/ticket-id/upload/upload-id/${fileName}`
+  object_key: `tickets/ticket-id/upload/upload-id/${fileName}`
 });
 
 const setupUploadHook = (ticketArtifact: ITicketArtifact) => {

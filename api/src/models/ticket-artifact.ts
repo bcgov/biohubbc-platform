@@ -6,7 +6,7 @@ export const TicketArtifact = z.object({
   artifact_id: z.string().uuid(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),
-  key: z.string()
+  object_key: z.string()
 });
 
 export type TicketArtifact = z.infer<typeof TicketArtifact>;

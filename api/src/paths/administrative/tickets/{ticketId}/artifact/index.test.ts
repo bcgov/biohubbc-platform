@@ -18,7 +18,7 @@ describe('paths/administrative/tickets/{ticketId}/artifact', () => {
       artifact_id: '33333333-3333-4333-8333-333333333333',
       record_end_date: null,
       create_date: '2026-04-29T00:00:00.000Z',
-      key: 'tickets/file.txt'
+      object_key: 'tickets/file.txt'
     }
   ];
 
@@ -38,17 +38,21 @@ describe('paths/administrative/tickets/{ticketId}/artifact', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId };
-    mockReq.query = { page: '2', limit: '10', sort: 'create_date', order: 'desc' };
+    mockReq.query = { page: '2', limit: '10', sort: 'create_date', order: 'desc', search: 'file' };
 
     await getTicketArtifacts()(mockReq, mockRes, mockNext);
 
-    expect(getArtifactsStub).to.have.been.calledOnceWith(ticketId, {
-      page: 2,
-      limit: 10,
-      sort: 'create_date',
-      order: 'desc'
-    });
-    expect(getCountStub).to.have.been.calledOnceWith(ticketId);
+    expect(getArtifactsStub).to.have.been.calledOnceWith(
+      ticketId,
+      { search: 'file' },
+      {
+        page: 2,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      }
+    );
+    expect(getCountStub).to.have.been.calledOnceWith(ticketId, { search: 'file' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       artifacts,

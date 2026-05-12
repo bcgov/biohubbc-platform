@@ -25,7 +25,7 @@ describe('paths/tickets/{ticketId}/artifact/{ticketArtifactId}', () => {
     artifact_id: artifactId,
     record_end_date: null,
     create_date: '2026-04-29T00:00:00.000Z',
-    key: 'tickets/file.txt'
+    object_key: 'tickets/file.txt'
   };
 
   beforeEach(() => {

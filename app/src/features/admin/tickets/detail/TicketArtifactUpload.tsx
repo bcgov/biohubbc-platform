@@ -1,18 +1,13 @@
+import { mdiPaperclip } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button, { ButtonProps } from '@mui/material/Button';
+import Button from '@mui/material/Button';
 import { useConfigContext, useDialogContext } from 'hooks/useContext';
-import { ChangeEvent, CSSProperties, useRef } from 'react';
+import { ChangeEvent, useRef } from 'react';
 
 interface ITicketArtifactUploadProps {
   label: string;
-  buttonAriaLabel: string;
-  inputAriaLabel: string;
-  iconPath: string;
-  iconSize?: number;
-  iconStyle?: CSSProperties;
   isUploading: boolean;
-  buttonProps?: Pick<ButtonProps, 'color' | 'disabled' | 'size' | 'variant'>;
   onArtifactsSelected: (artifacts: File[]) => Promise<void> | void;
 }
 
@@ -26,17 +21,7 @@ interface ITicketArtifactUploadProps {
  * @return {*}
  */
 export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
-  const {
-    label,
-    buttonAriaLabel,
-    inputAriaLabel,
-    iconPath,
-    iconSize = 0.75,
-    iconStyle,
-    isUploading,
-    buttonProps,
-    onArtifactsSelected
-  } = props;
+  const { label, isUploading, onArtifactsSelected } = props;
   const config = useConfigContext();
   const dialogContext = useDialogContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,13 +45,15 @@ export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <Button
-        aria-label={buttonAriaLabel}
-        {...buttonProps}
+        aria-label={label}
+        color="primary"
         loading={isUploading}
         onClick={() => {
           fileInputRef.current?.click();
         }}
-        startIcon={<Icon path={iconPath} size={iconSize} style={iconStyle} />}>
+        size="small"
+        startIcon={<Icon path={mdiPaperclip} size={0.75} />}
+        variant="contained">
         {label}
       </Button>
       <input
@@ -75,7 +62,7 @@ export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
         multiple
         hidden
         onChange={handleFileSelection}
-        aria-label={inputAriaLabel}
+        aria-label={`${label} file input`}
       />
     </Box>
   );

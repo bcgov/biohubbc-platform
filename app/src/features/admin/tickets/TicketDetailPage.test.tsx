@@ -281,7 +281,7 @@ describe('TicketDetailPage', () => {
             artifact_id: '66666666-6666-4666-8666-666666666666',
             record_end_date: null,
             create_date: '2026-02-26T00:00:00.000Z',
-            key: 'tickets/test/file.txt'
+            object_key: 'tickets/test/file.txt'
           }
         ]
       })

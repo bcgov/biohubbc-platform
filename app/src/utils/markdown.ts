@@ -66,7 +66,8 @@ export const getArtifactHref = (url: string) => {
  * @param {ITicketArtifact} artifact - Ticket artifact metadata from the ticket detail API.
  * @returns {string} File-style display name derived from the artifact object key.
  */
-export const getArtifactDisplayName = (artifact: ITicketArtifact) => artifact.key.split('/').pop() ?? artifact.key;
+export const getArtifactDisplayName = (artifact: ITicketArtifact) =>
+  artifact.object_key.split('/').pop() ?? artifact.object_key;
 
 /**
  * Flatten simple React children into text for link-label decisions.

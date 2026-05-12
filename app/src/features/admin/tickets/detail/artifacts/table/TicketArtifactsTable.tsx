@@ -44,7 +44,7 @@ export const TicketArtifactsTable = (props: ITicketArtifactsTableProps) => {
     () => [
       { field: 'ticket_artifact_id', headerName: 'Ticket Artifact ID', flex: 1, minWidth: 260 },
       {
-        field: 'key',
+        field: 'object_key',
         headerName: 'Artifact Key',
         flex: 1.5,
         minWidth: 280,

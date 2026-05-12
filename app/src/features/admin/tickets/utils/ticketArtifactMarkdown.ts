@@ -9,11 +9,11 @@ import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 /**
  * Get the display filename for a ticket artifact object key.
  *
- * @param {Pick<ITicketArtifact, 'key'>} artifact Ticket artifact with object key.
+ * @param {Pick<ITicketArtifact, 'object_key'>} artifact Ticket artifact with object key.
  * @returns {string} Filename segment, or the full key when no filename segment exists.
  */
-export const getTicketArtifactFileName = (artifact: Pick<ITicketArtifact, 'key'>) => {
-  return artifact.key.split('/').pop() || artifact.key;
+export const getTicketArtifactFileName = (artifact: Pick<ITicketArtifact, 'object_key'>) => {
+  return artifact.object_key.split('/').pop() || artifact.object_key;
 };
 
 /**
@@ -53,9 +53,9 @@ export const getArtifactMarkdownByMimeType = (file: File, ticketArtifactId: stri
 /**
  * Convert a ticket artifact row into copyable markdown.
  *
- * @param {Pick<ITicketArtifact, 'key' | 'ticket_artifact_id'>} artifact Ticket artifact row.
+ * @param {Pick<ITicketArtifact, 'object_key' | 'ticket_artifact_id'>} artifact Ticket artifact row.
  * @returns {string} Markdown link for the artifact.
  */
-export const getTicketArtifactMarkdown = (artifact: Pick<ITicketArtifact, 'key' | 'ticket_artifact_id'>) => {
+export const getTicketArtifactMarkdown = (artifact: Pick<ITicketArtifact, 'object_key' | 'ticket_artifact_id'>) => {
   return `[${getTicketArtifactFileName(artifact)}](/artifact/${artifact.ticket_artifact_id})`;
 };

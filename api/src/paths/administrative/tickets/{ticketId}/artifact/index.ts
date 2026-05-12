@@ -47,6 +47,15 @@ GET.apiDoc = {
       },
       description: 'Ticket UUID.'
     },
+    {
+      in: 'query',
+      name: 'search',
+      required: false,
+      schema: {
+        type: 'string'
+      },
+      description: 'Optional case-insensitive search across ticket artifact ID and object key.'
+    },
     ...paginationRequestQueryParamSchema
   ],
   responses: {
@@ -71,10 +80,15 @@ export function getTicketArtifacts(): RequestHandler {
 
       const ticketArtifactService = new TicketArtifactService(connection);
       const pagination = makePaginationOptionsFromRequest(req);
+      const filters = { search: req.query.search as string | undefined };
 
       const [artifacts, count] = await Promise.all([
-        ticketArtifactService.getTicketArtifacts(req.params.ticketId, ensureCompletePaginationOptions(pagination)),
-        ticketArtifactService.getTicketArtifactsCount(req.params.ticketId)
+        ticketArtifactService.getTicketArtifacts(
+          req.params.ticketId,
+          filters,
+          ensureCompletePaginationOptions(pagination)
+        ),
+        ticketArtifactService.getTicketArtifactsCount(req.params.ticketId, filters)
       ]);
 
       await connection.commit();

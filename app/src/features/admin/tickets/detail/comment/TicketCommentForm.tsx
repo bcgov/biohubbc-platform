@@ -1,4 +1,3 @@
-import { mdiAttachmentRemove } from '@mdi/js';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -53,12 +52,7 @@ export const TicketCommentForm = (props: ITicketCommentFormProps) => {
           />
           <TicketArtifactUpload
             label="Attach"
-            buttonAriaLabel="Attach file"
-            inputAriaLabel="Attach file input"
-            iconPath={mdiAttachmentRemove}
-            iconStyle={{ transform: 'rotate(-45deg)' }}
             isUploading={isUploadingAttachment}
-            buttonProps={{ size: 'small', disabled: isSaving || isUploadingAttachment }}
             onArtifactsSelected={handleAttachmentSelection}
           />
         </Box>

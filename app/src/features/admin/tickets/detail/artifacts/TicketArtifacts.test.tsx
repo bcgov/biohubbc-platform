@@ -66,7 +66,7 @@ const ticketArtifact: ITicketArtifact = {
   artifact_id: '66666666-6666-4666-8666-666666666666',
   record_end_date: null,
   create_date: '2026-02-25T12:00:00.000Z',
-  key: 'tickets/test/file.txt'
+  object_key: 'tickets/test/file.txt'
 };
 
 const ticket: ITicketExtended = {
@@ -144,10 +144,11 @@ describe('TicketArtifacts', () => {
     expect(screen.getByTestId('ticket-artifacts-grid')).toHaveAttribute('data-row-count', '1');
     expect(screen.getByTestId('ticket-artifacts-grid')).toHaveAttribute('data-pagination-mode', 'server');
     expect(screen.getByTestId('ticket-artifacts-grid')).toHaveAttribute('data-sorting-mode', 'server');
-    expect(screen.queryByText(ticketArtifact.key)).not.toBeInTheDocument();
+    expect(screen.queryByText(ticketArtifact.object_key)).not.toBeInTheDocument();
     expect(screen.getByText('February 25, 2026')).toBeVisible();
     expect(screen.queryByText(ticketArtifact.artifact_id)).not.toBeInTheDocument();
     expect(getTicketArtifacts).toHaveBeenCalledWith(ticket.ticket_id, {
+      search: '',
       page: 1,
       limit: 10,
       sort: 'create_date',
@@ -161,7 +162,7 @@ describe('TicketArtifacts', () => {
       ...ticketArtifact,
       ticket_artifact_id: '77777777-7777-4777-8777-777777777777',
       artifact_id: '88888888-8888-4888-8888-888888888888',
-      key: 'tickets/test/uploaded.txt'
+      object_key: 'tickets/test/uploaded.txt'
     };
 
     createTicketUpload.mockResolvedValue({
@@ -174,7 +175,7 @@ describe('TicketArtifacts', () => {
 
     await user.click(screen.getByRole('button', { name: 'Upload' }));
     await user.upload(
-      screen.getByLabelText('Upload ticket artifact input'),
+      screen.getByLabelText('Upload file input'),
       new File(['uploaded'], 'uploaded.txt', { type: 'text/plain' })
     );
 

@@ -1,4 +1,3 @@
-import { mdiPlus } from '@mdi/js';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -27,7 +26,7 @@ export const TicketArtifacts = (props: ITicketArtifactsProps) => {
   const dialogContext = useDialogContext();
   const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({ ticketId: ticket.ticket_id });
   const ticketArtifactsGrid = useServerPaginatedDataGrid<ITicketArtifact, IGetTicketArtifactsResponse>({
-    fetcher: (_search, pagination) => api.tickets.getTicketArtifacts(ticket.ticket_id, pagination),
+    fetcher: (search, pagination) => api.tickets.getTicketArtifacts(ticket.ticket_id, { search, ...pagination }),
     extractData: (response) => response.artifacts,
     extractTotal: (response) => response.pagination.total,
     defaultSort: { field: 'create_date', sort: 'desc' }
@@ -103,12 +102,7 @@ export const TicketArtifacts = (props: ITicketArtifactsProps) => {
       headerContent={
         <TicketArtifactUpload
           label="Upload"
-          buttonAriaLabel="Upload"
-          inputAriaLabel="Upload ticket artifact input"
-          iconPath={mdiPlus}
-          iconSize={0.8}
           isUploading={isUploadingAttachment}
-          buttonProps={{ color: 'primary', size: 'small', variant: 'contained' }}
           onArtifactsSelected={handleUploadSelection}
         />
       }>

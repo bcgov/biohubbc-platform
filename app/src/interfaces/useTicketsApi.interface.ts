@@ -38,7 +38,7 @@ export interface ITicketArtifact {
   artifact_id: string;
   record_end_date: string | null;
   create_date: string;
-  key: string;
+  object_key: string;
 }
 
 export type TicketRelationshipType =
@@ -152,6 +152,10 @@ export interface IGetTicketsResponse {
 export interface IGetTicketArtifactsResponse {
   artifacts: ITicketArtifact[];
   pagination: ApiPaginationResponseParams;
+}
+
+export interface IGetTicketArtifactsQueryParams extends Partial<ApiPaginationRequestOptions> {
+  search?: string;
 }
 
 export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {

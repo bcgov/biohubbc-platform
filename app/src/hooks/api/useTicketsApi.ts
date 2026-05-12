@@ -7,6 +7,7 @@ import {
   ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
+  IGetTicketArtifactsQueryParams,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ITicketSystemUser,
@@ -23,7 +24,6 @@ import {
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
-import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with tickets.
@@ -190,15 +190,15 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get paginated ticket attachment artifacts for an admin ticket detail view.
    *
    * @param {string} ticketId
-   * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {IGetTicketArtifactsQueryParams} [params]
    * @return {Promise<IGetTicketArtifactsResponse>}
    */
   const getTicketArtifacts = async (
     ticketId: string,
-    pagination?: ApiPaginationRequestOptions
+    params?: IGetTicketArtifactsQueryParams
   ): Promise<IGetTicketArtifactsResponse> => {
     const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
-      params: pagination,
+      params,
       paramsSerializer: (params) => qs.stringify(params)
     });
 

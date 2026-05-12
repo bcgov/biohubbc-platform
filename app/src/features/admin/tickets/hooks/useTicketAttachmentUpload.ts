@@ -1,6 +1,7 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 
@@ -20,6 +21,7 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
   const config = useConfigContext();
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
+  const { runSerialized } = useSerializedAsync();
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   /**
@@ -34,60 +36,64 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails.
    */
   const uploadTicketAttachment = async (file: File): Promise<ITicketArtifact | null> => {
-    const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
+    const ticketArtifact = await runSerialized(async () => {
+      const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
 
-    if (file.size > maxTicketAttachmentFileSize) {
-      const maxTicketAttachmentFileSizeMB = Math.round(maxTicketAttachmentFileSize / 1024 / 1024);
+      if (file.size > maxTicketAttachmentFileSize) {
+        const maxTicketAttachmentFileSizeMB = Math.round(maxTicketAttachmentFileSize / 1024 / 1024);
 
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: `Attachment exceeds the ${maxTicketAttachmentFileSizeMB} MB limit.`
-      });
-      return null;
-    }
-
-    try {
-      setIsUploadingAttachment(true);
-
-      const initializedUpload = await api.tickets.createTicketUpload(ticketId, {
-        file_name: file.name,
-        byte_size: file.size,
-        content_type: file.type
-      });
-
-      await api.objectStorage.uploadFileToUrl({
-        url: initializedUpload.presigned_upload_url,
-        file,
-        contentType: file.type
-      });
-
-      const ticketArtifact = await api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, {
-        status: 'uploaded'
-      });
-
-      const latestTicket = ticketDataLoader.data;
-      if (latestTicket) {
-        ticketDataLoader.setData({
-          ...latestTicket,
-          artifacts: latestTicket.artifacts.some(
-            (artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id
-          )
-            ? latestTicket.artifacts
-            : [...latestTicket.artifacts, ticketArtifact]
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: `Attachment exceeds the ${maxTicketAttachmentFileSizeMB} MB limit.`
         });
+        return null;
       }
 
-      return ticketArtifact;
-    } catch (caughtError) {
-      const apiError = caughtError as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message || 'Failed to upload attachment.'
-      });
-      return null;
-    } finally {
-      setIsUploadingAttachment(false);
-    }
+      try {
+        setIsUploadingAttachment(true);
+
+        const initializedUpload = await api.tickets.createTicketUpload(ticketId, {
+          file_name: file.name,
+          byte_size: file.size,
+          content_type: file.type
+        });
+
+        await api.objectStorage.uploadFileToUrl({
+          url: initializedUpload.presigned_upload_url,
+          file,
+          contentType: file.type
+        });
+
+        const ticketArtifact = await api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, {
+          status: 'uploaded'
+        });
+
+        const latestTicket = ticketDataLoader.data;
+        if (latestTicket) {
+          ticketDataLoader.setData({
+            ...latestTicket,
+            artifacts: latestTicket.artifacts.some(
+              (artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id
+            )
+              ? latestTicket.artifacts
+              : [...latestTicket.artifacts, ticketArtifact]
+          });
+        }
+
+        return ticketArtifact;
+      } catch (caughtError) {
+        const apiError = caughtError as APIError;
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: apiError.message || 'Failed to upload attachment.'
+        });
+        return null;
+      } finally {
+        setIsUploadingAttachment(false);
+      }
+    });
+
+    return ticketArtifact ?? null;
   };
 
   return {

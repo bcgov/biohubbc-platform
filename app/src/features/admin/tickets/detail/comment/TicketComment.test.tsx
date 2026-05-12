@@ -87,7 +87,7 @@ describe('TicketComment', () => {
             artifact_id: '11111111-1111-4111-8111-111111111111',
             record_end_date: null,
             create_date: '2026-02-25T00:00:00.000Z',
-            key: 'tickets/ticket-id/upload/upload-id/diagram.png'
+            object_key: 'tickets/ticket-id/upload/upload-id/diagram.png'
           }
         ]}
         comment="![diagram.png](/artifact/05c4063e-a344-42a6-89f8-b15161789cda)"
@@ -121,8 +121,6 @@ describe('TicketComment', () => {
     const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
 
     render(<TicketComment {...baseProps} comment="Draft comment" onUploadAttachment={onUploadAttachment} />);
-
-    await user.click(screen.getByRole('button', { name: 'Attach file' }));
 
     const fileInput = screen.getByLabelText('Attach file input') as HTMLInputElement;
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });

@@ -34,7 +34,7 @@ describe('TicketArtifactRepository', () => {
           artifact_id: mockArtifactIds[0],
           record_end_date: null,
           create_date: '2026-04-29T00:00:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
@@ -55,7 +55,7 @@ describe('TicketArtifactRepository', () => {
         artifact_id: '22222222-2222-2222-8222-222222222222',
         record_end_date: null,
         create_date: '2026-04-29T00:00:00.000Z',
-        key: 'tickets/abc/file.txt'
+        object_key: 'tickets/abc/file.txt'
       };
       const mockQueryResponse = Promise.resolve(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -89,7 +89,7 @@ describe('TicketArtifactRepository', () => {
           artifact_id: '22222222-2222-2222-8222-222222222222',
           record_end_date: null,
           create_date: '2026-04-29T00:00:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
@@ -109,19 +109,23 @@ describe('TicketArtifactRepository', () => {
           artifact_id: '22222222-2222-2222-8222-222222222222',
           record_end_date: null,
           create_date: '2026-04-29T00:00:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketArtifactRepository(mockDBConnection);
 
-      const result = await repo.getTicketArtifacts('11111111-1111-1111-1111-111111111111', {
-        page: 1,
-        limit: 10,
-        sort: 'create_date',
-        order: 'desc'
-      });
+      const result = await repo.getTicketArtifacts(
+        '11111111-1111-1111-1111-111111111111',
+        { search: 'file' },
+        {
+          page: 1,
+          limit: 10,
+          sort: 'create_date',
+          order: 'desc'
+        }
+      );
 
       chai.expect(result).to.eql(rows);
     });
