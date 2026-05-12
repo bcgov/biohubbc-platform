@@ -9,12 +9,6 @@ export interface SubmissionFeaturePropertyFilters {
   search?: string;
 }
 
-export interface SubmissionFeatureSignedUrlPayload {
-  submissionFeatureId: number;
-  submissionFeatureObj: { key: string; value: string };
-  isAdmin: boolean;
-}
-
 /**
  * Model for a single submission feature
  */

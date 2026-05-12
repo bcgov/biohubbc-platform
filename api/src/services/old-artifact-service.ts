@@ -1,14 +1,10 @@
 import { IDBConnection } from '../database/db';
 import { ApiError, ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
-import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
-import { SubmissionFeatureRecord } from '../repositories/submission-repository';
-import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { deleteFileFromS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { CodeService } from './code-service';
 import { DBService } from './db-service';
-import { SubmissionFeatureService } from './submission-feature-service';
 
 const defaultLog = getLogger('services/artifact-service');
 
@@ -20,14 +16,11 @@ const defaultLog = getLogger('services/artifact-service');
  */
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
-  submissionFeatureService: SubmissionFeatureService;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
    */
   static readonly dependencies = {
-    generateSubmissionFeatureS3FileKey,
-    uploadFileToS3,
     deleteFileFromS3
   };
 
@@ -35,7 +28,6 @@ export class ArtifactService extends DBService {
     super(connection);
 
     this.artifactRepository = new ArtifactRepository(connection);
-    this.submissionFeatureService = new SubmissionFeatureService(connection);
   }
 
   /**
@@ -47,49 +39,6 @@ export class ArtifactService extends DBService {
    */
   async insertArtifactRecord(artifact: Artifact): Promise<{ artifact_id: number }> {
     return this.artifactRepository.insertArtifactRecord(artifact);
-  }
-
-  /**
-   * Generates an S3 key for the artifact, uploads the file to S3, and persists the artifact key in the database.
-   *
-   * @param {string} artifactUploadKey
-   * @param {Express.Multer.File} file
-   * @return {*}  {Promise<SubmissionFeatureRecord>}
-   * @memberof ArtifactService
-   */
-  async uploadSubmissionFeatureArtifact(
-    artifactUploadKey: string,
-    file: Express.Multer.File
-  ): Promise<SubmissionFeatureRecord> {
-    const artifactFeatureSubmission = await this.submissionFeatureService.getSubmissionFeatureByUuid(artifactUploadKey);
-
-    // Generate S3 key
-    const artifactS3Key = ArtifactService.dependencies.generateSubmissionFeatureS3FileKey({
-      submissionId: artifactFeatureSubmission.submission_id,
-      submissionFeatureId: artifactFeatureSubmission.submission_feature_id
-    });
-
-    defaultLog.debug({ label: 'uploadSubmissionFeatureArtifact', message: 'S3 key', artifactS3Key });
-
-    // TODO add api codes cache: so lookups like this are fast (especially since codes dont change often)
-    const codeService = new CodeService(this.connection);
-    const artifactFeatureProperties = await codeService.getFeaturePropertyByName('artifact_key');
-
-    const searchFeatureRepository = new SearchFeatureRepository(this.connection);
-
-    // Insert S3 key in search string table
-    await searchFeatureRepository.insertSearchableStringRecords([
-      {
-        submission_feature_id: artifactFeatureSubmission.submission_feature_id,
-        feature_property_id: artifactFeatureProperties.feature_type_property_id,
-        value: artifactS3Key
-      }
-    ]);
-
-    // Upload artifact to S3
-    await ArtifactService.dependencies.uploadFileToS3(file, artifactS3Key, { filename: file.originalname });
-
-    return artifactFeatureSubmission;
   }
 
   /**
