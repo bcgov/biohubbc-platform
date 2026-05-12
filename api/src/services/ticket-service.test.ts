@@ -19,6 +19,7 @@ import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
 import { TicketSystemUserService } from './ticket-system-user-service';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
 
@@ -203,6 +204,9 @@ describe('TicketService', () => {
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
       const getDataRequestLogStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
+      const getSubmissionUploadsStub = sinon
+        .stub(SubmissionUploadService.prototype, 'findSubmissionUploadsByTicketId')
+        .resolves([]);
       const getTicketSystemUsersStub = sinon
         .stub(TicketSystemUserService.prototype, 'getActiveTicketSystemUsersByTicketId')
         .resolves([]);
@@ -215,6 +219,7 @@ describe('TicketService', () => {
       expect(getArtifactLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getSubmissionUploadsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getTicketSystemUsersStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
@@ -223,6 +228,7 @@ describe('TicketService', () => {
         artifacts: artifactLog,
         references: referenceLog,
         data_requests: [],
+        submission_uploads: [],
         ticket_system_users: []
       });
     });

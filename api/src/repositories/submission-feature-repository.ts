@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { SubmissionFeatureProperty } from '../models/feature-property';
-import { SubmissionFeaturePropertyFilters, SubmissionFeatureSignedUrlPayload } from '../models/submission-feature';
+import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
@@ -16,6 +16,95 @@ import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } 
  * @extends {BaseRepository}
  */
 export class SubmissionFeatureRepository extends BaseRepository {
+  /**
+   * Set record_effective_date for active features from a submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_effective_date = now(),
+        record_end_date = NULL
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record effective dates', [
+        'SubmissionFeatureRepository->setRecordEffectiveDateBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Set record_end_date for features from a rejected submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async setRecordEndDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_end_date = now()
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record end dates', [
+        'SubmissionFeatureRepository->setRecordEndDateBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Clear publication and rejection dates for features from a submitted upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async unsetRecordDatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_feature
+      SET
+        record_effective_date = NULL,
+        record_end_date = NULL
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to unset submission feature record dates', [
+        'SubmissionFeatureRepository->unsetRecordDatesBySubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
   /**
    * Get a submission feature record by uuid.
    *
@@ -199,73 +288,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
     }
 
     return response.rows[0].count;
-  }
-
-  /**
-   * Retrieves submission feature (artifact) key from data column key value pair.
-   * Checks submission feature is not secure.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @returns {Promise<string>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND NOT EXISTS (
-      SELECT NULL
-      FROM submission_feature_security sfs
-      WHERE sfs.submission_feature_id = ss.submission_feature_id
-    )
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key}
-    RETURNING ss.value;`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `submissionFeature is secure or matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionFeatureRepository->getSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
-  }
-
-  /**
-   * Retrieves submission feature (artifact) key from data column key value pair. Skips security checks.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @returns {Promise<string>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getAdminSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key};`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionFeatureRepository->getAdminSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
   }
 
   /**

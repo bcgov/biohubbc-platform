@@ -15,6 +15,7 @@ import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketStatusService } from './ticket-status-service';
 import { TicketSystemUserService } from './ticket-system-user-service';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 export class TicketService extends DBService {
   teamService: TeamService;
@@ -25,6 +26,7 @@ export class TicketService extends DBService {
   ticketReferenceService: TicketReferenceService;
   dataRequestService: DataRequestService;
   ticketSystemUserService: TicketSystemUserService;
+  submissionUploadService: SubmissionUploadService;
 
   /**
    * Creates an instance of TicketService.
@@ -42,6 +44,7 @@ export class TicketService extends DBService {
     this.ticketReferenceService = new TicketReferenceService(connection);
     this.dataRequestService = new DataRequestService(connection);
     this.ticketSystemUserService = new TicketSystemUserService(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
   }
 
   /**
@@ -100,15 +103,17 @@ export class TicketService extends DBService {
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
     // Read all timeline/relationship collections in parallel to keep detail view latency predictable.
-    const [ticket, statuses, comments, artifacts, references, dataRequests, ticketSystemUsers] = await Promise.all([
-      this.ticketRepository.getTicketById(ticketId),
-      this.ticketStatusService.getTicketStatus(ticketId),
-      this.ticketCommentService.getTicketComments(ticketId),
-      this.ticketArtifactService.getTicketArtifacts(ticketId),
-      this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
-      this.dataRequestService.findDataRequestsByTicketId(ticketId),
-      this.ticketSystemUserService.getActiveTicketSystemUsersByTicketId(ticketId)
-    ]);
+    const [ticket, statuses, comments, artifacts, references, dataRequests, submissionUploads, ticketSystemUsers] =
+      await Promise.all([
+        this.ticketRepository.getTicketById(ticketId),
+        this.ticketStatusService.getTicketStatus(ticketId),
+        this.ticketCommentService.getTicketComments(ticketId),
+        this.ticketArtifactService.getTicketArtifacts(ticketId),
+        this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
+        this.dataRequestService.findDataRequestsByTicketId(ticketId),
+        this.submissionUploadService.findSubmissionUploadsByTicketId(ticketId),
+        this.ticketSystemUserService.getActiveTicketSystemUsersByTicketId(ticketId)
+      ]);
 
     return {
       ...ticket,
@@ -117,6 +122,7 @@ export class TicketService extends DBService {
       artifacts,
       references,
       data_requests: dataRequests,
+      submission_uploads: submissionUploads,
       ticket_system_users: ticketSystemUsers
     };
   }

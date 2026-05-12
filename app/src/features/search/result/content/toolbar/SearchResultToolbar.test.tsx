@@ -1,6 +1,7 @@
 import { cleanup, fireEvent } from '@testing-library/react';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { render } from 'test-helpers/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 import { SearchResultToolbar } from './SearchResultToolbar';
 
@@ -16,61 +17,54 @@ vi.mock('components/toggle-button/ToggleButtons', () => ({
   ToggleButtons: () => <div data-testid="toggle-buttons" />
 }));
 
+vi.mock('hooks/useAuthStateContext');
+
+const mockUseAuthStateContext = useAuthStateContext as Mock;
+
 const defaultProps = {
   view: SEARCH_RESULT_OPTION_VIEW.LIST,
   onViewChange: vi.fn(),
   sortOptions: [{ label: 'Relevance', value: 'relevancy_score', direction: 'desc' as const }],
   activeSort: 'relevancy_score',
   onSortChange: vi.fn(),
-  handleAddAllToCart: vi.fn(),
-  handleDownloadAll: vi.fn()
+  onAddAllToCart: vi.fn(),
+  onCreateDownloadClick: vi.fn()
 };
 
 describe('SearchResultToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders Download All button alongside Add All to Cart', () => {
+  it('renders Create Download button alongside Add All to Cart for authenticated users', () => {
     const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
 
-    expect(getByRole('button', { name: /download all/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
     expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
   });
 
-  it('disables Download All button when isDownloading is true', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} isDownloading={true} />);
+  it('hides the Create Download button for anonymous users', () => {
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
 
-    expect(getByRole('button', { name: /download all/i })).toBeDisabled();
+    const { queryByRole, getByRole } = render(<SearchResultToolbar {...defaultProps} />);
+
+    expect(queryByRole('button', { name: /create download/i })).not.toBeInTheDocument();
+    expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
   });
 
-  it('enables Download All button when isDownloading is not provided', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
-
-    expect(getByRole('button', { name: /download all/i })).not.toBeDisabled();
-  });
-
-  it('calls handleDownloadAll on click', () => {
-    const handleDownloadAll = vi.fn();
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} />);
-
-    fireEvent.click(getByRole('button', { name: /download all/i }));
-
-    expect(handleDownloadAll).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call handleDownloadAll when disabled', () => {
-    const handleDownloadAll = vi.fn();
+  it('calls onCreateDownloadClick on click', () => {
+    const onCreateDownloadClick = vi.fn();
     const { getByRole } = render(
-      <SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} isDownloading={true} />
+      <SearchResultToolbar {...defaultProps} onCreateDownloadClick={onCreateDownloadClick} />
     );
 
-    fireEvent.click(getByRole('button', { name: /download all/i }));
+    fireEvent.click(getByRole('button', { name: /create download/i }));
 
-    expect(handleDownloadAll).not.toHaveBeenCalled();
+    expect(onCreateDownloadClick).toHaveBeenCalledTimes(1);
   });
 });

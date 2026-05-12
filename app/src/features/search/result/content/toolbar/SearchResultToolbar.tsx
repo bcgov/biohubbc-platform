@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Button, Stack } from '@mui/material';
 import { SortButton } from 'components/button/SortButton';
 import { ToggleButtonView, ToggleButtons } from 'components/toggle-button/ToggleButtons';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 
 interface SortOption {
@@ -18,9 +19,9 @@ interface SearchResultToolbarProps {
   activeSort: string;
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
   viewOptions?: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[];
-  handleAddAllToCart: () => void;
-  handleDownloadAll: () => void;
-  isDownloading?: boolean;
+  onAddAllToCart: () => void;
+  onCreateDownloadClick: () => void;
+  isCreateDownloadDisabled?: boolean;
 }
 
 export const SearchResultToolbar = ({
@@ -30,10 +31,14 @@ export const SearchResultToolbar = ({
   activeSort,
   onSortChange,
   viewOptions,
-  handleAddAllToCart,
-  handleDownloadAll,
-  isDownloading
+  onAddAllToCart,
+  onCreateDownloadClick,
+  isCreateDownloadDisabled
 }: SearchResultToolbarProps) => {
+  // Create Download requires authentication — anonymous downloads are deprecated and will be
+  // re-introduced via curated download packages.
+  const { auth } = useAuthStateContext();
+
   const defaultViews: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[] = [
     { value: SEARCH_RESULT_OPTION_VIEW.TABLE, label: 'Table' },
     { value: SEARCH_RESULT_OPTION_VIEW.LIST, label: 'List' }
@@ -67,19 +72,21 @@ export const SearchResultToolbar = ({
 
       {/* Right: Actions + View */}
       <Stack direction="row" alignItems="center" spacing={1}>
+        {auth.isAuthenticated && (
+          <Button
+            size="small"
+            color="primary"
+            onClick={onCreateDownloadClick}
+            disabled={isCreateDownloadDisabled}
+            startIcon={<Icon path={mdiDownload} size={0.8} />}
+            sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+            Create Download
+          </Button>
+        )}
         <Button
           size="small"
           color="primary"
-          onClick={handleDownloadAll}
-          disabled={isDownloading}
-          startIcon={<Icon path={mdiDownload} size={0.8} />}
-          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-          Download All
-        </Button>
-        <Button
-          size="small"
-          color="primary"
-          onClick={handleAddAllToCart}
+          onClick={onAddAllToCart}
           startIcon={<Icon path={mdiPlus} size={0.8} />}
           sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
           Add All to Cart

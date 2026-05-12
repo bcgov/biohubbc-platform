@@ -1,3 +1,5 @@
+import { getNumberEnv } from '../utils/env-utils';
+
 export const SIGNED_URL_EXPIRY_DOWNLOAD = 432000; // 5 days
 
 /**
@@ -12,4 +14,4 @@ export const DEFAULT_MAX_PART_SIZE_BYTES = '524288000';
  * Tunable via env var so ops can adjust memory pressure vs throughput without
  * a code change. Larger = fewer round trips but higher peak heap per batch.
  */
-export const DOWNLOAD_FEATURE_BATCH_SIZE = Number(process.env.DOWNLOAD_FEATURE_BATCH_SIZE ?? 5000);
+export const DOWNLOAD_FEATURE_BATCH_SIZE = getNumberEnv('DOWNLOAD_FEATURE_BATCH_SIZE', 5000);
