@@ -2,6 +2,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import {
+  IUpdateSubmissionUploadReviewStatusRequest,
   SubmissionUploadReviewScope,
   SubmissionUploadReviewTaskStatus,
   TicketSubmissionUploadResponse,
@@ -9,7 +10,7 @@ import {
 } from 'interfaces/useTicketsApi.interface';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 
-type SubmissionUploadFinalDecision = 'approved' | 'denied';
+type SubmissionUploadReviewStatusUpdate = IUpdateSubmissionUploadReviewStatusRequest['status'];
 
 /**
  * Submission upload review handlers for the ticket timeline.
@@ -22,111 +23,189 @@ export const useTicketTimelineUploadActions = () => {
   const { ticketDataLoader } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
 
-  const patchTicketUpload = (
+  /**
+   * Replaces the cached final review status for one upload after the backend accepts or denies it.
+   * This is only used for the upload-level decision row and intentionally leaves scoped review tasks unchanged.
+   *
+   * @param {string} submissionUploadId Submission upload being updated in the ticket cache.
+   * @param {TicketSubmissionUploadResponse['review_status']} reviewStatus Backend-confirmed upload review status.
+   * @returns {void}
+   */
+  const setCachedUploadReviewStatus = (
     submissionUploadId: string,
-    patch: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
-  ) => {
+    reviewStatus: TicketSubmissionUploadResponse['review_status']
+  ): void => {
     const latestTicket = ticketDataLoader.data;
 
     if (!latestTicket) {
       return;
     }
 
-    const submissionUploads = latestTicket.submission_uploads ?? [];
-
     ticketDataLoader.setData({
       ...latestTicket,
-      submission_uploads: submissionUploads.map((upload) =>
-        upload.submission_upload_id === submissionUploadId ? patch(upload) : upload
+      submission_uploads: latestTicket.submission_uploads.map((upload) =>
+        upload.submission_upload_id === submissionUploadId ? { ...upload, review_status: reviewStatus } : upload
       )
     });
   };
 
-  const patchTicketUploadReview = (
-    upload: TicketSubmissionUploadResponse,
+  /**
+   * Inserts or replaces one scoped upload review in the cached ticket after a create or update response.
+   * The backend response is treated as the source of truth, so this does not derive fields from stale row state.
+   *
+   * @param {TicketSubmissionUploadReviewResponse} review Backend-confirmed scoped review record.
+   * @returns {void}
+   */
+  const setCachedUploadReview = (
     review: TicketSubmissionUploadReviewResponse
-  ) => {
-    patchTicketUpload(upload.submission_upload_id, (currentUpload) => {
-      const existingReview = currentUpload.reviews.find(
-        (item) => item.submission_upload_review_id === review.submission_upload_review_id
-      );
+  ): void => {
+    const latestTicket = ticketDataLoader.data;
 
-      return {
-        ...currentUpload,
-        reviews: existingReview
-          ? currentUpload.reviews.map((item) =>
-              item.submission_upload_review_id === review.submission_upload_review_id ? review : item
-            )
-          : [...currentUpload.reviews, review]
-      };
+    if (!latestTicket) {
+      return;
+    }
+
+    ticketDataLoader.setData({
+      ...latestTicket,
+      submission_uploads: latestTicket.submission_uploads.map((upload) => {
+        if (upload.submission_upload_id !== review.submission_upload_id) {
+          return upload;
+        }
+
+        const reviewExists = upload.reviews.some(
+          (item) => item.submission_upload_review_id === review.submission_upload_review_id
+        );
+
+        return {
+          ...upload,
+          reviews: reviewExists
+            ? upload.reviews.map((item) =>
+                item.submission_upload_review_id === review.submission_upload_review_id ? review : item
+              )
+            : [...upload.reviews, review]
+        };
+      })
     });
   };
 
+  /**
+   * Shows the API error from a failed upload action in the shared ticket snackbar.
+   * All upload handlers use the same failure path so the UI reports backend validation and permission errors consistently.
+   *
+   * @param {unknown} error Error thrown by the tickets API client.
+   * @returns {void}
+   */
+  const showUploadActionError = (error: unknown): void => {
+    const apiError = error as APIError;
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: apiError.message
+    });
+  };
+
+  /**
+   * Persists an upload-level acceptance or denial and updates the cached upload with the backend response.
+   * Use this only from the confirmation dialog callback, after the reviewer has confirmed the final decision.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload receiving the final review decision.
+   * @param {SubmissionUploadReviewStatusUpdate} nextStatus Review status to persist.
+   * @returns {Promise<void>} Resolves after the backend response has been reflected in local ticket state.
+   */
   const handleSubmissionUploadReviewStatusUpdate = async (
     upload: TicketSubmissionUploadResponse,
-    nextStatus: SubmissionUploadFinalDecision
-  ) => {
+    nextStatus: SubmissionUploadReviewStatusUpdate
+  ): Promise<void> => {
     try {
-      await api.tickets.updateSubmissionUploadReviewStatus(upload.submission_uuid, upload.submission_upload_id, {
-        status: nextStatus
-      });
+      const updatedReviewStatus = await api.tickets.updateSubmissionUploadReviewStatus(
+        upload.submission_uuid,
+        upload.submission_upload_id,
+        {
+          status: nextStatus
+        }
+      );
 
-      patchTicketUpload(upload.submission_upload_id, (currentUpload) => ({
-        ...currentUpload,
-        review_status: nextStatus,
-        upload_status: nextStatus === 'approved' ? 'indexed' : currentUpload.upload_status
-      }));
+      setCachedUploadReviewStatus(upload.submission_upload_id, updatedReviewStatus.status);
     } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
+      showUploadActionError(error);
     }
   };
 
-  const handleSubmissionUploadReviewUpdate = async (
+  /**
+   * Creates a scoped upload review task and optionally moves it to the selected status.
+   * Use this from review rows that do not already have a review record; existing rows should call the update handler.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
+   * @param {SubmissionUploadReviewScope} scope Review scope being requested.
+   * @param {SubmissionUploadReviewTaskStatus} nextStatus Status selected by the reviewer after creating the task.
+   * @returns {Promise<void>} Resolves after the created or updated review is reflected in local ticket state.
+   */
+  const handleRequestSubmissionUploadReview = async (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
     nextStatus: SubmissionUploadReviewTaskStatus
-  ) => {
+  ): Promise<void> => {
     try {
-      const existingReview = upload.reviews.find((review) => review.scope === scope);
-      let updatedReview: TicketSubmissionUploadReviewResponse;
+      const insertedReview = await api.tickets.insertSubmissionUploadReview(
+        upload.submission_uuid,
+        upload.submission_upload_id,
+        { scope }
+      );
+      const updatedReview =
+        nextStatus === insertedReview.status
+          ? insertedReview
+          : await api.tickets.updateSubmissionUploadReview(
+              upload.submission_uuid,
+              upload.submission_upload_id,
+              insertedReview.submission_upload_review_id,
+              { status: nextStatus }
+            );
 
-      if (existingReview) {
-        updatedReview = await api.tickets.updateSubmissionUploadReview(
-          upload.submission_upload_id,
-          existingReview.submission_upload_review_id,
-          { status: nextStatus }
-        );
-      } else {
-        const insertedReview = await api.tickets.insertSubmissionUploadReview(upload.submission_upload_id, { scope });
-
-        updatedReview =
-          nextStatus === insertedReview.status
-            ? insertedReview
-            : await api.tickets.updateSubmissionUploadReview(
-                upload.submission_upload_id,
-                insertedReview.submission_upload_review_id,
-                { status: nextStatus }
-              );
-      }
-
-      patchTicketUploadReview(upload, updatedReview);
+      setCachedUploadReview(updatedReview);
     } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
+      showUploadActionError(error);
     }
   };
 
+  /**
+   * Updates the status of an existing scoped upload review task.
+   * Use this from review rows that already have a backend review record and therefore know the review id to patch.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
+   * @param {TicketSubmissionUploadReviewResponse} review Existing review task being updated.
+   * @param {SubmissionUploadReviewTaskStatus} nextStatus Status selected by the reviewer.
+   * @returns {Promise<void>} Resolves after the backend response has replaced the cached review.
+   */
+  const handleUpdateSubmissionUploadReview = async (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse,
+    nextStatus: SubmissionUploadReviewTaskStatus
+  ): Promise<void> => {
+    try {
+      const updatedReview = await api.tickets.updateSubmissionUploadReview(
+        upload.submission_uuid,
+        upload.submission_upload_id,
+        review.submission_upload_review_id,
+        { status: nextStatus }
+      );
+
+      setCachedUploadReview(updatedReview);
+    } catch (error) {
+      showUploadActionError(error);
+    }
+  };
+
+  /**
+   * Opens the confirmation dialog for accepting or denying a submission upload.
+   * The dialog callback is the only place that calls the final decision handler so accidental button clicks do not persist.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload receiving the final review decision.
+   * @param {Exclude<SubmissionUploadReviewStatusUpdate, 'submitted'>} nextStatus Final status that will be persisted if confirmed.
+   * @returns {void}
+   */
   const handleConfirmSubmissionUploadReviewStatusUpdate = (
     upload: TicketSubmissionUploadResponse,
-    nextStatus: SubmissionUploadFinalDecision
-  ) => {
+    nextStatus: Exclude<SubmissionUploadReviewStatusUpdate, 'submitted'>
+  ): void => {
     const isApproval = nextStatus === 'approved';
 
     openConfirmationDialog({
@@ -141,8 +220,28 @@ export const useTicketTimelineUploadActions = () => {
     });
   };
 
+  /**
+   * Opens the confirmation dialog for clearing an accepted or rejected submission upload decision.
+   * Confirming writes the backend `submitted` status, which returns the upload to the no-decision review state.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload whose final decision should be reset.
+   * @returns {void}
+   */
+  const handleConfirmSubmissionUploadReviewStatusReset = (upload: TicketSubmissionUploadResponse): void => {
+    openConfirmationDialog({
+      dialogTitle: 'Confirm Reset',
+      dialogText: 'Are you sure you want to reset this submission upload decision?',
+      yesButtonLabel: 'Reset',
+      onConfirm: async () => {
+        await handleSubmissionUploadReviewStatusUpdate(upload, 'submitted');
+      }
+    });
+  };
+
   return {
-    handleSubmissionUploadReviewUpdate,
-    handleConfirmSubmissionUploadReviewStatusUpdate
+    handleRequestSubmissionUploadReview,
+    handleUpdateSubmissionUploadReview,
+    handleConfirmSubmissionUploadReviewStatusUpdate,
+    handleConfirmSubmissionUploadReviewStatusReset
   };
 };

@@ -47,8 +47,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
   const {
-    handleSubmissionUploadReviewUpdate,
-    handleConfirmSubmissionUploadReviewStatusUpdate
+    handleRequestSubmissionUploadReview,
+    handleUpdateSubmissionUploadReview,
+    handleConfirmSubmissionUploadReviewStatusUpdate,
+    handleConfirmSubmissionUploadReviewStatusReset
   } = useTicketTimelineUploadActions();
 
   return (
@@ -64,8 +66,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onViewFinalizedPolicy={handleOpenViewPolicyDialog}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
-        onUpdateSubmissionUploadReview={handleSubmissionUploadReviewUpdate}
+        onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
+        onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
         onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
+        onConfirmSubmissionUploadReviewStatusReset={handleConfirmSubmissionUploadReviewStatusReset}
       />
 
       {selectedPolicy && (

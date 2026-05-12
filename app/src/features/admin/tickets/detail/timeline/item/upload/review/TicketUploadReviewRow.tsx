@@ -17,19 +17,19 @@ import { ITicketUploadReviewRowProps } from '../TicketUploadTimelineItem.interfa
  * @return {*}
  */
 export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
-  const { label, scope, upload, onUpdateReview } = props;
+  const { label, scope, upload, onRequestReview, onUpdateReview } = props;
   const navigate = useNavigate();
   const review = upload.reviews.find((item) => item.scope === scope);
   const reviewStatus = review?.status ?? 'requested';
-  const primaryLabel =
-    reviewStatus === 'requested' ? 'Open' : SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS[reviewStatus];
-  let reviewButtonColor: 'primary' | 'success' | undefined;
 
-  if (reviewStatus === 'requested') {
-    reviewButtonColor = 'primary';
-  } else if (reviewStatus === 'completed') {
-    reviewButtonColor = 'success';
-  }
+  const getReviewStatusLabel = (status: SubmissionUploadReviewTaskStatus) =>
+    status === 'requested' ? 'Open' : SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS[status];
+
+  const reviewButtonColorByStatus: Partial<Record<SubmissionUploadReviewTaskStatus, 'primary' | 'success'>> = {
+    requested: 'primary',
+    completed: 'success'
+  };
+  const reviewButtonColor = reviewButtonColorByStatus[reviewStatus];
 
   return (
     <Box
@@ -50,7 +50,7 @@ export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
       {review ? (
         <DropdownButtonGroup
           value={reviewStatus}
-          primaryLabel={primaryLabel}
+          primaryLabel={getReviewStatusLabel(reviewStatus)}
           itemGroups={[{ groupId: `${scope}-review-status`, items: SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_OPTIONS }]}
           size="small"
           variant="contained"
@@ -61,7 +61,7 @@ export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
               `/admin/submission/${upload.submission_uuid}/upload/${upload.submission_upload_id}/review/${review.submission_upload_review_id}`
             )
           }
-          onSelect={(value) => onUpdateReview(upload, scope, value as SubmissionUploadReviewTaskStatus)}
+          onSelect={(value) => onUpdateReview(upload, review, value as SubmissionUploadReviewTaskStatus)}
         />
       ) : (
         <DropdownButtonGroup
@@ -71,7 +71,7 @@ export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
           size="small"
           variant="contained"
           sx={SUBMISSION_UPLOAD_REVIEW_ACTION_BUTTON_SX}
-          onSelect={(value) => onUpdateReview(upload, scope, value as SubmissionUploadReviewTaskStatus)}
+          onSelect={(value) => onRequestReview(upload, scope, value as SubmissionUploadReviewTaskStatus)}
         />
       )}
     </Box>

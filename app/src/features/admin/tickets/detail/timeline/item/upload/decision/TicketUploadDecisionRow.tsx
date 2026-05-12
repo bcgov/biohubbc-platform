@@ -15,7 +15,7 @@ import { ITicketUploadDecisionRowProps } from '../TicketUploadTimelineItem.inter
  * @return {*}
  */
 export const TicketUploadDecisionRow = (props: ITicketUploadDecisionRowProps) => {
-  const { upload, onAccept, onReject } = props;
+  const { upload, onAccept, onReject, onResetDecision } = props;
   let finalDecisionButtonColor: 'success' | 'error' | undefined;
 
   if (upload.review_status === 'approved') {
@@ -56,7 +56,7 @@ export const TicketUploadDecisionRow = (props: ITicketUploadDecisionRowProps) =>
           }}
         />
       ) : (
-        <Button size="small" variant="contained" color={finalDecisionButtonColor}>
+        <Button size="small" variant="contained" color={finalDecisionButtonColor} onClick={() => onResetDecision(upload)}>
           {SUBMISSION_UPLOAD_REVIEW_STATUS_LABELS[upload.review_status]}
         </Button>
       )}

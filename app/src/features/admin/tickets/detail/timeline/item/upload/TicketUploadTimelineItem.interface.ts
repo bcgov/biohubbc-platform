@@ -1,28 +1,40 @@
 import {
   SubmissionUploadReviewScope,
   SubmissionUploadReviewTaskStatus,
-  TicketSubmissionUploadResponse
+  TicketSubmissionUploadResponse,
+  TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
 
 export interface ITicketUploadTimelineItemProps {
   upload: TicketSubmissionUploadResponse;
   dateLabel: string;
-  onUpdateReview: (
+  onRequestReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
     status: SubmissionUploadReviewTaskStatus
   ) => void;
+  onUpdateReview: (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse,
+    status: SubmissionUploadReviewTaskStatus
+  ) => void;
   onAccept: (upload: TicketSubmissionUploadResponse) => void;
   onReject: (upload: TicketSubmissionUploadResponse) => void;
+  onResetDecision: (upload: TicketSubmissionUploadResponse) => void;
 }
 
 export interface ITicketUploadReviewRowProps {
   label: string;
   scope: SubmissionUploadReviewScope;
   upload: TicketSubmissionUploadResponse;
-  onUpdateReview: (
+  onRequestReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
+    status: SubmissionUploadReviewTaskStatus
+  ) => void;
+  onUpdateReview: (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse,
     status: SubmissionUploadReviewTaskStatus
   ) => void;
 }
@@ -35,4 +47,5 @@ export interface ITicketUploadDecisionRowProps {
   upload: TicketSubmissionUploadResponse;
   onAccept: (upload: TicketSubmissionUploadResponse) => void;
   onReject: (upload: TicketSubmissionUploadResponse) => void;
+  onResetDecision: (upload: TicketSubmissionUploadResponse) => void;
 }

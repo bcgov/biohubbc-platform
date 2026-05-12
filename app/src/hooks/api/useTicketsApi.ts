@@ -9,6 +9,7 @@ import {
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
+  ISubmissionUploadReviewStatusResponse,
   ITicketSystemUser,
   ITicket,
   ITicketArtifact,
@@ -26,7 +27,6 @@ import {
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
-import { normalizeExtendedTicket } from 'utils/ticket';
 
 /**
  * Returns a set of supported api methods for working with tickets.
@@ -59,7 +59,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
     const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
 
-    return normalizeExtendedTicket(data);
+    return data;
   };
 
   /**
@@ -211,31 +211,38 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @param {string} submissionUuid
    * @param {string} submissionUploadId
    * @param {IUpdateSubmissionUploadReviewStatusRequest} payload
-   * @return {Promise<void>}
+   * @return {Promise<ISubmissionUploadReviewStatusResponse>}
    */
   const updateSubmissionUploadReviewStatus = async (
     submissionUuid: string,
     submissionUploadId: string,
     payload: IUpdateSubmissionUploadReviewStatusRequest
-  ): Promise<void> => {
-    await axios.patch(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`, payload);
+  ): Promise<ISubmissionUploadReviewStatusResponse> => {
+    const { data } = await axios.patch<ISubmissionUploadReviewStatusResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`,
+      payload
+    );
+
+    return data;
   };
 
   /**
    * Update a scoped submission upload review task.
    *
+   * @param {string} submissionUuid
    * @param {string} submissionUploadId
    * @param {string} submissionUploadReviewId
    * @param {IUpdateSubmissionUploadReviewRequest} payload
    * @return {Promise<TicketSubmissionUploadReviewResponse>}
    */
   const updateSubmissionUploadReview = async (
+    submissionUuid: string,
     submissionUploadId: string,
     submissionUploadReviewId: string,
     payload: IUpdateSubmissionUploadReviewRequest
   ): Promise<TicketSubmissionUploadReviewResponse> => {
     const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(
-      `/api/administrative/submission-upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
       payload
     );
 
@@ -245,16 +252,18 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Create a scoped submission upload review task.
    *
+   * @param {string} submissionUuid
    * @param {string} submissionUploadId
    * @param {ICreateSubmissionUploadReviewRequest} payload
    * @return {Promise<TicketSubmissionUploadReviewResponse>}
    */
   const insertSubmissionUploadReview = async (
+    submissionUuid: string,
     submissionUploadId: string,
     payload: ICreateSubmissionUploadReviewRequest
   ): Promise<TicketSubmissionUploadReviewResponse> => {
     const { data } = await axios.post<TicketSubmissionUploadReviewResponse>(
-      `/api/administrative/submission-upload/${submissionUploadId}/review`,
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`,
       payload
     );
 
@@ -312,7 +321,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
     const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
 
-    return normalizeExtendedTicket(data);
+    return data;
   };
 
   /**

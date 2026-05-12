@@ -85,34 +85,6 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(apiTicket);
   });
 
-  it('getTicketForAdmin defaults missing extended ticket collections', async () => {
-    const apiTicket = {
-      ticket_id: '11111111-1111-1111-1111-111111111111',
-      ticket_slug: '04900001',
-      subject: 'Test ticket',
-      description: null,
-      team_id: '22222222-2222-2222-2222-222222222222',
-      create_date: '2026-02-25T00:00:00.000Z',
-      priority: 'medium',
-      status: 'open'
-    } as ITicketExtended;
-
-    mock.onGet(`/api/administrative/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
-
-    const result = await useTicketsApi(axios).getTicketForAdmin(apiTicket.ticket_id);
-
-    expect(result).toEqual({
-      ...apiTicket,
-      statuses: [],
-      comments: [],
-      artifacts: [],
-      references: [],
-      data_requests: [],
-      submission_uploads: [],
-      ticket_system_users: []
-    });
-  });
-
   it('createTicket posts payload and returns ticket', async () => {
     const payload: ICreateTicketRequest = {
       subject: 'New ticket',
@@ -254,17 +226,23 @@ describe('useTicketsApi', () => {
     const submissionUuid = '11111111-1111-1111-1111-111111111111';
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const payload = { status: 'approved' as const };
+    const response = {
+      submission_upload_status_id: 12,
+      submission_upload_id: submissionUploadId,
+      status: 'approved' as const
+    };
 
     mock
       .onPatch(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`, payload)
-      .reply(204);
+      .reply(200, response);
 
     await expect(
       useTicketsApi(axios).updateSubmissionUploadReviewStatus(submissionUuid, submissionUploadId, payload)
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(response);
   });
 
   it('insertSubmissionUploadReview posts a scoped upload review task', async () => {
+    const submissionUuid = '11111111-1111-1111-1111-111111111111';
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const payload = { scope: 'security' as const };
     const response: TicketSubmissionUploadReviewResponse = {
@@ -275,14 +253,17 @@ describe('useTicketsApi', () => {
       requested_by: 7
     };
 
-    mock.onPost(`/api/administrative/submission-upload/${submissionUploadId}/review`, payload).reply(200, response);
+    mock
+      .onPost(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`, payload)
+      .reply(201, response);
 
-    const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionUploadId, payload);
+    const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionUuid, submissionUploadId, payload);
 
     expect(result).toEqual(response);
   });
 
   it('updateSubmissionUploadReview patches a scoped upload review task', async () => {
+    const submissionUuid = '11111111-1111-1111-1111-111111111111';
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const submissionUploadReviewId = '11111111-1111-4111-8111-111111111111';
     const payload = { status: 'completed' as const };
@@ -296,12 +277,13 @@ describe('useTicketsApi', () => {
 
     mock
       .onPatch(
-        `/api/administrative/submission-upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+        `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
         payload
       )
       .reply(200, response);
 
     const result = await useTicketsApi(axios).updateSubmissionUploadReview(
+      submissionUuid,
       submissionUploadId,
       submissionUploadReviewId,
       payload
@@ -405,34 +387,6 @@ describe('useTicketsApi', () => {
     const result = await useTicketsApi(axios).getTicketForUser(ticketId);
 
     expect(result).toEqual(apiTicket);
-  });
-
-  it('getTicketForUser defaults missing extended ticket collections', async () => {
-    const apiTicket = {
-      ticket_id: '11111111-1111-1111-1111-111111111111',
-      ticket_slug: '04900001',
-      subject: 'Test ticket',
-      description: null,
-      team_id: '22222222-2222-2222-2222-222222222222',
-      create_date: '2026-02-25T00:00:00.000Z',
-      priority: 'medium',
-      status: 'open'
-    } as ITicketExtended;
-
-    mock.onGet(`/api/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
-
-    const result = await useTicketsApi(axios).getTicketForUser(apiTicket.ticket_id);
-
-    expect(result).toEqual({
-      ...apiTicket,
-      statuses: [],
-      comments: [],
-      artifacts: [],
-      references: [],
-      data_requests: [],
-      submission_uploads: [],
-      ticket_system_users: []
-    });
   });
 
   it('createTicketSystemUsers posts payload and returns ticket system users', async () => {

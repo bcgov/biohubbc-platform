@@ -12,7 +12,8 @@ import {
   ITicketExtended,
   SubmissionUploadReviewScope,
   SubmissionUploadReviewTaskStatus,
-  TicketSubmissionUploadResponse
+  TicketSubmissionUploadResponse,
+  TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
 import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
@@ -32,15 +33,21 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
-  onUpdateSubmissionUploadReview: (
+  onRequestSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
+    status: SubmissionUploadReviewTaskStatus
+  ) => void;
+  onUpdateSubmissionUploadReview: (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse,
     status: SubmissionUploadReviewTaskStatus
   ) => void;
   onConfirmSubmissionUploadReviewStatusUpdate: (
     upload: TicketSubmissionUploadResponse,
     status: 'approved' | 'denied'
   ) => void;
+  onConfirmSubmissionUploadReviewStatusReset: (upload: TicketSubmissionUploadResponse) => void;
 }
 
 /**
@@ -61,8 +68,10 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onViewFinalizedPolicy,
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
+    onRequestSubmissionUploadReview,
     onUpdateSubmissionUploadReview,
-    onConfirmSubmissionUploadReviewStatusUpdate
+    onConfirmSubmissionUploadReviewStatusUpdate,
+    onConfirmSubmissionUploadReviewStatusReset
   } = props;
 
   const timelineEvents: TimelineEvent[] = [
@@ -153,9 +162,11 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
+              onRequestReview={onRequestSubmissionUploadReview}
               onUpdateReview={onUpdateSubmissionUploadReview}
               onAccept={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
               onReject={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}
+              onResetDecision={onConfirmSubmissionUploadReviewStatusReset}
             />
           )
         };

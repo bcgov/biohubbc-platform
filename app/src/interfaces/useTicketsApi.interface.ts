@@ -16,6 +16,7 @@ export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | '
 export type SubmissionUploadReviewStatus = 'submitted' | 'approved' | 'denied' | 'deleted';
 export type SubmissionUploadReviewScope = 'validation' | 'security';
 export type SubmissionUploadReviewTaskStatus =
+  | 'pending'
   | 'requested'
   | 'in_progress'
   | 'completed'
@@ -104,10 +105,8 @@ export interface TicketSubmissionUploadReviewResponse {
 
 export interface TicketSubmissionUploadResponse {
   submission_upload_id: string;
-  submission_id: number;
   submission_uuid: string;
   upload_id: string;
-  ticket_id: string;
   create_date: string;
   submission_name: string | null;
   submission_description: string | null;
@@ -116,14 +115,14 @@ export interface TicketSubmissionUploadResponse {
   upload_status: SubmissionUploadJobStatus;
   review_status: SubmissionUploadReviewStatus;
   validation: {
-    submission_validation_id: number | null;
-    job_id: string | null;
-    status: SubmissionValidationStatus | null;
+    submission_validation_id: number;
+    job_id: string;
+    status: SubmissionValidationStatus;
     metadata: Record<string, unknown> | null;
     started_at: string | null;
     ended_at: string | null;
-    create_date: string | null;
-  };
+    create_date: string;
+  } | null;
   reviews: TicketSubmissionUploadReviewResponse[];
 }
 
@@ -179,7 +178,13 @@ export interface ITicketArtifactDownloadResponse {
 }
 
 export interface IUpdateSubmissionUploadReviewStatusRequest {
-  status: 'approved' | 'denied';
+  status: 'submitted' | 'approved' | 'denied';
+}
+
+export interface ISubmissionUploadReviewStatusResponse {
+  submission_upload_status_id: number;
+  submission_upload_id: string;
+  status: SubmissionUploadReviewStatus;
 }
 
 export interface IUpdateSubmissionUploadReviewRequest {

@@ -25,6 +25,7 @@ export const SUBMISSION_UPLOAD_REVIEW_STATUS_LABELS: Record<SubmissionUploadRevi
 };
 
 export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS: Record<SubmissionUploadReviewTaskStatus, string> = {
+  pending: 'Pending',
   requested: 'Ready for review',
   in_progress: 'In progress',
   completed: 'Completed',
@@ -34,6 +35,7 @@ export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS: Record<SubmissionUploa
 };
 
 export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_ICONS: Record<SubmissionUploadReviewTaskStatus, string> = {
+  pending: mdiCircleMedium,
   requested: mdiCircleMedium,
   in_progress: mdiProgressClock,
   completed: mdiCheck,

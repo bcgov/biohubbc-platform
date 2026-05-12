@@ -208,6 +208,18 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
       expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
     });
+
+    it('selects validation from the lateral validation alias', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('validation.validation');
+    });
   });
 
   describe('insertSubmissionUpload', () => {

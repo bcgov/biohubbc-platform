@@ -13,7 +13,7 @@ import { ITicketUploadTimelineItemProps } from './upload/TicketUploadTimelineIte
  * @return {*}
  */
 export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) => {
-  const { upload, dateLabel, onUpdateReview, onAccept, onReject } = props;
+  const { upload, dateLabel, onRequestReview, onUpdateReview, onAccept, onReject, onResetDecision } = props;
   const bodyText =
     upload.submission_comment ||
     upload.submission_description ||
@@ -28,15 +28,27 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
 
         <TicketUploadStatusRow upload={upload} />
 
-        <TicketUploadReviewRow label="Validation" scope="validation" upload={upload} onUpdateReview={onUpdateReview} />
+        <TicketUploadReviewRow
+          label="Validation"
+          scope="validation"
+          upload={upload}
+          onRequestReview={onRequestReview}
+          onUpdateReview={onUpdateReview}
+        />
         <TicketUploadReviewRow
           label="Security Review"
           scope="security"
           upload={upload}
+          onRequestReview={onRequestReview}
           onUpdateReview={onUpdateReview}
         />
 
-        <TicketUploadDecisionRow upload={upload} onAccept={onAccept} onReject={onReject} />
+        <TicketUploadDecisionRow
+          upload={upload}
+          onAccept={onAccept}
+          onReject={onReject}
+          onResetDecision={onResetDecision}
+        />
       </Box>
     </TicketTimelineItem>
   );
