@@ -303,7 +303,7 @@ describe('PolicyService', () => {
         .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
         .resolves(mockCondition);
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
 
       const result = await policyService.createPolicyWithStatements(
@@ -332,7 +332,7 @@ describe('PolicyService', () => {
       });
     });
 
-    it('should not call createScopeForPolicyStatement when no statements provided', async () => {
+    it('should not call materializeScopeForPolicyStatement when no statements provided', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Empty Policy',
@@ -341,7 +341,7 @@ describe('PolicyService', () => {
       };
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
 
       const result = await policyService.createPolicyWithStatements(
@@ -374,7 +374,7 @@ describe('PolicyService', () => {
       insertStatementStub.onCall(1).resolves(mockStatement2);
       sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
 
       await policyService.createPolicyWithStatements({ name: 'Multi Policy', description: 'Desc' } as CreatePolicy, [
@@ -412,7 +412,7 @@ describe('PolicyService', () => {
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
       sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
-      sinon.stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement').resolves('scope-1');
+      sinon.stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement').resolves('scope-1');
       const writeExpressionTreeStub = sinon
         .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
         .resolves({ expression_id: 'expr-1' });
@@ -475,7 +475,7 @@ describe('PolicyService', () => {
       sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
       const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
 
@@ -507,7 +507,7 @@ describe('PolicyService', () => {
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
       sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
       const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
 

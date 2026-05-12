@@ -1458,7 +1458,7 @@ describe('Security scope search (integration)', function () {
       // security_scope row (scope_hash match) but its anchors were deleted
       // during the orphan cleanup from the first change.
       //
-      // setupScopeChain mirrors createScopeForPolicyStatement: it checks
+      // setupScopeChain mirrors materializeScopeForPolicyStatement: it checks
       // insertSecurityScope (ON CONFLICT DO NOTHING) — if null, reuses the
       // existing scope WITHOUT recomputing anchors.
       //

@@ -350,7 +350,7 @@ export class PolicyService extends DBService {
 
     // Materialize scope records after statement identifiers exist.
     for (const stmt of createdStatements) {
-      await this.securityScopeService.createScopeForPolicyStatement(
+      await this.securityScopeService.materializeScopeForPolicyStatement(
         stmt.policy_statement_id,
         stmt.submission_feature_urn
       );

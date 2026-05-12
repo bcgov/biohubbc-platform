@@ -22,7 +22,7 @@ describe('SecurityScopeService', () => {
     sinon.restore();
   });
 
-  describe('createScopeForPolicyStatement', () => {
+  describe('materializeScopeForPolicyStatement', () => {
     const policyStatementId = '11111111-1111-1111-1111-111111111111';
     const urn = 'urn:10:telemetry:*';
     const scopeHash = 'fakehash123';
@@ -40,7 +40,7 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
-      const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
+      const result = await service.materializeScopeForPolicyStatement(policyStatementId, urn);
 
       expect(SecurityScopeService.dependencies.computeScopeHash).to.have.been.calledWith(urn);
       expect(insertStub).to.have.been.calledWith(scopeHash);
@@ -60,7 +60,7 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
-      const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
+      const result = await service.materializeScopeForPolicyStatement(policyStatementId, urn);
 
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(getStub).to.have.been.calledWith(scopeHash);
@@ -78,7 +78,7 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
-      await service.createScopeForPolicyStatement(policyStatementId, urn);
+      await service.materializeScopeForPolicyStatement(policyStatementId, urn);
 
       expect(mappingStub).to.have.been.calledOnce;
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
@@ -93,8 +93,8 @@ describe('SecurityScopeService', () => {
         .rejects(new Error('pg-boss unavailable'));
 
       try {
-        await service.createScopeForPolicyStatement(policyStatementId, urn);
-        expect.fail('expected createScopeForPolicyStatement to throw');
+        await service.materializeScopeForPolicyStatement(policyStatementId, urn);
+        expect.fail('expected materializeScopeForPolicyStatement to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss unavailable');
       }
@@ -110,8 +110,8 @@ describe('SecurityScopeService', () => {
         .rejects(new Error('pg-boss unavailable'));
 
       try {
-        await service.createScopeForPolicyStatement(policyStatementId, urn);
-        expect.fail('expected createScopeForPolicyStatement to throw');
+        await service.materializeScopeForPolicyStatement(policyStatementId, urn);
+        expect.fail('expected materializeScopeForPolicyStatement to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss unavailable');
       }
@@ -227,13 +227,171 @@ describe('SecurityScopeService', () => {
     });
   });
 
-  describe('grantTeamScopesForPolicy', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy').resolves();
+  describe('materializeStatementScopesAndTeamAccess', () => {
+    const teamId = 'team-1';
+    const policyId = 'policy-1';
+    const statementOneId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const statementTwoId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    const urnOne = 'urn:10:telemetry:*';
+    const urnTwo = 'urn:10:observation:*';
+    const scopeIdOne = '11111111-1111-1111-1111-111111111111';
+    const scopeIdTwo = '22222222-2222-2222-2222-222222222222';
 
-      await service.grantTeamScopesForPolicy('team-1', 'policy-1');
+    it('A1: materializes ALLOW statements then issues the team grant (effect gate + ordering)', async () => {
+      const getStatementsStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .resolves([
+          { policy_statement_id: statementOneId, submission_feature_urn: urnOne },
+          { policy_statement_id: statementTwoId, submission_feature_urn: urnTwo }
+        ]);
 
-      expect(stub).to.have.been.calledOnceWith('team-1', 'policy-1');
+      const computeHashStub = sinon
+        .stub(SecurityScopeService.dependencies, 'computeScopeHash')
+        .onFirstCall()
+        .returns('hash-1')
+        .onSecondCall()
+        .returns('hash-2');
+
+      const insertScopeStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertSecurityScope')
+        .onFirstCall()
+        .resolves({ security_scope_id: scopeIdOne, scope_hash: 'hash-1' })
+        .onSecondCall()
+        .resolves({ security_scope_id: scopeIdTwo, scope_hash: 'hash-2' });
+
+      const insertMappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+
+      const publishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+
+      const insertTeamGrantStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
+        .resolves();
+
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+
+      expect(getStatementsStub).to.have.been.calledOnceWith(policyId);
+      expect(computeHashStub).to.have.been.calledTwice;
+      expect(insertScopeStub).to.have.been.calledTwice;
+      expect(insertMappingStub).to.have.been.calledTwice;
+      expect(insertMappingStub.firstCall).to.have.been.calledWith(statementOneId, scopeIdOne);
+      expect(insertMappingStub.secondCall).to.have.been.calledWith(statementTwoId, scopeIdTwo);
+      expect(publishStub).to.have.been.calledTwice;
+      expect(insertTeamGrantStub).to.have.been.calledOnceWith(teamId, policyId);
+      // Materialize-then-grant ordering: every mapping insert precedes the team grant.
+      expect(insertMappingStub).to.have.been.calledBefore(insertTeamGrantStub);
+      expect(publishStub).to.have.been.calledBefore(insertTeamGrantStub);
+    });
+
+    it('A2: not approved → short-circuits before any materialization or team grant', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([]);
+
+      const insertScopeStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope');
+      const insertMappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope');
+      const publishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob');
+      const insertTeamGrantStub = sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy');
+
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+
+      expect(insertScopeStub).not.to.have.been.called;
+      expect(insertMappingStub).not.to.have.been.called;
+      expect(publishStub).not.to.have.been.called;
+      expect(insertTeamGrantStub).not.to.have.been.called;
+    });
+
+    it('A3: approved with zero ALLOW statements → same observable behavior as A2 (no team grant)', async () => {
+      // The repository returns `[]` both when the policy is not approved AND when
+      // the policy is approved but has no active ALLOW statements (the SQL filters
+      // on both gates). At the service layer the two cases are indistinguishable
+      // and both short-circuit before the team-grant insert. The integration test
+      // suite covers the SQL-layer distinction.
+      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([]);
+
+      const insertScopeStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope');
+      const insertTeamGrantStub = sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy');
+
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+
+      expect(insertScopeStub).not.to.have.been.called;
+      expect(insertTeamGrantStub).not.to.have.been.called;
+    });
+
+    it('A4: ALLOW statement URN already has a scope → existing scope reused, mapping inserted, anchor re-queued', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ policy_statement_id: statementOneId, submission_feature_urn: urnOne }]);
+
+      sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash-1');
+
+      // First insert returns null (existing scope wins the conflict).
+      sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(null);
+      const getExistingStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'getSecurityScopeByScopeHash')
+        .resolves({ security_scope_id: scopeIdOne, scope_hash: 'hash-1' });
+
+      const insertMappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      const publishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      const insertTeamGrantStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
+        .resolves();
+
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+
+      expect(getExistingStub).to.have.been.calledOnceWith('hash-1');
+      expect(insertMappingStub).to.have.been.calledOnceWith(statementOneId, scopeIdOne);
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId: scopeIdOne });
+      expect(insertTeamGrantStub).to.have.been.calledOnceWith(teamId, policyId);
+    });
+
+    it('A5: called twice with the same args → both resolve (idempotency)', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ policy_statement_id: statementOneId, submission_feature_urn: urnOne }]);
+      sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash-1');
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'insertSecurityScope')
+        .resolves({ security_scope_id: scopeIdOne, scope_hash: 'hash-1' });
+      sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy').resolves();
+
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+      await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+    });
+
+    it('A6: publish failure on the first statement aborts before the team grant runs', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([
+        { policy_statement_id: statementOneId, submission_feature_urn: urnOne },
+        { policy_statement_id: statementTwoId, submission_feature_urn: urnTwo }
+      ]);
+
+      sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash-1');
+      const insertScopeStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertSecurityScope')
+        .resolves({ security_scope_id: scopeIdOne, scope_hash: 'hash-1' });
+      sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .rejects(new Error('pg-boss unavailable'));
+      const insertTeamGrantStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
+        .resolves();
+
+      try {
+        await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+        expect.fail('expected materializeStatementScopesAndTeamAccess to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+
+      // Sequential for-await — second statement never reached, team grant never runs.
+      expect(insertScopeStub).to.have.been.calledOnce;
+      expect(insertTeamGrantStub).not.to.have.been.called;
     });
   });
 

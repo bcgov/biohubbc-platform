@@ -39,8 +39,12 @@ export class TeamPolicyService extends DBService {
 
     const teamPolicy = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
 
-    // Grant the team access to all scopes derived from this policy's statements
-    await this.securityScopeService.grantTeamScopesForPolicy(teamPolicyData.team_id, teamPolicyData.policy_id);
+    // Materialize the access cache for this (team, policy) pair: statement scopes
+    // (shared across teams) and the team's access rows that point at them.
+    await this.securityScopeService.materializeStatementScopesAndTeamAccess(
+      teamPolicyData.team_id,
+      teamPolicyData.policy_id
+    );
 
     return teamPolicy;
   }
@@ -73,10 +77,10 @@ export class TeamPolicyService extends DBService {
       )
     );
 
-    // Grant scopes only for newly created team-policy associations.
-    // Pre-existing policies already had their scopes granted on first creation.
+    // Materialize the access cache for newly created team-policy associations.
+    // Pre-existing policies already had their cache rows materialized on first creation.
     for (const policyId of policyIdsToCreate) {
-      await this.securityScopeService.grantTeamScopesForPolicy(teamId, policyId);
+      await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
     }
 
     return createdTeamPolicies;

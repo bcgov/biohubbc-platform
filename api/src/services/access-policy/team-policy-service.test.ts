@@ -33,7 +33,9 @@ describe('TeamPolicyService', () => {
 
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const grantScopesStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -67,7 +69,9 @@ describe('TeamPolicyService', () => {
         .stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId')
         .resolves([existingTeamPolicy]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const grantScopesStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -122,7 +126,9 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const grantScopesStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -174,7 +180,9 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const grantScopesStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -218,7 +226,9 @@ describe('TeamPolicyService', () => {
       ]);
 
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const grantScopesStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333'

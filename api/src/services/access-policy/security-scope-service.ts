@@ -9,12 +9,22 @@ import { AnchorBatchResult, SecurityScopeUrn } from './security-scope-service.in
 const defaultLog = getLogger('security-scope-service');
 
 /**
- * Service for managing normalized security scopes — the access model that replaces
- * the materialized team_feature cache.
+ * Service for managing the team-access scope cache — the normalized model that
+ * replaces the materialized team_feature cache.
  *
- * Orchestrates scope creation, policy-statement-to-scope mapping, team scope
- * derivation, and anchor computation triggers. Repository handles all SQL;
- * this service handles the sequencing and decision logic.
+ * The cache only describes standing access grants. It materializes lazily when a
+ * team gains access through a `team_policy` link or when a policy's status flips
+ * to `approved`. Statement creation alone never produces cache rows — a policy
+ * without a `team_policy` link is a stored filter expression, not an access grant.
+ * Non-access policies (download, data_request, security_reason) consequently
+ * leave the cache untouched until they are linked to a team and approved.
+ *
+ * Materialization order: ALLOW statements on an approved policy are materialized
+ * into `security_scope` + `policy_statement_scope` rows before the team-grant
+ * insert runs — the team-grant SQL joins through `policy_statement_scope` and
+ * requires those rows to already exist in the same connection/transaction.
+ *
+ * Repository handles all SQL; this service handles sequencing and decision logic.
  */
 export class SecurityScopeService extends DBService {
   securityScopeRepository: SecurityScopeRepository;
@@ -33,7 +43,13 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Create a security scope and policy_statement_scope mapping for a policy statement.
+   * Materialize the `security_scope` + `policy_statement_scope` rows for one
+   * policy statement and publish its anchor-computation job.
+   *
+   * Encapsulates the hash → insert-or-reuse → mapping → publish-anchor-job flow.
+   * The caller is `materializeStatementScopesAndTeamAccess`, which invokes this
+   * helper once per active ALLOW statement on an approved policy before issuing
+   * the team-access insert.
    *
    * Always publishes a background job to compute anchors — the secured subtree
    * roots that the walk-up search strategy checks against. For new scopes this
@@ -46,7 +62,7 @@ export class SecurityScopeService extends DBService {
    * @param urn The submission_feature_urn (e.g., 'urn:10:telemetry:*')
    * @returns The security_scope_id (new or existing)
    */
-  async createScopeForPolicyStatement(policyStatementId: string, urn: string): Promise<string> {
+  async materializeScopeForPolicyStatement(policyStatementId: string, urn: string): Promise<string> {
     const scopeHash = SecurityScopeService.dependencies.computeScopeHash(urn);
 
     const inserted = await this.securityScopeRepository.insertSecurityScope(scopeHash);
@@ -60,7 +76,7 @@ export class SecurityScopeService extends DBService {
       });
 
       defaultLog.info({
-        label: 'createScopeForPolicyStatement',
+        label: 'materializeScopeForPolicyStatement',
         message: 'New security scope created, anchor computation job published',
         securityScopeId: inserted.security_scope_id,
         scopeHash
@@ -81,7 +97,7 @@ export class SecurityScopeService extends DBService {
     });
 
     defaultLog.info({
-      label: 'createScopeForPolicyStatement',
+      label: 'materializeScopeForPolicyStatement',
       message: 'Existing security scope reused, anchor computation job published',
       securityScopeId: existing.security_scope_id,
       scopeHash
@@ -143,15 +159,47 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Grant a team access to all scopes derived from a specific policy.
+   * Materialize the access-cache rows for one (team, policy) pair.
    *
-   * Called when a team-policy association is created. Walks the policy's statements
-   * to find their mapped scopes and inserts team_security_scope rows.
+   * The method does two things, both required for the team's access to be
+   * usable, both named in the method name:
    *
-   * @param teamId UUID of the team
-   * @param policyId UUID of the policy being assigned to the team
+   *   1. Statement scopes — global `security_scope` + `policy_statement_scope`
+   *      rows for each active ALLOW statement on the policy. These rows are
+   *      shared across every team that links to the same policy; deduplicated
+   *      by URN hash. Anchor-computation jobs are published per scope.
+   *   2. Team access — the team-specific `team_security_scope` rows that make
+   *      the cached scopes visible to this team's authorization checks.
+   *
+   * Statement scopes are materialized first so the team-access SQL can join
+   * through `policy_statement_scope`. Statements are processed sequentially
+   * (not via `Promise.all`) so a publish-anchor-job failure aborts before any
+   * team-access rows are written.
+   *
+   * This is the lazy-materialization entry point — invoked when a `team_policy`
+   * link is created or when a policy's status flips to `approved`. Statement
+   * creation alone never produces cache rows; a policy without a `team_policy`
+   * link is a stored filter expression, not an access grant.
+   *
+   * Both access gates (`policy.status='approved'`, `policy_statement.effect='ALLOW'`)
+   * live in the SQL that returns the statement list. When the repository
+   * returns `[]` — either gate filtered everything out — the method short-circuits
+   * before writing any rows.
+   *
+   * @param teamId UUID of the team gaining access
+   * @param policyId UUID of the policy whose ALLOW statements grant the access
    */
-  async grantTeamScopesForPolicy(teamId: string, policyId: string): Promise<void> {
+  async materializeStatementScopesAndTeamAccess(teamId: string, policyId: string): Promise<void> {
+    const statements = await this.securityScopeRepository.getActiveAllowStatementsForApprovedPolicy(policyId);
+
+    if (statements.length === 0) {
+      return;
+    }
+
+    for (const statement of statements) {
+      await this.materializeScopeForPolicyStatement(statement.policy_statement_id, statement.submission_feature_urn);
+    }
+
     await this.securityScopeRepository.insertTeamSecurityScopesForPolicy(teamId, policyId);
   }
 

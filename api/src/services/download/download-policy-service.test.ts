@@ -159,7 +159,7 @@ describe('DownloadPolicyService', () => {
       // The boundary stubs: if the production service ever wires these in, these
       // assertions fail and the access-grant boundary is restored.
       const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
       const insertTeamPolicyStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
         team_policy_id: 'tp1',

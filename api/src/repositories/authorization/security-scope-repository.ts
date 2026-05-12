@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { SECURITY_SCOPE_ANCHOR_BATCH_SIZE } from '../../constants/security';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { PolicyEffect } from '../../models/policy-statement';
+import { PolicyEffect, PolicyStatementUrn } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
@@ -552,6 +552,39 @@ export class SecurityScopeRepository extends BaseRepository {
     `;
 
     await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Return the active ALLOW statements for an approved policy.
+   *
+   * The scope cache materializes lazily — when a team gains standing access through
+   * a `team_policy` link or when a policy's status flips to `approved`. Only ALLOW
+   * statements on an approved policy contribute access; DENY statements record
+   * filters but do not produce visible cache rows. Both gates (`policy.status` and
+   * `policy_statement.effect`) are enforced here so the service layer can stay thin.
+   *
+   * Returns an empty array when the policy is not approved, has no active ALLOW
+   * statements, or does not exist — callers treat `[]` as a no-op signal.
+   *
+   * @param policyId UUID of the policy
+   * @returns Array of `{ policy_statement_id, submission_feature_urn }` for active ALLOW statements
+   */
+  async getActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<PolicyStatementUrn[]> {
+    const sqlStatement = SQL`
+      SELECT ps.policy_statement_id, ps.submission_feature_urn
+      FROM policy p
+      JOIN policy_statement ps
+        ON ps.policy_id = p.policy_id
+        AND ps.effect = ${PolicyEffect.ALLOW}
+        AND ps.record_end_date IS NULL
+      WHERE p.policy_id = ${policyId}
+        AND p.status = 'approved'
+        AND p.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, PolicyStatementUrn);
+
+    return response.rows;
   }
 
   /**
