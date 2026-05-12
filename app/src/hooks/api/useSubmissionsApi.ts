@@ -6,7 +6,6 @@ import {
   ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
-  SubmissionFeatureSignedUrlPayload,
   SubmissionFilters,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -169,23 +168,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch signed URL for a submission_feature (artifact) key value pair
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} params
-   * @returns {Promise<string>} signed URL
-   */
-  const getSubmissionFeatureSignedUrl = async (params: SubmissionFeatureSignedUrlPayload): Promise<string> => {
-    const { submissionFeatureKey, submissionFeatureValue, submissionId, submissionFeatureId } = params;
-
-    const { data } = await axios.get(
-      `api/submission/${submissionId}/features/${submissionFeatureId}/signed-url?key=${submissionFeatureKey}&value=${submissionFeatureValue}`
-    );
-
-    return data;
-  };
-
-  /**
    * Initiate a new submission upload
    *
    * @param {ICreateSubmission} submission
@@ -227,7 +209,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     updateSubmissionRecord,
     getPublishedSubmissions,
     getSubmissionsForUser,
-    getSubmissionFeatureSignedUrl,
     getSubmissionUploadUrls,
     completeSubmissionUpload
   };

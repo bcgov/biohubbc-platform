@@ -183,8 +183,12 @@ describe('Security scope search (integration)', function () {
     featureTypes: string[],
     systemUserId?: number | null
   ): Promise<{ submission_feature_id: number; is_secured: boolean }[]> {
-    const results = await searchRepo.searchFeaturesByFilters({ feature_types: featureTypes }, undefined, systemUserId);
-    return results
+    const all: { submission_id: number; submission_feature_id: number; is_secured: boolean }[] = [];
+    for (const featureType of featureTypes) {
+      const results = await searchRepo.searchFeaturesByExpressionTree(featureType, undefined, undefined, systemUserId);
+      all.push(...results);
+    }
+    return all
       .filter((r) => r.submission_id === submissionId)
       .map((r) => ({
         submission_feature_id: r.submission_feature_id,
