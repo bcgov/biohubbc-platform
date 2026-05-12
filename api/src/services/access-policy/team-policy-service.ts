@@ -17,10 +17,21 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
-   * Create a new team policy record.
+   * Create a team policy record and materialize the access cache for the pair.
+   *
+   * Inserting a `team_policy` link is the trigger that lazily builds the
+   * normalized scope cache (`security_scope`, `policy_statement_scope`,
+   * `team_security_scope`) for the team. The materialization runs via
+   * `SecurityScopeService.materializeStatementScopesAndTeamAccess`, which
+   * short-circuits when the policy is not `status='approved'` or has no
+   * `ALLOW` statements — so unapproved or empty policies create the link
+   * without granting any access.
+   *
+   * If the (team, policy) link already exists, returns the existing record
+   * without re-materializing.
    *
    * @param {CreateTeamPolicy} teamPolicyData - Data required to create a new team policy.
-   * @return {Promise<TeamPolicy>} - The created team policy record.
+   * @return {Promise<TeamPolicy>} - The created (or pre-existing) team policy record.
    * @memberof TeamPolicyService
    */
   async createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
