@@ -106,6 +106,198 @@ describe('PolicyService', () => {
       expect(stub).to.have.been.calledWith('1', { name: 'Updated', description: 'Updated desc' });
       expect(result).to.eql(updatedPolicy);
     });
+
+    // C1: reviewed → approved + 2 team_policies → materialize fires once per team; rebuild not called.
+    it('materializes the access cache once per linked team on transition into approved', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'reviewed' };
+      const updatedPolicy: Policy = { ...currentPolicy, status: 'approved' };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      const result = await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
+
+      expect(updateStub).to.have.been.calledOnceWith('1', { status: 'approved' });
+      expect(materializeStub).to.have.been.calledTwice;
+      expect(materializeStub.firstCall).to.have.been.calledWith('team-1', '1');
+      expect(materializeStub.secondCall).to.have.been.calledWith('team-2', '1');
+      expect(rebuildStub).to.not.have.been.called;
+      expect(result).to.eql(updatedPolicy);
+    });
+
+    // C2: approved → reviewed + 2 team_policies → rebuild fires once per team; materialize not called.
+    it('rebuilds the access cache once per linked team on transition out of approved (→ reviewed)', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'approved' };
+      const updatedPolicy: Policy = { ...currentPolicy, status: 'reviewed' };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await policyService.updatePolicy('1', { status: 'reviewed' } as UpdatePolicy);
+
+      expect(rebuildStub).to.have.been.calledTwice;
+      expect(rebuildStub.firstCall).to.have.been.calledWith('team-1');
+      expect(rebuildStub.secondCall).to.have.been.calledWith('team-2');
+      expect(materializeStub).to.not.have.been.called;
+    });
+
+    // C3: approved → denied + 1 team_policy → rebuild fires once; materialize not called.
+    it('rebuilds the access cache once per linked team on transition out of approved (→ denied)', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'approved' };
+      const updatedPolicy: Policy = { ...currentPolicy, status: 'denied' };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      sinon
+        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
+        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await policyService.updatePolicy('1', { status: 'denied' } as UpdatePolicy);
+
+      expect(rebuildStub).to.have.been.calledOnceWith('team-1');
+      expect(materializeStub).to.not.have.been.called;
+    });
+
+    // C4: requested → reviewed + 1 team_policy → neither orchestration branch fires; getTeamPolicies still called.
+    it('skips both orchestration branches when transitioning between non-approved statuses', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'requested' };
+      const updatedPolicy: Policy = { ...currentPolicy, status: 'reviewed' };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      const getTeamPoliciesStub = sinon
+        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
+        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await policyService.updatePolicy('1', { status: 'reviewed' } as UpdatePolicy);
+
+      expect(getTeamPoliciesStub).to.have.been.calledOnceWith({ policyIds: ['1'] });
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    // C5: same-status update approved → approved short-circuits before fetching team policies.
+    it('short-circuits same-status updates without fetching team policies or touching the cache', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'approved' };
+      const updatedPolicy: Policy = { ...currentPolicy, name: 'Renamed' };
+
+      const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await policyService.updatePolicy('1', { name: 'Renamed', status: 'approved' } as UpdatePolicy);
+
+      expect(getPolicyStub).to.have.been.calledOnce;
+      expect(updateStub).to.have.been.calledOnce;
+      expect(getTeamPoliciesStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    // C6: payload without status — bypasses workflow validation entirely.
+    it('bypasses workflow validation and orchestration when status is not in the payload', async () => {
+      const updatedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Renamed',
+        description: 'desc',
+        status: 'requested'
+      };
+      const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy');
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await policyService.updatePolicy('1', { name: 'Renamed' } as UpdatePolicy);
+
+      expect(updateStub).to.have.been.calledOnceWith('1', { name: 'Renamed' });
+      expect(getPolicyStub).to.not.have.been.called;
+      expect(getTeamPoliciesStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    // C7: reviewed → approved + zero linked team_policies → neither materialize nor rebuild fires.
+    it('skips orchestration when no team policies are linked to the policy', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'reviewed' };
+      const updatedPolicy: Policy = { ...currentPolicy, status: 'approved' };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
+
+      expect(updateStub).to.have.been.calledOnce;
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    // C8: requested → approved is blocked by assertCanApproveRequest. No repo write, no team-policy fetch.
+    it('throws HTTP400 and does not write or fetch team policies when approving directly from requested', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'requested' };
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy');
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+
+      try {
+        await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
+        expect.fail('expected updatePolicy to throw');
+      } catch (err: any) {
+        expect(err.message).to.equal(`Cannot approve request while policy is 'requested'`);
+      }
+
+      expect(updateStub).to.not.have.been.called;
+      expect(getTeamPoliciesStub).to.not.have.been.called;
+    });
+
+    // C9: denied → approved is blocked by assertValidStatusTransition (denied only transitions to reviewed).
+    it('throws HTTP400 and does not write or fetch team policies when approving from denied', async () => {
+      const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'denied' };
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy');
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+
+      try {
+        await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
+        expect.fail('expected updatePolicy to throw');
+      } catch (err: any) {
+        expect(err.message).to.equal('Invalid policy status transition: denied -> approved');
+      }
+
+      expect(updateStub).to.not.have.been.called;
+      expect(getTeamPoliciesStub).to.not.have.been.called;
+    });
   });
 
   describe('deletePolicy', () => {
@@ -279,82 +471,9 @@ describe('PolicyService', () => {
   });
 
   describe('createPolicyWithStatements', () => {
-    it('should create policy, statements, and scopes for each statement', async () => {
+    // A1: New policy with 2 ALLOW statements — scope materialization NOT called; statements + conditions inserted.
+    it('does not call materializeScopeForPolicyStatement; persists statements and conditions', async () => {
       const mockPolicy: Policy = { policy_id: '1', name: 'New Policy', description: 'Desc', status: 'requested' };
-      const mockStatement: PolicyStatement = {
-        policy_statement_id: 's1',
-        policy_id: '1',
-        effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:telemetry:*'
-      };
-      const mockCondition: PolicyStatementCondition = {
-        policy_statement_condition_id: 'c1',
-        policy_statement_id: 's1',
-        operator: PolicyConditionOperator.STRING_EQUALS,
-        key: 'region',
-        value: 'north'
-      };
-
-      const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
-      const insertStatementStub = sinon
-        .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
-        .resolves(mockStatement);
-      const insertConditionStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
-        .resolves(mockCondition);
-      const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
-        .resolves('scope-1');
-
-      const result = await policyService.createPolicyWithStatements(
-        { name: 'New Policy', description: 'Desc', status: 'requested' } as CreatePolicy,
-        [
-          {
-            effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:telemetry:*',
-            conditions: [{ operator: PolicyConditionOperator.STRING_EQUALS, key: 'region', value: 'north' }]
-          }
-        ]
-      );
-
-      expect(insertPolicyStub).to.have.been.calledWith({
-        name: 'New Policy',
-        description: 'Desc',
-        status: 'requested'
-      });
-      expect(insertStatementStub).to.have.been.calledOnce;
-      expect(insertConditionStub).to.have.been.calledOnce;
-      expect(createScopeStub).to.have.been.calledOnce;
-      expect(createScopeStub).to.have.been.calledWith('s1', 'urn:*:telemetry:*');
-      expect(result).to.eql({
-        ...mockPolicy,
-        statements: [{ ...mockStatement, conditions: [mockCondition] }]
-      });
-    });
-
-    it('should not call materializeScopeForPolicyStatement when no statements provided', async () => {
-      const mockPolicy: Policy = {
-        policy_id: '1',
-        name: 'Empty Policy',
-        description: 'No statements',
-        status: 'requested'
-      };
-      sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
-      const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
-        .resolves('scope-1');
-
-      const result = await policyService.createPolicyWithStatements(
-        { name: 'Empty Policy', description: 'No statements', status: 'requested' } as CreatePolicy,
-        []
-      );
-
-      expect(createScopeStub).to.not.have.been.called;
-      expect(result).to.eql({ ...mockPolicy, statements: [] });
-    });
-
-    it('should create scopes for multiple statements', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Multi Policy', description: 'Desc', status: 'requested' };
       const mockStatement1: PolicyStatement = {
         policy_statement_id: 's1',
         policy_id: '1',
@@ -367,27 +486,63 @@ describe('PolicyService', () => {
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:10:*:*'
       };
+      const mockCondition: PolicyStatementCondition = {
+        policy_statement_condition_id: 'c1',
+        policy_statement_id: 's1',
+        operator: PolicyConditionOperator.STRING_EQUALS,
+        key: 'region',
+        value: 'north'
+      };
 
-      sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const insertStatementStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement');
       insertStatementStub.onCall(0).resolves(mockStatement1);
       insertStatementStub.onCall(1).resolves(mockStatement2);
-      sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
-      const createScopeStub = sinon
+      const insertConditionStub = sinon
+        .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
+        .resolves(mockCondition);
+      const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
-      await policyService.createPolicyWithStatements({ name: 'Multi Policy', description: 'Desc' } as CreatePolicy, [
-        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' },
-        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:10:*:*' }
-      ]);
+      const result = await policyService.createPolicyWithStatements(
+        { name: 'New Policy', description: 'Desc', status: 'requested' } as CreatePolicy,
+        [
+          {
+            effect: PolicyEffect.ALLOW,
+            submission_feature_urn: 'urn:*:telemetry:*',
+            conditions: [{ operator: PolicyConditionOperator.STRING_EQUALS, key: 'region', value: 'north' }]
+          },
+          {
+            effect: PolicyEffect.ALLOW,
+            submission_feature_urn: 'urn:10:*:*'
+          }
+        ]
+      );
 
-      expect(createScopeStub).to.have.been.calledTwice;
-      expect(createScopeStub.firstCall).to.have.been.calledWith('s1', 'urn:*:telemetry:*');
-      expect(createScopeStub.secondCall).to.have.been.calledWith('s2', 'urn:10:*:*');
+      expect(insertPolicyStub).to.have.been.calledWith({
+        name: 'New Policy',
+        description: 'Desc',
+        status: 'requested'
+      });
+      expect(insertStatementStub).to.have.been.calledTwice;
+      expect(insertConditionStub).to.have.been.calledOnce;
+      expect(materializeStub).to.not.have.been.called;
+      expect(materializeTeamAccessStub).to.not.have.been.called;
+      expect(result).to.eql({
+        ...mockPolicy,
+        statements: [
+          { ...mockStatement1, conditions: [mockCondition] },
+          { ...mockStatement2, conditions: [] }
+        ]
+      });
     });
 
-    it('should persist optional statement expressions', async () => {
+    // A2: Statement with expression — expression persisted; scope materialization NOT called.
+    it('persists statement expressions without materializing scopes', async () => {
       const mockPolicy: Policy = { policy_id: '1', name: 'Expression Policy', description: null, status: 'requested' };
       const mockStatement: PolicyStatement = {
         policy_statement_id: 's1',
@@ -412,7 +567,9 @@ describe('PolicyService', () => {
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
       sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
-      sinon.stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement').resolves('scope-1');
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
+        .resolves('scope-1');
       const writeExpressionTreeStub = sinon
         .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
         .resolves({ expression_id: 'expr-1' });
@@ -433,13 +590,49 @@ describe('PolicyService', () => {
 
       expect(writeExpressionTreeStub).to.have.been.calledOnceWith(expression);
       expect(replaceExpressionStub).to.have.been.calledOnceWith('s1', 'expr-1');
+      expect(materializeStub).to.not.have.been.called;
       expect(result.statements[0]).to.include({ ...mockStatement });
       expect(result.statements[0].expression).to.eql(expression);
+    });
+
+    // A3: Empty statements list — no statement, condition, scope, or expression work.
+    it('skips statement, condition, scope, and expression work for an empty statement list', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Empty Policy',
+        description: 'No statements',
+        status: 'requested'
+      };
+      sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      const insertStatementStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves();
+      const insertConditionStub = sinon
+        .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
+        .resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
+        .resolves('scope-1');
+      const writeExpressionTreeStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves();
+      const replaceExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .resolves();
+
+      const result = await policyService.createPolicyWithStatements(
+        { name: 'Empty Policy', description: 'No statements', status: 'requested' } as CreatePolicy,
+        []
+      );
+
+      expect(insertStatementStub).to.not.have.been.called;
+      expect(insertConditionStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(writeExpressionTreeStub).to.not.have.been.called;
+      expect(replaceExpressionStub).to.not.have.been.called;
+      expect(result).to.eql({ ...mockPolicy, statements: [] });
     });
   });
 
   describe('updatePolicyWithStatements', () => {
-    it('should clean up old scope mappings, create new scopes, and rebuild affected teams', async () => {
+    // B1: Existing stmt + new stmt + zero linked team_policies — scope materialization NOT called; cleanup runs on old IDs.
+    it('cleans up old statement scope mappings without materializing scopes (no linked teams)', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Updated Policy',
@@ -463,21 +656,16 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
-      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
-        {
-          team_policy_id: 'tp1',
-          team_id: 'team-1',
-          policy_id: '1',
-          team_name: 'Team 1',
-          policy_name: 'Policy 1'
-        }
-      ]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
       sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
-      const createScopeStub = sinon
+      const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
       const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
       const result = await policyService.updatePolicyWithStatements(
         '1',
@@ -485,42 +673,174 @@ describe('PolicyService', () => {
         [{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }]
       );
 
-      expect(createScopeStub).to.have.been.calledOnce;
-      expect(createScopeStub).to.have.been.calledWith('new-s1', 'urn:*:telemetry:*');
-      expect(cleanupStub).to.have.been.calledOnce;
-      expect(cleanupStub).to.have.been.calledWith(['old-s1'], ['team-1']);
+      expect(materializeStub).to.not.have.been.called;
+      expect(cleanupStub).to.have.been.calledOnceWith(['old-s1'], []);
+      expect(materializeTeamAccessStub).to.not.have.been.called;
       expect(result).to.eql({
         ...mockPolicy,
         statements: [{ ...newStatement, conditions: [] }]
       });
     });
 
-    it('should clean up old scope mappings and skip scope creation when updating with empty statements', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Policy', description: 'Desc', status: 'requested' };
+    // B2: Approved policy + 3 linked team_policies — team-access materialization runs once per team.
+    it('runs team-access materialization once per linked team when the policy is approved', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved Policy',
+        description: 'desc',
+        status: 'approved'
+      };
+      const newStatement: PolicyStatement = {
+        policy_statement_id: 'new-s1',
+        policy_id: '1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:*:telemetry:*'
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' },
+        { team_policy_id: 'tp3', team_id: 'team-3', policy_id: '1', team_name: 'C', policy_name: 'P' }
+      ]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
+      sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
+        .resolves('scope-1');
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, [
+        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
+      ]);
+
+      expect(materializeStub).to.not.have.been.called;
+      expect(materializeTeamAccessStub).to.have.been.calledThrice;
+      expect(materializeTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
+      expect(materializeTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
+      expect(materializeTeamAccessStub.thirdCall).to.have.been.calledWith('team-3', '1');
+    });
+
+    // B3: Approved + 0 linked teams — no team-access materialization.
+    it('skips team-access materialization when the approved policy has no linked teams', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved Policy',
+        description: 'desc',
+        status: 'approved'
+      };
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, []);
+
+      expect(materializeTeamAccessStub).to.not.have.been.called;
+    });
+
+    // B4: Non-approved (reviewed) + 2 linked teams — no team-access materialization (status gate).
+    it('skips team-access materialization when the policy is not approved', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Reviewed Policy',
+        description: 'desc',
+        status: 'reviewed'
+      };
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, []);
+
+      expect(materializeTeamAccessStub).to.not.have.been.called;
+    });
+
+    // B5: Ordering — delete old statements, then create new ones, then cleanup, then per-team materialization.
+    it('orders delete-old statements before createStatements before cleanup before team-access materialization', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved Policy',
+        description: 'desc',
+        status: 'approved'
+      };
       const existingStatements: PolicyStatement[] = [
-        { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' },
-        { policy_statement_id: 's2', policy_id: '1', effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }
+        {
+          policy_statement_id: 'old-s1',
+          policy_id: '1',
+          effect: PolicyEffect.ALLOW,
+          submission_feature_urn: 'urn:old:*:*'
+        }
       ];
+      const newStatement: PolicyStatement = {
+        policy_statement_id: 'new-s1',
+        policy_id: '1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:*:telemetry:*'
+      };
 
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
-      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
-      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
-      const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
-        .resolves('scope-1');
+      sinon
+        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
+        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      const deleteStub = sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      const insertStmtStub = sinon
+        .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
+        .resolves(newStatement);
       const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
 
-      const result = await policyService.updatePolicyWithStatements(
-        '1',
-        { name: 'Policy', description: 'Desc' } as UpdatePolicy,
-        []
-      );
+      await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, [
+        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
+      ]);
 
-      expect(createScopeStub).to.not.have.been.called;
-      expect(cleanupStub).to.have.been.calledOnce;
-      expect(cleanupStub).to.have.been.calledWith(['s1', 's2'], []);
-      expect(result).to.eql({ ...mockPolicy, statements: [] });
+      expect(deleteStub).to.have.been.calledBefore(insertStmtStub);
+      expect(insertStmtStub).to.have.been.calledBefore(cleanupStub);
+      expect(cleanupStub).to.have.been.calledBefore(materializeTeamAccessStub);
+    });
+
+    // B6: Approved + linked teams + empty replacement statement list — team-access materialization still fires once per team.
+    // This is the deliberate-revocation path: the cache rebuilds against an empty ALLOW set.
+    it('fires team-access materialization once per team when an approved policy is updated with no statements', async () => {
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved Policy',
+        description: 'desc',
+        status: 'approved'
+      };
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, []);
+
+      expect(materializeTeamAccessStub).to.have.been.calledTwice;
+      expect(materializeTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
+      expect(materializeTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
     });
   });
 });
