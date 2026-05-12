@@ -13,6 +13,7 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchRepository } from '../../repositories/search-repository';
@@ -110,7 +111,7 @@ describe('SearchRepository (integration)', function () {
 
   async function createCodesetCode(key: string, label: string, description: string | null = null): Promise<number> {
     const systemUserId = connection.systemUserId();
-    const codesetKey = `int_test_${TOKEN}_${Date.now()}_${Math.random()}`;
+    const codesetKey = `int_test_${TOKEN}_${Date.now()}_${randomUUID().slice(0, 8)}`;
 
     // Mirror createTestSubmission: ensure the SIMS contributor exists before referencing it.
     await connection.sql(SQL`
