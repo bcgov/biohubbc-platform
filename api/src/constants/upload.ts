@@ -1,3 +1,5 @@
+import { getNumberEnv } from '../utils/env-utils';
+
 /**
  * Multipart upload sizing and presign configuration.
  *
@@ -40,9 +42,7 @@ export const S3_MULTIPART_MAX_PARTS = 10000;
  * (fewer requests/round-trips), but can exceed it when constrained by S3 limits.
  * Backward compatible fallback to legacy `UPLOAD_TARGET_PARTS`.
  */
-export const UPLOAD_TARGET_PART_COUNT = Number(
-  process.env.UPLOAD_TARGET_PART_COUNT ?? process.env.UPLOAD_TARGET_PARTS ?? 10
-);
+export const UPLOAD_TARGET_PART_COUNT = getNumberEnv(['UPLOAD_TARGET_PART_COUNT', 'UPLOAD_TARGET_PARTS'], 10);
 
 /**
  * Application-level soft cap for part size during multipart planning.
@@ -52,8 +52,9 @@ export const UPLOAD_TARGET_PART_COUNT = Number(
  * larger parts to satisfy `S3_MULTIPART_MAX_PARTS` on very large uploads.
  * Backward compatible fallback to legacy `UPLOAD_DESIRED_MAX_PART_SIZE_BYTES`.
  */
-export const UPLOAD_PART_SIZE_CAP_BYTES = Number(
-  process.env.UPLOAD_PART_SIZE_CAP_BYTES ?? process.env.UPLOAD_DESIRED_MAX_PART_SIZE_BYTES ?? 100 * 1024 * 1024
+export const UPLOAD_PART_SIZE_CAP_BYTES = getNumberEnv(
+  ['UPLOAD_PART_SIZE_CAP_BYTES', 'UPLOAD_DESIRED_MAX_PART_SIZE_BYTES'],
+  100 * 1024 * 1024
 ); // prefer max ~100 MiB part size unless S3 max-part-count requires larger
 
 /**
@@ -62,8 +63,9 @@ export const UPLOAD_PART_SIZE_CAP_BYTES = Number(
  * For uploads at or below this size, planner can remain near minimum part size.
  * Above this threshold, part size increases stepwise to avoid too many tiny parts.
  */
-export const UPLOAD_PART_SIZE_SCALE_START_BYTES = Number(
-  process.env.UPLOAD_PART_SIZE_SCALE_START_BYTES ?? process.env.UPLOAD_SCALE_START_BYTES ?? 20 * 1024 * 1024
+export const UPLOAD_PART_SIZE_SCALE_START_BYTES = getNumberEnv(
+  ['UPLOAD_PART_SIZE_SCALE_START_BYTES', 'UPLOAD_SCALE_START_BYTES'],
+  20 * 1024 * 1024
 );
 
 /**
@@ -73,8 +75,9 @@ export const UPLOAD_PART_SIZE_SCALE_START_BYTES = Number(
  * - every additional 10 MiB of object size after `UPLOAD_PART_SIZE_SCALE_START_BYTES`
  *   advances one ramp step.
  */
-export const UPLOAD_PART_SIZE_SCALE_STEP_BYTES = Number(
-  process.env.UPLOAD_PART_SIZE_SCALE_STEP_BYTES ?? process.env.UPLOAD_SCALE_STEP_BYTES ?? 10 * 1024 * 1024
+export const UPLOAD_PART_SIZE_SCALE_STEP_BYTES = getNumberEnv(
+  ['UPLOAD_PART_SIZE_SCALE_STEP_BYTES', 'UPLOAD_SCALE_STEP_BYTES'],
+  10 * 1024 * 1024
 );
 
 /**
@@ -85,10 +88,9 @@ export const UPLOAD_PART_SIZE_SCALE_STEP_BYTES = Number(
  *   `UPLOAD_PART_SIZE_CAP_BYTES` (or overridden by S3 hard constraints).
  * Backward compatible fallback to legacy `UPLOAD_SCALE_STEP_PART_SIZE_BYTES`.
  */
-export const UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES = Number(
-  process.env.UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES ??
-    process.env.UPLOAD_SCALE_STEP_PART_SIZE_BYTES ??
-    1024 * 1024
+export const UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES = getNumberEnv(
+  ['UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES', 'UPLOAD_SCALE_STEP_PART_SIZE_BYTES'],
+  1024 * 1024
 ); // +1 MiB per step
 
 /**
@@ -97,14 +99,14 @@ export const UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES = Number(
  * Batching reduces request payload size and avoids very large single presign responses
  * when uploads contain many parts.
  */
-export const UPLOAD_PRESIGNED_URL_BATCH_SIZE = Number(process.env.UPLOAD_PRESIGNED_URL_BATCH_SIZE ?? 200);
+export const UPLOAD_PRESIGNED_URL_BATCH_SIZE = getNumberEnv('UPLOAD_PRESIGNED_URL_BATCH_SIZE', 200);
 
 /**
  * Expiry window (seconds) for generated presigned part URLs.
  *
  * Must be long enough for clients to upload all planned parts under normal conditions.
  */
-export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = Number(process.env.UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS ?? 3600);
+export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = getNumberEnv('UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS', 3600);
 
 /**
  * Approximate in-memory byte threshold for pending feature batch flush.
@@ -113,7 +115,7 @@ export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = Number(process.env.UPLOAD_PRE
  * is not sufficient. Parser computes an estimated per-feature byte contribution and
  * flushes when this threshold is reached.
  */
-export const UPLOAD_FEATURE_BATCH_MAX_BYTES = Number(process.env.UPLOAD_FEATURE_BATCH_MAX_BYTES ?? 8 * 1024 * 1024);
+export const UPLOAD_FEATURE_BATCH_MAX_BYTES = getNumberEnv('UPLOAD_FEATURE_BATCH_MAX_BYTES', 8 * 1024 * 1024);
 
 /**
  * Maximum concurrent media uploads from `files/*` entries while streaming one archive.
@@ -121,8 +123,9 @@ export const UPLOAD_FEATURE_BATCH_MAX_BYTES = Number(process.env.UPLOAD_FEATURE_
  * Higher values can improve throughput but increase memory/socket pressure.
  * Backward compatible fallback to legacy `SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY`.
  */
-export const UPLOAD_ARCHIVE_MEDIA_CONCURRENCY = Number(
-  process.env.UPLOAD_ARCHIVE_MEDIA_CONCURRENCY ?? process.env.SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY ?? 1
+export const UPLOAD_ARCHIVE_MEDIA_CONCURRENCY = getNumberEnv(
+  ['UPLOAD_ARCHIVE_MEDIA_CONCURRENCY', 'SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY'],
+  1
 );
 
 /**
@@ -131,7 +134,7 @@ export const UPLOAD_ARCHIVE_MEDIA_CONCURRENCY = Number(
  * Keep this at 1 for memory-constrained workers (1 GiB / 1 vCPU) so a worker
  * processes one upload job at a time.
  */
-export const UPLOAD_JOB_BATCH_SIZE = Number(process.env.UPLOAD_JOB_BATCH_SIZE ?? 1);
+export const UPLOAD_JOB_BATCH_SIZE = getNumberEnv('UPLOAD_JOB_BATCH_SIZE', 1);
 
 /**
  * Hard size limit for a single JSON archive entry (`features/*.json` or `codes/*.json`).
@@ -139,6 +142,4 @@ export const UPLOAD_JOB_BATCH_SIZE = Number(process.env.UPLOAD_JOB_BATCH_SIZE ??
  * Prevents unbounded buffering/parse of unexpectedly large JSON files and fails fast
  * with `IngestionValidationError` when exceeded.
  */
-export const UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES = Number(
-  process.env.UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES ?? 32 * 1024 * 1024
-); // 32 MiB
+export const UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES = getNumberEnv('UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES', 32 * 1024 * 1024); // 32 MiB
