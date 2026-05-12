@@ -1,3 +1,4 @@
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
@@ -27,4 +28,26 @@ export interface DownloadRecord {
 export interface DownloadListResponse {
   downloads: DownloadRecord[];
   pagination: ApiPaginationResponseParams;
+}
+
+/**
+ * Body for POST /api/download.
+ *
+ * `expression` is sent as a literal `null` when no filter expression is applied. The backend
+ * schema marks the key `.nullable()` (not `.optional()`), so omitting it yields a 400.
+ */
+export interface CreateDownloadRequest {
+  name: string;
+  description?: string | null;
+  featureTypes: string[];
+  expression: ExpressionTreeExpression | null;
+}
+
+/**
+ * Response from POST /api/download. The worker job id and a presigned URL the caller can poll
+ * once the export is ready.
+ */
+export interface CreateDownloadResponse {
+  download_id: string;
+  download_url: string;
 }

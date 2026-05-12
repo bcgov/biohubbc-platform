@@ -1159,6 +1159,85 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('unsetRecordDatesBySubmissionUploadId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should set record effective dates for submission features from an upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = now()');
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
+    });
+
+    it('should set record end dates for submission features from an upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.setRecordEndDateBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
+    });
+
+    it('should clear record dates for submission features from an upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_feature_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
+    });
+
+    it('should throw when no rows are updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: sinon.stub().resolves(mockQueryResponse) });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      try {
+        await submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+        expect.fail('Expected ApiExecuteSQLError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to unset submission feature record dates');
+      }
+    });
+  });
+
   describe('findSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();
@@ -1370,134 +1449,6 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.downloadPublishedSubmission(1);
 
       expect(response).to.eql([mockResponse]);
-    });
-  });
-
-  describe('getAdminSubmissionFeatureAritifactKey', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails (rowCount 0)', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      try {
-        await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
-          isAdmin: true,
-          submissionFeatureId: 0,
-          submissionFeatureObj: { key: 'a', value: 'b' }
-        });
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
-      }
-    });
-
-    it('should throw an error when insert sql fails (missing value property)', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ test: 'blah' }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      try {
-        await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
-          isAdmin: true,
-          submissionFeatureId: 0,
-          submissionFeatureObj: { key: 'a', value: 'b' }
-        });
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        value: 'KEY'
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      const response = await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
-        isAdmin: true,
-        submissionFeatureId: 0,
-        submissionFeatureObj: { key: 'a', value: 'b' }
-      });
-
-      expect(response).to.eql('KEY');
-    });
-  });
-
-  describe('getSubmissionFeatureAritifactKey', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails (rowCount 0)', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      try {
-        await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
-          isAdmin: false,
-          submissionFeatureId: 0,
-          submissionFeatureObj: { key: 'a', value: 'b' }
-        });
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
-      }
-    });
-
-    it('should throw an error when insert sql fails (missing value prop)', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ test: 'blah' }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      try {
-        await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
-          isAdmin: false,
-          submissionFeatureId: 0,
-          submissionFeatureObj: { key: 'a', value: 'b' }
-        });
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        value: 'KEY'
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      const response = await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
-        isAdmin: false,
-        submissionFeatureId: 0,
-        submissionFeatureObj: { key: 'a', value: 'b' }
-      });
-
-      expect(response).to.eql('KEY');
     });
   });
 

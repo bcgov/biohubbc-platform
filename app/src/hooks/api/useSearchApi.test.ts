@@ -2,7 +2,6 @@ import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import {
-  CreateDownloadResponse,
   GroupedPropertyResults,
   SearchFeatureResponse,
   SearchFeatureResultWithRelevancy,
@@ -303,41 +302,6 @@ describe('useSearchApi', () => {
         page: 1,
         limit: 10
       });
-    });
-  });
-
-  describe('createDownload', () => {
-    it('should POST filters to /api/download and return download_id', async () => {
-      const mockResponse: CreateDownloadResponse = {
-        download_id: '550e8400-e29b-41d4-a716-446655440099',
-        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099'
-      };
-
-      mock.onPost('/api/download').reply(201, mockResponse);
-
-      const result = await useSearchApi(axios).createDownload({ keyword: 'moose' });
-
-      expect(result).toEqual(mockResponse);
-      expect(mock.history.post[0].data).toEqual(JSON.stringify({ filters: { keyword: 'moose' } }));
-    });
-
-    it('should resolve with download_id from response', async () => {
-      const mockResponse: CreateDownloadResponse = {
-        download_id: 'uuid-abc-123',
-        download_url: 'https://localhost/api/download/uuid-abc-123'
-      };
-
-      mock.onPost('/api/download').reply(201, mockResponse);
-
-      const result = await useSearchApi(axios).createDownload({ feature_types: ['dataset'], species: [42] });
-
-      expect(result.download_id).toBe('uuid-abc-123');
-    });
-
-    it('should propagate rejection on server error', async () => {
-      mock.onPost('/api/download').reply(400);
-
-      await expect(useSearchApi(axios).createDownload({ keyword: 'moose' })).rejects.toThrow();
     });
   });
 

@@ -4,6 +4,7 @@ import {
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -81,6 +82,17 @@ export class SubmissionUploadService extends DBService {
     pagination?: ApiPaginationOptions
   ): Promise<SubmissionUpload[]> {
     return this.submissionUploadRepository.getSubmissionUploadsBySubmissionId(submissionId, filters, pagination);
+  }
+
+  /**
+   * Find ticket-scoped submission upload timeline records.
+   *
+   * @param {string} ticketId Ticket UUID.
+   * @returns {Promise<TicketSubmissionUpload[]>} Submission uploads linked to the ticket.
+   * @memberof SubmissionUploadService
+   */
+  async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
+    return this.submissionUploadRepository.findSubmissionUploadsByTicketId(ticketId);
   }
 
   /**
