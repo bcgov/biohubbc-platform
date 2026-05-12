@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { PRIORITY_FEATURE_TYPE } from '../constants/feature-type';
+import { LANDING_PAGE_FEATURE_TYPES, PRIORITY_FEATURE_TYPE } from '../constants/feature-type';
 import { getKnex } from '../database/db';
 import {
   SearchFeatureResult,
@@ -18,16 +18,19 @@ export class SearchRepository extends BaseRepository {
   /**
    * Builds a query to find features matching a search term.
    *
-   * Matches the keyword against any string property in submission_feature_property_string. The
-   * returned `label` is the feature's display name (from sf.data->>'name'), so the FE dropdown
-   * row and its click-through search query stay recognizable even when the keyword matched a
-   * description or other non-name property.
+   * Matches the keyword against three corpora — free-text string properties, codeset code
+   * labels/descriptions, and taxon names/codes — and emits one row per matched feature. Only
+   * feature types in {@link LANDING_PAGE_FEATURE_TYPES} are eligible. The displayed `label`
+   * is the matched value itself, so the dropdown row always reflects *why* the feature
+   * surfaced. For types that store a canonical `name` in both `sf.data` and a `_string`
+   * property (e.g. study_area, sample_site, dataset), a keyword that hits the name produces
+   * the name as the matched value — so the name-search UX is preserved.
    *
-   * Feature types that don't declare a `name` property (e.g. species_observation, animal,
-   * capture, measurement, telemetry*) are intentionally excluded from this section — they
-   * surface via the Species/taxonomy section and the per-feature-type result page instead.
-   * The NULLIF guard also drops rows where `name` is present but empty so the click-through
-   * keyword is never blank.
+   * The code arm matches `c.label`, `c.key`, and `c.description`. Keys aren't necessarily
+   * numeric — many codesets use human-readable tokens — so they're worth searching despite
+   * the occasional bare-integer key. The taxon arm matches scientific/common name, BC taxon
+   * code, and ITIS TSN, and prefers the friendliest available label (`common_name` →
+   * scientific → BC code → TSN) as the matched value.
    *
    * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding features
@@ -35,18 +38,56 @@ export class SearchRepository extends BaseRepository {
    */
   private _makeFindFeaturesQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
-    return knex('submission_feature_property_string as sfps')
-      .join('submission_feature as sf', 'sf.submission_feature_id', 'sfps.submission_feature_id')
+    const pattern = `%${keyword}%`;
+
+    // String arm — match the free-text value.
+    const stringMatches = knex('submission_feature_property_string as p')
+      .select('p.submission_feature_id', knex.raw('p.value::text as matched_value'))
+      .whereILike('p.value', pattern);
+
+    // Code arm — match the display label, key, or description. Keys aren't always numeric;
+    // many codesets use human-readable tokens worth searching.
+    const codeMatches = knex('submission_feature_property_code as p')
+      .join('contributor_codeset_code as c', 'c.contributor_codeset_code_id', 'p.contributor_codeset_code_id')
+      .select('p.submission_feature_id', knex.raw('c.label as matched_value'))
+      .whereNull('c.record_end_date')
+      .where((qb) => {
+        qb.whereILike('c.label', pattern).orWhereILike('c.key', pattern).orWhereILike('c.description', pattern);
+      });
+
+    // Taxon arm — match scientific/common name, BC code, or TSN. Prefer the friendliest
+    // available label for the fragment fallback (common name → scientific name → BC code → TSN).
+    const taxonMatches = knex('submission_feature_property_taxon as p')
+      .join('taxon as t', 't.taxon_id', 'p.taxon_id')
+      .select(
+        'p.submission_feature_id',
+        knex.raw(
+          'COALESCE(t.common_name, t.itis_scientific_name, t.bc_taxon_code, t.itis_tsn::text)::text as matched_value'
+        )
+      )
+      .whereNull('t.record_end_date')
+      .where((qb) => {
+        qb.whereILike('t.itis_scientific_name', pattern)
+          .orWhereILike('t.common_name', pattern)
+          .orWhereILike('t.bc_taxon_code', pattern)
+          .orWhereRaw('CAST(t.itis_tsn AS TEXT) ILIKE ?', [pattern]);
+      });
+
+    const matches = stringMatches.unionAll([codeMatches, taxonMatches]);
+
+    return knex
+      .from(matches.as('matches'))
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .whereNull('sf.record_end_date')
       .whereNull('ft.record_end_date')
-      .whereILike('sfps.value', `%${keyword}%`)
-      .whereRaw(`NULLIF(sf.data->>'name', '') IS NOT NULL`)
-      .distinct(
+      .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES])
+      .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name')
+      .select(
         'sf.submission_feature_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`sf.data->>'name' as label`)
+        knex.raw('MIN(matches.matched_value) as label')
       );
   }
 
@@ -200,21 +241,45 @@ export class SearchRepository extends BaseRepository {
    */
   async findFeatureSummary(params: SearchParams): Promise<SearchSummaryFeature[]> {
     const priorityTypes = Object.values(PRIORITY_FEATURE_TYPE);
+    const allowedTypes = [...LANDING_PAGE_FEATURE_TYPES];
+    const pattern = `%${params.keyword}%`;
 
     const query = SQL`
-      WITH matching_features AS (
+      WITH matching_ids AS (
+        SELECT submission_feature_id
+          FROM submission_feature_property_string
+         WHERE value ILIKE ${pattern}
+        UNION ALL
+        SELECT p.submission_feature_id
+          FROM submission_feature_property_code p
+          JOIN contributor_codeset_code c ON c.contributor_codeset_code_id = p.contributor_codeset_code_id
+         WHERE c.record_end_date IS NULL
+           AND (c.label ILIKE ${pattern} OR c.description ILIKE ${pattern})
+        UNION ALL
+        SELECT p.submission_feature_id
+          FROM submission_feature_property_taxon p
+          JOIN taxon t ON t.taxon_id = p.taxon_id
+         WHERE t.record_end_date IS NULL
+           AND ( t.itis_scientific_name ILIKE ${pattern}
+              OR t.common_name           ILIKE ${pattern}
+              OR t.bc_taxon_code         ILIKE ${pattern}
+              OR CAST(t.itis_tsn AS TEXT) ILIKE ${pattern} )
+      ),
+      matching_features AS (
         SELECT DISTINCT sf.submission_feature_id, sf.feature_type_id
-        FROM submission_feature_property_string sfps
-        JOIN submission_feature sf ON sfps.submission_feature_id = sf.submission_feature_id
-        WHERE sfps.value ILIKE ${`%${params.keyword}%`}
-          AND sf.record_end_date IS NULL
+          FROM matching_ids m
+          JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
+          JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+         WHERE sf.record_end_date IS NULL
+           AND ft.record_end_date IS NULL
+           AND ft.name = ANY(${allowedTypes}::text[])
       ),
       priority_types AS (
         SELECT feature_type_id, name FROM feature_type
         WHERE name = ANY(${priorityTypes}::text[])
           AND record_end_date IS NULL
       )
-      SELECT 
+      SELECT
         pt.name as feature_type_name,
         COALESCE(COUNT(mf.submission_feature_id)::int, 0) as total
       FROM priority_types pt
