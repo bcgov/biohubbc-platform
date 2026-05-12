@@ -8,11 +8,7 @@ import {
 export interface ITicketUploadTimelineItemProps {
   upload: TicketSubmissionUploadResponse;
   dateLabel: string;
-  onRequestReview: (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    status: SubmissionUploadReviewTaskStatus
-  ) => void;
+  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
   onUpdateReview: (
     upload: TicketSubmissionUploadResponse,
     review: TicketSubmissionUploadReviewResponse,
@@ -27,11 +23,8 @@ export interface ITicketUploadReviewRowProps {
   label: string;
   scope: SubmissionUploadReviewScope;
   upload: TicketSubmissionUploadResponse;
-  onRequestReview: (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    status: SubmissionUploadReviewTaskStatus
-  ) => void;
+  review: TicketSubmissionUploadReviewResponse | null;
+  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
   onUpdateReview: (
     upload: TicketSubmissionUploadResponse,
     review: TicketSubmissionUploadReviewResponse,

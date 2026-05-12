@@ -50,15 +50,13 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Inserts or replaces one scoped upload review in the cached ticket after a create or update response.
+   * Replaces one scoped upload review in the cached ticket after an update response.
    * The backend response is treated as the source of truth, so this does not derive fields from stale row state.
    *
    * @param {TicketSubmissionUploadReviewResponse} review Backend-confirmed scoped review record.
    * @returns {void}
    */
-  const setCachedUploadReview = (
-    review: TicketSubmissionUploadReviewResponse
-  ): void => {
+  const setCachedUploadReview = (review: TicketSubmissionUploadReviewResponse): void => {
     const latestTicket = ticketDataLoader.data;
 
     if (!latestTicket) {
@@ -72,17 +70,12 @@ export const useTicketTimelineUploadActions = () => {
           return upload;
         }
 
-        const reviewExists = upload.reviews.some(
-          (item) => item.submission_upload_review_id === review.submission_upload_review_id
-        );
-
         return {
           ...upload,
-          reviews: reviewExists
-            ? upload.reviews.map((item) =>
-                item.submission_upload_review_id === review.submission_upload_review_id ? review : item
-              )
-            : [...upload.reviews, review]
+          reviews: {
+            ...upload.reviews,
+            [review.scope]: review
+          }
         };
       })
     });
@@ -131,42 +124,6 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Creates a scoped upload review task and optionally moves it to the selected status.
-   * Use this from review rows that do not already have a review record; existing rows should call the update handler.
-   *
-   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
-   * @param {SubmissionUploadReviewScope} scope Review scope being requested.
-   * @param {SubmissionUploadReviewTaskStatus} nextStatus Status selected by the reviewer after creating the task.
-   * @returns {Promise<void>} Resolves after the created or updated review is reflected in local ticket state.
-   */
-  const handleRequestSubmissionUploadReview = async (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    nextStatus: SubmissionUploadReviewTaskStatus
-  ): Promise<void> => {
-    try {
-      const insertedReview = await api.tickets.insertSubmissionUploadReview(
-        upload.submission_uuid,
-        upload.submission_upload_id,
-        { scope }
-      );
-      const updatedReview =
-        nextStatus === insertedReview.status
-          ? insertedReview
-          : await api.tickets.updateSubmissionUploadReview(
-              upload.submission_uuid,
-              upload.submission_upload_id,
-              insertedReview.submission_upload_review_id,
-              { status: nextStatus }
-            );
-
-      setCachedUploadReview(updatedReview);
-    } catch (error) {
-      showUploadActionError(error);
-    }
-  };
-
-  /**
    * Updates the status of an existing scoped upload review task.
    * Use this from review rows that already have a backend review record and therefore know the review id to patch.
    *
@@ -189,6 +146,34 @@ export const useTicketTimelineUploadActions = () => {
       );
 
       setCachedUploadReview(updatedReview);
+    } catch (error) {
+      showUploadActionError(error);
+    }
+  };
+
+  /**
+   * Requests a replacement review for one scoped upload task and caches the backend-created row.
+   * Use this from missing review rows only; existing rows should either navigate to the review page or patch status.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
+   * @param {SubmissionUploadReviewScope} scope Review scope being requested.
+   * @returns {Promise<void>} Resolves after the backend-created review is reflected in local ticket state.
+   */
+  const handleRequestSubmissionUploadReview = async (
+    upload: TicketSubmissionUploadResponse,
+    scope: SubmissionUploadReviewScope
+  ): Promise<void> => {
+    try {
+      const insertedReview = await api.tickets.insertSubmissionUploadReview(
+        upload.submission_uuid,
+        upload.submission_upload_id,
+        {
+          scope,
+          status: 'requested'
+        }
+      );
+
+      setCachedUploadReview(insertedReview);
     } catch (error) {
       showUploadActionError(error);
     }

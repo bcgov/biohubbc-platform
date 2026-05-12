@@ -103,6 +103,11 @@ export interface TicketSubmissionUploadReviewResponse {
   requested_by: number | null;
 }
 
+export type TicketSubmissionUploadReviews = Record<
+  SubmissionUploadReviewScope,
+  TicketSubmissionUploadReviewResponse | null
+>;
+
 export interface TicketSubmissionUploadResponse {
   submission_upload_id: string;
   submission_uuid: string;
@@ -123,7 +128,7 @@ export interface TicketSubmissionUploadResponse {
     ended_at: string | null;
     create_date: string;
   } | null;
-  reviews: TicketSubmissionUploadReviewResponse[];
+  reviews: TicketSubmissionUploadReviews;
 }
 
 export interface ITicketExtended extends ITicket {
@@ -193,6 +198,7 @@ export interface IUpdateSubmissionUploadReviewRequest {
 
 export interface ICreateSubmissionUploadReviewRequest {
   scope: SubmissionUploadReviewScope;
+  status: SubmissionUploadReviewTaskStatus;
 }
 
 export interface ICreateTicketReference {

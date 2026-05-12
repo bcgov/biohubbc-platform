@@ -33,11 +33,7 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
-  onRequestSubmissionUploadReview: (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    status: SubmissionUploadReviewTaskStatus
-  ) => void;
+  onRequestSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
   onUpdateSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
     review: TicketSubmissionUploadReviewResponse,
@@ -196,13 +192,13 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
 
       case 'status': {
         const isFirstOpenStatus = index === firstOpenStatusIndex;
-        let message = `${item.user_identifier} reopened the ticket`;
+        const getStatusMessage = () => {
+          if (item.status === 'closed') {
+            return `${item.user_identifier} closed the ticket`;
+          }
 
-        if (item.status === 'closed') {
-          message = `${item.user_identifier} closed the ticket`;
-        } else if (isFirstOpenStatus) {
-          message = `${item.user_identifier} opened the ticket`;
-        }
+          return `${item.user_identifier} ${isFirstOpenStatus ? 'opened' : 'reopened'} the ticket`;
+        };
 
         const statusKey: 'open' | 'closed' = item.status === 'closed' ? 'closed' : 'open';
 
@@ -211,7 +207,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
           icon: <Icon path={TICKET_TIMELINE_ICONS[statusKey]} size={0.75} />,
           children: (
             <TicketTimelineStatusItem
-              message={message}
+              message={getStatusMessage()}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {
                   maxRelativeDays: 30,

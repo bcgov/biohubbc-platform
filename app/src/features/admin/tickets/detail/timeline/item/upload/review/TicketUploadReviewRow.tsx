@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { DropdownButtonGroup } from 'components/DropdownButtonGroup';
 import {
@@ -17,13 +18,16 @@ import { ITicketUploadReviewRowProps } from '../TicketUploadTimelineItem.interfa
  * @return {*}
  */
 export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
-  const { label, scope, upload, onRequestReview, onUpdateReview } = props;
+  const { label, scope, upload, review, onRequestReview, onUpdateReview } = props;
   const navigate = useNavigate();
-  const review = upload.reviews.find((item) => item.scope === scope);
   const reviewStatus = review?.status ?? 'requested';
 
   const getReviewStatusLabel = (status: SubmissionUploadReviewTaskStatus) =>
     status === 'requested' ? 'Open' : SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS[status];
+
+  const reviewRoute = review
+    ? `/admin/submission/${upload.submission_uuid}/upload/${upload.submission_upload_id}/review/${review.submission_upload_review_id}`
+    : null;
 
   const reviewButtonColorByStatus: Partial<Record<SubmissionUploadReviewTaskStatus, 'primary' | 'success'>> = {
     requested: 'primary',
@@ -56,23 +60,17 @@ export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
           variant="contained"
           color={reviewButtonColor}
           sx={reviewButtonColor ? undefined : SUBMISSION_UPLOAD_REVIEW_ACTION_BUTTON_SX}
-          onPrimaryClick={() =>
-            navigate(
-              `/admin/submission/${upload.submission_uuid}/upload/${upload.submission_upload_id}/review/${review.submission_upload_review_id}`
-            )
-          }
+          onPrimaryClick={() => reviewRoute && navigate(reviewRoute)}
           onSelect={(value) => onUpdateReview(upload, review, value as SubmissionUploadReviewTaskStatus)}
         />
       ) : (
-        <DropdownButtonGroup
-          value="requested"
-          primaryLabel="Request"
-          itemGroups={[{ groupId: `${scope}-review-status`, items: SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_OPTIONS }]}
+        <Button
           size="small"
           variant="contained"
           sx={SUBMISSION_UPLOAD_REVIEW_ACTION_BUTTON_SX}
-          onSelect={(value) => onRequestReview(upload, scope, value as SubmissionUploadReviewTaskStatus)}
-        />
+          onClick={() => onRequestReview(upload, scope)}>
+          Request Review
+        </Button>
       )}
     </Box>
   );

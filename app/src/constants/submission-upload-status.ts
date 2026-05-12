@@ -34,7 +34,7 @@ export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS: Record<SubmissionUploa
   cancelled: 'Cancelled'
 };
 
-export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_ICONS: Record<SubmissionUploadReviewTaskStatus, string> = {
+const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_ICONS: Record<SubmissionUploadReviewTaskStatus, string> = {
   pending: mdiCircleMedium,
   requested: mdiCircleMedium,
   in_progress: mdiProgressClock,

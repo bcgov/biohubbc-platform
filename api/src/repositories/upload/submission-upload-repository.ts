@@ -210,7 +210,30 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.status AS upload_status,
         sus.status AS review_status,
         sv.validation,
-        COALESCE(reviews.reviews, '[]'::json) AS reviews
+        json_build_object(
+          'validation',
+          CASE
+            WHEN validation_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', validation_review.submission_upload_review_id,
+              'submission_upload_id', validation_review.submission_upload_id,
+              'scope', validation_review.scope,
+              'status', validation_review.status,
+              'requested_by', validation_review.requested_by
+            )
+          END,
+          'security',
+          CASE
+            WHEN security_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', security_review.submission_upload_review_id,
+              'submission_upload_id', security_review.submission_upload_id,
+              'scope', security_review.scope,
+              'status', security_review.status,
+              'requested_by', security_review.requested_by
+            )
+          END
+        ) AS reviews
       FROM
         submission_upload su
       INNER JOIN
@@ -252,24 +275,18 @@ export class SubmissionUploadRepository extends BaseRepository {
           sv.create_date DESC
         LIMIT 1
       ) sv ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT
-          json_agg(
-            json_build_object(
-              'submission_upload_review_id', sur.submission_upload_review_id,
-              'submission_upload_id', sur.submission_upload_id,
-              'scope', sur.scope,
-              'status', sur.status,
-              'requested_by', sur.requested_by
-            )
-            ORDER BY sur.create_date ASC
-          ) AS reviews
-        FROM
-          submission_upload_review sur
-        WHERE
-          sur.submission_upload_id = su.submission_upload_id
-          AND sur.record_end_date IS NULL
-      ) reviews ON TRUE
+      LEFT JOIN
+        submission_upload_review validation_review
+      ON
+        validation_review.submission_upload_id = su.submission_upload_id
+        AND validation_review.scope = 'validation'
+        AND validation_review.record_end_date IS NULL
+      LEFT JOIN
+        submission_upload_review security_review
+      ON
+        security_review.submission_upload_id = su.submission_upload_id
+        AND security_review.scope = 'security'
+        AND security_review.record_end_date IS NULL
       WHERE
         su.ticket_id = ${ticketId}
         AND su.record_end_date IS NULL

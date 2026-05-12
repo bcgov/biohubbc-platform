@@ -250,7 +250,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Create a scoped submission upload review task.
+   * Request a new scoped submission upload review task.
+   *
+   * The backend closes any active review for the requested scope before creating
+   * the replacement review row.
    *
    * @param {string} submissionUuid
    * @param {string} submissionUploadId

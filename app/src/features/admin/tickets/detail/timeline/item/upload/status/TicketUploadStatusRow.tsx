@@ -7,6 +7,7 @@ import {
   SUBMISSION_UPLOAD_JOB_STATUS_LABELS,
   TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES
 } from 'constants/submission-upload-status';
+import { SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interface';
 
@@ -18,18 +19,27 @@ import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interfa
  */
 export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
   const { upload } = props;
-  let statusColor = 'primary.main';
 
-  if (upload.upload_status === 'indexed') {
-    statusColor = 'success.main';
-  } else if (upload.upload_status === 'invalid' || upload.upload_status === 'failed') {
-    statusColor = 'error.main';
-  }
+  const statusColorByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
+    indexed: 'success.main',
+    invalid: 'error.main',
+    failed: 'error.main'
+  };
+  const terminalIconByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
+    indexed: mdiCheck,
+    invalid: mdiClose,
+    failed: mdiClose
+  };
+  const terminalIconColorByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
+    indexed: appTheme.palette.success.main,
+    invalid: appTheme.palette.error.main,
+    failed: appTheme.palette.error.main
+  };
 
   const isTerminalUploadStatus = TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES.includes(upload.upload_status);
-  const terminalStatusIcon = upload.upload_status === 'indexed' ? mdiCheck : mdiClose;
-  const terminalStatusColor =
-    upload.upload_status === 'indexed' ? appTheme.palette.success.main : appTheme.palette.error.main;
+  const statusColor = statusColorByStatus[upload.upload_status] ?? 'primary.main';
+  const terminalStatusIcon = terminalIconByStatus[upload.upload_status] ?? mdiClose;
+  const terminalStatusColor = terminalIconColorByStatus[upload.upload_status] ?? appTheme.palette.error.main;
 
   return (
     <Box

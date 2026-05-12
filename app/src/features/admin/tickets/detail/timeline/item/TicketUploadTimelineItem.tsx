@@ -32,6 +32,7 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
           label="Validation"
           scope="validation"
           upload={upload}
+          review={upload.reviews.validation}
           onRequestReview={onRequestReview}
           onUpdateReview={onUpdateReview}
         />
@@ -39,6 +40,7 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
           label="Security Review"
           scope="security"
           upload={upload}
+          review={upload.reviews.security}
           onRequestReview={onRequestReview}
           onUpdateReview={onUpdateReview}
         />

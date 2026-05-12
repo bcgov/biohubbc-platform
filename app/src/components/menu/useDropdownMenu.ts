@@ -18,8 +18,10 @@ export const useDropdownMenu = (
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
   const flattenedItems = useMemo(() => itemGroups.flatMap((group) => group.items), [itemGroups]);
-  const selectedItem = useMemo(() => flattenedItems.find((item) => item.value === value), [flattenedItems, value]);
-  const selectedLabel = selectedItem?.label ?? value;
+  const selectedLabel = useMemo(
+    () => flattenedItems.find((item) => item.value === value)?.label ?? value,
+    [flattenedItems, value]
+  );
   const hasEnabledMenuItems = flattenedItems.some((item) => !item.disabled);
 
   const handleClose = () => setAnchorEl(null);
@@ -32,7 +34,6 @@ export const useDropdownMenu = (
   return {
     anchorEl,
     open,
-    selectedItem,
     selectedLabel,
     hasEnabledMenuItems,
     handleClose,

@@ -2,7 +2,10 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
-import { SubmissionUploadReviewScope } from '../../../../../../../models/submission-upload-review';
+import {
+  SubmissionUploadReviewScope,
+  SubmissionUploadReviewStatus
+} from '../../../../../../../models/submission-upload-review';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
   RequestSubmissionUploadReviewRequestSchema,
@@ -145,12 +148,13 @@ export function insertSubmissionUploadReview(): RequestHandler {
       await connection.open();
 
       const { submissionId, submissionUploadId } = req.params;
-      const { scope }: { scope: SubmissionUploadReviewScope } = req.body;
+      const { scope, status }: { scope: SubmissionUploadReviewScope; status: SubmissionUploadReviewStatus } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       const result = await submissionUploadReviewService.insertSubmissionUploadReview(submissionId, {
         submission_upload_id: submissionUploadId,
         scope,
+        status,
         requested_by: connection.systemUserId()
       });
 
