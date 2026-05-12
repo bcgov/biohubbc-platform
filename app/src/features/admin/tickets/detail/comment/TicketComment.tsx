@@ -41,7 +41,6 @@ export const TicketComment = (props: ITicketCommentProps) => {
           comment={comment}
           artifacts={artifacts}
           setComment={setComment}
-          isSaving={isSaving}
           isUploadingAttachment={isUploadingAttachment}
           onUploadAttachment={onUploadAttachment}
         />

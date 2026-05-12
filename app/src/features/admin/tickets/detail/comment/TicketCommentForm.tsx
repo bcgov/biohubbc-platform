@@ -15,7 +15,6 @@ interface ITicketCommentFormProps {
   comment: string;
   artifacts: ITicketArtifact[];
   setComment: (comment: string) => void;
-  isSaving: boolean;
   isUploadingAttachment: boolean;
   onUploadAttachment: (file: File) => Promise<void>;
 }
@@ -27,7 +26,7 @@ interface ITicketCommentFormProps {
  * @return {*}
  */
 export const TicketCommentForm = (props: ITicketCommentFormProps) => {
-  const { comment, artifacts, setComment, isSaving, isUploadingAttachment, onUploadAttachment } = props;
+  const { comment, artifacts, setComment, isUploadingAttachment, onUploadAttachment } = props;
   const [activeTab, setActiveTab] = useState<TicketCommentFormView>('write');
   const viewOptions: ToggleButtonView<TicketCommentFormView>[] = [
     { value: 'write', label: 'Write' },

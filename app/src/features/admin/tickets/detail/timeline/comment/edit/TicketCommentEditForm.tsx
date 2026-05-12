@@ -10,7 +10,7 @@ import { ITicketCommentEditFormProps, ITicketCommentEditFormValues } from './Tic
  * @return {*}
  */
 export const TicketCommentEditForm = (props: ITicketCommentEditFormProps) => {
-  const { artifacts, isSaving, isUploadingAttachment, onUploadAttachment } = props;
+  const { artifacts, isUploadingAttachment, onUploadAttachment } = props;
   const { values, setFieldValue } = useFormikContext<ITicketCommentEditFormValues>();
   const commentRef = useRef(values.comment);
   commentRef.current = values.comment;
@@ -34,7 +34,6 @@ export const TicketCommentEditForm = (props: ITicketCommentEditFormProps) => {
       comment={values.comment}
       artifacts={artifacts}
       setComment={(comment) => setFieldValue('comment', comment)}
-      isSaving={isSaving}
       isUploadingAttachment={isUploadingAttachment}
       onUploadAttachment={(file) => onUploadAttachment(file, appendMarkdownLink)}
     />
