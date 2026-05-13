@@ -354,14 +354,22 @@ describe('SecurityScopeService', () => {
       sinon
         .stub(SecurityScopeRepository.prototype, 'insertSecurityScope')
         .resolves({ security_scope_id: scopeIdOne, scope_hash: 'hash-1' });
-      sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      const insertMappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
       sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
-      sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy').resolves();
+      const insertTeamGrantStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
+        .resolves();
 
       await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
       await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
+
+      // Idempotency at this layer means the service runs the same chain on each call
+      // without early-exit or throw. SQL-level dedup (ON CONFLICT DO NOTHING) is the
+      // production safety net; the integration test suite covers that.
+      expect(insertMappingStub).to.have.been.calledTwice;
+      expect(insertTeamGrantStub).to.have.been.calledTwice;
     });
 
     it('A6: publish failure on the first statement aborts before the team grant runs', async () => {
