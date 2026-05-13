@@ -1,5 +1,5 @@
 import { EditDialog } from 'components/dialog/EditDialog';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -51,7 +51,7 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
     availableUsersLoader.load();
   }, [open, availableUsersLoader]);
 
-  const userOptions = useMemo<SidebarOption[]>(
+  const userOptions = useMemo<SearchOption[]>(
     () =>
       (availableUsersLoader.data?.users ?? []).map((user) => ({
         value: user.system_user_id,

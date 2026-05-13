@@ -1,12 +1,12 @@
 import Stack from '@mui/material/Stack';
 import { TeamForm } from 'components/form/TeamForm';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { useFormikContext } from 'formik';
 import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
 
 interface ICreateDataRequestFormProps {
-  options: SidebarOption[];
+  options: SearchOption[];
   isLoadingUsers: boolean;
   isSubmitting: boolean;
   onSearchUsers: (search: string) => void;
@@ -34,7 +34,7 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
     label: user.user_identifier
   }));
 
-  const handleSelectUser = (option: SidebarOption | null) => {
+  const handleSelectUser = (option: SearchOption | null) => {
     if (!option) {
       return;
     }

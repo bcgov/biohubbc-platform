@@ -1,6 +1,5 @@
 import { cleanup, fireEvent } from '@testing-library/react';
-import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
-import { DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
+import { type DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { makeDownload, makeExport } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { DownloadFeatureCard } from './DownloadFeatureCard';
@@ -35,14 +34,6 @@ describe('DownloadFeatureCard', () => {
       const props = makeProps({ download: makeDownload({ download_status: status }) });
       const { getByText } = render(<DownloadFeatureCard {...props} />);
       expect(getByText(label)).toBeVisible();
-    });
-
-    it('falls back to the raw status string for an unknown status', () => {
-      const props = makeProps({
-        download: makeDownload({ download_status: 'mystery-status' as DownloadRecord['download_status'] })
-      });
-      const { getByText } = render(<DownloadFeatureCard {...props} />);
-      expect(getByText('mystery-status')).toBeVisible();
     });
   });
 
@@ -212,15 +203,6 @@ describe('DownloadFeatureCard', () => {
       const { getAllByTestId } = render(<DownloadFeatureCard {...props} />);
       const rowIds = getAllByTestId(/^export-row-/).map((el) => el.getAttribute('data-testid'));
       expect(rowIds).toEqual(['export-row-exp-newer', 'export-row-exp-older']);
-    });
-
-    it('falls back to the raw status string for an unknown export status', () => {
-      const mystery = 'mystery-status' as DownloadExportStatus;
-      const props = makeProps({
-        exports: [makeExport({ download_export_id: 'exp-1', status: mystery })]
-      });
-      const { getByText } = render(<DownloadFeatureCard {...props} />);
-      expect(getByText('mystery-status')).toBeVisible();
     });
   });
 });

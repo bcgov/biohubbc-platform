@@ -1,8 +1,8 @@
 import Stack from '@mui/material/Stack';
 import { AlertBanner } from 'components/notifications/AlertBanner';
+import { SearchAutocomplete } from 'components/search/SearchAutocomplete';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { TICKET_SYSTEM_USER_STATUS_PRESENTATION } from 'constants/ticket';
-import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { ArrayHelpers, FieldArray, getIn, useFormikContext } from 'formik';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
@@ -17,7 +17,7 @@ export interface ITicketSystemUserFormValues {
 }
 
 interface ITicketSystemUserFormProps {
-  options: SidebarOption[];
+  options: SearchOption[];
   isLoadingUsers: boolean;
   isSubmitting: boolean;
   onSearchUsers: (search: string) => void;
@@ -46,7 +46,7 @@ export const TicketSystemUserForm = (props: ITicketSystemUserFormProps) => {
     []
   );
 
-  const handleSelectUser = (option: SidebarOption | null, arrayHelpers: ArrayHelpers) => {
+  const handleSelectUser = (option: SearchOption | null, arrayHelpers: ArrayHelpers) => {
     if (!option) {
       return;
     }

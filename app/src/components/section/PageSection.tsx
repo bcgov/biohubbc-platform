@@ -17,10 +17,10 @@ export interface IPageSectionProps extends PropsWithChildren {
 }
 
 /**
- * Reusable page section layout for admin list screens.
+ * Reusable page section layout for labeled content sections.
  *
- * Renders a titled paper section with a standardized Add button and
- * customizable header/children content.
+ * Renders a titled paper section with optional header actions and a
+ * standardized Add button.
  *
  * @param {IPageSectionProps} props
  * @returns {JSX.Element}
@@ -31,7 +31,7 @@ export const PageSection = (props: IPageSectionProps) => {
   return (
     <Paper>
       <Toolbar disableGutters sx={{ px: 2 }}>
-        <Typography variant="h4" component="h2" flexGrow={1}>
+        <Typography variant="h5" component="h2" flexGrow={1}>
           {label}
         </Typography>
         <Stack gap={1} direction="row" alignItems="center">

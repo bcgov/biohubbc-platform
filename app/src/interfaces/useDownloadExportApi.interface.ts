@@ -3,7 +3,7 @@
  *
  * No `'downloaded'` state — that's a `download`-only terminal; exports don't transition there.
  */
-export type DownloadExportStatus = 'pending' | 'processing' | 'ready' | 'failed' | 'downloaded';
+export type DownloadExportStatus = 'pending' | 'processing' | 'ready' | 'failed';
 
 /**
  * A single export row, as embedded in `DownloadRecord.exports` and returned by `POST /api/download/:id/export`.

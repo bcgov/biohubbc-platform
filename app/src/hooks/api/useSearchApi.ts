@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
   ISearchAllFilters,
@@ -23,15 +23,19 @@ export const useSearchApi = (axios: AxiosInstance) => {
    *
    * @param {ExpressionTreeExpression} expressionTree - Optional expression tree search parameters
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options - Optional request controls, including an abort signal for canceling stale searches.
    * @return {Promise<SearchFeatureResponse >} Array of matching features sorted by relevancy
    */
   const searchFeatures = async (
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchFeatureResponse> => {
     const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
-    const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body);
+    const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body, {
+      signal: options?.signal
+    });
 
     return data;
   };
