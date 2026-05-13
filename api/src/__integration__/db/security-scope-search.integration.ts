@@ -1537,6 +1537,10 @@ describe('Security scope search (integration)', function () {
     // Seed data may include policy_statements with wildcard URNs (urn_submission_id = '*')
     // that match any submission. Tests use a baseline snapshot to isolate assertions
     // to scopes created within the test.
+    //
+    // A live team_policy link is required for the gate (SIMSBIOHUB-985 invariant) —
+    // each test wires one so the URN-matching predicates are what's actually being
+    // exercised. Tests that target the gate itself live in the next describe block.
 
     it('should match a submission-scoped URN (urn:{subId}:*:*)', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -1545,6 +1549,8 @@ describe('Security scope search (integration)', function () {
       const policyId = await createPolicy(connection, 'sub-scope-match');
       const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
       const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
+      const teamId = await createTeam(connection, 'sub-scope-team');
+      await createTeamPolicy(connection, teamId, policyId);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1560,6 +1566,8 @@ describe('Security scope search (integration)', function () {
       const policyId = await createPolicy(connection, 'wildcard-match');
       const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:*:*');
       const scopeId = await setupScopeChain(scopeRepo, stmtId, 'urn:*:*:*');
+      const teamId = await createTeam(connection, 'wildcard-team');
+      await createTeamPolicy(connection, teamId, policyId);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1574,6 +1582,8 @@ describe('Security scope search (integration)', function () {
       const policyId = await createPolicy(connection, 'type-wildcard-match');
       const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:telemetry:*');
       const scopeId = await setupScopeChain(scopeRepo, stmtId, 'urn:*:telemetry:*');
+      const teamId = await createTeam(connection, 'type-wildcard-team');
+      await createTeamPolicy(connection, teamId, policyId);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1590,6 +1600,8 @@ describe('Security scope search (integration)', function () {
       const policyId = await createPolicy(connection, 'no-match');
       const stmtId = await createPolicyStatement(connection, policyId, `urn:${sub1}:*:*`);
       const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${sub1}:*:*`);
+      const teamId = await createTeam(connection, 'no-match-team');
+      await createTeamPolicy(connection, teamId, policyId);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(sub2);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1607,11 +1619,15 @@ describe('Security scope search (integration)', function () {
       const policyA = await createPolicy(connection, 'specific-match');
       const stmtA = await createPolicyStatement(connection, policyA, `urn:${submissionId}:*:*`);
       const scopeIdA = await setupScopeChain(scopeRepo, stmtA, `urn:${submissionId}:*:*`);
+      const teamA = await createTeam(connection, 'specific-team');
+      await createTeamPolicy(connection, teamA, policyA);
 
       // Wildcard scope (different hash → different scope row)
       const policyB = await createPolicy(connection, 'wildcard-also-match');
       const stmtB = await createPolicyStatement(connection, policyB, 'urn:*:*:*');
       const scopeIdB = await setupScopeChain(scopeRepo, stmtB, 'urn:*:*:*');
+      const teamB = await createTeam(connection, 'wildcard-also-team');
+      await createTeamPolicy(connection, teamB, policyB);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1628,6 +1644,8 @@ describe('Security scope search (integration)', function () {
       const policyId = await createPolicy(connection, 'soft-deleted-match');
       const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
       const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
+      const teamId = await createTeam(connection, 'soft-deleted-team');
+      await createTeamPolicy(connection, teamId, policyId);
 
       await softDeleteStatement(stmtId);
 
@@ -1648,10 +1666,14 @@ describe('Security scope search (integration)', function () {
       const policyA = await createPolicy(connection, 'dedup-A');
       const stmtA = await createPolicyStatement(connection, policyA, urn);
       const scopeIdA = await setupScopeChain(scopeRepo, stmtA, urn);
+      const teamA = await createTeam(connection, 'dedup-team-A');
+      await createTeamPolicy(connection, teamA, policyA);
 
       const policyB = await createPolicy(connection, 'dedup-B');
       const stmtB = await createPolicyStatement(connection, policyB, urn);
       const scopeIdB = await setupScopeChain(scopeRepo, stmtB, urn);
+      const teamB = await createTeam(connection, 'dedup-team-B');
+      await createTeamPolicy(connection, teamB, policyB);
 
       // Same scope_hash → same scope row
       expect(scopeIdA).to.equal(scopeIdB);
@@ -1660,6 +1682,68 @@ describe('Security scope search (integration)', function () {
 
       // DISTINCT in the query → only 1 new scope despite 2 statements
       expect(result).to.have.lengthOf(baseline.length + 1);
+    });
+  });
+
+  // ── findScopeIdsMatchingSubmission → team_policy gate (SIMSBIOHUB-985) ──
+
+  describe('findScopeIdsMatchingSubmission → team_policy gate', () => {
+    // Edge case #9 from spec.md: anchor recomputation must not fire for scopes
+    // outside the team-link set. The repository gates on a live team_policy so
+    // orphaned scopes (no team granted) don't drive wasted anchor-compute jobs.
+
+    it('should not return scopes for an approved policy with no team_policy', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      const policyId = await createPolicy(connection, 'no-team-policy');
+      const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      expect(scopeIds).to.not.include(scopeId);
+      expect(result).to.have.lengthOf(baseline.length);
+    });
+
+    it('should drop a scope from the result after its last team_policy is soft-deleted', async () => {
+      const submissionId = await createTestSubmission(connection);
+
+      const policyId = await createPolicy(connection, 'orphan-on-delete');
+      const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
+      const teamId = await createTeam(connection, 'orphan-on-delete-team');
+      const teamPolicyId = await createTeamPolicy(connection, teamId, policyId);
+
+      // While the team_policy is live, the scope appears
+      const before = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      expect(before.map((r) => r.security_scope_id)).to.include(scopeId);
+
+      // After the only team_policy is soft-deleted, the scope is gated out
+      await softDeleteTeamPolicy(teamPolicyId);
+      const after = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      expect(after.map((r) => r.security_scope_id)).to.not.include(scopeId);
+    });
+
+    it('should keep a shared scope while any team_policy still references its policy', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const urn = `urn:${submissionId}:*:*`;
+
+      const policyId = await createPolicy(connection, 'shared-team-policies');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
+
+      const teamA = await createTeam(connection, 'shared-A');
+      const teamB = await createTeam(connection, 'shared-B');
+      const tpA = await createTeamPolicy(connection, teamA, policyId);
+      await createTeamPolicy(connection, teamB, policyId);
+
+      // Drop only one of the two links — the other still justifies the scope
+      await softDeleteTeamPolicy(tpA);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      expect(result.map((r) => r.security_scope_id)).to.include(scopeId);
     });
   });
 

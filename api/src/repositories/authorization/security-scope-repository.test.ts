@@ -367,7 +367,7 @@ describe('SecurityScopeRepository', () => {
       expect(result).to.eql([]);
     });
 
-    it('filters to ALLOW statements on approved active policies', async () => {
+    it('filters to ALLOW statements on approved active policies with a live team_policy', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SecurityScopeRepository(mockDBConnection);
@@ -379,6 +379,8 @@ describe('SecurityScopeRepository', () => {
       expect(sqlText).to.include('ps.effect =');
       expect(sqlText).to.include("p.status = 'approved'");
       expect(sqlText).to.include('p.record_end_date is null');
+      expect(sqlText).to.include('join team_policy tp');
+      expect(sqlText).to.include('tp.record_end_date is null');
       expect(sqlValues).to.include('allow');
     });
   });

@@ -593,6 +593,11 @@ export class SecurityScopeRepository extends BaseRepository {
    * Used when new security rules are applied to features in a submission —
    * finds scopes that may need new anchors computed for the affected submission.
    *
+   * A live `team_policy` link is required: a scope without one grants access to
+   * no team, so anchor recomputation for it is wasted work. Gating here keeps
+   * anchor-compute jobs scoped to the access cache only — the invariant captured
+   * in SIMSBIOHUB-985.
+   *
    * @param submissionId The submission ID to match against scope URNs
    * @returns Array of SecurityScopeId rows for matching scopes
    */
@@ -602,6 +607,7 @@ export class SecurityScopeRepository extends BaseRepository {
       FROM policy_statement ps
       JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
       JOIN policy p ON p.policy_id = ps.policy_id
+      JOIN team_policy tp ON tp.policy_id = p.policy_id AND tp.record_end_date IS NULL
       WHERE ps.record_end_date IS NULL
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND p.record_end_date IS NULL
