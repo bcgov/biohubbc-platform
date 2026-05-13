@@ -190,7 +190,7 @@ export class SecurityScopeService extends DBService {
    * @param policyId UUID of the policy whose ALLOW statements grant the access
    */
   async materializeStatementScopesAndTeamAccess(teamId: string, policyId: string): Promise<void> {
-    const statements = await this.securityScopeRepository.getActiveAllowStatementsForApprovedPolicy(policyId);
+    const statements = await this.securityScopeRepository.findActiveAllowStatementsForApprovedPolicy(policyId);
 
     if (statements.length === 0) {
       return;

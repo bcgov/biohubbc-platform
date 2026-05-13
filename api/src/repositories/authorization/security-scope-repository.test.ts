@@ -386,7 +386,7 @@ describe('SecurityScopeRepository', () => {
   });
 
   describe('team scope derivation guards', () => {
-    it('insertTeamSecurityScopesForPolicy only grants from ALLOW approved active policy and active team', async () => {
+    it('insertTeamSecurityScopesForPolicy requires a live team_policy link and an ALLOW approved active policy + active team', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SecurityScopeRepository(mockDBConnection);
@@ -395,6 +395,8 @@ describe('SecurityScopeRepository', () => {
 
       const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
       const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlText).to.include('from team_policy tp');
+      expect(sqlText).to.include('tp.record_end_date is null');
       expect(sqlText).to.include('ps.effect =');
       expect(sqlText).to.include("p.status = 'approved'");
       expect(sqlText).to.include('p.record_end_date is null');

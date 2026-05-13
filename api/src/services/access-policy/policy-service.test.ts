@@ -300,6 +300,105 @@ describe('PolicyService', () => {
     });
   });
 
+  // Direct tests of the private `applyCacheFanOutForTransition` helper. Public-method
+  // tests (`updatePolicy` C-tests, `updatePolicyWithStatements` B-tests) exercise the
+  // helper transitively, but this block pins its contract independent of any caller
+  // so a future caller cannot accidentally bypass an invariant the helper enforces
+  // (e.g. the same-status no-op).
+  describe('applyCacheFanOutForTransition', () => {
+    const policyId = 'policy-1';
+    const linkedTeamPolicies = [
+      { team_policy_id: 'tp1', team_id: 'team-1', policy_id: policyId, team_name: 'A', policy_name: 'P' },
+      { team_policy_id: 'tp2', team_id: 'team-2', policy_id: policyId, team_name: 'B', policy_name: 'P' }
+    ];
+
+    // The helper is intentionally private; tests access it via an `any` cast to
+    // pin the contract without exposing the surface to production callers.
+    const invoke = (from: 'requested' | 'reviewed' | 'approved' | 'denied', to: typeof from) =>
+      (
+        policyService as unknown as {
+          applyCacheFanOutForTransition: (id: string, from: string, to: string) => Promise<void>;
+        }
+      ).applyCacheFanOutForTransition(policyId, from, to);
+
+    it('returns early without fetching team policies when from === to', async () => {
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await invoke('approved', 'approved');
+
+      expect(getTeamPoliciesStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    it('fetches team policies but skips fan-out when no team_policy links exist', async () => {
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await invoke('reviewed', 'approved');
+
+      expect(getTeamPoliciesStub).to.have.been.calledOnceWith({ policyIds: [policyId] });
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    it('materializes per linked team when transitioning into approved', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves(linkedTeamPolicies);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await invoke('reviewed', 'approved');
+
+      expect(materializeStub).to.have.been.calledTwice;
+      expect(materializeStub.firstCall).to.have.been.calledWith('team-1', policyId);
+      expect(materializeStub.secondCall).to.have.been.calledWith('team-2', policyId);
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    it('rebuilds per linked team when transitioning out of approved (→ reviewed)', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves(linkedTeamPolicies);
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await invoke('approved', 'reviewed');
+
+      expect(rebuildStub).to.have.been.calledTwice;
+      expect(rebuildStub.firstCall).to.have.been.calledWith('team-1');
+      expect(rebuildStub.secondCall).to.have.been.calledWith('team-2');
+      expect(materializeStub).to.not.have.been.called;
+    });
+
+    it('rebuilds per linked team when transitioning out of approved (→ denied)', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves(linkedTeamPolicies);
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await invoke('approved', 'denied');
+
+      expect(rebuildStub).to.have.been.calledTwice;
+      expect(materializeStub).to.not.have.been.called;
+    });
+
+    it('fetches team policies but fires neither branch for transitions not involving approved', async () => {
+      const getTeamPoliciesStub = sinon
+        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
+        .resolves(linkedTeamPolicies);
+      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
+
+      await invoke('requested', 'reviewed');
+
+      expect(getTeamPoliciesStub).to.have.been.calledOnce;
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+  });
+
   describe('deletePolicy', () => {
     it('should fetch teams and statements before soft-delete, then clean up scope mappings', async () => {
       const mockStatements: PolicyStatement[] = [
@@ -654,6 +753,7 @@ describe('PolicyService', () => {
         submission_feature_urn: 'urn:*:telemetry:*'
       };
 
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
@@ -697,6 +797,7 @@ describe('PolicyService', () => {
         submission_feature_urn: 'urn:*:telemetry:*'
       };
 
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
@@ -733,6 +834,7 @@ describe('PolicyService', () => {
         description: 'desc',
         status: 'approved'
       };
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
@@ -754,6 +856,7 @@ describe('PolicyService', () => {
         description: 'desc',
         status: 'reviewed'
       };
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
@@ -793,6 +896,7 @@ describe('PolicyService', () => {
         submission_feature_urn: 'urn:*:telemetry:*'
       };
 
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
       sinon
@@ -825,6 +929,7 @@ describe('PolicyService', () => {
         description: 'desc',
         status: 'approved'
       };
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
@@ -841,6 +946,159 @@ describe('PolicyService', () => {
       expect(materializeTeamAccessStub).to.have.been.calledTwice;
       expect(materializeTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
       expect(materializeTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
+    });
+
+    // B7: Combined { status: 'approved', statements } on a reviewed policy with linked teams.
+    // The shared `applyCacheFanOutForTransition` fans out materialize once per team for
+    // the reviewed → approved transition. The same-status tail block at the end of
+    // `updatePolicyWithStatements` is skipped because previousStatus !== nextStatus,
+    // so anchor-publish jobs are not doubled.
+    it('combined approval + statement replacement fires team-access materialization exactly once per team', async () => {
+      const reviewedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Reviewing',
+        description: 'desc',
+        status: 'reviewed'
+      };
+      const approvedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved',
+        description: 'desc',
+        status: 'approved'
+      };
+      const newStatement: PolicyStatement = {
+        policy_statement_id: 'new-s1',
+        policy_id: '1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:*:telemetry:*'
+      };
+
+      // `getPolicy` is called once to capture the previous status. The transition
+      // validator runs against that snapshot; the repository's `updatePolicy` below
+      // is a plain row write with no orchestration of its own.
+      const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(reviewedPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(approvedPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
+      sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', { status: 'approved' } as UpdatePolicy, [
+        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
+      ]);
+
+      expect(materializeTeamAccessStub).to.have.been.calledTwice;
+      expect(materializeTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
+      expect(materializeTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
+      expect(getPolicyStub).to.have.been.calledOnce;
+    });
+
+    // B8: Combined { status: 'reviewed', statements } downgrade on an approved policy.
+    // The shared `applyCacheFanOutForTransition` fans out rebuild once per team for
+    // the approved → reviewed transition. The same-status tail block is skipped
+    // because previousStatus !== nextStatus.
+    it('combined downgrade + statement replacement issues per-team rebuilds and skips the tail materialize', async () => {
+      const approvedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved',
+        description: 'desc',
+        status: 'approved'
+      };
+      const reviewedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Reviewed',
+        description: 'desc',
+        status: 'reviewed'
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(approvedPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(reviewedPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
+        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+      ]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      await policyService.updatePolicyWithStatements('1', { status: 'reviewed' } as UpdatePolicy, []);
+
+      expect(materializeTeamAccessStub).to.not.have.been.called;
+      expect(rebuildStub).to.have.been.calledTwice;
+      expect(rebuildStub.firstCall).to.have.been.calledWith('team-1');
+      expect(rebuildStub.secondCall).to.have.been.calledWith('team-2');
+    });
+
+    // B9: Invalid status transition is rejected before any statement mutation happens.
+    // The fail-fast guard exists so a rejected transition cannot leave the statement
+    // set replaced and the policy row unchanged.
+    it('rejects an invalid status transition before deleting old statements or writing new ones', async () => {
+      const deniedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Denied',
+        description: 'desc',
+        status: 'denied'
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(deniedPolicy);
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy');
+      const deleteStmtStub = sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement');
+      const insertStmtStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement');
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+
+      try {
+        await policyService.updatePolicyWithStatements('1', { status: 'approved' } as UpdatePolicy, [
+          { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
+        ]);
+        expect.fail('expected updatePolicyWithStatements to throw for invalid transition');
+      } catch (error) {
+        expect((error as Error).message).to.match(/Invalid policy status transition: denied -> approved/);
+      }
+
+      expect(updateStub).to.not.have.been.called;
+      expect(deleteStmtStub).to.not.have.been.called;
+      expect(insertStmtStub).to.not.have.been.called;
+    });
+
+    // B10: Same-status combined update on an approved policy. The shared
+    // `applyCacheFanOutForTransition` is a no-op on same-status calls, so the tail
+    // block at the end of `updatePolicyWithStatements` is the only path that
+    // re-derives the cache. Without it, a statement swap would leave the team
+    // pointing at the deleted statements' scope mappings.
+    it('fires the tail materialize when the combined update is same-status approved + statements', async () => {
+      const approvedPolicy: Policy = {
+        policy_id: '1',
+        name: 'Approved',
+        description: 'desc',
+        status: 'approved'
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(approvedPolicy);
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(approvedPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      sinon
+        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
+        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const materializeTeamAccessStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
+        .resolves();
+
+      await policyService.updatePolicyWithStatements('1', { status: 'approved' } as UpdatePolicy, []);
+
+      expect(materializeTeamAccessStub).to.have.been.calledOnceWith('team-1', '1');
     });
   });
 });

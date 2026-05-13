@@ -239,7 +239,7 @@ describe('SecurityScopeService', () => {
 
     it('A1: materializes ALLOW statements then issues the team grant (effect gate + ordering)', async () => {
       const getStatementsStub = sinon
-        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
         .resolves([
           { policy_statement_id: statementOneId, submission_feature_urn: urnOne },
           { policy_statement_id: statementTwoId, submission_feature_urn: urnTwo }
@@ -285,7 +285,7 @@ describe('SecurityScopeService', () => {
     });
 
     it('A2: not approved → short-circuits before any materialization or team grant', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([]);
+      sinon.stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy').resolves([]);
 
       const insertScopeStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope');
       const insertMappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope');
@@ -306,7 +306,7 @@ describe('SecurityScopeService', () => {
       // on both gates). At the service layer the two cases are indistinguishable
       // and both short-circuit before the team-grant insert. The integration test
       // suite covers the SQL-layer distinction.
-      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([]);
+      sinon.stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy').resolves([]);
 
       const insertScopeStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope');
       const insertTeamGrantStub = sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy');
@@ -319,7 +319,7 @@ describe('SecurityScopeService', () => {
 
     it('A4: ALLOW statement URN already has a scope → existing scope reused, mapping inserted, anchor re-queued', async () => {
       sinon
-        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
         .resolves([{ policy_statement_id: statementOneId, submission_feature_urn: urnOne }]);
 
       sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash-1');
@@ -348,7 +348,7 @@ describe('SecurityScopeService', () => {
 
     it('A5: called twice with the same args → both resolve (idempotency)', async () => {
       sinon
-        .stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy')
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
         .resolves([{ policy_statement_id: statementOneId, submission_feature_urn: urnOne }]);
       sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash-1');
       sinon
@@ -373,7 +373,7 @@ describe('SecurityScopeService', () => {
     });
 
     it('A6: publish failure on the first statement aborts before the team grant runs', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'getActiveAllowStatementsForApprovedPolicy').resolves([
+      sinon.stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy').resolves([
         { policy_statement_id: statementOneId, submission_feature_urn: urnOne },
         { policy_statement_id: statementTwoId, submission_feature_urn: urnTwo }
       ]);

@@ -476,8 +476,12 @@ export class SecurityScopeRepository extends BaseRepository {
   /**
    * Insert team_security_scope rows for a team's scopes derived from a specific policy.
    *
-   * Walks the policy → policy_statement → policy_statement_scope chain to find
-   * all scopes granted by the policy, then inserts team_security_scope rows.
+   * The team-link invariant — cache rows exist iff a live `team_policy` ties the
+   * team to an approved policy with at least one ALLOW statement — is enforced
+   * in this SQL via the `team_policy` join. A stale caller that holds onto a
+   * `(teamId, policyId)` pair after the link has been soft-deleted cannot
+   * recreate cache rows; the join filters them out.
+   *
    * ON CONFLICT DO NOTHING makes this safe for idempotent calls — a team may
    * already have access to the same scope through a different policy.
    *
@@ -487,19 +491,24 @@ export class SecurityScopeRepository extends BaseRepository {
   async insertTeamSecurityScopesForPolicy(teamId: string, policyId: string): Promise<void> {
     const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
-      SELECT ${teamId}, pss.security_scope_id
-      FROM policy p
+      SELECT tp.team_id, pss.security_scope_id
+      FROM team_policy tp
+      JOIN policy p
+        ON p.policy_id = tp.policy_id
+        AND p.status = 'approved'
+        AND p.record_end_date IS NULL
       JOIN policy_statement ps
         ON ps.policy_id = p.policy_id
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
-      JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
+      JOIN policy_statement_scope pss
+        ON pss.policy_statement_id = ps.policy_statement_id
       JOIN team t
-        ON t.team_id = ${teamId}
+        ON t.team_id = tp.team_id
         AND t.record_end_date IS NULL
-      WHERE p.policy_id = ${policyId}
-        AND p.status = 'approved'
-        AND p.record_end_date IS NULL
+      WHERE tp.team_id = ${teamId}
+        AND tp.policy_id = ${policyId}
+        AND tp.record_end_date IS NULL
       ON CONFLICT (team_id, security_scope_id) DO NOTHING;
     `;
 
@@ -569,7 +578,7 @@ export class SecurityScopeRepository extends BaseRepository {
    * @param policyId UUID of the policy
    * @returns Array of `{ policy_statement_id, submission_feature_urn }` for active ALLOW statements
    */
-  async getActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<PolicyStatementUrn[]> {
+  async findActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<PolicyStatementUrn[]> {
     const sqlStatement = SQL`
       SELECT ps.policy_statement_id, ps.submission_feature_urn
       FROM policy p

@@ -119,38 +119,94 @@ export class PolicyService extends DBService {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
-    // Explicit approval requests are guarded: requests must be reviewed before approval.
-    if (policyData.status === 'approved') {
-      this.assertCanApproveRequest(currentPolicy.status);
-    }
-
-    // Enforce lifecycle transition matrix for all status changes.
     this.assertValidStatusTransition(currentPolicy.status, policyData.status);
 
     const updated = await this.policyRepository.updatePolicy(policyId, policyData);
 
-    // Orchestrate the access cache for any linked team_policies. Validation must
-    // succeed before this point so a rejected status write cannot mutate the cache.
-    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
-    if (teamPolicies.length === 0) {
-      return updated;
+    // Cache orchestration runs only after the row write succeeds — a rejected
+    // status write must not mutate the cache.
+    await this.applyCacheFanOutForTransition(policyId, currentPolicy.status, policyData.status);
+
+    return updated;
+  }
+
+  /**
+   * Apply the access-cache side effects implied by a policy status transition.
+   *
+   * The cache materializes lazily and reflects standing access only: a row
+   * exists iff a live `team_policy` links a team to an approved policy with at
+   * least one ALLOW statement. Two transitions move rows in or out:
+   *
+   *   - `* → approved` materializes scope + mapping + team-grant rows for each
+   *     linked team.
+   *   - `approved → *` rebuilds each linked team from the remaining policy
+   *     chain. Without the reverse direction, a downgraded policy would
+   *     silently keep granting access.
+   *
+   * Same-status calls and transitions that do not involve `approved` (e.g.
+   * `requested → reviewed`) are no-ops; the call shape `(policyId, from, to)`
+   * stays the same so callers do not need to branch on whether status changed.
+   *
+   * Teams are processed sequentially to pin grant ordering and keep the
+   * connection-use window bounded.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @param {PolicyStatus} from - Status the policy held before the write.
+   * @param {PolicyStatus} to - Status the policy holds after the write.
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  private async applyCacheFanOutForTransition(policyId: string, from: PolicyStatus, to: PolicyStatus): Promise<void> {
+    if (from === to) {
+      return;
     }
 
-    if (policyData.status === 'approved') {
-      // Transition into approved — populate the cache for each linked team.
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+    if (teamPolicies.length === 0) {
+      return;
+    }
+
+    if (to === 'approved') {
       for (const teamPolicy of teamPolicies) {
         await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamPolicy.team_id, policyId);
       }
-    } else if (currentPolicy.status === 'approved') {
-      // Transition out of approved — rebuild each linked team from the remaining
-      // policy chain. Without the reverse direction, a downgraded policy would
-      // silently keep granting access.
+    } else if (from === 'approved') {
       for (const teamPolicy of teamPolicies) {
         await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
       }
     }
+  }
 
-    return updated;
+  /**
+   * Validate lifecycle transition between two policy status values.
+   *
+   * Encodes the full transition matrix plus the additional "requested cannot
+   * jump directly to approved" guard so callers compose a single validation
+   * call. Throws `HTTP400` on invalid transitions; same-status calls should be
+   * filtered by the caller before reaching this method.
+   *
+   * @private
+   * @param {PolicyStatus} current - Current policy status.
+   * @param {PolicyStatus} next - Target policy status.
+   * @return {void}
+   * @memberof PolicyService
+   */
+  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
+    if (next === 'approved') {
+      this.assertCanApproveRequest(current);
+    }
+
+    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
+      requested: ['reviewed', 'denied'],
+      reviewed: ['approved', 'denied'],
+      approved: ['reviewed', 'denied'],
+      denied: ['reviewed']
+    };
+
+    if (!validTransitions[current].includes(next)) {
+      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
+    }
   }
 
   /**
@@ -167,28 +223,6 @@ export class PolicyService extends DBService {
 
     if (blockedStatuses.has(current)) {
       throw new HTTP400(`Cannot approve request while policy is '${current}'`);
-    }
-  }
-
-  /**
-   * Validate lifecycle transition between two policy status values.
-   *
-   * @private
-   * @param {PolicyStatus} current - Current policy status.
-   * @param {PolicyStatus} next - Target policy status.
-   * @return {void}
-   * @memberof PolicyService
-   */
-  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
-    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
-      requested: ['reviewed', 'denied'],
-      reviewed: ['approved', 'denied'],
-      approved: ['reviewed', 'denied'],
-      denied: ['reviewed']
-    };
-
-    if (!validTransitions[current].includes(next)) {
-      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
     }
   }
 
@@ -309,12 +343,15 @@ export class PolicyService extends DBService {
   /**
    * Update a policy and fully replace its statements and conditions.
    *
-   * After the statement set is replaced, re-derive the access cache for each
-   * live `team_policy` so the cache reflects the new statement set. The grant
-   * call short-circuits inside `SecurityScopeService` when the policy is not
-   * approved, so non-approved policies skip the fan-out cleanly. Teams are
-   * processed sequentially (not via `Promise.all`) to pin grant ordering and
-   * to keep the connection-use window bounded.
+   * Order is deliberate: status-transition validation runs first so a rejected
+   * transition cannot leave the statement set replaced and the policy row
+   * unchanged. Statements are replaced next, then stale scope mappings are
+   * cleaned up, then the policy row is written. The shared transition helper
+   * runs last so the single cache orchestration sees the new statement set.
+   *
+   * For approved policies whose status did not change, the helper is a no-op
+   * — but the statement set still changed, so the cache is re-derived here
+   * with a per-team materialize against the new mappings.
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
@@ -327,10 +364,18 @@ export class PolicyService extends DBService {
     policyData: UpdatePolicy,
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
-    // Apply policy metadata and status changes first, including lifecycle validation.
-    const policy = await this.updatePolicy(policyId, policyData);
+    // Capture state up front so we can decide validation + final orchestration.
+    const previousPolicy = await this.policyRepository.getPolicy(policyId);
+    const previousStatus = previousPolicy.status;
+    const nextStatus = policyData.status ?? previousStatus;
 
-    // Capture existing statement associations before replacement.
+    // Validate the status transition before any mutation so a rejected
+    // transition cannot leave the statement set replaced and the row unchanged.
+    if (policyData.status !== undefined && policyData.status !== previousStatus) {
+      this.assertValidStatusTransition(previousStatus, policyData.status);
+    }
+
+    // Capture existing statement associations + linked teams before replacement.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
     const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
 
@@ -349,9 +394,19 @@ export class PolicyService extends DBService {
       await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
     }
 
-    // Re-derive the access cache for each live team_policy against the new
-    // statement set. Non-approved policies short-circuit inside the service.
-    if (policy.status === 'approved' && affectedTeamIds.length > 0) {
+    // Write the policy row directly — validation already ran above so we do
+    // not need to re-enter the public `updatePolicy` path (which would also
+    // orchestrate, doubling the fan-out). The shared transition helper below
+    // owns the cache side effect.
+    const policy = await this.policyRepository.updatePolicy(policyId, policyData);
+
+    await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus);
+
+    // Statement-set replacement on an approved policy with linked teams must
+    // re-derive the cache even when status did not change — the transition
+    // helper is a no-op on same-status calls, and the new mappings do not
+    // exist in `team_security_scope` until we materialize.
+    if (previousStatus === nextStatus && nextStatus === 'approved' && affectedTeamIds.length > 0) {
       for (const teamId of affectedTeamIds) {
         await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
       }
