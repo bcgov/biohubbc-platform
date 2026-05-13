@@ -57,7 +57,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     const systemUserId = connection.systemUserId();
     const result = await connection.sql(SQL`
       INSERT INTO policy (name, status, create_user)
-      VALUES (${name}, ${status}, ${systemUserId})
+      VALUES (${name}, ${status}::policy_status, ${systemUserId})
       RETURNING policy_id;
     `);
     return result.rows[0].policy_id;
@@ -67,7 +67,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     const systemUserId = connection.systemUserId();
     const result = await connection.sql(SQL`
       INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, ${effect}, ${urn}, ${systemUserId})
+      VALUES (${policyId}, ${effect}::policy_effect, ${urn}, ${systemUserId})
       RETURNING policy_statement_id;
     `);
     return result.rows[0].policy_statement_id;
@@ -106,15 +106,17 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     return result.rows[0].count;
   }
 
-  // Unique URN suffix per test so concurrent runs / seeded scopes don't collide.
-  let _seq = 0;
-  const uniqueUrn = (label: string) => `urn:99999:test_${label}_${Date.now()}_${++_seq}:*`;
+  // URNs use real feature_type names — `tr_policy_statement_urn_validation` rejects
+  // unknown types. Tests use type-wildcard URNs (urn:*:<type>:*) so no real submission
+  // is needed; transaction rollback handles isolation between tests.
+  const URN_A = 'urn:*:dataset:*';
+  const URN_B = 'urn:*:marking:*';
 
   // ── Tests ───────────────────────────────────────────────────────────
 
   it('materializes team_security_scope when status transitions requested → reviewed → approved', async () => {
     const policyId = await insertPolicy('flip-up', 'requested');
-    await insertStatement(policyId, uniqueUrn('flip_up'), 'allow');
+    await insertStatement(policyId, URN_A, 'allow');
     const teamId = await createTeam(connection, 'flip-up-team');
     await insertTeamPolicy(teamId, policyId);
 
@@ -129,13 +131,12 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
   });
 
   it("removes only the downgraded policy's team_security_scope rows on approved → reviewed, preserving shared-scope grants from other live policies", async () => {
-    const sharedUrn = uniqueUrn('shared');
     const policyA = await insertPolicy('shared-A', 'approved');
-    await insertStatement(policyA, sharedUrn, 'allow');
+    await insertStatement(policyA, URN_A, 'allow');
     const policyB = await insertPolicy('shared-B', 'approved');
-    await insertStatement(policyB, sharedUrn, 'allow');
+    await insertStatement(policyB, URN_A, 'allow');
     const policyC = await insertPolicy('exclusive-C', 'approved');
-    await insertStatement(policyC, uniqueUrn('exclusive'), 'allow');
+    await insertStatement(policyC, URN_B, 'allow');
 
     const teamId = await createTeam(connection, 'shared-team');
     await insertTeamPolicy(teamId, policyA);
@@ -146,7 +147,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyA);
     await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyB);
     await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyC);
-    // sharedUrn dedupes to one security_scope row → team has 2 distinct scopes.
+    // URN_A dedupes to one security_scope row → team has 2 distinct scopes.
     expect(await countTeamScopes(teamId)).to.equal(2);
 
     // Downgrade A — B still justifies the shared scope; C still justifies its exclusive scope.
@@ -161,7 +162,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
 
   it('produces zero team_security_scope rows for an approved policy with DENY-only statements', async () => {
     const policyId = await insertPolicy('deny-only', 'approved');
-    await insertStatement(policyId, uniqueUrn('deny_only'), 'deny');
+    await insertStatement(policyId, URN_A, 'deny');
     const teamId = await createTeam(connection, 'deny-only-team');
     await insertTeamPolicy(teamId, policyId);
 
@@ -173,8 +174,8 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
 
   it('excludes statements with record_end_date IS NOT NULL from materialization', async () => {
     const policyId = await insertPolicy('mixed-ended', 'approved');
-    const liveStmt = await insertStatement(policyId, uniqueUrn('live'), 'allow');
-    const endedStmt = await insertStatement(policyId, uniqueUrn('ended'), 'allow');
+    const liveStmt = await insertStatement(policyId, URN_A, 'allow');
+    const endedStmt = await insertStatement(policyId, URN_B, 'allow');
     await softEndStatement(endedStmt);
     const teamId = await createTeam(connection, 'mixed-ended-team');
     await insertTeamPolicy(teamId, policyId);
