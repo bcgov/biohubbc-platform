@@ -1,7 +1,7 @@
 import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { CreateDataRequestDialog } from 'features/admin/tickets/components/dialog/data-request/CreateDataRequestDialog';
+import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
