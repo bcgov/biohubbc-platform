@@ -42,6 +42,20 @@ export const CreateDataRequestPayload = z.object({
 });
 export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;
 
+/**
+ * Request-body shape for `POST /api/data-request`. Omits `requested_by` so the route
+ * authoritatively injects it from `connection.systemUserId()` rather than trusting the
+ * client. `.strict()` rejects unknown keys — including a stray `expression.ui_id` from
+ * the frontend — so decoder bugs fail fast at the boundary instead of flowing into a
+ * persisted policy / expression tree. `reason` is tightened to `min(1)` so the route
+ * rejects an empty string at the boundary instead of letting it through to the
+ * ticket-subject helper.
+ */
+export const CreateDataRequestRequestBody = CreateDataRequestPayload.omit({ requested_by: true })
+  .extend({ reason: z.string().min(1) })
+  .strict();
+export type CreateDataRequestRequestBody = z.infer<typeof CreateDataRequestRequestBody>;
+
 export const UpdateDataRequest = z.object({
   reason: z.string().optional()
 });

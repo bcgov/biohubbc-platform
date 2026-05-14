@@ -1,7 +1,8 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
-import { DataRequestFilters } from '../../models/data-request';
+import { HTTP400 } from '../../errors/http-error';
+import { CreateDataRequestRequestBody, DataRequestFilters } from '../../models/data-request';
 import {
   CreateDataRequestRequestSchema,
   DataRequestListResponseSchema,
@@ -160,23 +161,39 @@ export function findDataRequests(): RequestHandler {
 /**
  * Create a data request owned by the current user context.
  *
+ * The request body is validated with Zod (`CreateDataRequestRequestBody`) rather than the
+ * OpenAPI schema. Two reasons: the optional `expression` field is a recursive discriminated
+ * union that OpenAPI cannot fully express, and `.strict()` rejects unknown keys (e.g. a stray
+ * `ui_id` on an expression node) so frontend decoder bugs surface as a 400 instead of being
+ * silently persisted into a policy.
+ *
+ * `requested_by` is injected from `connection.systemUserId()` after parse — the request body
+ * schema deliberately omits it so a client cannot impersonate another user.
+ *
  * @returns {RequestHandler}
  */
 export function createDataRequest(): RequestHandler {
   return async (req, res) => {
+    const parseResult = CreateDataRequestRequestBody.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new HTTP400('Invalid request body', parseResult.error.issues);
+    }
+
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const { reason, system_user_ids } = req.body;
+      const { reason, system_user_ids, featureTypes, expression } = parseResult.data;
 
       const dataRequestService = new DataRequestService(connection);
       const dataRequest = await dataRequestService.createDataRequest({
         requested_by: systemUserId,
         reason,
-        system_user_ids
+        system_user_ids,
+        featureTypes,
+        expression: expression ?? null
       });
 
       await connection.commit();
