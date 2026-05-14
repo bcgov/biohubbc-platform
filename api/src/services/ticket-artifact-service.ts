@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { TicketArtifact } from '../models/ticket-artifact';
-import { TicketArtifactRepository } from '../repositories/ticket-artifact-repository';
+import { TicketArtifactFilters, TicketArtifactRepository } from '../repositories/ticket-artifact-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -54,10 +55,28 @@ export class TicketArtifactService extends DBService {
    * can be matched to ticket files.
    *
    * @param {string} ticketId - Ticket UUID.
+   * @param {TicketArtifactFilters} [filters] - Optional filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination.
    * @returns {Promise<TicketArtifact[]>} Active attachments with display object keys.
    * @memberof TicketArtifactService
    */
-  async getTicketArtifacts(ticketId: string): Promise<TicketArtifact[]> {
-    return this.ticketArtifactRepository.getTicketArtifacts(ticketId);
+  async getTicketArtifacts(
+    ticketId: string,
+    filters?: TicketArtifactFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<TicketArtifact[]> {
+    return this.ticketArtifactRepository.getTicketArtifacts(ticketId, filters, pagination);
+  }
+
+  /**
+   * Count active attachments for a ticket.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {TicketArtifactFilters} [filters] - Optional filters.
+   * @returns {Promise<number>} Active attachment count.
+   * @memberof TicketArtifactService
+   */
+  async getTicketArtifactsCount(ticketId: string, filters?: TicketArtifactFilters): Promise<number> {
+    return this.ticketArtifactRepository.getTicketArtifactsCount(ticketId, filters);
   }
 }

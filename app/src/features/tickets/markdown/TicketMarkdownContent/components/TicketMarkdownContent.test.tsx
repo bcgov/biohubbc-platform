@@ -4,7 +4,7 @@ import { render } from 'test-helpers/test-utils';
 import { TicketMarkdownContent } from './TicketMarkdownContent';
 
 const ticketArtifact = (
-  artifact: Pick<ITicketArtifact, 'ticket_artifact_id' | 'artifact_id' | 'key'>
+  artifact: Pick<ITicketArtifact, 'ticket_artifact_id' | 'artifact_id' | 'object_key'>
 ): ITicketArtifact => ({
   ticket_id: '22222222-2222-4222-8222-222222222222',
   record_end_date: null,
@@ -33,7 +33,7 @@ describe('TicketMarkdownContent', () => {
           ticketArtifact({
             ticket_artifact_id: '3ea79946-8cf2-4792-9239-5b148f9f95eb',
             artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
-            key: 'tickets/ticket-id/upload/upload-id/report.pdf'
+            object_key: 'tickets/ticket-id/upload/upload-id/report.pdf'
           })
         ]}
       />
@@ -47,7 +47,7 @@ describe('TicketMarkdownContent', () => {
     const artifact = ticketArtifact({
       ticket_artifact_id: '3ea79946-8cf2-4792-9239-5b148f9f95eb',
       artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
-      key: 'tickets/ticket-id/upload/upload-id/report.pdf'
+      object_key: 'tickets/ticket-id/upload/upload-id/report.pdf'
     });
 
     render(

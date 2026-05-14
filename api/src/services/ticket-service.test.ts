@@ -177,7 +177,7 @@ describe('TicketService', () => {
           artifact_id: '88888888-8888-4888-8888-888888888888',
           record_end_date: null,
           create_date: '2026-02-25T01:30:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const referenceLog: TicketReference[] = [

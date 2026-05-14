@@ -7,6 +7,8 @@ import {
   ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
+  IGetTicketArtifactsQueryParams,
+  IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ITicketSystemUser,
   ITicket,
@@ -185,6 +187,25 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get paginated ticket attachment artifacts for an admin ticket detail view.
+   *
+   * @param {string} ticketId
+   * @param {IGetTicketArtifactsQueryParams} [params]
+   * @return {Promise<IGetTicketArtifactsResponse>}
+   */
+  const getTicketArtifacts = async (
+    ticketId: string,
+    params?: IGetTicketArtifactsQueryParams
+  ): Promise<IGetTicketArtifactsResponse> => {
+    const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
+
+    return data;
+  };
+
+  /**
    * Get a presigned download URL for a ticket attachment artifact.
    *
    * @param {string} ticketId
@@ -311,6 +332,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicketComment,
     createTicketUpload,
     completeTicketUpload,
+    getTicketArtifacts,
     getTicketArtifactDownloadUrl,
     createTicketReference,
     deleteTicketReference,
