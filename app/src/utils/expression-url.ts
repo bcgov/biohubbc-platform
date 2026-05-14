@@ -1,35 +1,12 @@
 import {
+  EXPRESSION_PREDICATE_OPERATORS,
   ExpressionLogicalOperator,
-  ExpressionPredicateOperator,
   ExpressionTreeExpression
 } from 'interfaces/expression.interface';
 
 const LOGICAL_OPERATORS: ReadonlySet<string> = new Set<ExpressionLogicalOperator>(['AND', 'OR']);
 
-const PREDICATE_OPERATORS: ReadonlySet<string> = new Set<ExpressionPredicateOperator>([
-  'Equals',
-  'NotEquals',
-  'Like',
-  'ILike',
-  'StartsWith',
-  'EndsWith',
-  'Contains',
-  'GreaterThan',
-  'GreaterThanOrEqual',
-  'LessThan',
-  'LessThanOrEqual',
-  'Before',
-  'After',
-  'OnDate',
-  'OnTime',
-  'ParentOf',
-  'ChildOf',
-  'DescendsFrom',
-  'AscendsFrom',
-  'Within',
-  'Intersects',
-  'Exists'
-]);
+const PREDICATE_OPERATORS: ReadonlySet<string> = new Set(EXPRESSION_PREDICATE_OPERATORS);
 
 /**
  * Recursively stringifies a value with object keys sorted alphabetically.
@@ -98,6 +75,12 @@ export function isValidExpressionTree(value: unknown): value is ExpressionTreeEx
   return isValidExpression(value);
 }
 
+/**
+ * Validates a JSON object as an expression group node (`type: 'expression'`).
+ *
+ * @param value - Candidate clause or root node from parsed JSON.
+ * @returns `true` when the value matches the expected expression shape.
+ */
 function isValidExpression(value: unknown): value is ExpressionTreeExpression {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -132,6 +115,12 @@ function isValidExpression(value: unknown): value is ExpressionTreeExpression {
   return (node['clauses'] as unknown[]).every(isValidClause);
 }
 
+/**
+ * Validates one clause entry: either a nested expression or a predicate leaf.
+ *
+ * @param value - One element of a `clauses` array from parsed JSON.
+ * @returns `true` when the clause is a valid expression or predicate node.
+ */
 function isValidClause(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -150,6 +139,12 @@ function isValidClause(value: unknown): boolean {
   return false;
 }
 
+/**
+ * Validates a predicate leaf node against API-aligned rules (strict keys, IDs, operator).
+ *
+ * @param node - Parsed JSON object expected to be a predicate clause.
+ * @returns `true` when the node is a valid predicate.
+ */
 function isValidPredicate(node: Record<string, unknown>): boolean {
   if (!hasOnlyKeys(node, ['type', 'feature_property_id', 'feature_type_property_id', 'operator', 'value'])) {
     return false;
@@ -174,6 +169,13 @@ function isValidPredicate(node: Record<string, unknown>): boolean {
   return true;
 }
 
+/**
+ * Normalizes a value for deterministic JSON: sorts object keys, preserves array order,
+ * and drops object keys whose normalized value is `undefined` (matches `JSON.stringify`).
+ *
+ * @param value - Any JSON-serializable subtree.
+ * @returns A structure safe to pass to `JSON.stringify` for stable output.
+ */
 function normalizeForStableStringify(value: unknown): unknown {
   if (Array.isArray(value)) {
     // Preserve authored array order (for expression clause semantics).
@@ -200,11 +202,23 @@ function normalizeForStableStringify(value: unknown): unknown {
   return value;
 }
 
+/**
+ * Returns true when every own key on `node` appears in `allowedKeys` (subset check).
+ * Does not require `node` to include every key in `allowedKeys`.
+ *
+ * @param node - Parsed object record.
+ * @param allowedKeys - Whitelist of permitted property names for strict schema validation.
+ */
 function hasOnlyKeys(node: Record<string, unknown>, allowedKeys: string[]): boolean {
   const keys = Object.keys(node);
   return keys.every((key) => allowedKeys.includes(key));
 }
 
+/**
+ * Type guard for positive finite integers (used for feature property IDs).
+ *
+ * @param value - Candidate id from parsed JSON.
+ */
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
