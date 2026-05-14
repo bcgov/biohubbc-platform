@@ -75,7 +75,7 @@ export class TicketArtifactRepository extends BaseRepository {
     pagination?: ApiPaginationOptions
   ): Knex.QueryBuilder {
     if (!pagination) {
-      return query.orderBy('ta.create_date', 'asc');
+      return query.orderBy('ta.create_date', 'desc');
     }
 
     if (pagination.limit) {
@@ -95,7 +95,7 @@ export class TicketArtifactRepository extends BaseRepository {
     if (pagination.sort && pagination.order && sortColumns[pagination.sort]) {
       query.orderBy(sortColumns[pagination.sort], pagination.order);
     } else {
-      query.orderBy('ta.create_date', 'asc');
+      query.orderBy('ta.create_date', 'desc');
     }
 
     return query;

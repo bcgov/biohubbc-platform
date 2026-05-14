@@ -93,12 +93,15 @@ describe('TicketArtifactRepository', () => {
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
-      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+      const knexStub = sinon.stub().returns(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
       const repo = new TicketArtifactRepository(mockDBConnection);
 
       const result = await repo.getTicketArtifacts('11111111-1111-1111-1111-111111111111');
 
       chai.expect(result).to.eql(rows);
+      chai.expect(knexStub).to.have.been.calledOnce;
+      chai.expect(knexStub.firstCall.args[0].toSQL().sql).to.contain('order by "ta"."create_date" desc');
     });
 
     it('accepts optional pagination', async () => {
@@ -128,6 +131,21 @@ describe('TicketArtifactRepository', () => {
       );
 
       chai.expect(result).to.eql(rows);
+    });
+
+    it('defaults to newest ticket artifacts first when pagination does not provide sorting', async () => {
+      const mockQueryResponse = Promise.resolve(mockQueryResult([], 0));
+      const knexStub = sinon.stub().returns(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new TicketArtifactRepository(mockDBConnection);
+
+      await repo.getTicketArtifacts('11111111-1111-1111-1111-111111111111', undefined, {
+        page: 1,
+        limit: 10
+      });
+
+      chai.expect(knexStub).to.have.been.calledOnce;
+      chai.expect(knexStub.firstCall.args[0].toSQL().sql).to.contain('order by "ta"."create_date" desc');
     });
   });
 

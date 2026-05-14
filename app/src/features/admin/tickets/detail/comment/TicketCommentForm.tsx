@@ -1,3 +1,5 @@
+import { mdiPaperclip } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -16,6 +18,7 @@ interface ITicketCommentFormProps {
   artifacts: ITicketArtifact[];
   setComment: (comment: string) => void;
   isUploadingAttachment: boolean;
+  disabled?: boolean;
   onUploadAttachment: (file: File) => Promise<void>;
 }
 
@@ -26,7 +29,7 @@ interface ITicketCommentFormProps {
  * @return {*}
  */
 export const TicketCommentForm = (props: ITicketCommentFormProps) => {
-  const { comment, artifacts, setComment, isUploadingAttachment, onUploadAttachment } = props;
+  const { comment, artifacts, setComment, isUploadingAttachment, disabled, onUploadAttachment } = props;
   const [activeTab, setActiveTab] = useState<TicketCommentFormView>('write');
   const viewOptions: ToggleButtonView<TicketCommentFormView>[] = [
     { value: 'write', label: 'Write' },
@@ -52,6 +55,10 @@ export const TicketCommentForm = (props: ITicketCommentFormProps) => {
           <TicketArtifactUpload
             label="Attach"
             isUploading={isUploadingAttachment}
+            disabled={disabled}
+            size="small"
+            startIcon={<Icon path={mdiPaperclip} size={0.75} rotate={45} />}
+            variant="text"
             onArtifactsSelected={handleAttachmentSelection}
           />
         </Box>

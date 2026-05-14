@@ -52,16 +52,18 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
       try {
         setIsUploadingAttachment(true);
 
+        const contentType = file.type || 'application/octet-stream';
+
         const initializedUpload = await api.tickets.createTicketUpload(ticketId, {
           file_name: file.name,
           byte_size: file.size,
-          content_type: file.type
+          content_type: contentType
         });
 
         await api.objectStorage.uploadFileToUrl({
           url: initializedUpload.presigned_upload_url,
           file,
-          contentType: file.type
+          contentType
         });
 
         const ticketArtifact = await api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, {

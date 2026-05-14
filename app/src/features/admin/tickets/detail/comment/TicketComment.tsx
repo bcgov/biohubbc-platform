@@ -42,6 +42,7 @@ export const TicketComment = (props: ITicketCommentProps) => {
           artifacts={artifacts}
           setComment={setComment}
           isUploadingAttachment={isUploadingAttachment}
+          disabled={isSaving}
           onUploadAttachment={onUploadAttachment}
         />
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>

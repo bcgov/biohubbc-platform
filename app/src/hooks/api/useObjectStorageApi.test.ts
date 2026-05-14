@@ -43,4 +43,19 @@ describe('useObjectStorageApi', () => {
 
     expect(mock.history.put[0].headers?.['Content-Type']).toBe('application/octet-stream');
   });
+
+  it('defaults to octet-stream when an empty content type is provided', async () => {
+    const url = 'https://object-store.example/upload';
+    const file = new File(['binary'], 'binary.dat', { type: '' });
+
+    mock.onPut(url).reply(200);
+
+    await useObjectStorageApi().uploadFileToUrl({
+      url,
+      file,
+      contentType: file.type
+    });
+
+    expect(mock.history.put[0].headers?.['Content-Type']).toBe('application/octet-stream');
+  });
 });

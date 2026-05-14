@@ -156,6 +156,24 @@ describe('TicketArtifacts', () => {
     });
   });
 
+  it('searches ticket artifacts by text input', async () => {
+    const user = userEvent.setup();
+
+    render(<TicketArtifacts ticket={ticket} />);
+
+    await user.type(screen.getByPlaceholderText('Search files'), 'field note');
+
+    await waitFor(() => {
+      expect(getTicketArtifacts).toHaveBeenCalledWith(ticket.ticket_id, {
+        search: 'field note',
+        page: 1,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      });
+    });
+  });
+
   it('uploads a selected file and refreshes ticket artifact data', async () => {
     const user = userEvent.setup();
     const uploadedTicketArtifact: ITicketArtifact = {

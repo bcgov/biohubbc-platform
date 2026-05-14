@@ -116,6 +116,16 @@ describe('TicketComment', () => {
     expect(screen.getByRole('button', { name: 'Comment' })).toBeDisabled();
   });
 
+  it('disables attachment upload while the comment is saving', () => {
+    const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TicketComment {...baseProps} comment="Draft comment" isSaving={true} onUploadAttachment={onUploadAttachment} />
+    );
+
+    expect(screen.getByRole('button', { name: 'Attach' })).toBeDisabled();
+  });
+
   it('triggers attachment callback when a file is selected', async () => {
     const user = userEvent.setup();
     const onUploadAttachment = vi.fn().mockResolvedValue(undefined);

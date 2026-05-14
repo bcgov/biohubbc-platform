@@ -1,13 +1,15 @@
-import { mdiPaperclip } from '@mdi/js';
-import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import Button, { ButtonProps } from '@mui/material/Button';
 import { useConfigContext, useDialogContext } from 'hooks/useContext';
-import { ChangeEvent, useRef } from 'react';
+import { ChangeEvent, ReactNode, useRef } from 'react';
 
 interface ITicketArtifactUploadProps {
   label: string;
   isUploading: boolean;
+  disabled?: boolean;
+  size: ButtonProps['size'];
+  startIcon: ReactNode;
+  variant: ButtonProps['variant'];
   onArtifactsSelected: (artifacts: File[]) => Promise<void> | void;
 }
 
@@ -21,7 +23,7 @@ interface ITicketArtifactUploadProps {
  * @return {*}
  */
 export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
-  const { label, isUploading, onArtifactsSelected } = props;
+  const { label, isUploading, disabled, size, startIcon, variant, onArtifactsSelected } = props;
   const config = useConfigContext();
   const dialogContext = useDialogContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,13 +49,14 @@ export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
       <Button
         aria-label={label}
         color="primary"
+        disabled={disabled || isUploading}
         loading={isUploading}
         onClick={() => {
           fileInputRef.current?.click();
         }}
-        size="small"
-        startIcon={<Icon path={mdiPaperclip} size={0.75} />}
-        variant="contained">
+        size={size}
+        startIcon={startIcon}
+        variant={variant}>
         {label}
       </Button>
       <input
@@ -61,6 +64,7 @@ export const TicketArtifactUpload = (props: ITicketArtifactUploadProps) => {
         type="file"
         multiple
         hidden
+        disabled={disabled || isUploading}
         onChange={handleFileSelection}
         aria-label={`${label} file input`}
       />
