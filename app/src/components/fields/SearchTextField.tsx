@@ -13,7 +13,7 @@ export type SearchTextFieldProps = ComponentProps<typeof CustomTextField>;
  * @return {*}
  */
 const SearchTextField = (props: SearchTextFieldProps) => {
-  const { slotProps, sx, ...rest } = props;
+  const { slotProps, ...rest } = props;
 
   return (
     <CustomTextField
@@ -29,7 +29,7 @@ const SearchTextField = (props: SearchTextFieldProps) => {
           )
         }
       }}
-      sx={[{ width: 250 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      sx={{ width: 250, ...rest.sx }}
     />
   );
 };
