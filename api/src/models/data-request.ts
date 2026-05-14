@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExpressionTree } from './expression-tree';
 import { PolicyStatus } from './policy';
 
 export const DataRequest = z.object({
@@ -35,7 +36,9 @@ export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 export const CreateDataRequestPayload = z.object({
   requested_by: z.number().int(),
   reason: z.string(),
-  system_user_ids: z.array(z.number().int())
+  system_user_ids: z.array(z.number().int()),
+  featureTypes: z.array(z.string()).min(1).optional(),
+  expression: ExpressionTree.nullable().optional()
 });
 export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;
 

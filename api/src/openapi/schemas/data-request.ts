@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -61,6 +62,19 @@ export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       description: 'System user ids to add to created data-request and policy-linked teams',
       items: { type: 'integer' }
+    },
+    featureTypes: {
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 1,
+      description:
+        'Optional feature-type names to scope the requested policy. When supplied, one ALLOW policy statement is created per feature type with URN urn:*:<featureType>:*. When omitted, the policy gets a single deny-all statement.'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      nullable: true,
+      description:
+        'Optional applied expression tree. When supplied (non-null), persisted once and linked as a fine-grained condition to every per-feature-type statement.'
     }
   }
 };
