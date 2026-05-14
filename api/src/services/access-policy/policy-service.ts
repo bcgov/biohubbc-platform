@@ -88,7 +88,19 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Update policy fields and validate lifecycle transitions when status changes.
+   * Update policy fields, validate lifecycle transitions, and keep the access
+   * cache in sync with the resulting status.
+   *
+   * The access cache (`security_scope`, `policy_statement_scope`,
+   * `team_security_scope`) must mirror the policy's approval state: an
+   * approved policy with linked `team_policies` must have rows; a non-approved
+   * policy must not. The reverse direction is load-bearing — without rebuilding
+   * each linked team when a policy leaves `approved`, the cache would silently
+   * keep granting access through a downgraded or denied policy.
+   *
+   * Validation runs before any cache writes so a rejected status change cannot
+   * mutate the cache. Teams are processed sequentially to pin grant ordering
+   * and keep the connection-use window bounded.
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
@@ -107,14 +119,102 @@ export class PolicyService extends DBService {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
-    // Explicit approval requests are guarded: requests must be reviewed before approval.
-    if (policyData.status === 'approved') {
-      this.assertCanApproveRequest(currentPolicy.status);
+    this.assertValidStatusTransition(currentPolicy.status, policyData.status);
+
+    const updated = await this.policyRepository.updatePolicy(policyId, policyData);
+
+    // Cache orchestration runs only after the row write succeeds — a rejected
+    // status write must not mutate the cache.
+    await this.applyCacheFanOutForTransition(policyId, currentPolicy.status, policyData.status);
+
+    return updated;
+  }
+
+  /**
+   * Apply the access-cache side effects implied by a policy status transition.
+   *
+   * The cache materializes lazily and reflects standing access only: a row
+   * exists iff a live `team_policy` links a team to an approved policy with at
+   * least one ALLOW statement. Two transitions move rows in or out:
+   *
+   *   - `* → approved` materializes scope + mapping + team-grant rows for each
+   *     linked team.
+   *   - `approved → *` rebuilds each linked team from the remaining policy
+   *     chain. Without the reverse direction, a downgraded policy would
+   *     silently keep granting access.
+   *
+   * Same-status calls and transitions that do not involve `approved` (e.g.
+   * `requested → reviewed`) are no-ops; the call shape `(policyId, from, to)`
+   * stays the same so callers do not need to branch on whether status changed.
+   *
+   * Teams are processed sequentially to pin grant ordering and keep the
+   * connection-use window bounded.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @param {PolicyStatus} from - Status the policy held before the write.
+   * @param {PolicyStatus} to - Status the policy holds after the write.
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  private async applyCacheFanOutForTransition(policyId: string, from: PolicyStatus, to: PolicyStatus): Promise<void> {
+    if (from === to) {
+      return;
     }
 
-    // Enforce lifecycle transition matrix for all status changes.
-    this.assertValidStatusTransition(currentPolicy.status, policyData.status);
-    return this.policyRepository.updatePolicy(policyId, policyData);
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+    if (teamPolicies.length === 0) {
+      return;
+    }
+
+    if (to === 'approved') {
+      // Materialize the shared statement-scope rows once for this policy, then
+      // grant access per team. The statement-scope work depends only on the
+      // policy, so splitting these avoids re-running the policy-wide INSERTs
+      // and re-publishing anchor jobs for every team in the fan-out.
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (!materialized) {
+        return;
+      }
+      for (const teamPolicy of teamPolicies) {
+        await this.securityScopeService.grantTeamAccessForPolicy(teamPolicy.team_id, policyId);
+      }
+    } else if (from === 'approved') {
+      for (const teamPolicy of teamPolicies) {
+        await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
+      }
+    }
+  }
+
+  /**
+   * Validate lifecycle transition between two policy status values.
+   *
+   * Encodes the full transition matrix plus the additional "requested cannot
+   * jump directly to approved" guard so callers compose a single validation
+   * call. Throws `HTTP400` on invalid transitions; same-status calls should be
+   * filtered by the caller before reaching this method.
+   *
+   * @private
+   * @param {PolicyStatus} current - Current policy status.
+   * @param {PolicyStatus} next - Target policy status.
+   * @return {void}
+   * @memberof PolicyService
+   */
+  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
+    if (next === 'approved') {
+      this.assertCanApproveRequest(current);
+    }
+
+    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
+      requested: ['reviewed', 'denied'],
+      reviewed: ['approved', 'denied'],
+      approved: ['reviewed', 'denied'],
+      denied: ['reviewed']
+    };
+
+    if (!validTransitions[current].includes(next)) {
+      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
+    }
   }
 
   /**
@@ -131,28 +231,6 @@ export class PolicyService extends DBService {
 
     if (blockedStatuses.has(current)) {
       throw new HTTP400(`Cannot approve request while policy is '${current}'`);
-    }
-  }
-
-  /**
-   * Validate lifecycle transition between two policy status values.
-   *
-   * @private
-   * @param {PolicyStatus} current - Current policy status.
-   * @param {PolicyStatus} next - Target policy status.
-   * @return {void}
-   * @memberof PolicyService
-   */
-  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
-    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
-      requested: ['reviewed', 'denied'],
-      reviewed: ['approved', 'denied'],
-      approved: ['reviewed', 'denied'],
-      denied: ['reviewed']
-    };
-
-    if (!validTransitions[current].includes(next)) {
-      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
     }
   }
 
@@ -248,7 +326,14 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Create a policy and its associated statements/conditions/scopes.
+   * Create a policy and its associated statements and conditions.
+   *
+   * Statement creation no longer materializes security scopes. The access-cache
+   * (`security_scope`, `policy_statement_scope`, `team_security_scope`) is only
+   * populated when a `team_policy` link exists and the policy is approved — that
+   * fan-out lives in `SecurityScopeService.materializePolicyStatementScopes` +
+   * `grantTeamAccessForPolicy` and fires from `TeamPolicyService.createTeamPolicy`
+   * and from policy approval.
    *
    * @param {CreatePolicy} policyData - Policy payload.
    * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
@@ -260,12 +345,22 @@ export class PolicyService extends DBService {
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
     const policy = await this.policyRepository.insertPolicy(policyData);
-    const createdStatements = await this.createStatementsWithScopes(policy.policy_id, statements);
+    const createdStatements = await this.createStatements(policy.policy_id, statements);
     return { ...policy, statements: createdStatements };
   }
 
   /**
-   * Update a policy and fully replace its statements/conditions/scopes.
+   * Update a policy and fully replace its statements and conditions.
+   *
+   * Order is deliberate: status-transition validation runs first so a rejected
+   * transition cannot leave the statement set replaced and the policy row
+   * unchanged. Statements are replaced next, then stale scope mappings are
+   * cleaned up, then the policy row is written. The shared transition helper
+   * runs last so the single cache orchestration sees the new statement set.
+   *
+   * For approved policies whose status did not change, the helper is a no-op
+   * — but the statement set still changed, so the cache is re-derived here
+   * with a per-team materialize against the new mappings.
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
@@ -278,10 +373,18 @@ export class PolicyService extends DBService {
     policyData: UpdatePolicy,
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
-    // Apply policy metadata and status changes first, including lifecycle validation.
-    const policy = await this.updatePolicy(policyId, policyData);
+    // Capture state up front so we can decide validation + final orchestration.
+    const previousPolicy = await this.policyRepository.getPolicy(policyId);
+    const previousStatus = previousPolicy.status;
+    const nextStatus = policyData.status ?? previousStatus;
 
-    // Capture existing statement and scope associations before replacement.
+    // Validate the status transition before any mutation so a rejected
+    // transition cannot leave the statement set replaced and the row unchanged.
+    if (policyData.status !== undefined && policyData.status !== previousStatus) {
+      this.assertValidStatusTransition(previousStatus, policyData.status);
+    }
+
+    // Capture existing statement associations + linked teams before replacement.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
     const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
 
@@ -292,19 +395,41 @@ export class PolicyService extends DBService {
       existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
     );
 
-    // Rebuild statements and recreate security scopes from the incoming payload.
-    const createdStatements = await this.createStatementsWithScopes(policyId, statements);
+    // Rebuild statements from the incoming payload.
+    const createdStatements = await this.createStatements(policyId, statements);
 
     // Remove outdated scope mappings for teams linked to this policy.
     if (oldStatementIds.length > 0) {
       await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
     }
 
+    // Write the policy row directly — validation already ran above so we do
+    // not need to re-enter the public `updatePolicy` path (which would also
+    // orchestrate, doubling the fan-out). The shared transition helper below
+    // owns the cache side effect.
+    const policy = await this.policyRepository.updatePolicy(policyId, policyData);
+
+    await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus);
+
+    // Statement-set replacement on an approved policy with linked teams must
+    // re-derive the cache even when status did not change — the transition
+    // helper is a no-op on same-status calls, and the new mappings do not
+    // exist in `team_security_scope` until we materialize.
+    if (previousStatus === nextStatus && nextStatus === 'approved' && affectedTeamIds.length > 0) {
+      // Materialize the policy-wide scope mappings once, then grant per team.
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (materialized) {
+        for (const teamId of affectedTeamIds) {
+          await this.securityScopeService.grantTeamAccessForPolicy(teamId, policyId);
+        }
+      }
+    }
+
     return { ...policy, statements: createdStatements };
   }
 
   /**
-   * Create policy statements, create nested conditions, and materialize security scopes.
+   * Create policy statements and their nested conditions and expressions.
    *
    * @private
    * @param {string} policyId - Policy UUID.
@@ -312,12 +437,11 @@ export class PolicyService extends DBService {
    * @return {Promise<PolicyStatementWithConditions[]>} Created statements with conditions.
    * @memberof PolicyService
    */
-  private async createStatementsWithScopes(
+  private async createStatements(
     policyId: string,
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyStatementWithConditions[]> {
-    // Create statements and nested conditions first.
-    const createdStatements = await Promise.all(
+    return Promise.all(
       statements.map(async (stmt) => {
         const statement = await this.policyStatementService.createPolicyStatement({
           policy_id: policyId,
@@ -347,15 +471,5 @@ export class PolicyService extends DBService {
         return { ...statement, conditions, ...(stmt.expression ? { expression: stmt.expression } : {}) };
       })
     );
-
-    // Materialize scope records after statement identifiers exist.
-    for (const stmt of createdStatements) {
-      await this.securityScopeService.createScopeForPolicyStatement(
-        stmt.policy_statement_id,
-        stmt.submission_feature_urn
-      );
-    }
-
-    return createdStatements;
   }
 }

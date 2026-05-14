@@ -16,6 +16,17 @@ export const PolicyStatement = z.object({
 
 export type PolicyStatement = z.infer<typeof PolicyStatement>;
 
+/**
+ * Picked shape for queries that return only the statement identity and its URN target.
+ * Used by the security-scope materialization path — the scope cache only needs to know
+ * which statement is being materialized and which feature URN it grants access to.
+ */
+export const PolicyStatementUrn = PolicyStatement.pick({
+  policy_statement_id: true,
+  submission_feature_urn: true
+});
+export type PolicyStatementUrn = z.infer<typeof PolicyStatementUrn>;
+
 export interface CreatePolicyStatement {
   policy_id: string;
   effect: PolicyEffect;
