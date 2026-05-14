@@ -1,6 +1,7 @@
 import { getArtifactMarkdownByMimeType } from 'features/admin/tickets/utils/ticketArtifactMarkdown';
 import { useTicketAttachmentUpload } from 'features/admin/tickets/hooks/useTicketAttachmentUpload';
 import { useTicketCommentCache } from 'features/admin/tickets/hooks/useTicketCommentCache';
+import { downloadTicketArtifact } from 'features/admin/tickets/utils/ticketArtifactDownload';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -44,34 +45,12 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
    * @returns {Promise<void>} Resolves after the signed URL is assigned or an error is shown.
    */
   const handleTicketArtifactDownload = async (artifact: ITicketArtifact) => {
-    const artifactWindow = window.open('', '_blank');
-
-    if (artifactWindow) {
-      artifactWindow.opener = null;
-    }
-
-    try {
-      const response = await api.tickets.getTicketArtifactDownloadUrl(ticket.ticket_id, artifact.ticket_artifact_id);
-
-      if (!artifactWindow) {
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: 'Unable to open attachment. Please allow pop-ups for this site.'
-        });
-        return;
-      }
-
-      artifactWindow.location.href = response.signed_url;
-    } catch (error) {
-      artifactWindow?.close();
-
-      const apiError = error as APIError;
-
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message || 'Failed to download attachment.'
-      });
-    }
+    await downloadTicketArtifact({
+      ticketId: ticket.ticket_id,
+      artifact,
+      getDownloadUrl: api.tickets.getTicketArtifactDownloadUrl,
+      setSnackbar: dialogContext.setSnackbar
+    });
   };
 
   /**

@@ -34,7 +34,7 @@ describe('TicketArtifactRepository', () => {
           artifact_id: mockArtifactIds[0],
           record_end_date: null,
           create_date: '2026-04-29T00:00:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
@@ -55,7 +55,7 @@ describe('TicketArtifactRepository', () => {
         artifact_id: '22222222-2222-2222-8222-222222222222',
         record_end_date: null,
         create_date: '2026-04-29T00:00:00.000Z',
-        key: 'tickets/abc/file.txt'
+        object_key: 'tickets/abc/file.txt'
       };
       const mockQueryResponse = Promise.resolve(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -89,16 +89,75 @@ describe('TicketArtifactRepository', () => {
           artifact_id: '22222222-2222-2222-8222-222222222222',
           record_end_date: null,
           create_date: '2026-04-29T00:00:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const knexStub = sinon.stub().returns(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
       const repo = new TicketArtifactRepository(mockDBConnection);
 
       const result = await repo.getTicketArtifacts('11111111-1111-1111-1111-111111111111');
 
       chai.expect(result).to.eql(rows);
+      chai.expect(knexStub).to.have.been.calledOnce;
+      chai.expect(knexStub.firstCall.args[0].toSQL().sql).to.contain('order by "ta"."create_date" desc');
+    });
+
+    it('accepts optional pagination', async () => {
+      const rows: TicketArtifact[] = [
+        {
+          ticket_artifact_id: '11111111-1111-1111-8111-111111111111',
+          ticket_id: '11111111-1111-1111-1111-111111111111',
+          artifact_id: '22222222-2222-2222-8222-222222222222',
+          record_end_date: null,
+          create_date: '2026-04-29T00:00:00.000Z',
+          object_key: 'tickets/abc/file.txt'
+        }
+      ];
+      const mockQueryResponse = Promise.resolve(mockQueryResult(rows, 1));
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+      const repo = new TicketArtifactRepository(mockDBConnection);
+
+      const result = await repo.getTicketArtifacts(
+        '11111111-1111-1111-1111-111111111111',
+        { search: 'file' },
+        {
+          page: 1,
+          limit: 10,
+          sort: 'create_date',
+          order: 'desc'
+        }
+      );
+
+      chai.expect(result).to.eql(rows);
+    });
+
+    it('defaults to newest ticket artifacts first when pagination does not provide sorting', async () => {
+      const mockQueryResponse = Promise.resolve(mockQueryResult([], 0));
+      const knexStub = sinon.stub().returns(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new TicketArtifactRepository(mockDBConnection);
+
+      await repo.getTicketArtifacts('11111111-1111-1111-1111-111111111111', undefined, {
+        page: 1,
+        limit: 10
+      });
+
+      chai.expect(knexStub).to.have.been.calledOnce;
+      chai.expect(knexStub.firstCall.args[0].toSQL().sql).to.contain('order by "ta"."create_date" desc');
+    });
+  });
+
+  describe('getTicketArtifactsCount', () => {
+    it('returns active ticket artifact count', async () => {
+      const mockQueryResponse = Promise.resolve(mockQueryResult([{ count: 3 }], 1));
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+      const repo = new TicketArtifactRepository(mockDBConnection);
+
+      const result = await repo.getTicketArtifactsCount('11111111-1111-1111-1111-111111111111');
+
+      chai.expect(result).to.equal(3);
     });
   });
 });

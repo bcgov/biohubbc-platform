@@ -26,7 +26,7 @@ export const useObjectStorageApi = () => {
 
     await axios.put(url, file, {
       headers: {
-        'Content-Type': contentType
+        'Content-Type': contentType || 'application/octet-stream'
       },
       timeout: 30000
     });

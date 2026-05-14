@@ -24,7 +24,7 @@ describe('paths/administrative/tickets/{ticketId}/upload/{uploadId}', () => {
       artifact_id: '44444444-4444-4444-8444-444444444444',
       record_end_date: null,
       create_date: '2026-04-29T00:00:00.000Z',
-      key: 'tickets/file.txt'
+      object_key: 'tickets/file.txt'
     };
     const mockDBConnection = getMockDBConnection({
       commit: sinon.stub(),
