@@ -49,10 +49,17 @@ export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;
  * the frontend — so decoder bugs fail fast at the boundary instead of flowing into a
  * persisted policy / expression tree. `reason` is tightened to `min(1)` so the route
  * rejects an empty string at the boundary instead of letting it through to the
- * ticket-subject helper.
+ * ticket-subject helper. `featureTypes` and `expression` are required at the boundary
+ * because the only caller is the search result page, which always supplies an active
+ * feature type and an applied expression (possibly `null`). Keeping the internal service
+ * payload permissive lets the legacy ticket-bound flow continue to omit both.
  */
 export const CreateDataRequestRequestBody = CreateDataRequestPayload.omit({ requested_by: true })
-  .extend({ reason: z.string().min(1) })
+  .extend({
+    reason: z.string().min(1),
+    featureTypes: z.array(z.string()).min(1),
+    expression: ExpressionTree.nullable()
+  })
   .strict();
 export type CreateDataRequestRequestBody = z.infer<typeof CreateDataRequestRequestBody>;
 

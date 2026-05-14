@@ -54,7 +54,7 @@ export const DataRequestListResponseSchema: OpenAPIV3.SchemaObject = {
 
 export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['reason', 'system_user_ids'],
+  required: ['reason', 'system_user_ids', 'featureTypes', 'expression'],
   additionalProperties: false,
   properties: {
     reason: { type: 'string', description: 'Reason for the data request' },
@@ -68,13 +68,13 @@ export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
       items: { type: 'string' },
       minItems: 1,
       description:
-        'Optional feature-type names to scope the requested policy. When supplied, one ALLOW policy statement is created per feature type with URN urn:*:<featureType>:*. When omitted, the policy gets a single deny-all statement.'
+        'Feature-type names to scope the requested policy. One ALLOW policy statement is created per feature type with URN urn:*:<featureType>:*.'
     },
     expression: {
       ...featureSearchExpressionTreeSchema,
       nullable: true,
       description:
-        'Optional applied expression tree. When supplied (non-null), persisted once and linked as a fine-grained condition to every per-feature-type statement.'
+        'Applied expression tree, or null when the user requests every feature of the selected type. When non-null, persisted once and linked as a fine-grained condition to every per-feature-type statement.'
     }
   }
 };

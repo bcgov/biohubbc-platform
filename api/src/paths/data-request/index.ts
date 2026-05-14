@@ -162,7 +162,7 @@ export function findDataRequests(): RequestHandler {
  * Create a data request owned by the current user context.
  *
  * The request body is validated with Zod (`CreateDataRequestRequestBody`) rather than the
- * OpenAPI schema. Two reasons: the optional `expression` field is a recursive discriminated
+ * OpenAPI schema. Two reasons: the `expression` field is a recursive discriminated
  * union that OpenAPI cannot fully express, and `.strict()` rejects unknown keys (e.g. a stray
  * `ui_id` on an expression node) so frontend decoder bugs surface as a 400 instead of being
  * silently persisted into a policy.
@@ -193,7 +193,7 @@ export function createDataRequest(): RequestHandler {
         reason,
         system_user_ids,
         featureTypes,
-        expression: expression ?? null
+        expression
       });
 
       await connection.commit();

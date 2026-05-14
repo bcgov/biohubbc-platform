@@ -194,7 +194,9 @@ describe('data-request', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         reason: 'Test',
-        system_user_ids: []
+        system_user_ids: [],
+        featureTypes: ['observation'],
+        expression: null
       };
 
       try {
@@ -321,7 +323,7 @@ describe('data-request', () => {
       expect(mockRes.statusValue).to.equal(201);
     });
 
-    it('R4: accepts legacy payload without featureTypes/expression and coerces expression to null', async () => {
+    it('R4: rejects payload missing featureTypes/expression with 400', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
         commit: sinon.stub(),
@@ -339,16 +341,14 @@ describe('data-request', () => {
         system_user_ids: []
       };
 
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(createStub).to.have.been.calledOnceWith({
-        requested_by: mockNonAdminUser.system_user_id,
-        reason: 'Need secured data for analysis',
-        system_user_ids: [],
-        featureTypes: undefined,
-        expression: null
-      });
-      expect(mockRes.statusValue).to.equal(201);
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
     });
 
     it('R5: rejects featureTypes: [] (minItems: 1) with 400', async () => {
@@ -486,7 +486,9 @@ describe('data-request', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         reason: 'Test',
-        system_user_ids: [2, 3]
+        system_user_ids: [2, 3],
+        featureTypes: ['observation'],
+        expression: null
       };
 
       try {
