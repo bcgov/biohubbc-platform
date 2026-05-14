@@ -3,14 +3,13 @@ import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import SearchLayout from 'layouts/SearchLayout';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { toSearchFeatureRoute } from 'utils/routes';
 
 /**
  * Router for all `/search/` result pages.
  */
 export const SearchRouter = () => {
   const location = useLocation();
-  const defaultResultPath = `${toSearchFeatureRoute(PRIORITY_FEATURE_TYPE.SPECIES_OBSERVATION)}${location.search}`;
+  const defaultResultPath = `${PRIORITY_FEATURE_TYPE.SPECIES_OBSERVATION}${location.search}`;
 
   return (
     <Routes>

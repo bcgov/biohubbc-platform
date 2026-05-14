@@ -10,7 +10,7 @@ import { isSupportedBrowser } from 'utils/browser';
 
 const SearchLayout = (props: PropsWithChildren) => {
   return (
-    <Box display="flex" flexDirection="column" height="100vh">
+    <Box display="flex" flexDirection="column" minHeight="100vh">
       <CssBaseline />
       <DialogContextProvider>
         <CodesContextProvider>
@@ -19,7 +19,7 @@ const SearchLayout = (props: PropsWithChildren) => {
           )}
 
           <Header />
-          <Box component="main" flex="1 1 auto" display="flex" flexDirection="column" minHeight={0}>
+          <Box component="main" flex="1 0 auto">
             {React.Children.map(props.children, (child: any) => {
               return React.cloneElement(child);
             })}

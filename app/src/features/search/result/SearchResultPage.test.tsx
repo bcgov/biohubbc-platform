@@ -1,6 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -32,21 +31,44 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('hooks/useApi');
-vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 vi.mock('./hooks/useSearchResults');
-vi.mock('./sidebar/search/hooks/useRecommendedFilters');
+vi.mock('./header/SearchResultSearch', () => ({
+  SearchResultSearch: ({ onExpressionApply }: { onExpressionApply: (expressionTree: unknown) => void }) => (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onExpressionApply({
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              {
+                type: 'predicate',
+                feature_property_id: 10,
+                feature_type_property_id: null,
+                operator: 'ILike',
+                value: 'salmon'
+              }
+            ]
+          })
+        }>
+        Apply expression
+      </button>
+      <button type="button" onClick={() => onExpressionApply(null)}>
+        Apply empty expression
+      </button>
+    </>
+  )
+}));
 
-import { useRecommendedFilters } from './sidebar/search/hooks/useRecommendedFilters';
 import { useSearchResults } from './hooks/useSearchResults';
 
 const mockUseApi = useApi as Mock;
-const mockUseAuthStateContext = useAuthStateContext as Mock;
 const mockUseCodesContext = useCodesContext as Mock;
 const mockUseCartContext = useCartContext as Mock;
 const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
-const mockUseRecommendedFilters = useRecommendedFilters as Mock;
 
 const mockCreateDownload = vi.fn();
 const mockSetSnackbar = vi.fn();
@@ -55,20 +77,19 @@ const mockSetOkDialog = vi.fn();
 const codesPayload = {
   feature_type_with_properties: [
     { feature_type: { name: 'dataset', display_name: 'Dataset' }, properties: [] },
-    { feature_type: { name: 'observation', display_name: 'Observation' }, properties: [] }
+    { feature_type: { name: 'telemetry', display_name: 'Telemetry' }, properties: [] }
   ]
 };
 
 const renderPage = () => render(<SearchResultPage />);
 
-describe('SearchResultPage — Create Download flow', () => {
+describe('SearchResultPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload }
     });
-    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseCodesContext.mockReturnValue({
       codesDataLoader: { isReady: true, data: codesPayload }
     });
@@ -82,16 +103,12 @@ describe('SearchResultPage — Create Download flow', () => {
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
     });
-    mockUseRecommendedFilters.mockReturnValue({
-      recommended: { species: [], feature_types: [], properties: [] },
-      handleRefresh: vi.fn()
-    });
+    mockUseParams.mockReturnValue({ featureType: 'dataset' });
     mockUseSearchResults.mockReturnValue({
-      rows: [{ submission_feature_id: 1 }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      removeSearchParam: vi.fn(),
       pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
@@ -103,13 +120,12 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
   });
 
-  it('opens an OkDialog when an authenticated user clicks Create Download with zero results', () => {
+  it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      removeSearchParam: vi.fn(),
       pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
     });
 
@@ -127,7 +143,7 @@ describe('SearchResultPage — Create Download flow', () => {
     expect(queryByRole('heading', { level: 2, name: /^create download$/i })).not.toBeInTheDocument();
   });
 
-  it('opens the form dialog when an authenticated user clicks Create Download with results', async () => {
+  it('opens the form dialog when Create Download is clicked with results', async () => {
     const { getByRole, getByLabelText } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /create download/i }));
@@ -136,15 +152,6 @@ describe('SearchResultPage — Create Download flow', () => {
       expect(getByLabelText(/Name/i)).toBeInTheDocument();
     });
     expect(mockSetOkDialog).not.toHaveBeenCalled();
-  });
-
-  it('hides the Create Download button entirely for unauthenticated users', () => {
-    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: false } });
-
-    const { queryByRole } = renderPage();
-
-    expect(queryByRole('button', { name: /create download/i })).not.toBeInTheDocument();
-    expect(mockCreateDownload).not.toHaveBeenCalled();
   });
 
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
@@ -212,7 +219,6 @@ describe('SearchResultPage — Create Download flow', () => {
       isLoading: true,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      removeSearchParam: vi.fn(),
       pagination: undefined
     });
 
@@ -231,10 +237,55 @@ describe('SearchResultPage — Create Download flow', () => {
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
-    mockUseParams.mockReturnValue({ featureType: 'observation' });
+    mockUseParams.mockReturnValue({ featureType: 'telemetry' });
     rerender(<SearchResultPage />);
 
     await waitFor(() => expect(queryByLabelText(/Name/i)).not.toBeInTheDocument());
+  });
+
+  it('keeps the applied expression when switching feature type tabs', async () => {
+    const { getByRole, rerender } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+
+    await waitFor(() => {
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith(
+        'dataset',
+        true,
+        expect.objectContaining({
+          type: 'expression',
+          operator: 'AND'
+        }),
+        expect.any(Number)
+      );
+    });
+
+    mockUseParams.mockReturnValue({ featureType: 'telemetry' });
+    rerender(<SearchResultPage />);
+
+    await waitFor(() => {
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith(
+        'telemetry',
+        true,
+        expect.objectContaining({
+          type: 'expression',
+          operator: 'AND'
+        }),
+        expect.any(Number)
+      );
+    });
+  });
+
+  it('refreshes with a null expression when applying no expression filters', async () => {
+    const { getByRole } = renderPage();
+    const callCountBeforeApply = mockUseSearchResults.mock.calls.length;
+
+    fireEvent.click(getByRole('button', { name: /apply empty expression/i }));
+
+    await waitFor(() => {
+      expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith('dataset', true, null, expect.any(Number));
+    });
   });
 
   it('surfaces the API error message in a snackbar when submit fails', async () => {

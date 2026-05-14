@@ -1,22 +1,12 @@
 import { FEATURE_TYPE_CONFIG, PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 
 /**
- * Converts a feature type name into the path segment used by search routes.
- *
- * Use this for route construction and route defaults so feature type values are
- * normalized consistently before being placed in `/search/:featureType`.
- *
- * @param {string} featureTypeName - Feature type name from constants, API metadata, or route state.
- * @returns {string} Lowercase search route segment for the feature type.
- */
-export const toSearchFeatureRoute = (featureTypeName: string): string => featureTypeName.trim().toLowerCase();
-
-/**
  * Builds a search result URL for a feature type and optional query params.
  *
- * Use this whenever navigating to a feature-type search result page. Empty,
- * null, and undefined query values are omitted so callers can pass partial
- * objects without producing blank URL parameters.
+ * Use this whenever navigating to a feature-type search result page from search
+ * tabs, preview list items, redirects, or other internal UI. It uses the feature
+ * type name directly as the route segment and omits empty query values so
+ * callers can pass partial param objects without producing blank URL parameters.
  *
  * @param {string} featureTypeName - Feature type name to place in the search URL path.
  * @param {Partial<Record<string, string | number | undefined>>} [params] - Optional query parameter values.
@@ -35,7 +25,7 @@ export const buildSearchFeatureTypePath = (
   });
 
   const queryString = searchParams.toString();
-  const path = `/search/${toSearchFeatureRoute(featureTypeName)}`;
+  const path = `/search/${featureTypeName}`;
 
   return queryString ? `${path}?${queryString}` : path;
 };

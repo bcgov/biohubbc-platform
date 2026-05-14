@@ -1,39 +1,51 @@
-import { mdiLock } from '@mdi/js';
-import Icon from '@mdi/react';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { AlertBanner } from 'components/notifications/AlertBanner';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
+import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { APIError } from 'hooks/api/useAxios';
 import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
-import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 
 interface SearchResultOptionsProps {
+  /** Search result rows rendered by the active table or list layout. */
   rows: SearchFeatureResultWithRelevancy[];
+  /** Whether the result request is currently loading. */
   isLoading: boolean;
-  view: SEARCH_RESULT_OPTION_VIEW;
-  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Active result layout selected in the toolbar. */
+  view: SEARCH_RESULT_VIEW;
+  /** Opens the selected result's feature detail page. */
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
 }
 
-export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick }: SearchResultOptionsProps) => {
+/**
+ * Chooses the active result layout and wires per-row cart actions.
+ *
+ * Selects the active result layout and keeps cart membership/error handling near
+ * the rendered row controls. The parent owns search state and pagination.
+ *
+ * @param {SearchResultOptionsProps} props - Rows, loading state, selected view, and result-click callback.
+ * @returns {JSX.Element} Loading, empty, table, or card result content.
+ */
+export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchResultOptionsProps) => {
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
-  const navigate = useNavigate();
 
   const hasResults = rows.length > 0;
-  const hasSecuredResults = rows.some((r) => r.is_secured);
 
   const cartFeatureIds = useMemo(() => {
     return new Set(features.map((f) => f.submission_feature_id));
   }, [features]);
 
+  /**
+   * Adds one rendered search result to the cart.
+   * Add failures are reported through the global snackbar.
+   *
+   * @param {SearchFeatureResultWithRelevancy} result - Result row selected for cart addition.
+   */
   const handleAddToCart = useCallback(
     async (result: SearchFeatureResultWithRelevancy) => {
       try {
@@ -45,6 +57,12 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
     [addToCart, dialogContext]
   );
 
+  /**
+   * Removes one rendered search result from the cart.
+   * Remove failures are reported through the global snackbar.
+   *
+   * @param {number} featureId - Submission feature id to remove from the cart.
+   */
   const handleRemoveFromCart = useCallback(
     async (featureId: number) => {
       try {
@@ -63,51 +81,34 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
       hasNoData={!hasResults}
       hasNoDataFallback={
         <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography variant="h4" color="text.secondary">
+          <Typography variant="body2" color="text.secondary">
             No results found
           </Typography>
         </Box>
       }>
-      <>
-        {hasSecuredResults && (
-          <AlertBanner
-            icon={<Icon path={mdiLock} size={0.875} />}
-            action={
-              <Button color="inherit" size="small" onClick={() => navigate('/portal/ticket')}>
-                Request Access
-              </Button>
-            }
-            sx={{ mx: 2, mt: 2 }}>
-            Some records in these results are secured. You can request access to view and download them.
-          </AlertBanner>
-        )}
-        <ComponentSwitch<SEARCH_RESULT_OPTION_VIEW>
-          switch={view}
-          components={{
-            table: (
-              <SearchResultTableLayout
-                results={rows}
-                cartFeatureIds={cartFeatureIds}
-                onClick={onClick}
-                onDownload={onDownload}
-                onAddToCart={handleAddToCart}
-                onRemoveFromCart={handleRemoveFromCart}
-                onRowSelectionModelChange={() => {}}
-              />
-            ),
-            list: (
-              <SearchResultCardLayout
-                results={rows}
-                cartFeatureIds={cartFeatureIds}
-                onClick={onClick}
-                onDownload={onDownload}
-                onAddToCart={handleAddToCart}
-                onRemoveFromCart={handleRemoveFromCart}
-              />
-            )
-          }}
-        />
-      </>
+      <ComponentSwitch<SEARCH_RESULT_VIEW>
+        switch={view}
+        components={{
+          [SEARCH_RESULT_VIEW.TABLE]: (
+            <SearchResultTableLayout
+              results={rows}
+              cartFeatureIds={cartFeatureIds}
+              onClick={onClick}
+              onAddToCart={handleAddToCart}
+              onRemoveFromCart={handleRemoveFromCart}
+            />
+          ),
+          [SEARCH_RESULT_VIEW.LIST]: (
+            <SearchResultCardLayout
+              results={rows}
+              cartFeatureIds={cartFeatureIds}
+              onClick={onClick}
+              onAddToCart={handleAddToCart}
+              onRemoveFromCart={handleRemoveFromCart}
+            />
+          )
+        }}
+      />
     </LoadingGuard>
   );
 };

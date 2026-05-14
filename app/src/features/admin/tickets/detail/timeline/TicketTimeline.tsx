@@ -6,8 +6,8 @@ import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditFo
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
-import { ITicketTimelineProps } from './TicketTimeline.interface';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
+import { ITicketTimelineProps } from './TicketTimeline.interface';
 
 /**
  * Renders the timeline section for a ticket.
