@@ -22,10 +22,10 @@ export class TeamPolicyService extends DBService {
    * Inserting a `team_policy` link is the trigger that lazily builds the
    * normalized scope cache (`security_scope`, `policy_statement_scope`,
    * `team_security_scope`) for the team. The materialization runs via
-   * `SecurityScopeService.materializeStatementScopesAndTeamAccess`, which
-   * short-circuits when the policy is not `status='approved'` or has no
-   * `ALLOW` statements — so unapproved or empty policies create the link
-   * without granting any access.
+   * `SecurityScopeService.materializePolicyStatementScopes` followed by
+   * `grantTeamAccessForPolicy`. The first call short-circuits when the policy
+   * is not `status='approved'` or has no `ALLOW` statements — so unapproved or
+   * empty policies create the link without granting any access.
    *
    * If the (team, policy) link already exists, returns the existing record
    * without re-materializing.
@@ -51,11 +51,12 @@ export class TeamPolicyService extends DBService {
     const teamPolicy = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
 
     // Materialize the access cache for this (team, policy) pair: statement scopes
-    // (shared across teams) and the team's access rows that point at them.
-    await this.securityScopeService.materializeStatementScopesAndTeamAccess(
-      teamPolicyData.team_id,
-      teamPolicyData.policy_id
-    );
+    // (shared across teams) first, then the team's access rows that point at them.
+    // Skip the team-grant insert when there's nothing to grant.
+    const materialized = await this.securityScopeService.materializePolicyStatementScopes(teamPolicyData.policy_id);
+    if (materialized) {
+      await this.securityScopeService.grantTeamAccessForPolicy(teamPolicyData.team_id, teamPolicyData.policy_id);
+    }
 
     return teamPolicy;
   }
@@ -91,7 +92,10 @@ export class TeamPolicyService extends DBService {
     // Materialize the access cache for newly created team-policy associations.
     // Pre-existing policies already had their cache rows materialized on first creation.
     for (const policyId of policyIdsToCreate) {
-      await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (materialized) {
+        await this.securityScopeService.grantTeamAccessForPolicy(teamId, policyId);
+      }
     }
 
     return createdTeamPolicies;

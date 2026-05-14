@@ -106,6 +106,16 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     return result.rows[0].count;
   }
 
+  // Run the full lazy-materialization sequence for one (team, policy) pair:
+  // materialize the policy-wide statement scopes, then grant team access if
+  // there were any ALLOW statements to materialize.
+  async function materializeAndGrant(teamId: string, policyId: string): Promise<void> {
+    const materialized = await scopeService.materializePolicyStatementScopes(policyId);
+    if (materialized) {
+      await scopeService.grantTeamAccessForPolicy(teamId, policyId);
+    }
+  }
+
   // URNs use real feature_type names — `tr_policy_statement_urn_validation` rejects
   // unknown types. Tests use type-wildcard URNs (urn:*:<type>:*) so no real submission
   // is needed; transaction rollback handles isolation between tests.
@@ -144,9 +154,9 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     await insertTeamPolicy(teamId, policyC);
 
     // Materialize the starting state (all three policies grant their scopes).
-    await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyA);
-    await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyB);
-    await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyC);
+    await materializeAndGrant(teamId, policyA);
+    await materializeAndGrant(teamId, policyB);
+    await materializeAndGrant(teamId, policyC);
     // URN_A dedupes to one security_scope row → team has 2 distinct scopes.
     expect(await countTeamScopes(teamId)).to.equal(2);
 
@@ -166,7 +176,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     const teamId = await createTeam(connection, 'deny-only-team');
     await insertTeamPolicy(teamId, policyId);
 
-    await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
+    await materializeAndGrant(teamId, policyId);
 
     expect(await countTeamScopes(teamId)).to.equal(0);
     expect(await countPolicyStatementScopes(policyId)).to.equal(0);
@@ -180,7 +190,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     const teamId = await createTeam(connection, 'mixed-ended-team');
     await insertTeamPolicy(teamId, policyId);
 
-    await scopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
+    await materializeAndGrant(teamId, policyId);
 
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(await countTeamScopes(teamId)).to.equal(1);

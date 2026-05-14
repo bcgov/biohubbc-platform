@@ -47,9 +47,8 @@ export class SecurityScopeService extends DBService {
    * policy statement and publish its anchor-computation job.
    *
    * Encapsulates the hash → insert-or-reuse → mapping → publish-anchor-job flow.
-   * The caller is `materializeStatementScopesAndTeamAccess`, which invokes this
-   * helper once per active ALLOW statement on an approved policy before issuing
-   * the team-access insert.
+   * The caller is `materializePolicyStatementScopes`, which invokes this
+   * helper once per active ALLOW statement on an approved policy.
    *
    * Always publishes a background job to compute anchors — the secured subtree
    * roots that the walk-up search strategy checks against. For new scopes this
@@ -159,48 +158,82 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Materialize the access-cache rows for one (team, policy) pair.
+   * Materialize the policy-wide access-cache rows for a policy's ALLOW statements.
    *
-   * The method does two things, both required for the team's access to be
-   * usable, both named in the method name:
-   *
-   *   1. Statement scopes — global `security_scope` + `policy_statement_scope`
-   *      rows for each active ALLOW statement on the policy. These rows are
-   *      shared across every team that links to the same policy; deduplicated
-   *      by URN hash. Anchor-computation jobs are published per scope.
-   *   2. Team access — the team-specific `team_security_scope` rows that make
-   *      the cached scopes visible to this team's authorization checks.
-   *
-   * Statement scopes are materialized first so the team-access SQL can join
-   * through `policy_statement_scope`. Statements are processed sequentially
-   * (not via `Promise.all`) so a publish-anchor-job failure aborts before any
-   * team-access rows are written.
-   *
-   * This is the lazy-materialization entry point — invoked when a `team_policy`
-   * link is created or when a policy's status flips to `approved`. Statement
-   * creation alone never produces cache rows; a policy without a `team_policy`
-   * link is a stored filter expression, not an access grant.
+   * Inserts (or de-duplicates by hash) `security_scope` and
+   * `policy_statement_scope` rows for every active ALLOW statement on the
+   * policy, and publishes one anchor-computation job per scope. These rows are
+   * shared across every team that links to the same policy.
    *
    * Both access gates (`policy.status='approved'`, `policy_statement.effect='ALLOW'`)
    * live in the SQL that returns the statement list. When the repository
-   * returns `[]` — either gate filtered everything out — the method short-circuits
-   * before writing any rows.
+   * returns `[]` — either gate filtered everything out — the method
+   * short-circuits and returns `false` so callers can skip the team-grant step.
+   * Statements are processed sequentially (not via `Promise.all`) so a
+   * publish-anchor-job failure aborts before more work is queued.
    *
-   * @param teamId UUID of the team gaining access
-   * @param policyId UUID of the policy whose ALLOW statements grant the access
+   * This is the policy-wide half of the lazy-materialization entry point.
+   * Callers that also need to grant team access for this policy should invoke
+   * `grantTeamAccessForPolicy(teamId, policyId)` after this method returns
+   * `true`. Splitting the calls lets the fan-out path (one policy → N teams)
+   * materialize statement scopes once and only loop per team for the team-grant
+   * insert.
+   *
+   * @param policyId UUID of the policy whose ALLOW statements should be materialized
+   * @returns `true` if statement scopes were materialized, `false` if the policy
+   *   had no active ALLOW statements (gate-filtered or not approved)
    */
-  async materializeStatementScopesAndTeamAccess(teamId: string, policyId: string): Promise<void> {
+  async materializePolicyStatementScopes(policyId: string): Promise<boolean> {
     const statements = await this.securityScopeRepository.findActiveAllowStatementsForApprovedPolicy(policyId);
 
     if (statements.length === 0) {
-      return;
+      return false;
     }
 
     for (const statement of statements) {
       await this.materializeScopeForPolicyStatement(statement.policy_statement_id, statement.submission_feature_urn);
     }
 
+    return true;
+  }
+
+  /**
+   * Insert the team-specific `team_security_scope` rows for a (team, policy)
+   * pair.
+   *
+   * Joins `team_policy → policy_statement → policy_statement_scope` to produce
+   * the team's grant rows. The SQL re-asserts both access gates
+   * (`p.status='approved'`, `effect='ALLOW'`) and uses `ON CONFLICT DO NOTHING`
+   * for idempotency. Callers should invoke `materializePolicyStatementScopes`
+   * first when the policy may not yet have its scope mappings — otherwise the
+   * join returns zero rows and no access is granted.
+   *
+   * @param teamId UUID of the team gaining access
+   * @param policyId UUID of the policy whose ALLOW statements grant the access
+   */
+  async grantTeamAccessForPolicy(teamId: string, policyId: string): Promise<void> {
     await this.securityScopeRepository.insertTeamSecurityScopesForPolicy(teamId, policyId);
+  }
+
+  /**
+   * Convenience wrapper for the common single-(team, policy) materialization
+   * sequence: materialize the policy's statement scopes, then grant the team's
+   * access. Equivalent to:
+   *
+   *   const materialized = await materializePolicyStatementScopes(policyId);
+   *   if (materialized) await grantTeamAccessForPolicy(teamId, policyId);
+   *
+   * Fan-out callers (one policy → N teams) should call the two methods
+   * directly so the statement-scope materialization runs once, not per team.
+   *
+   * @param teamId UUID of the team gaining access
+   * @param policyId UUID of the policy whose ALLOW statements grant the access
+   */
+  async materializeStatementScopesAndTeamAccess(teamId: string, policyId: string): Promise<void> {
+    const materialized = await this.materializePolicyStatementScopes(policyId);
+    if (materialized) {
+      await this.grantTeamAccessForPolicy(teamId, policyId);
+    }
   }
 
   /**

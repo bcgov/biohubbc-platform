@@ -168,8 +168,16 @@ export class PolicyService extends DBService {
     }
 
     if (to === 'approved') {
+      // Materialize the shared statement-scope rows once for this policy, then
+      // grant access per team. The statement-scope work depends only on the
+      // policy, so splitting these avoids re-running the policy-wide INSERTs
+      // and re-publishing anchor jobs for every team in the fan-out.
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (!materialized) {
+        return;
+      }
       for (const teamPolicy of teamPolicies) {
-        await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamPolicy.team_id, policyId);
+        await this.securityScopeService.grantTeamAccessForPolicy(teamPolicy.team_id, policyId);
       }
     } else if (from === 'approved') {
       for (const teamPolicy of teamPolicies) {
@@ -323,8 +331,9 @@ export class PolicyService extends DBService {
    * Statement creation no longer materializes security scopes. The access-cache
    * (`security_scope`, `policy_statement_scope`, `team_security_scope`) is only
    * populated when a `team_policy` link exists and the policy is approved — that
-   * fan-out lives in `SecurityScopeService.materializeStatementScopesAndTeamAccess`
-   * and fires from `TeamPolicyService.createTeamPolicy` and from policy approval.
+   * fan-out lives in `SecurityScopeService.materializePolicyStatementScopes` +
+   * `grantTeamAccessForPolicy` and fires from `TeamPolicyService.createTeamPolicy`
+   * and from policy approval.
    *
    * @param {CreatePolicy} policyData - Policy payload.
    * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
@@ -407,8 +416,12 @@ export class PolicyService extends DBService {
     // helper is a no-op on same-status calls, and the new mappings do not
     // exist in `team_security_scope` until we materialize.
     if (previousStatus === nextStatus && nextStatus === 'approved' && affectedTeamIds.length > 0) {
-      for (const teamId of affectedTeamIds) {
-        await this.securityScopeService.materializeStatementScopesAndTeamAccess(teamId, policyId);
+      // Materialize the policy-wide scope mappings once, then grant per team.
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (materialized) {
+        for (const teamId of affectedTeamIds) {
+          await this.securityScopeService.grantTeamAccessForPolicy(teamId, policyId);
+        }
       }
     }
 
