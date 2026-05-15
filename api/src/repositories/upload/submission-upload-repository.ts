@@ -209,7 +209,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submitter.user_identifier AS submitted_by_identifier,
         su.status AS upload_status,
         sus.status AS review_status,
-        validation.validation,
+        sv.validation,
         COALESCE(reviews.reviews, '[]'::json) AS reviews
       FROM
         submission_upload su
