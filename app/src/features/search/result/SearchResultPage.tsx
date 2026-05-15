@@ -78,7 +78,7 @@ export const SearchResultPage = () => {
     handleOpenCreateDataRequest,
     handleCreateDataRequest,
     handleCancelCreateDataRequest
-  } = useSearchResultDataRequest({ featureType, expressionTree });
+  } = useSearchResultDataRequest({ featureType: routeConfig?.featureTypeName, expressionTree });
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   const hasSecuredResults = rows.some((row) => row.is_secured);

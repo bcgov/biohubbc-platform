@@ -8,7 +8,7 @@ import { CreateTicketDataRequestPayload } from 'interfaces/useDataRequestApi.int
 import { useCallback, useEffect, useState } from 'react';
 
 interface UseSearchResultDataRequestProps {
-  /** Raw feature-type route segment; used to close the create-request dialog on tab change. */
+  /** Canonical feature-type name (already normalized via routeConfig); sent verbatim to the API and used to close the dialog on tab change. */
   featureType: string | undefined;
   /** Expression tree to include in create-data-request submissions. */
   expressionTree: ExpressionTreeExpression | null;

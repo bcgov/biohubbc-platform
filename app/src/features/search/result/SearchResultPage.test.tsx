@@ -403,6 +403,33 @@ describe('SearchResultPage', () => {
     );
   });
 
+  it('P3a: submits the canonical lowercase featureType when the route is mixed-case', async () => {
+    mockCreateDataRequest.mockResolvedValue({});
+    mockUseParams.mockReturnValue({ featureType: 'DATASET' });
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /request access/i }));
+    await findByRole('heading', { level: 2, name: /create data request/i });
+
+    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
+    expect(mockCreateDataRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureTypes: ['dataset']
+      })
+    );
+  });
+
   it('P4: surfaces an API error and keeps the create-data-request dialog open on failure', async () => {
     mockCreateDataRequest.mockRejectedValue({ message: 'Server exploded' });
     mockUseSearchResults.mockReturnValue({
