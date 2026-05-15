@@ -39,7 +39,7 @@ export interface ITicketArtifact {
   artifact_id: string;
   record_end_date: string | null;
   create_date: string;
-  key: string;
+  object_key: string;
 }
 
 export type TicketRelationshipType =
@@ -104,6 +104,10 @@ export interface ICreateTicketCommentRequest {
   comment: string;
 }
 
+export interface IUpdateTicketCommentRequest {
+  comment: string;
+}
+
 export interface ICreateTicketUploadRequest {
   file_name: string;
   byte_size: number;
@@ -144,6 +148,15 @@ export interface IUpdateTicketSystemUserStatusRequest {
 export interface IGetTicketsResponse {
   tickets: ITicket[];
   pagination: ApiPaginationResponseParams;
+}
+
+export interface IGetTicketArtifactsResponse {
+  artifacts: ITicketArtifact[];
+  pagination: ApiPaginationResponseParams;
+}
+
+export interface IGetTicketArtifactsQueryParams extends Partial<ApiPaginationRequestOptions> {
+  search?: string;
 }
 
 export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {

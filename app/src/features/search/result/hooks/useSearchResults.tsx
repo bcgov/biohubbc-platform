@@ -1,12 +1,11 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ISearchFeaturesFilters, SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { normalizeQueryParam } from 'utils/query-param';
 
@@ -23,109 +22,142 @@ interface SearchResultsLoaderInput {
   params: URLSearchParams;
   expressionTree: ExpressionTreeExpression | null;
   featureTypeName: string;
+  signal: AbortSignal;
 }
+
+type SearchResultsPagination = ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' };
+
+const buildPagination = (params: URLSearchParams): SearchResultsPagination => ({
+  page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
+  limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
+  sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
+  order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
+});
+
+const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureResponse => ({
+  features: [],
+  pagination: {
+    total: 0,
+    per_page: pagination.limit,
+    current_page: pagination.page,
+    last_page: 1,
+    sort: pagination.sort,
+    order: pagination.order
+  }
+});
+
+const isAbortError = (error: unknown) => {
+  return error instanceof Error && (error.name === 'CanceledError' || error.message === 'canceled');
+};
 
 /**
  * Loads feature-search results from URL pagination/sort params and an expression tree.
  *
- * Use this hook from result pages that need the current URL query params to be
- * the source of truth for pagination and sort state. It converts those params to
- * the search API pagination payload, calls `/api/search/feature/:featureType`,
- * and returns a typed param setter that keeps the URL and result loader in sync.
+ * Treats URL query params as the source of truth for pagination and sort state.
+ * Converts them to the search API pagination payload, calls
+ * `/api/search/feature/:featureType`, and returns a typed param setter.
  * Pass `enabled=false` until the route has resolved a valid feature type.
  *
- * @param {string} featureTypeName - API feature type route segment to search.
+ * @param {string | undefined} featureTypeName - API feature type route segment to search once route metadata resolves.
  * @param {boolean} enabled - Whether the route has enough context to issue requests.
  * @param {ExpressionTreeExpression | null} expressionTree - Applied expression tree, or null to list target features.
+ * @param {number} refreshKey - Explicit apply counter; changes abort the active request and start the next one immediately.
  * @returns Search rows, pagination, loading state, current URL params, and URL-aware setter.
  */
 export const useSearchResults = (
-  featureTypeName: string,
+  featureTypeName: string | undefined,
   enabled = true,
-  expressionTree: ExpressionTreeExpression | null = null
+  expressionTree: ExpressionTreeExpression | null = null,
+  refreshKey = 0
 ) => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
+  const [data, setData] = useState<SearchFeatureResponse>();
+  const [isLoading, setIsLoading] = useState(false);
+  const searchApiRef = useRef(api.search);
+  const dialogContextRef = useRef(dialogContext);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+  const previousRefreshKeyRef = useRef(refreshKey);
 
-  const buildPagination = (
-    params: URLSearchParams
-  ): ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' } => ({
-    page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
-    limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
-    sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
-    order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
-  });
+  useEffect(() => {
+    searchApiRef.current = api.search;
+    dialogContextRef.current = dialogContext;
+  }, [api.search, dialogContext]);
 
-  const buildEmptyResponse = (
-    pagination: ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' }
-  ): SearchFeatureResponse => ({
-    features: [],
-    pagination: {
-      total: 0,
-      per_page: pagination.limit ?? 10,
-      current_page: pagination.page ?? 1,
-      last_page: 1,
-      sort: pagination.sort,
-      order: pagination.order
-    }
-  });
-
-  const buildDownloadFilters = (params: URLSearchParams, featureTypeName: string): ISearchFeaturesFilters => {
-    const filters: ISearchFeaturesFilters = {};
-
-    const featureTypes = params.getAll(URL_PARAMS.FEATURE_TYPE.toLowerCase());
-
-    if (featureTypes.length > 0) {
-      filters.feature_types = featureTypes;
-    } else if (featureTypeName) {
-      filters.feature_types = [featureTypeName];
-    }
-
-    params.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-
-      switch (lowerKey) {
-        case URL_PARAMS.SPECIES.toLowerCase():
-          filters.species = filters.species ?? [];
-          filters.species.push(Number(value));
-          break;
-        case URL_PARAMS.SEARCH_QUERY.toLowerCase():
-          filters.keyword = value;
-          break;
-        default:
-          break;
-      }
-    });
-
-    return filters;
-  };
-
-  /** Data loader for search results */
-  const searchDataLoader = useDataLoader(
-    async ({ params, expressionTree, featureTypeName }: SearchResultsLoaderInput): Promise<SearchFeatureResponse> => {
+  /**
+   * Loads search results for a single prepared request.
+   * Converts URL params to API pagination, ignores user-driven aborts, and
+   * reports real API errors through the snackbar.
+   *
+   * @param {SearchResultsLoaderInput} input - URL params, expression, feature type, and abort signal for one request.
+   * @returns Search response for the request, or `undefined` when the request was aborted or failed.
+   */
+  const loadSearchResults = useCallback(
+    async ({ params, expressionTree, featureTypeName, signal }: SearchResultsLoaderInput) => {
       const pagination = buildPagination(params);
 
-      if (featureTypeName) {
-        return api.search.searchFeatures(featureTypeName, expressionTree, pagination);
-      }
+      try {
+        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, { signal });
+      } catch (error) {
+        if (isAbortError(error)) {
+          return undefined;
+        }
 
-      return buildEmptyResponse(pagination);
+        dialogContextRef.current.setSnackbar({
+          open: true,
+          snackbarMessage: (error as Error).message
+        });
+        return undefined;
+      }
     },
-    (error) => {
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: (error as Error).message
-      });
-    }
+    []
   );
 
-  /** Debounced refresh */
-  const debouncedRefreshRef = useRef(
-    debounce((input: SearchResultsLoaderInput) => searchDataLoader.refresh(input), 300)
-  ).current;
+  /**
+   * Starts a latest-wins search request and aborts any active request first.
+   * Owns the `AbortController`, loading state, and stale response guard.
+   *
+   * @param {Omit<SearchResultsLoaderInput, 'signal'>} input - Request inputs before the hook adds an abort signal.
+   */
+  const startSearch = useCallback(
+    async (input: Omit<SearchResultsLoaderInput, 'signal'>) => {
+      abortControllerRef.current?.abort();
 
-  /** Low-level URL param updater */
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setIsLoading(true);
+
+      const nextData = await loadSearchResults({
+        ...input,
+        signal: abortController.signal
+      });
+
+      if (requestIdRef.current !== requestId) {
+        return;
+      }
+
+      if (nextData) {
+        setData(nextData);
+      }
+
+      setIsLoading(false);
+    },
+    [loadSearchResults]
+  );
+
+  const debouncedRefresh = useMemo(() => debounce(startSearch, 300), [startSearch]);
+
+  /**
+   * Writes normalized result query params to the router.
+   * `setSearchParams` owns normalization, deletion, replacement, and pagination
+   * reset rules.
+   *
+   * @param {TypedURLSearchParams} newParams - Complete next query param state for the result route.
+   */
   const updateParams = useCallback(
     (newParams: TypedURLSearchParams) => {
       setRawSearchParams(newParams);
@@ -162,7 +194,7 @@ export const useSearchResults = (
         (key) => key.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
+        newParams.set(URL_PARAMS.PAGE, '1');
       }
 
       updateParams(newParams);
@@ -170,48 +202,50 @@ export const useSearchResults = (
     [searchParams, updateParams]
   );
 
-  const removeSearchParam = useCallback(
-    (key: UrlParamKey, value?: string | number) => {
-      const normalizedKey = key.toLowerCase() as UrlParamKey;
-      const newParams = new TypedURLSearchParams(searchParams.toString());
-
-      if (value !== undefined && value !== null) {
-        const normalizedValue = normalizeQueryParam(value);
-        const remaining = newParams.getAll(normalizedKey).filter((existingValue) => existingValue !== normalizedValue);
-
-        newParams.delete(normalizedKey);
-        remaining.forEach((existingValue) => newParams.append(normalizedKey, existingValue));
-      } else {
-        newParams.delete(normalizedKey);
-      }
-
-      if (normalizedKey !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)) {
-        newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
-      }
-
-      updateParams(newParams);
-    },
-    [searchParams, updateParams]
-  );
-
-  // Refresh when the route, URL params, or applied expression changes.
+  // Refresh when the route, URL params, applied expression, or explicit refresh key changes.
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    debouncedRefreshRef({ params: searchParams, expressionTree, featureTypeName });
-  }, [searchParams, expressionTree, featureTypeName, enabled, debouncedRefreshRef]);
+    const pagination = buildPagination(searchParams);
 
-  useEffect(() => () => debouncedRefreshRef.cancel(), [debouncedRefreshRef]);
+    if (!featureTypeName) {
+      debouncedRefresh.cancel();
+      abortControllerRef.current?.abort();
+      setData(buildEmptyResponse(pagination));
+      setIsLoading(false);
+      return;
+    }
+
+    const input = { params: searchParams, expressionTree, featureTypeName };
+    const isExplicitExpressionApply = previousRefreshKeyRef.current !== refreshKey;
+    previousRefreshKeyRef.current = refreshKey;
+
+    abortControllerRef.current?.abort();
+
+    if (isExplicitExpressionApply) {
+      debouncedRefresh.cancel();
+      startSearch(input);
+      return;
+    }
+
+    debouncedRefresh(input);
+  }, [searchParams, expressionTree, featureTypeName, enabled, refreshKey, debouncedRefresh, startSearch]);
+
+  useEffect(
+    () => () => {
+      debouncedRefresh.cancel();
+      abortControllerRef.current?.abort();
+    },
+    [debouncedRefresh]
+  );
 
   return {
-    rows: searchDataLoader.data?.features ?? [],
-    isLoading: searchDataLoader.isLoading,
+    rows: data?.features ?? [],
+    isLoading,
     searchParams,
     setSearchParams,
-    removeSearchParam,
-    pagination: searchDataLoader.data?.pagination,
-    filters: buildDownloadFilters(searchParams, featureTypeName)
+    pagination: data?.pagination
   };
 };

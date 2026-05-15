@@ -192,6 +192,25 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('findSubmissionUploadsByTicketId', () => {
+    it('uses the latest submission upload status row for each upload', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
+    });
+  });
+
   describe('insertSubmissionUpload', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
@@ -202,7 +221,8 @@ describe('SubmissionUploadRepository', () => {
         submission_id: 123,
         upload_id: 'a-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'uploaded'
+        status: 'uploaded',
+        comment: 'Upload-specific note'
       };
 
       try {
@@ -276,13 +296,52 @@ describe('SubmissionUploadRepository', () => {
     });
 
     it('succeeds if soft delete affects one row', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
       const result = await repo.deleteSubmissionUpload('id-1');
 
       expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUpload', () => {
+    it('succeeds if soft delete affects one row and returns the updated row id', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUpload('id-1');
+
+      expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUploadsBySubmissionId', () => {
+    it('returns the number of soft-deleted rows and returns row ids from SQL', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ submission_upload_id: 'id-1' }, { submission_upload_id: 'id-2' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUploadsBySubmissionId(123);
+
+      expect(result).to.equal(2);
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
     });
   });
 });

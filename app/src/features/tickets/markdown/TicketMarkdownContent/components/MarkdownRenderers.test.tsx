@@ -7,7 +7,7 @@ import { ticketMarkdownUrlTransform } from 'utils/markdown';
 import { getTicketMarkdownComponents } from './MarkdownRenderers';
 
 const ticketArtifact = (
-  artifact: Pick<ITicketArtifact, 'ticket_artifact_id' | 'artifact_id' | 'key'>
+  artifact: Pick<ITicketArtifact, 'ticket_artifact_id' | 'artifact_id' | 'object_key'>
 ): ITicketArtifact => ({
   ticket_id: '22222222-2222-4222-8222-222222222222',
   record_end_date: null,
@@ -68,7 +68,7 @@ describe('MarkdownRenderers', () => {
     const artifact = ticketArtifact({
       ticket_artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
       artifact_id: '11111111-1111-4111-8111-111111111111',
-      key: 'tickets/ticket-id/upload/upload-id/generate.py'
+      object_key: 'tickets/ticket-id/upload/upload-id/generate.py'
     });
     const handleArtifactClick = vi.fn().mockResolvedValue(undefined);
 
@@ -103,7 +103,7 @@ describe('MarkdownRenderers', () => {
     const artifact = ticketArtifact({
       ticket_artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
       artifact_id: '11111111-1111-4111-8111-111111111111',
-      key: 'tickets/ticket-id/upload/upload-id/diagram.png'
+      object_key: 'tickets/ticket-id/upload/upload-id/diagram.png'
     });
 
     renderMarkdown('![diagram](/artifact/90b6df74-1b23-4064-ad62-f83c291d31d2)', {

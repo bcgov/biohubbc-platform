@@ -3,8 +3,8 @@ import Icon from '@mdi/react';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import { LabelledCard } from 'components/card/LabelledCard';
-import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchAutocomplete } from 'components/search/SearchAutocomplete';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 
 export interface ITeamFormUser {
   id: string;
@@ -12,12 +12,12 @@ export interface ITeamFormUser {
 }
 
 interface ITeamFormProps {
-  options: SidebarOption[];
+  options: SearchOption[];
   isLoading: boolean;
   users: ITeamFormUser[];
   isSubmitting: boolean;
   onSearch: (search: string) => void;
-  onSelectUser: (option: SidebarOption | null) => void;
+  onSelectUser: (option: SearchOption | null) => void;
   onRemoveUser: (userId: string) => void;
 }
 

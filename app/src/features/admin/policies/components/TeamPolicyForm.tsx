@@ -1,8 +1,8 @@
 import Box from '@mui/material/Box';
 import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
 import { CustomMultiAutocompleteFormik } from 'components/fields/CustomMultiAutocompleteFormik';
-import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
-import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
+import { SearchAutocomplete } from 'components/search/SearchAutocomplete';
+import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { useFormikContext } from 'formik';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
@@ -40,7 +40,7 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
   const { teams, policies, onTeamSearch, onPolicySearch } = props;
   const { values, setFieldValue } = useFormikContext<ITeamPolicyFormValues>();
 
-  const teamOptions: SidebarOption[] = teams.map((team) => ({
+  const teamOptions: SearchOption[] = teams.map((team) => ({
     label: team.name,
     value: team.team_id
   }));

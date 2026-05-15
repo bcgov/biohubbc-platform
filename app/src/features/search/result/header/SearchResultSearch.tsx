@@ -13,10 +13,9 @@ interface SearchResultSearchProps {
 /**
  * Search result header controller that wires the expression builder popover.
  *
- * Use this component on feature search result pages that submit expression-tree
- * searches. It keeps the editable search text local while the user is working in
- * the popover, passes that text to `ExpressionBuilder` for recommendations, and
- * only notifies the result page when the user applies a valid expression tree.
+ * Keeps editable search text local while the user works in the popover, passes
+ * that text to `ExpressionBuilder` for recommendations, and only notifies the
+ * page when the user applies an expression tree.
  *
  * @param {SearchResultSearchProps} props
  * @returns {JSX.Element} Search result header connected to the expression builder.
@@ -31,10 +30,20 @@ export const SearchResultSearch = (props: SearchResultSearchProps) => {
     setValue(searchTerm);
   }, [searchTerm]);
 
+  /**
+   * Clears the editable search text in the header input.
+   * Result data refreshes only after the expression builder applies changes.
+   */
   const handleClear = () => {
     setValue('');
   };
 
+  /**
+   * Applies the expression builder value and closes the filter popover.
+   * The parent result page owns expression state and search refresh.
+   *
+   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression selected by the user, or `null` when filters are cleared.
+   */
   const handleExpressionApply = (nextExpressionTree: ExpressionTreeExpression | null) => {
     setIsFilterPanelOpen(false);
     onExpressionApply(nextExpressionTree);

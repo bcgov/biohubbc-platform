@@ -22,7 +22,7 @@ describe('TicketArtifactService', () => {
       artifact_id: artifactIds[0],
       record_end_date: null,
       create_date: '2026-04-29T00:00:00.000Z',
-      key: 'tickets/abc/file.txt'
+      object_key: 'tickets/abc/file.txt'
     }
   ];
 
@@ -42,10 +42,34 @@ describe('TicketArtifactService', () => {
     const service = new TicketArtifactService(mockDBConnection);
     const getStub = sinon.stub(TicketArtifactRepository.prototype, 'getTicketArtifacts').resolves(artifacts);
 
-    const result = await service.getTicketArtifacts(ticketId);
+    const result = await service.getTicketArtifacts(ticketId, { search: 'abc' });
 
-    expect(getStub).to.have.been.calledOnceWith(ticketId);
+    expect(getStub).to.have.been.calledOnceWith(ticketId, { search: 'abc' });
     expect(result).to.eql(artifacts);
+  });
+
+  it('passes optional filters and pagination through ticket artifact lookup', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const service = new TicketArtifactService(mockDBConnection);
+    const filters = { search: 'file' };
+    const pagination = { page: 1, limit: 10, sort: 'create_date', order: 'desc' as const };
+    const getStub = sinon.stub(TicketArtifactRepository.prototype, 'getTicketArtifacts').resolves(artifacts);
+
+    const result = await service.getTicketArtifacts(ticketId, filters, pagination);
+
+    expect(getStub).to.have.been.calledOnceWith(ticketId, filters, pagination);
+    expect(result).to.eql(artifacts);
+  });
+
+  it('delegates ticket artifact count to the repository', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const service = new TicketArtifactService(mockDBConnection);
+    const getStub = sinon.stub(TicketArtifactRepository.prototype, 'getTicketArtifactsCount').resolves(1);
+
+    const result = await service.getTicketArtifactsCount(ticketId, { search: 'abc' });
+
+    expect(getStub).to.have.been.calledOnceWith(ticketId, { search: 'abc' });
+    expect(result).to.equal(1);
   });
 
   it('delegates single ticket artifact lookup to the repository', async () => {

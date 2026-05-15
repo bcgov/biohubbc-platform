@@ -19,6 +19,7 @@ import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
 import { TicketSystemUserService } from './ticket-system-user-service';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
 
@@ -177,7 +178,7 @@ describe('TicketService', () => {
           artifact_id: '88888888-8888-4888-8888-888888888888',
           record_end_date: null,
           create_date: '2026-02-25T01:30:00.000Z',
-          key: 'tickets/abc/file.txt'
+          object_key: 'tickets/abc/file.txt'
         }
       ];
       const referenceLog: TicketReference[] = [
@@ -204,6 +205,9 @@ describe('TicketService', () => {
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
       const getDataRequestLogStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
+      const getSubmissionUploadsStub = sinon
+        .stub(SubmissionUploadService.prototype, 'findSubmissionUploadsByTicketId')
+        .resolves([]);
       const getTicketSystemUsersStub = sinon
         .stub(TicketSystemUserService.prototype, 'getActiveTicketSystemUsersByTicketId')
         .resolves([]);
@@ -216,6 +220,7 @@ describe('TicketService', () => {
       expect(getArtifactLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getSubmissionUploadsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getTicketSystemUsersStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
@@ -224,6 +229,7 @@ describe('TicketService', () => {
         artifacts: artifactLog,
         references: referenceLog,
         data_requests: [],
+        submission_uploads: [],
         ticket_system_users: []
       });
     });

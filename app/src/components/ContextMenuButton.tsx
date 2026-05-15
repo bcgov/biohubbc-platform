@@ -3,7 +3,7 @@ import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { Fragment, ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 
 export interface IContextMenuItem {
   label: string;
@@ -53,20 +53,18 @@ export const ContextMenuButton = (props: IContextMenuButtonProps) => {
       </IconButton>
 
       <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        {resolvedGroups.map((group, groupIndex) => (
-          <Fragment key={group.groupId}>
-            {group.items.map((item) => (
-              <MenuItem
-                key={`${group.groupId}-${item.label}`}
-                disabled={item.disabled}
-                onClick={() => handleItemClick(item.onClick)}>
-                {item.icon ? <ListItemIcon>{item.icon}</ListItemIcon> : null}
-                {item.label}
-              </MenuItem>
-            ))}
-            {groupIndex < resolvedGroups.length - 1 ? <Divider /> : null}
-          </Fragment>
-        ))}
+        {resolvedGroups.flatMap((group, groupIndex) => [
+          ...group.items.map((item) => (
+            <MenuItem
+              key={`${group.groupId}-${item.label}`}
+              disabled={item.disabled}
+              onClick={() => handleItemClick(item.onClick)}>
+              {item.icon ? <ListItemIcon>{item.icon}</ListItemIcon> : null}
+              {item.label}
+            </MenuItem>
+          )),
+          groupIndex < resolvedGroups.length - 1 ? <Divider key={`${group.groupId}-divider`} /> : null
+        ])}
       </Menu>
     </>
   );

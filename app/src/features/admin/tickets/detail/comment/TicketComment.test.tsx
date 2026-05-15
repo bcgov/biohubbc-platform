@@ -36,6 +36,7 @@ describe('TicketComment', () => {
   it('defaults to Write tab and shows multiline text field', () => {
     render(<TicketComment {...baseProps} comment="Draft comment" />);
 
+    expect(screen.getByText('New Comment')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Write' })).toBeVisible();
     expect(screen.getByPlaceholderText('Type your comment...')).toBeVisible();
   });
@@ -86,7 +87,7 @@ describe('TicketComment', () => {
             artifact_id: '11111111-1111-4111-8111-111111111111',
             record_end_date: null,
             create_date: '2026-02-25T00:00:00.000Z',
-            key: 'tickets/ticket-id/upload/upload-id/diagram.png'
+            object_key: 'tickets/ticket-id/upload/upload-id/diagram.png'
           }
         ]}
         comment="![diagram.png](/artifact/05c4063e-a344-42a6-89f8-b15161789cda)"
@@ -115,13 +116,21 @@ describe('TicketComment', () => {
     expect(screen.getByRole('button', { name: 'Comment' })).toBeDisabled();
   });
 
+  it('disables attachment upload while the comment is saving', () => {
+    const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TicketComment {...baseProps} comment="Draft comment" isSaving={true} onUploadAttachment={onUploadAttachment} />
+    );
+
+    expect(screen.getByRole('button', { name: 'Attach' })).toBeDisabled();
+  });
+
   it('triggers attachment callback when a file is selected', async () => {
     const user = userEvent.setup();
     const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
 
     render(<TicketComment {...baseProps} comment="Draft comment" onUploadAttachment={onUploadAttachment} />);
-
-    await user.click(screen.getByRole('button', { name: 'Attach file' }));
 
     const fileInput = screen.getByLabelText('Attach file input') as HTMLInputElement;
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
@@ -170,7 +179,7 @@ describe('TicketComment', () => {
 
     expect(setSnackbar).toHaveBeenCalledWith({
       open: true,
-      snackbarMessage: 'Number of files uploaded at once exceeds maximum'
+      snackbarMessage: 'Number of artifacts selected at once exceeds maximum'
     });
     expect(onUploadAttachment).not.toHaveBeenCalled();
   });

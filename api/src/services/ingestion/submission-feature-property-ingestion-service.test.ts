@@ -7,6 +7,7 @@ import { FeatureIngestionRepository } from '../../repositories/ingestion/feature
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { ContributorService } from '../contributor-service';
+import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
 import { SubmissionFeaturePropertyIngestionService } from './submission-feature-property-ingestion-service';
 
 describe('SubmissionFeaturePropertyIngestionService', () => {
@@ -17,9 +18,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
   });
 
   it('runs deterministic upload-scoped SQL phases and succeeds when no errors are recorded', async () => {
-    const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
+    const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection({ systemUserId: () => 11 }));
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
+    const requestDefaultReviewsStub = sinon
+      .stub(SubmissionUploadReviewService.prototype, 'requestDefaultReviewsForUpload')
+      .resolves([]);
 
     const deleteDerivedPropertiesStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -155,6 +159,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(insertTaxonStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertArtifactStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
     expect(insertReferencesStub.calledOnce).to.equal(true);
+    expect(requestDefaultReviewsStub.calledOnceWith(99, '550e8400-e29b-41d4-a716-446655440000', 11)).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
     expect(outcome).to.eql({ status: 'ok' });
@@ -181,7 +186,8 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       insertCodeStub,
       insertTaxonStub,
       insertArtifactStub,
-      insertReferencesStub
+      insertReferencesStub,
+      requestDefaultReviewsStub
     );
   });
 
@@ -189,6 +195,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
+    const requestDefaultReviewsStub = sinon
+      .stub(SubmissionUploadReviewService.prototype, 'requestDefaultReviewsForUpload')
+      .resolves([]);
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
       .resolves();
@@ -328,6 +337,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
 
     expect(insertStringStub.called).to.equal(false);
     expect(insertRelationshipsStub.called).to.equal(false);
+    expect(requestDefaultReviewsStub.called).to.equal(false);
     expect(outcome.status).to.equal('invalid');
     if (outcome.status === 'invalid') {
       expect(outcome.errorCount).to.equal(2);

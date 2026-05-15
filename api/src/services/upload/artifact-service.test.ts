@@ -4,9 +4,11 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
-import { HTTP401 } from '../../errors/http-error';
+import { HTTP401, HTTP409 } from '../../errors/http-error';
 import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from './artifact-service';
 
@@ -104,24 +106,33 @@ describe('ArtifactService', () => {
   });
 
   describe('getArtifactSignedUrl', () => {
+    const artifactId = '11111111-1111-1111-1111-111111111111';
+    const artifact: Artifact = {
+      artifact_id: artifactId,
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      bucket: 'main-bucket',
+      object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+      byte_size: '128',
+      checksum_sha256: null,
+      uploaded_at: '2026-04-29T00:00:00.000Z',
+      format: 'txt'
+    };
+    const cleanSecurity = {
+      artifact_security_id: '22222222-2222-4222-9222-222222222222',
+      artifact_id: artifactId,
+      security: SecurityStatusEnum.CLEAN
+    };
+
     beforeEach(() => {
       process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
       process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME = 'quarantine-bucket';
     });
 
     it('should return a signed URL for a main-bucket artifact using the complete object key', async () => {
-      const artifact: Artifact = {
-        artifact_id: '11111111-1111-1111-1111-111111111111',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'main-bucket',
-        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
-        byte_size: '128',
-        checksum_sha256: null,
-        uploaded_at: '2026-04-29T00:00:00.000Z',
-        format: 'txt'
-      };
-
       sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves(cleanSecurity);
       const getSignedUrlStub = sinon
         .stub(ObjectStorageService.prototype, 'getSignedUrl')
         .resolves('https://example.com/download');
@@ -149,65 +160,95 @@ describe('ArtifactService', () => {
       sinon
         .stub(ArtifactRepository.prototype, 'getArtifact')
         .rejects(new ApiNotFoundError('Artifact not found', ['ArtifactRepository->getArtifact']));
+      const getLatestSecurityStub = sinon.stub(
+        ArtifactSecurityRepository.prototype,
+        'findLatestArtifactSecurityByArtifactId'
+      );
       const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
 
       try {
-        await service.getArtifactSignedUrl('11111111-1111-1111-1111-111111111111');
+        await service.getArtifactSignedUrl(artifactId);
         expect.fail('Expected error not thrown');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
         expect((error as Error).message).to.equal('Artifact not found');
+        expect(getLatestSecurityStub).not.to.have.been.called;
         expect(getSignedUrlStub).not.to.have.been.called;
       }
     });
 
-    it('should reject unsupported artifact buckets before requesting a signed URL', async () => {
-      const artifact: Artifact = {
-        artifact_id: '11111111-1111-1111-1111-111111111111',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'unsupported-bucket',
-        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
-        byte_size: '128',
-        checksum_sha256: null,
-        uploaded_at: '2026-04-29T00:00:00.000Z',
-        format: 'txt'
-      };
-
+    it('should return 409 when no artifact security record exists', async () => {
       sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      sinon.stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId').resolves(null);
       const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
 
       try {
         await service.getArtifactSignedUrl(artifact.artifact_id);
         expect.fail('Expected error not thrown');
       } catch (error) {
-        expect((error as Error).message).to.equal('Unsupported artifact bucket: unsupported-bucket');
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal(
+          'Attachment is not ready for download yet. It is pending security scan.'
+        );
         expect(getSignedUrlStub).not.to.have.been.called;
       }
     });
 
-    it('should not return a signed URL for a quarantine artifact', async () => {
-      const artifact: Artifact = {
-        artifact_id: '11111111-1111-1111-1111-111111111111',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'quarantine-bucket',
-        object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
-        byte_size: '128',
-        checksum_sha256: null,
-        uploaded_at: '2026-04-29T00:00:00.000Z',
-        format: 'txt'
-      };
-
+    it('should return 409 when artifact security is pending', async () => {
       sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
-      const getSignedUrlStub = sinon
-        .stub(ObjectStorageService.prototype, 'getSignedUrl')
-        .rejects(new Error('Presigned GET URLs are not allowed for the quarantine bucket'));
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves({ ...cleanSecurity, security: SecurityStatusEnum.PENDING });
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
 
       try {
         await service.getArtifactSignedUrl(artifact.artifact_id);
         expect.fail('Expected error not thrown');
       } catch (error) {
-        expect(getSignedUrlStub).to.have.been.calledOnceWith(BucketType.QUARANTINE, artifact.object_key);
-        expect((error as Error).message).to.equal('Presigned GET URLs are not allowed for the quarantine bucket');
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal(
+          'Attachment is not ready for download yet. It is pending security scan.'
+        );
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    for (const security of [SecurityStatusEnum.INFECTED, SecurityStatusEnum.ERROR, SecurityStatusEnum.SKIPPED]) {
+      it(`should return 409 when artifact security is ${security}`, async () => {
+        sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+        sinon
+          .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+          .resolves({ ...cleanSecurity, security });
+        const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+        try {
+          await service.getArtifactSignedUrl(artifact.artifact_id);
+          expect.fail('Expected error not thrown');
+        } catch (error) {
+          expect(error).to.be.instanceOf(HTTP409);
+          expect((error as Error).message).to.equal(
+            'Attachment is not available for download because it failed security validation.'
+          );
+          expect(getSignedUrlStub).not.to.have.been.called;
+        }
+      });
+    }
+
+    it('should return 409 when a clean artifact is still in quarantine', async () => {
+      const quarantineArtifact = { ...artifact, bucket: 'quarantine-bucket' };
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(quarantineArtifact);
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves(cleanSecurity);
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal('Attachment is not ready for download yet. It is pending promotion.');
+        expect(getSignedUrlStub).not.to.have.been.called;
       }
     });
   });

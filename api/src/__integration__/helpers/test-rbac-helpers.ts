@@ -7,6 +7,8 @@
  */
 import SQL from 'sql-template-strings';
 import { IDBConnection } from '../../database/db';
+import { PolicyStatus } from '../../models/policy';
+import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { computeScopeHash } from '../../utils/scope-hash';
 
@@ -40,11 +42,24 @@ export async function addTeamMember(connection: IDBConnection, teamId: string, s
   `);
 }
 
-export async function createPolicy(connection: IDBConnection, name: string): Promise<string> {
+/**
+ * Insert a policy row. Defaults to `status='approved'` so existing callers that
+ * only need a working access-policy do not have to thread the status through;
+ * tests exercising the request → reviewed → approved lifecycle override it.
+ *
+ * The `status` parameter is cast to `biohub.policy_status` in SQL because pg
+ * binds string parameters as `text`; without the explicit cast Postgres
+ * rejects the INSERT (no implicit text → policy_status coercion).
+ */
+export async function createPolicy(
+  connection: IDBConnection,
+  name: string,
+  status: PolicyStatus = 'approved'
+): Promise<string> {
   const systemUserId = connection.systemUserId();
   const result = await connection.sql(SQL`
     INSERT INTO policy (name, status, create_user)
-    VALUES (${name}, 'approved', ${systemUserId})
+    VALUES (${name}, ${status}::biohub.policy_status, ${systemUserId})
     RETURNING policy_id;
   `);
   return result.rows[0].policy_id;
@@ -53,12 +68,24 @@ export async function createPolicy(connection: IDBConnection, name: string): Pro
 /**
  * Create a policy statement with the given URN.
  * The DB trigger auto-decomposes the URN into indexed columns.
+ *
+ * Defaults to `effect='allow'` so existing callers that grant access keep
+ * their original shape; tests for DENY-only policies override the effect.
+ *
+ * The `effect` parameter is cast to `biohub.policy_effect` in SQL because pg
+ * binds string parameters as `text`; without the explicit cast Postgres
+ * rejects the INSERT (no implicit text → policy_effect coercion).
  */
-export async function createPolicyStatement(connection: IDBConnection, policyId: string, urn: string): Promise<string> {
+export async function createPolicyStatement(
+  connection: IDBConnection,
+  policyId: string,
+  urn: string,
+  effect: PolicyEffect = PolicyEffect.ALLOW
+): Promise<string> {
   const systemUserId = connection.systemUserId();
   const result = await connection.sql(SQL`
     INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-    VALUES (${policyId}, 'allow', ${urn}, ${systemUserId})
+    VALUES (${policyId}, ${effect}::biohub.policy_effect, ${urn}, ${systemUserId})
     RETURNING policy_statement_id;
   `);
   return result.rows[0].policy_statement_id;

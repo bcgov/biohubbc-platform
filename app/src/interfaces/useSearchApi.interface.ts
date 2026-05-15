@@ -14,23 +14,6 @@ export interface ISearchAllFilters {
   feature_type_name?: string;
 }
 
-/** Request parameters for legacy filter-based feature download creation */
-export interface ISearchFeaturesFilters {
-  /** Free-text keyword search across all searchable properties */
-  keyword?: string;
-
-  /** Filter results by one or more feature types (e.g., species_observation) */
-  feature_types?: string[];
-
-  /** Filter results by one or more species */
-  species?: number[];
-}
-
-export interface CreateDownloadResponse {
-  download_id: string;
-  download_url: string;
-}
-
 /** Feature search result (for combined search) */
 export interface SearchFeatureResult {
   submission_feature_id: number;

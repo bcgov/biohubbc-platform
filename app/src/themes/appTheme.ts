@@ -82,10 +82,25 @@ const appTheme = createTheme({
     },
     MuiAlert: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           fontSize: '0.9rem',
-          padding: '12px 20px'
-        },
+          padding: '8px 16px',
+          '&.MuiAlert-standard': {
+            border: `1px solid ${alpha(theme.palette.primary.dark, 0.25)}`
+          },
+          '&.MuiAlert-standard.MuiAlert-colorError, &.MuiAlert-standardError': {
+            borderColor: alpha(theme.palette.error.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorInfo, &.MuiAlert-standardInfo': {
+            borderColor: alpha(theme.palette.info.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorSuccess, &.MuiAlert-standardSuccess': {
+            borderColor: alpha(theme.palette.success.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorWarning, &.MuiAlert-standardWarning': {
+            borderColor: alpha(theme.palette.warning.dark, 0.25)
+          }
+        }),
         icon: {
           marginRight: '1rem'
         }
@@ -99,7 +114,8 @@ const appTheme = createTheme({
     MuiAlertTitle: {
       styleOverrides: {
         root: {
-          fontWeight: 700
+          fontWeight: 700,
+          fontSize: '0.9rem'
         }
       }
     },
@@ -590,7 +606,7 @@ const appTheme = createTheme({
             border: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
-            padding: '6px 12px'
+            padding: '4px 10px'
           }
         }
       }
@@ -634,6 +650,7 @@ const appTheme = createTheme({
           fontWeight: 700,
           color: theme.palette.text.secondary,
           opacity: 0.8,
+          textTransform: 'none',
           padding: theme.spacing(0, 2),
           '&.Mui-selected': {
             color: theme.palette.primary.main,

@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRecommendedFilters } from './useRecommendedFilters';
 
 const MAX_NUMBER_SEARCH_SUGGESTIONS_PER_CATEGORY = 6;
+const PROPERTY_SEARCH_DEFAULT_LIMIT = 25;
+const PROPERTY_SEARCH_HYDRATION_MAX_PAGES = 20;
 
 interface UseExpressionBuilderPropertiesResult {
   propertyOptions: ExpressionBuilderProperty[];
@@ -62,12 +64,17 @@ export const useExpressionBuilderProperties = (
   );
   const lastRecommendedSearchTermRef = useRef<string | null>(null);
   const activePropertyOptionsLookupIdRef = useRef(0);
+  const usedPropertyKeysRef = useRef(usedPropertyKeys);
   const { recommended, handleRefresh: refreshRecommendedFilters } = useRecommendedFilters();
 
   useEffect(() => {
     searchPropertiesRef.current = api.search.searchProperties;
     setSnackbarRef.current = dialogContext.setSnackbar;
   });
+
+  useEffect(() => {
+    usedPropertyKeysRef.current = usedPropertyKeys;
+  }, [usedPropertyKeys]);
 
   /**
    * Finds the expression-builder property that represents species predicates.
@@ -176,10 +183,44 @@ export const useExpressionBuilderProperties = (
    */
   const loadPropertyOptions = useCallback(async (keyword: string, lookupId: number) => {
     try {
-      const response = await searchPropertiesRef.current(keyword ? { keyword } : {}, { page: 1, limit: 25 });
-      const nextProperties = Object.values(response.properties)
-        .flat()
-        .map(mapSearchPropertyToExpressionBuilderProperty);
+      const usedPropertyKeysSnapshot = usedPropertyKeysRef.current;
+      const shouldHydrateMissingUsedProperties = keyword.length === 0 && usedPropertyKeysSnapshot.size > 0;
+      const collectedPropertiesByKey = new Map<string, ExpressionBuilderProperty>();
+      let page = 1;
+      let lastPage = 1;
+      let pagesFetched = 0;
+
+      do {
+        const response = await searchPropertiesRef.current(keyword ? { keyword } : {}, {
+          page,
+          limit: PROPERTY_SEARCH_DEFAULT_LIMIT
+        });
+        const mappedProperties = Object.values(response.properties)
+          .flat()
+          .map(mapSearchPropertyToExpressionBuilderProperty);
+
+        mappedProperties.forEach((property) => {
+          collectedPropertiesByKey.set(getExpressionBuilderPropertyKeyFromProperty(property), property);
+        });
+
+        pagesFetched += 1;
+        lastPage = response.pagination.last_page;
+        page += 1;
+
+        if (!shouldHydrateMissingUsedProperties) {
+          break;
+        }
+
+        const missingUsedPropertyCount = Array.from(usedPropertyKeysSnapshot).filter(
+          (key) => !collectedPropertiesByKey.has(key)
+        ).length;
+
+        if (missingUsedPropertyCount === 0) {
+          break;
+        }
+      } while (page <= lastPage && pagesFetched < PROPERTY_SEARCH_HYDRATION_MAX_PAGES);
+
+      const nextProperties = Array.from(collectedPropertiesByKey.values());
 
       if (lookupId === activePropertyOptionsLookupIdRef.current) {
         setPropertyOptions(nextProperties);

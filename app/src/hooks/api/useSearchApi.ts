@@ -1,9 +1,7 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
-  CreateDownloadResponse,
   ISearchAllFilters,
-  ISearchFeaturesFilters,
   ISearchPropertyFilters,
   SearchFeatureResponse,
   SearchPropertyResponse,
@@ -25,15 +23,19 @@ export const useSearchApi = (axios: AxiosInstance) => {
    *
    * @param {ExpressionTreeExpression} expressionTree - Optional expression tree search parameters
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options - Optional request controls, including an abort signal for canceling stale searches.
    * @return {Promise<SearchFeatureResponse >} Array of matching features sorted by relevancy
    */
   const searchFeatures = async (
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchFeatureResponse> => {
     const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
-    const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body);
+    const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body, {
+      signal: options?.signal
+    });
 
     return data;
   };
@@ -91,22 +93,10 @@ export const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  /**
-   * Create a download from search filters.
-   * Bypasses the shopping cart — sends current search filters to the server which resolves
-   * them to feature IDs and creates a download record. The download UUID is the access
-   * credential for anonymous users; authenticated users get it linked to their account.
-   */
-  const createDownload = async (filters: ISearchFeaturesFilters): Promise<CreateDownloadResponse> => {
-    const { data } = await axios.post<CreateDownloadResponse>('/api/download', { filters });
-    return data;
-  };
-
   return {
     searchFeatures,
     searchAll,
     searchProperties,
-    searchSummary,
-    createDownload
+    searchSummary
   };
 };

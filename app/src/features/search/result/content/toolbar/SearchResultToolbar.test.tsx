@@ -1,7 +1,7 @@
-import { cleanup, fireEvent } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
+import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import { render } from 'test-helpers/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
 import { SearchResultToolbar } from './SearchResultToolbar';
 
 vi.mock('components/button/SortButton', () => ({
@@ -17,13 +17,12 @@ vi.mock('components/toggle-button/ToggleButtons', () => ({
 }));
 
 const defaultProps = {
-  view: SEARCH_RESULT_OPTION_VIEW.LIST,
-  onViewChange: vi.fn(),
   sortOptions: [{ label: 'Relevance', value: 'relevancy_score', direction: 'desc' as const }],
   activeSort: 'relevancy_score',
   onSortChange: vi.fn(),
-  handleAddAllToCart: vi.fn(),
-  handleDownloadAll: vi.fn()
+  view: SEARCH_RESULT_VIEW.TABLE,
+  onViewChange: vi.fn(),
+  viewOptions: SEARCH_RESULT_VIEW_OPTIONS
 };
 
 describe('SearchResultToolbar', () => {
@@ -35,42 +34,10 @@ describe('SearchResultToolbar', () => {
     cleanup();
   });
 
-  it('renders Download All button alongside Add All to Cart', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
+  it('renders sort controls alongside the table/list toggle', () => {
+    const { getByText, getByTestId } = render(<SearchResultToolbar {...defaultProps} />);
 
-    expect(getByRole('button', { name: /download all/i })).toBeInTheDocument();
-    expect(getByRole('button', { name: /add all to cart/i })).toBeInTheDocument();
-  });
-
-  it('disables Download All button when isDownloading is true', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} isDownloading={true} />);
-
-    expect(getByRole('button', { name: /download all/i })).toBeDisabled();
-  });
-
-  it('enables Download All button when isDownloading is not provided', () => {
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} />);
-
-    expect(getByRole('button', { name: /download all/i })).not.toBeDisabled();
-  });
-
-  it('calls handleDownloadAll on click', () => {
-    const handleDownloadAll = vi.fn();
-    const { getByRole } = render(<SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} />);
-
-    fireEvent.click(getByRole('button', { name: /download all/i }));
-
-    expect(handleDownloadAll).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call handleDownloadAll when disabled', () => {
-    const handleDownloadAll = vi.fn();
-    const { getByRole } = render(
-      <SearchResultToolbar {...defaultProps} handleDownloadAll={handleDownloadAll} isDownloading={true} />
-    );
-
-    fireEvent.click(getByRole('button', { name: /download all/i }));
-
-    expect(handleDownloadAll).not.toHaveBeenCalled();
+    expect(getByText('Relevance')).toBeInTheDocument();
+    expect(getByTestId('toggle-buttons')).toBeInTheDocument();
   });
 });

@@ -3,14 +3,11 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { HTTP401 } from '../../../../../errors/http-error';
-import { SecurityStatusEnum } from '../../../../../models/security-status';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { ArtifactDownloadResponseSchema } from '../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TicketArtifactService } from '../../../../../services/ticket-artifact-service';
-import { ArtifactSecurityService } from '../../../../../services/upload/artifact-security-service';
 import { ArtifactService } from '../../../../../services/upload/artifact-service';
-import { getObjectStoreBucketName } from '../../../../../utils/file-utils';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/tickets/{ticketId}/artifact/{ticketArtifactId}');
@@ -80,7 +77,6 @@ export function getArtifactDownloadUrl(): RequestHandler {
 
       const ticketArtifactService = new TicketArtifactService(connection);
       const artifactService = new ArtifactService(connection);
-      const artifactSecurityService = new ArtifactSecurityService(connection);
 
       const ticketArtifact = await ticketArtifactService.findTicketArtifactById(
         req.params.ticketId,
@@ -88,15 +84,6 @@ export function getArtifactDownloadUrl(): RequestHandler {
       );
 
       if (!ticketArtifact) {
-        throw new HTTP401('Access Denied');
-      }
-
-      const [artifact, latestSecurity] = await Promise.all([
-        artifactService.getArtifact(ticketArtifact.artifact_id),
-        artifactSecurityService.findLatestArtifactSecurityByArtifactId(ticketArtifact.artifact_id)
-      ]);
-
-      if (latestSecurity?.security !== SecurityStatusEnum.CLEAN || artifact.bucket !== getObjectStoreBucketName()) {
         throw new HTTP401('Access Denied');
       }
 

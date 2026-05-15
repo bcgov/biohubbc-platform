@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { SECURITY_SCOPE_ANCHOR_BATCH_SIZE } from '../../constants/security';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { PolicyEffect } from '../../models/policy-statement';
+import { PolicyEffect, PolicyStatementUrn } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
@@ -476,8 +476,12 @@ export class SecurityScopeRepository extends BaseRepository {
   /**
    * Insert team_security_scope rows for a team's scopes derived from a specific policy.
    *
-   * Walks the policy → policy_statement → policy_statement_scope chain to find
-   * all scopes granted by the policy, then inserts team_security_scope rows.
+   * The team-link invariant — cache rows exist iff a live `team_policy` ties the
+   * team to an approved policy with at least one ALLOW statement — is enforced
+   * in this SQL via the `team_policy` join. A stale caller that holds onto a
+   * `(teamId, policyId)` pair after the link has been soft-deleted cannot
+   * recreate cache rows; the join filters them out.
+   *
    * ON CONFLICT DO NOTHING makes this safe for idempotent calls — a team may
    * already have access to the same scope through a different policy.
    *
@@ -487,19 +491,24 @@ export class SecurityScopeRepository extends BaseRepository {
   async insertTeamSecurityScopesForPolicy(teamId: string, policyId: string): Promise<void> {
     const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
-      SELECT ${teamId}, pss.security_scope_id
-      FROM policy p
+      SELECT tp.team_id, pss.security_scope_id
+      FROM team_policy tp
+      JOIN policy p
+        ON p.policy_id = tp.policy_id
+        AND p.status = 'approved'
+        AND p.record_end_date IS NULL
       JOIN policy_statement ps
         ON ps.policy_id = p.policy_id
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
-      JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
+      JOIN policy_statement_scope pss
+        ON pss.policy_statement_id = ps.policy_statement_id
       JOIN team t
-        ON t.team_id = ${teamId}
+        ON t.team_id = tp.team_id
         AND t.record_end_date IS NULL
-      WHERE p.policy_id = ${policyId}
-        AND p.status = 'approved'
-        AND p.record_end_date IS NULL
+      WHERE tp.team_id = ${teamId}
+        AND tp.policy_id = ${policyId}
+        AND tp.record_end_date IS NULL
       ON CONFLICT (team_id, security_scope_id) DO NOTHING;
     `;
 
@@ -555,10 +564,48 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * Return the active ALLOW statements for an approved policy.
+   *
+   * The scope cache materializes lazily — when a team gains standing access through
+   * a `team_policy` link or when a policy's status flips to `approved`. Only ALLOW
+   * statements on an approved policy contribute access; DENY statements record
+   * filters but do not produce visible cache rows. Both gates (`policy.status` and
+   * `policy_statement.effect`) are enforced here so the service layer can stay thin.
+   *
+   * Returns an empty array when the policy is not approved, has no active ALLOW
+   * statements, or does not exist — callers treat `[]` as a no-op signal.
+   *
+   * @param policyId UUID of the policy
+   * @returns Array of `{ policy_statement_id, submission_feature_urn }` for active ALLOW statements
+   */
+  async findActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<PolicyStatementUrn[]> {
+    const sqlStatement = SQL`
+      SELECT ps.policy_statement_id, ps.submission_feature_urn
+      FROM policy p
+      JOIN policy_statement ps
+        ON ps.policy_id = p.policy_id
+        AND ps.effect = ${PolicyEffect.ALLOW}
+        AND ps.record_end_date IS NULL
+      WHERE p.policy_id = ${policyId}
+        AND p.status = 'approved'
+        AND p.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, PolicyStatementUrn);
+
+    return response.rows;
+  }
+
+  /**
    * Find security_scope IDs whose originating policy statement URN matches a submission.
    *
    * Used when new security rules are applied to features in a submission —
    * finds scopes that may need new anchors computed for the affected submission.
+   *
+   * A live `team_policy` link is required: a scope without one grants access to
+   * no team, so anchor recomputation for it is wasted work. Gating here keeps
+   * anchor-compute jobs scoped to the access cache only — the invariant captured
+   * in SIMSBIOHUB-985.
    *
    * @param submissionId The submission ID to match against scope URNs
    * @returns Array of SecurityScopeId rows for matching scopes
@@ -569,6 +616,7 @@ export class SecurityScopeRepository extends BaseRepository {
       FROM policy_statement ps
       JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
       JOIN policy p ON p.policy_id = ps.policy_id
+      JOIN team_policy tp ON tp.policy_id = p.policy_id AND tp.record_end_date IS NULL
       WHERE ps.record_end_date IS NULL
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND p.record_end_date IS NULL
