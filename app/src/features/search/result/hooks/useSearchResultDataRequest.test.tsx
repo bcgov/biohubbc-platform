@@ -1,9 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { ICreateDataRequestFormValues } from 'features/data-request/components/form/CreateDataRequestForm';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { CreateTicketDataRequestPayload } from 'interfaces/useDataRequestApi.interface';
 import { Mock, vi } from 'vitest';
 import { useSearchResultDataRequest } from './useSearchResultDataRequest';
 
@@ -27,12 +27,9 @@ const expressionTree: ExpressionTreeExpression = {
   ]
 };
 
-const formValues: ICreateDataRequestFormValues = {
+const payload: CreateTicketDataRequestPayload = {
   reason: 'needed for analysis',
-  system_users: [
-    { system_user_id: 7, user_identifier: 'alice' },
-    { system_user_id: 11, user_identifier: 'bob' }
-  ]
+  system_user_ids: [7, 11]
 };
 
 describe('useSearchResultDataRequest', () => {
@@ -87,7 +84,7 @@ describe('useSearchResultDataRequest', () => {
     const { result } = renderHook(() => useSearchResultDataRequest({ featureType: 'observation', expressionTree }));
 
     await act(async () => {
-      await result.current.handleCreateDataRequest(formValues);
+      await result.current.handleCreateDataRequest(payload);
     });
 
     expect(mockCreateDataRequest).toHaveBeenCalledTimes(1);
@@ -105,13 +102,13 @@ describe('useSearchResultDataRequest', () => {
     );
 
     await act(async () => {
-      await result.current.handleCreateDataRequest(formValues);
+      await result.current.handleCreateDataRequest(payload);
     });
 
     expect(mockCreateDataRequest).toHaveBeenCalledTimes(1);
-    const payload = mockCreateDataRequest.mock.calls[0][0];
-    expect(payload.expression).toBeNull();
-    expect(payload).toEqual(
+    const sentPayload = mockCreateDataRequest.mock.calls[0][0];
+    expect(sentPayload.expression).toBeNull();
+    expect(sentPayload).toEqual(
       expect.objectContaining({
         featureTypes: ['observation'],
         expression: null
@@ -128,7 +125,7 @@ describe('useSearchResultDataRequest', () => {
     expect(result.current.isCreateDataRequestDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDataRequest(formValues);
+      await result.current.handleCreateDataRequest(payload);
     });
 
     expect(result.current.isCreateDataRequestDialogOpen).toBe(false);
@@ -152,7 +149,7 @@ describe('useSearchResultDataRequest', () => {
     expect(result.current.isCreateDataRequestDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDataRequest(formValues);
+      await result.current.handleCreateDataRequest(payload);
     });
 
     expect(result.current.isCreateDataRequestDialogOpen).toBe(true);
@@ -180,8 +177,8 @@ describe('useSearchResultDataRequest', () => {
     let secondSubmit: Promise<void> | undefined;
 
     act(() => {
-      firstSubmit = result.current.handleCreateDataRequest(formValues) as Promise<void>;
-      secondSubmit = result.current.handleCreateDataRequest(formValues) as Promise<void>;
+      firstSubmit = result.current.handleCreateDataRequest(payload) as Promise<void>;
+      secondSubmit = result.current.handleCreateDataRequest(payload) as Promise<void>;
     });
 
     expect(mockCreateDataRequest).toHaveBeenCalledTimes(1);
@@ -226,7 +223,7 @@ describe('useSearchResultDataRequest', () => {
 
     let submitPromise: Promise<void> | undefined;
     act(() => {
-      submitPromise = result.current.handleCreateDataRequest(formValues) as Promise<void>;
+      submitPromise = result.current.handleCreateDataRequest(payload) as Promise<void>;
     });
 
     await waitFor(() => {

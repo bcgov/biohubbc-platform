@@ -2,6 +2,7 @@ import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
+import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
 import { useCodesContext } from 'hooks/useContext';
 import { useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router';
@@ -12,6 +13,7 @@ import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
 import { useSearchResultCartActions } from './hooks/useSearchResultCartActions';
+import { useSearchResultDataRequest } from './hooks/useSearchResultDataRequest';
 import { useSearchResultDownload } from './hooks/useSearchResultDownload';
 import { useSearchResultExpression } from './hooks/useSearchResultExpression';
 import { useSearchResultNavigation } from './hooks/useSearchResultNavigation';
@@ -59,8 +61,7 @@ export const SearchResultPage = () => {
   const { cart, handleAddAllToCart } = useSearchResultCartActions(rows);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
     useSearchResultPagingSort({ pagination, setSearchParams });
-  const { handleResultClick, handleFeatureTypeTabChange, handleRequestAccess } =
-    useSearchResultNavigation(featureTypeLinks);
+  const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
     setDownloadView,
@@ -71,6 +72,13 @@ export const SearchResultPage = () => {
     handleCancelCreateDownload,
     handleCheckout
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
+  const {
+    isCreateDataRequestDialogOpen,
+    isSubmittingDataRequest,
+    handleOpenCreateDataRequest,
+    handleCreateDataRequest,
+    handleCancelCreateDataRequest
+  } = useSearchResultDataRequest({ featureType, expressionTree });
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   const hasSecuredResults = rows.some((row) => row.is_secured);
@@ -97,7 +105,7 @@ export const SearchResultPage = () => {
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
-          {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleRequestAccess} />}
+          {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
 
           <SearchResultPanel
             rows={rows}
@@ -127,6 +135,14 @@ export const SearchResultPage = () => {
             featureTypeOptions={featureTypeOptions}
             onCancel={handleCancelCreateDownload}
             onSave={handleCreateDownload}
+          />
+
+          <CreateDataRequestDialog
+            open={isCreateDataRequestDialogOpen}
+            isSubmitting={isSubmittingDataRequest}
+            initialReason=""
+            onCancel={handleCancelCreateDataRequest}
+            onSave={handleCreateDataRequest}
           />
         </ResultPageContainer>
       </LoadingGuard>

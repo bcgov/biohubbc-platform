@@ -71,6 +71,8 @@ const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
 
 const mockCreateDownload = vi.fn();
+const mockCreateDataRequest = vi.fn();
+const mockGetAvailableUsers = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
 
@@ -99,8 +101,11 @@ describe('SearchResultPage', () => {
       }
     });
 
+    mockGetAvailableUsers.mockResolvedValue({ users: [] });
     mockUseApi.mockReturnValue({
-      download: { createDownload: mockCreateDownload }
+      download: { createDownload: mockCreateDownload },
+      dataRequest: { createDataRequest: mockCreateDataRequest },
+      teams: { getAvailableUsers: mockGetAvailableUsers }
     });
     mockUseCodesContext.mockReturnValue({
       codesDataLoader: { isReady: true, data: codesPayload }
@@ -319,5 +324,112 @@ describe('SearchResultPage', () => {
         })
       )
     );
+  });
+
+  it('P1: hides the secured-results banner when no rows are secured', () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { queryByRole } = renderPage();
+
+    expect(queryByRole('button', { name: /request access/i })).not.toBeInTheDocument();
+  });
+
+  it('P2: shows the banner and opens the create-data-request dialog without navigating', async () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [
+        { uuid: 'result-1', submission_feature_id: 1, is_secured: false },
+        { uuid: 'result-2', submission_feature_id: 2, is_secured: true }
+      ],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      pagination: { total: 2, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { getByRole, findByRole } = renderPage();
+
+    const requestAccessButton = getByRole('button', { name: /request access/i });
+    fireEvent.click(requestAccessButton);
+
+    expect(await findByRole('heading', { level: 2, name: /create data request/i })).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('P3: submits create-data-request with current featureType and applied expressionTree', async () => {
+    mockCreateDataRequest.mockResolvedValue({});
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
+
+    // Apply an expression so it flows into the create-data-request payload.
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+
+    fireEvent.click(getByRole('button', { name: /request access/i }));
+
+    await findByRole('heading', { level: 2, name: /create data request/i });
+
+    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
+    expect(mockCreateDataRequest).toHaveBeenCalledWith({
+      reason: 'needed for analysis',
+      system_user_ids: [],
+      featureTypes: ['dataset'],
+      expression: expect.objectContaining({
+        type: 'expression',
+        operator: 'AND'
+      })
+    });
+    await waitFor(() =>
+      expect(mockSetSnackbar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          open: true,
+          snackbarMessage: expect.stringMatching(/data request created/i)
+        })
+      )
+    );
+  });
+
+  it('P4: surfaces an API error and keeps the create-data-request dialog open on failure', async () => {
+    mockCreateDataRequest.mockRejectedValue({ message: 'Server exploded' });
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      isLoading: false,
+      searchParams: new URLSearchParams(),
+      setSearchParams: vi.fn(),
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /request access/i }));
+    await findByRole('heading', { level: 2, name: /create data request/i });
+
+    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockSetSnackbar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          open: true,
+          snackbarMessage: 'Server exploded'
+        })
+      )
+    );
+    expect(getByRole('heading', { level: 2, name: /create data request/i })).toBeInTheDocument();
   });
 });
