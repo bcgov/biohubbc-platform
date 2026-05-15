@@ -87,6 +87,18 @@ describe('SearchResultPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Reset location to default (no search params) before each test.
+    mockUseLocation.mockReturnValue({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' });
+
+    // Mirror navigate calls into useLocation so URL-derived state (e.g. the `expr` param)
+    // is visible on subsequent renders, matching real router behaviour.
+    mockNavigate.mockImplementation((to: unknown) => {
+      if (to && typeof to === 'object' && 'search' in to) {
+        const { pathname = '/search/dataset', search = '' } = to as { pathname?: string; search?: string };
+        mockUseLocation.mockReturnValue({ search, pathname, hash: '', state: null, key: 'k' });
+      }
+    });
+
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload }
     });

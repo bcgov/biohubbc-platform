@@ -10,6 +10,7 @@ import { MAX_EXPRESSION_BUILDER_NESTED_GROUP_DEPTH } from 'constants/expression'
 import {
   ExpressionTreeExpression,
   ExpressionTreeClause,
+  ExpressionTreePredicate,
   ExpressionLogicalOperator,
   ExpressionPredicateOperator,
   ExpressionPropertyType
@@ -277,22 +278,56 @@ const hydrateBuilderExpressionNodeWithPropertyTypes = (
     const predicateType = propertyTypesById.get(
       getExpressionBuilderPropertyKey(clause.feature_property_id, clause.feature_type_property_id)
     );
+    const fallbackPredicateType = inferPredicateTypeFromHydratedClause(clause);
 
     return {
       ui_id: crypto.randomUUID(),
       type: 'predicate',
       feature_property_id: clause.feature_property_id,
       feature_type_property_id: clause.feature_type_property_id,
-      predicate: predicateType
-        ? {
-            type: predicateType,
-            operator: clause.operator,
-            value: predicateType === 'datetime' ? datetimeStringToObject(clause.value) : clause.value
-          }
-        : null
+      predicate:
+        predicateType || fallbackPredicateType
+          ? {
+              type: predicateType ?? fallbackPredicateType,
+              operator: clause.operator,
+              value:
+                (predicateType ?? fallbackPredicateType) === 'datetime'
+                  ? datetimeStringToObject(clause.value)
+                  : clause.value
+            }
+          : null
     };
   })
 });
+
+const inferPredicateTypeFromHydratedClause = (clause: ExpressionTreePredicate): ExpressionPropertyType => {
+  if (
+    clause.operator === 'Before' ||
+    clause.operator === 'After' ||
+    clause.operator === 'OnDate' ||
+    clause.operator === 'OnTime'
+  ) {
+    return 'datetime';
+  }
+  if (clause.operator === 'Within' || clause.operator === 'Intersects') {
+    return 'spatial';
+  }
+  if (
+    clause.operator === 'ParentOf' ||
+    clause.operator === 'ChildOf' ||
+    clause.operator === 'DescendsFrom' ||
+    clause.operator === 'AscendsFrom'
+  ) {
+    return 'taxon';
+  }
+  if (typeof clause.value === 'boolean') {
+    return 'boolean';
+  }
+  if (typeof clause.value === 'number') {
+    return 'number';
+  }
+  return 'string';
+};
 
 /**
  * Converts an API expression tree into editable builder nodes.
