@@ -42,6 +42,7 @@ GET.apiDoc = {
               type: 'object',
               required: [
                 'security_rule_id',
+                'policy_id',
                 'name',
                 'description',
                 'record_effective_date',
@@ -55,6 +56,10 @@ GET.apiDoc = {
               properties: {
                 security_rule_id: {
                   type: 'integer'
+                },
+                policy_id: {
+                  type: 'string',
+                  format: 'uuid'
                 },
                 name: {
                   type: 'string'

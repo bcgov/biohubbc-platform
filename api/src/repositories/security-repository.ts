@@ -23,6 +23,7 @@ export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecuri
 
 export const SecurityRuleRecord = z.object({
   security_rule_id: z.number(),
+  policy_id: z.string().uuid(),
   name: z.string(),
   description: z.string(),
   record_effective_date: z.string(),
@@ -51,6 +52,7 @@ export type SecurityCategoryRecord = z.infer<typeof SecurityCategoryRecord>;
 
 export const SecurityRuleAndCategory = z.object({
   security_rule_id: z.number(),
+  policy_id: z.string().uuid(),
   name: z.string(),
   description: z.string(),
   record_effective_date: z.string(),
@@ -330,6 +332,7 @@ export class SecurityRepository extends BaseRepository {
     const sql = SQL`
       SELECT 
         sr.security_rule_id,
+        sr.policy_id,
         sr.name,
         sr.description,
         sr.record_effective_date,
@@ -357,7 +360,20 @@ export class SecurityRepository extends BaseRepository {
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     defaultLog.debug({ label: 'getActiveSecurityRules' });
     const sql = SQL`
-      SELECT * FROM security_rule WHERE record_end_date IS NULL;
+      SELECT
+        security_rule_id,
+        policy_id,
+        name,
+        description,
+        record_effective_date,
+        record_end_date,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count
+      FROM security_rule
+      WHERE record_end_date IS NULL;
     `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
     return response.rows;

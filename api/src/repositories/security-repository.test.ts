@@ -265,6 +265,7 @@ describe('SecurityRepository', () => {
         rows: [
           {
             security_rule_id: 1,
+            policy_id: 'f4b2f372-98b2-4faa-b98e-91ea2296e370',
             name: 'name',
             description: 'description',
             record_effective_date: 1,
