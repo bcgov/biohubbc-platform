@@ -33,6 +33,29 @@ import { DataRequestService } from '../../services/data-request-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { TicketService } from '../../services/ticket-service';
 
+/**
+ * Helper: build a minimal one-predicate expression tree against
+ * `dataset.name`. The predicate ids (31/70) match the seed; the literal
+ * `value` is randomised so two calls produce distinct hashes and never
+ * collapse onto the same `expression` row via the `expression_hash`
+ * unique index.
+ */
+function buildExpression(value?: string): ExpressionTree {
+  return {
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        type: 'predicate',
+        feature_property_id: 31,
+        feature_type_property_id: 70,
+        operator: 'Equals',
+        value: value ?? `dr-int-${randomUUID()}`
+      }
+    ]
+  };
+}
+
 describe('DataRequestService (integration)', function () {
   this.timeout(15000);
 
@@ -88,29 +111,6 @@ describe('DataRequestService (integration)', function () {
     `);
 
     return result.rows[0].system_user_id;
-  }
-
-  /**
-   * Helper: build a minimal one-predicate expression tree against
-   * `dataset.name`. The predicate ids (31/70) match the seed; the literal
-   * `value` is randomised so two calls produce distinct hashes and never
-   * collapse onto the same `expression` row via the `expression_hash`
-   * unique index.
-   */
-  function buildExpression(value?: string): ExpressionTree {
-    return {
-      type: 'expression',
-      operator: 'AND',
-      clauses: [
-        {
-          type: 'predicate',
-          feature_property_id: 31,
-          feature_type_property_id: 70,
-          operator: 'Equals',
-          value: value ?? `dr-int-${randomUUID()}`
-        }
-      ]
-    };
   }
 
   /**
