@@ -191,7 +191,10 @@ export function createDataRequest(): RequestHandler {
       const dataRequest = await dataRequestService.createDataRequest({
         requested_by: systemUserId,
         reason,
-        system_user_ids,
+        // The picker captures additional collaborators; the requester is the principal subject and
+        // must be a member of both the data-request and policy teams. Duplicates are deduped inside
+        // `_createTeamWithMembers` so this stays a simple prepend.
+        system_user_ids: [systemUserId, ...system_user_ids],
         featureTypes,
         expression
       });

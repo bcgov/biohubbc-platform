@@ -223,7 +223,7 @@ describe('data-request', () => {
       ]
     };
 
-    it('R1: forwards parsed payload (featureTypes + expression) to service with requested_by from systemUserId()', async () => {
+    it('R1: forwards parsed payload (featureTypes + expression) to service with requested_by unioned into system_user_ids', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
         commit: sinon.stub(),
@@ -238,17 +238,19 @@ describe('data-request', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         reason: 'Need secured data for analysis',
-        system_user_ids: [2, 3],
+        system_user_ids: [3, 4],
         featureTypes: ['observation'],
         expression: expressionTree
       };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
+      // The route unions requester into system_user_ids before calling the service so the service
+      // can treat system_user_ids as the canonical access list.
       expect(createStub).to.have.been.calledOnceWith({
         requested_by: mockNonAdminUser.system_user_id,
         reason: 'Need secured data for analysis',
-        system_user_ids: [2, 3],
+        system_user_ids: [mockNonAdminUser.system_user_id, 3, 4],
         featureTypes: ['observation'],
         expression: expressionTree
       });
@@ -316,7 +318,7 @@ describe('data-request', () => {
       expect(createStub).to.have.been.calledOnceWith({
         requested_by: mockNonAdminUser.system_user_id,
         reason: 'reason text',
-        system_user_ids: [],
+        system_user_ids: [mockNonAdminUser.system_user_id],
         featureTypes: ['observation'],
         expression: null
       });

@@ -140,12 +140,13 @@ export class DataRequestService extends DBService {
    *
    * Business rules this method encodes:
    *
-   * - **Requester is always in both teams.** The `system_user_ids` picker captures
-   *   *additional* collaborators, not the canonical access list. The requester is the
-   *   principal subject of the request and must be a member of both the data-request
-   *   team and the policy team. Without this, an empty picker would produce a
-   *   zero-member policy team and silently break the approve-grant chain when the
-   *   policy is later approved.
+   * - **`system_user_ids` is the canonical access list for both teams.** The caller
+   *   decides who belongs in the data-request and policy teams; the service does not
+   *   union the requester back in. The user-facing route (`POST /api/data-request`) is
+   *   responsible for adding `requested_by` into `system_user_ids` before calling, since
+   *   in that flow the requester is the principal subject. The admin ticket flow
+   *   (`POST /api/tickets/{ticketId}/data-request`) intentionally passes the admin's
+   *   picker selection as-is and does not auto-add anyone.
    * - **One expression tree, many statement links.** When `featureTypes` is supplied
    *   with a non-null expression, the expression tree is persisted once and linked to
    *   every per-feature-type statement using the same `expression_id`. This keeps
@@ -164,14 +165,9 @@ export class DataRequestService extends DBService {
    * @memberof DataRequestService
    */
   async createDataRequestForTicket(ticketId: string, payload: CreateDataRequestPayload): Promise<DataRequest> {
-    // Always include the requester in both teams. The picker captures additional collaborators,
-    // not the canonical access list — the requester is the principal subject of the request and
-    // must receive access if the policy is later approved.
-    const members = Array.from(new Set([payload.requested_by, ...payload.system_user_ids]));
-
     const [dataRequestTeam, policyTeam] = await Promise.all([
-      this._createTeamWithMembers(members),
-      this._createTeamWithMembers(members)
+      this._createTeamWithMembers(payload.system_user_ids),
+      this._createTeamWithMembers(payload.system_user_ids)
     ]);
 
     // Branch on whether the caller supplied an explicit feature-type scope.
@@ -306,7 +302,7 @@ export class DataRequestService extends DBService {
   private async _createTeamWithMembers(systemUserIds: number[]): Promise<Team> {
     const team = await this.teamService.createTeam({ name: _generateDataRequestTeamName() });
     // Remove duplicate incoming member identifiers to avoid duplicate team-member inserts.
-    const uniqueMemberIds = Array.from(new Set(systemUserIds));
+    const uniqueMemberIds = [...new Set(systemUserIds)];
 
     await Promise.all(
       uniqueMemberIds.map((systemUserId) =>

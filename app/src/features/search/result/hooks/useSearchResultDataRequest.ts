@@ -3,8 +3,8 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
+import { CreateDataRequestDialogValues } from 'features/data-request/components/CreateDataRequestDialog';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { CreateTicketDataRequestPayload } from 'interfaces/useDataRequestApi.interface';
 import { useCallback, useEffect, useState } from 'react';
 
 interface UseSearchResultDataRequestProps {
@@ -46,11 +46,11 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
    * shows a confirmation snackbar; failure keeps the dialog open and surfaces
    * the API error. State updates are skipped after unmount.
    *
-   * @param {CreateTicketDataRequestPayload} values - Reason and selected collaborator system user IDs from the dialog.
+   * @param {CreateDataRequestDialogValues} values - Reason and selected collaborator system user IDs from the dialog.
    * @returns Promise from the serialized create-data-request operation, or `undefined` when another submission is already running.
    */
   const handleCreateDataRequest = useCallback(
-    (values: CreateTicketDataRequestPayload) =>
+    (values: CreateDataRequestDialogValues) =>
       runSerialized(async () => {
         if (!featureType) {
           return undefined;

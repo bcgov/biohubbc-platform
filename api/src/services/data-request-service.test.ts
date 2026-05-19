@@ -251,13 +251,12 @@ describe('DataRequestService', () => {
     );
   });
 
-  it('createDataRequestForTicket includes only the requester in both teams when system_user_ids is empty', async () => {
-    // Verifies: an empty picker still places the requester in BOTH the data-request team and the policy team
-    // (the requester is canonical, not optional).
+  it('createDataRequestForTicket inserts every system_user_ids entry into both teams without unioning the requester', async () => {
+    // Verifies: the service treats `system_user_ids` as the canonical access list and does NOT add the
+    // requester back in. Union-with-requester semantics belong to the user-facing route, not the service.
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
 
-    // Step 1: stub the two team creations and downstream artifacts so the test isolates membership logic.
     sinon
       .stub(TeamService.prototype, 'createTeam')
       .onFirstCall()
@@ -274,63 +273,25 @@ describe('DataRequestService', () => {
     sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
     sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
-    // Step 2: act with an empty system_user_ids picker.
-    await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
-      requested_by: 7,
-      reason: 'r',
-      system_user_ids: []
-    });
-
-    // Step 3: createTeamMember is called twice — once per team — with the requester (id=7) only.
-    expect(createTeamMemberStub).to.have.callCount(2);
-    for (const call of createTeamMemberStub.getCalls()) {
-      expect(call.args[0].system_user_id).to.equal(7);
-    }
-  });
-
-  it('createDataRequestForTicket unions requester into both teams when system_user_ids omits the requester', async () => {
-    // Verifies: when the picker captures additional collaborators that do NOT include the requester,
-    // the requester is unioned into the member set for both teams.
-    const mockDB = getMockDBConnection();
-    const service = new DataRequestService(mockDB);
-
-    // Step 1: standard stubs.
-    sinon
-      .stub(TeamService.prototype, 'createTeam')
-      .onFirstCall()
-      .resolves({ team_id: 'dr-team', name: 'dr', description: null, member_count: 0 })
-      .onSecondCall()
-      .resolves({ team_id: 'policy-team', name: 'policy', description: null, member_count: 0 });
-    const createTeamMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
-    sinon.stub(PolicyService.prototype, 'createPolicyWithStatements').resolves(buildMockPolicy());
-    sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
-      team_policy_id: 'tp-1',
-      team_id: 'policy-team',
-      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345'
-    } as TeamPolicy);
-    sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
-    sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
-
-    // Step 2: act with requester 7 and picker [42, 99] (requester NOT in picker).
+    // Act with a requester not present in system_user_ids; the service should NOT add 7.
     await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
       requested_by: 7,
       reason: 'r',
       system_user_ids: [42, 99]
     });
 
-    // Step 3: 3 members × 2 teams = 6 inserts; the union across all calls is {7, 42, 99}.
-    expect(createTeamMemberStub).to.have.callCount(6);
+    // 2 members × 2 teams = 4 inserts. The requester (7) is absent — caller owns that decision.
+    expect(createTeamMemberStub).to.have.callCount(4);
     const seen = new Set(createTeamMemberStub.getCalls().map((call) => call.args[0].system_user_id));
-    expect(seen).to.deep.equal(new Set([7, 42, 99]));
+    expect(seen).to.deep.equal(new Set([42, 99]));
   });
 
-  it('createDataRequestForTicket dedupes the requester when system_user_ids already includes it', async () => {
-    // Verifies: when the picker already contains the requester, the union does NOT double-insert
-    // (no duplicate team_member rows for the same team).
+  it('createDataRequestForTicket dedupes duplicate ids in system_user_ids before inserting team members', async () => {
+    // Verifies: defensive dedup inside _createTeamWithMembers collapses duplicates so the database
+    // does not see redundant team_member inserts for the same (team_id, system_user_id).
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
 
-    // Step 1: standard stubs.
     sinon
       .stub(TeamService.prototype, 'createTeam')
       .onFirstCall()
@@ -347,25 +308,23 @@ describe('DataRequestService', () => {
     sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
     sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
-    // Step 2: requester 7 with picker [7, 42] — requester already present.
     await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
       requested_by: 7,
       reason: 'r',
-      system_user_ids: [7, 42]
+      system_user_ids: [42, 42, 99]
     });
 
-    // Step 3: 2 deduped members × 2 teams = 4 inserts; values across calls are {7, 42}.
+    // 2 unique members × 2 teams = 4 inserts; values across calls are {42, 99}.
     expect(createTeamMemberStub).to.have.callCount(4);
     const seen = new Set(createTeamMemberStub.getCalls().map((call) => call.args[0].system_user_id));
-    expect(seen).to.deep.equal(new Set([7, 42]));
+    expect(seen).to.deep.equal(new Set([42, 99]));
   });
 
-  it('createDataRequestForTicket dedupes duplicate requester entries from system_user_ids', async () => {
-    // Verifies: duplicate entries inside system_user_ids itself are collapsed by the Set-based union.
+  it('createDataRequestForTicket inserts nothing when system_user_ids is empty', async () => {
+    // Verifies: an empty access list produces zero team_member inserts (no implicit requester fallback).
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
 
-    // Step 1: standard stubs.
     sinon
       .stub(TeamService.prototype, 'createTeam')
       .onFirstCall()
@@ -382,17 +341,13 @@ describe('DataRequestService', () => {
     sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
     sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
-    // Step 2: picker has the requester twice plus one extra (duplicates inside the array itself).
     await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
       requested_by: 7,
       reason: 'r',
-      system_user_ids: [7, 7, 42]
+      system_user_ids: []
     });
 
-    // Step 3: still 2 unique members × 2 teams = 4 inserts; values {7, 42}.
-    expect(createTeamMemberStub).to.have.callCount(4);
-    const seen = new Set(createTeamMemberStub.getCalls().map((call) => call.args[0].system_user_id));
-    expect(seen).to.deep.equal(new Set([7, 42]));
+    expect(createTeamMemberStub).to.have.callCount(0);
   });
 
   it('createDataRequestForTicket builds one ALLOW statement per featureType with URN urn:*:<ft>:* and status "requested"', async () => {

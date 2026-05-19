@@ -3,7 +3,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { CreateTicketDataRequestPayload } from 'interfaces/useDataRequestApi.interface';
+import { CreateDataRequestDialogValues } from 'features/data-request/components/CreateDataRequestDialog';
 import { Mock, vi } from 'vitest';
 import { useSearchResultDataRequest } from './useSearchResultDataRequest';
 
@@ -27,7 +27,7 @@ const expressionTree: ExpressionTreeExpression = {
   ]
 };
 
-const payload: CreateTicketDataRequestPayload = {
+const payload: CreateDataRequestDialogValues = {
   reason: 'needed for analysis',
   system_user_ids: [7, 11]
 };

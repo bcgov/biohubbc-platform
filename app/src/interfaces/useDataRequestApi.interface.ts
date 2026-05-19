@@ -2,6 +2,7 @@ import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 
 export interface CreateTicketDataRequestPayload {
+  requested_by: number;
   reason: string;
   system_user_ids: number[];
 }
