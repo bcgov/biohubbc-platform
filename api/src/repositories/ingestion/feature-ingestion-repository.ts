@@ -1,10 +1,16 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
-import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
+import { InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
+
+const ActiveFeatureTypeRow = z.object({
+  feature_type_id: z.number(),
+  name: z.string()
+});
+
+export type ActiveFeatureTypeRow = z.infer<typeof ActiveFeatureTypeRow>;
 
 /**
  * A repository class for ingestion-related data access.
@@ -15,21 +21,62 @@ import { BaseRepository } from '../base-repository';
  */
 export class FeatureIngestionRepository extends BaseRepository {
   /**
-   * Bulk insert submission feature rows (raw payload persisted in `data`).
+   * Get active feature type name/id mapping.
    *
-   * @param {CreateSubmissionFeatureIngestionRecord[]} records
-   * @return {Promise<void>}
+   * Repository methods should return row-shaped data; callers can project this
+   * into domain-specific structures (for example, a `Map`) in the service layer.
+   *
+   * @returns {Promise<ActiveFeatureTypeRow[]>}
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<void> {
+  async getActiveFeatureTypeMap(): Promise<ActiveFeatureTypeRow[]> {
+    const sqlStatement = SQL`
+      SELECT
+        feature_type_id,
+        name
+      FROM
+        feature_type
+      WHERE
+        record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, ActiveFeatureTypeRow);
+
+    return response.rows;
+  }
+
+  /**
+   * Bulk insert submission feature rows with pre-resolved feature_type_id.
+   *
+   * @param {Array<{
+   *   submissionId: number;
+   *   submissionUploadId: string;
+   *   sourceId: string;
+   *   featureTypeId: number;
+   *   data: unknown;
+   *   dataByteSize: number;
+   * }>} records
+   * @returns {Promise<number>}
+   * @memberof FeatureIngestionRepository
+   */
+  async insertSubmissionFeatureRecordsByTypeId(
+    records: Array<{
+      submissionId: number;
+      submissionUploadId: string;
+      sourceId: string;
+      featureTypeId: number;
+      data: unknown;
+      dataByteSize: number;
+    }>
+  ): Promise<number> {
     if (!records.length) {
-      return;
+      return 0;
     }
 
     const submissionIds = records.map((record) => record.submissionId);
     const submissionUploadIds = records.map((record) => record.submissionUploadId);
     const sourceIds = records.map((record) => record.sourceId);
-    const featureTypeNames = records.map((record) => record.featureTypeName);
+    const featureTypeIds = records.map((record) => record.featureTypeId);
     const dataValues = records.map((record) => JSON.stringify(record.data));
     const dataByteSizes = records.map((record) => record.dataByteSize);
 
@@ -41,46 +88,36 @@ export class FeatureIngestionRepository extends BaseRepository {
         source_id,
         feature_type_id,
         data,
-        data_byte_size,
-        record_effective_date
+        data_byte_size
       )
       SELECT
         staged.submission_id,
         staged.submission_upload_id,
         NULL,
         staged.source_id,
-        ft.feature_type_id,
+        staged.feature_type_id,
         parsed.data,
-        staged.data_byte_size,
-        now()
+        staged.data_byte_size
       FROM unnest(
         ${submissionIds}::integer[],
         ${submissionUploadIds}::uuid[],
         ${sourceIds}::text[],
-        ${featureTypeNames}::text[],
+        ${featureTypeIds}::integer[],
         ${dataValues}::text[],
         ${dataByteSizes}::bigint[]
       ) AS staged(
         submission_id,
         submission_upload_id,
         source_id,
-        feature_type_name,
+        feature_type_id,
         data_text,
         data_byte_size
       )
-      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name AND ft.record_end_date IS NULL
       CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
     `;
 
     const response = await this.connection.sql(sqlStatement);
-    const insertedCount = response.rowCount ?? 0;
-    const expectedCount = records.length;
-
-    if (insertedCount !== expectedCount) {
-      throw new IngestionValidationError(
-        `Failed to insert all submission feature records: inserted ${insertedCount} of ${expectedCount}`
-      );
-    }
+    return response.rowCount ?? 0;
   }
 
   /**
@@ -90,7 +127,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    * (append, replace).
    *
    * @param {InsertSubmissionFeatureRecord} record The submission feature insert payload.
-   * @return {*}  {Promise<{ submission_feature_id: number }>}
+   * @returns {Promise<{ submission_feature_id: number }>} Inserted submission feature identifier.
    * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecord(
@@ -143,30 +180,12 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Update the parent reference for a submission feature.
-   *
-   * @param {number} submissionFeatureId The ID of the feature to update.
-   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
-   * @return {*}  {Promise<void>}
-   * @memberof FeatureIngestionRepository
-   */
-  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
-      WHERE submission_feature_id = ${submissionFeatureId};
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
    * Soft-delete features scoped to a specific upload event.
    * Multiple uploads produce features under the same submission_id;
    * re-ingesting one upload must not affect features from other uploads.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -174,6 +193,7 @@ export class FeatureIngestionRepository extends BaseRepository {
       UPDATE submission_feature
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
+        AND record_effective_date IS NULL
         AND record_end_date IS NULL;
     `;
 
@@ -181,19 +201,27 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Delete all submission features for a submission (soft delete).
-   * Used for idempotency - allows job retries to start fresh.
+   * Resolve parent feature references for rows produced by one upload.
    *
-   * @param {number} submissionId The submission ID.
-   * @return {Promise<void>}
+   * Shallow ingestion stores raw feature payloads first. The indexing stage then
+   * resolves `data.parent` source identifiers to canonical `submission_feature_id`
+   * values after all rows for the upload have been inserted.
+   *
+   * @param {string} submissionUploadId The submission_upload_id (UUID).
+   * @returns {Promise<void>}
    * @memberof FeatureIngestionRepository
    */
-  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
+  async updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
+      UPDATE submission_feature AS child
+      SET parent_submission_feature_id = parent.submission_feature_id
+      FROM submission_feature AS parent
+      WHERE child.submission_upload_id = ${submissionUploadId}
+        AND parent.submission_upload_id = child.submission_upload_id
+        AND parent.source_id = child.data->>'parent'
+        AND child.data->>'parent' IS NOT NULL
+        AND child.record_end_date IS NULL
+        AND parent.record_end_date IS NULL;
     `;
 
     await this.connection.sql(sqlStatement);
@@ -202,10 +230,9 @@ export class FeatureIngestionRepository extends BaseRepository {
   /**
    * Get feature type with its associated properties.
    * Returns null if the feature type does not exist.
-   * Returns empty properties array if the feature type exists but has no properties.
    *
-   * @param {string} name - The feature type name to look up
-   * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
+   * @param {string} name Feature type name.
+   * @returns {Promise<FeatureTypeWithProperties | null>}
    * @memberof FeatureIngestionRepository
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {

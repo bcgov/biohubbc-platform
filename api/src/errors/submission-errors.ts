@@ -1,7 +1,9 @@
-export class IngestionValidationError extends Error {
+import { BaseError } from './base-error';
+
+export class IngestionValidationError extends BaseError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/IngestionValidationError');
+
   constructor(message: string) {
-    super(message);
-    this.name = 'IngestionValidationError';
-    Object.setPrototypeOf(this, new.target.prototype);
+    super('IngestionValidationError', message);
   }
 }

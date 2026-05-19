@@ -1,10 +1,9 @@
 import { Container, Paper, Stack, Typography } from '@mui/material';
-import { FEATURE_TYPE_CONFIG, PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
-import { URL_PARAMS } from 'constants/query-params';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
 import { SearchContainer } from './container/SearchContainer';
+import { buildSearchFeatureTypeLinks } from './utils/search-feature-type-links';
 
 /**
  * Main search page and entry point for browsing and downloading biodiversity data.
@@ -19,29 +18,8 @@ export const SearchPage = () => {
     featureTypesDataLoader.load();
   }, [featureTypesDataLoader]);
 
-  /**
-   * Build navigation links for each feature type that has a configured label.
-   * Links navigate to the list page with the feature type filter applied.
-   */
   const featureTypeLinks = useMemo(
-    () =>
-      featureTypesDataLoader.data?.feature_type_with_properties
-        .map((featureType) => {
-          const typeName = featureType.feature_type.name;
-
-          // Only include types that are in the priority enum
-          if (!Object.values(PRIORITY_FEATURE_TYPE).includes(typeName as PRIORITY_FEATURE_TYPE)) {
-            return null;
-          }
-
-          const label = FEATURE_TYPE_CONFIG[typeName as PRIORITY_FEATURE_TYPE]?.label;
-
-          return {
-            label,
-            to: `list?${URL_PARAMS.FEATURE_TYPE}=${typeName}`
-          };
-        })
-        .filter((link): link is NonNullable<typeof link> => link !== null) ?? [],
+    () => buildSearchFeatureTypeLinks(featureTypesDataLoader.data?.feature_type_with_properties),
     [featureTypesDataLoader.data?.feature_type_with_properties]
   );
 

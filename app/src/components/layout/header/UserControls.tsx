@@ -6,6 +6,7 @@ import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedIdentitySource } from 'utils/Utils';
 
 // Authenticated view
@@ -30,9 +31,14 @@ export const LoggedInUser = () => {
         <Box
           display="flex"
           alignItems="center"
+          component={RouterLink}
+          to="/portal"
+          data-testid="menu_portal_link"
           sx={{
             padding: '6px 14px',
-            lineHeight: '1.75'
+            lineHeight: '1.75',
+            color: 'inherit',
+            textDecoration: 'none'
           }}>
           <Icon path={mdiAccountCircle} size={1} />
           <Box ml={1}>{formattedUsername}</Box>

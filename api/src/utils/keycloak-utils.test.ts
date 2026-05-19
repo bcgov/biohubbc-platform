@@ -10,7 +10,8 @@ import {
   getServiceClientSystemUser,
   getUserGuid,
   getUserIdentifier,
-  getUserIdentitySource
+  getUserIdentitySource,
+  keycloakUtilsDependencies
 } from './keycloak-utils';
 
 chai.use(sinonChai);
@@ -163,7 +164,7 @@ describe('keycloakUtils', () => {
     it('returns null if the sub field is undefined', () => {
       const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
 
-      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+      sinon.stub(keycloakUtilsDependencies, 'getDBConstants').returns(dbConstantsMock);
 
       const token = { sub: undefined };
 
@@ -175,7 +176,7 @@ describe('keycloakUtils', () => {
     it('returns null if no matching known service client system user is found', () => {
       const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
 
-      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+      sinon.stub(keycloakUtilsDependencies, 'getDBConstants').returns(dbConstantsMock);
 
       const token = { sub: 'not-null' };
 
@@ -207,7 +208,7 @@ describe('keycloakUtils', () => {
 
       const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [serviceClientSystemUser] };
 
-      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+      sinon.stub(keycloakUtilsDependencies, 'getDBConstants').returns(dbConstantsMock);
 
       const token = { sub: 'known-service-client-guid' };
 

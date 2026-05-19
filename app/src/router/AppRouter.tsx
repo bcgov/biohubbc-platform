@@ -1,20 +1,19 @@
 import { CartContextProvider } from 'contexts/cartContext';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
+import { SearchPage } from 'features/search/SearchPage';
+import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
-import { DataRequestRouter } from './data-request/DataRequestRouter';
+import { PortalRouter } from './portal/PortalRouter';
 import { SearchRouter } from './search/SearchRouter';
 import { SubmissionRouter } from './submission/SubmissionRouter';
 
 export const AppRouter = () => {
   return (
     <Routes>
-      {/* Redirect base to search router */}
-      <Route path="/" element={<Navigate to="/search" replace />} />
-
       {/* Search and Submission routes share CartContextProvider */}
       <Route
         element={
@@ -22,6 +21,16 @@ export const AppRouter = () => {
             <Outlet />
           </CartContextProvider>
         }>
+        <Route
+          path="/"
+          element={
+            <BaseLayout>
+              <PageTitle title="Search Data" description="Search and download data" />
+              <SearchPage />
+            </BaseLayout>
+          }
+        />
+
         {/* Search Routes */}
         <Route
           path="/search/*"
@@ -56,14 +65,29 @@ export const AppRouter = () => {
         }
       />
 
-      {/* Data Request Routes */}
+      {/* Portal Routes */}
       <Route
-        path="/data-request/*"
+        path="/portal/*"
         element={
-          <>
-            <PageTitle title="Data Request" description="Data requests for secured data" />
-            <DataRequestRouter />
-          </>
+          <BaseLayout>
+            <PageTitle title="My Portal" description="View your tickets and submissions" />
+            <AuthenticatedRouteGuard>
+              <PortalRouter />
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Portal Routes */}
+      <Route
+        path="/portal/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="My Submissions" description="View your past submissions" />
+            <AuthenticatedRouteGuard>
+              <PortalRouter />
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
         }
       />
 

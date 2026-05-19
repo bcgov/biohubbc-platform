@@ -1,21 +1,49 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { PredicateOperator } from '../../../models/expression-predicate';
+import { GeoJSON } from '../geoJson';
 import { paginationRequestBodySchema, paginationResponseSchema } from '../pagination';
 
 /**
- * Filters for feature search
+ * Recursive expression tree for feature search.
  */
-export const featureSearchFiltersSchema: OpenAPIV3.SchemaObject = {
+export const featureSearchExpressionTreeSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  additionalProperties: false,
+  required: ['type', 'operator', 'clauses'],
   properties: {
-    keyword: { type: 'string' },
-    feature_types: {
+    type: { type: 'string', enum: ['expression'] },
+    operator: { type: 'string', enum: ['AND', 'OR'] },
+    clauses: {
       type: 'array',
-      items: { type: 'string' }
-    },
-    species: {
-      type: 'array',
-      items: { type: 'integer' }
+      minItems: 1,
+      items: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['type', 'feature_property_id', 'feature_type_property_id', 'operator'],
+            properties: {
+              type: { type: 'string', enum: ['predicate'] },
+              feature_property_id: { type: 'integer', minimum: 1 },
+              feature_type_property_id: { type: 'integer', nullable: true },
+              operator: { type: 'string', enum: PredicateOperator.options },
+              value: {
+                description:
+                  'Predicate value. Allowed shape is validated server-side from property metadata. Datetime values are scalar strings such as "2020-01-01", "14:30:00-07:00", or "2020-01-01T14:30:00-07:00".',
+                oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, GeoJSON]
+              }
+            },
+            additionalProperties: false
+          },
+          {
+            type: 'object',
+            required: ['type', 'operator', 'clauses'],
+            properties: {
+              type: { type: 'string', enum: ['expression'] },
+              operator: { type: 'string', enum: ['AND', 'OR'] },
+              clauses: { type: 'array', minItems: 1, items: { type: 'object' } }
+            }
+          }
+        ]
+      }
     }
   }
 };
@@ -34,7 +62,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     'feature_type_name',
     'submission_name',
     'is_secured',
-    'relevancy_score'
+    'relevancy_score',
+    'create_date'
   ],
   properties: {
     submission_feature_id: { type: 'integer' },
@@ -46,7 +75,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     feature_description: { type: 'string', nullable: true },
     submission_name: { type: 'string' },
     is_secured: { type: 'boolean' },
-    relevancy_score: { type: 'number' }
+    relevancy_score: { type: 'number' },
+    create_date: { type: 'string', format: 'date-time' }
   }
 };
 
@@ -59,11 +89,12 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
     'application/json': {
       schema: {
         type: 'object',
-        required: ['filters', 'pagination'],
+        additionalProperties: false,
         properties: {
-          filters: featureSearchFiltersSchema,
+          expression: featureSearchExpressionTreeSchema,
           pagination: paginationRequestBodySchema
-        }
+        },
+        description: 'Optional expression tree and pagination. Omit expression to list target features.'
       }
     }
   }

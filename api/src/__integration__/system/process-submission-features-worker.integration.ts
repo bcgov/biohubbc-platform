@@ -5,16 +5,14 @@
 import { expect } from 'chai';
 import { Knex } from 'knex';
 import { randomUUID } from 'node:crypto';
-import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
-import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { defaultPoolConfig, getAPIUserDBConnection, initDBPool } from '../../database/db';
 import { JobQueues } from '../../queue/jobs';
 import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestKnex } from '../helpers/test-db-setup';
-import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = '__integration-test__';
@@ -115,17 +113,6 @@ describe('Process Submission Features Worker', function () {
     try {
       // Clean up in reverse FK order
       for (const submissionId of createdSubmissionIds) {
-        // search_ tables FK to submission_feature — delete first
-        const featureIds = await db('biohub.submission_feature')
-          .where('submission_id', submissionId)
-          .select('submission_feature_id');
-        const ids = featureIds.map((r: { submission_feature_id: number }) => r.submission_feature_id);
-        if (ids.length) {
-          await db('biohub.search_string').whereIn('submission_feature_id', ids).del();
-          await db('biohub.search_number').whereIn('submission_feature_id', ids).del();
-          await db('biohub.search_datetime').whereIn('submission_feature_id', ids).del();
-          await db('biohub.search_spatial').whereIn('submission_feature_id', ids).del();
-        }
         await db('biohub.submission_feature').where('submission_id', submissionId).del();
         await db('biohub.submission_validation').where('submission_id', submissionId).del();
         await db('biohub.submission_upload').where('submission_id', submissionId).del();
@@ -149,6 +136,7 @@ describe('Process Submission Features Worker', function () {
       }
 
       if (createdTicketIds.length) {
+        await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
@@ -214,7 +202,8 @@ describe('Process Submission Features Worker', function () {
         object_key: objectKey,
         byte_size: tarBuffer.length,
         artifact_status: 'uploaded',
-        uploaded_at: new Date().toISOString()
+        uploaded_at: new Date().toISOString(),
+        format: 'tar'
       })
       .returning('artifact_id');
     createdArtifactIds.push(artifact.artifact_id);
@@ -272,7 +261,7 @@ describe('Process Submission Features Worker', function () {
         submission_upload_id: params.submissionUploadId,
         submission_id: params.submissionId,
         upload_id: params.uploadId,
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: params.ticketId
       });
       await connection.commit();
@@ -323,22 +312,18 @@ describe('Process Submission Features Worker', function () {
     expect(features.some((f: { feature_type_name: string }) => f.feature_type_name === 'dataset')).to.be.true;
   });
 
-  it('should prevent concurrent jobs for same submission via singleton key', async () => {
-    // Singleton key is `submission-${submissionId}` (not per-upload). Prod runs 2 worker replicas —
-    // per-upload keys would allow two uploads for the same submission to process simultaneously,
-    // causing conflicting feature writes.
-    //
+  it('should prevent concurrent jobs for same submission upload via singleton key', async () => {
     // Tests pg-boss singleton enforcement directly: two sends with the same key back-to-back,
     // the second should return null (ON CONFLICT DO NOTHING). Requires queue policy = 'short'.
 
     const boss = getPgBoss();
-    const testSubmissionId = Date.now(); // unique per run, avoids collisions
-    const singletonKey = `submission-${testSubmissionId}`;
+    const submissionUploadId = randomUUID();
+    const singletonKey = `submission-upload-${submissionUploadId}`;
 
     // Send first job — should succeed
     const jobId1 = await boss.send(
       JobQueues.PROCESS_SUBMISSION_FEATURES,
-      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { submission_upload_id: submissionUploadId, upload_id: randomUUID(), submission_id: Date.now() },
       { singletonKey, expireInSeconds: 5 }
     );
     expect(jobId1).to.not.be.null;
@@ -346,7 +331,7 @@ describe('Process Submission Features Worker', function () {
     // Send second job with same singleton key — should be rejected
     const jobId2 = await boss.send(
       JobQueues.PROCESS_SUBMISSION_FEATURES,
-      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { submission_upload_id: submissionUploadId, upload_id: randomUUID(), submission_id: Date.now() },
       { singletonKey, expireInSeconds: 5 }
     );
     expect(jobId2).to.be.null;
@@ -357,7 +342,7 @@ describe('Process Submission Features Worker', function () {
     }
   });
 
-  it('should mark submission upload invalid for unknown feature type', async () => {
+  it('should ignore unknown feature type without marking upload invalid', async () => {
     const datasetId = randomUUID();
     const featureId = randomUUID();
 
@@ -380,51 +365,99 @@ describe('Process Submission Features Worker', function () {
     const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
     await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
 
-    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId, ['invalid'], 60000);
-    expect(uploadStatus).to.equal('invalid');
+    const validation = await waitForValidationStatus(db, submissionId);
+    expect(validation.status).to.equal('completed');
+
+    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId, ['ingested'], 60000);
+    expect(uploadStatus).to.equal('ingested');
+
+    const insertedFeatureCount = await db('biohub.submission_feature')
+      .where('submission_upload_id', submissionUploadId)
+      .count<{ count: string }>('submission_feature_id as count')
+      .first();
+    expect(insertedFeatureCount?.count).to.equal('0');
   });
 });
 
 /**
  * Service-level tests for SubmissionIngestionService.ingestSubmissionUpload().
- * Calls the service directly (no pg-boss), uses transaction rollback for cleanup.
+ * Calls the service directly (no pg-boss).
+ *
+ * Uses Knex auto-committed inserts + manual cleanup in `after()` (mirroring the
+ * Worker block above) because the service uses `withConnection(...)` internally
+ * — every internal phase opens its own short-lived transaction, so the test's
+ * setup must be committed for the service to see it.
  */
 describe('SubmissionIngestionService pipeline (system)', function () {
   this.timeout(30000);
 
-  let connection: IDBConnection;
+  let db: Knex;
   let service: SubmissionIngestionService;
   const storageService = new ObjectStorageService();
-  let s3KeysToCleanup: string[];
+
+  // Track created resources for cleanup (mirrors the worker block above)
+  const createdSubmissionIds: number[] = [];
+  const createdUploadIds: string[] = [];
+  const createdArtifactIds: string[] = [];
+  const createdTicketIds: string[] = [];
+  const createdObjectKeys: string[] = [];
 
   before(() => {
+    db = createTestKnex();
     initDBPool(defaultPoolConfig);
+    service = new SubmissionIngestionService();
   });
 
-  beforeEach(async () => {
-    connection = getAPIUserDBConnection();
-    await connection.open();
-    service = new SubmissionIngestionService(connection);
-    s3KeysToCleanup = [];
-  });
-
-  afterEach(async () => {
-    await connection.rollback();
-    connection.release();
-
-    // Clean up S3 objects (not rolled back by DB transaction)
-    for (const key of s3KeysToCleanup) {
-      try {
-        await storageService.deleteFile(BucketType.MAIN, key);
-      } catch {
-        /* may already be deleted */
+  after(async () => {
+    try {
+      // Clean up in reverse FK order
+      for (const submissionId of createdSubmissionIds) {
+        await db('biohub.submission_feature').where('submission_id', submissionId).del();
+        await db('biohub.submission_validation').where('submission_id', submissionId).del();
+        await db('biohub.submission_upload').where('submission_id', submissionId).del();
       }
+
+      for (const uploadId of createdUploadIds) {
+        await db('biohub.upload_artifact').where('upload_id', uploadId).del();
+        await db('biohub.upload_archive').where('upload_id', uploadId).del();
+      }
+
+      for (const artifactId of createdArtifactIds) {
+        await db('biohub.artifact').where('artifact_id', artifactId).del();
+      }
+
+      for (const uploadId of createdUploadIds) {
+        await db('biohub.upload').where('upload_id', uploadId).del();
+      }
+
+      for (const submissionId of createdSubmissionIds) {
+        await db('biohub.submission').where('submission_id', submissionId).del();
+      }
+
+      if (createdTicketIds.length) {
+        await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
+        await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
+      }
+
+      // Clean up S3 objects (not rolled back by DB transaction)
+      for (const key of createdObjectKeys) {
+        try {
+          await storageService.deleteFile(BucketType.MAIN, key);
+        } catch {
+          /* may already be deleted */
+        }
+      }
+    } catch (error_) {
+      console.warn('Cleanup failed:', error_);
     }
+
+    await db.destroy();
   });
 
   /**
-   * Insert the full FK chain and upload a TAR to S3.
-   * Same chain as the worker test's setupSubmissionWithTar, using connection.sql() for rollback cleanup.
+   * Insert the full FK chain and upload a TAR to S3 — same chain as the worker
+   * block's setupSubmissionWithTar, using Knex (auto-committed) so the service's
+   * own short-lived transactions can see the rows.
    */
   async function setupSubmissionWithTar(
     tarBuffer: Buffer
@@ -432,58 +465,76 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
 
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
-    s3KeysToCleanup.push(objectKey);
+    createdObjectKeys.push(objectKey);
 
     // 1. submission
-    const submissionResult = await connection.sql<{ submission_id: number }>(
-      SQL`INSERT INTO biohub.submission (uuid, system_user_id, contributor_id, name, description, comment)
-          VALUES (${randomUUID()}, ${SYSTEM_USER_ID}, 1, ${TEST_PREFIX}, ${TEST_PREFIX}, ${TEST_PREFIX})
-          RETURNING submission_id`
-    );
-    const submissionId = submissionResult.rows[0].submission_id;
+    const [submission] = await db('biohub.submission')
+      .insert({
+        uuid: randomUUID(),
+        system_user_id: SYSTEM_USER_ID,
+        contributor_id: 1,
+        name: TEST_PREFIX,
+        description: TEST_PREFIX,
+        comment: TEST_PREFIX
+      })
+      .returning('submission_id');
+    createdSubmissionIds.push(submission.submission_id);
 
     // 2. upload
-    const uploadResult = await connection.sql<{ upload_id: string }>(
-      SQL`INSERT INTO biohub.upload (upload_status, record_end_date)
-          VALUES ('completed', ${new Date(Date.now() + 30 * 60 * 1000).toISOString()})
-          RETURNING upload_id`
-    );
-    const uploadId = uploadResult.rows[0].upload_id;
+    const [upload] = await db('biohub.upload')
+      .insert({
+        upload_status: 'completed',
+        record_end_date: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      })
+      .returning('upload_id');
+    createdUploadIds.push(upload.upload_id);
 
     // 3. artifact
-    const artifactResult = await connection.sql<{ artifact_id: string }>(
-      SQL`INSERT INTO biohub.artifact (bucket, object_key, byte_size, artifact_status, uploaded_at)
-          VALUES (${process.env.OBJECT_STORE_BUCKET_NAME}, ${objectKey}, ${
-        tarBuffer.length
-      }, 'uploaded', ${new Date().toISOString()})
-          RETURNING artifact_id`
-    );
-    const artifactId = artifactResult.rows[0].artifact_id;
+    const [artifact] = await db('biohub.artifact')
+      .insert({
+        bucket: process.env.OBJECT_STORE_BUCKET_NAME,
+        object_key: objectKey,
+        byte_size: tarBuffer.length,
+        artifact_status: 'uploaded',
+        uploaded_at: new Date().toISOString(),
+        format: 'tar'
+      })
+      .returning('artifact_id');
+    createdArtifactIds.push(artifact.artifact_id);
 
     // 4. upload_archive
-    await connection.sql(
-      SQL`INSERT INTO biohub.upload_archive (upload_id, artifact_id, archive_status)
-          VALUES (${uploadId}, ${artifactId}, 'completed')`
-    );
+    await db('biohub.upload_archive').insert({
+      upload_id: upload.upload_id,
+      artifact_id: artifact.artifact_id,
+      archive_status: 'completed'
+    });
 
     // 5. ticket (required FK for submission_upload)
-    const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, SYSTEM_USER_ID);
+    const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
+    createdTicketIds.push(ticketId);
 
     // 6. submission_upload
-    const submissionUploadResult = await connection.sql<{ submission_upload_id: string }>(
-      SQL`INSERT INTO biohub.submission_upload (submission_id, upload_id, ticket_id)
-          VALUES (${submissionId}, ${uploadId}, ${ticketId})
-          RETURNING submission_upload_id`
-    );
-    const submissionUploadId = submissionUploadResult.rows[0].submission_upload_id;
+    const [submissionUpload] = await db('biohub.submission_upload')
+      .insert({
+        submission_id: submission.submission_id,
+        upload_id: upload.upload_id,
+        ticket_id: ticketId
+      })
+      .returning('submission_upload_id');
 
-    // 6. upload_artifact
-    await connection.sql(
-      SQL`INSERT INTO biohub.upload_artifact (upload_id, artifact_id, role)
-          VALUES (${uploadId}, ${artifactId}, 'feature')`
-    );
+    // 7. upload_artifact
+    await db('biohub.upload_artifact').insert({
+      upload_id: upload.upload_id,
+      artifact_id: artifact.artifact_id,
+      role: 'feature'
+    });
 
-    return { submissionId, uploadId, submissionUploadId, ticketId };
+    return {
+      submissionId: submission.submission_id,
+      uploadId: upload.upload_id,
+      submissionUploadId: submissionUpload.submission_upload_id,
+      ticketId
+    };
   }
 
   /**
@@ -500,7 +551,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_upload_id: setup.submissionUploadId,
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
-      status: 'pending',
+      status: 'uploaded',
       ticket_id: setup.ticketId
     });
     return { result, ...setup };
@@ -549,26 +600,27 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(result.errors).to.have.lengthOf(0);
 
     // Verify features were inserted with correct types and parent relationships
-    const features = await connection.sql<{ feature_type_name: string; parent_submission_feature_id: number | null }>(
-      SQL`SELECT ft.name as feature_type_name, sf.parent_submission_feature_id
-          FROM biohub.submission_feature sf
-          JOIN biohub.feature_type ft ON sf.feature_type_id = ft.feature_type_id
-          WHERE sf.submission_id = ${submissionId}
-          ORDER BY ft.name`
-    );
+    const features = await db('biohub.submission_feature as sf')
+      .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('sf.submission_id', submissionId)
+      .orderBy('ft.name')
+      .select<Array<{ feature_type_name: string; parent_submission_feature_id: number | null }>>(
+        db.raw('ft.name as feature_type_name'),
+        'sf.parent_submission_feature_id'
+      );
 
-    const typeNames = features.rows.map((r) => r.feature_type_name);
+    const typeNames = features.map((r) => r.feature_type_name);
     expect(typeNames).to.include('dataset');
     expect(typeNames).to.include('sample_site');
 
     // Parent relationships are unresolved in raw ingest (handled later by indexing).
-    const dataset = features.rows.find((r) => r.feature_type_name === 'dataset');
-    const site = features.rows.find((r) => r.feature_type_name === 'sample_site');
+    const dataset = features.find((r) => r.feature_type_name === 'dataset');
+    const site = features.find((r) => r.feature_type_name === 'sample_site');
     expect(dataset?.parent_submission_feature_id).to.be.null;
     expect(site?.parent_submission_feature_id).to.be.null;
   });
 
-  it('should throw for unknown feature type during raw insert', async () => {
+  it('should ignore unknown feature type during raw insert', async () => {
     const datasetId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
@@ -587,12 +639,15 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    try {
-      await ingestTar(tarBuffer);
-      expect.fail('Expected ingestion to throw for unknown feature type');
-    } catch (error) {
-      expect(String(error)).to.include('Failed to insert all submission feature records');
-    }
+    const { result, submissionId } = await ingestTar(tarBuffer);
+
+    expect(result.valid).to.be.true;
+    expect(result.errors).to.have.lengthOf(0);
+
+    const [{ count }] = await db('biohub.submission_feature')
+      .where('submission_id', submissionId)
+      .count<Array<{ count: string }>>('*', { as: 'count' });
+    expect(String(count)).to.equal('0');
   });
 
   it('should process media files and create artifact records', async () => {
@@ -636,39 +691,38 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     const { result, submissionId, uploadId, submissionUploadId } = await ingestTar(tarBuffer);
 
     // Track S3 media upload for cleanup
-    s3KeysToCleanup.push(`submissions/${submissionId}/uploads/${submissionUploadId}/media/photo.jpg`);
+    createdObjectKeys.push(`submissions/${submissionId}/uploads/${submissionUploadId}/media/photo.jpg`);
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
 
     // Verify features were inserted (dataset + file)
-    const features = await connection.sql<{ feature_type_name: string; data: Record<string, unknown> }>(
-      SQL`SELECT ft.name as feature_type_name, sf.data
-          FROM biohub.submission_feature sf
-          JOIN biohub.feature_type ft ON sf.feature_type_id = ft.feature_type_id
-          WHERE sf.submission_id = ${submissionId}
-          ORDER BY ft.name`
-    );
+    const features = await db('biohub.submission_feature as sf')
+      .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('sf.submission_id', submissionId)
+      .orderBy('ft.name')
+      .select<Array<{ feature_type_name: string; data: Record<string, unknown> }>>(
+        db.raw('ft.name as feature_type_name'),
+        'sf.data'
+      );
 
-    const typeNames = features.rows.map((r) => r.feature_type_name);
+    const typeNames = features.map((r) => r.feature_type_name);
     expect(typeNames).to.include('dataset');
     expect(typeNames).to.include('file');
 
     // Raw ingest keeps original feature payload shape.
-    const fileFeature = features.rows.find((r) => r.feature_type_name === 'file');
+    const fileFeature = features.find((r) => r.feature_type_name === 'file');
     expect(fileFeature?.data).to.have.property('properties');
     expect((fileFeature?.data.properties as Record<string, unknown>)['filename']).to.equal('photo.jpg');
 
     // Verify media upload_artifact rows were created with persisted path values.
-    const mediaUploadArtifacts = await connection.sql<{ path: string | null }>(
-      SQL`SELECT ua.path
-          FROM biohub.upload_artifact ua
-          JOIN biohub.artifact a ON ua.artifact_id = a.artifact_id
-          WHERE ua.upload_id = ${uploadId}
-            AND a.object_key LIKE ${'submissions/' + submissionId + '/uploads/' + submissionUploadId + '/media/%'}`
-    );
-    expect(mediaUploadArtifacts.rows).to.have.lengthOf(1);
-    expect(mediaUploadArtifacts.rows[0].path).to.equal('photo.jpg');
+    const mediaUploadArtifacts = await db('biohub.upload_artifact as ua')
+      .join('biohub.artifact as a', 'ua.artifact_id', 'a.artifact_id')
+      .where('ua.upload_id', uploadId)
+      .where('a.object_key', 'like', `submissions/${submissionId}/uploads/${submissionUploadId}/media/%`)
+      .select<Array<{ path: string | null }>>('ua.path');
+    expect(mediaUploadArtifacts).to.have.lengthOf(1);
+    expect(mediaUploadArtifacts[0].path).to.equal('files/photo.jpg');
   });
 
   it('should ingest successfully when referenced media file is missing from tar', async () => {
@@ -715,10 +769,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(result.errors).to.have.lengthOf(0);
 
     // Features are still ingested even if there were no media files in the tar.
-    const features = await connection.sql<{ count: string }>(
-      SQL`SELECT count(*)::text as count FROM biohub.submission_feature WHERE submission_id = ${submissionId}`
-    );
-    expect(features.rows[0].count).to.equal('2');
+    const [{ count }] = await db('biohub.submission_feature')
+      .where('submission_id', submissionId)
+      .count<Array<{ count: string }>>('*', { as: 'count' });
+    expect(String(count)).to.equal('2');
   });
 
   it('should persist unknown properties to JSONB without validation error', async () => {
@@ -752,16 +806,15 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(result.valid).to.be.true;
 
     // Verify unknown properties are persisted under data.properties in raw payload.
-    const features = await connection.sql<{ data: Record<string, unknown> }>(
-      SQL`SELECT sf.data
-          FROM biohub.submission_feature sf
-          JOIN biohub.feature_type ft ON sf.feature_type_id = ft.feature_type_id
-          WHERE sf.submission_id = ${submissionId} AND ft.name = 'dataset'`
-    );
+    const features = await db('biohub.submission_feature as sf')
+      .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('sf.submission_id', submissionId)
+      .where('ft.name', 'dataset')
+      .select<Array<{ data: Record<string, unknown> }>>('sf.data');
 
-    expect(features.rows).to.have.lengthOf(1);
+    expect(features).to.have.lengthOf(1);
 
-    const data = features.rows[0].data;
+    const data = features[0].data;
     expect(data).to.have.property('id', featureId);
     expect(data).to.have.property('type', 'dataset');
     expect(data).to.have.property('properties');
@@ -773,7 +826,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(properties).to.have.property('unknown_prop_b', 42);
   });
 
-  it('should throw on unknown feature types during raw insert', async () => {
+  it('should ignore unknown feature types during raw insert', async () => {
     const datasetId = randomUUID();
     const duplicateId = randomUUID();
 
@@ -800,11 +853,14 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    try {
-      await ingestTar(tarBuffer);
-      expect.fail('Expected ingestion to throw for unknown feature types');
-    } catch (error) {
-      expect(String(error)).to.include('Failed to insert all submission feature records');
-    }
+    const { result, submissionId } = await ingestTar(tarBuffer);
+
+    expect(result.valid).to.be.true;
+    expect(result.errors).to.have.lengthOf(0);
+
+    const [{ count }] = await db('biohub.submission_feature')
+      .where('submission_id', submissionId)
+      .count<Array<{ count: string }>>('*', { as: 'count' });
+    expect(String(count)).to.equal('0');
   });
 });

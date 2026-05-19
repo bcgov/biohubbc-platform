@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { Cart, CartStatus, UpdateCart } from '../models/cart';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CartRepository } from './cart-repository';
 
 chai.use(sinonChai);

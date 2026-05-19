@@ -1,22 +1,22 @@
 import dayjs from 'dayjs';
+import mime from 'mime';
 import { IDBConnection } from '../../database/db';
-import { ArtifactStatusEnum, BatchUpdateArtifact } from '../../models/artifact';
+import { ArtifactStatusEnum, CreateArtifact } from '../../models/artifact';
 import { CreateUploadArtifact, UploadArtifactRoleEnum } from '../../models/upload-artifact';
-import { streamMedia } from '../../utils/biohub-tar-parser';
+import { IUploadedMediaFile } from '../../utils/biohub-tar-parser.interface';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
+import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 
-const MEDIA_INGEST_BATCH_BYTES = 50 * 1024 * 1024;
-const MEDIA_INGEST_BATCH_FILES = 1000;
+export { INGESTION_MEDIA_BATCH_BYTES, INGESTION_MEDIA_BATCH_FILES } from '../../constants/ingestion';
+const defaultLog = getLogger('services/ingestion/media-ingestion-service');
 
 /**
- * Ingest media files from tarball to object storage and artifact tables.
+ * Persist uploaded media metadata into artifact and upload_artifact tables.
  */
 export class MediaIngestionService extends DBService {
-  objectStorageService = new ObjectStorageService();
   artifactService = new ArtifactService(this.connection);
   uploadArtifactService = new UploadArtifactService(this.connection);
 
@@ -25,122 +25,66 @@ export class MediaIngestionService extends DBService {
   }
 
   /**
-   * Upload media files and persist artifact plus upload_artifact rows.
+   * Persist one uploaded media batch with bulk artifact insert + linkage + status update.
    *
-   * @param {string} objectKey
-   * @param {number} submissionId
-   * @param {string} submissionUploadId
    * @param {string} uploadId
    * @param {string} uploadArchiveId
-   * @return {Promise<void>}
+   * @param {string} submissionUploadId
+   * @param {IUploadedMediaFile[]} mediaFiles
+   * @returns {Promise<void>}
    */
-  async ingestMediaFiles(
-    objectKey: string,
-    submissionId: number,
-    submissionUploadId: string,
+  async persistUploadedMediaBatch(
     uploadId: string,
-    uploadArchiveId: string
+    uploadArchiveId: string,
+    submissionUploadId: string,
+    mediaFiles: IUploadedMediaFile[]
   ): Promise<void> {
-    // Scope uploaded media under submission + submission upload so each upload attempt
-    // lands in a deterministic, isolated key namespace.
-    const s3KeyPrefix = `submissions/${submissionId}/uploads/${submissionUploadId}/media`;
+    if (!mediaFiles.length) {
+      return;
+    }
 
-    // Batched write buffers:
-    // 1) upload_artifact linkage rows (upload_id <-> artifact_id + archive path)
-    // 2) artifact status/checksum updates (pending -> uploaded)
-    //
-    // Keeping these buffered lets us reduce SQL round-trips and avoid generating
-    // oversized SQL payloads on very large archives.
-    const pendingUploadArtifacts: CreateUploadArtifact[] = [];
-    const pendingArtifactUpdates: BatchUpdateArtifact[] = [];
-    let pendingUploadArtifactBytes = 0;
-    let pendingUpdateBytes = 0;
+    const uploadedAt = dayjs().toISOString();
+    const artifactPayloads: CreateArtifact[] = mediaFiles.map((mediaFile) => ({
+      bucket: getObjectStoreBucketName(),
+      object_key: mediaFile.s3Key,
+      byte_size: mediaFile.byteSize,
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      checksum_sha256: mediaFile.checksumSha256,
+      uploaded_at: uploadedAt,
+      format: mime.getExtension(mediaFile.mimetype) ?? 'bin'
+    }));
 
-    // Flush policy: whichever threshold is hit first.
-    // - file-count guard protects SQL payload size / parameter fanout
-    // - byte-size guard protects memory for large file cohorts
-    const shouldFlush = (fileCount: number, totalBytes: number): boolean =>
-      fileCount >= MEDIA_INGEST_BATCH_FILES || totalBytes >= MEDIA_INGEST_BATCH_BYTES;
+    const insertedArtifacts = await this.artifactService.insertArtifacts(artifactPayloads);
+    const artifactIdByObjectKey = new Map(
+      insertedArtifacts.map((artifact) => [artifact.object_key, artifact.artifact_id])
+    );
 
-    const flushPendingUploadArtifacts = async (): Promise<void> => {
-      if (!pendingUploadArtifacts.length) {
-        return;
+    const uploadArtifacts: CreateUploadArtifact[] = [];
+
+    for (const mediaFile of mediaFiles) {
+      const artifactId = artifactIdByObjectKey.get(mediaFile.s3Key);
+      if (!artifactId) {
+        throw new Error(`Failed to resolve artifact_id for media object_key=${mediaFile.s3Key}`);
       }
 
-      // Persist upload_artifact links in one bulk insert and reset byte accounting.
-      const currentBatch = pendingUploadArtifacts.splice(0, pendingUploadArtifacts.length);
-      pendingUploadArtifactBytes = 0;
-      await this.uploadArtifactService.insertUploadArtifacts(currentBatch);
-    };
+      uploadArtifacts.push({
+        upload_id: uploadId,
+        artifact_id: artifactId,
+        role: UploadArtifactRoleEnum.ATTACHMENT,
+        upload_archive_id: uploadArchiveId,
+        path: mediaFile.path
+      });
+    }
 
-    const flushPendingArtifactUpdates = async (): Promise<void> => {
-      if (!pendingArtifactUpdates.length) {
-        return;
-      }
+    await this.uploadArtifactService.insertUploadArtifacts(uploadArtifacts);
 
-      // Persist artifact status/checksum transitions in one bulk update.
-      const currentBatch = pendingArtifactUpdates.splice(0, pendingArtifactUpdates.length);
-      pendingUpdateBytes = 0;
-      await this.artifactService.updateArtifactsByIds(currentBatch);
-    };
-
-    // Stream tar media in a single pass:
-    // - bytes are uploaded to object storage by streamMedia
-    // - for each uploaded file we persist DB records in bounded batches
-    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-
-    await streamMedia(tarStream, {
-      objectStorageService: this.objectStorageService,
-      s3KeyPrefix,
-      batchSize: MEDIA_INGEST_BATCH_FILES,
-      maxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
-      ingestMediaBatch: async (mediaFiles) => {
-        for (const mediaFile of mediaFiles) {
-          // Step 1: create artifact stub first (pending status) so we have artifact_id
-          // for linkage and auditability even before post-upload metadata is flushed.
-          const artifact = await this.artifactService.insertArtifact({
-            bucket: getObjectStoreBucketName(),
-            object_key: mediaFile.s3Key,
-            byte_size: mediaFile.byteSize,
-            artifact_status: ArtifactStatusEnum.PENDING,
-            checksum_sha256: null,
-            uploaded_at: null
-          });
-
-          // Step 2: queue upload_artifact lineage row (path is archive-relative files/* path).
-          pendingUploadArtifacts.push({
-            upload_id: uploadId,
-            artifact_id: artifact.artifact_id,
-            role: UploadArtifactRoleEnum.ATTACHMENT,
-            upload_archive_id: uploadArchiveId,
-            path: mediaFile.path
-          });
-          pendingUploadArtifactBytes += mediaFile.byteSize;
-
-          // Flush linkage rows when either threshold is reached.
-          if (shouldFlush(pendingUploadArtifacts.length, pendingUploadArtifactBytes)) {
-            await flushPendingUploadArtifacts();
-          }
-
-          // Step 3: queue artifact transition to uploaded with checksum + uploaded_at.
-          pendingArtifactUpdates.push({
-            artifact_id: artifact.artifact_id,
-            artifact_status: ArtifactStatusEnum.UPLOADED,
-            checksum_sha256: mediaFile.checksumSha256,
-            uploaded_at: dayjs().toISOString()
-          });
-          pendingUpdateBytes += mediaFile.byteSize;
-
-          // Flush artifact updates under the same thresholds.
-          if (shouldFlush(pendingArtifactUpdates.length, pendingUpdateBytes)) {
-            await flushPendingArtifactUpdates();
-          }
-        }
-      }
+    const batchBytes = mediaFiles.reduce((acc, mediaFile) => acc + mediaFile.byteSize, 0);
+    defaultLog.debug({
+      label: 'persistUploadedMediaBatch',
+      message: 'Persisted uploaded media batch',
+      submissionUploadId,
+      batchSize: mediaFiles.length,
+      batchBytes
     });
-
-    // Final drain for any partial batches left after stream completion.
-    await flushPendingUploadArtifacts();
-    await flushPendingArtifactUpdates();
   }
 }

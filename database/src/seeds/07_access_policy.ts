@@ -28,6 +28,7 @@ export async function seed(knex: Knex): Promise<void> {
       .insert({
         name: 'Telemetry Access',
         description: 'Grants read access to all Telemetry submission features',
+        status: 'approved',
         create_user: createUser
       })
       .returning('*');
@@ -137,6 +138,7 @@ export async function seed(knex: Knex): Promise<void> {
       .insert({
         name: 'Secret Sampling Sites Access',
         description: 'Grants unrestricted access to all submission features and data',
+        status: 'approved',
         create_user: createUser
       })
       .returning('*');

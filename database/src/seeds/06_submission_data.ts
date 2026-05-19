@@ -22,46 +22,98 @@ interface SeedContext {
   artifacts: { artifact_id: string; role: string }[];
 }
 
+type SeedConnection = Knex | Knex.Transaction;
+
 export async function seed(knex: Knex): Promise<void> {
   if (!ENABLE_MOCK_FEATURE_SEEDING) {
     return knex.raw('SELECT null;'); // dummy query to appease knex
   }
 
-  await knex.raw(`
-    SET SCHEMA 'biohub';
-    SET SEARCH_PATH = 'biohub','public';
-  `);
+  await knex.transaction(async (trx) => {
+    await trx.raw(`
+      SET SCHEMA 'biohub';
+      SET SEARCH_PATH = 'biohub','public';
+    `);
 
-  // Create realistic test scenarios
-  const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
-    { level: 'SECURE', reviewed: true, withArchive: true },
-    { level: 'SECURE', reviewed: true, withArchive: true },
-    { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
-    { level: 'UNSECURE', reviewed: true, withArchive: false },
-    { level: 'UNSECURE', reviewed: false, withArchive: false }
-  ];
+    // Create realistic test scenarios
+    const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
+      { level: 'SECURE', reviewed: true, withArchive: true },
+      { level: 'SECURE', reviewed: true, withArchive: true },
+      { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
+      { level: 'UNSECURE', reviewed: true, withArchive: false },
+      { level: 'UNSECURE', reviewed: false, withArchive: false }
+    ];
 
-  for (const scenario of scenarios) {
-    await createSubmissionWithUploads(knex, scenario.level, scenario.reviewed, scenario.withArchive);
-  }
+    const seedContexts: SeedContext[] = [];
 
-  // Backfill data_byte_size for seeded rows — migration runs before seeds,
-  // so seeded submission_feature rows have NULL data_byte_size
-  await knex.raw(`
-    UPDATE submission_feature sf
-    SET data_byte_size = octet_length(sf.data::text) + 500 + COALESCE(
-      (SELECT a.byte_size FROM artifact a WHERE a.object_key = sf.data->>'artifact_key'),
-      0
-    )
-    WHERE sf.data_byte_size IS NULL;
-  `);
+    for (const scenario of scenarios) {
+      const ctx = await createSubmissionWithUploads(trx, scenario.level, scenario.reviewed, scenario.withArchive);
+      seedContexts.push(ctx);
+    }
+
+    // Cross-join every seeded system_user with every seeded submission via submission_team
+    const systemUsers = await trx('system_user').select('system_user_id');
+    const teamName = `Seed Submission Team ${faker.string.alphanumeric(12)}`;
+    const [{ team_id: seedTeamId }] = await trx('team')
+      .insert({
+        name: teamName,
+        description: 'Auto-generated team for seeded submissions.',
+        create_user: 1
+      })
+      .returning('team_id');
+
+    for (const { system_user_id } of systemUsers) {
+      await trx.raw(
+        `
+          INSERT INTO team_member (team_id, system_user_id, create_user)
+          SELECT ?, ?, 1
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM team_member tm
+            WHERE tm.team_id = ?
+              AND tm.system_user_id = ?
+              AND tm.record_end_date IS NULL
+          );
+        `,
+        [seedTeamId, system_user_id, seedTeamId, system_user_id]
+      );
+    }
+
+    for (const { submission_id } of seedContexts) {
+      await trx.raw(
+        `
+          INSERT INTO submission_team (submission_id, team_id, create_user)
+          SELECT ?, ?, 1
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM submission_team st
+            WHERE st.submission_id = ?
+              AND st.team_id = ?
+              AND st.record_end_date IS NULL
+          );
+        `,
+        [submission_id, seedTeamId, submission_id, seedTeamId]
+      );
+    }
+
+    // Backfill data_byte_size for seeded rows — migration runs before seeds,
+    // so seeded submission_feature rows have NULL data_byte_size
+    await trx.raw(`
+      UPDATE submission_feature sf
+      SET data_byte_size = octet_length(sf.data::text) + 500 + COALESCE(
+        (SELECT a.byte_size FROM artifact a WHERE a.object_key = sf.data->>'artifact_key'),
+        0
+      )
+      WHERE sf.data_byte_size IS NULL;
+    `);
+  });
 }
 
 /**
  * Creates a complete submission with realistic upload, artifact, and security data
  */
 const createSubmissionWithUploads = async (
-  knex: Knex,
+  knex: SeedConnection,
   securityLevel: SecurityLevel,
   reviewed: boolean,
   withArchive: boolean
@@ -75,16 +127,32 @@ const createSubmissionWithUploads = async (
 
   // --- 3. Create features (requires submission_upload_id for FK) ---
   const parent_feature_id = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
-  await insertSampleSiteRecord(knex, {
-    submission_id,
-    submission_upload_id,
-    parent_submission_feature_id: parent_feature_id
-  });
-  await insertTelemetryRecord(knex, {
-    submission_id,
-    submission_upload_id,
-    parent_submission_feature_id: parent_feature_id
-  });
+  const sampleSiteIds = await Promise.all([
+    insertSampleSiteRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: parent_feature_id
+    }),
+    insertSampleSiteRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: parent_feature_id
+    })
+  ]);
+  const telemetryIds = await Promise.all([
+    insertTelemetryRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: parent_feature_id
+    }),
+    insertTelemetryRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: parent_feature_id
+    })
+  ]);
+
+  await insertMockRelatedSubmissionFeatures(knex, sampleSiteIds, telemetryIds);
 
   // --- 4. Create artifacts and security scans ---
   const artifacts: { artifact_id: string; role: string }[] = [];
@@ -99,10 +167,35 @@ const createSubmissionWithUploads = async (
 };
 
 /**
+ * Insert deterministic mock relationships between sample-site and telemetry features.
+ *
+ * @param {Knex} knex
+ * @param {number[]} sampleSiteIds
+ * @param {number[]} telemetryIds
+ * @returns {Promise<void>}
+ */
+const insertMockRelatedSubmissionFeatures = async (
+  knex: SeedConnection,
+  sampleSiteIds: number[],
+  telemetryIds: number[]
+): Promise<void> => {
+  const relationshipRows = [
+    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[0], create_user: 1 },
+    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[1], create_user: 1 },
+    { source_feature_id: sampleSiteIds[1], target_feature_id: telemetryIds[1], create_user: 1 }
+  ];
+
+  await knex('submission_feature_feature')
+    .insert(relationshipRows)
+    .onConflict(['source_feature_id', 'target_feature_id'])
+    .ignore();
+};
+
+/**
  * Creates direct artifacts with individual scans (no archive)
  */
 const createDirectUpload = async (
-  knex: Knex,
+  knex: SeedConnection,
   upload_id: string,
   submission_id: number,
   securityLevel: SecurityLevel,
@@ -125,6 +218,7 @@ const createDirectUpload = async (
         checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
         artifact_status: 'uploaded',
         uploaded_at: new Date(),
+        format: 'tar',
         create_user: 1
       })
       .returning('artifact_id');
@@ -179,7 +273,7 @@ const createDirectUpload = async (
  * Creates an archive upload with multiple files inside
  */
 const createArchiveUpload = async (
-  knex: Knex,
+  knex: SeedConnection,
   upload_id: string,
   submission_id: number,
   securityLevel: SecurityLevel,
@@ -194,6 +288,7 @@ const createArchiveUpload = async (
       checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
       artifact_status: 'uploaded',
       uploaded_at: new Date(),
+      format: 'tar',
       create_user: 1
     })
     .returning('artifact_id');
@@ -255,6 +350,7 @@ const createArchiveUpload = async (
         checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
         artifact_status: 'uploaded',
         uploaded_at: new Date(),
+        format: 'tar',
         create_user: 1
       })
       .returning('artifact_id');

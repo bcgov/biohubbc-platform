@@ -1,6 +1,9 @@
-// Integration test for Download services — verifies multi-step download operations
-// (create download, link features, status transitions, fragment planning, auth, claiming)
-// work correctly against the real database.
+// Integration test for the request-time download services — verifies that
+// `createDownload` writes a policy-driven download row, `getDownloadSource`
+// returns `{ policy_id, create_user }` for the pipeline, status transitions
+// behave, and the team-based access flows (`claimDownload`,
+// `getAuthorizedDownload`, `getDownloadsByTeamMembership`) still work after
+// the cart→policy refactor.
 //
 // DownloadService = request-time operations (path handlers)
 // DownloadPipelineService = background processing (pg-boss job handler only)
@@ -11,21 +14,25 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
+import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Download services (integration)', function () {
   this.timeout(15000);
 
   let connection: IDBConnection;
-  let service: DownloadPipelineService;
-  let crudService: DownloadService;
+  let pipelineService: DownloadPipelineService;
+  let downloadService: DownloadService;
+  let policyService: DownloadPolicyService;
+  let downloadRepo: DownloadRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -34,8 +41,10 @@ describe('Download services (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    service = new DownloadPipelineService(connection);
-    crudService = new DownloadService(connection);
+    pipelineService = new DownloadPipelineService(connection);
+    downloadService = new DownloadService(connection);
+    policyService = new DownloadPolicyService(connection);
+    downloadRepo = new DownloadRepository(connection);
   });
 
   afterEach(async () => {
@@ -44,307 +53,26 @@ describe('Download services (integration)', function () {
   });
 
   /**
-   * Helper: mark a submission feature as secured.
-   * Uses security_rule_id 1 from seed data.
-   * Optional effectiveDate allows testing future-dated security rules.
+   * Helper: create a download policy + download row in one shot, returning the
+   * download id. Mirrors the route's create-download flow without the team
+   * link or job publish, so each test can decide how to wire those.
    */
-  async function secureFeature(submissionFeatureId: number, effectiveDate?: string): Promise<void> {
-    const systemUserId = connection.systemUserId();
-
-    if (effectiveDate) {
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date, create_user)
-        VALUES (${submissionFeatureId}, 1, ${effectiveDate}::date, ${systemUserId});
-      `);
-    } else {
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-        VALUES (${submissionFeatureId}, 1, ${systemUserId});
-      `);
-    }
+  async function createPolicyDownload(opts?: {
+    name?: string;
+    featureTypes?: string[];
+  }): Promise<{ download_id: string; policy_id: string }> {
+    const { policy_id } = await policyService.createDownloadPolicy({
+      name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
+      description: null,
+      featureTypes: opts?.featureTypes ?? ['dataset'],
+      expressionId: null
+    });
+    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    return { download_id, policy_id };
   }
 
-  describe('createDownloadRequest', () => {
-    it('should create a download record and link submission features', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset A' });
-      const featureId2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset B' });
-
-      const result = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId1, featureId2]
-      });
-
-      const download = await crudService.findDownloadById(result.download_id);
-      expect(download).to.not.be.null;
-      expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
-      expect(download!.total_fragments).to.equal(1);
-      expect(download!.completed_fragments).to.equal(0);
-
-      const features = await connection.sql(SQL`
-        SELECT submission_feature_id FROM download_feature
-        WHERE download_id = ${result.download_id}
-        ORDER BY submission_feature_id;
-      `);
-      expect(features.rows).to.have.length(2);
-      expect(features.rows.map((r: { submission_feature_id: number }) => r.submission_feature_id)).to.deep.equal([
-        featureId1,
-        featureId2
-      ]);
-    });
-
-    it('should fail and not create a download when linking an invalid feature ID', async () => {
-      const before = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
-      const countBefore = before.rows[0].count;
-
-      await connection.query('SAVEPOINT before_fk_test');
-
-      try {
-        await crudService.createDownloadRequest({ submissionFeatureIds: [999999] });
-        expect.fail('Should have thrown a foreign key violation');
-      } catch (error) {
-        expect(error).to.exist;
-      }
-
-      await connection.query('ROLLBACK TO SAVEPOINT before_fk_test');
-
-      const after = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
-      const countAfter = after.rows[0].count;
-      expect(countAfter).to.equal(countBefore);
-    });
-  });
-
-  describe('updateDownloadStatus', () => {
-    it('should set started_at only when transitioning to processing', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
-
-      const afterProcessing = await crudService.findDownloadById(download_id);
-      expect(afterProcessing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
-      expect(afterProcessing!.started_at).to.not.be.null;
-      expect(afterProcessing!.completed_at).to.be.null;
-
-      const firstStartedAt = afterProcessing!.started_at;
-
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
-
-      const afterReady = await crudService.findDownloadById(download_id);
-      expect(afterReady!.download_status).to.equal(DownloadStatusEnum.READY);
-      expect(afterReady!.started_at).to.equal(firstStartedAt);
-      expect(afterReady!.completed_at).to.not.be.null;
-    });
-  });
-
-  describe('full status lifecycle', () => {
-    it('should transition pending -> processing -> ready and track all timestamps', async () => {
-      const apiUserId = connection.systemUserId();
-      const submissionId = await createTestSubmission(connection);
-      const featureId1 = await createTestFeature(connection, submissionId, 'species_observation', {
-        taxon_id: 180703,
-        count: 35,
-        timestamp: '2024-01-15T10:00:00Z'
-      });
-      const featureId2 = await createTestFeature(connection, submissionId, 'species_observation', {
-        taxon_id: 12345,
-        count: 12,
-        timestamp: '2024-01-16T14:30:00Z'
-      });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId1, featureId2]
-      });
-
-      // Link to a team so it appears in getDownloadsByTeamMembership
-      await crudService.linkDownloadToNewTeam(
-        download_id,
-        apiUserId,
-        'Test team for lifecycle',
-        'Test team for lifecycle'
-      );
-
-      const initial = await crudService.findDownloadById(download_id);
-      expect(initial!.download_status).to.equal(DownloadStatusEnum.PENDING);
-      expect(initial!.started_at).to.be.null;
-      expect(initial!.completed_at).to.be.null;
-      expect(initial!.downloaded_at).to.be.null;
-
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
-      const processing = await crudService.findDownloadById(download_id);
-      expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
-      expect(processing!.started_at).to.not.be.null;
-
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
-      const ready = await crudService.findDownloadById(download_id);
-      expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
-      expect(ready!.completed_at).to.not.be.null;
-
-      // Step 5: Verify download appears in user's download list with all timestamps
-      const systemUserId = connection.systemUserId();
-      const { downloads: userDownloads } = await crudService.getDownloadsByTeamMembership(systemUserId);
-      const found = userDownloads.find((d) => d.download_id === download_id);
-      expect(found).to.not.be.undefined;
-      expect(found!.download_status).to.equal(DownloadStatusEnum.READY);
-      expect(ready!.started_at).to.not.be.null;
-      expect(ready!.completed_at).to.not.be.null;
-    });
-  });
-
-  describe('getDownloadFeatures', () => {
-    it('should return per-feature estimated_byte_size from pre-computed column', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size Test' });
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
-      const sizeData = await crudService.getDownloadFeatures(download_id);
-
-      expect(sizeData).to.have.length(1);
-      expect(sizeData[0].submission_feature_id).to.equal(featureId);
-      expect(sizeData[0].estimated_byte_size).to.be.a('string');
-      expect(Number(sizeData[0].estimated_byte_size)).to.be.greaterThan(0);
-      expect(sizeData[0].feature_type_name).to.equal('dataset');
-      expect(sizeData[0]).to.not.have.property('data');
-    });
-
-    it('should return all linked features regardless of security status', async () => {
-      // Authorization is enforced at creation time via buildSecurityFilter in the search query.
-      // At retrieval time, getDownloadFeatures returns everything that was linked.
-      const submissionId = await createTestSubmission(connection);
-      const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeatureId);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [openFeatureId, securedFeatureId]
-      });
-
-      const result = await crudService.getDownloadFeatures(download_id);
-
-      expect(result).to.have.length(2);
-      const featureIds = result.map((f: { submission_feature_id: number }) => f.submission_feature_id);
-      expect(featureIds).to.include(openFeatureId);
-      expect(featureIds).to.include(securedFeatureId);
-    });
-
-    it('should not leak features across different downloads', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featA = await createTestFeature(connection, submissionId, 'dataset', { name: 'DL-A Feature' });
-      const featB = await createTestFeature(connection, submissionId, 'dataset', { name: 'DL-B Feature' });
-
-      const dlA = await crudService.createDownloadRequest({ submissionFeatureIds: [featA] });
-      const dlB = await crudService.createDownloadRequest({ submissionFeatureIds: [featB] });
-
-      const resultA = await crudService.getDownloadFeatures(dlA.download_id);
-      expect(resultA).to.have.length(1);
-      expect(resultA[0].submission_feature_id).to.equal(featA);
-
-      const resultB = await crudService.getDownloadFeatures(dlB.download_id);
-      expect(resultB).to.have.length(1);
-      expect(resultB[0].submission_feature_id).to.equal(featB);
-    });
-
-    it('should return empty for a download with no linked features', async () => {
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: []
-      });
-
-      const result = await crudService.getDownloadFeatures(download_id);
-
-      expect(result).to.have.length(0);
-    });
-  });
-
-  describe('streamFragmentFeaturesByType (parent denormalization)', () => {
-    it('should return parent_data and parent_feature_type_name for child features', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Test Dataset',
-        description: 'Parent dataset for testing'
-      });
-      const childFeatureId = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { taxon_id: 180703, count: 5 },
-        parentFeatureId
-      );
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [childFeatureId]
-      });
-      const sizeEstimate = await service.estimateDownloadSize(download_id);
-      await service.planFragments(download_id, sizeEstimate);
-
-      const fragments = await crudService.getFragmentsByDownloadId(download_id);
-      expect(fragments).to.have.length(1);
-
-      const fragmentRepo = new DownloadFragmentRepository(connection);
-      const batches: unknown[][] = [];
-      for await (const batch of fragmentRepo.streamFragmentFeaturesByType(
-        fragments[0].download_fragment_id,
-        'species_observation'
-      )) {
-        batches.push(batch);
-      }
-
-      expect(batches).to.have.length(1);
-      expect(batches[0]).to.have.length(1);
-
-      const feature = batches[0][0] as {
-        submission_feature_id: number;
-        parent_data: Record<string, unknown> | null;
-        parent_feature_type_name: string | null;
-      };
-      expect(feature.submission_feature_id).to.equal(childFeatureId);
-      expect(feature.parent_feature_type_name).to.equal('dataset');
-      expect(feature.parent_data).to.not.be.null;
-      expect(feature.parent_data!.name).to.equal('Test Dataset');
-    });
-
-    it('should return null parent fields for root features (no parent)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const rootFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Root Dataset'
-      });
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [rootFeatureId]
-      });
-      const sizeEstimate = await service.estimateDownloadSize(download_id);
-      await service.planFragments(download_id, sizeEstimate);
-
-      const fragments = await crudService.getFragmentsByDownloadId(download_id);
-      const fragmentRepo = new DownloadFragmentRepository(connection);
-      const batches: unknown[][] = [];
-      for await (const batch of fragmentRepo.streamFragmentFeaturesByType(
-        fragments[0].download_fragment_id,
-        'dataset'
-      )) {
-        batches.push(batch);
-      }
-
-      expect(batches).to.have.length(1);
-      const feature = batches[0][0] as {
-        submission_feature_id: number;
-        parent_data: Record<string, unknown> | null;
-        parent_feature_type_name: string | null;
-      };
-      expect(feature.submission_feature_id).to.equal(rootFeatureId);
-      expect(feature.parent_feature_type_name).to.be.null;
-      expect(feature.parent_data).to.be.null;
-    });
-  });
-
-  // ── Helpers for ownership / auth integration tests ──────────────────
-
   /**
-   * Helper: create a second system_user for "other user" scenarios.
-   * Returns the new system_user_id.
+   * Helper: create a fresh system_user — used for team-membership negative cases.
    */
   let _userSeq = 0;
   async function createOtherUser(): Promise<number> {
@@ -363,66 +91,94 @@ describe('Download services (integration)', function () {
     return result.rows[0].system_user_id;
   }
 
-  /**
-   * Helper: create an anonymous download (no team association).
-   * The UUID is the only credential — anyone with the link can access it.
-   */
-  async function createAnonymousDownload(): Promise<string> {
-    const submissionId = await createTestSubmission(connection);
-    const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Anon' });
-    const { download_id } = await crudService.createDownloadRequest({
-      submissionFeatureIds: [featureId]
-    });
-    return download_id;
-  }
+  describe('createDownload', () => {
+    it('writes a download row with policy_id populated, format set, and status=pending', async () => {
+      const { download_id, policy_id } = await createPolicyDownload();
 
-  // ── claimDownload ───────────────────────────────────────────────────
+      const row = await connection.sql(SQL`
+        SELECT download_status, format, policy_id, create_user
+        FROM download WHERE download_id = ${download_id};
+      `);
+      expect(row.rowCount).to.equal(1);
+      expect(row.rows[0].download_status).to.equal(DownloadStatusEnum.PENDING);
+      expect(row.rows[0].format).to.equal('parquet');
+      expect(row.rows[0].policy_id).to.equal(policy_id);
+      expect(row.rows[0].create_user).to.equal(connection.systemUserId());
+    });
+  });
+
+  describe('getDownloadSource', () => {
+    it('returns policy_id and create_user for an existing download', async () => {
+      const { download_id, policy_id } = await createPolicyDownload();
+
+      const source = await downloadRepo.getDownloadSource(download_id);
+      expect(source.policy_id).to.equal(policy_id);
+      expect(source.create_user).to.equal(connection.systemUserId());
+    });
+
+    it('throws ApiNotFoundError when the download does not exist', async () => {
+      try {
+        // Random valid UUID that is not in the table.
+        await downloadRepo.getDownloadSource('00000000-0000-0000-0000-000000000000');
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
+  });
+
+  describe('full status lifecycle', () => {
+    it('transitions pending → processing → ready and tracks the expected timestamps', async () => {
+      const { download_id } = await createPolicyDownload();
+
+      const initial = await downloadService.findDownloadById(download_id);
+      expect(initial!.download_status).to.equal(DownloadStatusEnum.PENDING);
+      expect(initial!.started_at).to.be.null;
+      expect(initial!.completed_at).to.be.null;
+
+      await pipelineService.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [
+        DownloadStatusEnum.PENDING
+      ]);
+      const processing = await downloadService.findDownloadById(download_id);
+      expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(processing!.started_at).to.not.be.null;
+      expect(processing!.completed_at).to.be.null;
+
+      const firstStartedAt = processing!.started_at;
+
+      await pipelineService.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [
+        DownloadStatusEnum.PROCESSING
+      ]);
+      const ready = await downloadService.findDownloadById(download_id);
+      expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
+      expect(ready!.started_at).to.equal(firstStartedAt);
+      expect(ready!.completed_at).to.not.be.null;
+    });
+  });
 
   describe('claimDownload', () => {
-    it('should create team association for an anonymous download', async () => {
-      const downloadId = await createAnonymousDownload();
+    it('creates team association for an anonymous download', async () => {
+      const { download_id } = await createPolicyDownload();
       const systemUserId = connection.systemUserId();
 
       // Before claim: anonymous access works (no team rows -> UUID is the credential)
-      await crudService.getAuthorizedDownload(downloadId, null);
+      await downloadService.getAuthorizedDownload(download_id, null);
 
       // Claim creates team + download_team link
-      await crudService.claimDownload(downloadId, systemUserId);
+      await downloadService.claimDownload(download_id, systemUserId);
 
       // After claim: team member can access
-      await crudService.getAuthorizedDownload(downloadId, systemUserId);
+      await downloadService.getAuthorizedDownload(download_id, systemUserId);
     });
 
-    it('should fail when download is already claimed', async () => {
-      const downloadId = await createAnonymousDownload();
+    it('fails when download is already claimed', async () => {
+      const { download_id } = await createPolicyDownload();
       const systemUserId = connection.systemUserId();
 
-      await crudService.claimDownload(downloadId, systemUserId);
+      await downloadService.claimDownload(download_id, systemUserId);
 
       try {
-        await crudService.claimDownload(downloadId, systemUserId);
-        expect.fail('Expected HTTP409');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP409);
-        expect((error as HTTP409).message).to.equal('Download already claimed');
-      }
-    });
-
-    it('should fail when download already has team associations', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team DL' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
-      const systemUserId = connection.systemUserId();
-      // Link to a team (simulates authenticated download creation)
-      await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Original team', 'Original team');
-
-      // Claim should fail because download_team rows already exist
-      const otherUserId = await createOtherUser();
-      try {
-        await crudService.claimDownload(download_id, otherUserId);
+        await downloadService.claimDownload(download_id, systemUserId);
         expect.fail('Expected HTTP409');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
@@ -431,62 +187,44 @@ describe('Download services (integration)', function () {
     });
   });
 
-  // ── getAuthorizedDownload (team-based) ────────────────────────────
-
   describe('getAuthorizedDownload', () => {
-    it('should allow access to anonymous download (no team associations)', async () => {
-      const downloadId = await createAnonymousDownload();
+    it('allows access to an anonymous (no-team) download for any caller', async () => {
+      const { download_id } = await createPolicyDownload();
 
-      // Anyone can access — no download_team rows means UUID is the credential
-      const download = await crudService.getAuthorizedDownload(downloadId, null);
-      expect(download.download_id).to.equal(downloadId);
-    });
-
-    it('should authorize team member on team-linked download', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team DL' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
-      const systemUserId = connection.systemUserId();
-      await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
-
-      const download = await crudService.getAuthorizedDownload(download_id, systemUserId);
+      const download = await downloadService.getAuthorizedDownload(download_id, null);
       expect(download.download_id).to.equal(download_id);
     });
 
-    it('should throw HTTP403 for non-team-member on team-linked download', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Locked' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
+    it('authorizes a team member on a team-linked download', async () => {
+      const { download_id } = await createPolicyDownload();
       const systemUserId = connection.systemUserId();
-      await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
+      await downloadService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth team', 'Auth team');
+
+      const download = await downloadService.getAuthorizedDownload(download_id, systemUserId);
+      expect(download.download_id).to.equal(download_id);
+    });
+
+    it('rejects a non-team-member with HTTP403 on a team-linked download', async () => {
+      const { download_id } = await createPolicyDownload();
+      const systemUserId = connection.systemUserId();
+      await downloadService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth team', 'Auth team');
 
       const outsider = await createOtherUser();
       try {
-        await crudService.getAuthorizedDownload(download_id, outsider);
+        await downloadService.getAuthorizedDownload(download_id, outsider);
         expect.fail('Expected HTTP403');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP403);
       }
     });
 
-    it('should throw HTTP403 for unauthenticated access to team-linked download', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Locked' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
+    it('rejects unauthenticated access to a team-linked download with HTTP403', async () => {
+      const { download_id } = await createPolicyDownload();
       const systemUserId = connection.systemUserId();
-      await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
+      await downloadService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth team', 'Auth team');
 
       try {
-        await crudService.getAuthorizedDownload(download_id, null);
+        await downloadService.getAuthorizedDownload(download_id, null);
         expect.fail('Expected HTTP403');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP403);
@@ -494,34 +232,22 @@ describe('Download services (integration)', function () {
     });
   });
 
-  // ── getDownloadsByTeamMembership ───────────────────────────────────
-
   describe('getDownloadsByTeamMembership', () => {
-    it('should return downloads linked via team membership', async () => {
-      const apiUserId = connection.systemUserId();
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Mine' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+    it('returns downloads linked via team membership', async () => {
+      const { download_id } = await createPolicyDownload();
+      const systemUserId = connection.systemUserId();
+      await downloadService.linkDownloadToNewTeam(download_id, systemUserId, 'Listing team', 'Listing team');
 
-      await crudService.linkDownloadToNewTeam(download_id, apiUserId, 'Listing test team', 'Listing test team');
-
-      const { downloads } = await crudService.getDownloadsByTeamMembership(apiUserId);
+      const { downloads } = await downloadService.getDownloadsByTeamMembership(systemUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.include(download_id);
     });
 
-    it('should not return downloads the user has no team membership for', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Private' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+    it('does not return downloads the user has no team membership for', async () => {
+      const { download_id } = await createPolicyDownload();
 
-      // Anonymous download (no team link) should not appear in team-based listing
       const otherUserId = await createOtherUser();
-      const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
+      const { downloads } = await downloadService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.not.include(download_id);
     });

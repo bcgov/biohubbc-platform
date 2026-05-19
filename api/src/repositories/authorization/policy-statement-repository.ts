@@ -1,7 +1,26 @@
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreatePolicyStatement, PolicyStatement, UpdatePolicyStatement } from '../../models/policy-statement';
 import { BaseRepository } from '../base-repository';
+
+/**
+ * Row shape for an active policy statement joined to its (optional) linked expression.
+ *
+ * The download pipeline reads one row per active statement on a policy and uses it to
+ * decide, per feature type, whether to evaluate an expression tree (`expression_id` set)
+ * or fall back to a broad "all features of this type" projection (`expression_id` null).
+ *
+ * The link is a LEFT JOIN because not every statement has a linked expression: a
+ * statement without one means "everything of this feature type that the policy creator
+ * can see at export time".
+ */
+export const ActivePolicyStatementWithExpression = z.object({
+  policy_statement_id: z.string().uuid(),
+  urn_feature_type: z.string(),
+  expression_id: z.string().uuid().nullable()
+});
+export type ActivePolicyStatementWithExpression = z.infer<typeof ActivePolicyStatementWithExpression>;
 
 /**
  * A repository class for accessing policy statement data.
@@ -90,6 +109,47 @@ export class PolicyStatementRepository extends BaseRepository {
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, PolicyStatement);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all active policy statements for a policy, each joined to its optional
+   * linked expression id.
+   *
+   * Single roundtrip used by the download pipeline to decide what to export:
+   * each row drives one Parquet file, and `expression_id` selects between an
+   * expression-tree evaluation (set) and a broad "everything of this feature
+   * type" projection (null).
+   *
+   * The join is a LEFT JOIN because the absence of an expression link is a
+   * legitimate, distinct semantic state — not a missing-row error. Returns `[]`
+   * for a policy with no active statements.
+   *
+   * Ordered by `urn_feature_type` so the caller's downstream loop produces a
+   * stable, alphabetic sequence of Parquet files.
+   *
+   * @param {string} policyId - The policy id whose active statements to fetch.
+   * @return {Promise<ActivePolicyStatementWithExpression[]>} Active statements with optional expression ids.
+   * @memberof PolicyStatementRepository
+   */
+  async getActiveStatementsWithExpressionByPolicyId(policyId: string): Promise<ActivePolicyStatementWithExpression[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('policy_statement as ps')
+      .select<ActivePolicyStatementWithExpression[]>(
+        'ps.policy_statement_id',
+        'ps.urn_feature_type',
+        'pse.expression_id'
+      )
+      .leftJoin('policy_statement_expression as pse', function () {
+        this.on('pse.policy_statement_id', '=', 'ps.policy_statement_id').andOnNull('pse.record_end_date');
+      })
+      .where('ps.policy_id', policyId)
+      .whereNull('ps.record_end_date')
+      .orderBy('ps.urn_feature_type');
+
+    const response = await this.connection.knex(query, ActivePolicyStatementWithExpression);
 
     return response.rows;
   }

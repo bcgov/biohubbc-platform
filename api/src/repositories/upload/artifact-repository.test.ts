@@ -3,21 +3,156 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Artifact, ArtifactStatusEnum, CreateArtifact } from '../../models/artifact';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactRepository } from './artifact-repository';
 
 chai.use(sinonChai);
 
 describe('ArtifactRepository', () => {
+  describe('insertArtifacts', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('builds a direct upsert query without DISTINCT ON dedupe CTEs', async () => {
+      const artifactRows: Artifact[] = [
+        {
+          artifact_id: '11111111-1111-1111-1111-111111111111',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-a',
+          object_key: 'a/key.txt',
+          byte_size: '100',
+          checksum_sha256: 'a'.repeat(64),
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          artifact_id: '33333333-3333-3333-3333-333333333333',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-a',
+          object_key: 'a/key-2.txt',
+          byte_size: '200',
+          checksum_sha256: 'b'.repeat(64),
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        },
+        {
+          artifact_id: '22222222-2222-2222-2222-222222222222',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-b',
+          object_key: 'b/key.txt',
+          byte_size: '300',
+          checksum_sha256: 'c'.repeat(64),
+          uploaded_at: '2026-01-01T00:02:00Z',
+          format: 'csv'
+        }
+      ];
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        if (sqlStatement.text.includes('INSERT INTO artifact')) {
+          expect(sqlStatement.text).to.not.include('DISTINCT ON (bucket, object_key)');
+          expect(sqlStatement.text).to.not.include('WITH ORDINALITY');
+          expect(sqlStatement.text).to.not.include('distinct_input');
+          expect(sqlStatement.text).to.include('FROM UNNEST(');
+          expect(sqlStatement.text).to.include('::bigint[]');
+          expect(sqlStatement.text).to.not.include('::integer[]');
+          expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+          expect(sqlStatement.text).to.include('SET');
+        }
+
+        return { rowCount: 3, rows: artifactRows } as unknown as Promise<QueryResult<any>>;
+      });
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const payload: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 100,
+          checksum_sha256: 'aaa',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key-2.txt',
+          byte_size: 200,
+          checksum_sha256: 'bbb',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 300,
+          checksum_sha256: 'ccc',
+          uploaded_at: '2026-01-01T00:02:00Z',
+          format: 'csv'
+        }
+      ];
+
+      const result = await repo.insertArtifacts(payload);
+      expect(result).to.have.length(3);
+    });
+
+    it('returns rows as-is when rowCount is lower than input key count', async () => {
+      const artifactRows: Artifact[] = [
+        {
+          artifact_id: '11111111-1111-1111-1111-111111111111',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-a',
+          object_key: 'a/key.txt',
+          byte_size: '100',
+          checksum_sha256: 'a'.repeat(64),
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        }
+      ];
+      const mockQueryResponse = { rowCount: 1, rows: artifactRows } as unknown as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.insertArtifacts([
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 100,
+          checksum_sha256: 'aaa',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 200,
+          checksum_sha256: 'bbb',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ]);
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.include({ bucket: 'bucket-a', object_key: 'a/key.txt' });
+    });
+  });
+
   describe('getArtifact', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('throws an error if no artifact found', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -32,20 +167,21 @@ describe('ArtifactRepository', () => {
 
     it('returns an artifact if found', async () => {
       const mockRow: Artifact = {
-        artifact_id: 'artifact-uuid-1',
+        artifact_id: '11111111-1111-1111-1111-111111111111',
         bucket: 'test-bucket',
         artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
         byte_size: '1234',
-        checksum_sha256: 'checksum',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'tar'
       };
 
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
-      const result = await repo.getArtifact('artifact-uuid-1');
+      const result = await repo.getArtifact('11111111-1111-1111-1111-111111111111');
       expect(result).to.eql(mockRow);
     });
   });
@@ -58,31 +194,87 @@ describe('ArtifactRepository', () => {
     it('returns an array of artifacts', async () => {
       const mockRows: Artifact[] = [
         {
-          artifact_id: 'artifact-uuid-1',
+          artifact_id: '11111111-1111-1111-1111-111111111111',
           bucket: 'bucket1',
           artifact_status: ArtifactStatusEnum.UPLOADED,
           object_key: 'key1.txt',
           byte_size: '123',
-          checksum_sha256: 'abc',
-          uploaded_at: '2025-12-31T12:00:00Z'
+          checksum_sha256: 'a'.repeat(64),
+          uploaded_at: '2025-12-31T12:00:00Z',
+          format: 'tar'
         },
         {
-          artifact_id: 'artifact-uuid-2',
+          artifact_id: '22222222-2222-2222-2222-222222222222',
           bucket: 'bucket2',
           artifact_status: ArtifactStatusEnum.ARCHIVED,
           object_key: 'key2.txt',
           byte_size: '456',
-          checksum_sha256: 'def',
-          uploaded_at: '2025-12-31T12:10:00Z'
+          checksum_sha256: 'b'.repeat(64),
+          uploaded_at: '2025-12-31T12:10:00Z',
+          format: 'tar'
         }
       ];
 
-      const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 2, rows: mockRows } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
       const result = await repo.getArtifacts();
       expect(result).to.eql(mockRows);
+    });
+  });
+
+  describe('getArtifactByteSizesByObjectKeys', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns an empty map without hitting the DB when given no keys', async () => {
+      const sqlStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.getArtifactByteSizesByObjectKeys('bucket-a', []);
+
+      expect(result).to.be.instanceOf(Map);
+      expect(result.size).to.equal(0);
+      expect(sqlStub.called).to.be.false;
+    });
+
+    it('returns a map of object_key → byte_size for matched rows', async () => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        // Sanity-check the query shape — bucket guard, ANY() against the keys
+        // array, and the IS NOT NULL filter. The contract is that
+        // unuploaded/pending rows contribute zero, not undefined.
+        expect(sqlStatement.text).to.include('FROM');
+        expect(sqlStatement.text).to.include('artifact');
+        expect(sqlStatement.text).to.include('bucket =');
+        expect(sqlStatement.text).to.include('object_key = ANY(');
+        expect(sqlStatement.text).to.include('byte_size IS NOT NULL');
+
+        return Promise.resolve({
+          rowCount: 2,
+          rows: [
+            { object_key: 'a/key.txt', byte_size: 100 },
+            { object_key: 'a/key-2.txt', byte_size: 200 }
+          ]
+        } as any);
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const result = await repo.getArtifactByteSizesByObjectKeys('bucket-a', [
+        'a/key.txt',
+        'a/key-2.txt',
+        'a/missing.txt'
+      ]);
+
+      // The repo doesn't fabricate entries for missing keys — the caller
+      // (export pipeline) treats absence as zero.
+      expect(result.size).to.equal(2);
+      expect(result.get('a/key.txt')).to.equal(100);
+      expect(result.get('a/key-2.txt')).to.equal(200);
+      expect(result.has('a/missing.txt')).to.be.false;
     });
   });
 
@@ -92,37 +284,57 @@ describe('ArtifactRepository', () => {
     });
 
     it('returns the inserted artifact ID on new insert', async () => {
-      const mockRow = { artifact_id: 'artifact-uuid-1' };
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockRow: Artifact = {
+        artifact_id: '11111111-1111-1111-1111-111111111111',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'bucket',
+        object_key: 'key.txt',
+        byte_size: '5179155456',
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
+      };
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('::bigint');
+        expect(sqlStatement.text).to.not.include('::integer');
+        return { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new ArtifactRepository(mockDBConnection);
 
       const payload: CreateArtifact = {
         bucket: 'bucket',
         artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
-        byte_size: 100,
-        checksum_sha256: 'abc',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        byte_size: 5179155456,
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
       };
 
       const result = await repo.insertArtifact(payload);
       expect(result).to.eql(mockRow);
+      expect(sqlStub).to.have.been.calledOnce;
     });
 
     it('returns the existing artifact ID on conflict', async () => {
-      const existingRow = { artifact_id: 'existing-uuid' };
-      let callCount = 0;
+      const existingRow: Artifact = {
+        artifact_id: '22222222-2222-2222-2222-222222222222',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'bucket',
+        object_key: 'key.txt',
+        byte_size: '100',
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
+      };
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+        expect(sqlStatement.text).to.not.include('ON CONFLICT (bucket, object_key) DO NOTHING');
+        return { rowCount: 1, rows: [existingRow] } as unknown as Promise<QueryResult<any>>;
+      });
       const mockDBConnection = getMockDBConnection({
-        sql: () => {
-          callCount++;
-          if (callCount === 1) {
-            // INSERT with DO NOTHING — conflict, no rows returned
-            return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-          }
-          // Follow-up SELECT returns existing row
-          return { rowCount: 1, rows: [existingRow] } as any as Promise<QueryResult<any>>;
-        }
+        sql: sqlStub
       });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -131,13 +343,13 @@ describe('ArtifactRepository', () => {
         artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
         byte_size: 100,
-        checksum_sha256: 'abc',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
       };
 
       const result = await repo.insertArtifact(payload);
-      expect(result).to.eql(existingRow);
-      expect(callCount).to.equal(2);
+      expect(result.artifact_id).to.eql(existingRow.artifact_id);
     });
   });
 
@@ -147,7 +359,7 @@ describe('ArtifactRepository', () => {
     });
 
     it('throws an error if update fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -161,8 +373,8 @@ describe('ArtifactRepository', () => {
     });
 
     it('returns the updated artifact ID if successful', async () => {
-      const mockRow = { artifact_id: 'artifact-uuid-1' };
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockRow: { artifact_id: string } = { artifact_id: '11111111-1111-1111-1111-111111111111' };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -177,7 +389,7 @@ describe('ArtifactRepository', () => {
     });
 
     it('throws an error if delete fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -191,7 +403,7 @@ describe('ArtifactRepository', () => {
     });
 
     it('succeeds if delete affects one row', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactRepository(mockDBConnection);
 

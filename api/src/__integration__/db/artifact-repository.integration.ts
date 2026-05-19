@@ -40,7 +40,8 @@ describe('ArtifactRepository (integration)', function () {
       byte_size: 1024,
       artifact_status: ArtifactStatusEnum.UPLOADED,
       checksum_sha256: 'a'.repeat(64),
-      uploaded_at: '2026-01-01T00:00:00Z'
+      uploaded_at: '2026-01-01T00:00:00Z',
+      format: 'tar'
     };
 
     it('returns a new artifact_id on fresh insert', async () => {
@@ -72,6 +73,29 @@ describe('ArtifactRepository (integration)', function () {
       });
 
       expect(first.artifact_id).to.not.equal(second.artifact_id);
+    });
+  });
+
+  describe('getArtifact', () => {
+    it('returns artifact with format field populated', async () => {
+      const payload: CreateArtifact = {
+        bucket: 'test-bucket',
+        object_key: 'integration-test/get-artifact-format.txt',
+        byte_size: 512,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        checksum_sha256: 'c'.repeat(64),
+        uploaded_at: '2026-01-01T00:00:00Z',
+        format: 'csv'
+      };
+
+      const { artifact_id } = await repo.insertArtifact(payload);
+      const artifact = await repo.getArtifact(artifact_id);
+
+      expect(artifact.format).to.equal('csv');
+      expect(artifact.artifact_id).to.equal(artifact_id);
+      expect(artifact.artifact_status).to.equal(ArtifactStatusEnum.UPLOADED);
+      expect(artifact.bucket).to.equal('test-bucket');
+      expect(artifact.object_key).to.equal('integration-test/get-artifact-format.txt');
     });
   });
 });

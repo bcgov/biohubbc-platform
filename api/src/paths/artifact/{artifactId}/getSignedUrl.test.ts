@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { SecurityService } from '../../../services/security-service';
-import { getMockDBConnection } from '../../../__mocks__/db';
 import * as getSignedUrl from './getSignedUrl';
 
 chai.use(sinonChai);
@@ -20,7 +20,7 @@ describe('getSignedUrl', () => {
       const dbConnectionObj = getMockDBConnection({
         systemUserId: () => 1000
       });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSignedURLStub = sinon
         .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')
@@ -56,7 +56,7 @@ describe('getSignedUrl', () => {
       const dbConnectionObj = getMockDBConnection({
         systemUserId: () => 1000
       });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getS3SignedURLStub = sinon
         .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')

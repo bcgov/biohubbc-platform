@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
 import { FeatureTypeProperty } from '../models/feature-type-property';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository } from './code-repository';
 
 chai.use(sinonChai);
@@ -62,7 +62,8 @@ describe('CodeRepository', () => {
             description: 'Name',
             type_name: FEATURE_PROPERTY_TYPE.STRING,
             required_value: true,
-            calculated_value: false
+            calculated_value: false,
+            allow_multiple: false
           }
         ]
       };
@@ -121,7 +122,8 @@ describe('CodeRepository', () => {
         description: 'Name',
         type_name: FEATURE_PROPERTY_TYPE.STRING,
         required_value: true,
-        calculated_value: false
+        calculated_value: false,
+        allow_multiple: false
       };
 
       const mockQueryResponse = {

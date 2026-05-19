@@ -19,7 +19,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });
@@ -39,7 +40,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });
@@ -59,7 +61,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });
@@ -81,6 +84,7 @@ describe('Header', () => {
     expect(getByTestId('menu_log_out')).toBeVisible();
 
     expect(getByText('BCeID Basic/admin-username')).toBeVisible();
+    expect(getByTestId('menu_portal_link')).toHaveAttribute('href', '/portal');
   });
 
   describe('Log out', () => {

@@ -1,4 +1,4 @@
-import { isString } from 'lodash';
+import lodash from 'lodash';
 
 /**
  * Safely apply `.toLowerCase()` to a value of unknown type.
@@ -11,7 +11,7 @@ import { isString } from 'lodash';
  * @return {*}  {T}
  */
 export function safeToLowerCase<T>(value: T): T {
-  if (isString(value)) {
+  if (lodash.isString(value)) {
     return value.toLowerCase() as unknown as T;
   }
 
@@ -29,7 +29,7 @@ export function safeToLowerCase<T>(value: T): T {
  * @return {*}  {T}
  */
 export function safeTrim<T>(value: T): T {
-  if (isString(value)) {
+  if (lodash.isString(value)) {
     return value.trim() as unknown as T;
   }
 

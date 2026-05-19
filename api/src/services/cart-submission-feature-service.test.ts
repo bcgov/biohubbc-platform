@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiError } from '../errors/api-error';
 import { CartFeatureListResponse, CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 
 chai.use(sinonChai);
@@ -16,15 +16,31 @@ describe('CartSubmissionFeatureService', () => {
     sinon.restore();
   });
 
-  describe('addSubmissionFeaturesToCart', () => {
-    it('should call repository with correct parameters', async () => {
+  describe('createCartSubmissionFeatures', () => {
+    it('should call scope-checked repository method for authenticated user', async () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
 
-      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
+      const stub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'createCartSubmissionFeaturesWithScopeCheck')
+        .resolves();
 
       const features: number[] = [1, 2, 3];
-      await service.addSubmissionFeaturesToCart('cart-1', features);
+      await service.createCartSubmissionFeatures('cart-1', features, 42);
+
+      expect(stub).to.have.been.calledOnceWith('cart-1', features, 42);
+    });
+
+    it('should call unsecured repository method for anonymous user', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const stub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'createUnsecuredCartSubmissionFeatures')
+        .resolves();
+
+      const features: number[] = [1, 2, 3];
+      await service.createCartSubmissionFeatures('cart-1', features, null);
 
       expect(stub).to.have.been.calledOnceWith('cart-1', features);
     });
@@ -34,11 +50,11 @@ describe('CartSubmissionFeatureService', () => {
       const service = new CartSubmissionFeatureService(mockDB);
 
       sinon
-        .stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart')
+        .stub(CartSubmissionFeatureRepository.prototype, 'createCartSubmissionFeaturesWithScopeCheck')
         .rejects(new Error('DB error'));
 
       try {
-        await service.addSubmissionFeaturesToCart('cart-1', [1, 2]);
+        await service.createCartSubmissionFeatures('cart-1', [1, 2], 42);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
@@ -50,11 +66,17 @@ describe('CartSubmissionFeatureService', () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
 
-      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
+      const unsecuredStub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'createUnsecuredCartSubmissionFeatures')
+        .resolves();
+      const scopeStub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'createCartSubmissionFeaturesWithScopeCheck')
+        .resolves();
 
-      await service.addSubmissionFeaturesToCart('cart-1', []);
+      await service.createCartSubmissionFeatures('cart-1', [], null);
 
-      expect(stub).not.to.have.been.called;
+      expect(unsecuredStub).not.to.have.been.called;
+      expect(scopeStub).not.to.have.been.called;
     });
   });
 

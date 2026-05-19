@@ -3,10 +3,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { PolicyAutocompleteContextProvider } from 'contexts/policyAutocompleteContext';
 import { useFormikContext } from 'formik';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useCallback } from 'react';
 import yup from 'utils/YupSchema';
-import { PolicyJsonEditor } from './PolicyJsonEditor';
 import { defaultPolicyDocument, validatePolicyJson } from '../utils/policyTransform';
+import { PolicyJsonEditor } from './PolicyJsonEditor';
 
 /**
  * Form values for creating or editing a policy.
@@ -17,6 +18,8 @@ export interface IAddPolicyFormValues {
   name: string;
   /** Optional description of the policy's purpose */
   description: string;
+  /** Lifecycle status for the policy */
+  status: PolicyStatus;
   /** JSON string containing the policy document (IPolicyDocument structure) */
   policy_json: string;
 }
@@ -27,6 +30,7 @@ export interface IAddPolicyFormValues {
 export const AddPolicyFormInitialValues: IAddPolicyFormValues = {
   name: '',
   description: '',
+  status: PolicyStatus.REQUESTED,
   policy_json: JSON.stringify(defaultPolicyDocument, null, 2)
 };
 
@@ -37,6 +41,7 @@ export const AddPolicyFormInitialValues: IAddPolicyFormValues = {
 export const AddPolicyFormYupSchema = yup.object().shape({
   name: yup.string().required('Policy name is required'),
   description: yup.string(),
+  status: yup.mixed<PolicyStatus>().required('Status is required'),
   policy_json: yup
     .string()
     .required('Policy document is required')
@@ -58,7 +63,7 @@ export const AddPolicyFormYupSchema = yup.object().shape({
  *
  * @returns {React.ReactElement} The policy form
  */
-export const AddPolicyForm: React.FC = () => {
+export const AddPolicyForm = () => {
   const { values, handleChange, handleSubmit, errors, touched, setFieldValue, setFieldError } =
     useFormikContext<IAddPolicyFormValues>();
 
@@ -106,11 +111,11 @@ export const AddPolicyForm: React.FC = () => {
         />
 
         <Box>
-          <Typography variant="h6" mb={1}>
-            Policy Document
+          <Typography component="legend" mb={1}>
+            Definition
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Define policy statements using JSON. Use the format:{' '}
+            Add statements using JSON. Use the format:{' '}
             <code>urn:&lt;submissionId&gt;:&lt;featureType&gt;:&lt;featureId&gt;</code> for resources. Use{' '}
             <code>*</code> as a wildcard.
           </Typography>

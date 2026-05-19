@@ -5,6 +5,38 @@ import { BaseRepository } from '../base-repository';
 
 export class ArtifactSecurityRepository extends BaseRepository {
   /**
+   * Find the most recent active security record for an artifact.
+   *
+   * @param {string} artifactId - Artifact UUID.
+   * @returns {Promise<ArtifactSecurity | null>} Latest active security row, or null when absent.
+   * @memberof ArtifactSecurityRepository
+   */
+  async findLatestArtifactSecurityByArtifactId(artifactId: string): Promise<ArtifactSecurity | null> {
+    const sqlStatement = SQL`
+      SELECT
+        artifact_security_id,
+        artifact_id,
+        security
+      FROM
+        artifact_security
+      WHERE
+        artifact_id = ${artifactId}
+        AND record_end_date IS NULL
+      ORDER BY
+        create_date DESC
+      LIMIT 1;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
+
+    if (!response.rowCount) {
+      return null;
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Get a security record by ID.
    *
    * @param {string} uploadArtifactSecurityId

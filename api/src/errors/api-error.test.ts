@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { ApiErrorType, ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from './api-error';
+import { ApiErrorType, ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError, ApiValidationError } from './api-error';
 
 describe('ApiError', () => {
   describe('No error value provided', () => {
@@ -20,6 +20,10 @@ describe('ApiError', () => {
 
     it('Creates Api not found error', function () {
       expect(new ApiNotFoundError(message).name).to.equal(ApiErrorType.NOT_FOUND);
+    });
+
+    it('Creates Api validation error', function () {
+      expect(new ApiValidationError(message).name).to.equal(ApiErrorType.VALIDATION);
     });
   });
 });

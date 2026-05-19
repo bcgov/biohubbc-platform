@@ -34,7 +34,8 @@ export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogP
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const ticketOptionsLoader = useDataLoader(
-    (search?: string) => api.tickets.getTickets({ search, page: 1, limit: 50, sort: 'create_date', order: 'desc' }),
+    (search?: string) =>
+      api.tickets.getTicketsForAdmin({ search, page: 1, limit: 50, sort: 'create_date', order: 'desc' }),
     (error) => {
       const apiError = error as APIError;
       dialogContext.setSnackbar({

@@ -64,8 +64,30 @@ pg.types.setTypeParser(pg.types.builtins.NUMERIC, (stringValue: string) => {
   return parseFloat(stringValue);
 });
 
-// singleton pg pool instance used by the api
-let DBPool: pg.Pool | undefined;
+// Keep the pool singleton on globalThis so ESM/CJS loaders share one instance in dev.
+type DBGlobal = typeof globalThis & {
+  __biohub_db_pool__?: pg.Pool;
+};
+
+const dbGlobal = globalThis as DBGlobal;
+
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention:
+ * - Prefer stubbing `dbDependencies` directly for DB connection seams.
+ * - Higher-level modules may expose local dependency bags, but DB-specific stubs should
+ *   target this bag unless a test intentionally verifies a higher-level seam.
+ */
+export interface DBDependencies {
+  getDBPool: () => pg.Pool | undefined;
+  getDBConnection: (keycloakToken: object) => IDBConnection;
+  getAPIUserDBConnection: () => IDBConnection;
+  getServiceAccountDBConnection: (systemUser: SystemUser) => IDBConnection;
+  getUserGuid: typeof getUserGuid;
+  getUserIdentitySource: typeof getUserIdentitySource;
+  getServiceClientSystemUser: typeof getServiceClientSystemUser;
+}
 
 /**
  * Initializes the singleton pg pool instance used by the api.
@@ -73,7 +95,7 @@ let DBPool: pg.Pool | undefined;
  * @param {pg.PoolConfig} [poolConfig]
  */
 export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
-  if (DBPool) {
+  if (dbGlobal.__biohub_db_pool__) {
     // the pool has already been initialized, do nothing
     return;
   }
@@ -81,7 +103,7 @@ export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
   defaultLog.debug({ label: 'create db pool', message: 'pool config', poolConfig });
 
   try {
-    DBPool = new pg.Pool(poolConfig);
+    dbGlobal.__biohub_db_pool__ = new pg.Pool(poolConfig);
   } catch (error) {
     defaultLog.error({ label: 'create db pool', message: 'failed to create db pool', error });
     throw error;
@@ -96,7 +118,7 @@ export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
  * @return {*}  {(pg.Pool | undefined)}
  */
 export const getDBPool = function (): pg.Pool | undefined {
-  return DBPool;
+  return dbGlobal.__biohub_db_pool__;
 };
 
 export interface IDBConnection {
@@ -162,7 +184,7 @@ export interface IDBConnection {
    * @memberof IDBConnection
    */
   knex: <T extends pg.QueryResultRow = any>(
-    queryBuilder: Knex.QueryBuilder,
+    queryBuilder: Knex.QueryBuilder | Knex.Raw,
     zodSchema?: z.Schema<T, any, any>
   ) => Promise<pg.QueryResult<T>>;
   /**
@@ -197,7 +219,7 @@ export interface IDBConnection {
  * @param {object} keycloakToken
  * @return {*} {IDBConnection}
  */
-export const getDBConnection = function (keycloakToken: object): IDBConnection {
+const getDBConnectionInternal = function (keycloakToken: object): IDBConnection {
   if (!keycloakToken) {
     throw Error('Keycloak token is undefined');
   }
@@ -223,7 +245,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
       return;
     }
 
-    const pool = getDBPool();
+    const pool = dbDependencies.getDBPool();
 
     if (!pool) {
       throw Error('DBPool is not initialized');
@@ -377,7 +399,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _knex = async <T extends pg.QueryResultRow = any>(
-    queryBuilder: Knex.QueryBuilder,
+    queryBuilder: Knex.QueryBuilder | Knex.Raw,
     ZodSchema?: z.ZodSchema<T, any, any>
   ) => {
     const { sql, bindings } = queryBuilder.toSQL().toNative();
@@ -452,11 +474,11 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * Sets the _systemUserId if successful.
    */
   const _setUserContext = async () => {
-    const userGuid = getUserGuid(_token);
+    const userGuid = dbDependencies.getUserGuid(_token);
 
     // Check if this is a known service client - if so, use SYSTEM identity source
-    let userIdentitySource = getUserIdentitySource(_token);
-    const serviceClientUser = getServiceClientSystemUser(_token);
+    let userIdentitySource = dbDependencies.getUserIdentitySource(_token);
+    const serviceClientUser = dbDependencies.getServiceClientSystemUser(_token);
     if (serviceClientUser) {
       // This is a known service client, use SYSTEM identity source
       userIdentitySource = SYSTEM_IDENTITY_SOURCE.SYSTEM;
@@ -497,6 +519,10 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
   };
 };
 
+export const getDBConnection = function (keycloakToken: object): IDBConnection {
+  return dbDependencies.getDBConnection(keycloakToken);
+};
+
 /**
  * Returns an IDBConnection where the system user context is set to the API's system user.
  *
@@ -505,7 +531,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  *
  * @return {*}  {IDBConnection}
  */
-export const getAPIUserDBConnection = (): IDBConnection => {
+const getAPIUserDBConnectionInternal = (): IDBConnection => {
   return getDBConnection({
     preferred_username: `${getDbUsername()}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
     identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
@@ -521,11 +547,29 @@ export const getAPIUserDBConnection = (): IDBConnection => {
  * @param {SystemUser} systemUser
  * @return {*}  {IDBConnection}
  */
-export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {
+const getServiceAccountDBConnectionInternal = (systemUser: SystemUser): IDBConnection => {
   return getDBConnection({
     preferred_username: systemUser.user_guid,
     identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
   });
+};
+
+export const dbDependencies: DBDependencies = {
+  getDBPool,
+  getDBConnection: getDBConnectionInternal,
+  getAPIUserDBConnection: getAPIUserDBConnectionInternal,
+  getServiceAccountDBConnection: getServiceAccountDBConnectionInternal,
+  getUserGuid,
+  getUserIdentitySource,
+  getServiceClientSystemUser
+};
+
+export const getAPIUserDBConnection = (): IDBConnection => {
+  return dbDependencies.getAPIUserDBConnection();
+};
+
+export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {
+  return dbDependencies.getServiceAccountDBConnection(systemUser);
 };
 
 /**

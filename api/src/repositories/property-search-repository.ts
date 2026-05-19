@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
-import { getKnex } from '../database/db';
+import { OperatorsByPropertyType } from '../constants/expression';
+import { getKnex, IDBConnection } from '../database/db';
 import { ISearchPropertyFilters, SearchPropertyResult } from '../services/property-search-service.interface';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -9,28 +10,48 @@ const defaultLog = getLogger('repositories/property-search-repository');
 
 /**
  * Repository for searching feature properties across all searchable tables.
- * Provides separate methods to search string and number properties.
  */
 export class PropertySearchRepository extends BaseRepository {
+  private readonly supportedPropertyTypes: string[];
+  private readonly defaultRelevancyScoreSql: string;
+  private readonly keywordRelevancyScoreSql: string;
+
   /**
-   * Searches string properties by filters.
+   * Build the property search repository.
    *
-   * Performs a search across the string search table, matching against property names.
+   * @param {IDBConnection} connection - Active database connection.
+   */
+  constructor(connection: IDBConnection) {
+    super(connection);
+    this.supportedPropertyTypes = Object.keys(OperatorsByPropertyType);
+    this.defaultRelevancyScoreSql = '1.0 as relevancy_score';
+    this.keywordRelevancyScoreSql = `
+      CASE
+        WHEN fp.name ILIKE ? OR fp.display_name ILIKE ? THEN 2.0
+        ELSE 1.0
+      END as relevancy_score
+    `;
+  }
+
+  /**
+   * Searches feature properties by filters.
+   *
+   * Performs a search against the feature_property table, matching against property names.
    * Results are paginated and sorted by relevancy score.
    *
    * @param {ISearchPropertyFilters} filters - Filter criteria including keyword
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings (page, limit)
-   * @return {Promise<SearchPropertyResult[]>} Array of string property results
+   * @return {Promise<SearchPropertyResult[]>} Array of property results
    * @memberof PropertySearchRepository
    */
-  async searchStringProperties(
+  async searchProperties(
     filters: ISearchPropertyFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SearchPropertyResult[]> {
-    defaultLog.debug({ label: 'searchStringProperties', filters, pagination });
+    defaultLog.debug({ label: 'searchProperties', filters, pagination });
 
     const knex = getKnex();
-    const query = this._buildStringQuery(filters, knex);
+    const query = this._buildPropertyQuery(filters, knex);
     this._applyPagination(query, pagination);
 
     const response = await this.connection.knex(query, SearchPropertyResult);
@@ -38,59 +59,17 @@ export class PropertySearchRepository extends BaseRepository {
   }
 
   /**
-   * Searches number properties by filters.
-   *
-   * Performs a search across the number search table, matching against property names.
-   * Results are paginated and sorted by relevancy score.
-   *
-   * @param {ISearchPropertyFilters} filters - Filter criteria including keyword
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination settings (page, limit)
-   * @return {Promise<SearchPropertyResult[]>} Array of number property results
-   * @memberof PropertySearchRepository
-   */
-  async searchNumberProperties(
-    filters: ISearchPropertyFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SearchPropertyResult[]> {
-    defaultLog.debug({ label: 'searchNumberProperties', filters, pagination });
-
-    const knex = getKnex();
-    const query = this._buildNumberQuery(filters, knex);
-    this._applyPagination(query, pagination);
-
-    const response = await this.connection.knex(query, SearchPropertyResult);
-    return response.rows;
-  }
-
-  /**
-   * Returns the total count of string properties matching the filters.
+   * Returns the total count of properties matching the filters.
    *
    * @param {ISearchPropertyFilters} filters - Filter criteria
-   * @return {Promise<number>} Total count of matching string properties
+   * @return {Promise<number>} Total count of matching properties
    * @memberof PropertySearchRepository
    */
-  async searchStringPropertiesCount(filters: ISearchPropertyFilters): Promise<number> {
-    defaultLog.debug({ label: 'searchStringPropertiesCount', filters });
+  async searchPropertiesCount(filters: ISearchPropertyFilters): Promise<number> {
+    defaultLog.debug({ label: 'searchPropertiesCount', filters });
 
     const knex = getKnex();
-    const query = this._buildStringCountQuery(filters, knex);
-
-    const response = await this.connection.knex(query);
-    return response.rows[0]?.count ?? 0;
-  }
-
-  /**
-   * Returns the total count of number properties matching the filters.
-   *
-   * @param {ISearchPropertyFilters} filters - Filter criteria
-   * @return {Promise<number>} Total count of matching number properties
-   * @memberof PropertySearchRepository
-   */
-  async searchNumberPropertiesCount(filters: ISearchPropertyFilters): Promise<number> {
-    defaultLog.debug({ label: 'searchNumberPropertiesCount', filters });
-
-    const knex = getKnex();
-    const query = this._buildNumberCountQuery(filters, knex);
+    const query = this._buildPropertyCountQuery(filters, knex);
 
     const response = await this.connection.knex(query);
     return response.rows[0]?.count ?? 0;
@@ -115,7 +94,7 @@ export class PropertySearchRepository extends BaseRepository {
   }
 
   /**
-   * Builds query for string properties.
+   * Builds query for feature properties.
    *
    * @param {ISearchPropertyFilters} filters - Filter criteria
    * @param {Knex} knex - Knex instance
@@ -123,47 +102,46 @@ export class PropertySearchRepository extends BaseRepository {
    * @private
    * @memberof PropertySearchRepository
    */
-  private _buildStringQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
+  private _buildPropertyQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
     const keyword = filters.keyword?.trim() ?? '';
+    const featureTypes = filters.feature_types ?? [];
 
     const query = knex
-      .distinct('ss.feature_property_id', 'ftp.name as property_name', knex.raw('1.0 as relevancy_score'))
-      .from('search_string as ss')
-      .innerJoin('feature_property as ftp', 'ss.feature_property_id', 'ftp.feature_property_id');
+      .distinct()
+      .select(
+        'fp.feature_property_id',
+        'fp.name as property_name',
+        'fp.display_name as property_display_name',
+        'fpt.name as feature_property_type',
+        knex.raw(this.buildOperatorCaseSql()),
+        this.buildRelevancyScoreSql(keyword, knex)
+      )
+      .from('feature_property as fp')
+      .innerJoin('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
+      .whereNull('fp.record_end_date')
+      .whereNull('fpt.record_end_date')
+      .whereIn('fpt.name', this.supportedPropertyTypes);
 
-    if (keyword) {
-      query.where('ftp.name', 'ILIKE', `%${keyword}%`);
+    if (featureTypes.length) {
+      query
+        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
+        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
+        .whereIn('ft.name', featureTypes)
+        .whereNull('ftp.record_end_date')
+        .whereNull('ft.record_end_date');
     }
 
-    return query.orderBy('relevancy_score', 'desc');
+    if (keyword) {
+      query.where((builder) => {
+        builder.where('fp.name', 'ILIKE', `%${keyword}%`).orWhere('fp.display_name', 'ILIKE', `%${keyword}%`);
+      });
+    }
+
+    return query.orderBy('relevancy_score', 'desc').orderBy('fp.display_name', 'asc');
   }
 
   /**
-   * Builds query for number properties.
-   *
-   * @param {ISearchPropertyFilters} filters - Filter criteria
-   * @param {Knex} knex - Knex instance
-   * @return {Knex.QueryBuilder} Number property query
-   * @private
-   * @memberof PropertySearchRepository
-   */
-  private _buildNumberQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
-    const keyword = filters.keyword?.trim() ?? '';
-
-    const query = knex
-      .distinct('sn.feature_property_id', 'ftp.name as property_name', knex.raw('1.0 as relevancy_score'))
-      .from('search_number as sn')
-      .innerJoin('feature_property as ftp', 'sn.feature_property_id', 'ftp.feature_property_id');
-
-    if (keyword) {
-      query.where('ftp.name', 'ILIKE', `%${keyword}%`);
-    }
-
-    return query.orderBy('relevancy_score', 'desc');
-  }
-
-  /**
-   * Builds count query for string properties.
+   * Builds count query for feature properties.
    *
    * @param {ISearchPropertyFilters} filters - Filter criteria
    * @param {Knex} knex - Knex instance
@@ -171,40 +149,72 @@ export class PropertySearchRepository extends BaseRepository {
    * @private
    * @memberof PropertySearchRepository
    */
-  private _buildStringCountQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
+  private _buildPropertyCountQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
     const keyword = filters.keyword?.trim() ?? '';
+    const featureTypes = filters.feature_types ?? [];
 
-    const query = knex('search_string as ss')
-      .innerJoin('feature_property as ftp', 'ss.feature_property_id', 'ftp.feature_property_id')
-      .select(knex.raw('count(*)::integer as count'));
+    const query = knex('feature_property as fp')
+      .innerJoin('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
+      .whereNull('fp.record_end_date')
+      .whereNull('fpt.record_end_date')
+      .whereIn('fpt.name', this.supportedPropertyTypes)
+      .select(knex.raw('count(DISTINCT fp.feature_property_id)::integer as count'));
+
+    if (featureTypes.length) {
+      query
+        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
+        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
+        .whereIn('ft.name', featureTypes)
+        .whereNull('ftp.record_end_date')
+        .whereNull('ft.record_end_date');
+    }
 
     if (keyword) {
-      query.where('ftp.name', 'ILIKE', `%${keyword}%`);
+      query.where((builder) => {
+        builder.where('fp.name', 'ILIKE', `%${keyword}%`).orWhere('fp.display_name', 'ILIKE', `%${keyword}%`);
+      });
     }
 
     return query;
   }
 
   /**
-   * Builds count query for number properties.
+   * Build the SQL CASE expression that exposes allowed operators for each property type.
    *
-   * @param {ISearchPropertyFilters} filters - Filter criteria
-   * @param {Knex} knex - Knex instance
-   * @return {Knex.QueryBuilder} Number count query
+   * @return {string} SQL fragment for the `operators` projection.
    * @private
    * @memberof PropertySearchRepository
    */
-  private _buildNumberCountQuery(filters: ISearchPropertyFilters, knex: Knex): Knex.QueryBuilder {
-    const keyword = filters.keyword?.trim() ?? '';
+  private buildOperatorCaseSql(): string {
+    const cases = Object.entries(OperatorsByPropertyType)
+      .map(([propertyType, operators]) => {
+        const quotedOperators = operators.map((operator) => `'${operator}'`).join(', ');
+        return `WHEN '${propertyType}' THEN ARRAY[${quotedOperators}]`;
+      })
+      .join('\n            ');
 
-    const query = knex('search_number as sn')
-      .innerJoin('feature_property as ftp', 'sn.feature_property_id', 'ftp.feature_property_id')
-      .select(knex.raw('count(*)::integer as count'));
+    return `
+          CASE fpt.name
+            ${cases}
+            ELSE ARRAY[]::text[]
+          END as operators
+        `;
+  }
 
-    if (keyword) {
-      query.where('ftp.name', 'ILIKE', `%${keyword}%`);
+  /**
+   * Build the relevancy score projection for property search results.
+   *
+   * @param {string} keyword - Trimmed search keyword.
+   * @param {Knex} knex - Knex instance.
+   * @return {Knex.Raw} SQL projection for `relevancy_score`.
+   * @private
+   * @memberof PropertySearchRepository
+   */
+  private buildRelevancyScoreSql(keyword: string, knex: Knex): Knex.Raw {
+    if (!keyword) {
+      return knex.raw(this.defaultRelevancyScoreSql);
     }
 
-    return query;
+    return knex.raw(this.keywordRelevancyScoreSql, [keyword, keyword]);
   }
 }

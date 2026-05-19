@@ -1,5 +1,6 @@
 import dayjs, { Dayjs } from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
 
 dayjs.extend(relativeTime);
 
@@ -7,7 +8,7 @@ export type RelativeTimeInput = string | Date | Dayjs | null | undefined;
 
 export interface IRelativeTimeLabelOptions {
   maxRelativeDays?: number;
-  absoluteFormat?: string;
+  absoluteFormat?: DATE_FORMAT;
   now?: Dayjs;
 }
 
@@ -21,7 +22,7 @@ export const getRelativeTimeLabel = (
   options: IRelativeTimeLabelOptions = {}
 ): string | null => {
   const maxRelativeDays = options.maxRelativeDays;
-  const absoluteFormat = options.absoluteFormat ?? 'MMM D, YYYY';
+  const absoluteFormat = options.absoluteFormat ?? DATE_FORMAT.ShortMediumDateFormat;
   const now = options.now ?? dayjs();
   const date = value ? dayjs(value) : null;
 

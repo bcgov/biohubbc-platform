@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { deleteCartSubmissionFeature } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { ApiError } from '../../../../../errors/api-error';
 import { HTTP500 } from '../../../../../errors/http-error';
 import { CartSubmissionFeatureService } from '../../../../../services/cart-submission-feature-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -22,7 +22,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
     const requestHandler = deleteCartSubmissionFeature();
@@ -46,7 +46,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     // Mocking the service method
     const removeSubmissionFeatureStub = sinon
@@ -76,7 +76,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     sinon
       .stub(CartSubmissionFeatureService.prototype, 'removeSubmissionFeaturesFromCart')

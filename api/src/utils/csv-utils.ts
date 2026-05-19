@@ -3,6 +3,13 @@
  *
  * Used by the download pipeline to convert JSON feature data to CSV format.
  */
+import wkx from 'wkx';
+
+import {
+  assertNoDatetimeColumnCollisions,
+  DATETIME_DATE_SUFFIX,
+  DATETIME_TIME_SUFFIX
+} from '../models/datetime-column';
 
 export interface CsvPropertyDefinition {
   feature_property_name: string;
@@ -11,19 +18,33 @@ export interface CsvPropertyDefinition {
 
 /**
  * Build CSV header names from schema property definitions.
- * Spatial properties expand to `decimalLatitude` and `decimalLongitude`.
+ *
+ * Spatial properties emit a single column under the property's own name —
+ * the cell value is WKT (decoded from the Parquet WKB buffer at flatten
+ * time). artifact_key properties map to a single `filePath` column.
+ *
+ * `datetime` properties emit two columns (`<prop>_date`, `<prop>_time`) so
+ * partial-component data (date-only, time-only, or both) round-trips
+ * losslessly and remains queryable as native columnar predicates. The
+ * suffix convention is shared with the SQL projection and the Parquet
+ * column expansion — all three sites must agree on the names.
  *
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
  * @returns {string[]} Ordered header names.
  */
 export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[] {
+  assertNoDatetimeColumnCollisions(properties);
+
   const headers: string[] = [];
 
   for (const prop of properties) {
-    if (prop.feature_property_type_name === 'spatial') {
-      headers.push('decimalLatitude', 'decimalLongitude');
-    } else if (prop.feature_property_type_name === 'artifact_key') {
+    if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
+    } else if (prop.feature_property_type_name === 'datetime') {
+      headers.push(
+        `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`,
+        `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`
+      );
     } else {
       headers.push(prop.feature_property_name);
     }
@@ -94,17 +115,23 @@ export function flattenFeatureWithParent(
  * Flatten a feature's JSONB data using schema-defined property types.
  *
  * Type-aware rules:
- * - string, number, datetime, boolean → String(value)
- * - spatial → extract first Point from GeoJSON → decimalLatitude/decimalLongitude
+ * - string, number, boolean → String(value)
+ * - datetime → expands to two cells (`<prop>_date`, `<prop>_time`); each
+ *   pulled directly from the matching key on `data`. Partial-component data
+ *   round-trips losslessly: a null component produces an empty cell while
+ *   the other carries its ISO string. See {@link buildSchemaHeaders}.
+ * - spatial → decode WKB Buffer (as produced by the Parquet writer) → single
+ *   column under the property's own name, value is WKT
  * - array → delegate to flattenArray()
  * - artifact_key → files/{submissionFeatureId}_{filename}
  * - object → JSON.stringify(value)
- * - null/undefined → empty string (spatial gets two empty strings)
+ * - null/undefined → empty string
  *
- * @param {Record<string, unknown>} data - The feature's JSONB data.
- * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
- * @param {number} submissionFeatureId - The submission_feature_id for artifact_key paths.
- * @returns {Record<string, string>} Flattened key-value pairs keyed by header name.
+ * @param data - The feature's JSONB data.
+ * @param properties - Schema property definitions.
+ * @param submissionFeatureId - The submission_feature_id for artifact_key paths.
+ * @param filesFolderName - Subfolder name in the zip for artifact_key paths. Defaults to `'files'`.
+ * @returns Flattened key-value pairs keyed by header name.
  */
 export function flattenFeatureBySchema(
   data: Record<string, unknown>,
@@ -115,11 +142,27 @@ export function flattenFeatureBySchema(
   const result: Record<string, string> = {};
 
   for (const prop of properties) {
+    if (prop.feature_property_type_name === 'datetime') {
+      // The CSV is written from rows the Parquet reader returns. parquetjs reads
+      // `DATE` columns as JS `Date` objects (UTC midnight on the stored day) and
+      // `TIME_MILLIS` columns as raw millisecond integers. Both must be
+      // formatted back into the canonical `'YYYY-MM-DD'` / `'HH:MM:SS'` strings
+      // the SQL projection produced — otherwise the generic `toStringOrEmpty`
+      // path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`)
+      // and render the raw ms count for time. Strings still pass through
+      // unchanged for callers that haven't gone through Parquet.
+      const dateKey = `${prop.feature_property_name}${DATETIME_DATE_SUFFIX}`;
+      const timeKey = `${prop.feature_property_name}${DATETIME_TIME_SUFFIX}`;
+      result[dateKey] = formatDatetimeDateCell(data[dateKey]);
+      result[timeKey] = formatDatetimeTimeCell(data[timeKey]);
+      continue;
+    }
+
     const value = data[prop.feature_property_name];
 
     switch (prop.feature_property_type_name) {
       case 'spatial':
-        Object.assign(result, flattenSpatialValue(value));
+        result[prop.feature_property_name] = wkbToWkt(value);
         break;
       case 'artifact_key':
         result['filePath'] = flattenArtifactKeyValue(value, data, submissionFeatureId, filesFolderName);
@@ -140,6 +183,51 @@ export function flattenFeatureBySchema(
 }
 
 /**
+ * Format a `<prop>_date` cell value for CSV output. parquetjs hands back a
+ * `Date` (UTC midnight) for native `DATE` columns; the SQL projection emits a
+ * `'YYYY-MM-DD'` string when CSV is fed directly without a Parquet round-trip.
+ * Either form normalizes to the canonical date string. Null/undefined → empty.
+ *
+ * The Date branch matches the original SQL projection's
+ * `to_char(date_value, 'YYYY-MM-DD')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would JSON-stringify the Date (`'"2026-04-24T00:00:00.000Z"'`).
+ */
+function formatDatetimeDateCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * Format a `<prop>_time` cell value for CSV output. parquetjs hands back a
+ * raw millisecond integer for native `TIME_MILLIS` columns; the SQL projection
+ * emits a `'HH:MM:SS'` string when CSV is fed directly. Either form normalizes
+ * to the canonical time string. Null/undefined → empty.
+ *
+ * The number branch matches the original SQL projection's
+ * `to_char(time_value, 'HH24:MI:SS')` output exactly — without it, the
+ * generic `toStringOrEmpty` path would render the raw integer count
+ * (e.g. `'45296000'`).
+ */
+function formatDatetimeTimeCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'number') {
+    const totalSeconds = Math.floor(value / 1000);
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+/**
  * Convert a value to string, or empty string if null/undefined.
  */
 function toStringOrEmpty(value: unknown): string {
@@ -153,14 +241,20 @@ function toStringOrEmpty(value: unknown): string {
 }
 
 /**
- * Flatten a spatial property to decimalLatitude/decimalLongitude.
+ * Decode a WKB Buffer (as produced by the Parquet writer) into a WKT string.
+ * Returns an empty string for null/undefined or any value that isn't a Buffer,
+ * and swallows parse errors — a malformed geometry shouldn't fail the whole
+ * CSV.
  */
-function flattenSpatialValue(value: unknown): Record<string, string> {
-  const coords = extractFirstPointCoordinates(value);
-  if (coords) {
-    return { decimalLatitude: String(coords[1]), decimalLongitude: String(coords[0]) };
+function wkbToWkt(value: unknown): string {
+  if (!Buffer.isBuffer(value)) {
+    return '';
   }
-  return { decimalLatitude: '', decimalLongitude: '' };
+  try {
+    return wkx.Geometry.parse(value).toWkt();
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -181,40 +275,6 @@ function flattenArtifactKeyValue(
 }
 
 /**
- * Extract the first Point coordinates from a GeoJSON value.
- * Handles bare Point, Feature wrapping Point, and FeatureCollection with Features.
- *
- * @param {unknown} value - The GeoJSON value.
- * @returns {[number, number] | null} [longitude, latitude] or null if no Point found.
- */
-function extractFirstPointCoordinates(value: unknown): [number, number] | null {
-  if (value == null || typeof value !== 'object') {
-    return null;
-  }
-
-  const geo = value as Record<string, unknown>;
-
-  if (geo.type === 'Point' && Array.isArray(geo.coordinates)) {
-    return geo.coordinates as [number, number];
-  }
-
-  if (geo.type === 'Feature') {
-    return extractFirstPointCoordinates(geo.geometry);
-  }
-
-  if (geo.type === 'FeatureCollection' && Array.isArray(geo.features)) {
-    for (const feature of geo.features) {
-      const coords = extractFirstPointCoordinates(feature);
-      if (coords) {
-        return coords;
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
  * Flatten a nested object to a single-level object with dot-notation keys.
  * Arrays are converted to semicolon-separated strings.
  *
@@ -222,9 +282,9 @@ function extractFirstPointCoordinates(value: unknown): [number, number] | null {
  * flattenObject({ a: 1, b: { c: 2 }, d: [1, 2, 3] })
  * // Returns: { a: '1', b_c: '2', d: '1;2;3' }
  *
- * @param {Record<string, unknown>} obj - The object to flatten
- * @param {string} [prefix=''] - Key prefix for nested properties
- * @returns {Record<string, string>} Flattened object with string values
+ * @param obj - The object to flatten.
+ * @param prefix - Key prefix for nested properties. Defaults to `''`.
+ * @returns Flattened object with string values.
  */
 export function flattenObject(obj: Record<string, unknown>, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {};

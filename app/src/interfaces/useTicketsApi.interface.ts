@@ -1,7 +1,9 @@
 import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
+import { DataRequestResponse } from './useDataRequestApi.interface';
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+export type TicketSystemUserStatus = 'requested' | 'started' | 'blocked' | 'resolved';
 
 export interface ITicket {
   ticket_id: string;
@@ -14,18 +16,8 @@ export interface ITicket {
   status: TicketStatus;
 }
 
-export interface ITicketStatusHistory {
-  ticket_status_history_id?: string | null;
-  ticket_comment_id?: string | null;
-  ticket_id: string;
-  user_identifier: string;
-  create_date: string;
-  status?: TicketStatus | null;
-  comment?: string | null;
-}
-
 export interface ITicketStatusLog {
-  ticket_status_history_id: string;
+  ticket_status_id: string;
   ticket_id: string;
   user_identifier: string;
   create_date: string;
@@ -38,6 +30,15 @@ export interface ITicketCommentLog {
   user_identifier: string;
   create_date: string;
   comment: string;
+}
+
+export interface ITicketArtifact {
+  ticket_artifact_id: string;
+  ticket_id: string;
+  artifact_id: string;
+  record_end_date: string | null;
+  create_date: string;
+  object_key: string;
 }
 
 export type TicketRelationshipType =
@@ -62,16 +63,33 @@ export interface ITicketReference {
   create_date: string;
 }
 
-export interface ITicketWithHistory extends ITicket {
+export interface ITicketSystemUser {
+  ticket_system_user_id: string;
+  ticket_id: string;
+  system_user_id: number;
+  status: TicketSystemUserStatus;
+  system_user: {
+    system_user_id: number;
+    display_name: string | null;
+    user_identifier: string;
+    email: string | null;
+  };
+}
+
+export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
+  artifacts: ITicketArtifact[];
   references: ITicketReference[];
+  data_requests: DataRequestResponse[];
+  ticket_system_users: ITicketSystemUser[];
 }
 
 export interface ICreateTicketRequest {
   subject: string;
   description: string | null;
   priority: TicketPriority;
+  systemUserIds?: number[];
 }
 
 export interface IUpdateTicketRequest {
@@ -85,6 +103,29 @@ export interface ICreateTicketCommentRequest {
   comment: string;
 }
 
+export interface IUpdateTicketCommentRequest {
+  comment: string;
+}
+
+export interface ICreateTicketUploadRequest {
+  file_name: string;
+  byte_size: number;
+  content_type?: string;
+}
+
+export interface ICreateTicketUploadResponse {
+  upload_id: string;
+  presigned_upload_url: string;
+}
+
+export interface ICompleteTicketUploadRequest {
+  status: 'uploaded';
+}
+
+export interface ITicketArtifactDownloadResponse {
+  signed_url: string;
+}
+
 export interface ICreateTicketReference {
   target_ticket_id: string;
   relationship: TicketRelationshipType;
@@ -94,12 +135,30 @@ export interface ICreateTicketReferenceRequest {
   references: ICreateTicketReference[];
 }
 
+export interface ICreateTicketSystemUser {
+  system_user_id: number;
+  status: TicketSystemUserStatus;
+}
+
+export interface IUpdateTicketSystemUserStatusRequest {
+  status: TicketSystemUserStatus;
+}
+
 export interface IGetTicketsResponse {
   tickets: ITicket[];
   pagination: ApiPaginationResponseParams;
 }
 
-export interface IGetTicketsParams extends Partial<ApiPaginationRequestOptions> {
+export interface IGetTicketArtifactsResponse {
+  artifacts: ITicketArtifact[];
+  pagination: ApiPaginationResponseParams;
+}
+
+export interface IGetTicketArtifactsQueryParams extends Partial<ApiPaginationRequestOptions> {
+  search?: string;
+}
+
+export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {
   status?: TicketStatus;
   search?: string;
 }

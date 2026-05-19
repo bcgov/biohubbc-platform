@@ -118,4 +118,10 @@ describe('EditDialog', () => {
       expect(handleOnCancel).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('disables Cancel while loading so a click-storm cannot close the dialog mid-submit', () => {
+    const { getByTestId } = renderContainer({ testFieldValue: 'this is a test', open: true, isLoading: true });
+
+    expect(getByTestId('edit-dialog-cancel-button')).toBeDisabled();
+  });
 });

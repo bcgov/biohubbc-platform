@@ -11,7 +11,14 @@ export interface ISearchInputProps extends Omit<TextFieldProps, 'value' | 'onSub
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
+/**
+ * Shared search input with enter-to-submit and clear behavior.
+ *
+ * @param {ISearchInputProps} props
+ * @returns {JSX.Element}
+ */
 export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, ...props }: ISearchInputProps) => {
+  // Submit the current query value when the Enter key is pressed.
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -19,6 +26,7 @@ export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, .
     }
   };
 
+  // Clear the current query and emit an empty submit.
   const handleClear = () => {
     onClear?.();
     onSubmit?.('');
@@ -37,7 +45,7 @@ export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, .
       InputProps={{
         startAdornment: (
           <InputAdornment position="start">
-            <Icon path={mdiMagnify} size={1} style={{ opacity: 0.5 }} />
+            <Icon path={mdiMagnify} size={1} />
           </InputAdornment>
         ),
         endAdornment: value && (

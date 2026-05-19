@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   transformPolicyJsonToApi,
   transformApiToPolicyJson,
@@ -327,6 +328,7 @@ describe('policyTransform', () => {
         policy_id: 'uuid-policy',
         name: 'Test Policy',
         description: 'A test policy',
+        status: PolicyStatus.APPROVED,
         statements: [
           {
             policy_statement_id: 'uuid-1',

@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import {
   ArtifactSecurityScan,
@@ -9,7 +10,6 @@ import {
 } from '../../models/artifact-security-scan';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { ArtifactSecurityScanRepository } from '../../repositories/upload/artifact-security-scan-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 
 chai.use(sinonChai);

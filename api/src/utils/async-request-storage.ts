@@ -13,8 +13,19 @@ export type RequestStoreKey = 'requestId' | 'username';
 // trying to keep this as lightweight as possible.
 export type RequestStore = Map<RequestStoreKey, string>;
 
-// Initialize the request storage to track request metadata
-export const AsyncRequestStorage = new AsyncLocalStorage<RequestStore>();
+// The AsyncLocalStorage instance is hoisted onto globalThis so it survives
+// ESM module duplication. Without this, middleware that calls
+// `m1.AsyncRequestStorage.run(...)` is invisible to downstream code that reads
+// from `m2.AsyncRequestStorage.getStore()` — request IDs silently fall back to
+// 'SYSTEM' and log correlation breaks. See pg-boss-service.ts for the same
+// pattern applied to the pg-boss singleton.
+const GLOBAL_KEY = Symbol.for('biohub.asyncRequestStorage');
+type GlobalWithAsyncRequestStorage = typeof globalThis & {
+  [GLOBAL_KEY]?: AsyncLocalStorage<RequestStore>;
+};
+const globalRef = globalThis as GlobalWithAsyncRequestStorage;
+export const AsyncRequestStorage: AsyncLocalStorage<RequestStore> =
+  globalRef[GLOBAL_KEY] ?? (globalRef[GLOBAL_KEY] = new AsyncLocalStorage<RequestStore>());
 
 /**
  * Middleware to initialize the async request storage.

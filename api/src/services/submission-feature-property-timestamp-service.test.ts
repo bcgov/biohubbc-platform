@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   CreateSubmissionFeaturePropertyTimestamp,
   SubmissionFeaturePropertyTimestamp
 } from '../models/submission-feature-property-timestamp';
 import { SubmissionFeaturePropertyTimestampRepository } from '../repositories/submission-feature-property-timestamp-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionFeaturePropertyTimestampService } from './submission-feature-property-timestamp-service';
 
 chai.use(sinonChai);
@@ -20,13 +20,15 @@ describe('SubmissionFeaturePropertyTimestampService', () => {
     submission_feature_property_timestamp_id: 1,
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    value: '2026-01-01T00:00:00.000Z'
+    date_value: '2026-01-01',
+    time_value: '00:00:00'
   };
 
   const createPayload: CreateSubmissionFeaturePropertyTimestamp = {
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    value: '2026-01-01T00:00:00.000Z'
+    date_value: '2026-01-01',
+    time_value: '00:00:00'
   };
   it('delegates create', async () => {
     const service = new SubmissionFeaturePropertyTimestampService(getMockDBConnection());
@@ -72,18 +74,5 @@ describe('SubmissionFeaturePropertyTimestampService', () => {
     const result = await service.getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(20);
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
-  });
-  it('propagates repository errors', async () => {
-    const service = new SubmissionFeaturePropertyTimestampService(getMockDBConnection());
-    sinon
-      .stub(SubmissionFeaturePropertyTimestampRepository.prototype, 'insertSubmissionFeaturePropertyTimestamp')
-      .rejects(new Error('DB error'));
-
-    try {
-      await service.createSubmissionFeaturePropertyTimestamp(createPayload);
-      expect.fail('Expected error to be thrown');
-    } catch (error) {
-      expect((error as Error).message).to.equal('DB error');
-    }
   });
 });

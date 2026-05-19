@@ -2,10 +2,10 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { patchSecurityRulesOnSubmission } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { HTTPError } from '../../../../../errors/http-error';
 import { SecurityService } from '../../../../../services/security-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
 describe('patchSecurityRulesOnSubmission', () => {
   afterEach(() => {
@@ -19,7 +19,7 @@ describe('patchSecurityRulesOnSubmission', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -44,7 +44,7 @@ describe('patchSecurityRulesOnSubmission', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const patchSecurityStub = sinon.stub(SecurityService.prototype, 'patchSecurityRulesOnSubmission').resolves();
 
@@ -73,7 +73,7 @@ describe('patchSecurityRulesOnSubmission', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const patchSecurityStub = sinon.stub(SecurityService.prototype, 'patchSecurityRulesOnSubmission').resolves();
 
@@ -102,7 +102,7 @@ describe('patchSecurityRulesOnSubmission', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const patchSecurityStub = sinon.stub(SecurityService.prototype, 'patchSecurityRulesOnSubmission').resolves();
 
@@ -131,7 +131,7 @@ describe('patchSecurityRulesOnSubmission', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const patchSecurityStub = sinon.stub(SecurityService.prototype, 'patchSecurityRulesOnSubmission').resolves();
 

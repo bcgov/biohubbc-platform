@@ -4,9 +4,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ItisService } from '../../../../services/itis-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { getHierarchyForTSNs } from './hierarchy';
 
 chai.use(sinonChai);
@@ -28,7 +28,7 @@ describe('taxonomy/taxon/tsn/hierarchy', () => {
     it('returns an empty array if no species are found', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getHierarchyForTSNsStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
 
@@ -50,7 +50,7 @@ describe('taxonomy/taxon/tsn/hierarchy', () => {
     it('returns an array of species', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mock1 = {
         tsn: 1,

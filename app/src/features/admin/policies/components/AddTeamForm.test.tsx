@@ -42,7 +42,7 @@ describe('AddTeamForm', () => {
     const initialValues = {
       name: 'Test Team',
       description: 'A test description',
-      system_user_ids: []
+      system_users: []
     };
 
     const { getByLabelText } = renderWithFormik(initialValues);
@@ -57,13 +57,13 @@ describe('AddTeamForm', () => {
     expect(AddTeamFormInitialValues).toEqual({
       name: '',
       description: '',
-      system_user_ids: []
+      system_users: []
     });
   });
 
   describe('validation schema', () => {
     it('requires team name', async () => {
-      const result = await AddTeamFormYupSchema.validate({ name: '', description: '', system_user_ids: [] }).catch(
+      const result = await AddTeamFormYupSchema.validate({ name: '', description: '', system_users: [] }).catch(
         (err) => err
       );
 
@@ -75,7 +75,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: longName,
         description: '',
-        system_user_ids: []
+        system_users: []
       }).catch((err) => err);
 
       expect(result.message).toBe('Team name must be 250 characters or less');
@@ -85,7 +85,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Valid Team Name',
         description: '',
-        system_user_ids: []
+        system_users: []
       });
 
       expect(result.name).toBe('Valid Team Name');
@@ -96,7 +96,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: longDescription,
-        system_user_ids: []
+        system_users: []
       }).catch((err) => err);
 
       expect(result.message).toBe('Description must be 1000 characters or less');
@@ -106,20 +106,24 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: '',
-        system_user_ids: []
+        system_users: []
       });
 
       expect(result.description).toBe('');
     });
 
-    it('allows array of member user ids', async () => {
+    it('allows array of member user objects', async () => {
+      const users = [
+        { system_user_id: 1, user_identifier: 'alice' },
+        { system_user_id: 2, user_identifier: 'bob' }
+      ];
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: '',
-        system_user_ids: [1, 2, 3]
+        system_users: users
       });
 
-      expect(result.system_user_ids).toEqual([1, 2, 3]);
+      expect(result.system_users).toEqual(users);
     });
   });
 });

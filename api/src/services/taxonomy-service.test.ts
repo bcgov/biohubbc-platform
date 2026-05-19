@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
 import { TaxonomyService } from './taxonomy-service';
 

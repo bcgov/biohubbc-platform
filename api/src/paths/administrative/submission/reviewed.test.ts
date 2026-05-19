@@ -2,12 +2,12 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
 import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../../repositories/submission-repository';
 import { SubmissionService } from '../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { getReviewedSubmissionsForAdmins } from './reviewed';
 
 chai.use(sinonChai);
@@ -24,7 +24,7 @@ describe('getReviewedSubmissionsForAdmins', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -45,13 +45,12 @@ describe('getReviewedSubmissionsForAdmins', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const mockResponse: SubmissionRecordWithSecurityAndRootFeatureType[] = [
       {
         submission_id: 1,
         uuid: '123-456-789',
-        security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         publish_timestamp: '2023-12-12',
         system_user_id: 3,
@@ -59,12 +58,8 @@ describe('getReviewedSubmissionsForAdmins', () => {
         name: 'name',
         description: 'description',
         comment: 'comment',
-        record_end_date: '2023-12-12',
-        create_date: '2023-12-12',
         create_user: 1,
-        update_date: null,
         update_user: null,
-        revision_count: 0,
         security: SECURITY_APPLIED_STATUS.SECURED,
         root_feature_type_id: 1,
         root_feature_type_name: 'dataset',
@@ -73,7 +68,6 @@ describe('getReviewedSubmissionsForAdmins', () => {
       {
         submission_id: 2,
         uuid: '789-456-123',
-        security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         system_user_id: 3,
         contributor_id: 1,
@@ -81,12 +75,8 @@ describe('getReviewedSubmissionsForAdmins', () => {
         name: 'name',
         description: 'description',
         comment: 'comment',
-        record_end_date: '2023-12-12',
-        create_date: '2023-12-12',
         create_user: 1,
-        update_date: '2023-12-12',
         update_user: 1,
-        revision_count: 1,
         security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
         root_feature_type_id: 1,
         root_feature_type_name: 'dataset',

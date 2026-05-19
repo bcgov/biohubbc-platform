@@ -6,7 +6,7 @@ import {
   ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
  * Context object that stores information for policy editor autocomplete.
@@ -66,7 +66,7 @@ export const PolicyAutocompleteContext = React.createContext<IPolicyAutocomplete
  * @param {React.PropsWithChildren} props - Component props with children
  * @returns {React.ReactElement} Context provider wrapping children
  */
-export const PolicyAutocompleteContextProvider: React.FC<React.PropsWithChildren> = (props) => {
+export const PolicyAutocompleteContextProvider = (props: PropsWithChildren) => {
   const biohubApi = useApi();
   const codesContext = useCodesContext();
   const dialogContext = useDialogContext();

@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CreateTicketPayload, Ticket, TicketFilters, TicketSlug, UpdateTicketRequest } from '../models/ticket';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -23,12 +23,12 @@ export class TicketRepository extends BaseRepository {
    *
    * @param {Knex.QueryBuilder} query
    * @param {TicketFilters} [filters]
-   * @return {Knex.QueryBuilder}
+   * @returns {Knex.QueryBuilder}
    * @memberof TicketRepository
    */
   applyFilters(query: Knex.QueryBuilder, filters?: TicketFilters): Knex.QueryBuilder {
-    if (filters?.team_id) {
-      query = query.andWhere('team_id', filters.team_id);
+    if (filters?.team_ids !== undefined) {
+      query = filters.team_ids.length === 0 ? query.whereRaw('false') : query.whereIn('team_id', filters.team_ids);
     }
 
     if (filters?.status) {
@@ -51,7 +51,7 @@ export class TicketRepository extends BaseRepository {
    *
    * Uses a transaction-scoped advisory lock plus existing ticket rows to guarantee uniqueness without retries.
    *
-   * @return {Promise<string>} Next ticket slug.
+   * @returns {Promise<string>} Next ticket slug.
    * @throws {ApiExecuteSQLError} If slug generation fails.
    * @memberof TicketRepository
    */
@@ -96,7 +96,7 @@ export class TicketRepository extends BaseRepository {
    * Insert a new ticket record.
    *
    * @param {CreateTicketPayload} ticket - Ticket payload to persist with resolved team ID and generated slug.
-   * @return {Promise<Ticket>} The created ticket record.
+   * @returns {Promise<Ticket>} The created ticket record.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TicketRepository
    */
@@ -128,9 +128,14 @@ export class TicketRepository extends BaseRepository {
   /**
    * Get a single active ticket by UUID.
    *
+   * Behavior:
+   * - resolves the current active ticket record for a ticket id
+   * - distinguishes "not found" from data-integrity anomalies
+   *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<Ticket>} Matching ticket record.
-   * @throws {ApiExecuteSQLError} If exactly one active ticket is not found.
+   * @returns {Promise<Ticket>} Matching ticket record.
+   * @throws {ApiNotFoundError} If no matching active ticket exists.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
    * @memberof TicketRepository
    */
   async getTicketById(ticketId: string): Promise<Ticket> {
@@ -138,6 +143,10 @@ export class TicketRepository extends BaseRepository {
     const query = knex.table('ticket').select(TICKET_COLUMNS).where('ticket_id', ticketId).whereNull('record_end_date');
 
     const response = await this.connection.knex(query, Ticket);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Ticket not found', ['TicketRepository->getTicketById', { ticketId }]);
+    }
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get ticket record', [
@@ -154,7 +163,7 @@ export class TicketRepository extends BaseRepository {
    *
    * @param {TicketFilters} [filters] - Optional list filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
-   * @return {Promise<Ticket[]>} Matching tickets.
+   * @returns {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketRepository
    */
   async getTickets(filters?: TicketFilters, pagination?: ApiPaginationOptions): Promise<Ticket[]> {
@@ -172,7 +181,7 @@ export class TicketRepository extends BaseRepository {
    * Count active tickets with optional filters.
    *
    * @param {TicketFilters} [filters] - Optional list filters.
-   * @return {Promise<number>} Total number of matching tickets.
+   * @returns {Promise<number>} Total number of matching tickets.
    * @memberof TicketRepository
    */
   async getTicketsCount(filters?: TicketFilters): Promise<number> {
@@ -190,7 +199,7 @@ export class TicketRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {UpdateTicketRequest} ticket - Partial update payload.
-   * @return {Promise<Ticket>} Updated ticket record.
+   * @returns {Promise<Ticket>} Updated ticket record.
    * @throws {ApiExecuteSQLError} If the update does not affect exactly one row.
    * @memberof TicketRepository
    */
@@ -224,7 +233,7 @@ export class TicketRepository extends BaseRepository {
    * Soft delete an active ticket by UUID.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<Ticket>} Deleted ticket record.
+   * @returns {Promise<Ticket>} Deleted ticket record.
    * @throws {ApiExecuteSQLError} If the delete does not affect exactly one row.
    * @memberof TicketRepository
    */

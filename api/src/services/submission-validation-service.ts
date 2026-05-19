@@ -25,7 +25,7 @@ export class SubmissionValidationService extends DBService {
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {number} submissionId - The submission ID.
    * @param {string} jobId - The pg-boss job UUID.
-   * @return {Promise<{ submission_validation_id: number }>} The created record ID.
+   * @returns {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationService
    */
   async createSubmissionValidation(
@@ -44,14 +44,14 @@ export class SubmissionValidationService extends DBService {
    *
    * @param {string} jobId - The pg-boss job UUID.
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
-   * @return {Promise<void>}
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
+   * @returns {Promise<void>}
    * @memberof SubmissionValidationService
    */
   async updateSubmissionValidationStatus(
     jobId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
     return this.submissionValidationRepository.updateSubmissionValidationStatus(jobId, status, metadata);
   }
@@ -60,7 +60,7 @@ export class SubmissionValidationService extends DBService {
    * Get the most recent submission validation record for a submission upload.
    *
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
-   * @return {Promise<SubmissionValidationRecord | null>}
+   * @returns {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationService
    */
   async getSubmissionValidationBySubmissionUploadId(
@@ -77,14 +77,14 @@ export class SubmissionValidationService extends DBService {
    *
    * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
-   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
-   * @return {Promise<void>}
+   * @param {Record<string, unknown>} metadata - Metadata (e.g., counts or error details).
+   * @returns {Promise<void>}
    * @memberof SubmissionValidationService
    */
   async updateSubmissionValidationStatusBySubmissionUploadId(
     submissionUploadId: string,
     status: SubmissionValidationStatus,
-    metadata?: Record<string, unknown>
+    metadata: Record<string, unknown>
   ): Promise<void> {
     return this.submissionValidationRepository.updateSubmissionValidationStatusBySubmissionUploadId(
       submissionUploadId,

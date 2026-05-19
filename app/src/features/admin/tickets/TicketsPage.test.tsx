@@ -24,7 +24,7 @@ const sampleTicket = {
 
 const apiMock = {
   tickets: {
-    getTickets: mockGetTickets,
+    getTicketsForAdmin: mockGetTickets,
     createTicket: mockCreateTicket
   }
 };

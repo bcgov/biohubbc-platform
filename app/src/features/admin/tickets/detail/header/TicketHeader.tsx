@@ -5,9 +5,10 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
+import { TabGroup } from 'components/tabs/TabGroup';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
 import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
@@ -15,8 +16,12 @@ import { useTicketEditDialog } from '../../hooks/useTicketEditDialog';
 import { TicketHeaderSubtitle } from './TicketHeaderSubtitle';
 
 interface ITicketHeaderProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
+  activeTab: TicketDetailTab;
+  onTabChange: (tab: TicketDetailTab) => void;
 }
+
+export type TicketDetailTab = 'timeline' | 'artifacts';
 
 /**
  * Renders the ticket header with breadcrumb, identifier, status, and description.
@@ -25,7 +30,7 @@ interface ITicketHeaderProps {
  * @return {*}
  */
 export const TicketHeader = (props: ITicketHeaderProps) => {
-  const { ticket } = props;
+  const { ticket, activeTab, onTabChange } = props;
   const { biohubUserWrapper } = useAuthStateContext();
   const dialogContext = useDialogContext();
   const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } = useTicketEditDialog({
@@ -75,14 +80,15 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
         buttons={
           <Stack direction="row" spacing={1}>
             <Button
+              size="small"
               color={statusActionButtonColor}
-              variant="outlined"
+              variant="contained"
               onClick={handleStatusActionClick}
               disabled={isSavingStatus || isSavingTicket}
               data-testid={statusActionButtonTestId}>
               {statusActionButtonLabel}
             </Button>
-            <Button variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
+            <Button size="small" variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
               Edit
             </Button>
           </Stack>
@@ -101,6 +107,17 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
               <TicketHeaderSubtitle text={ticket.description} onReadMore={handleReadMoreClick} />
             ) : null}
           </Stack>
+        }
+        tabs={
+          <TabGroup<TicketDetailTab>
+            value={activeTab}
+            onChange={onTabChange}
+            ariaLabel="Ticket detail sections"
+            tabs={[
+              { value: 'timeline', label: 'Timeline' },
+              { value: 'artifacts', label: 'Files' }
+            ]}
+          />
         }
       />
 
