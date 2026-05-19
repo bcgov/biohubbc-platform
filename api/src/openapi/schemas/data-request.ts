@@ -79,6 +79,24 @@ export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const CreateTicketDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['requested_by', 'reason', 'system_user_ids'],
+  additionalProperties: false,
+  properties: {
+    requested_by: {
+      type: 'integer',
+      description: 'System user id of the principal subject of the request.'
+    },
+    reason: { type: 'string', description: 'Reason for the data request' },
+    system_user_ids: {
+      type: 'array',
+      description: 'Additional collaborators to add to the created data-request and policy-linked teams',
+      items: { type: 'integer' }
+    }
+  }
+};
+
 export const UpdateDataRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,

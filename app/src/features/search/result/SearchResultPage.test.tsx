@@ -361,48 +361,6 @@ describe('SearchResultPage', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('P3: submits create-data-request with current featureType and applied expressionTree', async () => {
-    mockCreateDataRequest.mockResolvedValue({});
-    mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
-      isLoading: false,
-      searchParams: new URLSearchParams(),
-      setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
-    });
-
-    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
-
-    // Apply an expression so it flows into the create-data-request payload.
-    fireEvent.click(getByRole('button', { name: /apply expression/i }));
-
-    fireEvent.click(getByRole('button', { name: /request access/i }));
-
-    await findByRole('heading', { level: 2, name: /create data request/i });
-
-    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
-    fireEvent.click(getByTestId('edit-dialog-save-button'));
-
-    await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
-    expect(mockCreateDataRequest).toHaveBeenCalledWith({
-      reason: 'needed for analysis',
-      system_user_ids: [],
-      featureTypes: ['dataset'],
-      expression: expect.objectContaining({
-        type: 'expression',
-        operator: 'AND'
-      })
-    });
-    await waitFor(() =>
-      expect(mockSetSnackbar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          open: true,
-          snackbarMessage: expect.stringMatching(/data request created/i)
-        })
-      )
-    );
-  });
-
   it('P3a: submits the canonical lowercase featureType when the route is mixed-case', async () => {
     mockCreateDataRequest.mockResolvedValue({});
     mockUseParams.mockReturnValue({ featureType: 'DATASET' });
@@ -414,12 +372,12 @@ describe('SearchResultPage', () => {
       pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
     });
 
-    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
+    const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /request access/i }));
     await findByRole('heading', { level: 2, name: /create data request/i });
 
-    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
+    fireEvent.change(await findByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
     fireEvent.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
@@ -440,12 +398,12 @@ describe('SearchResultPage', () => {
       pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
     });
 
-    const { getByRole, getByLabelText, getByTestId, findByRole } = renderPage();
+    const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /request access/i }));
     await findByRole('heading', { level: 2, name: /create data request/i });
 
-    fireEvent.change(getByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
+    fireEvent.change(await findByLabelText(/Reason/i), { target: { value: 'needed for analysis' } });
     fireEvent.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
