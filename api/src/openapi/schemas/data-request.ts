@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -53,13 +54,44 @@ export const DataRequestListResponseSchema: OpenAPIV3.SchemaObject = {
 
 export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['reason', 'system_user_ids'],
+  required: ['reason', 'system_user_ids', 'featureTypes', 'expression'],
   additionalProperties: false,
   properties: {
     reason: { type: 'string', description: 'Reason for the data request' },
     system_user_ids: {
       type: 'array',
       description: 'System user ids to add to created data-request and policy-linked teams',
+      items: { type: 'integer' }
+    },
+    featureTypes: {
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 1,
+      description:
+        'Feature-type names to scope the requested policy. One ALLOW policy statement is created per feature type with URN urn:*:<featureType>:*.'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      nullable: true,
+      description:
+        'Applied expression tree, or null when the user requests every feature of the selected type. When non-null, persisted once and linked as a fine-grained condition to every per-feature-type statement.'
+    }
+  }
+};
+
+export const CreateTicketDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['requested_by', 'reason', 'system_user_ids'],
+  additionalProperties: false,
+  properties: {
+    requested_by: {
+      type: 'integer',
+      description: 'System user id of the principal subject of the request.'
+    },
+    reason: { type: 'string', description: 'Reason for the data request' },
+    system_user_ids: {
+      type: 'array',
+      description: 'Additional collaborators to add to the created data-request and policy-linked teams',
       items: { type: 'integer' }
     }
   }

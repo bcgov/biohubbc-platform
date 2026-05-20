@@ -2,7 +2,10 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { CreateDataRequestRequestSchema, DataRequestResponseSchema } from '../../../../openapi/schemas/data-request';
+import {
+  CreateTicketDataRequestRequestSchema,
+  DataRequestResponseSchema
+} from '../../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../../services/data-request-service';
@@ -41,7 +44,7 @@ POST.apiDoc = {
   requestBody: {
     content: {
       'application/json': {
-        schema: CreateDataRequestRequestSchema
+        schema: CreateTicketDataRequestRequestSchema
       }
     }
   },
@@ -65,14 +68,13 @@ export function createTicketDataRequest(): RequestHandler {
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
-      const { reason, system_user_ids } = req.body;
+      const { requested_by, reason, system_user_ids } = req.body;
       const { ticketId } = req.params;
 
       const dataRequestService = new DataRequestService(connection);
 
       const dataRequest = await dataRequestService.createDataRequestForTicket(ticketId, {
-        requested_by: systemUserId,
+        requested_by,
         reason,
         system_user_ids
       });
