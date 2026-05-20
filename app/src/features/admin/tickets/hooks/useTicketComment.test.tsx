@@ -1,8 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
-import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import { Mock } from 'vitest';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
+import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { Mock } from 'vitest';
 import { useTicketComment } from './useTicketComment';
 
 vi.mock('hooks/useApi', () => ({
