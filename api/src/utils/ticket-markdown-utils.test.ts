@@ -22,5 +22,13 @@ describe('ticket-markdown-utils', () => {
 
       expect(result).to.eql([]);
     });
+
+    it('handles repeated opening brackets without scanning markdown label text', () => {
+      const result = getTicketArtifactIdsFromMarkdown(
+        `${'['.repeat(1000)}](/artifact/55555555-5555-4555-8555-555555555555)`
+      );
+
+      expect(result).to.eql(['55555555-5555-4555-8555-555555555555']);
+    });
   });
 });

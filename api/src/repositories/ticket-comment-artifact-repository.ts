@@ -24,7 +24,7 @@ export class TicketCommentArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Replace active artifact references for a ticket comment.
+   * Update active artifact references for a ticket comment.
    *
    * Only active ticket artifacts belonging to the same ticket are inserted.
    * Invalid or cross-ticket references are ignored so unresolved markdown keeps
@@ -36,7 +36,7 @@ export class TicketCommentArtifactRepository extends BaseRepository {
    * @return {Promise<void>}
    * @memberof TicketCommentArtifactRepository
    */
-  async replaceTicketCommentArtifacts(
+  async updateTicketCommentArtifacts(
     ticketId: string,
     ticketCommentId: string,
     ticketArtifactIds: string[]

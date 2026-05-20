@@ -179,7 +179,6 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'status',
     'statuses',
     'comments',
-    'artifacts',
     'references',
     'data_requests',
     'submission_uploads',
@@ -212,11 +211,6 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     comments: {
       type: 'array',
       items: TicketCommentSchema
-    },
-    artifacts: {
-      type: 'array',
-      description: 'Active artifacts attached to the ticket.',
-      items: TicketArtifactSchema
     },
     references: {
       type: 'array',

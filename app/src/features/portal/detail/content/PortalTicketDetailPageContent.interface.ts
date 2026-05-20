@@ -1,10 +1,11 @@
-import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { Dispatch, SetStateAction } from 'react';
 
 export interface IPortalTicketDetailPageContentProps {
   ticket: ITicketExtended;
   isLoading: boolean;
   comment: string;
+  commentArtifacts: ITicketArtifact[];
   setComment: Dispatch<SetStateAction<string>>;
   isSavingComment: boolean;
   isUploadingAttachment: boolean;

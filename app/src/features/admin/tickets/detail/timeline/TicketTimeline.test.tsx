@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketTimeline } from './TicketTimeline';
@@ -36,6 +36,14 @@ vi.mock('@monaco-editor/react', () => ({
 
 const ticketId = '22222222-2222-4222-8222-222222222222';
 const ticketCommentId = '33333333-3333-4333-8333-333333333333';
+const ticketArtifact: ITicketArtifact = {
+  ticket_artifact_id: '55555555-5555-4555-8555-555555555555',
+  ticket_id: ticketId,
+  artifact_id: '66666666-6666-4666-8666-666666666666',
+  record_end_date: null,
+  create_date: '2026-02-25T00:00:00.000Z',
+  object_key: 'tickets/test/notes.txt'
+};
 
 const makeTicket = (): ITicketExtended => ({
   ticket_id: ticketId,
@@ -54,10 +62,9 @@ const makeTicket = (): ITicketExtended => ({
       user_identifier: 'sarah@example.com',
       create_date: '2026-02-25T00:00:00.000Z',
       comment: 'Original comment',
-      artifacts: []
+      artifacts: [ticketArtifact]
     }
   ],
-  artifacts: [],
   references: [],
   data_requests: [],
   ticket_system_users: []
@@ -132,6 +139,18 @@ describe('TicketTimeline', () => {
       ...ticket,
       comments: [updatedComment]
     });
+  });
+
+  it('renders timeline comment markdown using artifacts attached to that comment', () => {
+    const ticket = makeTicket();
+    ticket.comments[0] = {
+      ...ticket.comments[0],
+      comment: `[notes](/artifact/${ticketArtifact.ticket_artifact_id})`
+    };
+
+    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+
+    expect(screen.getByRole('button', { name: 'notes.txt' })).toBeVisible();
   });
 
   it('ignores duplicate edit saves while save is in flight', async () => {

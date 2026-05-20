@@ -71,7 +71,6 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses,
       comments,
-      artifacts: [],
       references,
       data_requests: [],
       ticket_system_users: []
@@ -341,7 +340,6 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses: [],
       comments: [],
-      artifacts: [],
       references: [],
       data_requests: [],
       ticket_system_users: []

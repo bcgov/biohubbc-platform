@@ -21,8 +21,15 @@ import { useTicketComment } from './hooks/useTicketComment';
  */
 export const TicketDetailPage = () => {
   const { ticketDataLoader } = useTicketContext();
-  const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
-    useTicketComment();
+  const {
+    comment,
+    commentArtifacts,
+    setComment,
+    isSavingComment,
+    isUploadingAttachment,
+    handleAddComment,
+    handleUploadAttachment
+  } = useTicketComment();
   const ticket = ticketDataLoader.data;
   const isLoading = ticketDataLoader.isLoading;
   const [activeTab, setActiveTab] = useState<TicketDetailTab>('timeline');
@@ -52,7 +59,7 @@ export const TicketDetailPage = () => {
                         {ticket.status === 'open' && (
                           <TicketComment
                             comment={comment}
-                            artifacts={ticket.artifacts}
+                            artifacts={commentArtifacts}
                             setComment={setComment}
                             isSaving={isSavingComment}
                             isUploadingAttachment={isUploadingAttachment}
@@ -74,7 +81,7 @@ export const TicketDetailPage = () => {
                     </Stack>
                   </PageSection>
                 ),
-                artifacts: <TicketArtifacts ticket={ticket} />
+                artifacts: <TicketArtifacts ticketId={ticket.ticket_id} />
               }}
             />
           </Container>

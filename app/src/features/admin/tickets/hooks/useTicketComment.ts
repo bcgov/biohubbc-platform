@@ -3,7 +3,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
+import { ITicketArtifact, ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useTicketAttachmentUpload } from './useTicketAttachmentUpload';
 import { useTicketCommentCache } from './useTicketCommentCache';
@@ -22,6 +22,7 @@ export const useTicketComment = () => {
   const { appendCachedComment, removeCachedComment, replaceCachedComment } = useTicketCommentCache();
 
   const [comment, setComment] = useState('');
+  const [commentArtifacts, setCommentArtifacts] = useState<ITicketArtifact[]>([]);
   const [isSavingComment, setIsSavingComment] = useState(false);
 
   /**
@@ -81,6 +82,7 @@ export const useTicketComment = () => {
       replaceCachedComment(optimisticCommentId, persistedComment);
 
       setComment('');
+      setCommentArtifacts([]);
     } catch (caughtError) {
       removeCachedComment(optimisticCommentId);
       const apiError = caughtError as APIError;
@@ -114,6 +116,11 @@ export const useTicketComment = () => {
     }
 
     const markdownLink = getArtifactMarkdownByMimeType(file, ticketArtifact.ticket_artifact_id);
+    setCommentArtifacts((previousArtifacts) =>
+      previousArtifacts.some((artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id)
+        ? previousArtifacts
+        : [...previousArtifacts, ticketArtifact]
+    );
 
     setComment((previousComment) => {
       if (!previousComment) {
@@ -127,6 +134,7 @@ export const useTicketComment = () => {
 
   return {
     comment,
+    commentArtifacts,
     setComment,
     isSavingComment,
     isUploadingAttachment,

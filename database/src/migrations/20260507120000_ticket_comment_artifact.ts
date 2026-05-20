@@ -58,6 +58,13 @@ export async function up(knex: Knex): Promise<void> {
 
     --------------------------------------------------------------------------------
     -- BACKFILL EXISTING COMMENT ARTIFACT REFERENCES
+    --
+    -- Before this migration, comments stored artifact references only as markdown
+    -- links in comment.comment. New and edited comments will populate
+    -- ticket_comment_artifact through the API, but existing comments need rows here
+    -- so read queries can return the same referenced artifact metadata without
+    -- reparsing markdown on every request. Restrict matches to active artifacts on
+    -- the same ticket to avoid linking stale, deleted, or cross-ticket attachments.
     --------------------------------------------------------------------------------
 
     INSERT INTO ticket_comment_artifact (
@@ -87,13 +94,6 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
-
-    DROP TRIGGER IF EXISTS journal_ticket_comment_artifact ON ticket_comment_artifact;
-    DROP TRIGGER IF EXISTS audit_ticket_comment_artifact ON ticket_comment_artifact;
-
-    DROP INDEX IF EXISTS ticket_comment_artifact_artifact_idx;
-    DROP INDEX IF EXISTS ticket_comment_artifact_comment_idx;
-    DROP INDEX IF EXISTS ticket_comment_artifact_nuk1;
 
     DROP TABLE IF EXISTS ticket_comment_artifact;
   `);

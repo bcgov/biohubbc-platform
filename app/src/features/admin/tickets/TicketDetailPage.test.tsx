@@ -36,9 +36,7 @@ vi.mock('./detail/header/TicketHeader', () => ({
 }));
 
 vi.mock('./detail/artifacts/TicketArtifacts', () => ({
-  TicketArtifacts: ({ ticket }: { ticket: ITicketExtended }) => (
-    <div data-testid="ticket-artifacts" data-artifact-count={String(ticket.artifacts.length)} />
-  )
+  TicketArtifacts: ({ ticketId }: { ticketId: string }) => <div data-testid="ticket-artifacts" data-ticket-id={ticketId} />
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
@@ -60,15 +58,18 @@ vi.mock('./detail/comment/TicketComment', () => ({
   TicketComment: ({
     comment,
     isSaving,
-    isUploadingAttachment
+    isUploadingAttachment,
+    artifacts
   }: {
     comment: string;
+    artifacts: unknown[];
     isSaving: boolean;
     isUploadingAttachment: boolean;
   }) => (
     <div
       data-testid="ticket-comment"
       data-comment={comment}
+      data-artifact-count={String(artifacts.length)}
       data-saving={String(isSaving)}
       data-uploading={String(isUploadingAttachment)}
     />
@@ -139,7 +140,6 @@ const baseTicket: ITicketExtended = {
       status: 'open'
     }
   ],
-  artifacts: [],
   comments: [
     {
       ticket_comment_id: 'comment-1',
@@ -206,6 +206,7 @@ describe('TicketDetailPage', () => {
     vi.clearAllMocks();
     mockUseTicketComment.mockReturnValue({
       comment: 'Draft comment',
+      commentArtifacts: [],
       setComment,
       isSavingComment: false,
       isUploadingAttachment: false,
@@ -257,6 +258,7 @@ describe('TicketDetailPage', () => {
     mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
     mockUseTicketComment.mockReturnValue({
       comment: 'Hook comment',
+      commentArtifacts: [{ ticket_artifact_id: 'artifact-1' }],
       setComment,
       isSavingComment: true,
       isUploadingAttachment: false,
@@ -267,26 +269,13 @@ describe('TicketDetailPage', () => {
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Hook comment');
+    expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-artifact-count', '1');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-saving', 'true');
     expect(screen.getByTestId('ticket-timeline')).toHaveAttribute('data-loading', 'false');
   });
 
   it('switches from timeline to artifacts tab content', async () => {
-    mockUseTicketContext.mockReturnValue(
-      makeTicketContext({
-        ...baseTicket,
-        artifacts: [
-          {
-            ticket_artifact_id: '55555555-5555-4555-8555-555555555555',
-            ticket_id: baseTicket.ticket_id,
-            artifact_id: '66666666-6666-4666-8666-666666666666',
-            record_end_date: null,
-            create_date: '2026-02-26T00:00:00.000Z',
-            object_key: 'tickets/test/file.txt'
-          }
-        ]
-      })
-    );
+    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket));
 
     render(<TicketDetailPage />);
 
@@ -295,7 +284,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
 
     expect(screen.getByTestId('ticket-header')).toHaveAttribute('data-active-tab', 'artifacts');
-    expect(screen.getByTestId('ticket-artifacts')).toHaveAttribute('data-artifact-count', '1');
+    expect(screen.getByTestId('ticket-artifacts')).toHaveAttribute('data-ticket-id', baseTicket.ticket_id);
     expect(screen.queryByTestId('ticket-timeline')).not.toBeInTheDocument();
   });
 });

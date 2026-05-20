@@ -80,7 +80,6 @@ export interface ITicketSystemUser {
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
-  artifacts: ITicketArtifact[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
   ticket_system_users: ITicketSystemUser[];

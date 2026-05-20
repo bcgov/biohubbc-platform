@@ -128,7 +128,7 @@ export class TicketCommentRepository extends BaseRepository {
               'artifact_id', ta.artifact_id,
               'record_end_date', ta.record_end_date,
               'create_date', ta.create_date,
-              'key', a.object_key
+              'object_key', a.object_key
             )
             ORDER BY ta.create_date ASC
           ) FILTER (WHERE ta.ticket_artifact_id IS NOT NULL),
@@ -194,7 +194,7 @@ export class TicketCommentRepository extends BaseRepository {
               'artifact_id', ta.artifact_id,
               'record_end_date', ta.record_end_date,
               'create_date', ta.create_date,
-              'key', a.object_key
+              'object_key', a.object_key
             )
             ORDER BY ta.create_date ASC
           ) FILTER (WHERE ta.ticket_artifact_id IS NOT NULL),

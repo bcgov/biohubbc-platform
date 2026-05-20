@@ -35,7 +35,6 @@ const makeTicket = (): ITicketExtended => ({
   status: 'open',
   statuses: [],
   comments: [],
-  artifacts: [],
   references: [],
   data_requests: [],
   ticket_system_users: []
@@ -52,7 +51,6 @@ const makeTicketArtifact = (fileName: string): ITicketArtifact => ({
 
 const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
   const setSnackbar = vi.fn();
-  const setData = vi.fn();
   const createTicketUpload = vi.fn().mockResolvedValue({
     upload_id: '44444444-4444-4444-8444-444444444444',
     presigned_upload_url: 'https://object-store.example/upload'
@@ -91,14 +89,13 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
       load: vi.fn(),
       refresh: vi.fn(),
       clear: vi.fn(),
-      setData
+      setData: vi.fn()
     }
   });
 
   return {
     completeTicketUpload,
     createTicketUpload,
-    setData,
     setSnackbar,
     uploadFileToUrl
   };
@@ -120,6 +117,7 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`![diagram.png](/artifact/${ticketArtifactId})`);
+    expect(result.current.commentArtifacts).to.eql([makeTicketArtifact('diagram.png')]);
     expect(uploadFileToUrl).toHaveBeenCalledWith({
       url: 'https://object-store.example/upload',
       file,
@@ -159,6 +157,7 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
+    expect(result.current.commentArtifacts).to.eql([makeTicketArtifact('notes.pdf')]);
   });
 
   it('adds a space before attachment markdown when appending to existing comment text', async () => {

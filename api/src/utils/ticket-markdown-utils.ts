@@ -1,5 +1,5 @@
 const TICKET_ARTIFACT_MARKDOWN_REFERENCE_PATTERN =
-  /!?\[[^\]]*\]\(\/artifact\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)/gi;
+  /\]\(\/artifact\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)/gi;
 
 /**
  * Extract unique ticket artifact identifiers referenced by ticket markdown.

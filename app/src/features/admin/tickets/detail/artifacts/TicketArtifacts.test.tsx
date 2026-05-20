@@ -1,8 +1,8 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
-import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { useConfigContext, useDialogContext } from 'hooks/useContext';
+import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { ReactNode } from 'react';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -14,8 +14,7 @@ vi.mock('hooks/useApi', () => ({
 
 vi.mock('hooks/useContext', () => ({
   useConfigContext: vi.fn(),
-  useDialogContext: vi.fn(),
-  useTicketContext: vi.fn()
+  useDialogContext: vi.fn()
 }));
 
 vi.mock('components/data-grid/CustomDataGrid', () => ({
@@ -69,22 +68,7 @@ const ticketArtifact: ITicketArtifact = {
   object_key: 'tickets/test/file.txt'
 };
 
-const ticket: ITicketExtended = {
-  ticket_id: ticketArtifact.ticket_id,
-  ticket_slug: '04900042',
-  subject: 'Test Ticket',
-  description: 'Test description',
-  team_id: '22222222-2222-4222-8222-222222222222',
-  create_date: '2026-02-24T00:00:00.000Z',
-  priority: 'medium',
-  status: 'open',
-  statuses: [],
-  comments: [],
-  artifacts: [ticketArtifact],
-  references: [],
-  data_requests: [],
-  ticket_system_users: []
-};
+const ticketId = ticketArtifact.ticket_id;
 
 describe('TicketArtifacts', () => {
   const createTicketUpload = vi.fn();
@@ -92,7 +76,6 @@ describe('TicketArtifacts', () => {
   const getTicketArtifacts = vi.fn();
   const getTicketArtifactDownloadUrl = vi.fn();
   const uploadFileToUrl = vi.fn();
-  const setTicketData = vi.fn();
   const setSnackbar = vi.fn();
 
   beforeEach(() => {
@@ -118,12 +101,6 @@ describe('TicketArtifacts', () => {
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar
     });
-    (useTicketContext as Mock).mockReturnValue({
-      ticketDataLoader: {
-        data: ticket,
-        setData: setTicketData
-      }
-    });
     getTicketArtifacts.mockResolvedValue({
       artifacts: [ticketArtifact],
       pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10, sort: 'create_date', order: 'desc' }
@@ -131,7 +108,7 @@ describe('TicketArtifacts', () => {
   });
 
   it('renders paginated ticket artifact rows in the artifacts section grid', async () => {
-    render(<TicketArtifacts ticket={ticket} />);
+    render(<TicketArtifacts ticketId={ticketId} />);
 
     expect(screen.getByRole('heading', { name: 'Files' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeVisible();
@@ -147,7 +124,7 @@ describe('TicketArtifacts', () => {
     expect(screen.queryByText(ticketArtifact.object_key)).not.toBeInTheDocument();
     expect(screen.getByText('February 25, 2026')).toBeVisible();
     expect(screen.queryByText(ticketArtifact.artifact_id)).not.toBeInTheDocument();
-    expect(getTicketArtifacts).toHaveBeenCalledWith(ticket.ticket_id, {
+    expect(getTicketArtifacts).toHaveBeenCalledWith(ticketId, {
       search: '',
       page: 1,
       limit: 10,
@@ -159,12 +136,12 @@ describe('TicketArtifacts', () => {
   it('searches ticket artifacts by text input', async () => {
     const user = userEvent.setup();
 
-    render(<TicketArtifacts ticket={ticket} />);
+    render(<TicketArtifacts ticketId={ticketId} />);
 
     await user.type(screen.getByPlaceholderText('Search files'), 'field note');
 
     await waitFor(() => {
-      expect(getTicketArtifacts).toHaveBeenCalledWith(ticket.ticket_id, {
+      expect(getTicketArtifacts).toHaveBeenCalledWith(ticketId, {
         search: 'field note',
         page: 1,
         limit: 10,
@@ -189,7 +166,7 @@ describe('TicketArtifacts', () => {
     });
     completeTicketUpload.mockResolvedValue(uploadedTicketArtifact);
 
-    render(<TicketArtifacts ticket={ticket} />);
+    render(<TicketArtifacts ticketId={ticketId} />);
 
     await user.click(screen.getByRole('button', { name: 'Upload' }));
     await user.upload(
@@ -198,23 +175,19 @@ describe('TicketArtifacts', () => {
     );
 
     await waitFor(() => {
-      expect(createTicketUpload).toHaveBeenCalledWith(ticket.ticket_id, {
+      expect(createTicketUpload).toHaveBeenCalledWith(ticketId, {
         file_name: 'uploaded.txt',
         byte_size: 8,
         content_type: 'text/plain'
       });
     });
-    expect(completeTicketUpload).toHaveBeenCalledWith(ticket.ticket_id, '99999999-9999-4999-8999-999999999999', {
+    expect(completeTicketUpload).toHaveBeenCalledWith(ticketId, '99999999-9999-4999-8999-999999999999', {
       status: 'uploaded'
     });
     expect(uploadFileToUrl).toHaveBeenCalledWith({
       url: 'https://object-store.example/upload',
       file: expect.any(File),
       contentType: 'text/plain'
-    });
-    expect(setTicketData).toHaveBeenCalledWith({
-      ...ticket,
-      artifacts: [...ticket.artifacts, uploadedTicketArtifact]
     });
     expect(getTicketArtifacts).toHaveBeenCalledTimes(2);
   });
@@ -234,12 +207,12 @@ describe('TicketArtifacts', () => {
       signed_url: 'https://object-store.example/download'
     });
 
-    render(<TicketArtifacts ticket={ticket} />);
+    render(<TicketArtifacts ticketId={ticketId} />);
 
     await user.click(await screen.findByRole('link', { name: 'file.txt' }));
 
     await waitFor(() => {
-      expect(getTicketArtifactDownloadUrl).toHaveBeenCalledWith(ticket.ticket_id, ticketArtifact.ticket_artifact_id);
+      expect(getTicketArtifactDownloadUrl).toHaveBeenCalledWith(ticketId, ticketArtifact.ticket_artifact_id);
     });
     expect(artifactWindow.location.href).toBe('https://object-store.example/download');
   });
@@ -255,7 +228,7 @@ describe('TicketArtifacts', () => {
       }
     });
 
-    render(<TicketArtifacts ticket={ticket} />);
+    render(<TicketArtifacts ticketId={ticketId} />);
 
     await user.click(await screen.findByRole('button', { name: 'Copy markdown for file.txt' }));
 

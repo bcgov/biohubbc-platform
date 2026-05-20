@@ -16,11 +16,11 @@ describe('TicketCommentArtifactService', () => {
   const ticketCommentId = '33333333-3333-3333-3333-333333333333';
   const ticketArtifactIds = ['55555555-5555-4555-8555-555555555555'];
 
-  it('delegates artifact reference replacement to the repository', async () => {
+  it('delegates artifact reference replacement to the repository update method', async () => {
     const mockDBConnection = getMockDBConnection();
     const service = new TicketCommentArtifactService(mockDBConnection);
     const replaceStub = sinon
-      .stub(TicketCommentArtifactRepository.prototype, 'replaceTicketCommentArtifacts')
+      .stub(TicketCommentArtifactRepository.prototype, 'updateTicketCommentArtifacts')
       .resolves();
 
     await service.replaceTicketCommentArtifacts(ticketId, ticketCommentId, ticketArtifactIds);

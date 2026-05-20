@@ -27,7 +27,7 @@ describe('TicketCommentArtifactRepository', () => {
     });
   });
 
-  describe('replaceTicketCommentArtifacts', () => {
+  describe('updateTicketCommentArtifacts', () => {
     it('soft deletes existing artifact references before inserting valid active ticket artifacts', async () => {
       const deleteResponse = Promise.resolve(mockQueryResult([]));
       const insertResponse = Promise.resolve(mockQueryResult([]));
@@ -36,7 +36,7 @@ describe('TicketCommentArtifactRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub, sql: sqlStub });
       const repo = new TicketCommentArtifactRepository(mockDBConnection);
 
-      await repo.replaceTicketCommentArtifacts(mockTicketId, mockTicketCommentId, [
+      await repo.updateTicketCommentArtifacts(mockTicketId, mockTicketCommentId, [
         '55555555-5555-4555-8555-555555555555'
       ]);
 
@@ -51,7 +51,7 @@ describe('TicketCommentArtifactRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub, sql: sqlStub });
       const repo = new TicketCommentArtifactRepository(mockDBConnection);
 
-      await repo.replaceTicketCommentArtifacts(mockTicketId, mockTicketCommentId, []);
+      await repo.updateTicketCommentArtifacts(mockTicketId, mockTicketCommentId, []);
 
       expect(knexStub).to.have.been.calledOnce;
       expect(sqlStub).not.to.have.been.called;

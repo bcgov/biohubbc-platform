@@ -1,6 +1,6 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useConfigContext, useDialogContext } from 'hooks/useContext';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
@@ -20,7 +20,6 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
   const api = useApi();
   const config = useConfigContext();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
   const { runSerialized } = useSerializedAsync();
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
@@ -30,7 +29,7 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
    * Comment create and edit flows call this before inserting markdown into their respective text fields. The helper
    * validates the configured file-size limit, initializes the ticket upload, uploads the file to object storage through
    * the shared object-storage API, completes the ticket upload, and adds the returned artifact to cached ticket details
-   * when it is not already present.
+   * to the caller so comment forms or artifact tables can update their own local state.
    *
    * @param {File} file File selected by the user.
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails.
@@ -69,18 +68,6 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
         const ticketArtifact = await api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, {
           status: 'uploaded'
         });
-
-        const latestTicket = ticketDataLoader.data;
-        if (latestTicket) {
-          ticketDataLoader.setData({
-            ...latestTicket,
-            artifacts: latestTicket.artifacts.some(
-              (artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id
-            )
-              ? latestTicket.artifacts
-              : [...latestTicket.artifacts, ticketArtifact]
-          });
-        }
 
         return ticketArtifact;
       } catch (caughtError) {

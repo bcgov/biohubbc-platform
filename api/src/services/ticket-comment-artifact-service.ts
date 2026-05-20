@@ -44,7 +44,7 @@ export class TicketCommentArtifactService extends DBService {
     ticketCommentId: string,
     ticketArtifactIds: string[]
   ): Promise<void> {
-    await this.ticketCommentArtifactRepository.replaceTicketCommentArtifacts(
+    await this.ticketCommentArtifactRepository.updateTicketCommentArtifacts(
       ticketId,
       ticketCommentId,
       ticketArtifactIds
