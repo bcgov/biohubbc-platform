@@ -77,14 +77,9 @@ export const insertSecurityRuleRecord = async (
   const effective_date = faker.date.past().toISOString();
   const create_user = 1;
 
-  const policy = await knex.raw(`
-    INSERT INTO policy (name, description, create_user, status)
-    VALUES ($$${name}$$, $$Auto-generated policy for security rule "${name}"$$, ${create_user}, 'approved')
-    RETURNING policy_id;`);
-
   const res = await knex.raw(`
-    INSERT INTO security_rule (security_category_id, policy_id, name, description, record_effective_date, record_end_date, create_user)
-    VALUES (${security_category_id}, '${policy.rows[0].policy_id}', $$${name}$$, $$${description}$$, $$${effective_date}$$, null, ${create_user})
+    INSERT INTO security_rule (security_category_id, name, description, record_effective_date, record_end_date, create_user)
+    VALUES (${security_category_id}, $$${name}$$, $$${description}$$, $$${effective_date}$$, null, ${create_user})
     RETURNING security_rule_id;`);
 
   return res.rows[0].security_rule_id;

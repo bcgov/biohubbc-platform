@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { PolicyEffect, PolicyStatement } from '../models/policy-statement';
+import { PolicyEffect } from '../models/policy-statement';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
@@ -31,13 +31,18 @@ export class SecurityRuleExpressionService extends DBService {
    *
    * Behavior:
    * 1. Load active security-rule links.
-   * 2. Return early when already linked to the requested expression.
-   * 3. Soft-delete existing links when the target changes.
-   * 4. Insert the replacement active link.
+   * 2. Soft-delete existing links when the target changes.
+   * 3. Insert the replacement active link when needed.
+   * 4. Synchronize the mapped `urn:*:*:*` ALLOW policy statement expression link.
+   *
+   * Notes:
+   * - Policy synchronization runs regardless of whether the security-rule link was already correct.
+   * - If the active security rule has no `policy_id`, synchronization is skipped.
    *
    * @param {number} securityRuleId - Security rule identifier.
    * @param {string} expressionId - Expression identifier.
    * @return {Promise<void>} Resolves once the link points to `expressionId`.
+   * @memberof SecurityRuleExpressionService
    */
   async replaceSecurityRuleExpression(securityRuleId: number, expressionId: string): Promise<void> {
     const existingLinks = await this.securityRuleExpressionRepository.getSecurityRuleExpressionsBySecurityRuleId(
@@ -45,22 +50,27 @@ export class SecurityRuleExpressionService extends DBService {
     );
     const alreadyLinked = existingLinks.length === 1 && existingLinks[0].expression_id === expressionId;
 
-    if (alreadyLinked) {
-      return;
-    }
-
-    if (existingLinks.length > 0) {
+    if (!alreadyLinked && existingLinks.length > 0) {
       await this.securityRuleExpressionRepository.deleteSecurityRuleExpressionsBySecurityRuleId(securityRuleId);
     }
 
-    await this.securityRuleExpressionRepository.insertSecurityRuleExpression({
-      security_rule_id: securityRuleId,
-      expression_id: expressionId
-    });
+    if (!alreadyLinked) {
+      await this.securityRuleExpressionRepository.insertSecurityRuleExpression({
+        security_rule_id: securityRuleId,
+        expression_id: expressionId
+      });
+    }
 
     const securityRule = await this.getActiveSecurityRuleById(securityRuleId);
+
+    if (!securityRule.policy_id) {
+      return;
+    }
+
     const policyStatements = await this.policyStatementRepository.getPolicyStatements(securityRule.policy_id);
-    const mappedStatement = this.getMappedPolicyStatement(policyStatements);
+    const mappedStatement = policyStatements.find(
+      (statement) => statement.effect === PolicyEffect.ALLOW && statement.submission_feature_urn === 'urn:*:*:*'
+    );
 
     if (!mappedStatement) {
       throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
@@ -72,7 +82,14 @@ export class SecurityRuleExpressionService extends DBService {
     );
   }
 
-  private async getActiveSecurityRuleById(securityRuleId: number): Promise<{ policy_id: string }> {
+  /**
+   * Resolve one active security rule by id.
+   *
+   * @param {number} securityRuleId - Security rule identifier.
+   * @return {Promise<{ policy_id: string | null }>} Active rule projection with policy linkage.
+   * @memberof SecurityRuleExpressionService
+   */
+  private async getActiveSecurityRuleById(securityRuleId: number): Promise<{ policy_id: string | null }> {
     const activeRules = await this.securityRepository.getActiveSecurityRules();
     const activeRule = activeRules.find((rule) => rule.security_rule_id === securityRuleId);
 
@@ -81,15 +98,5 @@ export class SecurityRuleExpressionService extends DBService {
     }
 
     return activeRule;
-  }
-
-  private getMappedPolicyStatement(policyStatements: PolicyStatement[]): PolicyStatement | undefined {
-    return (
-      policyStatements.find(
-        (statement) => statement.effect === PolicyEffect.ALLOW && statement.submission_feature_urn === 'urn:*:*:*'
-      ) ??
-      policyStatements.find((statement) => statement.effect === PolicyEffect.ALLOW) ??
-      policyStatements[0]
-    );
   }
 }
