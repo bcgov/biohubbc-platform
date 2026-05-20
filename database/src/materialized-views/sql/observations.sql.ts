@@ -3,11 +3,15 @@ WITH site_linked_observations AS (
   SELECT DISTINCT sf.submission_feature_id
   FROM biohub.submission_feature sf
   WHERE sf.parent_submission_feature_id IS NOT NULL
+    AND sf.record_effective_date IS NOT NULL
+    AND sf.record_effective_date <= NOW()::date
     AND sf.parent_submission_feature_id IN (
       SELECT submission_feature_id
       FROM biohub.submission_feature sf_parent
       JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
       WHERE ft_parent.name = 'sample_site' AND sf_parent.record_end_date IS NULL
+        AND sf_parent.record_effective_date IS NOT NULL
+        AND sf_parent.record_effective_date <= NOW()::date
     )
 
   UNION
@@ -23,6 +27,10 @@ WITH site_linked_observations AS (
   )
   JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
   WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+    AND sf.record_effective_date IS NOT NULL
+    AND sf.record_effective_date <= NOW()::date
+    AND sf_site.record_effective_date IS NOT NULL
+    AND sf_site.record_effective_date <= NOW()::date
 ),
 observation_datasets AS (
   SELECT DISTINCT
@@ -41,6 +49,10 @@ observation_datasets AS (
   )
   JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
   WHERE ft_dataset.name = 'dataset'
+    AND sf_obs.record_effective_date IS NOT NULL
+    AND sf_obs.record_effective_date <= NOW()::date
+    AND sf_dataset.record_effective_date IS NOT NULL
+    AND sf_dataset.record_effective_date <= NOW()::date
 ),
 observation_subcounts AS (
   -- Link parent observations to their subcounts via submission_feature_feature
@@ -56,6 +68,10 @@ observation_subcounts AS (
     AND ft_subcount.name = 'species_observation'
     AND sf_parent.data::text LIKE '%subcount%' IS FALSE  -- parent doesn't have subcount_ fields
     AND sf_subcount.data::text LIKE '%subcount%'  -- subcount has subcount_ fields
+    AND sf_parent.record_effective_date IS NOT NULL
+    AND sf_parent.record_effective_date <= NOW()::date
+    AND sf_subcount.record_effective_date IS NOT NULL
+    AND sf_subcount.record_effective_date <= NOW()::date
 )
 SELECT
     {columns}
@@ -74,6 +90,8 @@ LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
   ON (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
+  AND sf.record_effective_date IS NOT NULL
+  AND sf.record_effective_date <= NOW()::date
   {siteFilter}
   {securityFilter}
 `;

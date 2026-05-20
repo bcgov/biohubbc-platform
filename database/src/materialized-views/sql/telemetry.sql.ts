@@ -9,6 +9,8 @@ WITH deployments AS (
       ON dep.feature_type_id = ft_dep.feature_type_id
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
+      AND dep.record_effective_date IS NOT NULL
+      AND dep.record_effective_date <= NOW()::date
 ),
 
 related_features AS (
@@ -46,6 +48,8 @@ related_animals AS (
       ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
+      AND sf.record_effective_date IS NOT NULL
+      AND sf.record_effective_date <= NOW()::date
 ),
 
 datasets AS (
@@ -57,6 +61,8 @@ datasets AS (
       ON sf.feature_type_id = ft_dataset.feature_type_id
     WHERE ft_dataset.name = 'dataset'
       AND sf.record_end_date IS NULL
+      AND sf.record_effective_date IS NOT NULL
+      AND sf.record_effective_date <= NOW()::date
 ),
 
 related_ecological_units AS (
@@ -78,6 +84,8 @@ related_ecological_units AS (
           ON sf_eu.feature_type_id = ft_eu.feature_type_id
           AND ft_eu.name = 'ecological_unit'
         WHERE sf_eu.record_end_date IS NULL
+          AND sf_eu.record_effective_date IS NOT NULL
+          AND sf_eu.record_effective_date <= NOW()::date
 
         UNION
 
@@ -92,6 +100,8 @@ related_ecological_units AS (
           ON sf_eu.feature_type_id = ft_eu.feature_type_id
           AND ft_eu.name = 'ecological_unit'
         WHERE sf_eu.record_end_date IS NULL
+          AND sf_eu.record_effective_date IS NOT NULL
+          AND sf_eu.record_effective_date <= NOW()::date
     ) AS combined_ecological_units
     GROUP BY deployment_id
 )
@@ -119,6 +129,8 @@ LEFT JOIN biohub.taxon t
 
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
+  AND sf.record_effective_date IS NOT NULL
+  AND sf.record_effective_date <= NOW()::date
   AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months')
   {securityFilter}
 `;

@@ -8,7 +8,8 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'sex', expression: 'ra.sex' },
   { alias: 'pop_unit', expression: 'reu.ecological_unit_value' },
   { alias: 'device_key', expression: 'd.device_key' },
-  { alias: 'DATETIME', expression: "(sf.data->>'timestamp')::timestamptz" },
+  { alias: 'date', expression: "((sf.data->>'timestamp')::timestamptz)::date" },
+  { alias: 'time', expression: "((sf.data->>'timestamp')::timestamptz)::time" },
   { alias: 'YEAR', expression: "EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz)::int" },
   { alias: 'Latitude', expression: "(sf.data->>'latitude')::numeric" },
   { alias: 'Longitude', expression: "(sf.data->>'longitude')::numeric" },
@@ -19,6 +20,10 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
     alias: 'SECURED',
     expression:
       "CASE WHEN EXISTS (SELECT 1 FROM biohub.submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) THEN 'Y' ELSE 'N' END"
+  },
+  {
+    alias: 'source',
+    expression: "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
   }
 ];
 
@@ -26,7 +31,8 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'observation_id', expression: 'COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id)' },
   { alias: 'observation_subcount_id', expression: 'parent_obs.subcount_id' },
   { alias: 'Feature_ID', expression: 'COALESCE(sf_subcount.submission_feature_id, sf.submission_feature_id)' },
-  { alias: 'DATETIME', expression: "(sf.data->>'timestamp')::timestamptz" },
+  { alias: 'date', expression: "((sf.data->>'timestamp')::timestamptz)::date" },
+  { alias: 'time', expression: "((sf.data->>'timestamp')::timestamptz)::time" },
   { alias: 'YEAR', expression: "(EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int" },
   { alias: 'Latitude', expression: "public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry'))" },
   { alias: 'Longitude', expression: "public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry'))" },
@@ -47,5 +53,9 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
     alias: 'SECURED',
     expression:
       "CASE WHEN EXISTS (SELECT 1 FROM biohub.submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) THEN 'Y' ELSE 'N' END"
+  },
+  {
+    alias: 'source',
+    expression: "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
   }
 ];
