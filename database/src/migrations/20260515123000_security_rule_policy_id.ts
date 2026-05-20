@@ -113,7 +113,7 @@ export async function up(knex: Knex): Promise<void> {
     )
     SELECT
       map.policy_id,
-      'ALLOW'::policy_effect,
+      'allow'::policy_effect,
       'urn:*:*:*',
       sr.record_end_date,
       sr.create_user
@@ -129,7 +129,7 @@ export async function up(knex: Knex): Promise<void> {
     JOIN policy_statement ps
       ON ps.policy_id = map.policy_id
     WHERE ps.submission_feature_urn = 'urn:*:*:*'
-      AND ps.effect = 'ALLOW'::policy_effect
+      AND ps.effect = 'allow'::policy_effect
       AND ps.record_end_date IS NOT DISTINCT FROM (
         SELECT sr.record_end_date
         FROM security_rule sr
