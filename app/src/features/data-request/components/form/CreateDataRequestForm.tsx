@@ -22,6 +22,12 @@ export interface ICreateDataRequestFormValues {
  *
  * Manages selected team members through Formik field `system_users`.
  *
+ * The `system_users` picker has caller-dependent semantics. From the user/search flow it
+ * selects *additional collaborators* on top of the requester (empty is valid — the requester
+ * is added server-side via the `requested_by` union). From the admin/ticket flow it selects
+ * *the* access list; an empty selection is currently accepted but semantically nonsensical
+ * because the admin is not themselves the requester.
+ *
  * @param {ICreateDataRequestFormProps} props - Form props.
  * @returns {JSX.Element}
  */

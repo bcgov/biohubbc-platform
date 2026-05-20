@@ -8,11 +8,10 @@ import { ISearchContainerLink } from '../../container/tab/SearchTabs.interface';
  * Builds navigation handlers for search result interactions.
  *
  * Keeps router-specific behavior out of presentational components: result
- * detail navigation, feature-type tab navigation, and secured-data access route
- * changes.
+ * detail navigation and feature-type tab navigation.
  *
  * @param {ISearchContainerLink[]} featureTypeLinks - Current feature-type tab links, used to resolve tab values to routes.
- * @returns Handlers for result clicks, feature-type tab changes, and secured-data access requests.
+ * @returns Handlers for result clicks and feature-type tab changes.
  */
 export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink[]) => {
   const navigate = useNavigate();
@@ -53,16 +52,8 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
     [featureTypeLinks, location.search, navigate]
   );
 
-  /**
-   * Opens the portal ticket flow for users requesting access to secured results.
-   */
-  const handleRequestAccess = useCallback(() => {
-    navigate('/portal/ticket');
-  }, [navigate]);
-
   return {
     handleResultClick,
-    handleFeatureTypeTabChange,
-    handleRequestAccess
+    handleFeatureTypeTabChange
   };
 };
