@@ -3,104 +3,23 @@ import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { CountResult } from '../models/count';
-import { SecurityCategoryWithRuleCount } from '../models/security-category';
-import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
+import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
+import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
+import {
+  SecurityRuleAndCategory,
+  SecurityRuleRecord,
+  SecurityRuleWithFeatureCount,
+  SecuritySearchFilters
+} from '../models/security-rule';
+import {
+  SubmissionFeatureSecurityRecord,
+  SubmissionFeatureSecurityRulesSummary
+} from '../models/submission-feature-security';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/security-repository');
-
-export const PersecutionAndHarmSecurity = z.object({
-  persecution_or_harm_id: z.number(),
-  persecution_or_harm_type_id: z.number(),
-  wldtaxonomic_units_id: z.number(),
-  name: z.string(),
-  description: z.string().nullable().optional()
-});
-
-export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecurity>;
-
-export const SecurityRuleRecord = z.object({
-  security_rule_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
-
-export const SecurityCategoryRecord = z.object({
-  security_category_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SecurityCategoryRecord = z.infer<typeof SecurityCategoryRecord>;
-
-export const SecurityRuleAndCategory = z.object({
-  security_rule_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  security_category_id: z.number(),
-  category_name: z.string(),
-  category_description: z.string(),
-  category_record_effective_date: z.string(),
-  category_record_end_date: z.string().nullable()
-});
-export type SecurityRuleAndCategory = z.infer<typeof SecurityRuleAndCategory>;
-
-export const SubmissionFeatureSecurityRecord = z.object({
-  submission_feature_security_id: z.number(),
-  submission_feature_id: z.number(),
-  security_rule_id: z.number(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
-
-export const SubmissionFeatureSecurityRulesSummary = z.object({
-  rules: z.array(
-    z.object({
-      security_rule_id: z.number(),
-      count: z.number()
-    })
-  )
-});
-
-export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
-
-export const SecurityReason = z.object({
-  id: z.number(),
-  type_id: z.number()
-});
-export type SecurityReason = z.infer<typeof SecurityReason>;
-
-export const ArtifactPersecution = z.object({
-  artifact_persecution_id: z.number(),
-  persecution_or_harm_id: z.number(),
-  artifact_id: z.number()
-});
-
-export type ArtifactPersecution = z.infer<typeof ArtifactPersecution>;
 
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
@@ -330,6 +249,7 @@ export class SecurityRepository extends BaseRepository {
     const sql = SQL`
       SELECT 
         sr.security_rule_id,
+        sr.policy_id,
         sr.name,
         sr.description,
         sr.record_effective_date,
@@ -357,7 +277,20 @@ export class SecurityRepository extends BaseRepository {
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     defaultLog.debug({ label: 'getActiveSecurityRules' });
     const sql = SQL`
-      SELECT * FROM security_rule WHERE record_end_date IS NULL;
+      SELECT
+        security_rule_id,
+        policy_id,
+        name,
+        description,
+        record_effective_date,
+        record_end_date,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count
+      FROM security_rule
+      WHERE record_end_date IS NULL;
     `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
     return response.rows;

@@ -56,6 +56,11 @@ GET.apiDoc = {
                 security_rule_id: {
                   type: 'integer'
                 },
+                policy_id: {
+                  type: 'string',
+                  format: 'uuid',
+                  nullable: true
+                },
                 name: {
                   type: 'string'
                 },
