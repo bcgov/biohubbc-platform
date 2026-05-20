@@ -5,8 +5,10 @@ import { Knex } from 'knex';
  *
  * Notes:
  * - One policy row is created per existing security_rule row.
- * - Rollback removes the foreign key/index/column only and intentionally keeps
- *   created policy rows, because they are now domain data and may be referenced.
+ * - One policy_statement row is created per mapped policy, and expression links
+ *   are bridged from security_rule_expression to policy_statement_expression.
+ * - Rollback removes bridged policy statement rows and links, plus the
+ *   security_rule foreign key/index/column. It intentionally keeps policy rows.
  */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
@@ -94,6 +96,63 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE INDEX idx_security_rule_policy_id ON security_rule(policy_id);
 
+    --------------------------------------------------------------------------------
+    -- Create one policy statement per mapped policy.
+    --------------------------------------------------------------------------------
+    CREATE TEMP TABLE tmp_security_rule_policy_statement_map (
+      security_rule_id integer PRIMARY KEY,
+      policy_statement_id uuid NOT NULL
+    );
+
+    INSERT INTO policy_statement (
+      policy_id,
+      effect,
+      submission_feature_urn,
+      record_end_date,
+      create_user
+    )
+    SELECT
+      map.policy_id,
+      'ALLOW'::policy_effect,
+      'urn:*:*:*',
+      sr.record_end_date,
+      sr.create_user
+    FROM security_rule sr
+    JOIN tmp_security_rule_policy_map map
+      ON map.security_rule_id = sr.security_rule_id;
+
+    INSERT INTO tmp_security_rule_policy_statement_map (security_rule_id, policy_statement_id)
+    SELECT
+      map.security_rule_id,
+      ps.policy_statement_id
+    FROM tmp_security_rule_policy_map map
+    JOIN policy_statement ps
+      ON ps.policy_id = map.policy_id
+    WHERE ps.submission_feature_urn = 'urn:*:*:*'
+      AND ps.effect = 'ALLOW'::policy_effect
+      AND ps.record_end_date IS NOT DISTINCT FROM (
+        SELECT sr.record_end_date
+        FROM security_rule sr
+        WHERE sr.security_rule_id = map.security_rule_id
+      );
+
+    --------------------------------------------------------------------------------
+    -- Bridge active security rule expression links to policy statements.
+    --------------------------------------------------------------------------------
+    INSERT INTO policy_statement_expression (
+      policy_statement_id,
+      expression_id,
+      create_user
+    )
+    SELECT
+      statement_map.policy_statement_id,
+      sre.expression_id,
+      sre.create_user
+    FROM security_rule_expression sre
+    JOIN tmp_security_rule_policy_statement_map statement_map
+      ON statement_map.security_rule_id = sre.security_rule_id
+    WHERE sre.record_end_date IS NULL;
+
     COMMENT ON COLUMN security_rule.policy_id IS
       'Foreign key to the policy that defines feature-matching logic for this security rule.';
   `);
@@ -102,6 +161,15 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
+
+    DELETE FROM policy_statement_expression pse
+    USING policy_statement ps, security_rule sr
+    WHERE pse.policy_statement_id = ps.policy_statement_id
+      AND ps.policy_id = sr.policy_id;
+
+    DELETE FROM policy_statement ps
+    USING security_rule sr
+    WHERE ps.policy_id = sr.policy_id;
 
     DROP INDEX IF EXISTS idx_security_rule_policy_id;
 

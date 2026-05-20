@@ -1,9 +1,17 @@
 import { IDBConnection } from '../database/db';
+import { ApiExecuteSQLError } from '../errors/api-error';
+import { PolicyEffect, PolicyStatement } from '../models/policy-statement';
+import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
+import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
+import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { DBService } from './db-service';
 
 export class SecurityRuleExpressionService extends DBService {
   securityRuleExpressionRepository: SecurityRuleExpressionRepository;
+  securityRepository: SecurityRepository;
+  policyStatementRepository: PolicyStatementRepository;
+  policyStatementExpressionService: PolicyStatementExpressionService;
 
   /**
    * Build a security-rule expression service.
@@ -13,6 +21,9 @@ export class SecurityRuleExpressionService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.securityRuleExpressionRepository = new SecurityRuleExpressionRepository(connection);
+    this.securityRepository = new SecurityRepository(connection);
+    this.policyStatementRepository = new PolicyStatementRepository(connection);
+    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
   }
 
   /**
@@ -46,5 +57,39 @@ export class SecurityRuleExpressionService extends DBService {
       security_rule_id: securityRuleId,
       expression_id: expressionId
     });
+
+    const securityRule = await this.getActiveSecurityRuleById(securityRuleId);
+    const policyStatements = await this.policyStatementRepository.getPolicyStatements(securityRule.policy_id);
+    const mappedStatement = this.getMappedPolicyStatement(policyStatements);
+
+    if (!mappedStatement) {
+      throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
+    }
+
+    await this.policyStatementExpressionService.replacePolicyStatementExpression(
+      mappedStatement.policy_statement_id,
+      expressionId
+    );
+  }
+
+  private async getActiveSecurityRuleById(securityRuleId: number): Promise<{ policy_id: string }> {
+    const activeRules = await this.securityRepository.getActiveSecurityRules();
+    const activeRule = activeRules.find((rule) => rule.security_rule_id === securityRuleId);
+
+    if (!activeRule) {
+      throw new ApiExecuteSQLError('Active security rule not found for expression update');
+    }
+
+    return activeRule;
+  }
+
+  private getMappedPolicyStatement(policyStatements: PolicyStatement[]): PolicyStatement | undefined {
+    return (
+      policyStatements.find(
+        (statement) => statement.effect === PolicyEffect.ALLOW && statement.submission_feature_urn === 'urn:*:*:*'
+      ) ??
+      policyStatements.find((statement) => statement.effect === PolicyEffect.ALLOW) ??
+      policyStatements[0]
+    );
   }
 }
