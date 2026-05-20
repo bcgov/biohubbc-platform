@@ -77,15 +77,10 @@ export async function up(knex: Knex): Promise<void> {
     FROM ticket_comment tc
     JOIN comment c
       ON c.comment_id = tc.comment_id
-    CROSS JOIN LATERAL regexp_matches(
-      c.comment,
-      '!?\\[[^\\]]*\\]\\(/artifact/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\)',
-      'gi'
-    ) AS refs(ticket_artifact_id_match)
     JOIN ticket_artifact ta
-      ON ta.ticket_artifact_id = refs.ticket_artifact_id_match[1]::uuid
-      AND ta.ticket_id = tc.ticket_id
+      ON ta.ticket_id = tc.ticket_id
       AND ta.record_end_date IS NULL
+      AND c.comment ILIKE '%](/artifact/' || ta.ticket_artifact_id::text || ')%'
     WHERE tc.record_end_date IS NULL
     ON CONFLICT DO NOTHING;
   `);
