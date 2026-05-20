@@ -36,7 +36,9 @@ vi.mock('./detail/header/TicketHeader', () => ({
 }));
 
 vi.mock('./detail/artifacts/TicketArtifacts', () => ({
-  TicketArtifacts: ({ ticketId }: { ticketId: string }) => <div data-testid="ticket-artifacts" data-ticket-id={ticketId} />
+  TicketArtifacts: ({ ticketId }: { ticketId: string }) => (
+    <div data-testid="ticket-artifacts" data-ticket-id={ticketId} />
+  )
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({

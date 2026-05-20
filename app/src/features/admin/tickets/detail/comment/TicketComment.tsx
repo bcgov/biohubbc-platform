@@ -46,7 +46,12 @@ export const TicketComment = (props: ITicketCommentProps) => {
           onUploadAttachment={onUploadAttachment}
         />
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          <Button variant="contained" size="small" disabled={!comment.trim() || isSaving} onClick={onAddComment}>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!comment.trim() || isSaving}
+            loading={isSaving}
+            onClick={onAddComment}>
             Comment
           </Button>
         </Box>

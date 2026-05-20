@@ -99,7 +99,7 @@ describe('TicketComment', () => {
     expect(screen.getByRole('button', { name: 'diagram.png' })).toBeVisible();
   });
 
-  it('keeps comment button behavior unchanged', async () => {
+  it('submits comments and shows loading state while saving', async () => {
     const user = userEvent.setup();
     const onAddComment = vi.fn().mockResolvedValue(undefined);
     const { rerender } = render(<TicketComment {...baseProps} onAddComment={onAddComment} comment="   " />);
@@ -114,6 +114,7 @@ describe('TicketComment', () => {
 
     rerender(<TicketComment {...baseProps} onAddComment={onAddComment} isSaving={true} comment="ready" />);
     expect(screen.getByRole('button', { name: 'Comment' })).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeVisible();
   });
 
   it('disables attachment upload while the comment is saving', () => {

@@ -8,7 +8,6 @@ import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { MouseEvent } from 'react';
 import { Components } from 'react-markdown';
 import {
-  getArtifactDisplayName,
   getArtifactHref,
   getArtifactLinkText,
   getTicketArtifactIdFromUrl,
@@ -339,7 +338,7 @@ const getMarkdownImage =
     const isArtifactReference = isTicketArtifactReferenceUrl(normalizedSrc);
     const ticketArtifactId = getTicketArtifactIdFromUrl(normalizedSrc);
     const artifact = ticketArtifactId ? artifactsById.get(ticketArtifactId) : undefined;
-    const displayName = artifact ? getArtifactDisplayName(artifact) : alt;
+    const displayName = artifact ? getArtifactLinkText(artifact, alt) : alt;
 
     if (isArtifactReference && !artifact) {
       return <MissingArtifactText />;

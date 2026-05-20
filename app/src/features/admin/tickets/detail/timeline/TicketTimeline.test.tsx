@@ -150,7 +150,7 @@ describe('TicketTimeline', () => {
 
     render(<TicketTimeline ticket={ticket} isLoading={false} />);
 
-    expect(screen.getByRole('button', { name: 'notes.txt' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'notes' })).toBeVisible();
   });
 
   it('ignores duplicate edit saves while save is in flight', async () => {

@@ -63,7 +63,7 @@ describe('MarkdownRenderers', () => {
     expect(screen.getByRole('link', { name: 'BioHub' })).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('renders resolved artifact links as buttons and delegates clicks', async () => {
+  it('renders resolved artifact links with markdown labels as buttons and delegates clicks', async () => {
     const user = userEvent.setup();
     const artifact = ticketArtifact({
       ticket_artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
@@ -72,12 +72,12 @@ describe('MarkdownRenderers', () => {
     });
     const handleArtifactClick = vi.fn().mockResolvedValue(undefined);
 
-    renderMarkdown('[generate.py](/artifact/90b6df74-1b23-4064-ad62-f83c291d31d2)', {
+    renderMarkdown('[gen.py](/artifact/90b6df74-1b23-4064-ad62-f83c291d31d2)', {
       artifactsById: new Map([[artifact.ticket_artifact_id, artifact]]),
       onArtifactLinkClick: handleArtifactClick
     });
 
-    const linkButton = screen.getByRole('button', { name: 'generate.py' });
+    const linkButton = screen.getByRole('button', { name: 'gen.py' });
 
     expect(linkButton).not.toHaveAttribute('href');
 
@@ -99,7 +99,7 @@ describe('MarkdownRenderers', () => {
     expect(screen.queryByRole('img', { name: 'missing image' })).not.toBeInTheDocument();
   });
 
-  it('renders resolved artifact images as downloadable file buttons', () => {
+  it('renders resolved artifact images as downloadable file buttons with markdown alt text', () => {
     const artifact = ticketArtifact({
       ticket_artifact_id: '90b6df74-1b23-4064-ad62-f83c291d31d2',
       artifact_id: '11111111-1111-4111-8111-111111111111',
@@ -110,7 +110,7 @@ describe('MarkdownRenderers', () => {
       artifactsById: new Map([[artifact.ticket_artifact_id, artifact]])
     });
 
-    expect(screen.getByRole('button', { name: 'diagram.png' })).not.toHaveAttribute('href');
+    expect(screen.getByRole('button', { name: 'diagram' })).not.toHaveAttribute('href');
     expect(screen.queryByRole('img', { name: 'diagram' })).not.toBeInTheDocument();
   });
 
