@@ -1,8 +1,8 @@
 import * as crypto from 'node:crypto';
 import { IDBConnection } from '../database/db';
 import { HTTP401 } from '../errors/http-error';
-import { AccessKeyView } from '../models/access-key';
-import { AccessKeyRepository } from '../repositories/access-key-repository';
+import { ApiKeyView } from '../models/api-key';
+import { ApiKeyRepository } from '../repositories/api-key-repository';
 import { DBService } from './db-service';
 
 /**
@@ -78,11 +78,11 @@ const deriveKeyHash = (plaintext: string, salt: string): Promise<string> => {
 };
 
 /**
- * Result of a successful access key creation.
+ * Result of a successful API key creation.
  */
-export interface ICreateAccessKeyResult {
+export interface ICreateApiKeyResult {
   /** Public view of the persisted record (no `key_hash`). */
-  access_key: AccessKeyView;
+  api_key: ApiKeyView;
   /** The full plaintext key — shown to the user exactly once; never persisted. */
   plaintext_key: string;
 }
@@ -90,17 +90,17 @@ export interface ICreateAccessKeyResult {
 /**
  * Minimal result from a successful key verification, used by the auth handler.
  */
-export interface IVerifyAccessKeyResult {
-  access_key_id: string;
+export interface IVerifyApiKeyResult {
+  api_key_id: string;
   system_user_id: number;
 }
 
-export class AccessKeyService extends DBService {
-  accessKeyRepository: AccessKeyRepository;
+export class ApiKeyService extends DBService {
+  apiKeyRepository: ApiKeyRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
-    this.accessKeyRepository = new AccessKeyRepository(connection);
+    this.apiKeyRepository = new ApiKeyRepository(connection);
   }
 
   /**
@@ -111,10 +111,10 @@ export class AccessKeyService extends DBService {
    *
    * @param {number} systemUserId - Owner of the new key.
    * @param {string} name - Human-readable label supplied by the user.
-   * @return {Promise<ICreateAccessKeyResult>}
-   * @memberof AccessKeyService
+   * @return {Promise<ICreateApiKeyResult>}
+   * @memberof ApiKeyService
    */
-  async createAccessKey(systemUserId: number, name: string): Promise<ICreateAccessKeyResult> {
+  async createApiKey(systemUserId: number, name: string): Promise<ICreateApiKeyResult> {
     const prefixSegment = crypto.randomBytes(PREFIX_BYTES).toString('base64url');
     const secretSegment = crypto.randomBytes(SECRET_BYTES).toString('base64url');
 
@@ -126,7 +126,7 @@ export class AccessKeyService extends DBService {
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + KEY_EXPIRY_MONTHS);
 
-    const accessKey = await this.accessKeyRepository.insertAccessKey({
+    const apiKey = await this.apiKeyRepository.insertApiKey({
       system_user_id: systemUserId,
       name,
       key_prefix: keyPrefix,
@@ -134,49 +134,49 @@ export class AccessKeyService extends DBService {
       expires_at: expiresAt.toISOString()
     });
 
-    return { access_key: accessKey, plaintext_key: plaintextKey };
+    return { api_key: apiKey, plaintext_key: plaintextKey };
   }
 
   /**
-   * List all active access keys belonging to a system user.
+   * List all active API keys belonging to a system user.
    *
-   * `key_hash` is never included in the response.
+   * `key_hash` is excluded from results.
    *
    * @param {number} systemUserId
-   * @return {Promise<AccessKeyView[]>}
-   * @memberof AccessKeyService
+   * @return {Promise<ApiKeyView[]>}
+   * @memberof ApiKeyService
    */
-  async listAccessKeys(systemUserId: number): Promise<AccessKeyView[]> {
-    return this.accessKeyRepository.listAccessKeysByUserId(systemUserId);
+  async listApiKeys(systemUserId: number): Promise<ApiKeyView[]> {
+    return this.apiKeyRepository.listApiKeysByUserId(systemUserId);
   }
 
   /**
-   * Revoke an access key owned by a system user.
+   * Revoke an API key owned by a system user.
    *
    * Owner-scoping is enforced in the repository layer.
    *
-   * @param {string} accessKeyId
+   * @param {string} apiKeyId
    * @param {number} systemUserId
    * @return {Promise<void>}
-   * @memberof AccessKeyService
+   * @memberof ApiKeyService
    */
-  async revokeAccessKey(accessKeyId: string, systemUserId: number): Promise<void> {
-    return this.accessKeyRepository.revokeAccessKey(accessKeyId, systemUserId);
+  async revokeApiKey(apiKeyId: string, systemUserId: number): Promise<void> {
+    return this.apiKeyRepository.revokeApiKey(apiKeyId, systemUserId);
   }
 
   /**
-   * Soft-delete an access key owned by a system user.
+   * Soft-delete an API key owned by a system user.
    *
    * Sets `record_end_date`, `expires_at`, and (if not already revoked) `revoked_at` to now.
    * The key is immediately invalidated and disappears from the user's key list.
    *
-   * @param {string} accessKeyId
+   * @param {string} apiKeyId
    * @param {number} systemUserId
    * @return {Promise<void>}
-   * @memberof AccessKeyService
+   * @memberof ApiKeyService
    */
-  async deleteAccessKey(accessKeyId: string, systemUserId: number): Promise<void> {
-    return this.accessKeyRepository.deleteAccessKey(accessKeyId, systemUserId);
+  async deleteApiKey(apiKeyId: string, systemUserId: number): Promise<void> {
+    return this.apiKeyRepository.deleteApiKey(apiKeyId, systemUserId);
   }
 
   /**
@@ -191,11 +191,11 @@ export class AccessKeyService extends DBService {
    * Throws `HTTP401` for any failure to ensure consistent error behaviour regardless of failure mode.
    *
    * @param {string} plaintextKey - The full plaintext API key (e.g. `biohub_AbCdEfGh_...`).
-   * @return {Promise<IVerifyAccessKeyResult>}
+   * @return {Promise<IVerifyApiKeyResult>}
    * @throws {HTTP401} if the key is missing, invalid, expired, or revoked.
-   * @memberof AccessKeyService
+   * @memberof ApiKeyService
    */
-  async verifyAccessKey(plaintextKey: string): Promise<IVerifyAccessKeyResult> {
+  async verifyApiKey(plaintextKey: string): Promise<IVerifyApiKeyResult> {
     // Positional parse — `_`-search is unreliable because base64url output may contain `_`.
     // The delimiter between key_prefix and secret sits at a fixed, computable index:
     //   <vendor>_<prefixSegment>_<secret>
@@ -218,7 +218,7 @@ export class AccessKeyService extends DBService {
       throw new HTTP401('Access Denied');
     }
 
-    const record = await this.accessKeyRepository.getAccessKeyByPrefix(keyPrefix);
+    const record = await this.apiKeyRepository.getApiKeyByPrefix(keyPrefix);
 
     if (!record) {
       throw new HTTP401('Access Denied');
@@ -244,17 +244,17 @@ export class AccessKeyService extends DBService {
       throw new HTTP401('Access Denied');
     }
 
-    return { access_key_id: record.access_key_id, system_user_id: record.system_user_id };
+    return { api_key_id: record.api_key_id, system_user_id: record.system_user_id };
   }
 
   /**
-   * Update the `last_used_at` timestamp for an access key.
+   * Update the `last_used_at` timestamp for an API key.
    *
-   * @param {string} accessKeyId
+   * @param {string} apiKeyId
    * @return {Promise<void>}
-   * @memberof AccessKeyService
+   * @memberof ApiKeyService
    */
-  async touchLastUsedAt(accessKeyId: string): Promise<void> {
-    return this.accessKeyRepository.touchLastUsedAt(accessKeyId);
+  async touchLastUsedAt(apiKeyId: string): Promise<void> {
+    return this.apiKeyRepository.touchLastUsedAt(apiKeyId);
   }
 }

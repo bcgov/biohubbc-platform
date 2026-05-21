@@ -3,14 +3,14 @@ import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { AccessKeyService } from '../../../services/access-key-service';
+import { ApiKeyService } from '../../../services/api-key-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/api-key/{accessKeyId}');
+const defaultLog = getLogger('paths/api-key/{apiKeyId}');
 
 export const PATCH: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  revokeAccessKey()
+  revokeApiKey()
 ];
 
 PATCH.apiDoc = {
@@ -21,7 +21,7 @@ PATCH.apiDoc = {
   parameters: [
     {
       in: 'path',
-      name: 'accessKeyId',
+      name: 'apiKeyId',
       required: true,
       schema: { type: 'string', format: 'uuid' },
       description: 'The UUID of the API key to revoke.'
@@ -37,7 +37,7 @@ PATCH.apiDoc = {
 
 export const DELETE: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  deleteAccessKey()
+  deleteApiKey()
 ];
 
 DELETE.apiDoc = {
@@ -48,7 +48,7 @@ DELETE.apiDoc = {
   parameters: [
     {
       in: 'path',
-      name: 'accessKeyId',
+      name: 'apiKeyId',
       required: true,
       schema: { type: 'string', format: 'uuid' },
       description: 'The UUID of the API key to delete.'
@@ -70,7 +70,7 @@ DELETE.apiDoc = {
  *
  * @return {RequestHandler}
  */
-export function revokeAccessKey(): RequestHandler {
+export function revokeApiKey(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -78,16 +78,16 @@ export function revokeAccessKey(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const { accessKeyId } = req.params;
+      const { apiKeyId } = req.params;
 
-      const accessKeyService = new AccessKeyService(connection);
-      await accessKeyService.revokeAccessKey(accessKeyId, systemUserId);
+      const apiKeyService = new ApiKeyService(connection);
+      await apiKeyService.revokeApiKey(apiKeyId, systemUserId);
 
       await connection.commit();
 
       return res.status(204).send();
     } catch (error) {
-      defaultLog.error({ label: 'revokeAccessKey', message: 'error', error });
+      defaultLog.error({ label: 'revokeApiKey', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
@@ -104,7 +104,7 @@ export function revokeAccessKey(): RequestHandler {
  *
  * @return {RequestHandler}
  */
-export function deleteAccessKey(): RequestHandler {
+export function deleteApiKey(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -112,16 +112,16 @@ export function deleteAccessKey(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const { accessKeyId } = req.params;
+      const { apiKeyId } = req.params;
 
-      const accessKeyService = new AccessKeyService(connection);
-      await accessKeyService.deleteAccessKey(accessKeyId, systemUserId);
+      const apiKeyService = new ApiKeyService(connection);
+      await apiKeyService.deleteApiKey(apiKeyId, systemUserId);
 
       await connection.commit();
 
       return res.status(204).send();
     } catch (error) {
-      defaultLog.error({ label: 'deleteAccessKey', message: 'error', error });
+      defaultLog.error({ label: 'deleteApiKey', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

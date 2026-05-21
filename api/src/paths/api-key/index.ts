@@ -1,31 +1,31 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
-import { AccessKeyViewSchema, CreateAccessKeyResponseSchema } from '../../openapi/schemas/access-key';
+import { ApiKeyViewSchema, CreateApiKeyResponseSchema } from '../../openapi/schemas/api-key';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { AccessKeyService } from '../../services/access-key-service';
+import { ApiKeyService } from '../../services/api-key-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/api-key');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  listAccessKeys()
+  listApiKeys()
 ];
 
 GET.apiDoc = {
-  description: 'List all active API keys for the currently authenticated user. The key hash is never returned.',
+  description: 'List all active API keys for the currently authenticated user.',
   tags: ['api-key'],
   security: [{ Bearer: [] }],
   responses: {
     200: {
-      description: 'List of access keys.',
+      description: 'List of API keys.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
-            items: AccessKeyViewSchema
+            items: ApiKeyViewSchema
           }
         }
       }
@@ -39,7 +39,7 @@ GET.apiDoc = {
  *
  * @return {RequestHandler}
  */
-export function listAccessKeys(): RequestHandler {
+export function listApiKeys(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -47,14 +47,14 @@ export function listAccessKeys(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const accessKeyService = new AccessKeyService(connection);
-      const keys = await accessKeyService.listAccessKeys(systemUserId);
+      const apiKeyService = new ApiKeyService(connection);
+      const keys = await apiKeyService.listApiKeys(systemUserId);
 
       await connection.commit();
 
       return res.status(200).json(keys);
     } catch (error) {
-      defaultLog.error({ label: 'listAccessKeys', message: 'error', error });
+      defaultLog.error({ label: 'listApiKeys', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
@@ -65,7 +65,7 @@ export function listAccessKeys(): RequestHandler {
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  createAccessKey()
+  createApiKey()
 ];
 
 POST.apiDoc = {
@@ -99,7 +99,7 @@ POST.apiDoc = {
       description: 'API key created. The plaintext_key must be saved now — it will not be shown again.',
       content: {
         'application/json': {
-          schema: CreateAccessKeyResponseSchema
+          schema: CreateApiKeyResponseSchema
         }
       }
     },
@@ -112,7 +112,7 @@ POST.apiDoc = {
  *
  * @return {RequestHandler}
  */
-export function createAccessKey(): RequestHandler {
+export function createApiKey(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -122,14 +122,14 @@ export function createAccessKey(): RequestHandler {
       const systemUserId = connection.systemUserId();
       const { name } = req.body as { name: string };
 
-      const accessKeyService = new AccessKeyService(connection);
-      const result = await accessKeyService.createAccessKey(systemUserId, name);
+      const apiKeyService = new ApiKeyService(connection);
+      const result = await apiKeyService.createApiKey(systemUserId, name);
 
       await connection.commit();
 
       return res.status(201).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'createAccessKey', message: 'error', error });
+      defaultLog.error({ label: 'createApiKey', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

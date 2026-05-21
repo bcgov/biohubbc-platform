@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { IAccessKeyView, ICreateAccessKeyResponse } from 'interfaces/useApiKeysApi.interface';
+import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
 
 /**
  * Returns a set of supported api methods for managing user API keys.
@@ -14,20 +14,20 @@ export const useApiKeysApi = (axios: AxiosInstance) => {
    * The `plaintext_key` in the response is shown exactly once and cannot be recovered.
    *
    * @param {string} name - Human-readable label for the key.
-   * @return {Promise<ICreateAccessKeyResponse>}
+   * @return {Promise<ICreateApiKeyResponse>}
    */
-  const createApiKey = async (name: string): Promise<ICreateAccessKeyResponse> => {
-    const { data } = await axios.post<ICreateAccessKeyResponse>('/api/api-key', { name });
+  const createApiKey = async (name: string): Promise<ICreateApiKeyResponse> => {
+    const { data } = await axios.post<ICreateApiKeyResponse>('/api/api-key', { name });
     return data;
   };
 
   /**
    * List all active API keys for the current user.
    *
-   * @return {Promise<IAccessKeyView[]>}
+   * @return {Promise<IApiKeyView[]>}
    */
-  const listApiKeys = async (): Promise<IAccessKeyView[]> => {
-    const { data } = await axios.get<IAccessKeyView[]>('/api/api-key');
+  const listApiKeys = async (): Promise<IApiKeyView[]> => {
+    const { data } = await axios.get<IApiKeyView[]>('/api/api-key');
     return data;
   };
 
@@ -37,11 +37,11 @@ export const useApiKeysApi = (axios: AxiosInstance) => {
    * Sets `revoked_at` and `expires_at` to now. The key is immediately invalidated and
    * will no longer authorize requests, but remains visible in the key list.
    *
-   * @param {string} accessKeyId - UUID of the key to revoke.
+   * @param {string} apiKeyId - UUID of the key to revoke.
    * @return {Promise<void>}
    */
-  const revokeApiKey = async (accessKeyId: string): Promise<void> => {
-    await axios.patch(`/api/api-key/${accessKeyId}`);
+  const revokeApiKey = async (apiKeyId: string): Promise<void> => {
+    await axios.patch(`/api/api-key/${apiKeyId}`);
   };
 
   /**
@@ -50,11 +50,11 @@ export const useApiKeysApi = (axios: AxiosInstance) => {
    * Sets `record_end_date`, `expires_at`, and (if not yet revoked) `revoked_at` to now.
    * The key is immediately invalidated and removed from the key list.
    *
-   * @param {string} accessKeyId - UUID of the key to delete.
+   * @param {string} apiKeyId - UUID of the key to delete.
    * @return {Promise<void>}
    */
-  const deleteApiKey = async (accessKeyId: string): Promise<void> => {
-    await axios.delete(`/api/api-key/${accessKeyId}`);
+  const deleteApiKey = async (apiKeyId: string): Promise<void> => {
+    await axios.delete(`/api/api-key/${apiKeyId}`);
   };
 
   return { createApiKey, listApiKeys, revokeApiKey, deleteApiKey };

@@ -5,11 +5,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { HTTP401 } from '../errors/http-error';
-import { AccessKey, AccessKeyView } from '../models/access-key';
-import { AccessKeyRepository } from '../repositories/access-key-repository';
-import { AccessKeyService } from './access-key-service';
+import { ApiKey, ApiKeyView } from '../models/api-key';
+import { ApiKeyRepository } from '../repositories/api-key-repository';
+import { ApiKeyService } from './api-key-service';
 
-/** Mirrors the scrypt parameters and callback usage in access-key-service.ts. */
+/** Mirrors the scrypt parameters and callback usage in api-key-service.ts. */
 const deriveKeyHash = (plaintext: string, salt: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     crypto.scrypt(plaintext, salt, 32, { N: 16384, r: 8, p: 1 }, (err, derived) => {
@@ -24,8 +24,8 @@ const deriveKeyHash = (plaintext: string, salt: string): Promise<string> => {
 
 chai.use(sinonChai);
 
-const makeAccessKeyView = (overrides: Partial<AccessKeyView> = {}): AccessKeyView => ({
-  access_key_id: 'aabbccdd-0000-0000-0000-000000000001',
+const makeApiKeyView = (overrides: Partial<ApiKeyView> = {}): ApiKeyView => ({
+  api_key_id: 'aabbccdd-0000-0000-0000-000000000001',
   system_user_id: 1,
   name: 'My test key',
   key_prefix: 'biohub_AbCdEfGh',
@@ -41,22 +41,22 @@ const makeAccessKeyView = (overrides: Partial<AccessKeyView> = {}): AccessKeyVie
   ...overrides
 });
 
-describe('AccessKeyService', () => {
+describe('ApiKeyService', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('createAccessKey', () => {
+  describe('createApiKey', () => {
     it('should generate a plaintext key and return it alongside the persisted view record', async () => {
-      const view = makeAccessKeyView();
-      sinon.stub(AccessKeyRepository.prototype, 'insertAccessKey').resolves(view);
+      const view = makeApiKeyView();
+      sinon.stub(ApiKeyRepository.prototype, 'insertApiKey').resolves(view);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.createAccessKey(1, 'My test key');
+      const result = await service.createApiKey(1, 'My test key');
 
-      expect(result.access_key).to.eql(view);
+      expect(result.api_key).to.eql(view);
       expect(result.plaintext_key).to.be.a('string');
       expect(result.plaintext_key.startsWith('biohub_')).to.be.true;
       // Must have at least 3 underscore-separated segments
@@ -65,15 +65,15 @@ describe('AccessKeyService', () => {
 
     it('should hash the key using scrypt before persisting', async () => {
       let capturedParams: any;
-      sinon.stub(AccessKeyRepository.prototype, 'insertAccessKey').callsFake(async (params) => {
+      sinon.stub(ApiKeyRepository.prototype, 'insertApiKey').callsFake(async (params) => {
         capturedParams = params;
-        return makeAccessKeyView();
+        return makeApiKeyView();
       });
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.createAccessKey(1, 'Key');
+      const result = await service.createApiKey(1, 'Key');
 
       // Use the persisted key_prefix as salt — base64url prefix segments may contain underscores,
       // so the prefix cannot be reliably reconstructed by splitting the plaintext key.
@@ -81,60 +81,60 @@ describe('AccessKeyService', () => {
       expect(capturedParams.key_hash).to.equal(expectedHash);
     });
 
-    it('should not include key_hash in the returned access_key view', async () => {
-      const view = makeAccessKeyView();
-      sinon.stub(AccessKeyRepository.prototype, 'insertAccessKey').resolves(view);
+    it('should not include key_hash in the returned api_key view', async () => {
+      const view = makeApiKeyView();
+      sinon.stub(ApiKeyRepository.prototype, 'insertApiKey').resolves(view);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.createAccessKey(1, 'Key');
+      const result = await service.createApiKey(1, 'Key');
 
-      expect((result.access_key as any).key_hash).to.be.undefined;
+      expect((result.api_key as any).key_hash).to.be.undefined;
     });
   });
 
-  describe('listAccessKeys', () => {
-    it('should return access key views for the user', async () => {
-      const views = [makeAccessKeyView()];
-      sinon.stub(AccessKeyRepository.prototype, 'listAccessKeysByUserId').resolves(views);
+  describe('listApiKeys', () => {
+    it('should return API key views for the user', async () => {
+      const views = [makeApiKeyView()];
+      sinon.stub(ApiKeyRepository.prototype, 'listApiKeysByUserId').resolves(views);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.listAccessKeys(1);
+      const result = await service.listApiKeys(1);
 
       expect(result).to.eql(views);
     });
   });
 
-  describe('revokeAccessKey', () => {
-    it('should call repository.revokeAccessKey with correct arguments', async () => {
-      const stub = sinon.stub(AccessKeyRepository.prototype, 'revokeAccessKey').resolves();
+  describe('revokeApiKey', () => {
+    it('should call repository.revokeApiKey with correct arguments', async () => {
+      const stub = sinon.stub(ApiKeyRepository.prototype, 'revokeApiKey').resolves();
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      await service.revokeAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+      await service.revokeApiKey('aabbccdd-0000-0000-0000-000000000001', 1);
 
       expect(stub).to.have.been.calledOnceWith('aabbccdd-0000-0000-0000-000000000001', 1);
     });
   });
 
-  describe('deleteAccessKey', () => {
-    it('should call repository.deleteAccessKey with correct arguments', async () => {
-      const stub = sinon.stub(AccessKeyRepository.prototype, 'deleteAccessKey').resolves();
+  describe('deleteApiKey', () => {
+    it('should call repository.deleteApiKey with correct arguments', async () => {
+      const stub = sinon.stub(ApiKeyRepository.prototype, 'deleteApiKey').resolves();
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      await service.deleteAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+      await service.deleteApiKey('aabbccdd-0000-0000-0000-000000000001', 1);
 
       expect(stub).to.have.been.calledOnceWith('aabbccdd-0000-0000-0000-000000000001', 1);
     });
   });
 
-  describe('verifyAccessKey', () => {
+  describe('verifyApiKey', () => {
     const buildValidKey = async (): Promise<{ plaintext: string; hash: string; prefix: string }> => {
       const prefix = 'biohub_TestPref';
       const secret = 'supersecretvalue32byteslong12345';
@@ -143,22 +143,22 @@ describe('AccessKeyService', () => {
       return { plaintext, hash, prefix };
     };
 
-    it('should return access_key_id and system_user_id for a valid key', async () => {
+    it('should return api_key_id and system_user_id for a valid key', async () => {
       const { plaintext, hash, prefix } = await buildValidKey();
 
-      const record: AccessKey = {
-        ...makeAccessKeyView({ key_prefix: prefix }),
+      const record: ApiKey = {
+        ...makeApiKeyView({ key_prefix: prefix }),
         key_hash: hash
       };
 
-      sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.verifyAccessKey(plaintext);
+      const result = await service.verifyApiKey(plaintext);
 
-      expect(result.access_key_id).to.equal(record.access_key_id);
+      expect(result.api_key_id).to.equal(record.api_key_id);
       expect(result.system_user_id).to.equal(record.system_user_id);
     });
 
@@ -169,30 +169,30 @@ describe('AccessKeyService', () => {
       const plaintext = `${prefix}_${secret}`;
       const hash = await deriveKeyHash(plaintext, prefix);
 
-      const record: AccessKey = {
-        ...makeAccessKeyView({ key_prefix: prefix }),
+      const record: ApiKey = {
+        ...makeApiKeyView({ key_prefix: prefix }),
         key_hash: hash
       };
 
-      const getByPrefixStub = sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+      const getByPrefixStub = sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
-      const result = await service.verifyAccessKey(plaintext);
+      const result = await service.verifyApiKey(plaintext);
 
       expect(getByPrefixStub).to.have.been.calledOnceWith(prefix);
-      expect(result.access_key_id).to.equal(record.access_key_id);
+      expect(result.api_key_id).to.equal(record.api_key_id);
       expect(result.system_user_id).to.equal(record.system_user_id);
     });
 
     it('should throw HTTP401 when the key is too short to contain both prefix and secret', async () => {
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
         // 'biohub_short' is a valid vendor prefix but the prefix segment is too short
-        await service.verifyAccessKey('biohub_short_secret');
+        await service.verifyApiKey('biohub_short_secret');
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -201,10 +201,10 @@ describe('AccessKeyService', () => {
 
     it('should throw HTTP401 when the key does not have the biohub_ vendor prefix', async () => {
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
-        await service.verifyAccessKey('wrong_prefix_value');
+        await service.verifyApiKey('wrong_prefix_value');
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -212,15 +212,15 @@ describe('AccessKeyService', () => {
     });
 
     it('should throw HTTP401 when no row is found for the prefix', async () => {
-      sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(null);
+      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(null);
 
       const { plaintext } = await buildValidKey();
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
-        await service.verifyAccessKey(plaintext);
+        await service.verifyApiKey(plaintext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -231,18 +231,18 @@ describe('AccessKeyService', () => {
       const { plaintext, prefix } = await buildValidKey();
       const wrongHash = await deriveKeyHash('totally_different_key', prefix);
 
-      const record: AccessKey = {
-        ...makeAccessKeyView({ key_prefix: prefix }),
+      const record: ApiKey = {
+        ...makeApiKeyView({ key_prefix: prefix }),
         key_hash: wrongHash
       };
 
-      sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
-        await service.verifyAccessKey(plaintext);
+        await service.verifyApiKey(plaintext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -252,18 +252,18 @@ describe('AccessKeyService', () => {
     it('should throw HTTP401 when the key is revoked', async () => {
       const { plaintext, hash, prefix } = await buildValidKey();
 
-      const record: AccessKey = {
-        ...makeAccessKeyView({ key_prefix: prefix, revoked_at: '2026-01-01T00:00:00.000Z' }),
+      const record: ApiKey = {
+        ...makeApiKeyView({ key_prefix: prefix, revoked_at: '2026-01-01T00:00:00.000Z' }),
         key_hash: hash
       };
 
-      sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
-        await service.verifyAccessKey(plaintext);
+        await service.verifyApiKey(plaintext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -273,21 +273,21 @@ describe('AccessKeyService', () => {
     it('should throw HTTP401 when the key is expired', async () => {
       const { plaintext, hash, prefix } = await buildValidKey();
 
-      const record: AccessKey = {
-        ...makeAccessKeyView({
+      const record: ApiKey = {
+        ...makeApiKeyView({
           key_prefix: prefix,
           expires_at: '2020-01-01T00:00:00.000Z' // in the past
         }),
         key_hash: hash
       };
 
-      sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       try {
-        await service.verifyAccessKey(plaintext);
+        await service.verifyApiKey(plaintext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(HTTP401);
@@ -297,10 +297,10 @@ describe('AccessKeyService', () => {
 
   describe('touchLastUsedAt', () => {
     it('should call repository.touchLastUsedAt', async () => {
-      const stub = sinon.stub(AccessKeyRepository.prototype, 'touchLastUsedAt').resolves();
+      const stub = sinon.stub(ApiKeyRepository.prototype, 'touchLastUsedAt').resolves();
 
       const connection = getMockDBConnection();
-      const service = new AccessKeyService(connection);
+      const service = new ApiKeyService(connection);
 
       await service.touchLastUsedAt('aabbccdd-0000-0000-0000-000000000001');
 

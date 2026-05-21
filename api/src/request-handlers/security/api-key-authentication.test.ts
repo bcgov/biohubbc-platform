@@ -7,7 +7,7 @@ import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { HTTP401 } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
-import { AccessKeyService } from '../../services/access-key-service';
+import { ApiKeyService } from '../../services/api-key-service';
 import { UserService } from '../../services/user-service';
 import * as apiKeyAuth from './api-key-authentication';
 
@@ -61,7 +61,7 @@ describe('authenticateRequestApiKey', () => {
     const dbConnection = getMockDBConnection();
     sinon.stub(apiKeyAuth.apiKeyAuthenticationDependencies, 'getAPIUserDBConnection').returns(dbConnection);
 
-    sinon.stub(AccessKeyService.prototype, 'verifyAccessKey').rejects(new HTTP401('Access Denied'));
+    sinon.stub(ApiKeyService.prototype, 'verifyApiKey').rejects(new HTTP401('Access Denied'));
 
     const { mockReq } = getRequestHandlerMocks();
     mockReq.headers = { 'x-api-key': 'biohub_BadPrefix_badsecretvalue' };
@@ -78,8 +78,8 @@ describe('authenticateRequestApiKey', () => {
     const dbConnection = getMockDBConnection();
     sinon.stub(apiKeyAuth.apiKeyAuthenticationDependencies, 'getAPIUserDBConnection').returns(dbConnection);
 
-    sinon.stub(AccessKeyService.prototype, 'verifyAccessKey').resolves({
-      access_key_id: 'aabbccdd-0000-0000-0000-000000000001',
+    sinon.stub(ApiKeyService.prototype, 'verifyApiKey').resolves({
+      api_key_id: 'aabbccdd-0000-0000-0000-000000000001',
       system_user_id: 1
     });
 
@@ -102,15 +102,15 @@ describe('authenticateRequestApiKey', () => {
     const dbConnection = getMockDBConnection();
     sinon.stub(apiKeyAuth.apiKeyAuthenticationDependencies, 'getAPIUserDBConnection').returns(dbConnection);
 
-    const verifyStub = sinon.stub(AccessKeyService.prototype, 'verifyAccessKey').resolves({
-      access_key_id: 'aabbccdd-0000-0000-0000-000000000001',
+    const verifyStub = sinon.stub(ApiKeyService.prototype, 'verifyApiKey').resolves({
+      api_key_id: 'aabbccdd-0000-0000-0000-000000000001',
       system_user_id: 1
     });
 
     const user = makeSystemUser();
     sinon.stub(UserService.prototype, 'getUserById').resolves(user);
 
-    const touchStub = sinon.stub(AccessKeyService.prototype, 'touchLastUsedAt').resolves();
+    const touchStub = sinon.stub(ApiKeyService.prototype, 'touchLastUsedAt').resolves();
 
     const { mockReq } = getRequestHandlerMocks();
     mockReq.headers = { 'x-api-key': 'biohub_TestPref_supersecretvalue32byteslong12345' };

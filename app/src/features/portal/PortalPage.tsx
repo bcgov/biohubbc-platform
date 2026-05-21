@@ -25,7 +25,7 @@ const PortalPage = ({ initialTab = 'tickets' }: IPortalPageProps) => {
     } else if (value === 'submissions') {
       navigate('/portal/submission');
     } else {
-      navigate('/portal/api-keys');
+      navigate('/portal/api-key');
     }
   };
 

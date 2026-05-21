@@ -45,7 +45,7 @@ export const PortalRouter = () => {
       />
 
       <Route
-        path="/api-keys"
+        path="/api-key"
         element={
           <>
             <PageTitle title="API Keys" description="Manage your API keys" />

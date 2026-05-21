@@ -1,12 +1,12 @@
 import { OpenAPIV3 } from 'openapi-types';
 
 /**
- * OpenAPI schema for a public access key record (no key_hash).
+ * OpenAPI schema for a public API key record.
  */
-export const AccessKeyViewSchema: OpenAPIV3.SchemaObject = {
+export const ApiKeyViewSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
-    'access_key_id',
+    'api_key_id',
     'system_user_id',
     'name',
     'key_prefix',
@@ -22,7 +22,7 @@ export const AccessKeyViewSchema: OpenAPIV3.SchemaObject = {
   ],
   additionalProperties: false,
   properties: {
-    access_key_id: {
+    api_key_id: {
       type: 'string',
       format: 'uuid',
       description: 'System generated surrogate primary key identifier.'
@@ -87,15 +87,15 @@ export const AccessKeyViewSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * OpenAPI schema for the response body when a new access key is created.
+ * OpenAPI schema for the response body when a new API key is created.
  * The `plaintext_key` field is present only in this response and must be saved by the caller immediately.
  */
-export const CreateAccessKeyResponseSchema: OpenAPIV3.SchemaObject = {
+export const CreateApiKeyResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['access_key', 'plaintext_key'],
+  required: ['api_key', 'plaintext_key'],
   additionalProperties: false,
   properties: {
-    access_key: AccessKeyViewSchema,
+    api_key: ApiKeyViewSchema,
     plaintext_key: {
       type: 'string',
       description: 'The full plaintext API key. This is shown exactly once and cannot be recovered.'

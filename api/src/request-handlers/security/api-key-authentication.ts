@@ -1,7 +1,7 @@
 import { Request } from 'express';
 import { getAPIUserDBConnection } from '../../database/db';
 import { HTTP401 } from '../../errors/http-error';
-import { AccessKeyService } from '../../services/access-key-service';
+import { ApiKeyService } from '../../services/api-key-service';
 import { UserService } from '../../services/user-service';
 import { getLogger } from '../../utils/logger';
 
@@ -43,8 +43,8 @@ export const authenticateRequestApiKey = async (req: Request): Promise<true> => 
   try {
     await connection.open();
 
-    const accessKeyService = new AccessKeyService(connection);
-    const { access_key_id, system_user_id } = await accessKeyService.verifyAccessKey(apiKey);
+    const apiKeyService = new ApiKeyService(connection);
+    const { api_key_id, system_user_id } = await apiKeyService.verifyApiKey(apiKey);
 
     const userService = new UserService(connection);
     const user = await userService.getUserById(system_user_id);
@@ -63,7 +63,7 @@ export const authenticateRequestApiKey = async (req: Request): Promise<true> => 
 
     req.system_user = user;
 
-    await accessKeyService.touchLastUsedAt(access_key_id);
+    await apiKeyService.touchLastUsedAt(api_key_id);
 
     await connection.commit();
 

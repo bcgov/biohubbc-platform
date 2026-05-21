@@ -11,7 +11,7 @@ import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { IAccessKeyView } from 'interfaces/useApiKeysApi.interface';
+import { IApiKeyView } from 'interfaces/useApiKeysApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 
 type KeyStatus = 'Active' | 'Revoked' | 'Expired';
@@ -24,7 +24,7 @@ type KeyStatus = 'Active' | 'Revoked' | 'Expired';
  * @param {IAccessKeyView} key
  * @return {KeyStatus}
  */
-export const getKeyStatus = (key: IAccessKeyView): KeyStatus => {
+export const getKeyStatus = (key: IApiKeyView): KeyStatus => {
   if (key.revoked_at !== null) {
     return 'Revoked';
   }
@@ -52,7 +52,7 @@ const statusColor = (status: KeyStatus): 'success' | 'error' | 'warning' => {
 };
 
 interface IPortalApiKeysContainerProps {
-  rows: IAccessKeyView[];
+  rows: IApiKeyView[];
   rowCount: number;
   isLoading: boolean;
   /** Current value of the search field. */
@@ -62,9 +62,9 @@ interface IPortalApiKeysContainerProps {
   /** Called when the user clicks the "New API Key" button. */
   onAdd: () => void;
   /** Called when the user clicks the Revoke action for a specific key. */
-  onRevoke: (key: IAccessKeyView) => void;
+  onRevoke: (key: IApiKeyView) => void;
   /** Called when the user clicks the Delete action for a specific key. */
-  onDelete: (key: IAccessKeyView) => void;
+  onDelete: (key: IApiKeyView) => void;
 }
 
 /**
@@ -73,7 +73,7 @@ interface IPortalApiKeysContainerProps {
 export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
   const { rows, rowCount, isLoading, searchTerm, onSearch, onAdd, onRevoke, onDelete } = props;
 
-  const columns: GridColDef<IAccessKeyView>[] = [
+  const columns: GridColDef<IApiKeyView>[] = [
     {
       field: 'name',
       headerName: 'Name',
@@ -202,7 +202,7 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
           autoHeight
           rows={rows}
           columns={columns}
-          getRowId={(row) => row.access_key_id}
+          getRowId={(row) => row.api_key_id}
           loading={isLoading}
           noRowsMessage="No API keys."
           pageSizeOptions={[10, 25, 50]}

@@ -4,28 +4,28 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
-import { AccessKeyService } from '../../../services/access-key-service';
-import { deleteAccessKey, revokeAccessKey } from './index';
+import { ApiKeyService } from '../../../services/api-key-service';
+import { deleteApiKey, revokeApiKey } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/api-key/{accessKeyId}/index', () => {
+describe('paths/api-key/{apiKeyId}/index', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('PATCH revokeAccessKey', () => {
+  describe('PATCH revokeApiKey', () => {
     it('should return 204 when the key is successfully revoked', async () => {
       const dbConnection = getMockDBConnection({ systemUserId: () => 1 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnection);
 
-      sinon.stub(AccessKeyService.prototype, 'revokeAccessKey').resolves();
+      sinon.stub(ApiKeyService.prototype, 'revokeApiKey').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
-      mockReq.params = { accessKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
+      mockReq.params = { apiKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
 
-      await revokeAccessKey()(mockReq, mockRes, mockNext);
+      await revokeApiKey()(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(204);
     });
@@ -34,14 +34,14 @@ describe('paths/api-key/{accessKeyId}/index', () => {
       const dbConnection = getMockDBConnection({ systemUserId: () => 1 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnection);
 
-      sinon.stub(AccessKeyService.prototype, 'revokeAccessKey').rejects(new Error('revoke failed'));
+      sinon.stub(ApiKeyService.prototype, 'revokeApiKey').rejects(new Error('revoke failed'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
-      mockReq.params = { accessKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
+      mockReq.params = { apiKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
 
       try {
-        await revokeAccessKey()(mockReq, mockRes, mockNext);
+        await revokeApiKey()(mockReq, mockRes, mockNext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('revoke failed');
@@ -49,18 +49,18 @@ describe('paths/api-key/{accessKeyId}/index', () => {
     });
   });
 
-  describe('DELETE deleteAccessKey', () => {
+  describe('DELETE deleteApiKey', () => {
     it('should return 204 when the key is successfully deleted', async () => {
       const dbConnection = getMockDBConnection({ systemUserId: () => 1 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnection);
 
-      sinon.stub(AccessKeyService.prototype, 'deleteAccessKey').resolves();
+      sinon.stub(ApiKeyService.prototype, 'deleteApiKey').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
-      mockReq.params = { accessKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
+      mockReq.params = { apiKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
 
-      await deleteAccessKey()(mockReq, mockRes, mockNext);
+      await deleteApiKey()(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(204);
     });
@@ -69,14 +69,14 @@ describe('paths/api-key/{accessKeyId}/index', () => {
       const dbConnection = getMockDBConnection({ systemUserId: () => 1 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnection);
 
-      sinon.stub(AccessKeyService.prototype, 'deleteAccessKey').rejects(new Error('delete failed'));
+      sinon.stub(ApiKeyService.prototype, 'deleteApiKey').rejects(new Error('delete failed'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
-      mockReq.params = { accessKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
+      mockReq.params = { apiKeyId: 'aabbccdd-0000-0000-0000-000000000001' };
 
       try {
-        await deleteAccessKey()(mockReq, mockRes, mockNext);
+        await deleteApiKey()(mockReq, mockRes, mockNext);
         expect.fail('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('delete failed');

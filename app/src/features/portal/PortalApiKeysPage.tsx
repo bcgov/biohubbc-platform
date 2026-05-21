@@ -16,7 +16,7 @@ import Typography from '@mui/material/Typography';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IAccessKeyView, ICreateAccessKeyResponse } from 'interfaces/useApiKeysApi.interface';
+import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
 import { useEffect, useMemo, useState } from 'react';
 import { PortalListPageLayout } from './components/PortalListPageLayout';
 import { PortalApiKeysContainer } from './list/PortalApiKeysContainer';
@@ -53,15 +53,15 @@ export const PortalApiKeysPage = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [createResult, setCreateResult] = useState<ICreateAccessKeyResponse | null>(null);
+  const [createResult, setCreateResult] = useState<ICreateApiKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Revoke dialog state
-  const [revokeTarget, setRevokeTarget] = useState<IAccessKeyView | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<IApiKeyView | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
 
   // Delete dialog state
-  const [deleteTarget, setDeleteTarget] = useState<IAccessKeyView | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<IApiKeyView | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   /** Reset create-dialog state and open the dialog. */
@@ -118,7 +118,7 @@ export const PortalApiKeysPage = () => {
     }
     setIsRevoking(true);
     try {
-      await api.apiKeys.revokeApiKey(revokeTarget.access_key_id);
+      await api.apiKeys.revokeApiKey(revokeTarget.api_key_id);
       keysLoader.refresh();
     } finally {
       setIsRevoking(false);
@@ -137,7 +137,7 @@ export const PortalApiKeysPage = () => {
     }
     setIsDeleting(true);
     try {
-      await api.apiKeys.deleteApiKey(deleteTarget.access_key_id);
+      await api.apiKeys.deleteApiKey(deleteTarget.api_key_id);
       keysLoader.refresh();
     } finally {
       setIsDeleting(false);
@@ -183,7 +183,7 @@ export const PortalApiKeysPage = () => {
                 }
               />
               <Typography variant="caption" color="text.secondary">
-                Key prefix: <strong>{createResult.access_key.key_prefix}</strong>
+                Key prefix: <strong>{createResult.api_key.key_prefix}</strong>
               </Typography>
             </Stack>
           ) : (

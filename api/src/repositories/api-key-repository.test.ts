@@ -4,13 +4,13 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { AccessKeyView } from '../models/access-key';
-import { AccessKeyRepository, IInsertAccessKeyParams } from './access-key-repository';
+import { ApiKeyView } from '../models/api-key';
+import { ApiKeyRepository, IInsertApiKeyParams } from './api-key-repository';
 
 chai.use(sinonChai);
 
-const makeAccessKeyView = (overrides: Partial<AccessKeyView> = {}): AccessKeyView => ({
-  access_key_id: 'aabbccdd-0000-0000-0000-000000000001',
+const makeApiKeyView = (overrides: Partial<ApiKeyView> = {}): ApiKeyView => ({
+  api_key_id: 'aabbccdd-0000-0000-0000-000000000001',
   system_user_id: 1,
   name: 'My test key',
   key_prefix: 'biohub_AbCdEfGh',
@@ -26,20 +26,20 @@ const makeAccessKeyView = (overrides: Partial<AccessKeyView> = {}): AccessKeyVie
   ...overrides
 });
 
-describe('AccessKeyRepository', () => {
+describe('ApiKeyRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('insertAccessKey', () => {
-    it('should insert a new access key and return the view record', async () => {
-      const view = makeAccessKeyView();
+  describe('insertApiKey', () => {
+    it('should insert a new API key and return the view record', async () => {
+      const view = makeApiKeyView();
       const mockResponse = { rowCount: 1, rows: [view] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const params: IInsertAccessKeyParams = {
+      const params: IInsertApiKeyParams = {
         system_user_id: 1,
         name: 'My test key',
         key_prefix: 'biohub_AbCdEfGh',
@@ -47,21 +47,21 @@ describe('AccessKeyRepository', () => {
         expires_at: '2027-01-01T00:00:00.000Z'
       };
 
-      const result = await repo.insertAccessKey(params);
+      const result = await repo.insertApiKey(params);
 
       expect(result).to.eql(view);
     });
   });
 
-  describe('getAccessKeyByPrefix', () => {
-    it('should return the full access key record when found', async () => {
-      const row = { ...makeAccessKeyView(), key_hash: 'abc123hashvalue' };
+  describe('getApiKeyByPrefix', () => {
+    it('should return the full API key record when found', async () => {
+      const row = { ...makeApiKeyView(), key_hash: 'abc123hashvalue' };
       const mockResponse = { rowCount: 1, rows: [row] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getAccessKeyByPrefix('biohub_AbCdEfGh');
+      const result = await repo.getApiKeyByPrefix('biohub_AbCdEfGh');
 
       expect(result).to.eql(row);
     });
@@ -70,23 +70,23 @@ describe('AccessKeyRepository', () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getAccessKeyByPrefix('biohub_NoMatch11');
+      const result = await repo.getApiKeyByPrefix('biohub_NoMatch11');
 
       expect(result).to.be.null;
     });
   });
 
-  describe('getAccessKeyById', () => {
-    it('should return the access key view when found', async () => {
-      const view = makeAccessKeyView();
+  describe('getApiKeyById', () => {
+    it('should return the API key view when found', async () => {
+      const view = makeApiKeyView();
       const mockResponse = { rowCount: 1, rows: [view] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getAccessKeyById(view.access_key_id);
+      const result = await repo.getApiKeyById(view.api_key_id);
 
       expect(result).to.eql(view);
     });
@@ -95,26 +95,26 @@ describe('AccessKeyRepository', () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getAccessKeyById('nonexistent-uuid');
+      const result = await repo.getApiKeyById('nonexistent-uuid');
 
       expect(result).to.be.null;
     });
   });
 
-  describe('listAccessKeysByUserId', () => {
-    it('should return an array of access key views for the user', async () => {
+  describe('listApiKeysByUserId', () => {
+    it('should return an array of API key views for the user', async () => {
       const rows = [
-        makeAccessKeyView(),
-        makeAccessKeyView({ access_key_id: 'aabbccdd-0000-0000-0000-000000000002', name: 'Second key' })
+        makeApiKeyView(),
+        makeApiKeyView({ api_key_id: 'aabbccdd-0000-0000-0000-000000000002', name: 'Second key' })
       ];
       const mockResponse = { rowCount: 2, rows } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.listAccessKeysByUserId(1);
+      const result = await repo.listApiKeysByUserId(1);
 
       expect(result).to.eql(rows);
     });
@@ -123,37 +123,37 @@ describe('AccessKeyRepository', () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.listAccessKeysByUserId(99);
+      const result = await repo.listApiKeysByUserId(99);
 
       expect(result).to.eql([]);
     });
   });
 
-  describe('revokeAccessKey', () => {
+  describe('revokeApiKey', () => {
     it('should call sql without throwing', async () => {
       const mockResponse = { rowCount: 1, rows: [] } as unknown as QueryResult<any>;
       const sqlSpy = sinon.stub().resolves(mockResponse);
 
       const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      await repo.revokeAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+      await repo.revokeApiKey('aabbccdd-0000-0000-0000-000000000001', 1);
 
       expect(sqlSpy).to.have.been.calledOnce;
     });
   });
 
-  describe('deleteAccessKey', () => {
+  describe('deleteApiKey', () => {
     it('should call sql without throwing', async () => {
       const mockResponse = { rowCount: 1, rows: [] } as unknown as QueryResult<any>;
       const sqlSpy = sinon.stub().resolves(mockResponse);
 
       const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
-      await repo.deleteAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+      await repo.deleteApiKey('aabbccdd-0000-0000-0000-000000000001', 1);
 
       expect(sqlSpy).to.have.been.calledOnce;
     });
@@ -165,7 +165,7 @@ describe('AccessKeyRepository', () => {
       const sqlSpy = sinon.stub().resolves(mockResponse);
 
       const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
-      const repo = new AccessKeyRepository(mockDBConnection);
+      const repo = new ApiKeyRepository(mockDBConnection);
 
       await repo.touchLastUsedAt('aabbccdd-0000-0000-0000-000000000001');
 

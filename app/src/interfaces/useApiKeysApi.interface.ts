@@ -1,9 +1,9 @@
 /**
  * Public view of a BioHub API key as returned by the API.
- * The plaintext key and key_hash are never included.
+ * The plaintext key is not included.
  */
-export interface IAccessKeyView {
-  access_key_id: string;
+export interface IApiKeyView {
+  api_key_id: string;
   system_user_id: number;
   name: string;
   key_prefix: string;
@@ -22,7 +22,7 @@ export interface IAccessKeyView {
  * Response body for the POST /api/api-key endpoint.
  * The plaintext_key is shown exactly once and cannot be recovered.
  */
-export interface ICreateAccessKeyResponse {
-  access_key: IAccessKeyView;
+export interface ICreateApiKeyResponse {
+  api_key: IApiKeyView;
   plaintext_key: string;
 }

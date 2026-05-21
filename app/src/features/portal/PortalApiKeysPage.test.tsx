@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { IAccessKeyView, ICreateAccessKeyResponse } from 'interfaces/useApiKeysApi.interface';
+import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PortalApiKeysPage } from './PortalApiKeysPage';
@@ -9,8 +9,8 @@ vi.mock('../../hooks/useApi');
 
 const mockUseApi = useApi as Mock;
 
-const makeKeyView = (overrides: Partial<IAccessKeyView> = {}): IAccessKeyView => ({
-  access_key_id: 'aabbccdd-0000-0000-0000-000000000001',
+const makeKeyView = (overrides: Partial<IApiKeyView> = {}): IApiKeyView => ({
+  api_key_id: 'aabbccdd-0000-0000-0000-000000000001',
   system_user_id: 1,
   name: 'My script key',
   key_prefix: 'biohub_AbCdEfGh',
@@ -160,8 +160,8 @@ describe('PortalApiKeysPage', () => {
     });
 
     it('shows the plaintext key after successful creation', async () => {
-      const response: ICreateAccessKeyResponse = {
-        access_key: makeKeyView(),
+      const response: ICreateApiKeyResponse = {
+        api_key: makeKeyView(),
         plaintext_key: 'biohub_AbCdEfGh_supersecretvalue12345678'
       };
       mockCreateApiKey.mockResolvedValue(response);
