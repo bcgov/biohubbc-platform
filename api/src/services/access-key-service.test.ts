@@ -121,6 +121,19 @@ describe('AccessKeyService', () => {
     });
   });
 
+  describe('deleteAccessKey', () => {
+    it('should call repository.deleteAccessKey with correct arguments', async () => {
+      const stub = sinon.stub(AccessKeyRepository.prototype, 'deleteAccessKey').resolves();
+
+      const connection = getMockDBConnection();
+      const service = new AccessKeyService(connection);
+
+      await service.deleteAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+
+      expect(stub).to.have.been.calledOnceWith('aabbccdd-0000-0000-0000-000000000001', 1);
+    });
+  });
+
   describe('verifyAccessKey', () => {
     const buildValidKey = async (): Promise<{ plaintext: string; hash: string; prefix: string }> => {
       const prefix = 'biohub_TestPref';

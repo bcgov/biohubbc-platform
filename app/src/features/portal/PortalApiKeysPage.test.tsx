@@ -29,14 +29,25 @@ const makeKeyView = (overrides: Partial<IAccessKeyView> = {}): IAccessKeyView =>
 const mockListApiKeys = vi.fn();
 const mockCreateApiKey = vi.fn();
 const mockRevokeApiKey = vi.fn();
+const mockDeleteApiKey = vi.fn();
 
 const renderPage = () => render(<PortalApiKeysPage />);
 
-const clickRevokeFromMenu = async () => {
+const clickMenuButton = async () => {
   await waitFor(() => screen.getByTestId('custom-menu-icon-Actions'));
   fireEvent.click(screen.getByTestId('custom-menu-icon-Actions'));
+};
+
+const clickRevokeFromMenu = async () => {
+  await clickMenuButton();
   await waitFor(() => screen.getByTestId('custom-menu-icon-item-Revoke'));
   fireEvent.click(screen.getByTestId('custom-menu-icon-item-Revoke'));
+};
+
+const clickDeleteFromMenu = async () => {
+  await clickMenuButton();
+  await waitFor(() => screen.getByTestId('custom-menu-icon-item-Delete'));
+  fireEvent.click(screen.getByTestId('custom-menu-icon-item-Delete'));
 };
 
 describe('PortalApiKeysPage', () => {
@@ -46,7 +57,8 @@ describe('PortalApiKeysPage', () => {
       apiKeys: {
         listApiKeys: mockListApiKeys,
         createApiKey: mockCreateApiKey,
-        revokeApiKey: mockRevokeApiKey
+        revokeApiKey: mockRevokeApiKey,
+        deleteApiKey: mockDeleteApiKey
       }
     });
 
@@ -86,31 +98,57 @@ describe('PortalApiKeysPage', () => {
       });
     });
 
-    it('shows Revoked chip for a revoked key', async () => {
+    it('shows Revoked chip for a revoked key and action menu is still present', async () => {
       mockListApiKeys.mockResolvedValue([makeKeyView({ revoked_at: '2026-01-01T00:00:00.000Z' })]);
 
       renderPage();
 
       await waitFor(() => {
         expect(screen.getByText('Revoked')).toBeInTheDocument();
-        expect(screen.queryByTestId('custom-menu-icon-Actions')).not.toBeInTheDocument();
+        expect(screen.getByTestId('custom-menu-icon-Actions')).toBeInTheDocument();
       });
     });
 
-    it('shows Expired chip for an expired key', async () => {
+    it('shows Expired chip for an expired key and action menu is still present', async () => {
       mockListApiKeys.mockResolvedValue([makeKeyView({ expires_at: '2020-01-01T00:00:00.000Z' })]);
 
       renderPage();
 
       await waitFor(() => {
         expect(screen.getByText('Expired')).toBeInTheDocument();
-        expect(screen.queryByTestId('custom-menu-icon-Actions')).not.toBeInTheDocument();
+        expect(screen.getByTestId('custom-menu-icon-Actions')).toBeInTheDocument();
+      });
+    });
+
+    it('shows only Delete (no Revoke) in the menu for a revoked key', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView({ revoked_at: '2026-01-01T00:00:00.000Z' })]);
+
+      renderPage();
+
+      await clickMenuButton();
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('custom-menu-icon-item-Revoke')).not.toBeInTheDocument();
+        expect(screen.getByTestId('custom-menu-icon-item-Delete')).toBeInTheDocument();
+      });
+    });
+
+    it('shows Revoke and Delete in the menu for an active key', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView()]);
+
+      renderPage();
+
+      await clickMenuButton();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('custom-menu-icon-item-Revoke')).toBeInTheDocument();
+        expect(screen.getByTestId('custom-menu-icon-item-Delete')).toBeInTheDocument();
       });
     });
   });
 
   describe('create flow', () => {
-    it('opens create dialog when Create API Key button is clicked', async () => {
+    it('opens create dialog when New API Key button is clicked', async () => {
       renderPage();
 
       await waitFor(() => screen.getByTestId('portal-api-keys-add-button'));
@@ -118,7 +156,7 @@ describe('PortalApiKeysPage', () => {
 
       const dialog = screen.getByRole('dialog');
       expect(dialog).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Create API Key' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'New API Key' })).toBeInTheDocument();
     });
 
     it('shows the plaintext key after successful creation', async () => {
@@ -198,6 +236,67 @@ describe('PortalApiKeysPage', () => {
 
       await waitFor(() => {
         expect(mockRevokeApiKey).not.toHaveBeenCalled();
+        expect(screen.queryByTestId('yes-no-dialog')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('delete flow', () => {
+    it('shows delete confirmation dialog when Delete is clicked for an active key', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView()]);
+
+      renderPage();
+
+      await clickDeleteFromMenu();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('yes-no-dialog')).toBeInTheDocument();
+        expect(screen.getByText(/delete api key/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows delete confirmation dialog when Delete is clicked for a revoked key', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView({ revoked_at: '2026-01-01T00:00:00.000Z' })]);
+
+      renderPage();
+
+      await clickDeleteFromMenu();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('yes-no-dialog')).toBeInTheDocument();
+        expect(screen.getByText(/delete api key/i)).toBeInTheDocument();
+      });
+    });
+
+    it('calls deleteApiKey and refreshes the list when confirmed', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView()]);
+      mockDeleteApiKey.mockResolvedValue(undefined);
+
+      renderPage();
+
+      await clickDeleteFromMenu();
+
+      await waitFor(() => screen.getByTestId('yes-button'));
+      fireEvent.click(screen.getByTestId('yes-button'));
+
+      await waitFor(() => {
+        expect(mockDeleteApiKey).toHaveBeenCalledWith('aabbccdd-0000-0000-0000-000000000001');
+        expect(mockListApiKeys).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('closes the dialog without deleting when No is clicked', async () => {
+      mockListApiKeys.mockResolvedValue([makeKeyView()]);
+
+      renderPage();
+
+      await clickDeleteFromMenu();
+
+      await waitFor(() => screen.getByTestId('no-button'));
+      fireEvent.click(screen.getByTestId('no-button'));
+
+      await waitFor(() => {
+        expect(mockDeleteApiKey).not.toHaveBeenCalled();
         expect(screen.queryByTestId('yes-no-dialog')).not.toBeInTheDocument();
       });
     });

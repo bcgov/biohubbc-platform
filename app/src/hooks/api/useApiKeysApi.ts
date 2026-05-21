@@ -34,14 +34,28 @@ export const useApiKeysApi = (axios: AxiosInstance) => {
   /**
    * Revoke an API key owned by the current user.
    *
-   * The key is immediately invalidated and will no longer authorize requests.
+   * Sets `revoked_at` and `expires_at` to now. The key is immediately invalidated and
+   * will no longer authorize requests, but remains visible in the key list.
    *
    * @param {string} accessKeyId - UUID of the key to revoke.
    * @return {Promise<void>}
    */
   const revokeApiKey = async (accessKeyId: string): Promise<void> => {
+    await axios.patch(`/api/api-key/${accessKeyId}`);
+  };
+
+  /**
+   * Soft-delete an API key owned by the current user.
+   *
+   * Sets `record_end_date`, `expires_at`, and (if not yet revoked) `revoked_at` to now.
+   * The key is immediately invalidated and removed from the key list.
+   *
+   * @param {string} accessKeyId - UUID of the key to delete.
+   * @return {Promise<void>}
+   */
+  const deleteApiKey = async (accessKeyId: string): Promise<void> => {
     await axios.delete(`/api/api-key/${accessKeyId}`);
   };
 
-  return { createApiKey, listApiKeys, revokeApiKey };
+  return { createApiKey, listApiKeys, revokeApiKey, deleteApiKey };
 };

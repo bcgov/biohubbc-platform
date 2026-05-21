@@ -24,7 +24,7 @@ import { PortalApiKeysContainer } from './list/PortalApiKeysContainer';
 /**
  * Portal page for managing user API keys.
  *
- * Handles data loading, client-side search filtering, and create/revoke dialog state.
+ * Handles data loading, client-side search filtering, and create/revoke/delete dialog state.
  * Delegates all layout and table rendering to PortalApiKeysContainer.
  */
 export const PortalApiKeysPage = () => {
@@ -59,6 +59,10 @@ export const PortalApiKeysPage = () => {
   // Revoke dialog state
   const [revokeTarget, setRevokeTarget] = useState<IAccessKeyView | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
+
+  // Delete dialog state
+  const [deleteTarget, setDeleteTarget] = useState<IAccessKeyView | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /** Reset create-dialog state and open the dialog. */
   const handleOpenCreate = () => {
@@ -122,6 +126,25 @@ export const PortalApiKeysPage = () => {
     }
   };
 
+  /**
+   * Confirm deletion of `deleteTarget` and refresh the key list.
+   *
+   * The delete button is disabled while the request is in flight to prevent double-submission.
+   */
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await api.apiKeys.deleteApiKey(deleteTarget.access_key_id);
+      keysLoader.refresh();
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   return (
     <PortalListPageLayout>
       <PortalApiKeysContainer
@@ -132,11 +155,12 @@ export const PortalApiKeysPage = () => {
         onSearch={setSearchTerm}
         onAdd={handleOpenCreate}
         onRevoke={setRevokeTarget}
+        onDelete={setDeleteTarget}
       />
 
-      {/* Create API Key dialog */}
+      {/* New API Key dialog */}
       <Dialog open={createDialogOpen} onClose={handleCloseCreate} maxWidth="sm" fullWidth>
-        <DialogTitle>{createResult ? 'API Key Created' : 'Create API Key'}</DialogTitle>
+        <DialogTitle>{createResult ? 'API Key Created' : 'New API Key'}</DialogTitle>
         <DialogContent>
           {createResult ? (
             <Stack spacing={2} mt={1}>
@@ -164,9 +188,6 @@ export const PortalApiKeysPage = () => {
             </Stack>
           ) : (
             <Stack spacing={2} mt={1}>
-              <DialogContentText>
-                Choose a descriptive name so you can identify this key later (e.g. "Parquet download script").
-              </DialogContentText>
               <TextField
                 autoFocus
                 label="Key name"
@@ -178,6 +199,7 @@ export const PortalApiKeysPage = () => {
                   }
                 }}
                 inputProps={{ maxLength: 200 }}
+                helperText='Choose a descriptive name so you can identify this key later (e.g. "Parquet download script").'
                 fullWidth
               />
             </Stack>
@@ -217,6 +239,19 @@ export const PortalApiKeysPage = () => {
         onClose={() => setRevokeTarget(null)}
         onNo={() => setRevokeTarget(null)}
         onYes={handleRevokeConfirm}
+      />
+
+      {/* Delete confirmation dialog */}
+      <YesNoDialog
+        open={!!deleteTarget}
+        dialogTitle="Delete API Key"
+        dialogText={`Are you sure you want to delete "${deleteTarget?.name}"? The key will be permanently removed from your list and immediately invalidated.`}
+        yesButtonLabel="Delete"
+        yesButtonProps={{ color: 'error', variant: 'contained', disabled: isDeleting }}
+        noButtonLabel="Cancel"
+        onClose={() => setDeleteTarget(null)}
+        onNo={() => setDeleteTarget(null)}
+        onYes={handleDeleteConfirm}
       />
     </PortalListPageLayout>
   );

@@ -168,11 +168,38 @@ export class AccessKeyRepository extends BaseRepository {
   async revokeAccessKey(accessKeyId: string, systemUserId: number): Promise<void> {
     const sqlStatement = SQL`
       UPDATE access_key
-      SET revoked_at = now()
+      SET revoked_at = now(),
+          expires_at = now()
       WHERE access_key_id = ${accessKeyId}
         AND system_user_id = ${systemUserId}
         AND record_end_date IS NULL
         AND revoked_at IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Soft-delete an access key owned by a system user.
+   *
+   * Sets `record_end_date` and `expires_at` to now so the row is excluded from active queries
+   * and immediately invalidated. Also sets `revoked_at` if the key has not already been revoked.
+   * Owner-scoping via `system_user_id` prevents IDOR attacks.
+   *
+   * @param {string} accessKeyId - UUID of the key to delete.
+   * @param {number} systemUserId - Owner check; the key must belong to this user.
+   * @return {Promise<void>}
+   * @memberof AccessKeyRepository
+   */
+  async deleteAccessKey(accessKeyId: string, systemUserId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE access_key
+      SET record_end_date = now(),
+          expires_at      = now(),
+          revoked_at      = COALESCE(revoked_at, now())
+      WHERE access_key_id = ${accessKeyId}
+        AND system_user_id = ${systemUserId}
+        AND record_end_date IS NULL;
     `;
 
     await this.connection.sql(sqlStatement);

@@ -145,6 +145,20 @@ describe('AccessKeyRepository', () => {
     });
   });
 
+  describe('deleteAccessKey', () => {
+    it('should call sql without throwing', async () => {
+      const mockResponse = { rowCount: 1, rows: [] } as unknown as QueryResult<any>;
+      const sqlSpy = sinon.stub().resolves(mockResponse);
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
+      const repo = new AccessKeyRepository(mockDBConnection);
+
+      await repo.deleteAccessKey('aabbccdd-0000-0000-0000-000000000001', 1);
+
+      expect(sqlSpy).to.have.been.calledOnce;
+    });
+  });
+
   describe('touchLastUsedAt', () => {
     it('should call sql without throwing', async () => {
       const mockResponse = { rowCount: 1, rows: [] } as unknown as QueryResult<any>;

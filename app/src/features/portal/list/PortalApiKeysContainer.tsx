@@ -1,4 +1,4 @@
-import { mdiCancel, mdiDotsVertical, mdiMagnify } from '@mdi/js';
+import { mdiCancel, mdiDotsVertical, mdiMagnify, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -59,17 +59,19 @@ interface IPortalApiKeysContainerProps {
   searchTerm: string;
   /** Called when the user changes the search field value. */
   onSearch: (term: string) => void;
-  /** Called when the user clicks the "Create API Key" button. */
+  /** Called when the user clicks the "New API Key" button. */
   onAdd: () => void;
   /** Called when the user clicks the Revoke action for a specific key. */
   onRevoke: (key: IAccessKeyView) => void;
+  /** Called when the user clicks the Delete action for a specific key. */
+  onDelete: (key: IAccessKeyView) => void;
 }
 
 /**
  * Portal API keys container using the shared page section and data grid pattern.
  */
 export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
-  const { rows, rowCount, isLoading, searchTerm, onSearch, onAdd, onRevoke } = props;
+  const { rows, rowCount, isLoading, searchTerm, onSearch, onAdd, onRevoke, onDelete } = props;
 
   const columns: GridColDef<IAccessKeyView>[] = [
     {
@@ -133,21 +135,28 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
       headerAlign: 'center',
       renderCell: (params) => {
         const status = getKeyStatus(params.row);
-        if (status !== 'Active') {
-          return null;
+        const menuItems = [];
+
+        if (status === 'Active') {
+          menuItems.push({
+            menuIcon: <Icon path={mdiCancel} size={0.875} />,
+            menuLabel: 'Revoke',
+            menuOnClick: () => onRevoke(params.row)
+          });
         }
+
+        menuItems.push({
+          menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+          menuLabel: 'Delete',
+          menuOnClick: () => onDelete(params.row)
+        });
+
         return (
           <Box onClick={(event) => event.stopPropagation()}>
             <CustomMenuIconButton
               buttonTitle="Actions"
               buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-              menuItems={[
-                {
-                  menuIcon: <Icon path={mdiCancel} size={0.875} />,
-                  menuLabel: 'Revoke',
-                  menuOnClick: () => onRevoke(params.row)
-                }
-              ]}
+              menuItems={menuItems}
             />
           </Box>
         );
@@ -167,7 +176,7 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
         </>
       }
       onAdd={onAdd}
-      addLabel="Create API Key"
+      addLabel="New API Key"
       headerContent={
         <Stack gap={1} direction="row" alignItems="center">
           <TextField

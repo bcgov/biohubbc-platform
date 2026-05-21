@@ -165,6 +165,21 @@ export class AccessKeyService extends DBService {
   }
 
   /**
+   * Soft-delete an access key owned by a system user.
+   *
+   * Sets `record_end_date`, `expires_at`, and (if not already revoked) `revoked_at` to now.
+   * The key is immediately invalidated and disappears from the user's key list.
+   *
+   * @param {string} accessKeyId
+   * @param {number} systemUserId
+   * @return {Promise<void>}
+   * @memberof AccessKeyService
+   */
+  async deleteAccessKey(accessKeyId: string, systemUserId: number): Promise<void> {
+    return this.accessKeyRepository.deleteAccessKey(accessKeyId, systemUserId);
+  }
+
+  /**
    * Verify a plaintext API key and return its owner information.
    *
    * Steps:
