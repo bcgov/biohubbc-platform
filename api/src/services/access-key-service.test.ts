@@ -149,6 +149,43 @@ describe('AccessKeyService', () => {
       expect(result.system_user_id).to.equal(record.system_user_id);
     });
 
+    it('should verify a key when the secret segment contains underscores', async () => {
+      // base64url can produce `_` in the secret; positional parsing must handle this correctly.
+      const prefix = 'biohub_TestPref'; // 15 chars total — exact prefix length
+      const secret = 'secret_with_underscores_inside__';
+      const plaintext = `${prefix}_${secret}`;
+      const hash = await deriveKeyHash(plaintext, prefix);
+
+      const record: AccessKey = {
+        ...makeAccessKeyView({ key_prefix: prefix }),
+        key_hash: hash
+      };
+
+      const getByPrefixStub = sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(record);
+
+      const connection = getMockDBConnection();
+      const service = new AccessKeyService(connection);
+
+      const result = await service.verifyAccessKey(plaintext);
+
+      expect(getByPrefixStub).to.have.been.calledOnceWith(prefix);
+      expect(result.access_key_id).to.equal(record.access_key_id);
+      expect(result.system_user_id).to.equal(record.system_user_id);
+    });
+
+    it('should throw HTTP401 when the key is too short to contain both prefix and secret', async () => {
+      const connection = getMockDBConnection();
+      const service = new AccessKeyService(connection);
+
+      try {
+        // 'biohub_short' is a valid vendor prefix but the prefix segment is too short
+        await service.verifyAccessKey('biohub_short_secret');
+        expect.fail('Expected to throw');
+      } catch (err) {
+        expect(err).to.be.instanceOf(HTTP401);
+      }
+    });
+
     it('should throw HTTP401 when the key does not have the biohub_ vendor prefix', async () => {
       const connection = getMockDBConnection();
       const service = new AccessKeyService(connection);

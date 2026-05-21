@@ -7,7 +7,7 @@ import { Knex } from 'knex';
  * - `access_key` stores hashed API keys for non-interactive access to API-key-gated routes.
  * - The plaintext key is returned exactly once at creation and is never stored.
  * - `key_prefix` is stored in plaintext for display, lookup, and debugging.
- * - `key_hash` (SHA-256 hex) is used for verification only; the original key cannot be recovered.
+ * - `key_hash` (scrypt hex digest, keyed with `key_prefix` as salt) is used for verification only; the original key cannot be recovered.
  * - Each key expires 6 months after creation.
  * - Revocation is captured by setting `revoked_at`; the key is then immediately invalid.
  *
@@ -60,7 +60,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN access_key.system_user_id IS 'Foreign key to the system_user who owns this key.';
     COMMENT ON COLUMN access_key.name IS 'Human-readable label for the key (e.g. "My script key").';
     COMMENT ON COLUMN access_key.key_prefix IS 'Short plaintext prefix of the key (e.g. biohub_AbCdEfGh) used for display and lookup.';
-    COMMENT ON COLUMN access_key.key_hash IS 'SHA-256 hex digest of the full plaintext key; used for verification only.';
+    COMMENT ON COLUMN access_key.key_hash IS 'Scrypt hex digest of the full plaintext key (salted with key_prefix); used for verification only.';
     COMMENT ON COLUMN access_key.expires_at IS 'Timestamp after which the key is no longer valid.';
     COMMENT ON COLUMN access_key.revoked_at IS 'Timestamp at which the key was revoked; null when the key is still active.';
     COMMENT ON COLUMN access_key.last_used_at IS 'Timestamp of the most recent successful authentication using this key.';

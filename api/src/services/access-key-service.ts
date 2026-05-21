@@ -17,6 +17,16 @@ const KEY_EXPIRY_MONTHS = 6;
 const PREFIX_BYTES = 6;
 
 /**
+ * Number of base64url characters produced from `PREFIX_BYTES`.
+ *
+ * base64url encodes 6 bits per character, so: ceil(PREFIX_BYTES * 8 / 6) = 8.
+ * This constant is used for positional parsing during verification — it must stay in
+ * sync with `PREFIX_BYTES`.  Never derive the prefix boundary from delimiter search;
+ * base64url output may contain `_`, making any `_`-search approach ambiguous.
+ */
+const PREFIX_SEGMENT_CHARS = Math.ceil((PREFIX_BYTES * 8) / 6);
+
+/**
  * Byte length of the random secret segment.
  * 32 bytes → ~43 base64url characters (~192 bits of entropy).
  */
@@ -28,6 +38,10 @@ const SECRET_BYTES = 32;
  * The prefix portion (`biohub_<8charPrefix>`) is stored in `key_prefix` for display/lookup.
  * The full plaintext string is scrypt-hashed (using `key_prefix` as salt) and stored in
  * `key_hash` for verification.
+ *
+ * The `_` between prefix and secret sits at a fixed, known index derived from
+ * `KEY_VENDOR_PREFIX.length + 1 + PREFIX_SEGMENT_CHARS`.  Verification must use
+ * positional parsing (not `indexOf` / `lastIndexOf`) because base64url may contain `_`.
  */
 const KEY_VENDOR_PREFIX = 'biohub';
 
@@ -154,7 +168,7 @@ export class AccessKeyService extends DBService {
    * Verify a plaintext API key and return its owner information.
    *
    * Steps:
-   * 1. Parse the prefix from the plaintext key.
+   * 1. Parse `key_prefix` positionally using known fixed lengths (base64url segments may contain `_`).
    * 2. Look up the row by prefix.
    * 3. Constant-time compare the scrypt hash of the supplied key against the stored hash.
    * 4. Reject if the key is expired, revoked, or soft-deleted.
@@ -167,15 +181,27 @@ export class AccessKeyService extends DBService {
    * @memberof AccessKeyService
    */
   async verifyAccessKey(plaintextKey: string): Promise<IVerifyAccessKeyResult> {
-    const parts = plaintextKey.split('_');
+    // Positional parse — `_`-search is unreliable because base64url output may contain `_`.
+    // The delimiter between key_prefix and secret sits at a fixed, computable index:
+    //   <vendor>_<prefixSegment>_<secret>
+    //   └─ KEY_VENDOR_PREFIX.length ─┘↑└─ PREFIX_SEGMENT_CHARS ─┘↑
+    //                                 6                             15
+    const vendorPrefixWithSep = `${KEY_VENDOR_PREFIX}_`;
+    const keyPrefixLength = vendorPrefixWithSep.length + PREFIX_SEGMENT_CHARS;
+    const secretDelimiterIndex = keyPrefixLength; // position of `_` between prefix and secret
 
-    // Expected format: biohub_<prefix>_<secret> — at least 3 underscore-separated segments.
-    if (parts.length < 3 || parts[0] !== KEY_VENDOR_PREFIX) {
+    const keyPrefix = plaintextKey.substring(0, keyPrefixLength);
+    const delimiter = plaintextKey[secretDelimiterIndex];
+    const secretSegment = plaintextKey.substring(secretDelimiterIndex + 1);
+
+    if (
+      !keyPrefix.startsWith(vendorPrefixWithSep) ||
+      keyPrefix.length !== keyPrefixLength ||
+      delimiter !== '_' ||
+      secretSegment.length === 0
+    ) {
       throw new HTTP401('Access Denied');
     }
-
-    // key_prefix = "biohub_<prefixSegment>"
-    const keyPrefix = `${parts[0]}_${parts[1]}`;
 
     const record = await this.accessKeyRepository.getAccessKeyByPrefix(keyPrefix);
 
