@@ -13,7 +13,17 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IAccessKeyView } from 'interfaces/useApiKeysApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 
-export const getKeyStatus = (key: IAccessKeyView): 'Active' | 'Revoked' | 'Expired' => {
+type KeyStatus = 'Active' | 'Revoked' | 'Expired';
+
+/**
+ * Derive the display status of an API key.
+ *
+ * Precedence: Revoked > Expired > Active.
+ *
+ * @param {IAccessKeyView} key
+ * @return {KeyStatus}
+ */
+export const getKeyStatus = (key: IAccessKeyView): KeyStatus => {
   if (key.revoked_at !== null) {
     return 'Revoked';
   }
@@ -23,14 +33,20 @@ export const getKeyStatus = (key: IAccessKeyView): 'Active' | 'Revoked' | 'Expir
   return 'Active';
 };
 
-const statusColor = (status: 'Active' | 'Revoked' | 'Expired') => {
+/**
+ * Map a `KeyStatus` value to the corresponding MUI Chip colour.
+ *
+ * @param {KeyStatus} status
+ * @return {'success' | 'error' | 'warning'}
+ */
+const statusColor = (status: KeyStatus): 'success' | 'error' | 'warning' => {
   switch (status) {
     case 'Active':
-      return 'success' as const;
+      return 'success';
     case 'Revoked':
-      return 'error' as const;
+      return 'error';
     case 'Expired':
-      return 'warning' as const;
+      return 'warning';
   }
 };
 
@@ -38,9 +54,13 @@ interface IPortalApiKeysContainerProps {
   rows: IAccessKeyView[];
   rowCount: number;
   isLoading: boolean;
+  /** Current value of the search field. */
   searchTerm: string;
+  /** Called when the user changes the search field value. */
   onSearch: (term: string) => void;
+  /** Called when the user clicks the "Create API Key" button. */
   onAdd: () => void;
+  /** Called when the user clicks the Revoke action for a specific key. */
   onRevoke: (key: IAccessKeyView) => void;
 }
 
@@ -77,7 +97,7 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
       sortable: false,
       valueGetter: (_value, row) => getKeyStatus(row),
       renderCell: (params) => {
-        const status = params.value as 'Active' | 'Revoked' | 'Expired';
+        const status = params.value as KeyStatus;
         return <Chip label={status} color={statusColor(status)} size="small" sx={{ fontWeight: 700 }} />;
       }
     },
@@ -171,7 +191,7 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
           columns={columns}
           getRowId={(row) => row.access_key_id}
           loading={isLoading}
-          noRowsMessage="No API keys found."
+          noRowsMessage="No API keys."
           pageSizeOptions={[10, 25, 50]}
           rowSelection={false}
         />

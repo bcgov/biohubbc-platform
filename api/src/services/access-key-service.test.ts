@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import * as crypto from 'node:crypto';
+import { promisify } from 'node:util';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -8,6 +9,12 @@ import { HTTP401 } from '../errors/http-error';
 import { AccessKey, AccessKeyView } from '../models/access-key';
 import { AccessKeyRepository } from '../repositories/access-key-repository';
 import { AccessKeyService } from './access-key-service';
+
+const scrypt = promisify(crypto.scrypt);
+const deriveKeyHash = async (plaintext: string, salt: string): Promise<string> => {
+  const derived = (await scrypt(plaintext, salt, 32, { N: 16384, r: 8, p: 1 })) as Buffer;
+  return derived.toString('hex');
+};
 
 chai.use(sinonChai);
 
@@ -50,7 +57,7 @@ describe('AccessKeyService', () => {
       expect(result.plaintext_key.split('_').length).to.be.at.least(3);
     });
 
-    it('should hash the key using SHA-256 before persisting', async () => {
+    it('should hash the key using scrypt before persisting', async () => {
       let capturedParams: any;
       sinon.stub(AccessKeyRepository.prototype, 'insertAccessKey').callsFake(async (params) => {
         capturedParams = params;
@@ -62,7 +69,9 @@ describe('AccessKeyService', () => {
 
       const result = await service.createAccessKey(1, 'Key');
 
-      const expectedHash = crypto.createHash('sha256').update(result.plaintext_key).digest('hex');
+      // Derive the expected hash using the same algorithm: scrypt(plaintext, key_prefix, ...)
+      const keyPrefix = result.plaintext_key.split('_').slice(0, 2).join('_');
+      const expectedHash = await deriveKeyHash(result.plaintext_key, keyPrefix);
       expect(capturedParams.key_hash).to.equal(expectedHash);
     });
 
@@ -107,16 +116,16 @@ describe('AccessKeyService', () => {
   });
 
   describe('verifyAccessKey', () => {
-    const buildValidKey = (): { plaintext: string; hash: string; prefix: string } => {
+    const buildValidKey = async (): Promise<{ plaintext: string; hash: string; prefix: string }> => {
       const prefix = 'biohub_TestPref';
       const secret = 'supersecretvalue32byteslong12345';
       const plaintext = `${prefix}_${secret}`;
-      const hash = crypto.createHash('sha256').update(plaintext).digest('hex');
+      const hash = await deriveKeyHash(plaintext, prefix);
       return { plaintext, hash, prefix };
     };
 
     it('should return access_key_id and system_user_id for a valid key', async () => {
-      const { plaintext, hash, prefix } = buildValidKey();
+      const { plaintext, hash, prefix } = await buildValidKey();
 
       const record: AccessKey = {
         ...makeAccessKeyView({ key_prefix: prefix }),
@@ -149,7 +158,7 @@ describe('AccessKeyService', () => {
     it('should throw HTTP401 when no row is found for the prefix', async () => {
       sinon.stub(AccessKeyRepository.prototype, 'getAccessKeyByPrefix').resolves(null);
 
-      const { plaintext } = buildValidKey();
+      const { plaintext } = await buildValidKey();
 
       const connection = getMockDBConnection();
       const service = new AccessKeyService(connection);
@@ -163,8 +172,8 @@ describe('AccessKeyService', () => {
     });
 
     it('should throw HTTP401 when the hash does not match', async () => {
-      const { plaintext, prefix } = buildValidKey();
-      const wrongHash = crypto.createHash('sha256').update('totally_different_key').digest('hex');
+      const { plaintext, prefix } = await buildValidKey();
+      const wrongHash = await deriveKeyHash('totally_different_key', prefix);
 
       const record: AccessKey = {
         ...makeAccessKeyView({ key_prefix: prefix }),
@@ -185,7 +194,7 @@ describe('AccessKeyService', () => {
     });
 
     it('should throw HTTP401 when the key is revoked', async () => {
-      const { plaintext, hash, prefix } = buildValidKey();
+      const { plaintext, hash, prefix } = await buildValidKey();
 
       const record: AccessKey = {
         ...makeAccessKeyView({ key_prefix: prefix, revoked_at: '2026-01-01T00:00:00.000Z' }),
@@ -206,7 +215,7 @@ describe('AccessKeyService', () => {
     });
 
     it('should throw HTTP401 when the key is expired', async () => {
-      const { plaintext, hash, prefix } = buildValidKey();
+      const { plaintext, hash, prefix } = await buildValidKey();
 
       const record: AccessKey = {
         ...makeAccessKeyView({

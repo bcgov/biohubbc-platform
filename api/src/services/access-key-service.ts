@@ -26,9 +26,42 @@ const SECRET_BYTES = 32;
  * Format: `biohub_<8charPrefix>_<43charSecret>`
  *
  * The prefix portion (`biohub_<8charPrefix>`) is stored in `key_prefix` for display/lookup.
- * The full plaintext string is SHA-256 hashed and stored in `key_hash` for verification.
+ * The full plaintext string is scrypt-hashed (using `key_prefix` as salt) and stored in
+ * `key_hash` for verification.
  */
 const KEY_VENDOR_PREFIX = 'biohub';
+
+/**
+ * Output byte length for the scrypt-derived key (32 bytes → 64 hex chars).
+ */
+const SCRYPT_KEYLEN = 32;
+
+/**
+ * Scrypt cost parameters.
+ *
+ * N=16384 meets OWASP minimum for interactive logins; since API keys are high-entropy random
+ * tokens the cost could be lower, but this provides defence-in-depth against DB compromise
+ * while keeping per-request latency well under 100 ms on modern hardware.
+ */
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+
+/**
+ * Derive a hex-encoded scrypt hash of `plaintext` using `salt`.
+ *
+ * Using `key_prefix` as the salt means no additional column is required — each key has a
+ * unique, randomly-generated prefix that functions as a per-key salt.
+ */
+const deriveKeyHash = (plaintext: string, salt: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(plaintext, salt, SCRYPT_KEYLEN, SCRYPT_PARAMS, (err, derived) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(derived.toString('hex'));
+      }
+    });
+  });
+};
 
 /**
  * Result of a successful access key creation.
@@ -74,7 +107,7 @@ export class AccessKeyService extends DBService {
     const keyPrefix = `${KEY_VENDOR_PREFIX}_${prefixSegment}`;
     const plaintextKey = `${keyPrefix}_${secretSegment}`;
 
-    const keyHash = crypto.createHash('sha256').update(plaintextKey).digest('hex');
+    const keyHash = await deriveKeyHash(plaintextKey, keyPrefix);
 
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + KEY_EXPIRY_MONTHS);
@@ -123,7 +156,7 @@ export class AccessKeyService extends DBService {
    * Steps:
    * 1. Parse the prefix from the plaintext key.
    * 2. Look up the row by prefix.
-   * 3. Constant-time compare the SHA-256 hash of the supplied key against the stored hash.
+   * 3. Constant-time compare the scrypt hash of the supplied key against the stored hash.
    * 4. Reject if the key is expired, revoked, or soft-deleted.
    *
    * Throws `HTTP401` for any failure to ensure consistent error behaviour regardless of failure mode.
@@ -150,8 +183,8 @@ export class AccessKeyService extends DBService {
       throw new HTTP401('Access Denied');
     }
 
-    // Constant-time comparison to prevent timing attacks.
-    const suppliedHash = crypto.createHash('sha256').update(plaintextKey).digest('hex');
+    // Derive the hash using the stored prefix as salt, then compare in constant time.
+    const suppliedHash = await deriveKeyHash(plaintextKey, record.key_prefix);
     const storedHashBuffer = Buffer.from(record.key_hash, 'hex');
     const suppliedHashBuffer = Buffer.from(suppliedHash, 'hex');
 

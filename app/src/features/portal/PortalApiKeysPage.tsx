@@ -60,6 +60,7 @@ export const PortalApiKeysPage = () => {
   const [revokeTarget, setRevokeTarget] = useState<IAccessKeyView | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
 
+  /** Reset create-dialog state and open the dialog. */
   const handleOpenCreate = () => {
     setNewKeyName('');
     setCreateResult(null);
@@ -67,6 +68,7 @@ export const PortalApiKeysPage = () => {
     setCreateDialogOpen(true);
   };
 
+  /** Close the create dialog and refresh the key list to reflect any newly created key. */
   const handleCloseCreate = () => {
     setCreateDialogOpen(false);
     setCreateResult(null);
@@ -75,6 +77,11 @@ export const PortalApiKeysPage = () => {
     keysLoader.refresh();
   };
 
+  /**
+   * Submit a new API key creation request.
+   *
+   * On success, `createResult` is set so the dialog switches to the one-time plaintext view.
+   */
   const handleCreate = async () => {
     if (!newKeyName.trim()) {
       return;
@@ -88,6 +95,7 @@ export const PortalApiKeysPage = () => {
     }
   };
 
+  /** Copy the newly created plaintext key to the clipboard and mark it as copied. */
   const handleCopy = () => {
     if (createResult?.plaintext_key) {
       navigator.clipboard.writeText(createResult.plaintext_key);
@@ -95,6 +103,11 @@ export const PortalApiKeysPage = () => {
     }
   };
 
+  /**
+   * Confirm revocation of `revokeTarget` and refresh the key list.
+   *
+   * The revoke button is disabled while the request is in flight to prevent double-submission.
+   */
   const handleRevokeConfirm = async () => {
     if (!revokeTarget) {
       return;
@@ -125,26 +138,7 @@ export const PortalApiKeysPage = () => {
       <Dialog open={createDialogOpen} onClose={handleCloseCreate} maxWidth="sm" fullWidth>
         <DialogTitle>{createResult ? 'API Key Created' : 'Create API Key'}</DialogTitle>
         <DialogContent>
-          {!createResult ? (
-            <Stack spacing={2} mt={1}>
-              <DialogContentText>
-                Choose a descriptive name so you can identify this key later (e.g. "Parquet download script").
-              </DialogContentText>
-              <TextField
-                autoFocus
-                label="Key name"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreate();
-                  }
-                }}
-                inputProps={{ maxLength: 200 }}
-                fullWidth
-              />
-            </Stack>
-          ) : (
+          {createResult ? (
             <Stack spacing={2} mt={1}>
               <DialogContentText color="warning.main" fontWeight="bold">
                 Save this key now. It will not be shown again.
@@ -168,10 +162,33 @@ export const PortalApiKeysPage = () => {
                 Key prefix: <strong>{createResult.access_key.key_prefix}</strong>
               </Typography>
             </Stack>
+          ) : (
+            <Stack spacing={2} mt={1}>
+              <DialogContentText>
+                Choose a descriptive name so you can identify this key later (e.g. "Parquet download script").
+              </DialogContentText>
+              <TextField
+                autoFocus
+                label="Key name"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreate();
+                  }
+                }}
+                inputProps={{ maxLength: 200 }}
+                fullWidth
+              />
+            </Stack>
           )}
         </DialogContent>
         <DialogActions>
-          {!createResult ? (
+          {createResult ? (
+            <Button onClick={handleCloseCreate} variant="contained">
+              Done
+            </Button>
+          ) : (
             <>
               <Button onClick={handleCloseCreate} color="inherit">
                 Cancel
@@ -184,10 +201,6 @@ export const PortalApiKeysPage = () => {
                 Create
               </Button>
             </>
-          ) : (
-            <Button onClick={handleCloseCreate} variant="contained">
-              Done
-            </Button>
           )}
         </DialogActions>
       </Dialog>
