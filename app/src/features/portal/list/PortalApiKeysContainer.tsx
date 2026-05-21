@@ -1,6 +1,6 @@
-import { mdiMagnify } from '@mdi/js';
+import { mdiCancel, mdiDotsVertical, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
+import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IAccessKeyView } from 'interfaces/useApiKeysApi.interface';
 import { getFormattedDate } from 'utils/Utils';
@@ -126,26 +127,29 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      minWidth: 100,
       sortable: false,
-      align: 'right',
-      headerAlign: 'right',
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const status = getKeyStatus(params.row);
         if (status !== 'Active') {
           return null;
         }
         return (
-          <Button
-            size="small"
-            color="error"
-            variant="outlined"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRevoke(params.row);
-            }}>
-            Revoke
-          </Button>
+          <Box onClick={(event) => event.stopPropagation()}>
+            <CustomMenuIconButton
+              buttonTitle="Actions"
+              buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+              menuItems={[
+                {
+                  menuIcon: <Icon path={mdiCancel} size={0.875} />,
+                  menuLabel: 'Revoke',
+                  menuOnClick: () => onRevoke(params.row)
+                }
+              ]}
+            />
+          </Box>
         );
       }
     }

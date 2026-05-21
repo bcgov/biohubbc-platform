@@ -32,6 +32,13 @@ const mockRevokeApiKey = vi.fn();
 
 const renderPage = () => render(<PortalApiKeysPage />);
 
+const clickRevokeFromMenu = async () => {
+  await waitFor(() => screen.getByTestId('custom-menu-icon-Actions'));
+  fireEvent.click(screen.getByTestId('custom-menu-icon-Actions'));
+  await waitFor(() => screen.getByTestId('custom-menu-icon-item-Revoke'));
+  fireEvent.click(screen.getByTestId('custom-menu-icon-item-Revoke'));
+};
+
 describe('PortalApiKeysPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,6 +93,7 @@ describe('PortalApiKeysPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Revoked')).toBeInTheDocument();
+        expect(screen.queryByTestId('custom-menu-icon-Actions')).not.toBeInTheDocument();
       });
     });
 
@@ -96,6 +104,7 @@ describe('PortalApiKeysPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Expired')).toBeInTheDocument();
+        expect(screen.queryByTestId('custom-menu-icon-Actions')).not.toBeInTheDocument();
       });
     });
   });
@@ -152,8 +161,7 @@ describe('PortalApiKeysPage', () => {
 
       renderPage();
 
-      await waitFor(() => screen.getByRole('button', { name: /revoke/i }));
-      fireEvent.click(screen.getByRole('button', { name: /revoke/i }));
+      await clickRevokeFromMenu();
 
       await waitFor(() => {
         expect(screen.getByTestId('yes-no-dialog')).toBeInTheDocument();
@@ -167,8 +175,7 @@ describe('PortalApiKeysPage', () => {
 
       renderPage();
 
-      await waitFor(() => screen.getByRole('button', { name: /revoke/i }));
-      fireEvent.click(screen.getByRole('button', { name: /revoke/i }));
+      await clickRevokeFromMenu();
 
       await waitFor(() => screen.getByTestId('yes-button'));
       fireEvent.click(screen.getByTestId('yes-button'));
@@ -184,8 +191,7 @@ describe('PortalApiKeysPage', () => {
 
       renderPage();
 
-      await waitFor(() => screen.getByRole('button', { name: /revoke/i }));
-      fireEvent.click(screen.getByRole('button', { name: /revoke/i }));
+      await clickRevokeFromMenu();
 
       await waitFor(() => screen.getByTestId('no-button'));
       fireEvent.click(screen.getByTestId('no-button'));
