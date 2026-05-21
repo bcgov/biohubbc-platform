@@ -114,6 +114,26 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('populateFeatureCandidateStagingBySubmissionUploadId', () => {
+    it('resolves feature property jsonb values into feature candidate staging', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.populateFeatureCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('INSERT INTO submission_upload_staging_feature_candidate');
+      expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include("WHERE v.property_type_name = 'feature'");
+      expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
+      expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
+      expect(sqlText).to.include('LEFT JOIN submission_feature target');
+      expect(sqlText).to.include('target.source_id = p.parsed_source_id');
+    });
+  });
+
   describe('insertCodePropertiesBySubmissionUploadId', () => {
     it('inserts resolved code candidates into submission_feature_property_code', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
@@ -285,6 +305,8 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('MULTIPLE_VALUES_NOT_ALLOWED');
       expect(sqlText).to.include('TYPE_MISMATCH');
       expect(sqlText).to.include('UNSUPPORTED_PROPERTY_TYPE');
+      expect(sqlText).to.include("'artifact_key', 'feature')");
+      expect(sqlText).to.include("'taxon',\n            'feature'");
     });
   });
 

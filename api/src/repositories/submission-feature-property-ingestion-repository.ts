@@ -104,6 +104,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         USING upload_features uf
         WHERE sfptx.submission_feature_id = uf.submission_feature_id
         RETURNING 1
+      ),
+      delete_feature AS (
+        DELETE FROM submission_feature_property_feature sfpf
+        USING upload_features uf
+        WHERE sfpf.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
       )
       SELECT 1;
     `;
@@ -406,6 +412,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Clear upload-scoped feature candidate rows.
+   *
+   * Feature candidates store parsed feature::<source_id> references and the
+   * within-upload features they resolved to.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async clearFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      DELETE FROM submission_upload_staging_feature_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Clear upload property working-set staging tables in one SQL round trip.
    *
    * Removes both:
@@ -437,8 +460,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Clear all complex-type candidate staging tables in one SQL round trip.
    *
-   * Removes upload-scoped rows from datetime, spatial, code, taxon, and artifact
-   * candidate tables so candidate generation phases can rerun idempotently.
+   * Removes upload-scoped rows from datetime, spatial, code, taxon, artifact, and
+   * feature candidate tables so candidate generation phases can rerun idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -467,6 +490,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       ),
       clear_artifact AS (
         DELETE FROM submission_upload_staging_artifact_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_feature AS (
+        DELETE FROM submission_upload_staging_feature_candidate
         WHERE submission_upload_id = ${submissionUploadId}::uuid
         RETURNING 1
       )
@@ -869,6 +897,68 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Create `submission_upload_staging_feature_candidate` with parsed feature references and resolved targets.
+   *
+   * Expected format is a strict two-part reference `feature::<source_id>`. Source ids
+   * never contain `::`, so any other shape (`feature::`, `features::x`, `feature::a::b`)
+   * is malformed and rejected.
+   *
+   * Feature references resolve only against active features in the same upload, matching
+   * by `source_id`; cross-upload references are intentionally not resolved even though the
+   * foreign key permits them. The resolved target feature and its type are captured so later
+   * phases can validate the allowed target type and insert canonical rows.
+   *
+   * Rows remain in candidate staging even when unresolved so later phases can emit
+   * aggregated resolution errors.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async populateFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO submission_upload_staging_feature_candidate (
+        submission_upload_id, submission_feature_id, property_name, feature_type_property_id,
+        raw_value, is_format_valid, parsed_source_id,
+        referenced_submission_feature_id, referenced_feature_type_id
+      )
+      WITH valid_property_values AS (
+        SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
+               v.feature_type_property_id, v.property_type_name, v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+      ),
+      candidates AS (
+        SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
+               v.feature_type_property_id,
+               v.logical_value AS raw_value,
+               regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
+        FROM valid_property_values v
+        WHERE v.property_type_name = 'feature'
+          AND jsonb_typeof(v.logical_value) = 'string'
+      ),
+      parsed AS (
+        SELECT c.*,
+          (cardinality(c.parts) = 2 AND c.parts[1] = 'feature' AND btrim(c.parts[2]) <> '') AS is_format_valid,
+          CASE WHEN cardinality(c.parts) = 2 AND c.parts[1] = 'feature' AND btrim(c.parts[2]) <> ''
+               THEN btrim(c.parts[2]) ELSE NULL END AS parsed_source_id
+        FROM candidates c
+      )
+      SELECT
+        p.submission_upload_id, p.submission_feature_id, p.property_name, p.feature_type_property_id,
+        p.raw_value, p.is_format_valid, p.parsed_source_id,
+        target.submission_feature_id AS referenced_submission_feature_id,
+        target.feature_type_id        AS referenced_feature_type_id
+      FROM parsed p
+      LEFT JOIN submission_feature target
+        ON p.is_format_valid
+       AND target.submission_upload_id = ${submissionUploadId}::uuid
+       AND target.record_end_date IS NULL
+       AND target.source_id = p.parsed_source_id;
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Record missing required-property errors for features in an upload.
    *
    * Requiredness is evaluated by feature type against active metadata. A required property is
@@ -1006,7 +1096,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_upload_id = ${submissionUploadId}::uuid
           AND (
           (
-            v.property_type_name IN ('string', 'datetime', 'code', 'artifact_key')
+            v.property_type_name IN ('string', 'datetime', 'code', 'artifact_key', 'feature')
             AND jsonb_typeof(v.logical_value) <> 'string'
           )
           OR (
@@ -1048,7 +1138,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             'spatial',
             'artifact_key',
             'code',
-            'taxon'
+            'taxon',
+            'feature'
           )
       ),
       grouped_errors AS (
