@@ -190,15 +190,16 @@ export const PortalApiKeysPage = () => {
             </Button>
           ) : (
             <>
-              <Button onClick={handleCloseCreate} color="inherit">
-                Cancel
-              </Button>
               <Button
                 onClick={handleCreate}
+                color="primary"
                 variant="contained"
                 disabled={!newKeyName.trim() || isCreating}
                 startIcon={isCreating ? <CircularProgress size={16} /> : undefined}>
                 Create
+              </Button>
+              <Button onClick={handleCloseCreate} color="primary" variant="outlined">
+                Cancel
               </Button>
             </>
           )}
