@@ -1,7 +1,6 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import * as crypto from 'node:crypto';
-import { promisify } from 'node:util';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -10,10 +9,17 @@ import { AccessKey, AccessKeyView } from '../models/access-key';
 import { AccessKeyRepository } from '../repositories/access-key-repository';
 import { AccessKeyService } from './access-key-service';
 
-const scrypt = promisify(crypto.scrypt);
-const deriveKeyHash = async (plaintext: string, salt: string): Promise<string> => {
-  const derived = (await scrypt(plaintext, salt, 32, { N: 16384, r: 8, p: 1 })) as Buffer;
-  return derived.toString('hex');
+/** Mirrors the scrypt parameters and callback usage in access-key-service.ts. */
+const deriveKeyHash = (plaintext: string, salt: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(plaintext, salt, 32, { N: 16384, r: 8, p: 1 }, (err, derived) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(derived.toString('hex'));
+      }
+    });
+  });
 };
 
 chai.use(sinonChai);
@@ -69,9 +75,9 @@ describe('AccessKeyService', () => {
 
       const result = await service.createAccessKey(1, 'Key');
 
-      // Derive the expected hash using the same algorithm: scrypt(plaintext, key_prefix, ...)
-      const keyPrefix = result.plaintext_key.split('_').slice(0, 2).join('_');
-      const expectedHash = await deriveKeyHash(result.plaintext_key, keyPrefix);
+      // Use the persisted key_prefix as salt — base64url prefix segments may contain underscores,
+      // so the prefix cannot be reliably reconstructed by splitting the plaintext key.
+      const expectedHash = await deriveKeyHash(result.plaintext_key, capturedParams.key_prefix);
       expect(capturedParams.key_hash).to.equal(expectedHash);
     });
 
