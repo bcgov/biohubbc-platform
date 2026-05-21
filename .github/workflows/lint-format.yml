@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Checkout Target Branch
         uses: actions/checkout@v6
@@ -31,13 +31,13 @@ jobs:
 
       # Cache the repo
       - name: Cache repo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           # Cache repo based on the commit sha that triggered the workflow
-          path: ${{ github.workspace }}/*
+          path: ${{ github.workspace }}
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
   lintAndFormat:
@@ -50,16 +50,16 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
-          path: ${{ github.workspace }}/*
+          path: ${{ github.workspace }}
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
@@ -69,7 +69,7 @@ jobs:
 
       # api
       - name: Cache api node modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: cache-api-node-modules
         with:
@@ -81,7 +81,7 @@ jobs:
 
       - name: Install api dependencies
         working-directory: api
-        run: npm install
+        run: npm ci
 
       - name: Run api linter
         working-directory: api
@@ -93,7 +93,7 @@ jobs:
 
       # app
       - name: Cache app node modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: cache-app-node-modules
         with:
@@ -105,7 +105,7 @@ jobs:
 
       - name: Install app dependencies
         working-directory: app
-        run: npm install
+        run: npm ci
 
       - name: Run app linter
         working-directory: app
@@ -117,7 +117,7 @@ jobs:
 
       # database
       - name: Cache database node modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: cache-database-node-modules
         with:
@@ -129,7 +129,7 @@ jobs:
 
       - name: Install database dependencies
         working-directory: database
-        run: npm install
+        run: npm ci
 
       - name: Run database linter
         working-directory: database

@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as index from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../errors/http-error';
 import { RelatedSubmissionFeature, SubmissionFeature } from '../../../../../repositories/submission-repository';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
+import { SubmissionFeatureService } from '../../../../../services/submission-feature-service';
 
 chai.use(sinonChai);
 
@@ -19,13 +19,13 @@ describe('index', () => {
 
     it('propogates and re-throws errors', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeatureByIdStub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionFeatureById')
+        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById')
         .throws(new HTTP400('Error', ['Error']));
 
-      sinon.stub(SubmissionService.prototype, 'getRelatedSubmissionFeatures').resolves([]);
+      sinon.stub(SubmissionFeatureService.prototype, 'getRelatedSubmissionFeatures').resolves([]);
 
       const requestHandler = index.getSubmissionFeatureById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -46,7 +46,7 @@ describe('index', () => {
 
     it('should return 200 on success', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockFeature: SubmissionFeature = {
         submission_feature_id: 1,
@@ -72,11 +72,11 @@ describe('index', () => {
       ];
 
       const getSubmissionFeatureByIdStub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionFeatureById')
+        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById')
         .resolves(mockFeature);
 
       const getRelatedSubmissionFeaturesStub = sinon
-        .stub(SubmissionService.prototype, 'getRelatedSubmissionFeatures')
+        .stub(SubmissionFeatureService.prototype, 'getRelatedSubmissionFeatures')
         .resolves(mockRelatedFeatures);
 
       const requestHandler = index.getSubmissionFeatureById();

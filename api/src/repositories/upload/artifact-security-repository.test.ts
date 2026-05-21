@@ -3,10 +3,10 @@ import dayjs from 'dayjs';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityRepository } from './artifact-security-repository';
 
 chai.use(sinonChai);

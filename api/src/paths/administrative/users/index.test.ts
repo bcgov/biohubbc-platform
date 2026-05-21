@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../database/db';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import * as db from '../../../database/db';
 import { getAvailableUsers } from './index';
 
 chai.use(sinonChai);
@@ -20,7 +20,7 @@ describe('getAvailableUsers', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -41,7 +41,7 @@ describe('getAvailableUsers', () => {
     ];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -54,7 +54,7 @@ describe('getAvailableUsers', () => {
 
   it('should return empty array when no users available', async () => {
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: [] } as any) });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -69,7 +69,7 @@ describe('getAvailableUsers', () => {
     const mockUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'ali' };
@@ -88,7 +88,7 @@ describe('getAvailableUsers', () => {
     ];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: '' };
@@ -107,7 +107,7 @@ describe('getAvailableUsers', () => {
     ];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: '   ' };

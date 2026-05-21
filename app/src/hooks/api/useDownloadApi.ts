@@ -1,5 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { DownloadListResponse, FragmentUrlResponse } from 'interfaces/useDownloadApi.interface';
+import {
+  CreateDownloadRequest,
+  CreateDownloadResponse,
+  DownloadListResponse
+} from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
@@ -21,16 +25,15 @@ export const useDownloadApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Get a signed URL to download a specific fragment of a download package.
+   * Create a new download job for the supplied search expression and feature-type set.
    *
-   * @param {string} downloadId - The download ID.
-   * @param {number} fragmentIndex - The zero-based fragment index.
-   * @return {Promise<FragmentUrlResponse>}
+   * @param {CreateDownloadRequest} payload
+   * @return {Promise<CreateDownloadResponse>}
    */
-  const getFragmentUrl = async (downloadId: string, fragmentIndex: number): Promise<FragmentUrlResponse> => {
-    const { data } = await axios.get<FragmentUrlResponse>(`/api/download/${downloadId}/fragment/${fragmentIndex}/url`);
+  const createDownload = async (payload: CreateDownloadRequest): Promise<CreateDownloadResponse> => {
+    const { data } = await axios.post<CreateDownloadResponse>('/api/download', payload);
     return data;
   };
 
-  return { getDownloads, getFragmentUrl };
+  return { getDownloads, createDownload };
 };

@@ -20,7 +20,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
    * Get security details for a submission by its ID.
    *
    * @param {number} submissionId
-   * @return {SubmissionUploadStatus}
+   * @returns {SubmissionUploadStatus}
    * @memberof SubmissionUploadStatusRepository
    */
   async getSubmissionUploadStatusById(submissionId: number): Promise<SubmissionUploadStatus> {
@@ -47,7 +47,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
    *
    * @private
    * @param {number} submissionId - The submission ID to query
-   * @return {Knex.QueryBuilder} Query builder for getting submission upload status
+   * @returns {Knex.QueryBuilder} Query builder for getting submission upload status
    * @memberof SubmissionUploadStatusRepository
    */
   private _makeGetSubmissionUploadStatusQuery(submissionId: number): Knex.QueryBuilder {
@@ -64,7 +64,8 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
       .with('upload_artifacts', (qb) => {
         qb.select('upload_artifact.upload_id', 'upload_artifact.artifact_id', 'upload_artifact.role')
           .from('upload_artifact')
-          .whereIn('upload_artifact.upload_id', knex.select('upload_id').from('submission_uploads'));
+          .whereIn('upload_artifact.upload_id', knex.select('upload_id').from('submission_uploads'))
+          .whereNull('upload_artifact.record_end_date');
       })
       .with('enriched_artifacts', (qb) => {
         qb.select(
@@ -142,7 +143,7 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
                 SELECT 
                   role,
                   COUNT(*)::int AS count,
-                  COALESCE(SUM(artifact.byte_size)::int, 0) AS byte_size
+                  COALESCE(SUM(artifact.byte_size)::bigint, 0) AS byte_size
                 FROM upload_artifacts
                 LEFT JOIN artifact ON upload_artifacts.artifact_id = artifact.artifact_id
                 WHERE upload_artifacts.upload_id = submission_uploads.upload_id

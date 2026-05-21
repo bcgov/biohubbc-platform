@@ -11,10 +11,11 @@ import { SearchSectionHeader } from './header/SearchSectionHeader';
 
 export interface SearchResultsSectionProps {
   results: SearchResponse;
-  onSelect: (value: string | number) => void;
+  defaultFeatureTypeName: string;
+  onSelect: (value: string | number, featureTypeName: string) => void;
 }
 
-export const SearchResultsSection = ({ results, onSelect }: SearchResultsSectionProps) => {
+export const SearchResultsSection = ({ results, defaultFeatureTypeName, onSelect }: SearchResultsSectionProps) => {
   const { features, submissions, taxonomy } = results;
 
   return (
@@ -28,7 +29,7 @@ export const SearchResultsSection = ({ results, onSelect }: SearchResultsSection
             <ListItemButton
               key={`taxon-${taxon.taxon_id}`}
               role="option"
-              onClick={() => onSelect(taxon.itis_scientific_name)}
+              onClick={() => onSelect(taxon.itis_scientific_name, defaultFeatureTypeName)}
               data-search-item
               sx={{ borderRadius: 1 }}>
               <ListItemIcon>
@@ -50,7 +51,7 @@ export const SearchResultsSection = ({ results, onSelect }: SearchResultsSection
             <ListItemButton
               key={`feature-${feature.submission_feature_id}`}
               role="option"
-              onClick={() => onSelect(feature.label)}
+              onClick={() => onSelect(feature.label, feature.feature_type_name)}
               data-search-item
               sx={{ borderRadius: 1 }}>
               <ListItemIcon>
@@ -72,7 +73,7 @@ export const SearchResultsSection = ({ results, onSelect }: SearchResultsSection
             <ListItemButton
               key={`submission-${submission.submission_id}`}
               role="option"
-              onClick={() => onSelect(submission.name)}
+              onClick={() => onSelect(submission.name, defaultFeatureTypeName)}
               data-search-item
               sx={{ borderRadius: 1 }}>
               <ListItemIcon>

@@ -1,10 +1,15 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { IDBConnection } from '../../database/db';
-import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
-import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { IDBConnection } from '../../database/db';
+import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
+import { HTTP401, HTTP409 } from '../../errors/http-error';
+import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { SecurityStatusEnum } from '../../models/security-status';
+import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from './artifact-service';
 
 chai.use(sinonChai);
@@ -31,7 +36,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: '1234',
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       const stub = sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(fakeArtifact);
@@ -64,7 +70,8 @@ describe('ArtifactService', () => {
           object_key: 'test-object-key-1',
           byte_size: '1234',
           checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-          uploaded_at: '2025-01-01T00:00:00Z'
+          uploaded_at: '2025-01-01T00:00:00Z',
+          format: 'tar'
         },
         {
           artifact_id: 'artifact-2',
@@ -73,7 +80,8 @@ describe('ArtifactService', () => {
           object_key: 'test-object-key-2',
           byte_size: '5678',
           checksum_sha256: '1234567890abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-          uploaded_at: '2025-02-01T00:00:00Z'
+          uploaded_at: '2025-02-01T00:00:00Z',
+          format: 'tar'
         }
       ];
 
@@ -97,6 +105,169 @@ describe('ArtifactService', () => {
     });
   });
 
+  describe('getArtifactSignedUrl', () => {
+    const artifactId = '11111111-1111-1111-1111-111111111111';
+    const artifact: Artifact = {
+      artifact_id: artifactId,
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      bucket: 'main-bucket',
+      object_key: 'tickets/ticket-1/upload/upload-1/file.txt',
+      byte_size: '128',
+      checksum_sha256: null,
+      uploaded_at: '2026-04-29T00:00:00.000Z',
+      format: 'txt'
+    };
+    const cleanSecurity = {
+      artifact_security_id: '22222222-2222-4222-9222-222222222222',
+      artifact_id: artifactId,
+      security: SecurityStatusEnum.CLEAN
+    };
+
+    beforeEach(() => {
+      process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
+      process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME = 'quarantine-bucket';
+    });
+
+    it('should return a signed URL for a main-bucket artifact using the complete object key', async () => {
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves(cleanSecurity);
+      const getSignedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .resolves('https://example.com/download');
+
+      const result = await service.getArtifactSignedUrl(artifact.artifact_id);
+
+      expect(getSignedUrlStub).to.have.been.calledOnceWith(BucketType.MAIN, artifact.object_key);
+      expect(result).to.equal('https://example.com/download');
+    });
+
+    it('should throw access denied when no artifact id is provided', async () => {
+      const getArtifactStub = sinon.stub(ArtifactRepository.prototype, 'getArtifact');
+
+      try {
+        await service.getArtifactSignedUrl(null);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP401);
+        expect((error as Error).message).to.equal('Access Denied');
+        expect(getArtifactStub).not.to.have.been.called;
+      }
+    });
+
+    it('should rethrow when the artifact is not found', async () => {
+      sinon
+        .stub(ArtifactRepository.prototype, 'getArtifact')
+        .rejects(new ApiNotFoundError('Artifact not found', ['ArtifactRepository->getArtifact']));
+      const getLatestSecurityStub = sinon.stub(
+        ArtifactSecurityRepository.prototype,
+        'findLatestArtifactSecurityByArtifactId'
+      );
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifactId);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as Error).message).to.equal('Artifact not found');
+        expect(getLatestSecurityStub).not.to.have.been.called;
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    it('should return 409 when no artifact security record exists', async () => {
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      sinon.stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId').resolves(null);
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal(
+          'Attachment is not ready for download yet. It is pending security scan.'
+        );
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    it('should return 409 when artifact security is pending', async () => {
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves({ ...cleanSecurity, security: SecurityStatusEnum.PENDING });
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal(
+          'Attachment is not ready for download yet. It is pending security scan.'
+        );
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+
+    for (const security of [SecurityStatusEnum.INFECTED, SecurityStatusEnum.ERROR, SecurityStatusEnum.SKIPPED]) {
+      it(`should return 409 when artifact security is ${security}`, async () => {
+        sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(artifact);
+        sinon
+          .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+          .resolves({ ...cleanSecurity, security });
+        const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+        try {
+          await service.getArtifactSignedUrl(artifact.artifact_id);
+          expect.fail('Expected error not thrown');
+        } catch (error) {
+          expect(error).to.be.instanceOf(HTTP409);
+          expect((error as Error).message).to.equal(
+            'Attachment is not available for download because it failed security validation.'
+          );
+          expect(getSignedUrlStub).not.to.have.been.called;
+        }
+      });
+    }
+
+    it('should return 409 when a clean artifact is still in quarantine', async () => {
+      const quarantineArtifact = { ...artifact, bucket: 'quarantine-bucket' };
+      sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(quarantineArtifact);
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'findLatestArtifactSecurityByArtifactId')
+        .resolves(cleanSecurity);
+      const getSignedUrlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
+
+      try {
+        await service.getArtifactSignedUrl(artifact.artifact_id);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect((error as Error).message).to.equal('Attachment is not ready for download yet. It is pending promotion.');
+        expect(getSignedUrlStub).not.to.have.been.called;
+      }
+    });
+  });
+
+  describe('getArtifactByteSizesByObjectKeys', () => {
+    it('forwards arguments to the repository and returns its map verbatim', async () => {
+      const fakeMap = new Map<string, number>([
+        ['a/key.txt', 100],
+        ['a/key-2.txt', 200]
+      ]);
+      const stub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByteSizesByObjectKeys').resolves(fakeMap);
+
+      const result = await service.getArtifactByteSizesByObjectKeys('bucket-a', ['a/key.txt', 'a/key-2.txt']);
+
+      expect(stub).to.have.been.calledOnceWith('bucket-a', ['a/key.txt', 'a/key-2.txt']);
+      expect(result).to.equal(fakeMap);
+    });
+  });
+
   describe('insertArtifact', () => {
     it('should insert a new artifact and return its ID', async () => {
       const fakeInput: CreateArtifact = {
@@ -105,7 +276,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'csv'
       };
 
       const stub = sinon.stub(ArtifactRepository.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-new' });
@@ -123,7 +295,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'csv'
       };
 
       sinon.stub(ArtifactRepository.prototype, 'insertArtifact').throws(new Error('Insert failed'));
@@ -134,6 +307,92 @@ describe('ArtifactService', () => {
       } catch (err) {
         expect((err as Error).message).to.equal('Insert failed');
       }
+    });
+  });
+
+  describe('insertArtifacts', () => {
+    it('should insert artifact rows when no duplicate keys are present', async () => {
+      const artifacts: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 1,
+          checksum_sha256: 'a',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-b',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'b/key.txt',
+          byte_size: 2,
+          checksum_sha256: 'b',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ];
+      const insertArtifactsStub = sinon.stub(ArtifactRepository.prototype, 'insertArtifacts').resolves([
+        {
+          artifact_id: '11111111-1111-1111-1111-111111111111',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-a',
+          object_key: 'a/key.txt',
+          byte_size: '1',
+          checksum_sha256: 'a'.repeat(64),
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          artifact_id: '22222222-2222-2222-2222-222222222222',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          bucket: 'bucket-b',
+          object_key: 'b/key.txt',
+          byte_size: '2',
+          checksum_sha256: 'b'.repeat(64),
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ]);
+
+      const result = await service.insertArtifacts(artifacts);
+
+      expect(insertArtifactsStub.calledOnceWithExactly(artifacts)).to.be.true;
+      expect(result).to.have.length(2);
+    });
+
+    it('should throw conflict error and skip repository call when duplicate keys are present', async () => {
+      const artifacts: CreateArtifact[] = [
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 1,
+          checksum_sha256: 'a',
+          uploaded_at: '2026-01-01T00:00:00Z',
+          format: 'csv'
+        },
+        {
+          bucket: 'bucket-a',
+          artifact_status: ArtifactStatusEnum.UPLOADED,
+          object_key: 'a/key.txt',
+          byte_size: 2,
+          checksum_sha256: 'b',
+          uploaded_at: '2026-01-01T00:01:00Z',
+          format: 'csv'
+        }
+      ];
+      const insertArtifactsStub = sinon.stub(ArtifactRepository.prototype, 'insertArtifacts');
+
+      try {
+        await service.insertArtifacts(artifacts);
+        expect.fail('Expected conflict error');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+        expect((error as Error).message).to.equal('Duplicate artifact keys in bulk insert payload');
+      }
+
+      expect(insertArtifactsStub.called).to.be.false;
     });
   });
 

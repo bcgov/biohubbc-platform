@@ -1,11 +1,11 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { CreateUploadArchive, UpdateUploadArchive, UploadArchive } from '../../models/upload-archive';
 import { UploadArchiveRepository } from '../../repositories/upload/upload-archive-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArchiveService } from './upload-archive-service';
 
 chai.use(sinonChai);

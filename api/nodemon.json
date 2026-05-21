@@ -1,5 +1,0 @@
-{
-  "verbose": false,
-  "ignore": ["*.@(test|spec).ts"],
-  "watch": ["src"]
-}

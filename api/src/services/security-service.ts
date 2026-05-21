@@ -5,11 +5,11 @@ import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/s
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
+  SECURITY_APPLIED_STATUS,
   SecurityCategoryRecord,
   SecurityRepository,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
-  SECURITY_APPLIED_STATUS,
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
 } from '../repositories/security-repository';
@@ -34,6 +34,13 @@ export class SecurityService extends DBService {
   artifactService: ArtifactService;
   userService: UserService;
   securityScopeService: SecurityScopeService;
+
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    getS3SignedURL
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -269,7 +276,7 @@ export class SecurityService extends DBService {
 
     const artifact = await this.artifactService.getArtifactById(artifactId);
 
-    return getS3SignedURL(artifact.key);
+    return SecurityService.dependencies.getS3SignedURL(artifact.key);
   }
 
   /**
@@ -342,7 +349,7 @@ export class SecurityService extends DBService {
    * added.
    *
    * After mutations, triggers scope recomputation for all scopes covering the submission.
-   * The recompute job (deleteStaleAnchorsForScope + resolveUrnForScope + computeAnchorBatch) handles both
+   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
    * added and removed rules idempotently.
    *
    * @param {number} submissionId ID of the submission the features belong to.
@@ -381,7 +388,7 @@ export class SecurityService extends DBService {
    * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
    *
    * After mutations, triggers scope recomputation for all scopes covering the submission.
-   * The recompute job (deleteStaleAnchorsForScope + resolveUrnForScope + computeAnchorBatch) handles both
+   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
    * added and removed rules idempotently.
    *
    * @param {number} submissionId

@@ -1,19 +1,13 @@
-import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { TICKET_TIMELINE_ICONS } from 'constants/icon';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
-import { ITicketStatusHistory } from 'interfaces/useTicketsApi.interface';
-import { getRelativeTimeLabel } from 'utils/date';
-import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
-
-interface ITicketTimelineProps {
-  history: ITicketStatusHistory[];
-  isLoading: boolean;
-}
+import { EditDialog } from 'components/dialog/EditDialog';
+import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
+import { ViewPolicyDialog } from 'features/admin/policies/components/ViewPolicyDialog';
+import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
+import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditForm.interface';
+import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
+import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
+import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
+import { TicketTimelineItems } from './item/TicketTimelineItems';
+import { ITicketTimelineProps } from './TicketTimeline.interface';
 
 /**
  * Renders the timeline section for a ticket.
@@ -22,70 +16,90 @@ interface ITicketTimelineProps {
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { history, isLoading } = props;
-
-  if (!history.length) {
-    return null;
-  }
-
-  // The first "open" status is "opened"; later "open" statuses are "reopened".
-  const firstOpenStatusIndex = history.findIndex((item) => item.status === 'open');
-
-  const timelineItems: ICustomTimelineItem[] = history.map((item, index) => {
-    const itemId = item.ticket_status_history_id ?? item.ticket_comment_id ?? `${item.create_date}-${index}`;
-    const isCommentEvent = Boolean(item.comment);
-
-    if (isCommentEvent) {
-      return {
-        id: itemId,
-        icon: <Icon path={TICKET_TIMELINE_ICONS.comment} size={0.75} />,
-        children: (
-          <TicketCommentTimelineItem
-            author={item.user_identifier}
-            comment={item.comment ?? ''}
-            dateLabel={
-              getRelativeTimeLabel(item.create_date, { maxRelativeDays: 30, absoluteFormat: 'MMM D, YYYY' }) ?? ''
-            }
-          />
-        )
-      };
-    }
-
-    const actor = item.user_identifier;
-    const isFirstOpenStatus = item.status === 'open' && index === firstOpenStatusIndex;
-
-    let message = `${actor} reopened the ticket`;
-
-    if (item.status === 'closed') {
-      message = `${actor} closed the ticket`;
-    } else if (isFirstOpenStatus) {
-      message = `${actor} opened the ticket`;
-    }
-
-    return {
-      id: itemId,
-      icon: <Icon path={TICKET_TIMELINE_ICONS[item.status ?? 'open']} size={0.75} />,
-      children: (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2">{message}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {getRelativeTimeLabel(item.create_date, { maxRelativeDays: 30, absoluteFormat: 'MMM D, YYYY' })}
-          </Typography>
-        </Box>
-      )
-    };
-  });
+  const { ticket, isLoading } = props;
+  const {
+    selectedComment,
+    isEditCommentDialogOpen,
+    isSavingComment,
+    isUploadingCommentAttachment,
+    handleTicketArtifactDownload,
+    handleEditCommentUploadAttachment,
+    handleOpenEditCommentDialog,
+    handleCloseEditCommentDialog,
+    handleSaveEditedComment,
+    handleConfirmDeleteComment
+  } = useTicketTimelineCommentActions({ ticket });
+  const {
+    updatingDataRequestId,
+    isEditPolicyDialogOpen,
+    isViewPolicyDialogOpen,
+    selectedPolicy,
+    viewPolicy,
+    isLoadingPolicy,
+    isSavingPolicy,
+    handleConfirmDataRequestStatusUpdate,
+    handleConfirmResetToReviewed,
+    handleOpenPolicyDialog,
+    handleOpenViewPolicyDialog,
+    handleClosePolicyDialog,
+    handleCloseViewPolicyDialog,
+    handleSavePolicy
+  } = useTicketTimelineDataRequestActions();
 
   return (
-    <LoadingGuard
-      isLoading={isLoading}
-      isLoadingFallback={
-        <Stack gap={1.5}>
-          <Skeleton variant="rounded" height={52} />
-          <Skeleton variant="rounded" height={52} />
-        </Stack>
-      }>
-      <CustomTimeline items={timelineItems} />
-    </LoadingGuard>
+    <>
+      <TicketTimelineItems
+        ticket={ticket}
+        isLoading={isLoading}
+        updatingDataRequestId={updatingDataRequestId}
+        onArtifactLinkClick={handleTicketArtifactDownload}
+        onEditComment={handleOpenEditCommentDialog}
+        onDeleteComment={handleConfirmDeleteComment}
+        onViewPolicy={handleOpenPolicyDialog}
+        onViewFinalizedPolicy={handleOpenViewPolicyDialog}
+        onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
+        onConfirmResetToReviewed={handleConfirmResetToReviewed}
+      />
+
+      {selectedPolicy && (
+        <EditPolicyDialog
+          open={isEditPolicyDialogOpen}
+          isLoading={isLoadingPolicy || isSavingPolicy}
+          policy={selectedPolicy}
+          onCancel={handleClosePolicyDialog}
+          onSave={handleSavePolicy}
+        />
+      )}
+
+      {viewPolicy && (
+        <ViewPolicyDialog open={isViewPolicyDialogOpen} policy={viewPolicy} onClose={handleCloseViewPolicyDialog} />
+      )}
+
+      {selectedComment && (
+        <EditDialog<ITicketCommentEditFormValues>
+          open={isEditCommentDialogOpen}
+          dialogTitle="Edit Comment"
+          dialogSaveButtonLabel="Save"
+          isLoading={isSavingComment}
+          maxWidth="md"
+          component={{
+            element: (
+              <TicketCommentEditForm
+                artifacts={ticket.artifacts}
+                isSaving={isSavingComment}
+                isUploadingAttachment={isUploadingCommentAttachment}
+                onUploadAttachment={handleEditCommentUploadAttachment}
+              />
+            ),
+            initialValues: {
+              comment: selectedComment.comment
+            },
+            validationSchema: TicketCommentEditFormYupSchema
+          }}
+          onCancel={handleCloseEditCommentDialog}
+          onSave={handleSaveEditedComment}
+        />
+      )}
+    </>
   );
 };

@@ -104,6 +104,15 @@ export class TypedURLSearchParams<
   }
 
   /**
+   * Get value by key (case-insensitive) WITHOUT normalizing the value to lowercase.
+   * Use this for case-sensitive payloads such as base64url-encoded strings where
+   * downcasing would corrupt the data.
+   */
+  getRaw<K extends keyof ParamType & string>(key: K): string | null {
+    return super.get(this.normalizeKey(key));
+  }
+
+  /**
    * Get array of values (case-insensitive), all values normalized to lowercase
    */
   getArray<K extends keyof ParamType & string>(key: K): string[] {

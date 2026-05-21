@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import { DatabaseError } from 'pg';
-import { ApiError, ApiErrorType, ApiNotFoundError } from './api-error';
+import { ApiConflictError, ApiError, ApiErrorType, ApiNotFoundError, ApiValidationError } from './api-error';
 import { ensureHTTPError, HTTP400, HTTP401, HTTP403, HTTP409, HTTP500, HTTPError, isAjvError } from './http-error';
 
 describe('HTTPError', () => {
@@ -64,6 +64,40 @@ describe('ensureHTTPError', () => {
     expect(ensuredError).to.be.instanceof(HTTPError);
     expect(ensuredError.status).to.equal(404);
     expect(ensuredError.message).to.equal('not found');
+  });
+
+  it('returns HTTP409 when an ApiConflictError is provided', function () {
+    const apiError = new ApiConflictError('already assigned');
+
+    const ensuredError = ensureHTTPError(apiError);
+
+    expect(ensuredError).to.be.instanceOf(HTTPError);
+    expect(ensuredError.status).to.equal(409);
+    expect(ensuredError.message).to.equal('already assigned');
+  });
+
+  it('returns HTTP409 when conflict error has lost prototype chain', function () {
+    const conflictLikeError = {
+      name: ApiErrorType.CONFLICT,
+      message: 'already assigned',
+      errors: []
+    };
+
+    const ensuredError = ensureHTTPError(conflictLikeError);
+
+    expect(ensuredError).to.be.instanceOf(HTTPError);
+    expect(ensuredError.status).to.equal(409);
+    expect(ensuredError.message).to.equal('already assigned');
+  });
+
+  it('returns HTTP400 when an ApiValidationError is provided', function () {
+    const apiError = new ApiValidationError('invalid request');
+
+    const ensuredError = ensureHTTPError(apiError);
+
+    expect(ensuredError).to.be.instanceOf(HTTPError);
+    expect(ensuredError.status).to.equal(400);
+    expect(ensuredError.message).to.equal('invalid request');
   });
 
   it('returns a HTTPError when a DatabaseError provided', function () {

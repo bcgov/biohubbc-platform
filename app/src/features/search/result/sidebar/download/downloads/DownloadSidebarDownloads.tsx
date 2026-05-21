@@ -1,24 +1,55 @@
-import { IconButton, List, ListItem, Pagination, Stack, Typography } from '@mui/material';
-import Icon from '@mdi/react';
 import { mdiRefresh } from '@mdi/js';
+import Icon from '@mdi/react';
+import { IconButton, List, ListItem, Pagination, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
 import { useDialogContext } from 'hooks/useContext';
-import { useEffect, useState } from 'react';
+import useDataLoader from 'hooks/useDataLoader';
+import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { DownloadFeatureCard } from '../feature/DownloadFeatureCard';
 
-/**
- * Whether a download is in a state where its zip package can be retrieved.
- * Only `ready` and `downloaded` statuses have completed artifacts in S3 (AC #2).
- * `pending` and `processing` are still building; `failed` has no artifact.
- */
-export const isDownloadReady = (status: string): boolean => status === 'ready' || status === 'downloaded';
-
 const PAGE_SIZE = 10;
 
+/**
+ * Predicate for "this export is ready for download". No `'downloaded'` branch because
+ * `download_export.status` doesn't transition to `'downloaded'` — that's a `download`-only
+ * terminal. Exported (not inlined) so the card can share the same definition via sibling
+ * import.
+ */
+export const isExportReady = (status: DownloadExportStatus): boolean => status === 'ready';
+
+/**
+ * Inject a hidden iframe that triggers a browser download of the given URL, then clean it up
+ * after 30 seconds.
+ *
+ * Why iframe over `window.open`: popup blockers reject rapid-fire `window.open` calls (multi-
+ * part downloads hit this), and browsers collapse concurrent tabs. The iframe technique
+ * works around both problems and avoids stealing focus.
+ */
+export const triggerIframeDownload = (url: string): void => {
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = url;
+  document.body.appendChild(iframe);
+  setTimeout(() => {
+    iframe.remove();
+  }, 30000);
+};
+
+/**
+ * Sidebar list of the current user's downloads, with per-download Export menu + Exports rows
+ * delegated to `DownloadFeatureCard`.
+ *
+ * No polling on exports — the sidebar refresh button and the post-`handleCreateExport` refresh
+ * are the only signals. Each refresh replays the backend's pre-join (`download.exports`), so
+ * new export rows surface without a dedicated cache primitive.
+ *
+ * This component owns `useApi`, `useDialogContext().setErrorDialog`, and the iframe-injection
+ * technique. The card stays presentational; all four handlers below live here.
+ */
 export const DownloadSidebarDownloads = () => {
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
@@ -33,19 +64,26 @@ export const DownloadSidebarDownloads = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  const handleDownloadFragment = async (downloadId: string, fragmentIndex: number) => {
+  const downloads = downloadsDataLoader.data?.downloads ?? [];
+  const lastPage = downloadsDataLoader.data?.pagination?.last_page ?? 1;
+
+  /**
+   * Create a new CSV export for a ready download, then refresh the list. The refresh replays
+   * the backend's pre-join (`download.exports`) — the new pending export row surfaces via that
+   * refresh, so we need no separate cache or version bumper.
+   * Failures open the standard export error dialog.
+   *
+   * @param {string} downloadId - Download request id to export.
+   */
+  const handleCreateExport = async (downloadId: string) => {
     try {
-      const { url } = await biohubApi.download.getFragmentUrl(downloadId, fragmentIndex);
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      setTimeout(() => document.body.removeChild(iframe), 30000);
+      await biohubApi.downloadExport.createExport(downloadId);
+      await downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
     } catch {
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: 'Download Error',
-        dialogText: 'Failed to retrieve the download URL.',
+        dialogTitle: 'Export Error',
+        dialogText: 'Failed to start the export.',
         onOk: () => dialogContext.setErrorDialog({ open: false }),
         onClose: () => dialogContext.setErrorDialog({ open: false })
       });
@@ -53,34 +91,71 @@ export const DownloadSidebarDownloads = () => {
   };
 
   /**
-   * Download all fragments using iframes to avoid popup blockers and browser
-   * collapsing rapid <a> clicks into a single download. Each iframe independently
-   * triggers a Content-Disposition: attachment response from S3.
+   * Downloads a single export part by resolving a fresh presigned URL first.
+   * A missing part uses the same "Download Error" dialog as API failures.
+   *
+   * @param {string} exportId - Export id containing the requested part.
+   * @param {number} chunkId - One-based part id to download.
    */
-  const handleDownloadAll = async (downloadId: string, totalFragments: number) => {
+  const handleDownloadExportPart = async (exportId: string, chunkId: number) => {
     try {
-      for (let i = 0; i < totalFragments; i++) {
-        const { url } = await biohubApi.download.getFragmentUrl(downloadId, i);
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
-        // Clean up after download starts
-        setTimeout(() => document.body.removeChild(iframe), 30000);
+      const detail = await biohubApi.downloadExport.getExport(exportId);
+      const part = detail.parts.find((p) => p.chunk_id === chunkId);
+      if (!part) {
+        throw new Error('Part not found');
       }
+      triggerIframeDownload(part.url);
     } catch {
       dialogContext.setErrorDialog({
         open: true,
         dialogTitle: 'Download Error',
-        dialogText: 'Failed to retrieve download URLs.',
+        dialogText: 'Failed to retrieve the export part.',
         onOk: () => dialogContext.setErrorDialog({ open: false }),
         onClose: () => dialogContext.setErrorDialog({ open: false })
       });
     }
   };
 
-  const downloads = downloadsDataLoader.data?.downloads ?? [];
-  const lastPage = downloadsDataLoader.data?.pagination?.last_page ?? 1;
+  /**
+   * Downloads every part for a ready multi-part export.
+   * Fetches export detail once, then iframe-injects each part URL in backend
+   * order. No iframe downloads start if detail fetch fails.
+   *
+   * @param {string} exportId - Export id whose parts should all be downloaded.
+   */
+  const handleDownloadExportAllParts = async (exportId: string) => {
+    try {
+      const detail = await biohubApi.downloadExport.getExport(exportId);
+      for (const part of detail.parts) {
+        triggerIframeDownload(part.url);
+      }
+    } catch {
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: 'Download Error',
+        dialogText: 'Failed to retrieve the export.',
+        onOk: () => dialogContext.setErrorDialog({ open: false }),
+        onClose: () => dialogContext.setErrorDialog({ open: false })
+      });
+    }
+  };
+
+  /**
+   * Handles the rebuild affordance for ready exports with no available parts.
+   * Currently shows an explanatory dialog; the rebuild API is not wired yet.
+   *
+   * @param {string} _exportId - Export id reserved for the future rebuild request.
+   */
+  const handleRebuildExport = async (_exportId: string) => {
+    dialogContext.setErrorDialog({
+      open: true,
+      dialogTitle: 'Nothing to download',
+      dialogText:
+        'This export produced no files (no rows matched the download filter). Start a new download to rebuild.',
+      onOk: () => dialogContext.setErrorDialog({ open: false }),
+      onClose: () => dialogContext.setErrorDialog({ open: false })
+    });
+  };
 
   return (
     <>
@@ -107,17 +182,20 @@ export const DownloadSidebarDownloads = () => {
             <ListItem key={download.download_id} disableGutters sx={{ width: 1, pb: 1 }}>
               <DownloadFeatureCard
                 download={download}
-                onDownloadFragment={handleDownloadFragment}
-                onDownloadAll={handleDownloadAll}
+                exports={download.exports}
+                onCreateExport={handleCreateExport}
+                onDownloadExportPart={handleDownloadExportPart}
+                onDownloadExportAllParts={handleDownloadExportAllParts}
+                onRebuildExport={handleRebuildExport}
               />
             </ListItem>
           ))}
         </List>
-        {lastPage > 1 && (
+        {lastPage > 1 ? (
           <Stack alignItems="center" py={1}>
             <Pagination count={lastPage} page={page} onChange={(_, newPage) => setPage(newPage)} size="small" />
           </Stack>
-        )}
+        ) : null}
       </LoadingGuard>
     </>
   );

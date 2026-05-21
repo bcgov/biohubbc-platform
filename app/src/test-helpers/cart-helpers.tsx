@@ -86,7 +86,8 @@ export const createMockSearchFeature = (
   feature_description: 'This is a mocked feature description',
   submission_name: 'Mock Submission Name',
   is_secured: secured,
-  relevancy_score: 95
+  relevancy_score: 95,
+  create_date: '2026-05-01T12:00:00.000Z'
 });
 
 // Helper to create a mock CartWithFeaturesResponse
@@ -120,5 +121,6 @@ export const convertToSearchFeatureResult = (cartFeature: CartSubmissionFeature)
   feature_description: `Description for ${cartFeature.feature_type_name}`,
   submission_name: `Submission for ${cartFeature.submission_id}`,
   is_secured: cartFeature.secured,
-  relevancy_score: 100
+  relevancy_score: 100,
+  create_date: '2026-05-01T12:00:00.000Z'
 });

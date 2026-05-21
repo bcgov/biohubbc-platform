@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SubmissionFeaturePropertyStringRepository } from './submission-feature-property-string-repository';
 
 describe('SubmissionFeaturePropertyStringRepository', () => {

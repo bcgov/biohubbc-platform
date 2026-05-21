@@ -3,7 +3,8 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SubmissionFeatureForReview } from '../models/submission';
+import { SubmissionFeatureForReview, SubmissionFilters } from '../models/submission';
+import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
@@ -139,6 +140,8 @@ export interface ISubmissionRecordWithSpatial {
 export interface ISubmissionModel {
   submission_id?: number;
   uuid: string;
+  system_user_id: number;
+  comment?: string | null;
   security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
@@ -251,7 +254,19 @@ export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
 
-export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
+export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.pick({
+  submission_id: true,
+  uuid: true,
+  submitted_timestamp: true,
+  system_user_id: true,
+  contributor_id: true,
+  name: true,
+  description: true,
+  comment: true,
+  publish_timestamp: true,
+  create_user: true,
+  update_user: true
+}).extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
   root_feature_type_name: z.string(),
@@ -296,12 +311,6 @@ export const PatchSubmissionRecord = z.object({
 
 export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
 
-export type SubmissionFeatureSignedUrlPayload = {
-  submissionFeatureId: number;
-  submissionFeatureObj: { key: string; value: string };
-  isAdmin: boolean;
-};
-
 /**
  * A repository class for accessing submission data.
  *
@@ -314,7 +323,7 @@ export class SubmissionRepository extends BaseRepository {
    * Insert a new submission record.
    *
    * @param {ICreateSubmission} submissionData
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @returns {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
@@ -359,7 +368,7 @@ export class SubmissionRepository extends BaseRepository {
    * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
    * sensitive information. Should never be shared with the general public.
    * @param {number} contributorId
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @returns {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecordWithPotentialConflict(
@@ -431,7 +440,7 @@ export class SubmissionRepository extends BaseRepository {
    * @param {(string | null)} featureSourceId The source ID of the feature, or null.
    * @param {string} featureTypeName The name of the feature type.
    * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @return {*}  {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
+   * @returns {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
    * @memberof SubmissionRepository
    */
   async insertSubmissionFeatureRecord(
@@ -477,11 +486,36 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Delete all feature relationships for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      )
+      OR target_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Update the parent reference for a submission feature.
    *
    * @param {number} submissionFeatureId The ID of the feature to update.
    * @param {number} parentSubmissionFeatureId The ID of the parent feature.
-   * @return {*}  {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
@@ -499,7 +533,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId The submission_upload_id scope.
    * @param {{ submission_feature_id: number; parent_submission_feature_id: number }[]} pairs The child-parent pairs.
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionFeatureParents(
@@ -528,144 +562,10 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Delete all submission features for a submission (soft delete).
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @return {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Delete all submission feature relationships for features belonging to a submission.
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @return {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async deleteSubmissionFeatureRelationships(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      DELETE FROM submission_feature_feature
-      WHERE source_feature_id IN (
-        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
-      )
-      OR target_feature_id IN (
-        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
-      );
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Insert submission feature relationships (source-target from content array).
-   * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
-   *
-   * @param {Array<{ source_feature_id: number; target_feature_id: number }>} pairs The pairs to insert.
-   * @return {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRelationships(
-    pairs: Array<{ source_feature_id: number; target_feature_id: number }>
-  ): Promise<void> {
-    if (pairs.length === 0) {
-      return;
-    }
-
-    const sourceIds = pairs.map((p) => p.source_feature_id);
-    const targetIds = pairs.map((p) => p.target_feature_id);
-
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-      SELECT source_id, target_id FROM unnest(
-        ${sourceIds}::integer[],
-        ${targetIds}::integer[]
-      ) AS t(source_id, target_id)
-      ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Get all related submission feature IDs for a given feature (sources and targets).
-   * sourceIds = features that reference this one; targetIds = features this one references.
-   *
-   * @param {number} submissionFeatureId The submission feature ID.
-   * @return {Promise<{ sourceIds: number[]; targetIds: number[] }>}
-   * @memberof SubmissionRepository
-   */
-  async getRelatedSubmissionFeatureIds(
-    submissionFeatureId: number
-  ): Promise<{ sourceIds: number[]; targetIds: number[] }> {
-    const parentSqlStatement = SQL`
-      SELECT source_feature_id
-      FROM submission_feature_feature
-      WHERE target_feature_id = ${submissionFeatureId};
-    `;
-
-    const childSqlStatement = SQL`
-      SELECT target_feature_id
-      FROM submission_feature_feature
-      WHERE source_feature_id = ${submissionFeatureId};
-    `;
-
-    const [parentResult, childResult] = await Promise.all([
-      this.connection.sql<{ source_feature_id: number }>(parentSqlStatement),
-      this.connection.sql<{ target_feature_id: number }>(childSqlStatement)
-    ]);
-
-    return {
-      sourceIds: parentResult.rows.map((r) => r.source_feature_id),
-      targetIds: childResult.rows.map((r) => r.target_feature_id)
-    };
-  }
-
-  /**
-   * Get all related submission features with their type names.
-   *
-   * @param {number} submissionFeatureId The submission feature ID.
-   * @return {Promise<RelatedSubmissionFeature[]>}
-   * @memberof SubmissionRepository
-   */
-  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
-    const sqlStatement = SQL`
-      SELECT DISTINCT
-        sf.submission_feature_id,
-        ft.name as feature_type_name,
-        ft.display_name as feature_type_display_name,
-        sf.data
-      FROM submission_feature sf
-      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-      WHERE sf.submission_feature_id IN (
-        SELECT source_feature_id FROM submission_feature_feature
-        WHERE target_feature_id = ${submissionFeatureId}
-        UNION
-        SELECT target_feature_id FROM submission_feature_feature
-        WHERE source_feature_id = ${submissionFeatureId}
-      );
-    `;
-
-    const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
-    return response.rows;
-  }
-
-  /**
    * Get feature type id by name.
    *
    * @param {string} name
-   * @return {*}  {Promise<{ feature_type_id: number }>}
+   * @returns {Promise<{ feature_type_id: number }>}
    * @memberof SubmissionRepository
    */
   async getFeatureTypeIdByName(name: string): Promise<{ feature_type_id: number }> {
@@ -694,7 +594,7 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission record by primary id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @returns {Promise<ISubmissionModel>}
    * @memberof SubmissionRepository
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
@@ -723,7 +623,7 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission_id from uuid.
    *
    * @param {string} uuid - The submission UUID.
-   * @return {Promise<{ submission_id: number }>} The submission_id for the given UUID.
+   * @returns {Promise<{ submission_id: number }>} The submission_id for the given UUID.
    * @throws {ApiNotFoundError} If no submission exists for the given UUID.
    * @memberof SubmissionRepository
    */
@@ -748,7 +648,7 @@ export class SubmissionRepository extends BaseRepository {
    * Get spatial component counts by dataset id
    *
    * @param {string} datasetId
-   * @return {*}  {Promise<ISpatialComponentCount[]>}
+   * @returns {Promise<ISpatialComponentCount[]>}
    * @memberof SubmissionRepository
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
@@ -776,7 +676,7 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission source transform record by associated source system user id.
    *
    * @param {number} systemUserId
-   * @return {*}  {Promise<ISourceTransformModel>}
+   * @returns {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
   async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
@@ -806,7 +706,7 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission source transform record by associated source transform id.
    *
    * @param {number} sourceTransformId
-   * @return {*}  {Promise<ISourceTransformModel>}
+   * @returns {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
   async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
@@ -836,7 +736,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
-   * @return {*}  {Promise<{ submission_status_id: number; submission_status_type_id: number }>}
+   * @returns {Promise<{ submission_status_id: number; submission_status_type_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionStatus(
@@ -884,7 +784,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {number} submissionStatusId
    * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
-   * @return {*}  {Promise<{ submission_message_id: number; submission_message_type_id: number }>}
+   * @returns {Promise<{ submission_message_id: number; submission_message_type_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionMessage(
@@ -936,7 +836,7 @@ export class SubmissionRepository extends BaseRepository {
    * Note: Will only return the most recent unreviewed submission for each uuid, unless the most recent submission is
    * already reviewed.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
@@ -962,18 +862,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         ${SECURITY_APPLIED_STATUS.PENDING} AS security,
@@ -1002,23 +897,18 @@ export class SubmissionRepository extends BaseRepository {
         region_lookup.region_id = submission_regions.region_id
       WHERE
         submission_feature.parent_submission_feature_id IS NULL
-      group by 
+      group by
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1034,7 +924,7 @@ export class SubmissionRepository extends BaseRepository {
    * Note: Will only return the most recent reviewed submission for each uuid, unless the most recent submission is
    * already published.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
@@ -1067,18 +957,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         CASE
@@ -1123,12 +1008,8 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1141,13 +1022,23 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that have completed security review and are published.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
       SELECT
-        submission.*,
+        submission.submission_id,
+        submission.uuid,
+        submission.system_user_id,
+        submission.contributor_id,
+        submission.publish_timestamp,
+        submission.submitted_timestamp,
+        submission.name,
+        submission.description,
+        submission.comment,
+        submission.create_user,
+        submission.update_user,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         CASE
@@ -1199,7 +1090,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}
+   * @returns {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}
    * @memberof SubmissionRepository
    */
   async getSubmissionFeaturesBySubmissionId(
@@ -1233,22 +1124,177 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);
+    return response.rows;
+  }
 
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission feature record', [
-        'SubmissionRepository->getSubmissionFeaturesBySubmissionId',
-        'rowCount was null or undefined, expected rowCount != 0'
+  /**
+   * Get all submissions accessible to the given system user via their submission team membership.
+   *
+   * @param {number} systemUserId - The system user ID to fetch submissions for.
+   * @param {ApiPaginationOptions} pagination
+   * @param {SubmissionFilters} [filters]
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionsByUserId(
+    systemUserId: number,
+    pagination: ApiPaginationOptions,
+    filters?: SubmissionFilters
+  ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const knex = getKnex();
+    const sort = pagination.sort;
+    const order = pagination.order;
+
+    const sortColumnMap: Record<string, string> = {
+      submission_id: 's.submission_id',
+      name: 's.name',
+      submitted_timestamp: 's.submitted_timestamp',
+      security: 'security'
+    };
+
+    const requestedSort = sort ? sortColumnMap[sort] : undefined;
+    const resolvedSort = requestedSort ?? 's.submitted_timestamp';
+    const resolvedOrder = order === 'asc' ? 'asc' : 'desc';
+    const normalizedSearch = filters?.search?.trim().toLowerCase();
+
+    const queryBuilder = knex('team_member as tm')
+      .innerJoin('team as t', function () {
+        this.on('t.team_id', '=', 'tm.team_id').andOnNull('t.record_end_date');
+      })
+      .innerJoin('submission_team as st', function () {
+        this.on('st.team_id', '=', 'tm.team_id').andOnNull('st.record_end_date');
+      })
+      .innerJoin('submission as s', function () {
+        this.on('s.submission_id', '=', 'st.submission_id').andOnNull('s.record_end_date');
+      })
+      .innerJoin('submission_feature as sf', function () {
+        this.on('sf.submission_id', '=', 's.submission_id').andOnNull('sf.parent_submission_feature_id');
+      })
+      .innerJoin('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'sf.submission_feature_id')
+      .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
+      .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('tm.record_end_date')
+      .select([
+        's.submission_id',
+        's.uuid',
+        's.system_user_id',
+        's.contributor_id',
+        's.publish_timestamp',
+        's.submitted_timestamp',
+        's.name',
+        's.description',
+        's.comment',
+        's.create_user',
+        's.update_user',
+        knex.raw('sf.feature_type_id AS root_feature_type_id'),
+        knex.raw('ft.name AS root_feature_type_name'),
+        knex.raw(
+          `
+          CASE
+            WHEN s.security_review_timestamp IS NULL THEN ?
+            WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN ?
+            WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) THEN ?
+            ELSE ?
+          END AS security
+          `,
+          [
+            SECURITY_APPLIED_STATUS.PENDING,
+            SECURITY_APPLIED_STATUS.UNSECURED,
+            SECURITY_APPLIED_STATUS.SECURED,
+            SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
+          ]
+        ),
+        knex.raw(`COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT rl.region_name), NULL), '{}') AS regions`)
+      ])
+      .groupBy([
+        's.submission_id',
+        's.uuid',
+        's.system_user_id',
+        's.contributor_id',
+        's.security_review_timestamp',
+        's.publish_timestamp',
+        's.submitted_timestamp',
+        's.name',
+        's.description',
+        's.comment',
+        's.create_user',
+        's.update_user',
+        'sf.feature_type_id',
+        'ft.name'
       ]);
+
+    if (normalizedSearch) {
+      queryBuilder.andWhereRaw('LOWER(s.name) LIKE ?', [`%${normalizedSearch}%`]);
     }
 
+    this.applyPagination(queryBuilder, {
+      ...pagination,
+      sort: resolvedSort,
+      order: resolvedOrder
+    });
+
+    const response = await this.connection.knex(queryBuilder, SubmissionRecordWithSecurityAndRootFeatureType);
+
     return response.rows;
+  }
+
+  /**
+   * Count submissions accessible to the given system user with optional server-side search.
+   *
+   * @param {number} systemUserId
+   * @param {SubmissionFilters} [filters]
+   * @returns {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionsByUserIdCount(systemUserId: number, filters?: SubmissionFilters): Promise<number> {
+    const normalizedSearch = filters?.search?.trim().toLowerCase();
+
+    const sqlStatement = SQL`
+      SELECT COUNT(*)::int AS count
+      FROM (
+        SELECT
+          s.submission_id
+        FROM team_member tm
+        INNER JOIN team t
+          ON  t.team_id = tm.team_id
+          AND t.record_end_date IS NULL
+        INNER JOIN submission_team st
+          ON  st.team_id = tm.team_id
+          AND st.record_end_date IS NULL
+        INNER JOIN submission s
+          ON  s.submission_id = st.submission_id
+          AND s.record_end_date IS NULL
+        WHERE
+          tm.system_user_id = ${systemUserId}
+          AND tm.record_end_date IS NULL
+    `;
+
+    if (normalizedSearch) {
+      const searchPattern = `%${normalizedSearch}%`;
+      sqlStatement.append(SQL` AND LOWER(s.name) LIKE ${searchPattern}`);
+    }
+
+    sqlStatement.append(SQL`
+        GROUP BY s.submission_id
+      ) AS counted_submissions;
+    `);
+
+    const response = await this.connection.sql(sqlStatement, z.object({ count: z.number() }));
+
+    if (!response.rowCount) {
+      return 0;
+    }
+
+    return response.rows[0].count;
   }
 
   /**
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
+   * @returns {Promise<SubmissionRecordWithSecurity>}
    * @memberof SubmissionRepository
    */
   async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
@@ -1304,83 +1350,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get a submission feature record by uuid.
-   *
-   * @param {string} submissionUuid
-   * @return {*}  {Promise<SubmissionFeatureRecord>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionFeatureByUuid(submissionUuid: string): Promise<SubmissionFeatureRecord> {
-    const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        submission_feature
-      WHERE
-        uuid = ${submissionUuid};
-    `;
-
-    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission feature record', [
-        'SubmissionRepository->getSubmissionFeatureByUuid',
-        `rowCount was ${response.rowCount}, expected rowCount === 1`
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Get a submission feature record by Id.
-   *
-   * @param {number} submissionFeatureId
-   * @return {Promise<SubmissionFeature>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
-    const sqlStatement = SQL`
-      SELECT
-        sf.submission_feature_id,
-        sf.uuid,
-        sf.urn,
-        sf.submission_id,
-        sf.feature_type_id,
-        sf.source_id,
-        sf.data,
-        ft.name as feature_type_name,
-        ft.display_name as feature_type_display_name,
-        s.name as submission_name,
-        EXISTS (
-          SELECT 1
-          FROM submission_feature_security sfs
-          WHERE sfs.submission_feature_id = sf.submission_feature_id
-            AND sfs.record_end_date IS NULL
-        ) AS secured
-      FROM
-        submission_feature sf
-      JOIN
-        feature_type ft ON ft.feature_type_id = sf.feature_type_id
-      JOIN
-        submission s ON s.submission_id = sf.submission_id
-      WHERE
-        sf.submission_feature_id = ${submissionFeatureId};
-    `;
-
-    const response = await this.connection.sql(sqlStatement, SubmissionFeature);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission feature record', [
-        'SubmissionRepository->getSubmissionFeatureById',
-        `rowCount was ${response.rowCount}, expected rowCount === 1`
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * Find and return all submission feature records that match the provided criteria.
    *
    * @param {{
@@ -1388,7 +1357,7 @@ export class SubmissionRepository extends BaseRepository {
    *     systemUserId?: number;
    *     featureTypeNames?: string[];
    *   }} [criteria]
-   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @returns {Promise<SubmissionFeatureRecord[]>}
    * @memberof SubmissionRepository
    */
   async findSubmissionFeatures(criteria?: {
@@ -1436,7 +1405,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * Note: Will only return the most recent published submission for each uuid.
    *
-   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
+   * @returns {Promise<SubmissionRecordPublishedForPublic[]>}
    * @memberof SubmissionRepository
    */
   async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
@@ -1536,7 +1505,7 @@ export class SubmissionRepository extends BaseRepository {
    * Get all messages for a submission.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @returns {Promise<SubmissionMessageRecord[]>}
    * @memberof SubmissionRepository
    */
   async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
@@ -1561,7 +1530,7 @@ export class SubmissionRepository extends BaseRepository {
    *       SubmissionMessageRecord,
    *       'submission_id' | 'submission_message_type_id' | 'label' | 'message' | 'data'
    *     >[])} messages
-   * @return {*}  {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionRepository
    */
   async createMessages(
@@ -1588,7 +1557,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @param {PatchSubmissionRecord} patch
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @returns {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
   async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
@@ -1669,7 +1638,7 @@ export class SubmissionRepository extends BaseRepository {
    * Unpublish all submissions with the same uuid as the submission with the provided id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionRepository
    */
   async unpublishAllSubmissionsBySubmissionId(submissionId: number): Promise<void> {
@@ -1694,7 +1663,7 @@ export class SubmissionRepository extends BaseRepository {
    * Note: If more than one 'root' submission feature is found, returns the first one. Only one record is expected.
    *
    * @param {number} submissionId
-   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @returns {(Promise<SubmissionFeatureRecord>)}
    * @memberof SubmissionRepository
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
@@ -1725,7 +1694,7 @@ export class SubmissionRepository extends BaseRepository {
    * Download Submission with all associated Features
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
    * @memberof SubmissionRepository
    */
   async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
@@ -1810,7 +1779,7 @@ export class SubmissionRepository extends BaseRepository {
    * Download Published Submission with all associated Features
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
    * @memberof SubmissionRepository
    */
   async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
@@ -1902,83 +1871,14 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Retrieves submission feature (artifact) key from data column key value pair.
-   * Checks submission feature is not secure.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @throws {ApiExecuteSQLError}
-   * @memberof SubmissionRepository
-   * @returns {Promise<string>} - submission feature (artifact) key
-   */
-  async getSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND NOT EXISTS (
-      SELECT NULL
-      FROM submission_feature_security sfs
-      WHERE sfs.submission_feature_id = ss.submission_feature_id
-    )
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key}
-    RETURNING ss.value;`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `submissionFeature is secure or matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionRepository->getSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
-  }
-
-  /**
-   * Retrieves submission feature (artifact) key from data column key value pair. Skips security checks.
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @throws {ApiExecuteSQLError}
-   * @memberof SubmissionRepository
-   * @returns {Promise<string>} - submission feature (artifact) key
-   */
-  async getAdminSubmissionFeatureArtifactKey(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const sqlStatement = SQL`
-    SELECT ss.value
-    FROM search_string ss
-    INNER JOIN feature_property fp
-    ON ss.feature_property_id = fp.feature_property_id
-    WHERE ss.submission_feature_id = ${payload.submissionFeatureId}
-    AND ss.value = ${payload.submissionFeatureObj.value}
-    AND fp.name = ${payload.submissionFeatureObj.key};`;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
-
-    if (response.rowCount === 0 || !response.rows[0]?.value) {
-      throw new ApiExecuteSQLError('Failed to get key for signed URL', [
-        `matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
-        'SubmissionRepository->getAdminSubmissionFeatureArtifactKey'
-      ]);
-    }
-
-    return response.rows[0].value;
-  }
-
-  /**
    * Build the base query for submission features.
    *
    * @param {number} submissionId
    * @param {Knex} knex
-   * @return {Knex.QueryBuilder}
+   * @returns {Knex.QueryBuilder}
    * @memberof SubmissionRepository
    */
-  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex) {
+  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, filters?: SubmissionFeatureFilters) {
     const baseQuery = knex('submission_feature')
       .select(
         'submission_feature.submission_id',
@@ -1996,6 +1896,11 @@ export class SubmissionRepository extends BaseRepository {
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .where('submission_feature.submission_id', submissionId);
 
+    const normalizedSearch = filters?.search?.trim().toLowerCase();
+    if (normalizedSearch) {
+      baseQuery.andWhereRaw('LOWER(feature_type.name) LIKE ?', [`%${normalizedSearch}%`]);
+    }
+
     return knex.with('base_features', baseQuery).distinct('*').from('base_features');
   }
 
@@ -2004,16 +1909,17 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @param {ApiPaginationOptions} pagination
-   * @return {Promise<SubmissionFeatureForReview[]>}
+   * @returns {Promise<SubmissionFeatureForReview[]>}
    * @memberof SubmissionRepository
    */
   async getSubmissionFeatures(
     submissionId: number,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    filters?: SubmissionFeatureFilters
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, filters);
 
     this.applyPagination(baseQuery, pagination);
 
@@ -2026,14 +1932,14 @@ export class SubmissionRepository extends BaseRepository {
    * Get the total number of submission features for a given submission.
    *
    * @param {number} submissionId
-   * @return {Promise<number>}
+   * @returns {Promise<number>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesCount(submissionId: number): Promise<number> {
+  async getSubmissionFeaturesCount(submissionId: number, filters?: SubmissionFeatureFilters): Promise<number> {
     const knex = getKnex();
 
     // Wrap the base query as a subquery
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, filters);
     const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
@@ -2046,32 +1952,5 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].count;
-  }
-
-  /**
-   * Apply pagination + sorting to a Knex query.
-   *
-   * @param {Knex.QueryBuilder} query
-   * @param {ApiPaginationOptions} pagination
-   * @memberof SubmissionRepository
-   */
-  applyPagination(query: any, pagination?: ApiPaginationOptions) {
-    if (!pagination) {
-      return query;
-    }
-
-    if (pagination.limit) {
-      query.limit(pagination.limit);
-    }
-
-    if (pagination.page && pagination.limit) {
-      query.offset((pagination.page - 1) * pagination.limit);
-    }
-
-    if (pagination.sort && pagination.order) {
-      query.orderBy(pagination.sort, pagination.order);
-    }
-
-    return query;
   }
 }

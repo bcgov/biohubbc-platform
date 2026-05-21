@@ -5,7 +5,8 @@ export const URL_PARAMS = {
   PAGE: 'page',
   LIMIT: 'limit',
   SORT: 'sort',
-  ORDER: 'order'
+  ORDER: 'order',
+  EXPR: 'expr'
 } as const;
 
 /** Type-safe keys: the values, not the object keys */

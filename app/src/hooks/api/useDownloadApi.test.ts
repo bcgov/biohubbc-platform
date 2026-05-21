@@ -1,6 +1,10 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { DownloadListResponse, FragmentUrlResponse } from 'interfaces/useDownloadApi.interface';
+import {
+  CreateDownloadRequest,
+  CreateDownloadResponse,
+  DownloadListResponse
+} from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
 
 describe('useDownloadApi', () => {
@@ -23,12 +27,10 @@ describe('useDownloadApi', () => {
             download_status: 'ready',
             create_date: '2026-03-01T00:00:00Z',
             feature_count: 42,
-            total_fragments: 1,
-            completed_fragments: 1,
-            estimated_total_size_bytes: '1024',
             started_at: '2026-03-01T00:01:00Z',
             completed_at: '2026-03-01T00:02:00Z',
-            downloaded_at: null
+            downloaded_at: null,
+            exports: []
           }
         ],
         pagination: { total: 1, current_page: 1, last_page: 1 }
@@ -56,24 +58,38 @@ describe('useDownloadApi', () => {
     });
   });
 
-  describe('getFragmentUrl', () => {
-    it('should send GET to correct interpolated URL and return response', async () => {
-      const mockResponse: FragmentUrlResponse = {
-        url: 'https://s3.example.com/signed-url'
+  describe('createDownload', () => {
+    it('should POST payload to /api/download and return response', async () => {
+      const mockRequest: CreateDownloadRequest = {
+        name: 'Moose download',
+        description: 'Moose observations in the Skeena',
+        featureTypes: ['dataset'],
+        expression: null
+      };
+      const mockResponse: CreateDownloadResponse = {
+        download_id: '550e8400-e29b-41d4-a716-446655440099',
+        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099'
       };
 
-      mock.onGet('/api/download/abc-123/fragment/0/url').reply(200, mockResponse);
+      mock.onPost('/api/download').reply(201, mockResponse);
 
-      const result = await useDownloadApi(axios).getFragmentUrl('abc-123', 0);
+      const result = await useDownloadApi(axios).createDownload(mockRequest);
 
       expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].url).toBe('/api/download/abc-123/fragment/0/url');
+      expect(mock.history.post[0].url).toBe('/api/download');
+      expect(JSON.parse(mock.history.post[0].data)).toEqual(mockRequest);
     });
 
-    it('should propagate API errors', async () => {
-      mock.onGet('/api/download/abc-123/fragment/0/url').reply(500);
+    it('should propagate rejection on server error', async () => {
+      const mockRequest: CreateDownloadRequest = {
+        name: 'All datasets',
+        featureTypes: ['dataset'],
+        expression: null
+      };
 
-      await expect(useDownloadApi(axios).getFragmentUrl('abc-123', 0)).rejects.toThrow();
+      mock.onPost('/api/download').reply(400, { message: 'Validation failed' });
+
+      await expect(useDownloadApi(axios).createDownload(mockRequest)).rejects.toThrow();
     });
   });
 });

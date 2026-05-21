@@ -2,26 +2,54 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { PropertySearchService } from '../../../services/property-search-service';
 import { GroupedPropertyResults } from '../../../services/property-search-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
 
 describe('searchProperties', () => {
-  const mockStringResults = [{ feature_property_id: 1, property_name: 'Length', relevancy_score: 1 }];
-  const mockNumberResults = [{ feature_property_id: 2, property_name: 'Depth', relevancy_score: 1 }];
+  const mockStringResults = [
+    {
+      feature_property_id: 1,
+      property_name: 'length',
+      property_display_name: 'Length',
+      feature_property_type: 'string' as const,
+      operators: ['Equals', 'ILike', 'Exists'],
+      relevancy_score: 1
+    }
+  ];
+  const mockNumberResults = [
+    {
+      feature_property_id: 2,
+      property_name: 'depth',
+      property_display_name: 'Depth',
+      feature_property_type: 'number' as const,
+      operators: ['Equals', 'GreaterThan', 'Exists'],
+      relevancy_score: 1
+    }
+  ];
 
   const mockResultsWithData: GroupedPropertyResults = {
     string: mockStringResults,
-    number: mockNumberResults
+    number: mockNumberResults,
+    boolean: [],
+    datetime: [],
+    taxon: [],
+    spatial: [],
+    code: []
   };
 
   const mockResultsEmpty: GroupedPropertyResults = {
     string: [],
-    number: []
+    number: [],
+    boolean: [],
+    datetime: [],
+    taxon: [],
+    spatial: [],
+    code: []
   };
 
   afterEach(() => {
@@ -35,7 +63,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -73,7 +101,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -111,7 +139,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -151,7 +179,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -184,7 +212,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {

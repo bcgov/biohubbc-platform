@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { ArtifactSecurity } from './artifact-security';
 
+export interface SubmissionFeatureFilters {
+  search?: string;
+}
+
+export interface SubmissionFeaturePropertyFilters {
+  search?: string;
+}
+
 /**
  * Model for a single submission feature
  */
@@ -37,6 +45,19 @@ export interface CreateSubmissionFeatureIngestionRecord {
   featureTypeName: string;
   data: IFlattenedBlock;
   dataByteSize: number;
+}
+
+export interface DroppedSubmissionFeatureReason {
+  reason: 'unknown_feature_type_ignored' | 'feature_not_inserted';
+  count: number;
+  featureTypeCounts?: Record<string, number>;
+}
+
+export interface SubmissionFeatureBatchInsertResult {
+  expectedCount: number;
+  insertedCount: number;
+  droppedCount: number;
+  droppedReasons: DroppedSubmissionFeatureReason[];
 }
 
 export interface InsertSubmissionFeatureRecord {

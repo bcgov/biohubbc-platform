@@ -6,6 +6,7 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
  * Schema for policy statement condition.
@@ -87,6 +88,10 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: PolicyStatementConditionSchema,
       description: 'Conditions that must be met for this statement to apply'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description: 'Optional expression tree that builds the runtime feature graph for this statement'
     }
   }
 };
@@ -97,7 +102,7 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
 export const PolicySchema: OpenAPIV3.SchemaObject = {
   title: 'Policy',
   type: 'object',
-  required: ['policy_id', 'name'],
+  required: ['policy_id', 'name', 'status'],
   properties: {
     policy_id: {
       type: 'string',
@@ -114,6 +119,11 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       nullable: true,
       description: 'Description of the policy'
+    },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state of the policy'
     }
   }
 };
@@ -124,7 +134,7 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
 export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyWithStatements',
   type: 'object',
-  required: ['policy_id', 'name', 'statements'],
+  required: ['policy_id', 'name', 'status', 'statements'],
   properties: {
     policy_id: {
       type: 'string',
@@ -141,6 +151,11 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       nullable: true,
       description: 'Description of the policy'
+    },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state of the policy'
     },
     statements: {
       type: 'array',
@@ -168,10 +183,10 @@ export const PoliciesListResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Schema for creating a policy statement (request input).
+ * Schema for creating a policy statement payload.
  */
-export const CreatePolicyStatementInputSchema: OpenAPIV3.SchemaObject = {
-  title: 'CreatePolicyStatementInput',
+export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreatePolicyStatementPayload',
   type: 'object',
   required: ['effect', 'submission_feature_urn'],
   properties: {
@@ -221,6 +236,11 @@ export const CreatePolicyStatementInputSchema: OpenAPIV3.SchemaObject = {
         }
       },
       description: 'Optional conditions for this statement'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description:
+        'Optional expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
     }
   }
 };
@@ -245,7 +265,7 @@ export const CreatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
     },
     statements: {
       type: 'array',
-      items: CreatePolicyStatementInputSchema,
+      items: CreatePolicyStatementPayloadSchema,
       description: 'Policy statements to create'
     }
   }
@@ -269,10 +289,32 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       description: 'Description of the policy'
     },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Optional lifecycle state for the policy'
+    },
     statements: {
       type: 'array',
-      items: CreatePolicyStatementInputSchema,
+      items: CreatePolicyStatementPayloadSchema,
       description: 'Policy statements (replaces existing)'
+    }
+  }
+};
+
+/**
+ * Schema for status-only policy update request body.
+ */
+export const UpdatePolicyStatusRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'UpdatePolicyStatusRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state for the policy'
     }
   }
 };

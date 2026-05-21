@@ -1,5 +1,5 @@
-import { fireEvent } from '@testing-library/react';
 import { GridColDef } from '@mui/x-data-grid';
+import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
@@ -24,7 +24,7 @@ vi.mock('@mui/x-data-grid', () => ({
         rows.map((row) => (
           <div key={row.team_id} data-testid={`row-${row.team_id}`}>
             <span>{row.name}</span>
-            <span>{row.description || '-'}</span>
+            <span>{row.description}</span>
             <span>{row.member_count}</span>
             {/* Render actions column */}
             {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}
@@ -58,13 +58,20 @@ const mockAvailableUsers = [
   { system_user_id: 2, user_identifier: 'bob' }
 ];
 
+const mockTeamMembers = [
+  { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
+  { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' }
+];
+
 const mockCreateTeam = vi.fn();
 const mockUpdateTeam = vi.fn();
 const mockDeleteTeam = vi.fn();
+const mockGetTeamMembers = vi.fn().mockResolvedValue({ members: mockTeamMembers });
 
 const mockUseApi = {
   teams: {
     getAvailableUsers: vi.fn().mockResolvedValue({ users: mockAvailableUsers }),
+    getTeamMembers: mockGetTeamMembers,
     createTeam: mockCreateTeam,
     updateTeam: mockUpdateTeam,
     deleteTeam: mockDeleteTeam
@@ -264,18 +271,48 @@ describe('TeamsContainer', () => {
       // Step 8: Submit form
       fireEvent.click(getByRole('button', { name: /save/i }));
 
-      // Step 9: Verify API was called with correct params (id + updated values)
+      // Step 9: Verify API was called with correct params (id + updated values + current members)
       await waitFor(() => {
         expect(mockUpdateTeam).toHaveBeenCalledWith('team-1', {
           name: 'Updated Team',
           description: 'First team',
-          system_user_ids: []
+          system_user_ids: [1, 2]
         });
       });
 
       // Step 10: Verify dialog closes after success
       await waitFor(() => {
         expect(queryByText('Edit Team')).toBeNull();
+      });
+    });
+
+    it('sends current member IDs on save — backend handles subtractive sync', async () => {
+      // When a team has 1 member (was 2), the update payload sends [1].
+      // The backend diff removes the absent member (2) — subtractive sync.
+      mockGetTeamMembers.mockResolvedValueOnce({
+        members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
+      });
+      mockUpdateTeam.mockResolvedValueOnce({});
+      const mockRefresh = vi.fn();
+
+      const { getByText, getAllByTitle, getByLabelText, getByRole } = renderComponent({ refresh: mockRefresh });
+
+      await waitFor(() => expect(getByText('Alpha Team')).toBeVisible());
+
+      fireEvent.click(getAllByTitle('Actions')[0]);
+      await waitFor(() => expect(getByText('Edit team')).toBeVisible());
+      fireEvent.click(getByText('Edit team'));
+
+      await waitFor(() => expect(getByLabelText('Team Name *')).toHaveValue('Alpha Team'));
+
+      fireEvent.click(getByRole('button', { name: /save/i }));
+
+      await waitFor(() => {
+        expect(mockUpdateTeam).toHaveBeenCalledWith('team-1', {
+          name: 'Alpha Team',
+          description: 'First team',
+          system_user_ids: [1]
+        });
       });
     });
   });

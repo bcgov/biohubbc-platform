@@ -1,9 +1,12 @@
+import { getArtifactMarkdownByMimeType } from 'features/admin/tickets/utils/ticketArtifactMarkdown';
 import { APIError } from 'hooks/api/useAxios';
+import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { useApi } from 'hooks/useApi';
 import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
+import { useTicketAttachmentUpload } from './useTicketAttachmentUpload';
+import { useTicketCommentCache } from './useTicketCommentCache';
 
 /**
  * Comment state and submit behavior for ticket details.
@@ -15,63 +18,21 @@ export const useTicketComment = () => {
   const { ticketId, ticketDataLoader } = useTicketContext();
   const authStateContext = useAuthStateContext();
   const dialogContext = useDialogContext();
+  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({ ticketId });
+  const { appendCachedComment, removeCachedComment, replaceCachedComment } = useTicketCommentCache();
 
   const [comment, setComment] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
 
-  const appendComment = (newComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: [...latestTicket.comments, newComment]
-    });
-  };
-
-  const removeCommentById = (ticketCommentId: string) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.filter((existingComment) => existingComment.ticket_comment_id !== ticketCommentId)
-    });
-  };
-
-  const replaceCommentById = (ticketCommentId: string, replacementComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    const hasOptimisticComment = latestTicket.comments.some(
-      (existingComment) => existingComment.ticket_comment_id === ticketCommentId
-    );
-
-    if (!hasOptimisticComment) {
-      ticketDataLoader.setData({
-        ...latestTicket,
-        comments: [...latestTicket.comments, replacementComment]
-      });
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.map((existingComment) =>
-        existingComment.ticket_comment_id === ticketCommentId ? replacementComment : existingComment
-      )
-    });
-  };
-
+  /**
+   * Submit the current comment draft for the active ticket.
+   *
+   * Empty or whitespace-only drafts are ignored. Valid drafts are added
+   * optimistically, then replaced with the API response on success. Failures roll
+   * back the optimistic comment and surface the API error through the snackbar.
+   *
+   * @returns {Promise<void>} Resolves when the submit attempt has completed.
+   */
   const handleAddComment = async () => {
     const trimmedComment = comment.trim();
 
@@ -96,12 +57,14 @@ export const useTicketComment = () => {
 
     try {
       setIsSavingComment(true);
-      appendComment(optimisticComment);
+      appendCachedComment(optimisticComment);
 
-      const createdComment = await api.tickets.createTicketComment(ticketId, { comment: trimmedComment });
+      const createdComment = await api.tickets.createTicketComment(ticketId, {
+        comment: trimmedComment
+      });
 
       if (!createdComment) {
-        removeCommentById(optimisticCommentId);
+        removeCachedComment(optimisticCommentId);
         throw new Error('Failed to add comment.');
       }
 
@@ -113,11 +76,11 @@ export const useTicketComment = () => {
         comment: createdComment.comment ?? trimmedComment
       };
 
-      replaceCommentById(optimisticCommentId, persistedComment);
+      replaceCachedComment(optimisticCommentId, persistedComment);
 
       setComment('');
     } catch (caughtError) {
-      removeCommentById(optimisticCommentId);
+      removeCachedComment(optimisticCommentId);
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
         open: true,
@@ -128,10 +91,44 @@ export const useTicketComment = () => {
     }
   };
 
+  /**
+   * Upload a selected file as a ticket attachment and append its markdown link
+   * to the comment draft.
+   *
+   * The upload flow initializes a ticket upload, uploads the file to the
+   * presigned object-store URL, completes the ticket upload, adds the returned
+   * ticket artifact to the cached ticket details if needed, and appends markdown
+   * that references the stable `ticket_artifact_id`. Failures surface through
+   * the snackbar and leave the draft unchanged.
+   *
+   * @param {File} file File selected by the user for upload.
+   * @returns {Promise<void>} Resolves when the upload attempt has completed.
+   */
+  const handleUploadAttachment = async (file: File) => {
+    const ticketArtifact = await uploadTicketAttachment(file);
+
+    if (!ticketArtifact) {
+      return;
+    }
+
+    const markdownLink = getArtifactMarkdownByMimeType(file, ticketArtifact.ticket_artifact_id);
+
+    setComment((previousComment) => {
+      if (!previousComment) {
+        return markdownLink;
+      }
+
+      const separator = /\s$/.test(previousComment) ? '' : ' ';
+      return `${previousComment}${separator}${markdownLink}`;
+    });
+  };
+
   return {
     comment,
     setComment,
     isSavingComment,
-    handleAddComment
+    isUploadingAttachment,
+    handleAddComment,
+    handleUploadAttachment
   };
 };

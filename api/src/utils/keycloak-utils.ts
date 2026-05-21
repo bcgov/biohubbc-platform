@@ -3,6 +3,13 @@ import { getDBConstants } from '../database/db-constants';
 import { SystemUser } from '../repositories/user-repository';
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const keycloakUtilsDependencies = {
+  getDBConstants
+};
+
+/**
  * Parses out the user's GUID from a keycloak token, which is extracted from the
  * `preferred_username` property.
  *
@@ -104,7 +111,7 @@ export const getServiceClientSystemUser = (keycloakToken: Record<string, any>): 
   }
 
   // Find and return a matching known service client, if one exists
-  return getDBConstants().serviceClientUsers.find((item) => item.user_guid === sub) || null;
+  return keycloakUtilsDependencies.getDBConstants().serviceClientUsers.find((item) => item.user_guid === sub) || null;
 };
 
 /**

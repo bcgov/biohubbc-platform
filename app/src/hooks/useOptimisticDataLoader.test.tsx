@@ -68,7 +68,7 @@ describe('useOptimisticDataLoader', () => {
         dataLoader.data = nextData;
       })
     };
-    const rollback = vi.fn(({ currentState }) => {
+    const rollback = vi.fn((_, { currentState }) => {
       dataLoader.setData(currentState);
     });
 
@@ -90,7 +90,7 @@ describe('useOptimisticDataLoader', () => {
     expect(dataLoader.setData).toHaveBeenNthCalledWith(1, { value: 2 });
     expect(dataLoader.setData).toHaveBeenNthCalledWith(2, { value: 1 });
     expect(dataLoader.setData).toHaveBeenNthCalledWith(3, { value: 1 });
-    expect(rollback).toHaveBeenCalledWith({
+    expect(rollback).toHaveBeenCalledWith(error, {
       currentState: { value: 1 },
       optimisticState: { value: 2 }
     });

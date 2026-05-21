@@ -98,6 +98,26 @@ export class TeamMemberRepository extends BaseRepository {
   }
 
   /**
+   * Get all active team member records for a given system user.
+   *
+   * @param {number} systemUserId - System user ID.
+   * @return {Promise<TeamMember[]>} Team member rows with null `record_end_date`.
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMembersBySystemUserId(systemUserId: number): Promise<TeamMember[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member')
+      .select(['team_member_id', 'system_user_id', 'team_id'])
+      .where('system_user_id', systemUserId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, TeamMember);
+
+    return response.rows;
+  }
+
+  /**
    * Update an existing team member record.
    *
    * @param {string} teamMemberId - The ID of the team member to update.

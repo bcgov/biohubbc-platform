@@ -96,18 +96,81 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('deleteStaleAnchorsForScope', () => {
-    it('issues a DELETE query with the security scope ID', async () => {
-      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 3 });
+  describe('deleteStaleAnchorBatch', () => {
+    it('deletes stale anchors and returns pageLastId when stale anchors are found', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 0: Batch query — returns 2 stale anchors
+      queryStub.onCall(0).resolves({
+        rows: [
+          { anchor_submission_feature_id: 101, page_last_id: 200 },
+          { anchor_submission_feature_id: 150, page_last_id: 200 }
+        ],
+        rowCount: 2
+      });
+
+      // Call 1: DELETE batch
+      queryStub.onCall(1).resolves({ rows: [], rowCount: 2 });
+
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteStaleAnchorsForScope('scope-uuid-1');
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
 
-      expect(queryStub).to.have.been.calledOnce;
-      expect(queryStub.getCall(0).args[0]).to.include('DELETE FROM security_scope_anchor');
+      expect(result).to.eql({ pageLastId: 200 });
       expect(queryStub.getCall(0).args[0]).to.include('NOT EXISTS');
-      expect(queryStub.getCall(0).args[1]).to.eql(['scope-uuid-1']);
+      expect(queryStub.getCall(1).args[0]).to.include('DELETE FROM security_scope_anchor');
+      expect(queryStub.getCall(1).args[1]).to.include.deep.members(['scope-uuid-1', [101, 150]]);
+    });
+
+    it('advances keyset via boundary query when all anchors in batch are valid', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 0: Batch query — empty (no stale anchors)
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+
+      // Call 1: Boundary query — returns max ID
+      queryStub.onCall(1).resolves({ rows: [{ last_id: 5000 }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+
+      expect(result).to.eql({ pageLastId: 5000 });
+      expect(queryStub.getCall(1).args[0]).to.include('SELECT MAX');
+    });
+
+    it('returns null when no more anchors exist', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 0: Batch query — empty
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+
+      // Call 1: Boundary query — null (no more anchors)
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+
+      expect(result).to.be.null;
+    });
+
+    it('passes afterId to the batch query', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 5000);
+
+      // afterId=5000, securityScopeId, BATCH_SIZE=5000
+      expect(queryStub.getCall(0).args[1]).to.eql(['scope-uuid-1', 5000, 5000]);
     });
   });
 
@@ -302,6 +365,92 @@ describe('SecurityScopeRepository', () => {
       const result = await repository.findScopeIdsMatchingSubmission(999);
 
       expect(result).to.eql([]);
+    });
+
+    it('filters to ALLOW statements on approved active policies with a live team_policy', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      await repository.findScopeIdsMatchingSubmission(42);
+
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlText).to.include('ps.effect =');
+      expect(sqlText).to.include("p.status = 'approved'");
+      expect(sqlText).to.include('p.record_end_date is null');
+      expect(sqlText).to.include('join team_policy tp');
+      expect(sqlText).to.include('tp.record_end_date is null');
+      expect(sqlValues).to.include('allow');
+    });
+  });
+
+  describe('team scope derivation guards', () => {
+    it('insertTeamSecurityScopesForPolicy requires a live team_policy link and an ALLOW approved active policy + active team', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      await repository.insertTeamSecurityScopesForPolicy('team-1', 'policy-1');
+
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlText).to.include('from team_policy tp');
+      expect(sqlText).to.include('tp.record_end_date is null');
+      expect(sqlText).to.include('ps.effect =');
+      expect(sqlText).to.include("p.status = 'approved'");
+      expect(sqlText).to.include('p.record_end_date is null');
+      expect(sqlText).to.include('t.record_end_date is null');
+      expect(sqlValues).to.include('allow');
+    });
+
+    it('insertTeamSecurityScopesFromPolicyChain enforces active team and approved allow policy chain', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      await repository.insertTeamSecurityScopesFromPolicyChain('team-1');
+
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlText).to.include('join team t');
+      expect(sqlText).to.include('t.record_end_date is null');
+      expect(sqlText).to.include("p.status = 'approved'");
+      expect(sqlText).to.include('ps.effect =');
+      expect(sqlValues).to.include('allow');
+    });
+  });
+
+  describe('resolveUrnForScope', () => {
+    it('resolves only from ALLOW statements on approved active policies', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      await repository.resolveUrnForScope('scope-uuid-1');
+
+      const sqlText = queryStub.firstCall.args[0].toLowerCase();
+      expect(sqlText).to.include("ps.effect = 'allow'");
+      expect(sqlText).to.include("p.status = 'approved'");
+      expect(sqlText).to.include('p.record_end_date is null');
+    });
+  });
+
+  describe('deleteStaleAnchorBatch', () => {
+    it('validates anchors against ALLOW statements on approved active policies', async () => {
+      const queryStub = sinon.stub();
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+
+      const sqlText = queryStub.firstCall.args[0].toLowerCase();
+      expect(sqlText).to.include("ps.effect = 'allow'");
+      expect(sqlText).to.include("p.status = 'approved'");
+      expect(sqlText).to.include('p.record_end_date is null');
     });
   });
 });

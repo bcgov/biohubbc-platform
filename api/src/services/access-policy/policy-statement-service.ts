@@ -1,6 +1,9 @@
 import { IDBConnection } from '../../database/db';
 import { CreatePolicyStatement, PolicyStatement, UpdatePolicyStatement } from '../../models/policy-statement';
-import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
+import {
+  ActivePolicyStatementWithExpression,
+  PolicyStatementRepository
+} from '../../repositories/authorization/policy-statement-repository';
 import { DBService } from '../db-service';
 
 export class PolicyStatementService extends DBService {
@@ -42,6 +45,22 @@ export class PolicyStatementService extends DBService {
    */
   getPolicyStatements(policyId: string): Promise<PolicyStatement[]> {
     return this.policyStatementRepository.getPolicyStatements(policyId);
+  }
+
+  /**
+   * Retrieve all active policy statements for a policy with their optional linked
+   * expression ids in a single roundtrip.
+   *
+   * Used by the download pipeline to drive per-feature-type Parquet generation:
+   * each row produces one Parquet file, and the linked expression id selects
+   * between expression-tree evaluation and a broad feature-type projection.
+   *
+   * @param {string} policyId - The policy id whose active statements to fetch.
+   * @return {Promise<ActivePolicyStatementWithExpression[]>} Active statements with optional expression ids.
+   * @memberof PolicyStatementService
+   */
+  getActiveStatementsWithExpressionByPolicyId(policyId: string): Promise<ActivePolicyStatementWithExpression[]> {
+    return this.policyStatementRepository.getActiveStatementsWithExpressionByPolicyId(policyId);
   }
 
   /**

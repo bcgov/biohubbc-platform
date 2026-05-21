@@ -1,25 +1,36 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Button, Stack } from '@mui/material';
-import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridCellParams } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 
 interface SearchResultTableLayoutProps {
+  /** Result rows rendered in the data grid. */
   results: SearchFeatureResultWithRelevancy[];
+  /** Submission feature ids currently present in the cart. */
   cartFeatureIds: Set<number>;
-  onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
+  /** Opens the selected result's feature detail page. */
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
-  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Adds the selected result to the cart. */
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Removes the selected feature id from the cart. */
   onRemoveFromCart?: (featureId: number) => void;
 }
 
+/**
+ * Renders search results in the table view.
+ *
+ * Table-view layout for result rows. Derives grid columns from current rows and
+ * cart state, then forwards row/action clicks to `SearchResultOptions`.
+ *
+ * @param {SearchResultTableLayoutProps} props - Results, cart ids, and optional row action callbacks.
+ * @returns {JSX.Element} Search result data grid.
+ */
 export const SearchResultTableLayout = ({
   results,
   cartFeatureIds,
-  onRowSelectionModelChange,
   onClick,
   onAddToCart,
   onRemoveFromCart
@@ -86,7 +97,8 @@ export const SearchResultTableLayout = ({
               <Button
                 size="small"
                 variant="outlined"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   onClick?.(result);
                 }}>
                 View
@@ -96,7 +108,8 @@ export const SearchResultTableLayout = ({
                   size="small"
                   variant="contained"
                   color="error"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onRemoveFromCart?.(result.submission_feature_id);
                   }}>
                   Remove
@@ -105,7 +118,8 @@ export const SearchResultTableLayout = ({
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onAddToCart?.(result);
                   }}>
                   Add
@@ -123,12 +137,14 @@ export const SearchResultTableLayout = ({
       rows={results}
       columns={columns}
       getRowId={(row) => row.uuid}
-      checkboxSelection
-      onRowSelectionModelChange={onRowSelectionModelChange}
+      onRowClick={(params) => {
+        onClick?.(params.row as SearchFeatureResultWithRelevancy);
+      }}
       pageSizeOptions={[5, 10, 20]}
       disableRowSelectionOnClick
       disableColumnSelector
       disableColumnMenu
+      hideFooter
       sortingOrder={['asc', 'desc']}
       initialState={{
         sorting: { sortModel: [{ field: 'relevancy_score', sort: 'desc' }] },

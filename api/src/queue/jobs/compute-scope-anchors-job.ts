@@ -43,21 +43,36 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
     });
 
     try {
-      // Phase 1: Delete stale anchors
-      await withConnection((conn) => new SecurityScopeService(conn).deleteStaleAnchorsForScope(securityScopeId));
-
-      // Phase 2: Resolve URN pattern
+      // Phase 1: Resolve URN pattern
       const urn = await withConnection((conn) => new SecurityScopeService(conn).resolveUrnForScope(securityScopeId));
 
       if (!urn) {
-        // No active policy statements — stale check already deleted all anchors.
+        // Orphaned scope — no active policy statements. Clean up all derived data
+        // (anchors + team grants) instead of running the expensive CTE for nothing.
+        await withConnection((conn) => new SecurityScopeService(conn).deleteOrphanedScopeData(securityScopeId));
+
         defaultLog.info({
           label: 'computeScopeAnchorsJobHandler',
-          message: 'No active URN for scope, stale anchors cleaned',
+          message: 'Orphaned scope (no active policy statements), all anchors deleted',
           jobId: job.id,
           securityScopeId
         });
         continue;
+      }
+
+      // Phase 2: Delete stale anchors in keyset-paginated batches
+      let staleLastId = 0;
+
+      while (true) {
+        const staleBatch = await withConnection((conn) =>
+          new SecurityScopeService(conn).deleteStaleAnchorBatch(securityScopeId, staleLastId)
+        );
+
+        if (!staleBatch) {
+          break;
+        }
+
+        staleLastId = staleBatch.pageLastId;
       }
 
       // Phase 3: Insert new anchors in keyset-paginated batches

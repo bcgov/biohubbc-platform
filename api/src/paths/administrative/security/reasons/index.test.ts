@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getSecurityReasons } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
 import { SecurityService } from '../../../../services/security-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 import { makePaginationOptionsFromRequest } from '../../../../utils/pagination';
 
@@ -33,7 +33,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getSecurityReasons();
@@ -56,7 +56,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
@@ -90,7 +90,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
@@ -117,7 +117,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
 
       const requestHandler = getSecurityReasons();

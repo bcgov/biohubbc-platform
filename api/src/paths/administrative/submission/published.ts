@@ -44,18 +44,14 @@ GET.apiDoc = {
               required: [
                 'submission_id',
                 'uuid',
-                'security_review_timestamp',
                 'publish_timestamp',
                 'submitted_timestamp',
                 'system_user_id',
                 'contributor_id',
                 'name',
                 'description',
-                'create_date',
                 'create_user',
-                'update_date',
                 'update_user',
-                'revision_count',
                 'security',
                 'root_feature_type_id',
                 'root_feature_type_name',
@@ -69,10 +65,6 @@ GET.apiDoc = {
                 uuid: {
                   type: 'string',
                   format: 'uuid'
-                },
-                security_review_timestamp: {
-                  type: 'string',
-                  nullable: true
                 },
                 publish_timestamp: {
                   type: 'string',
@@ -101,29 +93,14 @@ GET.apiDoc = {
                   type: 'string',
                   maxLength: 3000
                 },
-                record_end_date: {
-                  type: 'string',
-                  nullable: true
-                },
-                create_date: {
-                  type: 'string'
-                },
                 create_user: {
                   type: 'integer',
                   minimum: 1
-                },
-                update_date: {
-                  type: 'string',
-                  nullable: true
                 },
                 update_user: {
                   type: 'integer',
                   minimum: 1,
                   nullable: true
-                },
-                revision_count: {
-                  type: 'integer',
-                  minimum: 0
                 },
                 security: {
                   type: 'string',

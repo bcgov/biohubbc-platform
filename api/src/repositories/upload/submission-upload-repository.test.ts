@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionUploadRepository } from './submission-upload-repository';
 
 chai.use(sinonChai);
@@ -36,7 +36,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'id-1',
         submission_id: 123,
         upload_id: 'upload-id',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -68,7 +68,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'upload-id',
         submission_id: 123,
         upload_id: 'upload-uuid',
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -89,14 +89,14 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
-            status: 'pending',
+            status: 'uploaded',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           },
           {
             submission_upload_id: 'id-2',
             submission_id: 123,
             upload_id: 'a-2',
-            status: 'pending',
+            status: 'uploaded',
             ticket_id: '22222222-2222-2222-2222-222222222222'
           }
         ]
@@ -114,14 +114,14 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
-          status: 'pending',
+          status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
-          status: 'pending',
+          status: 'uploaded',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ]);
@@ -135,7 +135,7 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
-            status: 'pending',
+            status: 'uploaded',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           }
         ]
@@ -153,7 +153,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
-          status: 'pending',
+          status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         }
       ]);
@@ -165,14 +165,14 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
-          status: 'pending',
+          status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
-          status: 'pending',
+          status: 'uploaded',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ];
@@ -192,6 +192,25 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('findSubmissionUploadsByTicketId', () => {
+    it('uses the latest submission upload status row for each upload', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
+      expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
+    });
+  });
+
   describe('insertSubmissionUpload', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
@@ -201,7 +220,9 @@ describe('SubmissionUploadRepository', () => {
       const payload: CreateSubmissionUpload = {
         submission_id: 123,
         upload_id: 'a-1',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        status: 'uploaded',
+        comment: 'Upload-specific note'
       };
 
       try {
@@ -222,7 +243,8 @@ describe('SubmissionUploadRepository', () => {
       const payload: CreateSubmissionUpload = {
         submission_id: 123,
         upload_id: 'a-1',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        status: 'uploaded'
       };
       const result = await repo.insertSubmissionUpload(payload);
 
@@ -274,13 +296,52 @@ describe('SubmissionUploadRepository', () => {
     });
 
     it('succeeds if soft delete affects one row', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
       const result = await repo.deleteSubmissionUpload('id-1');
 
       expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUpload', () => {
+    it('succeeds if soft delete affects one row and returns the updated row id', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_upload_id: 'id-1' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUpload('id-1');
+
+      expect(result).to.be.undefined;
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('softDeleteSubmissionUploadsBySubmissionId', () => {
+    it('returns the number of soft-deleted rows and returns row ids from SQL', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ submission_upload_id: 'id-1' }, { submission_upload_id: 'id-2' }]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.softDeleteSubmissionUploadsBySubmissionId(123);
+
+      expect(result).to.equal(2);
+      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
     });
   });
 });

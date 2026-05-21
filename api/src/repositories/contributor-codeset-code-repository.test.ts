@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { ContributorCodesetCode } from '../models/contributor-codeset-code';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ContributorCodesetCodeRepository } from './contributor-codeset-code-repository';
 
 describe('ContributorCodesetCodeRepository', () => {

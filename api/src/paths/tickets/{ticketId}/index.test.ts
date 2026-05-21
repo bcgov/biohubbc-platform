@@ -1,16 +1,16 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../database/db';
-import { Ticket, TicketWithHistory } from '../../../models/ticket';
-import { TicketService } from '../../../services/ticket-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import { deleteTicket, getTicket, putTicket } from './index';
+import * as db from '../../../database/db';
+import { TicketWithHistory } from '../../../models/ticket';
+import { TicketService } from '../../../services/ticket-service';
+import { getTicketForUser } from './index';
 
 chai.use(sinonChai);
 
 describe('paths/tickets/{ticketId}', () => {
-  const mockTicket: Ticket = {
+  const mockTicketWithHistory: TicketWithHistory = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
     ticket_slug: '04900001',
     subject: 'A ticket',
@@ -18,81 +18,67 @@ describe('paths/tickets/{ticketId}', () => {
     team_id: '22222222-2222-2222-2222-222222222222',
     create_date: '2026-02-25T00:00:00.000Z',
     priority: 'medium',
-    status: 'open'
-  };
-  const mockTicketWithHistory: TicketWithHistory = {
-    ...mockTicket,
+    status: 'open',
     statuses: [
       {
         ticket_status_id: '33333333-3333-3333-3333-333333333333',
-        ticket_id: mockTicket.ticket_id,
-        user_identifier: 'Sarah',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        user_identifier: 'user@example.com',
         create_date: '2026-02-25T00:00:00.000Z',
         status: 'open'
       }
     ],
     comments: [],
-    references: []
+    references: [],
+    data_requests: [],
+    ticket_system_users: []
   };
 
   afterEach(() => {
     sinon.restore();
   });
 
-  it('GET returns ticket by id', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+  describe('getTicketForUser', () => {
+    it('returns ticket details by ID with 200', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      const getTicketStub = sinon.stub(TicketService.prototype, 'getTicket').resolves(mockTicketWithHistory);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { ticketId: mockTicketWithHistory.ticket_id };
+
+      await getTicketForUser()(mockReq, mockRes, mockNext);
+
+      expect(getTicketStub).to.have.been.calledWith(mockTicketWithHistory.ticket_id);
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.eql(mockTicketWithHistory);
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(TicketService.prototype, 'getTicket').resolves(mockTicketWithHistory);
 
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { ticketId: mockTicket.ticket_id };
+    it('rolls back and rethrows on error', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
-    await getTicket()(mockReq, mockRes, mockNext);
+      const fetchError = new Error('ticket not found');
+      sinon.stub(TicketService.prototype, 'getTicket').rejects(fetchError);
 
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockTicketWithHistory);
-  });
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { ticketId: mockTicketWithHistory.ticket_id };
 
-  it('PUT updates ticket', async () => {
-    const updated = { ...mockTicket, subject: 'updated' };
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      try {
+        await getTicketForUser()(mockReq, mockRes, mockNext);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.equal(fetchError);
+        expect((mockDBConnection.rollback as sinon.SinonStub).calledOnce).to.be.true;
+      }
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const updateStub = sinon.stub(TicketService.prototype, 'updateTicket').resolves(updated);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { ticketId: mockTicket.ticket_id };
-    mockReq.body = { subject: 'updated' };
-
-    await putTicket()(mockReq, mockRes, mockNext);
-
-    expect(updateStub).to.have.been.calledWith(mockTicket.ticket_id, { subject: 'updated' });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(updated);
-  });
-
-  it('DELETE removes ticket', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const deleteStub = sinon.stub(TicketService.prototype, 'deleteTicket').resolves();
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { ticketId: mockTicket.ticket_id };
-
-    await deleteTicket()(mockReq, mockRes, mockNext);
-
-    expect(deleteStub).to.have.been.calledWith(mockTicket.ticket_id);
-    expect(mockRes.statusValue).to.equal(204);
   });
 });

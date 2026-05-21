@@ -1,113 +1,26 @@
 import { cleanup, fireEvent } from '@testing-library/react';
-import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
+import { type DownloadRecord } from 'interfaces/useDownloadApi.interface';
+import { makeDownload, makeExport } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { DownloadFeatureCard } from './DownloadFeatureCard';
 
-const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
-  download_id: 'abc-123',
-  download_status: 'ready',
-  create_date: '2026-03-01T00:00:00Z',
-  feature_count: 42,
-  total_fragments: 1,
-  completed_fragments: 1,
-  estimated_total_size_bytes: '1024',
-  started_at: '2026-03-01T00:01:00Z',
-  completed_at: '2026-03-01T00:02:00Z',
-  downloaded_at: null,
-  ...overrides
+const makeProps = (
+  overrides: {
+    download?: DownloadRecord;
+    exports?: ReturnType<typeof makeExport>[];
+  } = {}
+) => ({
+  download: overrides.download ?? makeDownload(),
+  exports: overrides.exports ?? [],
+  onCreateExport: vi.fn(),
+  onDownloadExportPart: vi.fn(),
+  onDownloadExportAllParts: vi.fn(),
+  onRebuildExport: vi.fn()
 });
 
 describe('DownloadFeatureCard', () => {
   afterEach(() => {
     cleanup();
-  });
-
-  describe('download button visibility', () => {
-    it('shows download button when status is ready', () => {
-      const { getByTestId } = render(
-        <DownloadFeatureCard download={makeDownload({ download_status: 'ready' })} onDownloadFragment={vi.fn()} />
-      );
-      expect(getByTestId('download-button')).toBeVisible();
-    });
-
-    it('shows download button when status is downloaded', () => {
-      const { getByTestId } = render(
-        <DownloadFeatureCard download={makeDownload({ download_status: 'downloaded' })} onDownloadFragment={vi.fn()} />
-      );
-      expect(getByTestId('download-button')).toBeVisible();
-    });
-
-    it.each(['pending', 'processing', 'failed'] as const)(
-      'does not show download button when status is %s',
-      (status) => {
-        const { queryByTestId } = render(
-          <DownloadFeatureCard download={makeDownload({ download_status: status })} onDownloadFragment={vi.fn()} />
-        );
-        expect(queryByTestId('download-button')).not.toBeInTheDocument();
-      }
-    );
-  });
-
-  describe('single-fragment download', () => {
-    it('calls onDownloadFragment with (id, 0) when download button is clicked', () => {
-      const onDownloadFragment = vi.fn();
-      const { getByTestId } = render(
-        <DownloadFeatureCard
-          download={makeDownload({ download_id: 'xyz-789', total_fragments: 1 })}
-          onDownloadFragment={onDownloadFragment}
-        />
-      );
-      fireEvent.click(getByTestId('download-button'));
-      expect(onDownloadFragment).toHaveBeenCalledWith('xyz-789', 0);
-    });
-
-    it('does not show parts UI for single-fragment downloads', () => {
-      const { queryByText } = render(
-        <DownloadFeatureCard download={makeDownload({ total_fragments: 1 })} onDownloadFragment={vi.fn()} />
-      );
-      expect(queryByText(/Part \d+ of/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('multi-fragment download', () => {
-    it('parts are collapsed by default and expand on toggle click', () => {
-      const onDownloadFragment = vi.fn();
-      const { getByTestId, queryByText } = render(
-        <DownloadFeatureCard
-          download={makeDownload({ download_id: 'multi-1', total_fragments: 3 })}
-          onDownloadFragment={onDownloadFragment}
-        />
-      );
-
-      // Parts hidden by default
-      expect(queryByText('Part 1 of 3')).not.toBeVisible();
-
-      // Expand
-      fireEvent.click(getByTestId('toggle-parts-button'));
-      expect(queryByText('Part 1 of 3')).toBeVisible();
-    });
-
-    it('renders part rows with correct labels and download buttons when expanded', () => {
-      const onDownloadFragment = vi.fn();
-      const { getByTestId, getByText, getAllByTestId } = render(
-        <DownloadFeatureCard
-          download={makeDownload({ download_id: 'multi-1', total_fragments: 3 })}
-          onDownloadFragment={onDownloadFragment}
-        />
-      );
-
-      fireEvent.click(getByTestId('toggle-parts-button'));
-
-      expect(getByText('Part 1 of 3')).toBeVisible();
-      expect(getByText('Part 2 of 3')).toBeVisible();
-      expect(getByText('Part 3 of 3')).toBeVisible();
-
-      const partButtons = getAllByTestId(/^download-part-button-/);
-      expect(partButtons).toHaveLength(3);
-
-      fireEvent.click(partButtons[1]);
-      expect(onDownloadFragment).toHaveBeenCalledWith('multi-1', 1);
-    });
   });
 
   describe('status chip', () => {
@@ -118,10 +31,178 @@ describe('DownloadFeatureCard', () => {
       { status: 'downloaded', label: 'Downloaded' },
       { status: 'failed', label: 'Failed' }
     ] as const)('renders chip with label "$label" for status "$status"', ({ status, label }) => {
-      const { getByText } = render(
-        <DownloadFeatureCard download={makeDownload({ download_status: status })} onDownloadFragment={vi.fn()} />
-      );
+      const props = makeProps({ download: makeDownload({ download_status: status }) });
+      const { getByText } = render(<DownloadFeatureCard {...props} />);
       expect(getByText(label)).toBeVisible();
+    });
+  });
+
+  describe('create date', () => {
+    it('renders the formatted create date', () => {
+      const expected = new Date('2026-03-01T00:00:00Z').toLocaleDateString();
+      const { getByText } = render(<DownloadFeatureCard {...makeProps()} />);
+      expect(getByText(expected)).toBeVisible();
+    });
+  });
+
+  describe('Export menu gate', () => {
+    it.each(['pending', 'processing', 'failed'] as const)(
+      'hides the Export menu for non-ready status "%s"',
+      (status) => {
+        const props = makeProps({ download: makeDownload({ download_status: status }) });
+        const { queryByTestId } = render(<DownloadFeatureCard {...props} />);
+        expect(queryByTestId('custom-menu-icon-Export')).toBeNull();
+      }
+    );
+
+    it('shows the Export menu when ready', () => {
+      const props = makeProps({ download: makeDownload({ download_status: 'ready' }) });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('custom-menu-icon-Export')).toBeVisible();
+    });
+  });
+
+  describe('Export menu item', () => {
+    it('fires onCreateExport(downloadId) when the "CSV — per feature type" item is clicked', () => {
+      const props = makeProps({ download: makeDownload({ download_id: 'abc-123', download_status: 'ready' }) });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      fireEvent.click(getByTestId('custom-menu-icon-Export'));
+      fireEvent.click(getByTestId('custom-menu-icon-item-CSV—perfeaturetype'));
+      expect(props.onCreateExport).toHaveBeenCalledWith('abc-123');
+    });
+  });
+
+  describe('Exports section', () => {
+    it('renders no export-row elements when exports is empty', () => {
+      const props = makeProps({ exports: [] });
+      const { queryAllByTestId } = render(<DownloadFeatureCard {...props} />);
+      // No way to "wildcard" data-testid with Testing Library, but we can query known ids instead.
+      const rows = queryAllByTestId(/^export-row-/);
+      expect(rows.length).toBe(0);
+    });
+
+    it('renders pending export rows with only the status chip — no spinner, no download button', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'pending', part_count: 0 })]
+      });
+      const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-row-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-row-spinner-exp-1')).toBeNull();
+      expect(queryByTestId('export-download-button-exp-1')).toBeNull();
+      expect(queryByTestId('export-download-all-button-exp-1')).toBeNull();
+      expect(queryByTestId('export-rebuild-button-exp-1')).toBeNull();
+    });
+
+    it('renders processing export rows with only the status chip — no spinner, no download button', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'processing', part_count: 0 })]
+      });
+      const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-row-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-row-spinner-exp-1')).toBeNull();
+      expect(queryByTestId('export-download-button-exp-1')).toBeNull();
+    });
+
+    it('renders failed export rows with error icon', () => {
+      const props = makeProps({
+        exports: [
+          makeExport({
+            download_export_id: 'exp-1',
+            status: 'failed',
+            part_count: 0,
+            error_message: 'Pipeline blew up'
+          })
+        ]
+      });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-row-error-icon-exp-1')).toBeInTheDocument();
+    });
+
+    it('renders a single Download button for a single-part ready export', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 1 })]
+      });
+      const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-download-button-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-download-all-button-exp-1')).toBeNull();
+      expect(queryByTestId('export-rebuild-button-exp-1')).toBeNull();
+    });
+
+    it('fires onDownloadExportPart(exportId, 1) when the single-part download is clicked', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 1 })]
+      });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      fireEvent.click(getByTestId('export-download-button-exp-1'));
+      expect(props.onDownloadExportPart).toHaveBeenCalledWith('exp-1', 1);
+    });
+
+    it('renders a rebuild button for ready + part_count === 0 and fires onRebuildExport on click', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 0 })]
+      });
+      const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-rebuild-button-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-download-button-exp-1')).toBeNull();
+      fireEvent.click(getByTestId('export-rebuild-button-exp-1'));
+      expect(props.onRebuildExport).toHaveBeenCalledWith('exp-1');
+    });
+
+    it('renders Download-all + collapsed parts list for multi-part ready export', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 3 })]
+      });
+      const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
+      expect(getByTestId('export-download-all-button-exp-1')).toBeInTheDocument();
+      // Parts collapsed by default — the Collapse wrapper renders children with display:none,
+      // but testing-library still finds them in the DOM. Check via Collapse's `in` prop effect:
+      expect(getByTestId('export-toggle-parts-exp-1')).toHaveTextContent(/show/i);
+      // Clicking a part-download button should not be required before expansion; but the visible
+      // user signal is the "Show individual parts" label.
+      expect(queryByTestId('export-download-all-button-exp-1')).toBeInTheDocument();
+    });
+
+    it('expands and collapses the individual parts list when toggle is clicked', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 2 })]
+      });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      const toggle = getByTestId('export-toggle-parts-exp-1');
+      expect(toggle).toHaveTextContent(/show/i);
+      fireEvent.click(toggle);
+      expect(toggle).toHaveTextContent(/hide/i);
+      fireEvent.click(toggle);
+      expect(toggle).toHaveTextContent(/show/i);
+    });
+
+    it('fires onDownloadExportPart with 1-based chunk when a part-download is clicked', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 3 })]
+      });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      // Expand first so the part buttons are visible (MUI Collapse still mounts children, but
+      // we mirror user behaviour — click toggle then click part).
+      fireEvent.click(getByTestId('export-toggle-parts-exp-1'));
+      fireEvent.click(getByTestId('export-download-part-button-exp-1-2'));
+      expect(props.onDownloadExportPart).toHaveBeenCalledWith('exp-1', 2);
+    });
+
+    it('fires onDownloadExportAllParts when the Download-all button is clicked', () => {
+      const props = makeProps({
+        exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 3 })]
+      });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+      fireEvent.click(getByTestId('export-download-all-button-exp-1'));
+      expect(props.onDownloadExportAllParts).toHaveBeenCalledWith('exp-1');
+    });
+
+    it('renders exports in the order provided (card does not sort)', () => {
+      const newer = makeExport({ download_export_id: 'exp-newer', completed_at: '2026-04-22T02:00:00Z' });
+      const older = makeExport({ download_export_id: 'exp-older', completed_at: '2026-04-22T01:00:00Z' });
+      const props = makeProps({ exports: [newer, older] });
+      const { getAllByTestId } = render(<DownloadFeatureCard {...props} />);
+      const rowIds = getAllByTestId(/^export-row-/).map((el) => el.getAttribute('data-testid'));
+      expect(rowIds).toEqual(['export-row-exp-newer', 'export-row-exp-older']);
     });
   });
 });

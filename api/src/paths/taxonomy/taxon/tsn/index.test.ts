@@ -4,10 +4,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, getTaxonByTSN } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { TaxonomyService } from '../../../../services/taxonomy-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -28,7 +28,7 @@ describe('tsn', () => {
     it('returns an empty array if no species are found', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getTaxonByTsnIdsStub = sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').resolves([]);
 
@@ -50,7 +50,7 @@ describe('tsn', () => {
     it('returns an array of species', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mock1 = { tsn: '1', commonNames: ['something'], scientificName: 'string' } as unknown as any;
       const mock2 = { tsn: '2', commonNames: [], scientificName: 'string' } as unknown as any;
@@ -75,7 +75,7 @@ describe('tsn', () => {
     it('catches error, and re-throws error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').rejects(new Error('a test error'));
 

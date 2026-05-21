@@ -7,22 +7,17 @@ import { TeamMemberSelect } from './TeamMemberSelect';
 
 /**
  * Form values for creating or editing a team.
+ *
+ * Stores full user objects so formik is the single source of truth —
+ * IDs are extracted in the submit handler.
  */
 export interface IAddTeamFormValues {
   /** Team name */
   name: string;
   /** Optional description */
   description: string;
-  /** Array of system user IDs for team members */
-  system_user_ids: number[];
-}
-
-/**
- * Props for AddTeamForm component.
- */
-export interface IAddTeamFormProps {
-  /** Initial users when editing a team (to pre-populate the member selector) */
-  initialUsers?: IAvailableUser[];
+  /** Full user objects for team members */
+  system_users: IAvailableUser[];
 }
 
 /**
@@ -31,7 +26,7 @@ export interface IAddTeamFormProps {
 export const AddTeamFormInitialValues: IAddTeamFormValues = {
   name: '',
   description: '',
-  system_user_ids: []
+  system_users: []
 };
 
 /**
@@ -40,17 +35,15 @@ export const AddTeamFormInitialValues: IAddTeamFormValues = {
 export const AddTeamFormYupSchema = yup.object().shape({
   name: yup.string().required('Team name is required').max(250, 'Team name must be 250 characters or less'),
   description: yup.string().max(1000, 'Description must be 1000 characters or less'),
-  system_user_ids: yup.array().of(yup.number())
+  system_users: yup.array().of(yup.object())
 });
 
 /**
  * Form component for creating or editing a team.
  *
  * Must be used within a Formik context (wrapped by EditDialog or similar).
- *
- * @param {IAddTeamFormProps} props
  */
-export const AddTeamForm = ({ initialUsers }: IAddTeamFormProps) => {
+export const AddTeamForm = () => {
   const { values, errors, touched, handleChange, handleBlur, setFieldValue } = useFormikContext<IAddTeamFormValues>();
 
   return (
@@ -81,9 +74,8 @@ export const AddTeamForm = ({ initialUsers }: IAddTeamFormProps) => {
       />
 
       <TeamMemberSelect
-        selectedUserIds={values.system_user_ids}
-        onChange={(userIds) => setFieldValue('system_user_ids', userIds)}
-        initialUsers={initialUsers}
+        selectedUsers={values.system_users}
+        onChange={(users) => setFieldValue('system_users', users)}
       />
     </Box>
   );

@@ -60,7 +60,8 @@ GET.apiDoc = {
                           'description',
                           'type_name',
                           'required_value',
-                          'calculated_value'
+                          'calculated_value',
+                          'allow_multiple'
                         ],
                         properties: {
                           feature_type_property_id: {
@@ -95,6 +96,10 @@ GET.apiDoc = {
                           calculated_value: {
                             type: 'boolean',
                             description: 'Whether the property value is calculated.'
+                          },
+                          allow_multiple: {
+                            type: 'boolean',
+                            description: 'Whether the property value can be an array of its given type'
                           }
                         },
                         additionalProperties: false

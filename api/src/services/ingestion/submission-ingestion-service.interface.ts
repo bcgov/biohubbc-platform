@@ -52,10 +52,40 @@ export interface IValidationError {
 }
 
 /**
+ * Non-fatal validation records captured during ingestion.
+ * These are persisted as metadata to explain dropped/ignored rows.
+ */
+export interface IValidationRecord {
+  level: 'warning';
+  code: 'unknown_feature_type_ignored' | 'feature_not_inserted';
+  message: string;
+  details: Record<string, unknown>;
+}
+
+/**
+ * Counts captured during archive ingestion and persisted to validation metadata.
+ */
+export interface IValidationMetadata extends Record<string, unknown> {
+  errorCount: number;
+  recordCount: number;
+  featureCount?: number;
+  uploadedCount?: number;
+  codesetFileCount?: number;
+  featureBatchCount?: number;
+  codesetBatchCount?: number;
+  mediaBatchCount?: number;
+  featureRowsPersisted?: number;
+  mediaFilesPersisted?: number;
+  mediaBytesPersisted?: number;
+}
+
+/**
  * Result of validating submission features.
  * Contains validation status and all collected errors.
  */
 export interface IValidationResult {
   valid: boolean;
   errors: IValidationError[];
+  records?: IValidationRecord[];
+  metadata?: IValidationMetadata;
 }

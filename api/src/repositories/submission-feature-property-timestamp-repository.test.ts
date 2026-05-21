@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SubmissionFeaturePropertyTimestampRepository } from './submission-feature-property-timestamp-repository';
 
 describe('SubmissionFeaturePropertyTimestampRepository', () => {
@@ -15,7 +15,8 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
     submission_feature_property_timestamp_id: 1,
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    value: '2026-01-01T00:00:00.000Z'
+    date_value: '2026-01-01',
+    time_value: '00:00:00'
   };
 
   describe('insert', () => {
@@ -26,7 +27,8 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
       const result = await repository.insertSubmissionFeaturePropertyTimestamp({
         submission_feature_id: 10,
         feature_type_property_id: 20,
-        value: '2026-01-01T00:00:00.000Z'
+        date_value: '2026-01-01',
+        time_value: '00:00:00'
       });
 
       expect(result).to.eql(mockRow);
@@ -40,7 +42,8 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
         await repository.insertSubmissionFeaturePropertyTimestamp({
           submission_feature_id: 10,
           feature_type_property_id: 20,
-          value: '2026-01-01T00:00:00.000Z'
+          date_value: '2026-01-01',
+          time_value: '00:00:00'
         });
         expect.fail();
       } catch (error) {

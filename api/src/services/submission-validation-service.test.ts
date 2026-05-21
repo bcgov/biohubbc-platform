@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { SubmissionValidationService } from './submission-validation-service';
 
 describe('SubmissionValidationService', () => {
@@ -74,7 +74,7 @@ describe('SubmissionValidationService', () => {
   });
 
   describe('updateSubmissionValidationStatus', () => {
-    it('updates status without metadata', async () => {
+    it('updates status with validation metadata', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SubmissionValidationService(mockDBConnection);
 
@@ -82,12 +82,13 @@ describe('SubmissionValidationService', () => {
         .stub(SubmissionValidationRepository.prototype, 'updateSubmissionValidationStatus')
         .resolves();
 
-      await service.updateSubmissionValidationStatus('550e8400-e29b-41d4-a716-446655440000', 'started');
+      const metadata = { errorCount: 0, recordCount: 0 };
+      await service.updateSubmissionValidationStatus('550e8400-e29b-41d4-a716-446655440000', 'started', metadata);
 
       expect(updateStub.calledOnce).to.be.true;
       expect(updateStub.firstCall.args[0]).to.equal('550e8400-e29b-41d4-a716-446655440000');
       expect(updateStub.firstCall.args[1]).to.equal('started');
-      expect(updateStub.firstCall.args[2]).to.be.undefined;
+      expect(updateStub.firstCall.args[2]).to.deep.equal(metadata);
     });
 
     it('updates status with metadata', async () => {
