@@ -45,6 +45,16 @@ export const PortalRouter = () => {
       />
 
       <Route
+        path="/api-keys"
+        element={
+          <>
+            <PageTitle title="API Keys" description="Manage your API keys" />
+            <PortalPage initialTab="apikeys" />
+          </>
+        }
+      />
+
+      <Route
         path="/ticket/:ticketId"
         element={
           <UserTicketContextProvider>
