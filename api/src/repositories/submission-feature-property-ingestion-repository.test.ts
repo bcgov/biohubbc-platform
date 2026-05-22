@@ -305,8 +305,13 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('MULTIPLE_VALUES_NOT_ALLOWED');
       expect(sqlText).to.include('TYPE_MISMATCH');
       expect(sqlText).to.include('UNSUPPORTED_PROPERTY_TYPE');
-      expect(sqlText).to.include("'artifact_key', 'feature')");
-      expect(sqlText).to.include("'taxon',\n            'feature'");
+      // `feature` must be in BOTH the string-type rule (single-line IN list) and the supported-type
+      // allowlist (multi-line NOT IN list). Normalise whitespace so the multi-line list can be
+      // reindented without breaking the assertion. `'artifact_key', 'feature')` is unique to the
+      // string rule; `'taxon', 'feature'` is unique to the allowlist.
+      const normalizedSql = sqlText.replace(/\s+/g, ' ');
+      expect(normalizedSql).to.include("'artifact_key', 'feature')");
+      expect(normalizedSql).to.include("'taxon', 'feature'");
     });
   });
 

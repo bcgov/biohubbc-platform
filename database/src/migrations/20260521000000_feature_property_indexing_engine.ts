@@ -75,7 +75,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_upload_staging_feature_candidate.parsed_source_id IS
       'The <source_id> extracted from a well-formed reference; null when malformed.';
     COMMENT ON COLUMN submission_upload_staging_feature_candidate.referenced_submission_feature_id IS
-      'The within-upload feature the source_id resolved to; null when unresolved.';
+      'The within-upload feature the source_id resolved to; null when unresolved. Resolution is intentionally upload-scoped — cross-upload references are not resolved even though the canonical FK permits them.';
     COMMENT ON COLUMN submission_upload_staging_feature_candidate.referenced_feature_type_id IS
       'The resolved target feature type, used to validate against the property allowed target type.';
   `);

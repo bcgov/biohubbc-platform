@@ -252,8 +252,10 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await repo.recordFeaturePropertyResolutionErrorsBySubmissionUploadId(uploadId);
 
       const errors = await getErrors(uploadId);
-      expect(errors).to.have.lengthOf(1);
-      expect(errors[0].error_code).to.equal('INVALID_FEATURE_REFERENCE_FORMAT');
+      // Exclusivity: a malformed value fires ONLY the FORMAT branch — never also the
+      // UNRESOLVED / TYPE / SELF branches. The four error categories are mutually exclusive,
+      // so the exact set of recorded codes must be just this one.
+      expect(errors.map((e) => e.error_code)).to.deep.equal(['INVALID_FEATURE_REFERENCE_FORMAT']);
     });
 
     it('records UNRESOLVED_FEATURE_REFERENCE when resolution misses', async () => {
@@ -527,6 +529,46 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       expect(errors.every((e) => e.error_code === 'CIRCULAR_FEATURE_REFERENCE')).to.equal(true);
     });
 
+    it('flags every edge of a long cycle whose back-path exceeds the old depth bound (regression)', async () => {
+      // Regression for the depth-capped walk that silently accepted cycles longer than ~50 hops:
+      // closing any edge of an N-node ring requires walking the other N-1 edges, so with N-1 > 50 the
+      // old `r.depth < 50` guard never materialised the closing path and recorded ZERO errors. The
+      // transitive-closure detector has no depth bound, so all N edges are flagged.
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(submissionId);
+      const type = await featureTypeIdByName('sample_site');
+      // Feature type / config are irrelevant to cycle detection (it reads only the edge endpoints), so
+      // reuse one feature type and one config for the whole ring; distinct property names keep each
+      // cyclic edge in its own grouped error row.
+      const { featureTypePropertyId: ftp } = await createFeatureTypeProperty('sample_site', 'sample_site');
+
+      const N = 55; // > old cap of 50
+      const features: number[] = [];
+      for (let i = 0; i < N; i++) {
+        features.push(await createTestFeature(connection, submissionId, 'sample_site', {}));
+      }
+      // Ring: f0 -> f1 -> ... -> f(N-1) -> f0
+      for (let i = 0; i < N; i++) {
+        await insertCandidate({
+          uploadId,
+          sourceFeatureId: features[i],
+          featureTypePropertyId: ftp,
+          propertyName: `edge_${i}`,
+          rawValue: `feature::f${(i + 1) % N}`,
+          isFormatValid: true,
+          parsedSourceId: `f${(i + 1) % N}`,
+          referencedFeatureId: features[(i + 1) % N],
+          referencedFeatureTypeId: type
+        });
+      }
+
+      await repo.recordCircularFeatureReferenceErrorsBySubmissionUploadId(uploadId);
+
+      const errors = await getErrors(uploadId);
+      expect(errors).to.have.lengthOf(N);
+      expect(errors.every((e) => e.error_code === 'CIRCULAR_FEATURE_REFERENCE')).to.equal(true);
+    });
+
     it('does NOT flag an acyclic chain (A->B, B->C)', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(submissionId);
@@ -760,6 +802,58 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await repo.insertFeaturePropertiesBySubmissionUploadId(uploadId);
 
       expect(await getPropertyFeatureRows(sourceFeatureId)).to.have.lengthOf(0);
+    });
+
+    it('skips candidates whose source or target feature was soft-deleted after staging (resolve-once staleness guard)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(submissionId);
+      const targetTypeId = await featureTypeIdByName('sample_site');
+      const { featureTypePropertyId } = await createFeatureTypeProperty('sample_period', 'sample_site');
+
+      // Helper: soft-delete a feature (the concurrent mutation the guard defends against).
+      const softDelete = (featureId: number) =>
+        connection.sql(SQL`
+          UPDATE submission_feature SET record_end_date = now() WHERE submission_feature_id = ${featureId};
+        `);
+
+      // 1) Valid candidate — both endpoints active → inserts.
+      const liveSource = await createTestFeature(connection, submissionId, 'sample_period', {});
+      const liveTarget = await createTestFeature(connection, submissionId, 'sample_site', {});
+      // 2) Candidate whose TARGET is soft-deleted after staging → must be skipped.
+      const sourceForDeadTarget = await createTestFeature(connection, submissionId, 'sample_period', {});
+      const deadTarget = await createTestFeature(connection, submissionId, 'sample_site', {});
+      // 3) Candidate whose SOURCE is soft-deleted after staging → must be skipped.
+      const deadSource = await createTestFeature(connection, submissionId, 'sample_period', {});
+      const targetForDeadSource = await createTestFeature(connection, submissionId, 'sample_site', {});
+
+      for (const [source, target] of [
+        [liveSource, liveTarget],
+        [sourceForDeadTarget, deadTarget],
+        [deadSource, targetForDeadSource]
+      ]) {
+        await insertCandidate({
+          uploadId,
+          sourceFeatureId: source,
+          featureTypePropertyId,
+          propertyName: 'site_ref',
+          rawValue: 'feature::area1',
+          isFormatValid: true,
+          parsedSourceId: 'area1',
+          referencedFeatureId: target,
+          referencedFeatureTypeId: targetTypeId
+        });
+      }
+
+      // Stale the two endpoints AFTER candidates are staged.
+      await softDelete(deadTarget);
+      await softDelete(deadSource);
+
+      await repo.insertFeaturePropertiesBySubmissionUploadId(uploadId);
+
+      // Only the all-active candidate inserts; the soft-deleted source and target are excluded.
+      expect(await getPropertyFeatureRows(liveSource)).to.have.lengthOf(1);
+      expect(await getPropertyFeatureRows(sourceForDeadTarget)).to.have.lengthOf(0);
+      expect(await getPropertyFeatureRows(deadSource)).to.have.lengthOf(0);
     });
 
     it('dedups exact-duplicate references to one row', async () => {

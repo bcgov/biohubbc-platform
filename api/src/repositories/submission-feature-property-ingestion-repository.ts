@@ -1441,9 +1441,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * the edge set here. The scope is the property-feature channel only; cycles routed through
    * `data.content` relationships or parent/child edges are not considered.
    *
-   * The recursive walk is bounded so it terminates and stays cheap: a simple-path guard
-   * (`NOT dst = ANY(path)`) prevents revisiting a node, and a depth cap stops runaway recursion on
-   * pathological graphs. The work is upload-scoped and runs off the HTTP request flow.
+   * Detection computes transitive reachability over the edge set with a set-based recursive CTE
+   * (`UNION`, not `UNION ALL`): each step adds only new `(origin, node)` reachability pairs, so the
+   * working set is bounded by the number of distinct pairs (<= N^2) and the recursion terminates with
+   * no depth cap — cycles of any length are detected, not just short ones. An edge `a -> b` is part of
+   * a cycle when `b` can reach `a`. The work is upload-scoped and runs off the HTTP request flow.
    *
    * Counts are aggregated and upserted into `submission_feature_error`.
    *
@@ -1463,14 +1465,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND c.referenced_submission_feature_id <> c.submission_feature_id
       ),
       reachable AS (
-        SELECT e.src AS origin, e.dst AS node, ARRAY[e.src, e.dst] AS path, 1 AS depth
+        SELECT e.src AS origin, e.dst AS node
         FROM edges e
-        UNION ALL
-        SELECT r.origin, e.dst, r.path || e.dst, r.depth + 1
+        UNION
+        SELECT r.origin, e.dst
         FROM reachable r
         JOIN edges e ON e.src = r.node
-        WHERE NOT e.dst = ANY(r.path)
-          AND r.depth < 50
       ),
       cyclic AS (
         SELECT
@@ -1994,6 +1994,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * excluded here (`referenced_submission_feature_id <> submission_feature_id`) as a hard guard so a
    * self-loop — which would corrupt downstream closure traversal — can never be written.
    *
+   * Resolution happens once at staging time; this insert runs later in the job. As a staleness guard
+   * it rejoins `submission_feature` for both endpoints with `record_end_date IS NULL`, so if a source
+   * or target feature is soft-deleted between staging and insert, no canonical row pointing at (or
+   * from) an inactive feature can land.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -2012,6 +2017,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       JOIN feature_type_property ftp
         ON ftp.feature_type_property_id = c.feature_type_property_id
        AND ftp.record_end_date IS NULL
+      JOIN submission_feature src
+        ON src.submission_feature_id = c.submission_feature_id
+       AND src.record_end_date IS NULL
+      JOIN submission_feature tgt
+        ON tgt.submission_feature_id = c.referenced_submission_feature_id
+       AND tgt.record_end_date IS NULL
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
         AND c.is_format_valid
         AND c.referenced_submission_feature_id IS NOT NULL
