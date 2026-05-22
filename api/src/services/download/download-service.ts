@@ -1,6 +1,13 @@
+import { SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { CreateDownload, DownloadDetailRecord, DownloadId, DownloadListRecord } from '../../models/download';
+import {
+  CreateDownload,
+  DownloadDetailRecord,
+  DownloadId,
+  DownloadListRecord,
+  DownloadParquetPart
+} from '../../models/download';
 import { DownloadVersionRecord } from '../../models/download-version';
 import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
@@ -8,10 +15,12 @@ import { publishProcessDownloadJob } from '../../queue/publisher';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPolicyService } from './download-policy-service';
 
 export interface CreateDownloadRequestPayload {
@@ -333,6 +342,51 @@ export class DownloadService extends DBService {
       system_user_ids: [systemUserId]
     });
     await this.downloadRepository.createDownloadTeam(downloadId, team.team_id);
+  }
+
+  /**
+   * Build the presigned-URL list for a Parquet download.
+   *
+   * Returns one entry per Parquet artifact — typically one per feature type
+   * (e.g. Animal, Observation). The `feature_type` is parsed from the S3 key
+   * shape `downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`.
+   * Artifacts that do not match this shape (e.g. export zips) are filtered out.
+   *
+   * URLs expire after 30 minutes and should not be cached.
+   *
+   * Does not enforce authorization — callers must first call `getAuthorizedDownload`
+   * to confirm access before calling this method.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The version whose Parquet artifacts to sign.
+   * @return {Promise<DownloadParquetPart[]>}
+   * @memberof DownloadService
+   */
+  async listDownloadParquetUrls(downloadId: string, downloadVersionId: string): Promise<DownloadParquetPart[]> {
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
+      downloadVersionId
+    );
+    const objectStorageService = new ObjectStorageService();
+
+    const parts: DownloadParquetPart[] = [];
+
+    for (const artifact of artifacts) {
+      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId, downloadVersionId);
+      if (featureType === null) {
+        continue;
+      }
+
+      const expiresAt = new Date(Date.now() + SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD * 1000).toISOString();
+      const url = await objectStorageService.getSignedUrl(
+        BucketType.MAIN,
+        artifact.object_key,
+        SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD
+      );
+
+      parts.push({ feature_type: featureType, url, expires_at: expiresAt });
+    }
+
+    return parts;
   }
 
   /**
