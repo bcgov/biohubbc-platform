@@ -23,7 +23,6 @@
 // Requires: database container running with seed data.
 
 import { expect } from 'chai';
-import crypto from 'crypto';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
@@ -31,7 +30,13 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionUploadReviewService } from '../../services/upload/submission-upload-review-service';
-import { createTestSubmission, getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
+import {
+  createFeatureTypeProperty,
+  createTestUpload,
+  getPropertyFeatureRows as fetchPropertyFeatureRows,
+  getSubmissionFeatureErrors
+} from '../helpers/test-feature-property-helpers';
+import { createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('SubmissionFeaturePropertyIngestionService — feature property indexing (integration)', function () {
   this.timeout(15000);
@@ -61,92 +66,6 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
 
   // --- local fixture helpers -----------------------------------------------
 
-  /** Resolve a seeded feature_type by name to its id. */
-  async function featureTypeIdByName(name: string): Promise<number> {
-    const result = await connection.sql(SQL`
-      SELECT feature_type_id FROM feature_type WHERE name = ${name} LIMIT 1;
-    `);
-    return result.rows[0].feature_type_id;
-  }
-
-  /** Create a real submission_upload row for a submission and return its uuid. */
-  async function createTestUpload(submissionId: number): Promise<string> {
-    const systemUserId = connection.systemUserId();
-
-    const uploadResult = await connection.sql(SQL`
-      INSERT INTO upload (upload_status, record_end_date, create_user)
-      VALUES ('completed', now(), ${systemUserId})
-      RETURNING upload_id;
-    `);
-    const uploadId = uploadResult.rows[0].upload_id;
-
-    const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
-
-    const bridgeResult = await connection.sql(SQL`
-      INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-      VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
-      RETURNING submission_upload_id;
-    `);
-
-    return bridgeResult.rows[0].submission_upload_id;
-  }
-
-  /**
-   * Create a synthetic `feature`-typed feature_property and assign it to a source feature type via
-   * feature_type_property with an allowed target type. Mirrors download-parquet's
-   * insertCodeFeatureProperty but for the 'feature' property type plus the allowed-target column.
-   *
-   * @returns The new feature_type_property_id and the feature_property.name to use as the
-   *   data.properties key on source features.
-   */
-  async function createFeatureTypeProperty(params: {
-    sourceFeatureTypeName: string;
-    allowedTargetFeatureTypeName: string | null;
-    allowMultiple?: boolean;
-  }): Promise<{ featureTypePropertyId: number; propertyName: string }> {
-    const systemUserId = connection.systemUserId();
-
-    const fptResult = await connection.sql(SQL`
-      SELECT feature_property_type_id FROM feature_property_type WHERE name = 'feature';
-    `);
-    const featurePropertyTypeId = fptResult.rows[0].feature_property_type_id;
-
-    const propertyName = `test_feature_ref_${crypto.randomInt(0, 1_000_000_000)}`;
-    const fpResult = await connection.sql(SQL`
-      INSERT INTO feature_property (feature_property_type_id, name, display_name, record_effective_date, create_user)
-      VALUES (${featurePropertyTypeId}, ${propertyName}, ${propertyName}, now(), ${systemUserId})
-      RETURNING feature_property_id;
-    `);
-    const featurePropertyId = fpResult.rows[0].feature_property_id;
-
-    const allowedFeatureTypeId =
-      params.allowedTargetFeatureTypeName === null
-        ? null
-        : await featureTypeIdByName(params.allowedTargetFeatureTypeName);
-
-    const ftpResult = await connection.sql(SQL`
-      INSERT INTO feature_type_property (
-        feature_type_id,
-        feature_property_id,
-        allow_multiple,
-        allowed_referenced_feature_type_id,
-        record_effective_date,
-        create_user
-      )
-      VALUES (
-        (SELECT feature_type_id FROM feature_type WHERE name = ${params.sourceFeatureTypeName} LIMIT 1),
-        ${featurePropertyId},
-        ${params.allowMultiple ?? false},
-        ${allowedFeatureTypeId},
-        now(),
-        ${systemUserId}
-      )
-      RETURNING feature_type_property_id;
-    `);
-
-    return { featureTypePropertyId: ftpResult.rows[0].feature_type_property_id, propertyName };
-  }
-
   /**
    * Insert one active submission_feature under a specific upload with an explicit source_id and data
    * JSON. Resolution joins on source_id, which createTestFeature does not set and which mints its own
@@ -154,7 +73,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
    *
    * @returns The new submission_feature_id.
    */
-  async function insertFeature(params: {
+  async function insertFeatureRow(params: {
     submissionId: number;
     submissionUploadId: string;
     featureTypeName: string;
@@ -191,35 +110,55 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     return result.rows[0].submission_feature_id;
   }
 
-  /**
-   * Fetch grouped error rows for an upload, ordered by code.
-   *
-   * Filters to count > 0: the engine writes a benign count-0 `UNRESOLVED_PARENT` diagnostic row for
-   * every feature, and the Phase 9 fail-fast gate keys off `SUM(count)`, so only count > 0 rows are
-   * upload-blocking. Matching that semantics keeps assertions about "the errors" meaningful.
-   */
-  async function getErrors(uploadId: string): Promise<{ error_code: string; count: number }[]> {
-    const result = await connection.sql(SQL`
-      SELECT error_code, count
-      FROM submission_feature_error
-      WHERE submission_upload_id = ${uploadId}::uuid
-        AND count > 0
-      ORDER BY error_code;
-    `);
-    return result.rows;
+  /** A submission + upload + one feature_type_property config, plus an upload-bound feature inserter. */
+  interface FeatureScenario {
+    submissionId: number;
+    uploadId: string;
+    featureTypePropertyId: number;
+    propertyName: string;
+    /** Insert a submission_feature into this scenario's submission + upload. */
+    insertFeature: (featureTypeName: string, sourceId: string, data?: Record<string, unknown>) => Promise<number>;
   }
 
-  /** Fetch canonical property-feature rows for a source feature. */
-  async function getPropertyFeatureRows(
+  /**
+   * Stand up the common arrange block: a submission, a real upload, and one synthetic feature_type_property
+   * config (defaulting to mortality → observation_subcount). The returned `insertFeature` is bound to the
+   * scenario's submission + upload so tests only state the feature type, source_id, and data that vary.
+   */
+  async function seedFeatureScenario(config?: {
+    sourceFeatureTypeName?: string;
+    allowedTargetFeatureTypeName?: string | null;
+    allowMultiple?: boolean;
+  }): Promise<FeatureScenario> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+      connection,
+      config?.sourceFeatureTypeName ?? 'mortality',
+      config?.allowedTargetFeatureTypeName === undefined ? 'observation_subcount' : config.allowedTargetFeatureTypeName,
+      config?.allowMultiple
+    );
+
+    return {
+      submissionId,
+      uploadId,
+      featureTypePropertyId,
+      propertyName,
+      insertFeature: (featureTypeName, sourceId, data = {}) =>
+        insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName, sourceId, data })
+    };
+  }
+
+  /** Grouped, upload-blocking error rows (count > 0) for an upload. */
+  function getErrors(uploadId: string): Promise<{ error_code: string; count: number }[]> {
+    return getSubmissionFeatureErrors(connection, uploadId, true);
+  }
+
+  /** Canonical property-feature rows for a source feature. */
+  function getPropertyFeatureRows(
     sourceFeatureId: number
   ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
-    const result = await connection.sql(SQL`
-      SELECT referenced_submission_feature_id, feature_type_property_id
-      FROM submission_feature_property_feature
-      WHERE submission_feature_id = ${sourceFeatureId}
-      ORDER BY referenced_submission_feature_id;
-    `);
-    return result.rows;
+    return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
 
   /** Count all canonical property-feature rows written for an upload's features. */
@@ -236,26 +175,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   // --- scenarios -----------------------------------------------------------
 
   it('1: happy path — one canonical row, no errors', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    const targetFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::area1' } }
+    const targetFeatureId = await insertFeature('observation_subcount', 'area1');
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      properties: { [propertyName]: 'feature::area1' }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -269,26 +193,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('2: idempotent rerun — identical canonical row set, no duplicates/orphans', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    const targetFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::area1' } }
+    const targetFeatureId = await insertFeature('observation_subcount', 'area1');
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      properties: { [propertyName]: 'feature::area1' }
     });
 
     await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -304,27 +213,10 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('3: unresolved reference (feature::nope) — one UNRESOLVED_FEATURE_REFERENCE, zero canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::nope' } }
-    });
+    await insertFeature('observation_subcount', 'area1');
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: 'feature::nope' } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -336,27 +228,10 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('4: malformed reference (features::area1) — one INVALID_FEATURE_REFERENCE_FORMAT, zero canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'features::area1' } }
-    });
+    await insertFeature('observation_subcount', 'area1');
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: 'features::area1' } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -368,28 +243,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('5: wrong-type resolution — one INVALID_FEATURE_REFERENCE_TYPE, zero canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    // Config allows sample_site, but the reference resolves to a sample_technique sibling.
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    // Config allows observation_subcount, but the reference resolves to a species_observation sibling.
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'species_observation',
-      sourceId: 'tech1',
-      data: {}
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::tech1' } }
-    });
+    await insertFeature('species_observation', 'tech1');
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: 'feature::tech1' } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -401,50 +259,15 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('6: two valid + one invalid in the same upload — zero canonical rows for the WHOLE upload (Phase 9 gate)', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area2',
-      data: {}
-    });
+    await insertFeature('observation_subcount', 'area1');
+    await insertFeature('observation_subcount', 'area2');
     // Two valid references...
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::area1' } }
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-2',
-      data: { properties: { [propertyName]: 'feature::area2' } }
-    });
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: 'feature::area1' } });
+    await insertFeature('mortality', 'period-2', { properties: { [propertyName]: 'feature::area2' } });
     // ...and one unresolved reference, which fails the whole upload.
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-3',
-      data: { properties: { [propertyName]: 'feature::nope' } }
-    });
+    await insertFeature('mortality', 'period-3', { properties: { [propertyName]: 'feature::nope' } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -456,34 +279,12 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('7: multi-valued ["feature::s1","feature::s2"] both resolve & allowed — two canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount',
-      allowMultiple: true
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: true });
 
-    const targetA = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 's1',
-      data: {}
-    });
-    const targetB = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 's2',
-      data: {}
-    });
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: ['feature::s1', 'feature::s2'] } }
+    const targetA = await insertFeature('observation_subcount', 's1');
+    const targetB = await insertFeature('observation_subcount', 's2');
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      properties: { [propertyName]: ['feature::s1', 'feature::s2'] }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -498,27 +299,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('8: multi-valued ["feature::s1","feature::s1"] exact duplicate — one canonical row (ON CONFLICT dedup)', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount',
-      allowMultiple: true
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: true });
 
-    const targetA = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 's1',
-      data: {}
-    });
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: ['feature::s1', 'feature::s1'] } }
+    const targetA = await insertFeature('observation_subcount', 's1');
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      properties: { [propertyName]: ['feature::s1', 'feature::s1'] }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -531,28 +316,10 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('9: single-valued prop given ["feature::s1"] array — MULTIPLE_VALUES_NOT_ALLOWED, zero canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount',
-      allowMultiple: false
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: false });
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 's1',
-      data: {}
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: ['feature::s1'] } }
-    });
+    await insertFeature('observation_subcount', 's1');
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: ['feature::s1'] } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -563,20 +330,14 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('10: self-reference — INVALID_FEATURE_REFERENCE_SELF, zero canonical rows (upload blocked)', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    // Source is a sample_site; config allows sample_site; the property points at its own source_id.
-    const { propertyName } = await createFeatureTypeProperty({
+    // Source is an observation_subcount; config allows observation_subcount; the property points at its own source_id.
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({
       sourceFeatureTypeName: 'observation_subcount',
       allowedTargetFeatureTypeName: 'observation_subcount'
     });
 
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'self-area',
-      data: { properties: { [propertyName]: 'feature::self-area' } }
+    const sourceFeatureId = await insertFeature('observation_subcount', 'self-area', {
+      properties: { [propertyName]: 'feature::self-area' }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -589,39 +350,16 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('11: channel separation — data.content lands in submission_feature_feature, prop in submission_feature_property_feature', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
     // propTarget: referenced by the feature-valued property.
-    const propTargetId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'prop-target',
-      data: {}
-    });
+    const propTargetId = await insertFeature('observation_subcount', 'prop-target');
     // contentTarget: referenced by data.content (a distinct relationship channel).
-    const contentTargetId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'species_observation',
-      sourceId: 'content-target',
-      data: {}
-    });
+    const contentTargetId = await insertFeature('species_observation', 'content-target');
     // Source carries BOTH a data.content reference AND a feature-valued property.
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: {
-        content: ['content-target'],
-        properties: { [propertyName]: 'feature::prop-target' }
-      }
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      content: ['content-target'],
+      properties: { [propertyName]: 'feature::prop-target' }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -648,26 +386,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('12: whitespace (feature:: area1) — resolves to area1, one canonical row', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    const targetFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'area1',
-      data: {}
-    });
-    const sourceFeatureId = await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature:: area1' } }
+    const targetFeatureId = await insertFeature('observation_subcount', 'area1');
+    const sourceFeatureId = await insertFeature('mortality', 'period-1', {
+      properties: { [propertyName]: 'feature:: area1' }
     });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
@@ -680,32 +403,12 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   });
 
   it('13: circular reference (A.prop -> B, B.prop -> A) — CIRCULAR_FEATURE_REFERENCE, zero canonical rows', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    // A (sample_period) -> B (sample_site); B (sample_site) -> A (sample_period). Both types allowed.
-    const { propertyName: propAtoB } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
-    const { propertyName: propBtoA } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'observation_subcount',
-      allowedTargetFeatureTypeName: 'mortality'
-    });
+    // A (mortality) -> B (observation_subcount); B (observation_subcount) -> A (mortality). Both types allowed.
+    const { submissionId, uploadId, propertyName: propAtoB, insertFeature } = await seedFeatureScenario();
+    const { propertyName: propBtoA } = await createFeatureTypeProperty(connection, 'observation_subcount', 'mortality');
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'a',
-      data: { properties: { [propAtoB]: 'feature::b' } }
-    });
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'observation_subcount',
-      sourceId: 'b',
-      data: { properties: { [propBtoA]: 'feature::a' } }
-    });
+    await insertFeature('mortality', 'a', { properties: { [propAtoB]: 'feature::b' } });
+    await insertFeature('observation_subcount', 'b', { properties: { [propBtoA]: 'feature::a' } });
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
     expect(outcome.status).to.equal('invalid');
@@ -718,20 +421,9 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   // AC-14: the new error codes surface through the existing aggregate-error reader, with no
   // feature-specific wiring — they are plain rows in submission_feature_error.
   it('14: new error codes surface via getIngestionErrorCountsByCode', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(submissionId);
-    const { propertyName } = await createFeatureTypeProperty({
-      sourceFeatureTypeName: 'mortality',
-      allowedTargetFeatureTypeName: 'observation_subcount'
-    });
+    const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
-    await insertFeature({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'mortality',
-      sourceId: 'period-1',
-      data: { properties: { [propertyName]: 'feature::nope' } }
-    });
+    await insertFeature('mortality', 'period-1', { properties: { [propertyName]: 'feature::nope' } });
 
     await service.indexSubmissionPropertiesBySubmissionUploadId(submissionId, uploadId);
 
