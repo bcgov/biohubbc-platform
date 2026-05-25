@@ -174,7 +174,7 @@ describe('PortalApiKeysPage', () => {
       const nameInput = screen.getByRole('textbox', { name: /key name/i });
       fireEvent.change(nameInput, { target: { value: 'My new key' } });
 
-      fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      fireEvent.click(screen.getByTestId('edit-dialog-save-button'));
 
       await waitFor(() => {
         expect(screen.getByText(/save this key now/i)).toBeInTheDocument();
@@ -182,14 +182,18 @@ describe('PortalApiKeysPage', () => {
       });
     });
 
-    it('disables Create button when name field is empty', async () => {
+    it('does not create an API key when name field is empty', async () => {
       renderPage();
 
       await waitFor(() => screen.getByTestId('portal-api-keys-add-button'));
       fireEvent.click(screen.getByTestId('portal-api-keys-add-button'));
 
-      const createBtn = screen.getByRole('button', { name: /^create$/i });
-      expect(createBtn).toBeDisabled();
+      fireEvent.click(screen.getByTestId('edit-dialog-save-button'));
+
+      await waitFor(() => {
+        expect(mockCreateApiKey).not.toHaveBeenCalled();
+        expect(screen.queryByText(/save this key now/i)).not.toBeInTheDocument();
+      });
     });
   });
 

@@ -68,7 +68,7 @@ export class ApiKeyRepository extends BaseRepository {
    * @return {Promise<ApiKey | null>}
    * @memberof ApiKeyRepository
    */
-  async getApiKeyByPrefix(keyPrefix: string): Promise<ApiKey | null> {
+  async findApiKeyByPrefix(keyPrefix: string): Promise<ApiKey | null> {
     const sqlStatement = SQL`
       SELECT *
       FROM api_key
@@ -91,7 +91,7 @@ export class ApiKeyRepository extends BaseRepository {
    * @return {Promise<ApiKeyView | null>}
    * @memberof ApiKeyRepository
    */
-  async getApiKeyById(apiKeyId: string): Promise<ApiKeyView | null> {
+  async findApiKeyById(apiKeyId: string): Promise<ApiKeyView | null> {
     const sqlStatement = SQL`
       SELECT
         api_key_id,

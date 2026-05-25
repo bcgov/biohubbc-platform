@@ -218,7 +218,7 @@ export class ApiKeyService extends DBService {
       throw new HTTP401('Access Denied');
     }
 
-    const record = await this.apiKeyRepository.getApiKeyByPrefix(keyPrefix);
+    const record = await this.apiKeyRepository.findApiKeyByPrefix(keyPrefix);
 
     if (!record) {
       throw new HTTP401('Access Denied');

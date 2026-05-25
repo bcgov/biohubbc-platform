@@ -53,7 +53,7 @@ describe('ApiKeyRepository', () => {
     });
   });
 
-  describe('getApiKeyByPrefix', () => {
+  describe('findApiKeyByPrefix', () => {
     it('should return the full API key record when found', async () => {
       const row = { ...makeApiKeyView(), key_hash: 'abc123hashvalue' };
       const mockResponse = { rowCount: 1, rows: [row] } as unknown as QueryResult<any>;
@@ -61,7 +61,7 @@ describe('ApiKeyRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
       const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getApiKeyByPrefix('biohub_AbCdEfGh');
+      const result = await repo.findApiKeyByPrefix('biohub_AbCdEfGh');
 
       expect(result).to.eql(row);
     });
@@ -72,13 +72,13 @@ describe('ApiKeyRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
       const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getApiKeyByPrefix('biohub_NoMatch11');
+      const result = await repo.findApiKeyByPrefix('biohub_NoMatch11');
 
       expect(result).to.be.null;
     });
   });
 
-  describe('getApiKeyById', () => {
+  describe('findApiKeyById', () => {
     it('should return the API key view when found', async () => {
       const view = makeApiKeyView();
       const mockResponse = { rowCount: 1, rows: [view] } as unknown as QueryResult<any>;
@@ -86,7 +86,7 @@ describe('ApiKeyRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
       const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getApiKeyById(view.api_key_id);
+      const result = await repo.findApiKeyById(view.api_key_id);
 
       expect(result).to.eql(view);
     });
@@ -97,7 +97,7 @@ describe('ApiKeyRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
       const repo = new ApiKeyRepository(mockDBConnection);
 
-      const result = await repo.getApiKeyById('nonexistent-uuid');
+      const result = await repo.findApiKeyById('nonexistent-uuid');
 
       expect(result).to.be.null;
     });

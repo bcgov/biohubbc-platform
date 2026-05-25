@@ -151,7 +151,7 @@ describe('ApiKeyService', () => {
         key_hash: hash
       };
 
-      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
       const service = new ApiKeyService(connection);
@@ -174,7 +174,7 @@ describe('ApiKeyService', () => {
         key_hash: hash
       };
 
-      const getByPrefixStub = sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
+      const getByPrefixStub = sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
       const service = new ApiKeyService(connection);
@@ -212,7 +212,7 @@ describe('ApiKeyService', () => {
     });
 
     it('should throw HTTP401 when no row is found for the prefix', async () => {
-      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(null);
+      sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(null);
 
       const { plaintext } = await buildValidKey();
 
@@ -236,7 +236,7 @@ describe('ApiKeyService', () => {
         key_hash: wrongHash
       };
 
-      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
       const service = new ApiKeyService(connection);
@@ -257,7 +257,7 @@ describe('ApiKeyService', () => {
         key_hash: hash
       };
 
-      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
       const service = new ApiKeyService(connection);
@@ -281,7 +281,7 @@ describe('ApiKeyService', () => {
         key_hash: hash
       };
 
-      sinon.stub(ApiKeyRepository.prototype, 'getApiKeyByPrefix').resolves(record);
+      sinon.stub(ApiKeyRepository.prototype, 'findApiKeyByPrefix').resolves(record);
 
       const connection = getMockDBConnection();
       const service = new ApiKeyService(connection);
