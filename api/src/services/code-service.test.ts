@@ -24,7 +24,8 @@ describe('codeService', () => {
           feature_type: {
             feature_type_id: 1,
             name: 'dataset',
-            display_name: 'Dataset'
+            display_name: 'Dataset',
+            description: null
           },
           properties: [
             {
@@ -94,7 +95,8 @@ describe('codeService', () => {
           feature_type: {
             feature_type_id: 1,
             name: 'dataset',
-            display_name: 'Dataset'
+            display_name: 'Dataset',
+            description: null
           },
           properties: [
             {
@@ -123,7 +125,8 @@ describe('codeService', () => {
           feature_type: {
             feature_type_id: 2,
             name: 'artifact',
-            display_name: 'Artifact'
+            display_name: 'Artifact',
+            description: null
           },
           properties: [
             {
