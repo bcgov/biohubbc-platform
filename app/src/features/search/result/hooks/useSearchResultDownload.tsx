@@ -1,12 +1,14 @@
 import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { useCallback, useEffect, useState } from 'react';
+import { DownloadUrlDisplay } from '../components/DownloadUrlDisplay';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -37,6 +39,7 @@ export const useSearchResultDownload = ({
   pagination
 }: UseSearchResultDownloadProps) => {
   const api = useApi();
+  const { auth } = useAuthStateContext();
   const { checkout } = useCartContext();
   const dialogContext = useDialogContext();
   const isMounted = useIsMounted();
@@ -75,9 +78,11 @@ export const useSearchResultDownload = ({
 
   /**
    * Submits the create-download form for the current expression search.
-   * Serialized to prevent duplicate downloads. Success closes the dialog and
-   * switches to Downloads; failure keeps the dialog open and shows the API
-   * error. State updates are skipped after unmount.
+   * Serialized to prevent duplicate downloads. On success the dialog closes and
+   * the outcome branches on authentication: authenticated users switch to the
+   * Downloads sidebar with a success snackbar, while anonymous users get a
+   * persistent dialog carrying their export status URL. Failure keeps the
+   * dialog open and shows the API error. State updates are skipped after unmount.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name, description, and feature types.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
@@ -87,7 +92,7 @@ export const useSearchResultDownload = ({
       runSerialized(async () => {
         setIsSubmittingDownload(true);
         try {
-          await api.download.createDownload({
+          const response = await api.download.createDownload({
             name: values.name,
             description: values.description,
             featureTypes: values.featureTypes,
@@ -97,11 +102,24 @@ export const useSearchResultDownload = ({
             return;
           }
           setIsCreateDownloadDialogOpen(false);
-          setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
-          });
+          if (auth.isAuthenticated) {
+            setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+            dialogContext.setSnackbar({
+              open: true,
+              snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
+            });
+          } else {
+            // Anonymous users have no Downloads sidebar; the returned export status URL is their
+            // only credential, so it is surfaced in a persistent dialog rather than a transient snackbar.
+            dialogContext.setOkDialog({
+              open: true,
+              dialogTitle: 'Download created',
+              dialogText:
+                'Your download is being prepared. Use this URL to check its status and get download links when ready.',
+              dialogContent: <DownloadUrlDisplay url={response.export_url ?? ''} />,
+              onClose: () => dialogContext.setOkDialog({ open: false })
+            });
+          }
         } catch (error) {
           if (!isMounted()) {
             return;
@@ -116,7 +134,7 @@ export const useSearchResultDownload = ({
           }
         }
       }),
-    [api.download, dialogContext, expressionTree, runSerialized, isMounted]
+    [api.download, auth.isAuthenticated, dialogContext, expressionTree, runSerialized, isMounted]
   );
 
   /**

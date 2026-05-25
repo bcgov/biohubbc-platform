@@ -68,7 +68,9 @@ describe('useDownloadApi', () => {
       };
       const mockResponse: CreateDownloadResponse = {
         download_id: '550e8400-e29b-41d4-a716-446655440099',
-        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099'
+        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099',
+        export_id: null,
+        export_url: null
       };
 
       mock.onPost('/api/download').reply(201, mockResponse);

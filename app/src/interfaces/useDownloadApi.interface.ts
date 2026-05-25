@@ -50,4 +50,6 @@ export interface CreateDownloadRequest {
 export interface CreateDownloadResponse {
   download_id: string;
   download_url: string;
+  export_id: string | null;
+  export_url: string | null;
 }
