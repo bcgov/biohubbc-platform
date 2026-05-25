@@ -127,7 +127,7 @@ describe('paths/download/index', () => {
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-1' });
+        .resolves({ download_id: 'download-uuid-1', export_id: null });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -159,7 +159,7 @@ describe('paths/download/index', () => {
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-2' });
+        .resolves({ download_id: 'download-uuid-2', export_id: null });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';

@@ -101,17 +101,14 @@ export class DownloadExportService extends DBService {
   /**
    * Authorize a user for an export.
    *
-   * Exports are authenticated-only — the Parquet download is the unauthenticated
-   * path and anonymous UUID holders must `PUT /api/download/:id` to claim
-   * before they can export. Delegates team-membership checks to
-   * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
-   * exactly one place.
+   * Export access mirrors download access: a teamless (anonymous) parent is
+   * reachable by UUID alone; a team-scoped parent requires team membership. The
+   * UUID is not a credential for a claimed download. Delegates the team-membership
+   * check to `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
+   * exactly one place — that helper returns for a teamless parent and throws HTTP403
+   * for a team-scoped parent when `systemUserId` is null.
    */
   async getAuthorizedExport(exportId: string, systemUserId: number | null): Promise<DownloadExportRecord> {
-    if (systemUserId === null) {
-      throw new HTTP403('Access denied');
-    }
-
     const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
     await this.downloadService.getAuthorizedDownload(exportRecord.download_id, systemUserId);
 

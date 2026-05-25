@@ -1,3 +1,4 @@
+import { DEFAULT_MAX_PART_SIZE_BYTES } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
@@ -17,7 +18,19 @@ export interface CreateDownloadRequestPayload {
   description: string | null;
   featureTypes: string[];
   expression: ExpressionTree | null;
-  requestedBy: number;
+  requestedBy: number | null;
+}
+
+/**
+ * Result of creating a download request.
+ *
+ * `export_id` is non-null only for anonymous requests, where the default export is
+ * created up front so the single returned status URL is stable; it is null for
+ * authenticated requests, which create their export later through the UI.
+ */
+export interface CreateDownloadRequestResult {
+  download_id: string;
+  export_id: string | null;
 }
 
 /**
@@ -92,25 +105,33 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Create a download request end-to-end for an authenticated user.
+   * Create a download request end-to-end for an authenticated or anonymous user.
    *
    * Persists the optional expression tree, creates the owning download policy, creates the
-   * download record, links a fresh team to the download for the requesting user, and queues
-   * the worker job. The caller (route handler) wraps this in a single transaction so a
-   * mid-flow failure leaves no orphan rows.
+   * download record, wires up access for the requester, and queues the worker job. The caller
+   * (route handler) wraps this in a single transaction so a mid-flow failure leaves no orphan
+   * rows.
    *
-   * `requestedBy` is the security identity the export is built with: it is both persisted to
-   * `download.requested_by` (which drives the parquet security filter) and used to seed the
-   * single-member team. Seeding both from one identity means the person the content is
-   * filtered for is exactly the person granted access. Authorization is enforced at export
-   * time, not create time — the worker re-evaluates visibility against `requested_by`, so a
-   * user cannot export data they no longer have access to by queuing a download earlier.
+   * `requestedBy` is the security identity the export is built with: it is persisted to
+   * `download.requested_by` (which drives the parquet security filter) and, for authenticated
+   * requests, used to seed the single-member team. requested_by and the single-member team are
+   * seeded from the same identity at creation: the person the content is filtered for is exactly
+   * the person granted access. They diverge only later, via claim.
+   *
+   * Anonymous downloads (requestedBy NULL) get no team link — the UUID is the access credential
+   * — and a default export is created at request time so the single returned status URL is
+   * stable, since an anonymous user has no UI to request an export later.
+   *
+   * Authorization is enforced at export time, not create time — the worker re-evaluates
+   * visibility against `requested_by`, so a user cannot export data they no longer have access
+   * to by queuing a download earlier.
    *
    * @param {CreateDownloadRequestPayload} payload - Request payload.
-   * @return {Promise<DownloadId>} The created download identifier.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier and, for
+   * anonymous requests, the up-front export identifier.
    * @memberof DownloadService
    */
-  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<DownloadId> {
+  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<CreateDownloadRequestResult> {
     let expressionId: string | null = null;
     if (payload.expression !== null) {
       const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
@@ -130,16 +151,29 @@ export class DownloadService extends DBService {
       requestedBy: payload.requestedBy
     });
 
-    await this.linkDownloadToNewTeam(
-      download_id,
-      payload.requestedBy,
-      `Team for download ${download_id}`,
-      'Team automatically created for download'
-    );
+    let export_id: string | null = null;
+    if (payload.requestedBy === null) {
+      // Anonymous: no team (UUID is the credential); create the default export up front so the
+      // single returned status URL is stable — anon has no UI to request an export later.
+      const exportRecord = await this.downloadExportRepository.createDownloadExport({
+        download_id,
+        format: 'csv',
+        mode: 'per_feature_type',
+        max_part_size_bytes: DEFAULT_MAX_PART_SIZE_BYTES
+      });
+      export_id = exportRecord.download_export_id;
+    } else {
+      await this.linkDownloadToNewTeam(
+        download_id,
+        payload.requestedBy,
+        `Team for download ${download_id}`,
+        'Team automatically created for download'
+      );
+    }
 
     await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
 
-    return { download_id };
+    return { download_id, export_id };
   }
 
   /**

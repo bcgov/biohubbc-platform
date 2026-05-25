@@ -71,10 +71,15 @@ export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
  * row); for an authenticated download they coincide, but the security filter
  * must read `requested_by` so the identity stays decoupled from the inserting
  * connection's grants.
+ *
+ * `requested_by` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const DownloadSource = z.object({
   policy_id: z.string().uuid(),
-  requested_by: z.number()
+  requested_by: z.number().nullable()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
@@ -85,11 +90,16 @@ export type DownloadSource = z.infer<typeof DownloadSource>;
  * `requestedBy` is the security identity the resulting export is filtered for —
  * persisted to `download.requested_by` and used by the parquet pipeline, not the
  * audit `create_user`.
+ *
+ * `requestedBy` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const CreateDownload = z.object({
   policyId: z.string().uuid(),
   format: z.string(),
-  requestedBy: z.number()
+  requestedBy: z.number().nullable()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
