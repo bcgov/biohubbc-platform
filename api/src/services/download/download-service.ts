@@ -306,6 +306,17 @@ export class DownloadService extends DBService {
   }
 
   /**
+   * Whether the download has been claimed by a team (i.e. has download_team rows).
+   *
+   * A teamless download is anonymous/public-by-link: the UUID is the credential and its parquet
+   * was built with `requested_by IS NULL`. Callers use this to keep anonymous downloads to their
+   * single auto-chained export — additional exports require claiming the download first.
+   */
+  async isDownloadClaimedByTeam(downloadId: string): Promise<boolean> {
+    return this.downloadRepository.isDownloadClaimedByTeam(downloadId);
+  }
+
+  /**
    * Link a download to a new team containing the given user.
    *
    * Creates a single-member team and inserts a download_team row so

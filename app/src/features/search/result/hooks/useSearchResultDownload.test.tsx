@@ -7,6 +7,7 @@ import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { Mock, vi } from 'vitest';
+import { DownloadUrlDisplay } from '../components/DownloadUrlDisplay';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 import { useSearchResultDownload } from './useSearchResultDownload';
 
@@ -127,8 +128,40 @@ describe('useSearchResultDownload', () => {
         dialogTitle: 'Download created'
       })
     );
+    // The returned export_url is the anon user's only credential — assert it is actually
+    // threaded into DownloadUrlDisplay, not just that some dialog opened.
+    const okDialogArg = mockSetOkDialog.mock.calls[0][0];
+    expect(okDialogArg.dialogContent.type).toBe(DownloadUrlDisplay);
+    expect(okDialogArg.dialogContent.props.url).toBe('http://localhost/api/download-export/export-uuid');
     expect(result.current.downloadView).not.toBe(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
     expect(mockSetSnackbar).not.toHaveBeenCalled();
+    expect(result.current.isCreateDownloadDialogOpen).toBe(false);
+  });
+
+  it('H5: anonymous success with a missing export_url surfaces an error snackbar, not an empty URL dialog', async () => {
+    setupAuth(false);
+    mockCreateDownload.mockResolvedValueOnce({
+      download_id: 'download-uuid',
+      download_url: 'http://localhost/api/download/download-uuid',
+      export_id: null,
+      export_url: null
+    });
+
+    const { result } = renderHook(() =>
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+    );
+
+    await act(async () => {
+      await result.current.handleCreateDownload(formValues);
+    });
+
+    expect(mockSetOkDialog).not.toHaveBeenCalled();
+    expect(mockSetSnackbar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        snackbarMessage: 'Download created, but no status URL was returned. Please try again.'
+      })
+    );
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
   });
 

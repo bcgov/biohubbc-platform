@@ -108,7 +108,7 @@ export const useSearchResultDownload = ({
               open: true,
               snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
             });
-          } else {
+          } else if (response.export_url) {
             // Anonymous users have no Downloads sidebar; the returned export status URL is their
             // only credential, so it is surfaced in a persistent dialog rather than a transient snackbar.
             dialogContext.setOkDialog({
@@ -116,8 +116,16 @@ export const useSearchResultDownload = ({
               dialogTitle: 'Download created',
               dialogText:
                 'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-              dialogContent: <DownloadUrlDisplay url={response.export_url ?? ''} />,
+              dialogContent: <DownloadUrlDisplay url={response.export_url} />,
               onClose: () => dialogContext.setOkDialog({ open: false })
+            });
+          } else {
+            // The anonymous create contract always returns an export status URL — the only
+            // credential an anon user gets. If it is missing, an empty URL box would strand them
+            // silently, so surface it as an error instead.
+            dialogContext.setSnackbar({
+              open: true,
+              snackbarMessage: 'Download created, but no status URL was returned. Please try again.'
             });
           }
         } catch (error) {

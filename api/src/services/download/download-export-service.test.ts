@@ -58,6 +58,7 @@ describe('DownloadExportService', () => {
         sinon
           .stub(DownloadService.prototype, 'getAuthorizedDownload')
           .resolves(createMockDownloadRecord({ download_status: status }));
+        sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
 
         const service = new DownloadExportService(getMockDBConnection());
 
@@ -70,10 +71,32 @@ describe('DownloadExportService', () => {
       });
     });
 
+    it('throws HTTP409 when the parent download is teamless (anonymous)', async () => {
+      // An authenticated holder of an anonymous download's UUID must claim it before requesting
+      // additional exports — anonymous downloads keep exactly one auto-chained default export.
+      sinon
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(false);
+      const repoStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+
+      const service = new DownloadExportService(getMockDBConnection());
+
+      try {
+        await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
+        expect.fail('Expected throw');
+      } catch (err) {
+        expect(err).to.be.instanceOf(HTTP409);
+      }
+
+      expect(repoStub).to.not.have.been.called;
+    });
+
     it('applies default max_part_size_bytes "524288000" when the request omits it', async () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -88,6 +111,7 @@ describe('DownloadExportService', () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -102,6 +126,7 @@ describe('DownloadExportService', () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -118,6 +143,7 @@ describe('DownloadExportService', () => {
       const authStub = sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport').resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
