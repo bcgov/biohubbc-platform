@@ -25,12 +25,15 @@ import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetim
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
+import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -115,6 +118,7 @@ describe('Download Parquet pipeline (integration)', function () {
   let pipelineService: DownloadPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
+  let scopeRepo: SecurityScopeRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -127,6 +131,7 @@ describe('Download Parquet pipeline (integration)', function () {
     pipelineService = new DownloadPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
+    scopeRepo = new SecurityScopeRepository(connection);
   });
 
   afterEach(async () => {
@@ -847,6 +852,84 @@ describe('Download Parquet pipeline (integration)', function () {
       }
       // The two artifact_ids are distinct
       expect(artifactRows.rows[0].artifact_id).to.not.equal(artifactRows.rows[1].artifact_id);
+    });
+  });
+
+  describe('export security filter — requested_by drives feature visibility', () => {
+    /**
+     * Run the feature-selection subquery the broad (no-expression) parquet path
+     * uses, and return the produced submission_feature_id set.
+     *
+     * `writeFeatureTypeParquet` builds `buildBroadFeatureTypeSubquery(featureTypeName,
+     * source.requested_by)` and streams its rows into the Parquet file. Driving the
+     * same builder with `source.requested_by` is the load-bearing assertion: whatever
+     * this set excludes never reaches the file. Asserting the id set directly avoids
+     * stubbing the Parquet writer + S3 just to peek at what was streamed.
+     */
+    async function selectedFeatureIds(featureTypeName: string, requestedBy: number | null): Promise<Set<number>> {
+      const subquery = buildBroadFeatureTypeSubquery(featureTypeName, requestedBy);
+      const { sql, bindings } = subquery.toSQL().toNative();
+      const result = await connection.query<{ submission_feature_id: number }>(sql, bindings as any[]);
+      return new Set(result.rows.map((r) => r.submission_feature_id));
+    }
+
+    it('anonymous export (requested_by NULL) excludes a secured feature, includes its unsecured sibling', async () => {
+      // AC #4 — an anonymous download must never package secured data. Two same-type
+      // features in one submission; one is secured. The anonymous identity used to
+      // build the export must strip the secured id while keeping the unsecured one.
+      const submissionId = await createTestSubmission(connection);
+      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public sibling' });
+      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured sibling' });
+      await secureFeature(connection, securedId);
+
+      const { policy_id } = await policyService.createDownloadPolicy({
+        name: `pq-sec-anon-${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: null,
+        featureTypes: ['dataset'],
+        expressionId: null
+      });
+      const { download_id } = await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: null
+      });
+      const source = await downloadRepo.getDownloadSource(download_id);
+      expect(source.requested_by).to.be.null;
+
+      const ids = await selectedFeatureIds('dataset', source.requested_by);
+      expect(ids.has(unsecuredId)).to.equal(true);
+      expect(ids.has(securedId)).to.equal(false);
+    });
+
+    it('authenticated export with grants includes the secured feature (authenticated path unchanged)', async () => {
+      // AC #5 — a user with a scope grant to the secured feature still gets it in
+      // their export. Same fixture as the anon case, but the export is built with the
+      // granted user's id as requested_by.
+      const submissionId = await createTestSubmission(connection);
+      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public sibling' });
+      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured sibling' });
+      await secureFeature(connection, securedId);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'pq-export-access-team');
+
+      const { policy_id } = await policyService.createDownloadPolicy({
+        name: `pq-sec-auth-${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: null,
+        featureTypes: ['dataset'],
+        expressionId: null
+      });
+      const { download_id } = await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: userId
+      });
+      const source = await downloadRepo.getDownloadSource(download_id);
+      expect(source.requested_by).to.equal(userId);
+
+      const ids = await selectedFeatureIds('dataset', source.requested_by);
+      expect(ids.has(unsecuredId)).to.equal(true);
+      expect(ids.has(securedId)).to.equal(true);
     });
   });
 });

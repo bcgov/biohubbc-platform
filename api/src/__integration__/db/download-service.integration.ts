@@ -15,7 +15,9 @@
 
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
+import { DEFAULT_MAX_PART_SIZE_BYTES } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
@@ -48,6 +50,7 @@ describe('Download services (integration)', function () {
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -108,6 +111,91 @@ describe('Download services (integration)', function () {
       expect(row.rows[0].format).to.equal('parquet');
       expect(row.rows[0].policy_id).to.equal(policy_id);
       expect(row.rows[0].create_user).to.equal(connection.systemUserId());
+    });
+  });
+
+  describe('createDownloadRequest', () => {
+    /**
+     * Stub the pg-boss publish so the request never reaches the real queue from
+     * inside the rolled-back test transaction. The DB-side wiring (policy,
+     * download, team/export rows) is exactly what these tests verify.
+     */
+    function stubPublish(): void {
+      sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+    }
+
+    it('anonymous request: writes requested_by NULL, no team, and one default csv export', async () => {
+      stubPublish();
+
+      const { download_id, export_id } = await downloadService.createDownloadRequest({
+        name: `Anon request ${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: 'Anonymous download request',
+        featureTypes: ['dataset'],
+        expression: null,
+        requestedBy: null
+      });
+
+      // requested_by IS NULL — asserted at the DB level to catch a silent NULL→number leak.
+      const downloadRow = await connection.sql(SQL`
+        SELECT requested_by FROM download WHERE download_id = ${download_id};
+      `);
+      expect(downloadRow.rowCount).to.equal(1);
+      expect(downloadRow.rows[0].requested_by).to.be.null;
+
+      // Anonymous downloads get no team link — the UUID is the access credential.
+      const teamRows = await connection.sql(SQL`
+        SELECT download_team_id FROM download_team WHERE download_id = ${download_id};
+      `);
+      expect(teamRows.rowCount).to.equal(0);
+
+      // Exactly one default export is created up front so the returned status URL is stable.
+      const exportRows = await connection.sql(SQL`
+        SELECT download_export_id, mode, format, max_part_size_bytes, status
+        FROM download_export WHERE download_id = ${download_id};
+      `);
+      expect(exportRows.rowCount).to.equal(1);
+      expect(exportRows.rows[0].download_export_id).to.equal(export_id);
+      expect(exportRows.rows[0].mode).to.equal('per_feature_type');
+      expect(exportRows.rows[0].format).to.equal('csv');
+      expect(String(exportRows.rows[0].max_part_size_bytes)).to.equal(DEFAULT_MAX_PART_SIZE_BYTES);
+      expect(exportRows.rows[0].status).to.equal(DownloadStatusEnum.PENDING);
+    });
+
+    it('authenticated request: writes requested_by, a single-member team, and no up-front export', async () => {
+      stubPublish();
+
+      const systemUserId = connection.systemUserId();
+
+      const { download_id, export_id } = await downloadService.createDownloadRequest({
+        name: `Auth request ${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: 'Authenticated download request',
+        featureTypes: ['dataset'],
+        expression: null,
+        requestedBy: systemUserId
+      });
+
+      // requested_by carries the security identity the export is later filtered for.
+      const downloadRow = await connection.sql(SQL`
+        SELECT requested_by FROM download WHERE download_id = ${download_id};
+      `);
+      expect(downloadRow.rowCount).to.equal(1);
+      expect(downloadRow.rows[0].requested_by).to.equal(systemUserId);
+
+      // Authenticated requests seed a single-member team from the same identity.
+      const teamRows = await connection.sql(SQL`
+        SELECT download_team_id FROM download_team WHERE download_id = ${download_id};
+      `);
+      expect(teamRows.rowCount).to.equal(1);
+
+      // No up-front export — authenticated users create exports later through the UI.
+      expect(export_id).to.be.null;
+      const exportRows = await connection.sql(SQL`
+        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
+      `);
+      expect(exportRows.rowCount).to.equal(0);
     });
   });
 
