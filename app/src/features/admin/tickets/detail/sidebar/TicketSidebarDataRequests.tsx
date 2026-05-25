@@ -10,24 +10,22 @@ import { useMemo, useState } from 'react';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
-interface ITicketSidebarDataRequestsProps {
-  dataRequests: DataRequestResponse[];
-}
+const EMPTY_DATA_REQUESTS: DataRequestResponse[] = [];
 
 /**
  * Data request sidebar section and create dialog.
  *
- * @param {ITicketSidebarDataRequestsProps} props
  * @return {*}
  */
-export const TicketSidebarDataRequests = (props: ITicketSidebarDataRequestsProps) => {
-  const { dataRequests } = props;
+export const TicketSidebarDataRequests = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId, ticketDataLoader } = useTicketContext();
+  const ticket = ticketDataLoader.data;
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dataRequests = ticket?.data_requests ?? EMPTY_DATA_REQUESTS;
 
   const orderedDataRequests = useMemo(
     () => [...dataRequests].sort((a, b) => (a.create_date ?? '').localeCompare(b.create_date ?? '')),

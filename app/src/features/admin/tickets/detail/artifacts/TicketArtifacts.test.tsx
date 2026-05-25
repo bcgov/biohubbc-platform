@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
-import { useConfigContext, useDialogContext } from 'hooks/useContext';
+import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { ReactNode } from 'react';
 import { render } from 'test-helpers/test-utils';
@@ -14,7 +14,8 @@ vi.mock('hooks/useApi', () => ({
 
 vi.mock('hooks/useContext', () => ({
   useConfigContext: vi.fn(),
-  useDialogContext: vi.fn()
+  useDialogContext: vi.fn(),
+  useTicketContext: vi.fn()
 }));
 
 vi.mock('components/data-grid/CustomDataGrid', () => ({
@@ -101,6 +102,9 @@ describe('TicketArtifacts', () => {
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar
     });
+    (useTicketContext as Mock).mockReturnValue({
+      ticketId
+    });
     getTicketArtifacts.mockResolvedValue({
       artifacts: [ticketArtifact],
       pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10, sort: 'create_date', order: 'desc' }
@@ -108,7 +112,7 @@ describe('TicketArtifacts', () => {
   });
 
   it('renders paginated ticket artifact rows in the artifacts section grid', async () => {
-    render(<TicketArtifacts ticketId={ticketId} />);
+    render(<TicketArtifacts />);
 
     expect(screen.getByRole('heading', { name: 'Files' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeVisible();
@@ -136,7 +140,7 @@ describe('TicketArtifacts', () => {
   it('searches ticket artifacts by text input', async () => {
     const user = userEvent.setup();
 
-    render(<TicketArtifacts ticketId={ticketId} />);
+    render(<TicketArtifacts />);
 
     await user.type(screen.getByPlaceholderText('Search files'), 'field note');
 
@@ -166,7 +170,7 @@ describe('TicketArtifacts', () => {
     });
     completeTicketUpload.mockResolvedValue(uploadedTicketArtifact);
 
-    render(<TicketArtifacts ticketId={ticketId} />);
+    render(<TicketArtifacts />);
 
     await user.click(screen.getByRole('button', { name: 'Upload' }));
     await user.upload(
@@ -207,7 +211,7 @@ describe('TicketArtifacts', () => {
       signed_url: 'https://object-store.example/download'
     });
 
-    render(<TicketArtifacts ticketId={ticketId} />);
+    render(<TicketArtifacts />);
 
     await user.click(await screen.findByRole('link', { name: 'file.txt' }));
 
@@ -228,7 +232,7 @@ describe('TicketArtifacts', () => {
       }
     });
 
-    render(<TicketArtifacts ticketId={ticketId} />);
+    render(<TicketArtifacts />);
 
     await user.click(await screen.findByRole('button', { name: 'Copy markdown for file.txt' }));
 

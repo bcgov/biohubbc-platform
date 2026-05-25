@@ -1,25 +1,20 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useConfigContext, useDialogContext } from 'hooks/useContext';
+import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 
-interface IUseTicketAttachmentUploadProps {
-  ticketId: string;
-}
-
 /**
  * Ticket attachment upload behavior shared by new and edited comments.
  *
- * @param {IUseTicketAttachmentUploadProps} props Hook props.
  * @returns Ticket attachment upload state and helper.
  */
-export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps) => {
-  const { ticketId } = props;
+export const useTicketAttachmentUpload = () => {
   const api = useApi();
   const config = useConfigContext();
   const dialogContext = useDialogContext();
+  const { ticketId } = useTicketContext();
   const { runSerialized } = useSerializedAsync();
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 

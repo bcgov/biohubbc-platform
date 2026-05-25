@@ -29,7 +29,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleCloseEditCommentDialog,
     handleSaveEditedComment,
     handleConfirmDeleteComment
-  } = useTicketTimelineCommentActions({ ticket });
+  } = useTicketTimelineCommentActions();
   const {
     updatingDataRequestId,
     isEditPolicyDialogOpen,

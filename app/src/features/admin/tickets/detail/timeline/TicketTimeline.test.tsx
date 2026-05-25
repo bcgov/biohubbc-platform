@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
@@ -6,6 +6,7 @@ import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.inter
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketTimeline } from './TicketTimeline';
+import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 
 vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
@@ -105,6 +106,7 @@ describe('TicketTimeline', () => {
       setYesNoDialog
     });
     (useTicketContext as Mock).mockReturnValue({
+      ticketId,
       ticketDataLoader: {
         data: makeTicket(),
         setData
@@ -139,6 +141,26 @@ describe('TicketTimeline', () => {
       ...ticket,
       comments: [updatedComment]
     });
+  });
+
+  it('opens edit dialog for a comment that was just added to cached ticket data', () => {
+    const cachedTicket = makeTicket();
+    (useTicketContext as Mock).mockReturnValue({
+      ticketId,
+      ticketDataLoader: {
+        data: cachedTicket,
+        setData
+      }
+    });
+
+    const { result } = renderHook(() => useTicketTimelineCommentActions());
+
+    act(() => {
+      result.current.handleOpenEditCommentDialog(ticketCommentId);
+    });
+
+    expect(result.current.selectedComment).toEqual(cachedTicket.comments[0]);
+    expect(result.current.isEditCommentDialogOpen).toBe(true);
   });
 
   it('renders timeline comment markdown using artifacts attached to that comment', () => {

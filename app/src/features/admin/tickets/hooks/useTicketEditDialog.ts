@@ -1,26 +1,20 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketExtended, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
+import { IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
-import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
-
-interface IUseTicketEditDialogProps {
-  ticket: ITicketExtended;
-}
+import { TICKET_DATA_NOT_LOADED_MESSAGE, useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 /**
  * Edit ticket dialog state and save behavior.
  *
- * @param {IUseTicketEditDialogProps} props
  * @return {*}
  */
-export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
-  const { ticket } = props;
+export const useTicketEditDialog = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId } = useTicketContext();
-  const { handleCommitOptimisticUpdate, handleOptimisticTicketUpdate } = useOptimisticTicketHandlers({ ticket });
+  const { ticketId, ticketDataLoader } = useTicketContext();
+  const { handleOptimisticTicketUpdate } = useOptimisticTicketHandlers();
 
   const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -32,15 +26,25 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
   };
 
   const handleEditTicket = async (payload: IUpdateTicketRequest) => {
+    const currentTicket = ticketDataLoader.data;
+
+    if (!currentTicket) {
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
+      });
+      return;
+    }
+
     try {
       setIsSavingTicket(true);
 
-      const nextTicket: ITicketExtended = {
-        ...ticket,
-        subject: payload.subject ?? ticket.subject,
-        description: payload.description === undefined ? ticket.description : payload.description,
-        priority: payload.priority ?? ticket.priority,
-        status: payload.status ?? ticket.status
+      const nextTicket = {
+        ...currentTicket,
+        subject: payload.subject ?? currentTicket.subject,
+        description: payload.description === undefined ? currentTicket.description : payload.description,
+        priority: payload.priority ?? currentTicket.priority,
+        status: payload.status ?? currentTicket.status
       };
 
       const updatePayload: IUpdateTicketRequest = {
@@ -55,8 +59,7 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
 
       await handleOptimisticTicketUpdate({
         buildOptimisticTicket: () => nextTicket,
-        handleUpdate: () => api.tickets.updateTicket(ticketId, updatePayload),
-        onCommit: handleCommitOptimisticUpdate
+        handleUpdate: () => api.tickets.updateTicket(ticketId, updatePayload)
       });
 
       setIsEditDialogOpen(false);

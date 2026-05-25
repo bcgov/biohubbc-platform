@@ -36,9 +36,7 @@ vi.mock('./detail/header/TicketHeader', () => ({
 }));
 
 vi.mock('./detail/artifacts/TicketArtifacts', () => ({
-  TicketArtifacts: ({ ticketId }: { ticketId: string }) => (
-    <div data-testid="ticket-artifacts" data-ticket-id={ticketId} />
-  )
+  TicketArtifacts: () => <div data-testid="ticket-artifacts" />
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
@@ -79,25 +77,7 @@ vi.mock('./detail/comment/TicketComment', () => ({
 }));
 
 vi.mock('./detail/sidebar/TicketSidebar', () => ({
-  TicketSidebar: ({
-    teamId,
-    ticketSystemUsers,
-    references,
-    dataRequests
-  }: {
-    teamId?: string;
-    ticketSystemUsers?: unknown[];
-    references?: unknown[];
-    dataRequests?: unknown[];
-  }) => (
-    <div
-      data-testid="ticket-sidebar"
-      data-team-id={teamId ?? ''}
-      data-ticket-system-user-count={String(ticketSystemUsers?.length ?? 0)}
-      data-reference-count={String(references?.length ?? 0)}
-      data-data-request-count={String(dataRequests?.length ?? 0)}
-    />
-  )
+  TicketSidebar: () => <div data-testid="ticket-sidebar" />
 }));
 
 vi.mock('./detail/skeleton/TicketSkeleton', () => ({
@@ -223,9 +203,7 @@ describe('TicketDetailPage', () => {
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Draft comment');
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-team-id', baseTicket.team_id);
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-reference-count', '1');
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-data-request-count', '1');
+    expect(screen.getByTestId('ticket-sidebar')).toBeVisible();
   });
 
   it('passes ticket data to timeline', () => {
@@ -286,7 +264,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
 
     expect(screen.getByTestId('ticket-header')).toHaveAttribute('data-active-tab', 'artifacts');
-    expect(screen.getByTestId('ticket-artifacts')).toHaveAttribute('data-ticket-id', baseTicket.ticket_id);
+    expect(screen.getByTestId('ticket-artifacts')).toBeVisible();
     expect(screen.queryByTestId('ticket-timeline')).not.toBeInTheDocument();
   });
 });

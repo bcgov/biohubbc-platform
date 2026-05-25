@@ -2,12 +2,13 @@ import { act, renderHook } from '@testing-library/react';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
+import { TICKET_DATA_NOT_LOADED_MESSAGE, useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 const mockUpdateTicketStatus = vi.fn();
 const mockSetYesNoDialog = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetTicketData = vi.fn();
+let mockTicketData: ITicketExtended | undefined;
 
 const baseDataRequest: DataRequestResponse = {
   data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -52,7 +53,7 @@ vi.mock('hooks/useContext', () => ({
   useTicketContext: () => ({
     ticketId: baseTicket.ticket_id,
     ticketDataLoader: {
-      data: null,
+      data: mockTicketData,
       setData: mockSetTicketData
     }
   })
@@ -61,6 +62,7 @@ vi.mock('hooks/useContext', () => ({
 describe('useOptimisticTicketHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTicketData = baseTicket;
   });
 
   it('shows snackbar and blocks close confirmation when ticket has requested data requests', () => {
@@ -69,15 +71,12 @@ describe('useOptimisticTicketHandlers', () => {
       data_requests: [baseDataRequest]
     };
 
-    const { result } = renderHook(() =>
-      useOptimisticTicketHandlers({
-        ticket: ticketWithUnaddressedDataRequest,
-        userIdentifier: 'test-user'
-      })
-    );
+    mockTicketData = ticketWithUnaddressedDataRequest;
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers());
 
     act(() => {
-      result.current.requestStatusChange('closed');
+      result.current.requestStatusChange('closed', 'test-user');
     });
 
     expect(mockSetSnackbar).toHaveBeenCalledWith({
@@ -98,15 +97,12 @@ describe('useOptimisticTicketHandlers', () => {
       ]
     };
 
-    const { result } = renderHook(() =>
-      useOptimisticTicketHandlers({
-        ticket: ticketWithActionedDataRequest,
-        userIdentifier: 'test-user'
-      })
-    );
+    mockTicketData = ticketWithActionedDataRequest;
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers());
 
     act(() => {
-      result.current.requestStatusChange('closed');
+      result.current.requestStatusChange('closed', 'test-user');
     });
 
     expect(mockSetSnackbar).not.toHaveBeenCalled();
@@ -116,5 +112,45 @@ describe('useOptimisticTicketHandlers', () => {
         dialogTitle: 'Close Ticket'
       })
     );
+  });
+
+  it('shows snackbar and skips status confirmation when ticket data is not loaded', () => {
+    mockTicketData = undefined;
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers());
+
+    act(() => {
+      result.current.requestStatusChange('closed', 'test-user');
+    });
+
+    expect(mockSetSnackbar).toHaveBeenCalledWith({
+      open: true,
+      snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
+    });
+    expect(mockSetYesNoDialog).not.toHaveBeenCalled();
+  });
+
+  it('shows snackbar and skips optimistic mutation when ticket data is not loaded', async () => {
+    mockTicketData = undefined;
+    const handleUpdate = vi.fn().mockResolvedValue(baseTicket);
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers());
+
+    let response: unknown;
+
+    await act(async () => {
+      response = await result.current.handleOptimisticTicketUpdate({
+        buildOptimisticTicket: (ticket) => ({ ...ticket, subject: 'Updated subject' }),
+        handleUpdate
+      });
+    });
+
+    expect(response).toBeUndefined();
+    expect(handleUpdate).not.toHaveBeenCalled();
+    expect(mockSetTicketData).not.toHaveBeenCalled();
+    expect(mockSetSnackbar).toHaveBeenCalledWith({
+      open: true,
+      snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
+    });
   });
 });

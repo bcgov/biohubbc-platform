@@ -16,7 +16,7 @@ export const useTicketComment = () => {
   const api = useApi();
   const { ticketId, ticketDataLoader } = useTicketContext();
   const dialogContext = useDialogContext();
-  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({ ticketId });
+  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
   const { appendCachedComment } = useTicketCommentCache();
 
   const [comment, setComment] = useState('');

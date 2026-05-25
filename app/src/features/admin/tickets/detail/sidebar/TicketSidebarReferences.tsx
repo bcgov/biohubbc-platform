@@ -3,27 +3,21 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { APIError } from 'hooks/api/useAxios';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { CreateTicketReferenceDialog } from '../../components/dialog/reference/CreateTicketReferenceDialog';
 import { useTicketReference } from '../../hooks/useTicketReference';
 import { formatRelationship } from '../../utils/formatRelationship';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
-interface ITicketSidebarReferencesProps {
-  references: ITicketReference[];
-}
-
 /**
  * Ticket reference section and create dialog wiring.
  *
- * @param {ITicketSidebarReferencesProps} props
  * @return {*}
  */
-export const TicketSidebarReferences = (props: ITicketSidebarReferencesProps) => {
-  const { references } = props;
+export const TicketSidebarReferences = () => {
   const dialogContext = useDialogContext();
-  const { ticketId } = useTicketContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
+  const references = ticketDataLoader.data?.references ?? [];
   const {
     isSubmittingReference,
     isCreateReferenceDialogOpen,
