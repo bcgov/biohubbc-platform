@@ -5,17 +5,21 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
-import { CreateTicketDataRequestPayload } from 'interfaces/useDataRequestApi.interface';
 import { useEffect, useMemo } from 'react';
 import { CreateDataRequestDialogYup } from './CreateDataRequestDialogYup';
 import { CreateDataRequestForm, ICreateDataRequestFormValues } from './form/CreateDataRequestForm';
+
+export interface CreateDataRequestDialogValues {
+  reason: string;
+  system_user_ids: number[];
+}
 
 interface ICreateDataRequestDialogProps {
   open: boolean;
   isSubmitting: boolean;
   initialReason: string;
   onCancel: () => void;
-  onSave: (values: CreateTicketDataRequestPayload) => void;
+  onSave: (values: CreateDataRequestDialogValues) => void;
 }
 
 /**

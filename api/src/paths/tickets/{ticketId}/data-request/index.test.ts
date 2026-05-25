@@ -39,12 +39,16 @@ describe('paths/tickets/{ticketId}/data-request', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: createdDataRequest.ticket_id };
-    mockReq.body = { reason: createdDataRequest.reason, system_user_ids: [2, 3] };
+    mockReq.body = {
+      requested_by: createdDataRequest.requested_by,
+      reason: createdDataRequest.reason,
+      system_user_ids: [2, 3]
+    };
 
     await createTicketDataRequest()(mockReq, mockRes, mockNext);
 
     expect(createStub).to.have.been.calledOnceWith(createdDataRequest.ticket_id, {
-      requested_by: mockDBConnection.systemUserId(),
+      requested_by: createdDataRequest.requested_by,
       reason: createdDataRequest.reason,
       system_user_ids: [2, 3]
     });
