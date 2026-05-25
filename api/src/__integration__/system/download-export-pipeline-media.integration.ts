@@ -251,7 +251,8 @@ describe('Download Export pipeline — media (system)', function () {
     });
     const { download_id: downloadId } = await downloadService.createDownload({
       policyId: policy_id,
-      format: 'parquet'
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
     });
 
     await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
@@ -480,7 +481,8 @@ describe('Download Export pipeline — media (system)', function () {
     });
     const { download_id: downloadId } = await downloadService.createDownload({
       policyId: policy_id,
-      format: 'parquet'
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
     });
 
     await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {

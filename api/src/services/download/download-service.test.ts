@@ -195,7 +195,7 @@ describe('DownloadService', () => {
       description: 'A description',
       featureTypes: ['observation'],
       expression: validExpression,
-      systemUserId: 42,
+      requestedBy: 42,
       ...overrides
     });
 
@@ -229,7 +229,11 @@ describe('DownloadService', () => {
         featureTypes: ['observation'],
         expressionId: 'expr-uuid-1'
       });
-      expect(createDownloadStub).to.have.been.calledOnceWith({ policyId: 'policy-uuid-1', format: 'parquet' });
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        policyId: 'policy-uuid-1',
+        format: 'parquet',
+        requestedBy: 42
+      });
       expect(linkStub).to.have.been.calledOnce;
       expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
       expect(linkStub.firstCall.args[1]).to.equal(42);

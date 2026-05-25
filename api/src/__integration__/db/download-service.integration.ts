@@ -1,6 +1,6 @@
 // Integration test for the request-time download services — verifies that
 // `createDownload` writes a policy-driven download row, `getDownloadSource`
-// returns `{ policy_id, create_user }` for the pipeline, status transitions
+// returns `{ policy_id, requested_by }` for the pipeline, status transitions
 // behave, and the team-based access flows (`claimDownload`,
 // `getAuthorizedDownload`, `getDownloadsByTeamMembership`) still work after
 // the cart→policy refactor.
@@ -67,7 +67,11 @@ describe('Download services (integration)', function () {
       featureTypes: opts?.featureTypes ?? ['dataset'],
       expressionId: null
     });
-    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await downloadService.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
+    });
     return { download_id, policy_id };
   }
 
@@ -108,12 +112,12 @@ describe('Download services (integration)', function () {
   });
 
   describe('getDownloadSource', () => {
-    it('returns policy_id and create_user for an existing download', async () => {
+    it('returns policy_id and requested_by for an existing download', async () => {
       const { download_id, policy_id } = await createPolicyDownload();
 
       const source = await downloadRepo.getDownloadSource(download_id);
       expect(source.policy_id).to.equal(policy_id);
-      expect(source.create_user).to.equal(connection.systemUserId());
+      expect(source.requested_by).to.equal(connection.systemUserId());
     });
 
     it('throws ApiNotFoundError when the download does not exist', async () => {

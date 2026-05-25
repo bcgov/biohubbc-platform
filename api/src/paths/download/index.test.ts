@@ -143,7 +143,7 @@ describe('paths/download/index', () => {
         description: 'A description',
         featureTypes: ['observation'],
         expression: validExpression,
-        systemUserId: 42
+        requestedBy: 42
       });
       expect(commitStub).to.have.been.calledOnce;
 

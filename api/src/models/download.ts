@@ -64,23 +64,32 @@ export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
  * Minimal projection of a download record for export-time pipeline evaluation.
  *
  * `policy_id` resolves to the policy whose statements drive what to export.
- * `create_user` carries the policy creator's identity so the pipeline can
- * apply the security filter at export time using the user's authorization
- * scope at the moment of export — not at create time.
+ * `requested_by` is the security identity the export is built with: the
+ * requesting user for an authenticated download. It drives the parquet security
+ * filter — the pipeline judges feature visibility against this identity's
+ * authorization scope. Distinct from the audit `create_user` (who inserted the
+ * row); for an authenticated download they coincide, but the security filter
+ * must read `requested_by` so the identity stays decoupled from the inserting
+ * connection's grants.
  */
 export const DownloadSource = z.object({
   policy_id: z.string().uuid(),
-  create_user: z.number()
+  requested_by: z.number()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
 /**
  * Payload for creating a new download record. The download's feature set is
  * defined by the referenced policy; format is the export wire format.
+ *
+ * `requestedBy` is the security identity the resulting export is filtered for —
+ * persisted to `download.requested_by` and used by the parquet pipeline, not the
+ * audit `create_user`.
  */
 export const CreateDownload = z.object({
   policyId: z.string().uuid(),
-  format: z.string()
+  format: z.string(),
+  requestedBy: z.number()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 

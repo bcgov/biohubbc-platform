@@ -16,7 +16,7 @@ describe('DownloadRepository', () => {
   });
 
   describe('createDownload', () => {
-    it('binds policyId and format and returns the inserted row', async () => {
+    it('binds policyId, format, and requestedBy and returns the inserted row', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
@@ -25,7 +25,8 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.createDownload({
         policyId: 'pppp0000-0000-0000-0000-000000000001',
-        format: 'parquet'
+        format: 'parquet',
+        requestedBy: 42
       });
 
       expect(result).to.deep.equal({ download_id: 'aaaa0000-0000-0000-0000-000000000001' });
@@ -34,6 +35,7 @@ describe('DownloadRepository', () => {
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include('pppp0000-0000-0000-0000-000000000001');
       expect(sqlValues).to.include('parquet');
+      expect(sqlValues).to.include(42);
     });
 
     it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
@@ -43,7 +45,11 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       try {
-        await repo.createDownload({ policyId: 'pppp0000-0000-0000-0000-000000000001', format: 'parquet' });
+        await repo.createDownload({
+          policyId: 'pppp0000-0000-0000-0000-000000000001',
+          format: 'parquet',
+          requestedBy: 42
+        });
         expect.fail('Expected ApiExecuteSQLError');
       } catch (err: any) {
         expect(err).to.be.instanceOf(ApiExecuteSQLError);
@@ -265,8 +271,8 @@ describe('DownloadRepository', () => {
   });
 
   describe('getDownloadSource', () => {
-    it('returns policy_id and create_user for a download', async () => {
-      const row = { policy_id: 'pppp0000-0000-0000-0000-000000000001', create_user: 42 };
+    it('returns policy_id and requested_by for a download', async () => {
+      const row = { policy_id: 'pppp0000-0000-0000-0000-000000000001', requested_by: 42 };
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -277,7 +283,7 @@ describe('DownloadRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('policy_id');
-      expect(sqlText).to.include('create_user');
+      expect(sqlText).to.include('requested_by');
     });
 
     it('throws ApiNotFoundError when download not found', async () => {

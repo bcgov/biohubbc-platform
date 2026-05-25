@@ -62,11 +62,11 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { policyId, format } = payload;
+    const { policyId, format, requestedBy } = payload;
 
     const sql = SQL`
-      INSERT INTO download (download_status, policy_id, format)
-      VALUES ('pending', ${policyId}, ${format})
+      INSERT INTO download (download_status, policy_id, format, requested_by)
+      VALUES ('pending', ${policyId}, ${format}, ${requestedBy})
       RETURNING download_id;
     `;
 
@@ -335,8 +335,10 @@ export class DownloadRepository extends BaseRepository {
    * Get the feature resolution source for a download.
    *
    * Returns the policy_id (drives statement-by-statement evaluation in the
-   * pipeline) and create_user (the policy creator's identity used to apply
-   * the security filter at export time).
+   * pipeline) and requested_by (the security identity the export is built with).
+   * The pipeline applies the security filter against `requested_by`, not the
+   * audit `create_user`, so feature visibility is judged against the requesting
+   * user's authorization scope rather than the inserting connection's grants.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadSource>}
@@ -345,7 +347,7 @@ export class DownloadRepository extends BaseRepository {
    */
   async getDownloadSource(downloadId: string): Promise<DownloadSource> {
     const sql = SQL`
-      SELECT policy_id, create_user
+      SELECT policy_id, requested_by
       FROM download
       WHERE download_id = ${downloadId};
     `;

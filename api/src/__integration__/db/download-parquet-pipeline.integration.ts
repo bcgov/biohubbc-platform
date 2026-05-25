@@ -149,7 +149,11 @@ describe('Download Parquet pipeline (integration)', function () {
       featureTypes,
       expressionId: null
     });
-    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await downloadService.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
+    });
     return download_id;
   }
 

@@ -17,7 +17,7 @@ export interface CreateDownloadRequestPayload {
   description: string | null;
   featureTypes: string[];
   expression: ExpressionTree | null;
-  systemUserId: number;
+  requestedBy: number;
 }
 
 /**
@@ -99,10 +99,12 @@ export class DownloadService extends DBService {
    * the worker job. The caller (route handler) wraps this in a single transaction so a
    * mid-flow failure leaves no orphan rows.
    *
-   * Authorization is enforced at export time, not create time. The user's authorization is
-   * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
-   * create-time would let users export data they no longer have access to by simply queuing
-   * a download earlier.
+   * `requestedBy` is the security identity the export is built with: it is both persisted to
+   * `download.requested_by` (which drives the parquet security filter) and used to seed the
+   * single-member team. Seeding both from one identity means the person the content is
+   * filtered for is exactly the person granted access. Authorization is enforced at export
+   * time, not create time — the worker re-evaluates visibility against `requested_by`, so a
+   * user cannot export data they no longer have access to by queuing a download earlier.
    *
    * @param {CreateDownloadRequestPayload} payload - Request payload.
    * @return {Promise<DownloadId>} The created download identifier.
@@ -122,11 +124,15 @@ export class DownloadService extends DBService {
       expressionId
     });
 
-    const { download_id } = await this.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await this.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: payload.requestedBy
+    });
 
     await this.linkDownloadToNewTeam(
       download_id,
-      payload.systemUserId,
+      payload.requestedBy,
       `Team for download ${download_id}`,
       'Team automatically created for download'
     );

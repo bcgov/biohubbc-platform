@@ -212,10 +212,10 @@ POST.apiDoc = {
  * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing,
  * the transaction boundary, and response shaping.
  *
- * Authorization is enforced at export time, not create time. The user's authorization is
- * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
- * create-time would let users export data they no longer have access to by simply queuing
- * a download earlier.
+ * The requesting user's id is passed as `requestedBy` — the security identity the export is
+ * built with and persisted to `download.requested_by`. Authorization is enforced at export
+ * time, not create time: the worker re-evaluates visibility against `requested_by`, so a user
+ * cannot export data they no longer have access to by queuing a download earlier.
  *
  * @return {RequestHandler}
  */
@@ -243,7 +243,7 @@ export function createDownload(): RequestHandler {
         description: description ?? null,
         featureTypes,
         expression,
-        systemUserId: connection.systemUserId()
+        requestedBy: connection.systemUserId()
       });
 
       await connection.commit();
