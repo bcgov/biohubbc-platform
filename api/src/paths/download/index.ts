@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { CreateDownloadRequestBody } from '../../models/download';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -147,10 +147,7 @@ export function getDownloads(): RequestHandler {
   };
 }
 
-export const POST: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  createDownload()
-];
+export const POST: Operation = [createDownload()];
 
 POST.apiDoc = {
   description:
@@ -158,7 +155,7 @@ POST.apiDoc = {
   tags: ['download'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
@@ -195,6 +192,16 @@ POST.apiDoc = {
               download_url: {
                 type: 'string',
                 description: 'Fully-qualified API URL the caller can poll for status'
+              },
+              export_id: {
+                type: 'string',
+                format: 'uuid',
+                nullable: true
+              },
+              export_url: {
+                type: 'string',
+                nullable: true,
+                description: 'Anon export status URL; null for authenticated'
               }
             }
           }
@@ -206,16 +213,24 @@ POST.apiDoc = {
 };
 
 /**
- * Create a download request.
+ * Create a download request. Anonymous-capable: a missing bearer token is allowed.
+ *
+ * Without a bearer token the request runs on the shared API-user connection and `requestedBy`
+ * is null. A null `requested_by` is the security identity "anonymous" — the parquet packaging
+ * filters to only unsecured data, so an anonymous caller can never pull secured records. An
+ * authenticated request runs on that user's connection and scopes the package to data visible
+ * to them; authorization is re-evaluated at export time against `requested_by`, so queuing
+ * early grants no extra access later.
+ *
+ * The two callers also differ in how they retrieve their package. An anonymous caller has no
+ * Downloads UI and no user identity to look the download up by, so the response hands back an
+ * `export_url` for the auto-created default export — that URL is the caller's only credential.
+ * An authenticated caller gets `export_url: null` and drives the explicit two-call export flow
+ * (create export, then poll it) from the Downloads UI.
  *
  * Delegates the business orchestration (expression tree → policy → download → team link →
- * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing,
- * the transaction boundary, and response shaping.
- *
- * The requesting user's id is passed as `requestedBy` — the security identity the export is
- * built with and persisted to `download.requested_by`. Authorization is enforced at export
- * time, not create time: the worker re-evaluates visibility against `requested_by`, so a user
- * cannot export data they no longer have access to by queuing a download earlier.
+ * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing, the
+ * connection choice, the transaction boundary, and response shaping.
  *
  * @return {RequestHandler}
  */
@@ -231,26 +246,31 @@ export function createDownload(): RequestHandler {
     }
     const { name, description, featureTypes, expression } = parseResult.data;
 
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
 
+      const requestedBy = isAuthenticated ? connection.systemUserId() : null;
+
       const downloadService = new DownloadService(connection);
 
-      const { download_id } = await downloadService.createDownloadRequest({
+      const { download_id, export_id } = await downloadService.createDownloadRequest({
         name,
         description: description ?? null,
         featureTypes,
         expression,
-        requestedBy: connection.systemUserId()
+        requestedBy
       });
 
       await connection.commit();
 
       return res.status(201).json({
         download_id,
-        download_url: `${getApiBaseUrl()}/api/download/${download_id}`
+        download_url: `${getApiBaseUrl()}/api/download/${download_id}`,
+        export_id,
+        export_url: export_id ? `${getApiBaseUrl()}/api/download-export/${export_id}` : null
       });
     } catch (error) {
       defaultLog.error({ label: 'createDownload', message: 'error', error });

@@ -153,6 +153,62 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
     });
 
+    it('uses the authenticated user as requestedBy and returns a null export_url', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-auth', export_id: null });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody();
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      // Authenticated requests run on the user's connection, never the shared API-user one.
+      expect(apiUserStub).to.not.have.been.called;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ requestedBy: 42 });
+
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.have.property('export_id', null);
+      expect(mockRes.jsonValue).to.have.property('export_url', null);
+    });
+
+    it('runs anonymously with requestedBy null and returns a populated export_url', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-anon', export_id: 'export-uuid-anon' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      // No keycloak_token — unauthenticated request
+      mockReq.keycloak_token = undefined as any;
+      mockReq.body = validBody();
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      // Anonymous requests run on the shared API-user connection, never a user-scoped one.
+      expect(apiUserStub).to.have.been.calledOnce;
+      expect(dbConnStub).to.not.have.been.called;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ requestedBy: null });
+
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-anon');
+      expect(mockRes.jsonValue).to.have.property('export_id', 'export-uuid-anon');
+      expect(mockRes.jsonValue).to.have.property('export_url').that.is.a('string');
+      expect(mockRes.jsonValue.export_url).to.match(/\/api\/download-export\/export-uuid-anon$/);
+    });
+
     it('passes through a null expression to the service', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);

@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import {
   CreateDownloadExportRequestSchema,
   DownloadExportListResponseSchema,
@@ -20,10 +20,7 @@ export const POST: Operation = [
   createDownloadExport()
 ];
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  listDownloadExports()
-];
+export const GET: Operation = [listDownloadExports()];
 
 POST.apiDoc = {
   description: 'Create a CSV export for a ready download',
@@ -61,7 +58,7 @@ POST.apiDoc = {
 GET.apiDoc = {
   description: 'List all exports for a download, newest first',
   tags: ['download'],
-  security: [{ Bearer: [] }],
+  security: [{ OptionalBearer: [] }],
   parameters: [
     {
       in: 'path',
@@ -132,7 +129,12 @@ export function createDownloadExport(): RequestHandler {
 }
 
 /**
- * List all exports for a download.
+ * List all exports for a download. Anonymous-capable: a missing bearer token is allowed.
+ *
+ * An anonymous caller has no Downloads UI, so this lets a teamless (never-claimed) download be
+ * polled by UUID alone — passing a null `systemUserId` into `getAuthorizedDownload` returns for
+ * a teamless parent and throws HTTP403 for a team-scoped one, so claimed downloads still
+ * require team membership.
  *
  * Authorizes against the parent download (same team-membership rule as every
  * other download-scoped endpoint) and returns the full list sorted newest
@@ -141,12 +143,13 @@ export function createDownloadExport(): RequestHandler {
  */
 export function listDownloadExports(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
       const downloadId = req.params.downloadId;
 
       // Authorize the parent download before returning any export rows.

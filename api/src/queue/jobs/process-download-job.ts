@@ -3,8 +3,10 @@ import { PROCESS_START_STATUSES, TERMINAL_DOWNLOAD_STATUSES } from '../../consta
 import { getAPIUserDBConnection } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { getLogger } from '../../utils/logger';
+import { publishProcessDownloadExportJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/process-download-job');
@@ -126,6 +128,16 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         await new DownloadPipelineService(connection).transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
           DownloadStatusEnum.PROCESSING
         ]);
+
+        // Anonymous downloads have no UI to request an export, so the default export created at
+        // request time is enqueued automatically once the parquet lands. Authenticated downloads
+        // keep the explicit two-call export flow.
+        if (source.requested_by === null) {
+          const [defaultExport] = await new DownloadExportService(connection).listExportsByDownloadId(downloadId);
+          if (defaultExport) {
+            await publishProcessDownloadExportJob(connection, { downloadExportId: defaultExport.download_export_id });
+          }
+        }
       });
 
       defaultLog.info({
