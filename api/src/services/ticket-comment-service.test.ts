@@ -5,8 +5,8 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { Comment } from '../models/comment';
 import { TicketComment } from '../models/ticket-comment';
 import { CommentRepository } from '../repositories/comment-repository';
+import { TicketCommentArtifactRepository } from '../repositories/ticket-comment-artifact-repository';
 import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
-import { TicketCommentArtifactService } from './ticket-comment-artifact-service';
 import { TicketCommentService } from './ticket-comment-service';
 
 chai.use(sinonChai);
@@ -45,8 +45,8 @@ describe('TicketCommentService', () => {
       const getTicketCommentByIdStub = sinon
         .stub(TicketCommentRepository.prototype, 'getTicketCommentById')
         .resolves(mockTicketComment);
-      const replaceTicketCommentArtifactsStub = sinon
-        .stub(TicketCommentArtifactService.prototype, 'replaceTicketCommentArtifacts')
+      const updateTicketCommentArtifactsStub = sinon
+        .stub(TicketCommentArtifactRepository.prototype, 'updateTicketCommentArtifacts')
         .resolves();
 
       const comment = 'New comment [file](/artifact/55555555-5555-4555-8555-555555555555)';
@@ -54,7 +54,7 @@ describe('TicketCommentService', () => {
 
       expect(createCommentStub).to.have.been.calledOnceWith(comment);
       expect(insertTicketCommentStub).to.have.been.calledOnceWith(mockTicketId, mockComment.comment_id);
-      expect(replaceTicketCommentArtifactsStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId, [
+      expect(updateTicketCommentArtifactsStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId, [
         '55555555-5555-4555-8555-555555555555'
       ]);
       expect(getTicketCommentByIdStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
@@ -77,19 +77,23 @@ describe('TicketCommentService', () => {
   });
 
   describe('deleteTicketComment', () => {
-    it('delegates delete to repository', async () => {
+    it('verifies ticket linkage before deleting comment link', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new TicketCommentService(mockDBConnection);
 
+      const getByIdStub = sinon
+        .stub(TicketCommentRepository.prototype, 'getTicketCommentById')
+        .resolves(mockTicketComment);
       const deleteStub = sinon
         .stub(TicketCommentRepository.prototype, 'deleteTicketComment')
         .resolves({ ticket_comment_id: mockTicketCommentId });
       const deleteArtifactsStub = sinon
-        .stub(TicketCommentArtifactService.prototype, 'deleteTicketCommentArtifacts')
+        .stub(TicketCommentArtifactRepository.prototype, 'deleteTicketCommentArtifacts')
         .resolves();
 
       await service.deleteTicketComment(mockTicketId, mockTicketCommentId);
 
+      expect(getByIdStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
       expect(deleteStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
       expect(deleteArtifactsStub).to.have.been.calledOnceWith(mockTicketCommentId);
     });
@@ -102,8 +106,8 @@ describe('TicketCommentService', () => {
       const updateTicketCommentStub = sinon
         .stub(TicketCommentRepository.prototype, 'updateTicketComment')
         .resolves({ comment_id: '44444444-4444-4444-4444-444444444444' });
-      const replaceTicketCommentArtifactsStub = sinon
-        .stub(TicketCommentArtifactService.prototype, 'replaceTicketCommentArtifacts')
+      const updateTicketCommentArtifactsStub = sinon
+        .stub(TicketCommentArtifactRepository.prototype, 'updateTicketCommentArtifacts')
         .resolves();
       const getTicketCommentByIdStub = sinon.stub(TicketCommentRepository.prototype, 'getTicketCommentById').resolves({
         ...mockTicketComment,
@@ -118,34 +122,11 @@ describe('TicketCommentService', () => {
       });
 
       expect(updateTicketCommentStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId, comment);
-      expect(replaceTicketCommentArtifactsStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId, [
+      expect(updateTicketCommentArtifactsStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId, [
         '55555555-5555-4555-8555-555555555555'
       ]);
       expect(getTicketCommentByIdStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
       expect(result.comment).to.equal('Updated comment');
-    });
-  });
-
-  describe('deleteTicketCommentByTicketId', () => {
-    it('verifies ticket linkage before deleting comment link', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new TicketCommentService(mockDBConnection);
-
-      const getByIdStub = sinon
-        .stub(TicketCommentRepository.prototype, 'getTicketCommentById')
-        .resolves(mockTicketComment);
-      const deleteStub = sinon
-        .stub(TicketCommentRepository.prototype, 'deleteTicketComment')
-        .resolves({ ticket_comment_id: mockTicketCommentId });
-      const deleteArtifactsStub = sinon
-        .stub(TicketCommentArtifactService.prototype, 'deleteTicketCommentArtifacts')
-        .resolves();
-
-      await service.deleteTicketCommentByTicketId(mockTicketId, mockTicketCommentId);
-
-      expect(getByIdStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
-      expect(deleteStub).to.have.been.calledOnceWith(mockTicketId, mockTicketCommentId);
-      expect(deleteArtifactsStub).to.have.been.calledOnceWith(mockTicketCommentId);
     });
   });
 

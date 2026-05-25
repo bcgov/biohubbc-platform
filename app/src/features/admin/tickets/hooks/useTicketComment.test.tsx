@@ -122,7 +122,6 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`![diagram.png](/artifact/${ticketArtifactId})`);
-    expect(result.current.commentArtifacts).to.eql([makeTicketArtifact('diagram.png')]);
     expect(uploadFileToUrl).toHaveBeenCalledWith({
       url: 'https://object-store.example/upload',
       file,
@@ -162,7 +161,6 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
-    expect(result.current.commentArtifacts).to.eql([makeTicketArtifact('notes.pdf')]);
   });
 
   it('adds a space before attachment markdown when appending to existing comment text', async () => {
@@ -181,7 +179,7 @@ describe('useTicketComment', () => {
     expect(result.current.comment).toBe(`See attached [notes.pdf](/artifact/${ticketArtifactId})`);
   });
 
-  it('does not optimistically insert a comment before the create request resolves', async () => {
+  it('appends a comment only after the create request resolves', async () => {
     let resolveCreateComment: (comment: ITicketCommentLog) => void = () => undefined;
     const createdComment = makeTicketComment('Review the attachment', [makeTicketArtifact('notes.pdf')]);
     const createTicketComment = vi.fn().mockReturnValue(
@@ -219,7 +217,26 @@ describe('useTicketComment', () => {
     });
   });
 
-  it('clears the draft and staged artifact metadata after a comment is created', async () => {
+  it('preserves authored line breaks when creating a comment', async () => {
+    const authoredComment = 'First line\nSecond line\n';
+    const createTicketComment = vi.fn().mockResolvedValue(makeTicketComment(authoredComment));
+    setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
+    const { result } = renderHook(() => useTicketComment());
+
+    act(() => {
+      result.current.setComment(authoredComment);
+    });
+
+    await act(async () => {
+      await result.current.handleAddComment();
+    });
+
+    expect(createTicketComment).toHaveBeenCalledWith(ticketId, {
+      comment: authoredComment
+    });
+  });
+
+  it('clears the draft after a comment is created', async () => {
     const createdComment = makeTicketComment(`See attached [notes.pdf](/artifact/${ticketArtifactId})`, [
       makeTicketArtifact('notes.pdf')
     ]);
@@ -243,10 +260,9 @@ describe('useTicketComment', () => {
       comments: [createdComment]
     });
     expect(result.current.comment).toBe('');
-    expect(result.current.commentArtifacts).to.eql([]);
   });
 
-  it('keeps the draft and staged artifact metadata when comment creation fails', async () => {
+  it('keeps the draft when comment creation fails', async () => {
     const createError = new Error('Failed to add comment.');
     const { setSnackbar, setTicketData } = setupUploadHook(
       makeTicketArtifact('notes.pdf'),
@@ -269,7 +285,6 @@ describe('useTicketComment', () => {
       snackbarMessage: 'Failed to add comment.'
     });
     expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
-    expect(result.current.commentArtifacts).to.eql([makeTicketArtifact('notes.pdf')]);
   });
 
   it('rejects attachments larger than the API limit before starting upload', async () => {

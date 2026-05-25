@@ -61,7 +61,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
-    const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketCommentByTicketId').resolves();
+    const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketComment').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId, ticketCommentId };

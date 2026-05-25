@@ -58,18 +58,15 @@ vi.mock('./detail/comment/TicketComment', () => ({
   TicketComment: ({
     comment,
     isSaving,
-    isUploadingAttachment,
-    artifacts
+    isUploadingAttachment
   }: {
     comment: string;
-    artifacts: unknown[];
     isSaving: boolean;
     isUploadingAttachment: boolean;
   }) => (
     <div
       data-testid="ticket-comment"
       data-comment={comment}
-      data-artifact-count={String(artifacts.length)}
       data-saving={String(isSaving)}
       data-uploading={String(isUploadingAttachment)}
     />
@@ -188,7 +185,6 @@ describe('TicketDetailPage', () => {
     vi.clearAllMocks();
     mockUseTicketComment.mockReturnValue({
       comment: 'Draft comment',
-      commentArtifacts: [],
       setComment,
       isSavingComment: false,
       isUploadingAttachment: false,
@@ -238,7 +234,6 @@ describe('TicketDetailPage', () => {
     mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
     mockUseTicketComment.mockReturnValue({
       comment: 'Hook comment',
-      commentArtifacts: [{ ticket_artifact_id: 'artifact-1' }],
       setComment,
       isSavingComment: true,
       isUploadingAttachment: false,
@@ -249,7 +244,6 @@ describe('TicketDetailPage', () => {
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Hook comment');
-    expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-artifact-count', '1');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-saving', 'true');
     expect(screen.getByTestId('ticket-timeline')).toHaveAttribute('data-loading', 'false');
   });

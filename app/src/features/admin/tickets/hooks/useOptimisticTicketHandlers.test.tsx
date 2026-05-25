@@ -2,13 +2,13 @@ import { act, renderHook } from '@testing-library/react';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import { TICKET_DATA_NOT_LOADED_MESSAGE, useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
+import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 const mockUpdateTicketStatus = vi.fn();
 const mockSetYesNoDialog = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetTicketData = vi.fn();
-let mockTicketData: ITicketExtended | undefined;
+let mockTicketData: ITicketExtended;
 
 const baseDataRequest: DataRequestResponse = {
   data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -73,7 +73,7 @@ describe('useOptimisticTicketHandlers', () => {
 
     mockTicketData = ticketWithUnaddressedDataRequest;
 
-    const { result } = renderHook(() => useOptimisticTicketHandlers());
+    const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithUnaddressedDataRequest }));
 
     act(() => {
       result.current.requestStatusChange('closed', 'test-user');
@@ -99,7 +99,7 @@ describe('useOptimisticTicketHandlers', () => {
 
     mockTicketData = ticketWithActionedDataRequest;
 
-    const { result } = renderHook(() => useOptimisticTicketHandlers());
+    const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithActionedDataRequest }));
 
     act(() => {
       result.current.requestStatusChange('closed', 'test-user');
@@ -112,45 +112,5 @@ describe('useOptimisticTicketHandlers', () => {
         dialogTitle: 'Close Ticket'
       })
     );
-  });
-
-  it('shows snackbar and skips status confirmation when ticket data is not loaded', () => {
-    mockTicketData = undefined;
-
-    const { result } = renderHook(() => useOptimisticTicketHandlers());
-
-    act(() => {
-      result.current.requestStatusChange('closed', 'test-user');
-    });
-
-    expect(mockSetSnackbar).toHaveBeenCalledWith({
-      open: true,
-      snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
-    });
-    expect(mockSetYesNoDialog).not.toHaveBeenCalled();
-  });
-
-  it('shows snackbar and skips optimistic mutation when ticket data is not loaded', async () => {
-    mockTicketData = undefined;
-    const handleUpdate = vi.fn().mockResolvedValue(baseTicket);
-
-    const { result } = renderHook(() => useOptimisticTicketHandlers());
-
-    let response: unknown;
-
-    await act(async () => {
-      response = await result.current.handleOptimisticTicketUpdate({
-        buildOptimisticTicket: (ticket) => ({ ...ticket, subject: 'Updated subject' }),
-        handleUpdate
-      });
-    });
-
-    expect(response).toBeUndefined();
-    expect(handleUpdate).not.toHaveBeenCalled();
-    expect(mockSetTicketData).not.toHaveBeenCalled();
-    expect(mockSetSnackbar).toHaveBeenCalledWith({
-      open: true,
-      snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
-    });
   });
 });

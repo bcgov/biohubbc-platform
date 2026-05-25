@@ -4,48 +4,39 @@ import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicket, ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 
-export const TICKET_DATA_NOT_LOADED_MESSAGE = 'Ticket data is not loaded.';
-
 interface IHandleOptimisticTicketUpdateOptions {
   buildOptimisticTicket: (currentTicket: ITicketExtended) => ITicketExtended;
   handleUpdate: () => Promise<ITicket>;
 }
 
+interface IUseOptimisticTicketHandlersProps {
+  ticket: ITicketExtended;
+}
+
 /**
  * Optimistic mutation handlers for ticket detail updates (status + generic ticket update mutations).
  *
+ * @param {IUseOptimisticTicketHandlersProps} props Hook props.
  * @return {*}
  */
-export const useOptimisticTicketHandlers = () => {
+export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersProps) => {
+  const { ticket } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId, ticketDataLoader } = useTicketContext();
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
-  const getCurrentTicket = useCallback(() => ticketDataLoader.data, [ticketDataLoader.data]);
-
-  const showTicketDataNotLoadedSnackbar = useCallback(() => {
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
-    });
-  }, [dialogContext]);
+  const getCurrentTicket = useCallback(() => ticketDataLoader.data ?? ticket, [ticket, ticketDataLoader.data]);
 
   const applyOptimisticUpdate = useCallback(
     (buildNextTicket: (current: ITicketExtended) => ITicketExtended) => {
       const previousTicket = getCurrentTicket();
-
-      if (!previousTicket) {
-        showTicketDataNotLoadedSnackbar();
-        return null;
-      }
-
       const optimisticTicket = buildNextTicket(previousTicket);
       ticketDataLoader.setData(optimisticTicket);
 
       return { previousTicket, optimisticTicket };
     },
-    [getCurrentTicket, showTicketDataNotLoadedSnackbar, ticketDataLoader]
+    [getCurrentTicket, ticketDataLoader]
   );
 
   const commitOptimisticUpdate = useCallback(
@@ -87,11 +78,6 @@ export const useOptimisticTicketHandlers = () => {
     async (options: IHandleOptimisticTicketUpdateOptions) => {
       const { buildOptimisticTicket, handleUpdate } = options;
       const optimisticUpdate = applyOptimisticUpdate(buildOptimisticTicket);
-
-      if (!optimisticUpdate) {
-        return undefined;
-      }
-
       const { previousTicket, optimisticTicket } = optimisticUpdate;
 
       try {
@@ -122,11 +108,6 @@ export const useOptimisticTicketHandlers = () => {
         status: nextStatus,
         statuses: buildOptimisticStatuses(currentTicket, nextStatus, userIdentifier)
       }));
-
-      if (!optimisticUpdate) {
-        return;
-      }
-
       const { previousTicket, optimisticTicket } = optimisticUpdate;
 
       try {
@@ -163,12 +144,6 @@ export const useOptimisticTicketHandlers = () => {
   const requestStatusChange = useCallback(
     (nextStatus: TicketStatus, userIdentifier: string | undefined) => {
       const currentTicket = getCurrentTicket();
-
-      if (!currentTicket) {
-        showTicketDataNotLoadedSnackbar();
-        return;
-      }
-
       const hasUnaddressedDataRequests = currentTicket.data_requests.some(
         (dataRequest) => dataRequest.status === PolicyStatus.REQUESTED || dataRequest.status === PolicyStatus.REVIEWED
       );
@@ -185,7 +160,7 @@ export const useOptimisticTicketHandlers = () => {
         buildStatusChangeDialogConfig(nextStatus, userIdentifier, closeConfirmationDialog, updateStatus)
       );
     },
-    [closeConfirmationDialog, dialogContext, getCurrentTicket, showTicketDataNotLoadedSnackbar, updateStatus]
+    [closeConfirmationDialog, dialogContext, getCurrentTicket, updateStatus]
   );
 
   return {

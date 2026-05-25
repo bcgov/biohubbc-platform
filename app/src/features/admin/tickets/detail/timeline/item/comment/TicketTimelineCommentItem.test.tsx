@@ -35,7 +35,6 @@ describe('TicketTimelineCommentItem', () => {
     expect(screen.getByText('Done', { selector: 'strong' })).toBeVisible();
     expect(screen.getByText('step-1', { selector: 'code' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'the script' })).not.toHaveAttribute('href');
-    expect(screen.queryByLabelText('Remove staged artifact generate.py')).not.toBeInTheDocument();
     expect(screen.queryByText('# Update')).not.toBeInTheDocument();
   });
 

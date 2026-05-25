@@ -2,10 +2,11 @@ import { mdiFileOutline, mdiFileQuestionOutline, mdiLinkBoxOutline } from '@mdi/
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { TICKET_MARKDOWN_HTTP_HREF_PATTERN } from 'constants/ticket';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
-import { MouseEvent } from 'react';
+import { MouseEvent, ReactNode } from 'react';
 import { Components } from 'react-markdown';
 import {
   getArtifactHref,
@@ -32,6 +33,11 @@ interface ITicketMarkdownComponentsProps {
    * download URL, open the file, or surface any API error state.
    */
   onArtifactLinkClick?: (artifact: ITicketArtifact) => Promise<void> | void;
+
+  /**
+   * Whether to render draft preview behavior for unresolved artifact references.
+   */
+  preview?: boolean;
 }
 
 /**
@@ -97,7 +103,7 @@ const MarkdownH3: NonNullable<Components['h3']> = ({ children }) => (
  * @returns JSX for the rendered paragraph.
  */
 const MarkdownParagraph: NonNullable<Components['p']> = ({ children }) => (
-  <Typography variant="body2" component="p" sx={{ mb: 1.5, '&:last-child': { mb: 0 } }}>
+  <Typography variant="body2" component="p" sx={{ mb: 1.5, whiteSpace: 'pre-wrap', '&:last-child': { mb: 0 } }}>
     {children}
   </Typography>
 );
@@ -213,29 +219,62 @@ const MarkdownCode: NonNullable<Components['code']> = ({ children }) => (
 );
 
 /**
- * Render the placeholder shown when markdown references an unavailable artifact.
+ * Render an unresolved artifact reference using the markdown-authored label.
  *
  * Link and image renderers use this component when a URL has ticket-artifact
- * syntax but no matching artifact exists in `artifactsById`. This keeps broken
- * artifact references visible without offering a non-functional download link.
+ * syntax but no matching artifact exists in `artifactsById`.
  *
- * @returns JSX for the missing-artifact inline placeholder.
+ * @param props - Component props.
+ * @param props.children - Markdown-authored label text.
+ * @param props.path - Referenced artifact path.
+ * @returns JSX for the unresolved artifact link presentation.
  */
-const MissingArtifactText = () => (
-  <Typography
+const MissingArtifactLabel = ({ children, path }: { children: ReactNode; path: string }) => (
+  <Tooltip title={`File not found: ${path}`}>
+    <Typography
+      component="span"
+      variant="inherit"
+      color="text.secondary"
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.25,
+        borderBottom: '1px dotted currentColor',
+        cursor: 'help',
+        fontWeight: 500,
+        verticalAlign: 'text-bottom'
+      }}>
+      <Icon path={mdiFileQuestionOutline} size={0.6} aria-hidden="true" />
+      {children || path}
+    </Typography>
+  </Tooltip>
+);
+
+/**
+ * Render a preview artifact reference without assuming artifact metadata exists.
+ *
+ * @param props - Component props.
+ * @param props.children - Markdown-authored label text.
+ * @returns JSX for the preview artifact link presentation.
+ */
+const PreviewArtifactLink = ({ children }: { children: ReactNode }) => (
+  <Link
     component="span"
-    variant="inherit"
-    color="text.secondary"
+    underline="always"
     sx={{
       display: 'inline-flex',
       alignItems: 'center',
       gap: 0.25,
-      fontWeight: 500,
+      fontWeight: 700,
       verticalAlign: 'text-bottom'
     }}>
-    <Icon path={mdiFileQuestionOutline} size={0.6} aria-hidden="true" />
-    File not found
-  </Typography>
+    <Icon path={mdiFileOutline} size={0.6} aria-hidden="true" />
+    {children}
+  </Link>
+);
+
+const getUnresolvedArtifactContent = (label: ReactNode, path: string) => (
+  <MissingArtifactLabel path={path}>{label}</MissingArtifactLabel>
 );
 
 /**
@@ -244,8 +283,8 @@ const MissingArtifactText = () => (
  * The returned component handles two link types:
  * ticket artifact references are rendered as button-style links that call
  * `onArtifactLinkClick`, while ordinary links are rendered as external anchors
- * with safe `target` and `rel` attributes. Missing ticket artifacts render the
- * shared missing-artifact placeholder.
+ * with safe `target` and `rel` attributes. Unresolved ticket artifact references
+ * render as non-interactive labels.
  *
  * @param props - Artifact lookup data and optional click behavior.
  * @param props.artifactsById - Ticket artifacts keyed by `ticket_artifact_id`.
@@ -253,7 +292,11 @@ const MissingArtifactText = () => (
  * @returns A React Markdown `a` renderer bound to the supplied artifact state.
  */
 const getMarkdownLink =
-  ({ artifactsById, onArtifactLinkClick }: ITicketMarkdownComponentsProps): NonNullable<Components['a']> =>
+  ({
+    artifactsById,
+    onArtifactLinkClick,
+    preview = false
+  }: ITicketMarkdownComponentsProps): NonNullable<Components['a']> =>
   ({ children, href }) => {
     const normalizedHref = href ?? '';
     const isArtifactReference = isTicketArtifactReferenceUrl(normalizedHref);
@@ -262,8 +305,12 @@ const getMarkdownLink =
     const resolvedHref = getArtifactHref(normalizedHref);
     const isHttpLink = TICKET_MARKDOWN_HTTP_HREF_PATTERN.test(resolvedHref);
 
+    if (isArtifactReference && preview) {
+      return <PreviewArtifactLink>{children}</PreviewArtifactLink>;
+    }
+
     if (isArtifactReference && !artifactAction) {
-      return <MissingArtifactText />;
+      return getUnresolvedArtifactContent(children, resolvedHref);
     }
 
     if (artifactAction) {
@@ -323,8 +370,8 @@ const getMarkdownLink =
  *
  * The returned component treats markdown images that point at ticket artifact
  * URLs as downloadable artifact references instead of direct image loads. Plain
- * image URLs still render as constrained `img` elements, while missing artifact
- * references render the shared missing-artifact placeholder.
+ * image URLs still render as constrained `img` elements, while unresolved
+ * artifact references render as non-interactive labels.
  *
  * @param props - Artifact lookup data and optional click behavior.
  * @param props.artifactsById - Ticket artifacts keyed by `ticket_artifact_id`.
@@ -332,7 +379,11 @@ const getMarkdownLink =
  * @returns A React Markdown `img` renderer bound to the supplied artifact state.
  */
 const getMarkdownImage =
-  ({ artifactsById, onArtifactLinkClick }: ITicketMarkdownComponentsProps): NonNullable<Components['img']> =>
+  ({
+    artifactsById,
+    onArtifactLinkClick,
+    preview = false
+  }: ITicketMarkdownComponentsProps): NonNullable<Components['img']> =>
   ({ alt, src }) => {
     const normalizedSrc = src ?? '';
     const isArtifactReference = isTicketArtifactReferenceUrl(normalizedSrc);
@@ -340,8 +391,12 @@ const getMarkdownImage =
     const artifact = ticketArtifactId ? artifactsById.get(ticketArtifactId) : undefined;
     const displayName = artifact ? getArtifactLinkText(artifact, alt) : alt;
 
+    if (isArtifactReference && preview) {
+      return <PreviewArtifactLink>{displayName}</PreviewArtifactLink>;
+    }
+
     if (isArtifactReference && !artifact) {
-      return <MissingArtifactText />;
+      return getUnresolvedArtifactContent(displayName, normalizedSrc);
     }
 
     if (artifact) {

@@ -23,7 +23,6 @@ export const useTicketTimelineCommentActions = () => {
   const { removeCachedComment, replaceCachedComment } = useTicketCommentCache();
   const { isUploadingAttachment: isUploadingCommentAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
   const [selectedComment, setSelectedComment] = useState<ITicketCommentLog | null>(null);
-  const [editCommentArtifacts, setEditCommentArtifacts] = useState<ITicketArtifact[]>([]);
   const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const isSavingCommentRef = useRef(false);
@@ -51,7 +50,7 @@ export const useTicketTimelineCommentActions = () => {
    * Upload an attachment selected from the edit-comment dialog and append its markdown reference to the form.
    *
    * The edit form passes `appendMarkdownLink` so this hook can reuse the ticket upload flow while letting Formik own the
-   * comment field. Successful uploads are tracked locally so previews can resolve new links before the edit is saved.
+   * comment field.
    *
    * @param {File} file File selected by the user in the edit-comment dialog.
    * @param {(markdownLink: string) => void} appendMarkdownLink Callback that inserts markdown into the edit form.
@@ -65,11 +64,6 @@ export const useTicketTimelineCommentActions = () => {
     }
 
     const markdownLink = getArtifactMarkdownByMimeType(file, ticketArtifact.ticket_artifact_id);
-    setEditCommentArtifacts((previousArtifacts) =>
-      previousArtifacts.some((artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id)
-        ? previousArtifacts
-        : [...previousArtifacts, ticketArtifact]
-    );
     appendMarkdownLink(markdownLink);
   };
 
@@ -92,7 +86,6 @@ export const useTicketTimelineCommentActions = () => {
     }
 
     setSelectedComment(comment);
-    setEditCommentArtifacts([]);
     setIsEditCommentDialogOpen(true);
   };
 
@@ -111,7 +104,6 @@ export const useTicketTimelineCommentActions = () => {
 
     setIsEditCommentDialogOpen(false);
     setSelectedComment(null);
-    setEditCommentArtifacts([]);
   };
 
   /**
@@ -135,14 +127,13 @@ export const useTicketTimelineCommentActions = () => {
       isSavingCommentRef.current = true;
       setIsSavingComment(true);
       const updatedComment = await api.tickets.updateTicketComment(ticketId, selectedComment.ticket_comment_id, {
-        comment: trimmedComment
+        comment: values.comment
       });
 
       replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
 
       setIsEditCommentDialogOpen(false);
       setSelectedComment(null);
-      setEditCommentArtifacts([]);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({
@@ -206,7 +197,6 @@ export const useTicketTimelineCommentActions = () => {
 
   return {
     selectedComment,
-    editCommentArtifacts,
     isEditCommentDialogOpen,
     isSavingComment,
     isUploadingCommentAttachment,

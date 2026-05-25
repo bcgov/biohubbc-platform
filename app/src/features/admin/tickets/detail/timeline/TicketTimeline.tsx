@@ -19,7 +19,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const { ticket, isLoading } = props;
   const {
     selectedComment,
-    editCommentArtifacts,
     isEditCommentDialogOpen,
     isSavingComment,
     isUploadingCommentAttachment,
@@ -86,7 +85,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           component={{
             element: (
               <TicketCommentEditForm
-                artifacts={[...selectedComment.artifacts, ...editCommentArtifacts]}
                 isSaving={isSavingComment}
                 isUploadingAttachment={isUploadingCommentAttachment}
                 onUploadAttachment={handleEditCommentUploadAttachment}

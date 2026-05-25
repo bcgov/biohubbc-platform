@@ -24,7 +24,7 @@ describe('TicketMarkdownContent', () => {
       <TicketMarkdownContent content="[3ea79946-8cf2-4792-9239-5b148f9f95eb](/artifact/3ea79946-8cf2-4792-9239-5b148f9f95eb)" />
     );
 
-    expect(screen.getByText('File not found')).toBeVisible();
+    expect(screen.getByText('3ea79946-8cf2-4792-9239-5b148f9f95eb')).toBeVisible();
 
     rerender(
       <TicketMarkdownContent
@@ -39,7 +39,6 @@ describe('TicketMarkdownContent', () => {
       />
     );
 
-    expect(screen.queryByText('File not found')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '3ea79946-8cf2-4792-9239-5b148f9f95eb' })).not.toHaveAttribute('href');
   });
 
@@ -65,7 +64,7 @@ describe('TicketMarkdownContent', () => {
     );
 
     expect(within(screen.getByTestId('first-markdown')).getByRole('button', { name: 'first' })).toBeVisible();
-    expect(within(screen.getByTestId('second-markdown')).getByText('File not found')).toBeVisible();
+    expect(within(screen.getByTestId('second-markdown')).getByText('second')).toBeVisible();
     expect(
       within(screen.getByTestId('second-markdown')).queryByRole('button', { name: 'second' })
     ).not.toBeInTheDocument();

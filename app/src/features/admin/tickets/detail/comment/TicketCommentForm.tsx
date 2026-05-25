@@ -6,8 +6,7 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { ToggleButtons, ToggleButtonView } from 'components/toggle-button/ToggleButtons';
-import { TicketMarkdownContent } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownContent';
-import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
+import { TicketMarkdownPreview } from 'features/tickets/markdown/TicketMarkdownContent/components/TicketMarkdownPreview';
 import { useState } from 'react';
 import { TicketArtifactUpload } from '../TicketArtifactUpload';
 
@@ -15,7 +14,6 @@ type TicketCommentFormView = 'write' | 'preview';
 
 interface ITicketCommentFormProps {
   comment: string;
-  artifacts: ITicketArtifact[];
   setComment: (comment: string) => void;
   isUploadingAttachment: boolean;
   disabled?: boolean;
@@ -29,7 +27,7 @@ interface ITicketCommentFormProps {
  * @return {*}
  */
 export const TicketCommentForm = (props: ITicketCommentFormProps) => {
-  const { comment, artifacts, setComment, isUploadingAttachment, disabled, onUploadAttachment } = props;
+  const { comment, setComment, isUploadingAttachment, disabled, onUploadAttachment } = props;
   const [activeTab, setActiveTab] = useState<TicketCommentFormView>('write');
   const viewOptions: ToggleButtonView<TicketCommentFormView>[] = [
     { value: 'write', label: 'Write' },
@@ -93,7 +91,7 @@ export const TicketCommentForm = (props: ITicketCommentFormProps) => {
                     Nothing to preview.
                   </Typography>
                 }>
-                <TicketMarkdownContent content={comment} artifacts={artifacts} />
+                <TicketMarkdownPreview content={comment} />
               </LoadingGuard>
             </Box>
           )

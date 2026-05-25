@@ -2,7 +2,6 @@ import { getArtifactMarkdownByMimeType } from 'features/admin/tickets/utils/tick
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useTicketAttachmentUpload } from './useTicketAttachmentUpload';
 import { useTicketCommentCache } from './useTicketCommentCache';
@@ -14,13 +13,12 @@ import { useTicketCommentCache } from './useTicketCommentCache';
  */
 export const useTicketComment = () => {
   const api = useApi();
-  const { ticketId, ticketDataLoader } = useTicketContext();
+  const { ticketId } = useTicketContext();
   const dialogContext = useDialogContext();
   const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
   const { appendCachedComment } = useTicketCommentCache();
 
   const [comment, setComment] = useState('');
-  const [commentArtifacts, setCommentArtifacts] = useState<ITicketArtifact[]>([]);
   const [isSavingComment, setIsSavingComment] = useState(false);
 
   /**
@@ -39,17 +37,11 @@ export const useTicketComment = () => {
       return;
     }
 
-    const currentTicket = ticketDataLoader.data;
-
-    if (!currentTicket) {
-      return;
-    }
-
     try {
       setIsSavingComment(true);
 
       const createdComment = await api.tickets.createTicketComment(ticketId, {
-        comment: trimmedComment
+        comment
       });
 
       if (!createdComment) {
@@ -59,7 +51,6 @@ export const useTicketComment = () => {
       appendCachedComment(createdComment);
 
       setComment('');
-      setCommentArtifacts([]);
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
@@ -76,10 +67,9 @@ export const useTicketComment = () => {
    * to the comment draft.
    *
    * The upload flow initializes a ticket upload, uploads the file to the
-   * presigned object-store URL, completes the ticket upload, adds the returned
-   * ticket artifact to the cached ticket details if needed, and appends markdown
-   * that references the stable `ticket_artifact_id`. Failures surface through
-   * the snackbar and leave the draft unchanged.
+   * presigned object-store URL, completes the ticket upload, and appends
+   * markdown that references the stable `ticket_artifact_id`. Failures surface
+   * through the snackbar and leave the draft unchanged.
    *
    * @param {File} file File selected by the user for upload.
    * @returns {Promise<void>} Resolves when the upload attempt has completed.
@@ -92,11 +82,6 @@ export const useTicketComment = () => {
     }
 
     const markdownLink = getArtifactMarkdownByMimeType(file, ticketArtifact.ticket_artifact_id);
-    setCommentArtifacts((previousArtifacts) =>
-      previousArtifacts.some((artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id)
-        ? previousArtifacts
-        : [...previousArtifacts, ticketArtifact]
-    );
 
     setComment((previousComment) => {
       if (!previousComment) {
@@ -110,7 +95,6 @@ export const useTicketComment = () => {
 
   return {
     comment,
-    commentArtifacts,
     setComment,
     isSavingComment,
     isUploadingAttachment,

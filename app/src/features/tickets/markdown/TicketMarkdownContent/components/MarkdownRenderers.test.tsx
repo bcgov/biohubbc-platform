@@ -63,6 +63,12 @@ describe('MarkdownRenderers', () => {
     expect(screen.getByRole('link', { name: 'BioHub' })).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  it('preserves authored soft line breaks inside paragraphs', () => {
+    renderMarkdown('First line\nSecond line');
+
+    expect(screen.getByText(/First line/)).toHaveStyle({ whiteSpace: 'pre-wrap' });
+  });
+
   it('renders resolved artifact links with markdown labels as buttons and delegates clicks', async () => {
     const user = userEvent.setup();
     const artifact = ticketArtifact({
@@ -86,7 +92,9 @@ describe('MarkdownRenderers', () => {
     expect(handleArtifactClick).toHaveBeenCalledWith(artifact);
   });
 
-  it('renders missing artifact links and images as file-not-found text', () => {
+  it('renders unresolved artifact links and images as missing labels in render mode', async () => {
+    const user = userEvent.setup();
+
     renderMarkdown(
       [
         '[missing file](/artifact/90b6df74-1b23-4064-ad62-f83c291d31d2)',
@@ -94,7 +102,33 @@ describe('MarkdownRenderers', () => {
       ].join('\n')
     );
 
-    expect(screen.getAllByText('File not found')).toHaveLength(2);
+    expect(screen.getByText('missing file')).toBeVisible();
+    expect(screen.getByText('missing image')).toBeVisible();
+    expect(screen.queryByText('File not found')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'missing file' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'missing image' })).not.toBeInTheDocument();
+
+    await user.hover(screen.getByText('missing file'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'File not found: /artifact/90b6df74-1b23-4064-ad62-f83c291d31d2'
+    );
+  });
+
+  it('renders unresolved artifact links and images as non-interactive file links in preview mode', () => {
+    renderMarkdown(
+      [
+        '[missing file](/artifact/90b6df74-1b23-4064-ad62-f83c291d31d2)',
+        '![missing image](/artifact/3ea79946-8cf2-4792-9239-5b148f9f95eb)'
+      ].join('\n'),
+      {
+        artifactsById: new Map(),
+        preview: true
+      }
+    );
+
+    expect(screen.getByText('missing file')).toBeVisible();
+    expect(screen.getByText('missing image')).toBeVisible();
+    expect(screen.queryByText('File not found')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'missing file' })).not.toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'missing image' })).not.toBeInTheDocument();
   });

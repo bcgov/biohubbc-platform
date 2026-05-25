@@ -117,9 +117,10 @@ describe('TicketTimeline', () => {
   it('opens edit dialog with existing comment and saves updated text', async () => {
     const user = userEvent.setup();
     const ticket = makeTicket();
+    const authoredComment = 'Updated comment\nwith a second line\n';
     const updatedComment = {
       ...ticket.comments[0],
-      comment: 'Updated comment'
+      comment: authoredComment
     };
     updateTicketComment.mockResolvedValue(updatedComment);
 
@@ -131,11 +132,11 @@ describe('TicketTimeline', () => {
     const commentInput = screen.getByPlaceholderText('Type your comment...');
     expect(commentInput).toHaveValue('Original comment');
 
-    fireEvent.change(commentInput, { target: { value: 'Updated comment' } });
+    fireEvent.change(commentInput, { target: { value: authoredComment } });
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(updateTicketComment).toHaveBeenCalledWith(ticketId, ticketCommentId, { comment: 'Updated comment' });
+      expect(updateTicketComment).toHaveBeenCalledWith(ticketId, ticketCommentId, { comment: authoredComment });
     });
     expect(setData).toHaveBeenCalledWith({
       ...ticket,

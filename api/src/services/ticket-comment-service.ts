@@ -1,10 +1,10 @@
 import { IDBConnection } from '../database/db';
 import { CreateTicketComment, TicketComment, UpdateTicketComment } from '../models/ticket-comment';
 import { CommentRepository } from '../repositories/comment-repository';
+import { TicketCommentArtifactRepository } from '../repositories/ticket-comment-artifact-repository';
 import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
 import { getTicketArtifactIdsFromMarkdown } from '../utils/ticket-markdown-utils';
 import { DBService } from './db-service';
-import { TicketCommentArtifactService } from './ticket-comment-artifact-service';
 
 /**
  * Service for ticket_comment operations.
@@ -12,7 +12,7 @@ import { TicketCommentArtifactService } from './ticket-comment-artifact-service'
 export class TicketCommentService extends DBService {
   commentRepository: CommentRepository;
   ticketCommentRepository: TicketCommentRepository;
-  ticketCommentArtifactService: TicketCommentArtifactService;
+  ticketCommentArtifactRepository: TicketCommentArtifactRepository;
 
   /**
    * Creates an instance of TicketCommentService.
@@ -24,7 +24,7 @@ export class TicketCommentService extends DBService {
     super(connection);
     this.commentRepository = new CommentRepository(connection);
     this.ticketCommentRepository = new TicketCommentRepository(connection);
-    this.ticketCommentArtifactService = new TicketCommentArtifactService(connection);
+    this.ticketCommentArtifactRepository = new TicketCommentArtifactRepository(connection);
   }
 
   /**
@@ -42,25 +42,13 @@ export class TicketCommentService extends DBService {
       payload.ticketId,
       comment.comment_id
     );
-    await this.ticketCommentArtifactService.replaceTicketCommentArtifacts(
+    await this.ticketCommentArtifactRepository.updateTicketCommentArtifacts(
       payload.ticketId,
       insertedTicketComment.ticket_comment_id,
       getTicketArtifactIdsFromMarkdown(payload.comment)
     );
 
     return this.ticketCommentRepository.getTicketCommentById(payload.ticketId, insertedTicketComment.ticket_comment_id);
-  }
-
-  /**
-   * Soft delete a ticket comment link row.
-   *
-   * @param {string} ticketCommentId - Ticket comment UUID.
-   * @return {Promise<void>}
-   * @memberof TicketCommentService
-   */
-  async deleteTicketComment(ticketId: string, ticketCommentId: string): Promise<void> {
-    await this.ticketCommentRepository.deleteTicketComment(ticketId, ticketCommentId);
-    await this.ticketCommentArtifactService.deleteTicketCommentArtifacts(ticketCommentId);
   }
 
   /**
@@ -72,7 +60,7 @@ export class TicketCommentService extends DBService {
    */
   async updateTicketComment(payload: UpdateTicketComment): Promise<TicketComment> {
     await this.ticketCommentRepository.updateTicketComment(payload.ticketId, payload.ticketCommentId, payload.comment);
-    await this.ticketCommentArtifactService.replaceTicketCommentArtifacts(
+    await this.ticketCommentArtifactRepository.updateTicketCommentArtifacts(
       payload.ticketId,
       payload.ticketCommentId,
       getTicketArtifactIdsFromMarkdown(payload.comment)
@@ -89,11 +77,11 @@ export class TicketCommentService extends DBService {
    * @return {Promise<void>}
    * @memberof TicketCommentService
    */
-  async deleteTicketCommentByTicketId(ticketId: string, ticketCommentId: string): Promise<void> {
+  async deleteTicketComment(ticketId: string, ticketCommentId: string): Promise<void> {
     await this.ticketCommentRepository.getTicketCommentById(ticketId, ticketCommentId);
     await Promise.all([
       this.ticketCommentRepository.deleteTicketComment(ticketId, ticketCommentId),
-      this.ticketCommentArtifactService.deleteTicketCommentArtifacts(ticketCommentId)
+      this.ticketCommentArtifactRepository.deleteTicketCommentArtifacts(ticketCommentId)
     ]);
   }
 

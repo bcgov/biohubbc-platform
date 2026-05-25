@@ -1,20 +1,26 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
-import { TICKET_DATA_NOT_LOADED_MESSAGE, useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
+import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
+
+interface IUseTicketEditDialogProps {
+  ticket: ITicketExtended;
+}
 
 /**
  * Edit ticket dialog state and save behavior.
  *
+ * @param {IUseTicketEditDialogProps} props Hook props.
  * @return {*}
  */
-export const useTicketEditDialog = () => {
+export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
+  const { ticket } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const { handleOptimisticTicketUpdate } = useOptimisticTicketHandlers();
+  const { ticketId } = useTicketContext();
+  const { handleOptimisticTicketUpdate } = useOptimisticTicketHandlers({ ticket });
 
   const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -26,25 +32,15 @@ export const useTicketEditDialog = () => {
   };
 
   const handleEditTicket = async (payload: IUpdateTicketRequest) => {
-    const currentTicket = ticketDataLoader.data;
-
-    if (!currentTicket) {
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: TICKET_DATA_NOT_LOADED_MESSAGE
-      });
-      return;
-    }
-
     try {
       setIsSavingTicket(true);
 
       const nextTicket = {
-        ...currentTicket,
-        subject: payload.subject ?? currentTicket.subject,
-        description: payload.description === undefined ? currentTicket.description : payload.description,
-        priority: payload.priority ?? currentTicket.priority,
-        status: payload.status ?? currentTicket.status
+        ...ticket,
+        subject: payload.subject ?? ticket.subject,
+        description: payload.description === undefined ? ticket.description : payload.description,
+        priority: payload.priority ?? ticket.priority,
+        status: payload.status ?? ticket.status
       };
 
       const updatePayload: IUpdateTicketRequest = {

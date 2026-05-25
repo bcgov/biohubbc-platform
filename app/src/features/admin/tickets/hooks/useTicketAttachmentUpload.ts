@@ -19,12 +19,11 @@ export const useTicketAttachmentUpload = () => {
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   /**
-   * Upload a selected file as a ticket attachment and cache the resulting artifact.
+   * Upload a selected file as a ticket attachment.
    *
    * Comment create and edit flows call this before inserting markdown into their respective text fields. The helper
    * validates the configured file-size limit, initializes the ticket upload, uploads the file to object storage through
-   * the shared object-storage API, completes the ticket upload, and adds the returned artifact to cached ticket details
-   * to the caller so comment forms or artifact tables can update their own local state.
+   * the shared object-storage API, completes the ticket upload, and returns the ticket artifact to the caller.
    *
    * @param {File} file File selected by the user.
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails.

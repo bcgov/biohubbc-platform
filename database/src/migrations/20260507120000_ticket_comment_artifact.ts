@@ -55,34 +55,6 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TRIGGER journal_ticket_comment_artifact
       AFTER INSERT OR UPDATE OR DELETE ON ticket_comment_artifact
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
-
-    --------------------------------------------------------------------------------
-    -- BACKFILL EXISTING COMMENT ARTIFACT REFERENCES
-    --
-    -- Before this migration, comments stored artifact references only as markdown
-    -- links in comment.comment. New and edited comments will populate
-    -- ticket_comment_artifact through the API, but existing comments need rows here
-    -- so read queries can return the same referenced artifact metadata without
-    -- reparsing markdown on every request. Restrict matches to active artifacts on
-    -- the same ticket to avoid linking stale, deleted, or cross-ticket attachments.
-    --------------------------------------------------------------------------------
-
-    INSERT INTO ticket_comment_artifact (
-      ticket_comment_id,
-      ticket_artifact_id
-    )
-    SELECT DISTINCT
-      tc.ticket_comment_id,
-      ta.ticket_artifact_id
-    FROM ticket_comment tc
-    JOIN comment c
-      ON c.comment_id = tc.comment_id
-    JOIN ticket_artifact ta
-      ON ta.ticket_id = tc.ticket_id
-      AND ta.record_end_date IS NULL
-      AND c.comment ILIKE '%](/artifact/' || ta.ticket_artifact_id::text || ')%'
-    WHERE tc.record_end_date IS NULL
-    ON CONFLICT DO NOTHING;
   `);
 }
 
