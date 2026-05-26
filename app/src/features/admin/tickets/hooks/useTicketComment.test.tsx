@@ -1,17 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
-import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import { Mock } from 'vitest';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
+import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { Mock } from 'vitest';
 import { useTicketComment } from './useTicketComment';
 
 vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
-}));
-
-vi.mock('hooks/useAuthStateContext', () => ({
-  useAuthStateContext: vi.fn()
 }));
 
 vi.mock('hooks/useContext', () => ({
@@ -35,7 +30,6 @@ const makeTicket = (): ITicketExtended => ({
   status: 'open',
   statuses: [],
   comments: [],
-  artifacts: [],
   references: [],
   data_requests: [],
   ticket_system_users: []
@@ -50,9 +44,21 @@ const makeTicketArtifact = (fileName: string): ITicketArtifact => ({
   object_key: `tickets/ticket-id/upload/upload-id/${fileName}`
 });
 
-const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
+const makeTicketComment = (comment: string, artifacts: ITicketArtifact[] = []): ITicketCommentLog => ({
+  ticket_comment_id: '33333333-3333-4333-8333-333333333333',
+  ticket_id: ticketId,
+  user_identifier: 'user@example.com',
+  create_date: '2026-02-25T00:00:00.000Z',
+  comment,
+  artifacts
+});
+
+const setupUploadHook = (
+  ticketArtifact: ITicketArtifact,
+  createTicketComment = vi.fn().mockResolvedValue(makeTicketComment('New comment'))
+) => {
   const setSnackbar = vi.fn();
-  const setData = vi.fn();
+  const setTicketData = vi.fn();
   const createTicketUpload = vi.fn().mockResolvedValue({
     upload_id: '44444444-4444-4444-8444-444444444444',
     presigned_upload_url: 'https://object-store.example/upload'
@@ -62,17 +68,12 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
 
   (useApi as Mock).mockReturnValue({
     tickets: {
-      createTicketComment: vi.fn(),
+      createTicketComment,
       createTicketUpload,
       completeTicketUpload
     },
     objectStorage: {
       uploadFileToUrl
-    }
-  });
-  (useAuthStateContext as Mock).mockReturnValue({
-    biohubUserWrapper: {
-      userIdentifier: 'user@example.com'
     }
   });
   (useDialogContext as Mock).mockReturnValue({
@@ -91,15 +92,16 @@ const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
       load: vi.fn(),
       refresh: vi.fn(),
       clear: vi.fn(),
-      setData
+      setData: setTicketData
     }
   });
 
   return {
     completeTicketUpload,
+    createTicketComment,
     createTicketUpload,
-    setData,
     setSnackbar,
+    setTicketData,
     uploadFileToUrl
   };
 };
@@ -175,6 +177,114 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`See attached [notes.pdf](/artifact/${ticketArtifactId})`);
+  });
+
+  it('appends a comment only after the create request resolves', async () => {
+    let resolveCreateComment: (comment: ITicketCommentLog) => void = () => undefined;
+    const createdComment = makeTicketComment('Review the attachment', [makeTicketArtifact('notes.pdf')]);
+    const createTicketComment = vi.fn().mockReturnValue(
+      new Promise<ITicketCommentLog>((resolve) => {
+        resolveCreateComment = resolve;
+      })
+    );
+    const { setTicketData } = setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
+    const { result } = renderHook(() => useTicketComment());
+
+    act(() => {
+      result.current.setComment('Review the attachment');
+    });
+
+    let submitPromise: Promise<void> = Promise.resolve();
+
+    await act(async () => {
+      submitPromise = result.current.handleAddComment();
+      await Promise.resolve();
+    });
+
+    expect(createTicketComment).toHaveBeenCalledWith(ticketId, {
+      comment: 'Review the attachment'
+    });
+    expect(setTicketData).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCreateComment(createdComment);
+      await submitPromise;
+    });
+
+    expect(setTicketData).toHaveBeenCalledWith({
+      ...makeTicket(),
+      comments: [createdComment]
+    });
+  });
+
+  it('preserves authored line breaks when creating a comment', async () => {
+    const authoredComment = 'First line\nSecond line\n';
+    const createTicketComment = vi.fn().mockResolvedValue(makeTicketComment(authoredComment));
+    setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
+    const { result } = renderHook(() => useTicketComment());
+
+    act(() => {
+      result.current.setComment(authoredComment);
+    });
+
+    await act(async () => {
+      await result.current.handleAddComment();
+    });
+
+    expect(createTicketComment).toHaveBeenCalledWith(ticketId, {
+      comment: authoredComment
+    });
+  });
+
+  it('clears the draft after a comment is created', async () => {
+    const createdComment = makeTicketComment(`See attached [notes.pdf](/artifact/${ticketArtifactId})`, [
+      makeTicketArtifact('notes.pdf')
+    ]);
+    const { setTicketData } = setupUploadHook(
+      makeTicketArtifact('notes.pdf'),
+      vi.fn().mockResolvedValue(createdComment)
+    );
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    await act(async () => {
+      await result.current.handleAddComment();
+    });
+
+    expect(setTicketData).toHaveBeenCalledWith({
+      ...makeTicket(),
+      comments: [createdComment]
+    });
+    expect(result.current.comment).toBe('');
+  });
+
+  it('keeps the draft when comment creation fails', async () => {
+    const createError = new Error('Failed to add comment.');
+    const { setSnackbar, setTicketData } = setupUploadHook(
+      makeTicketArtifact('notes.pdf'),
+      vi.fn().mockRejectedValue(createError)
+    );
+    const { result } = renderHook(() => useTicketComment());
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
+
+    await act(async () => {
+      await result.current.handleUploadAttachment(file);
+    });
+
+    await act(async () => {
+      await result.current.handleAddComment();
+    });
+
+    expect(setTicketData).not.toHaveBeenCalled();
+    expect(setSnackbar).toHaveBeenCalledWith({
+      open: true,
+      snackbarMessage: 'Failed to add comment.'
+    });
+    expect(result.current.comment).toBe(`[notes.pdf](/artifact/${ticketArtifactId})`);
   });
 
   it('rejects attachments larger than the API limit before starting upload', async () => {

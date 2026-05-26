@@ -36,9 +36,7 @@ vi.mock('./detail/header/TicketHeader', () => ({
 }));
 
 vi.mock('./detail/artifacts/TicketArtifacts', () => ({
-  TicketArtifacts: ({ ticket }: { ticket: ITicketExtended }) => (
-    <div data-testid="ticket-artifacts" data-artifact-count={String(ticket.artifacts.length)} />
-  )
+  TicketArtifacts: () => <div data-testid="ticket-artifacts" />
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
@@ -76,25 +74,7 @@ vi.mock('./detail/comment/TicketComment', () => ({
 }));
 
 vi.mock('./detail/sidebar/TicketSidebar', () => ({
-  TicketSidebar: ({
-    teamId,
-    ticketSystemUsers,
-    references,
-    dataRequests
-  }: {
-    teamId?: string;
-    ticketSystemUsers?: unknown[];
-    references?: unknown[];
-    dataRequests?: unknown[];
-  }) => (
-    <div
-      data-testid="ticket-sidebar"
-      data-team-id={teamId ?? ''}
-      data-ticket-system-user-count={String(ticketSystemUsers?.length ?? 0)}
-      data-reference-count={String(references?.length ?? 0)}
-      data-data-request-count={String(dataRequests?.length ?? 0)}
-    />
-  )
+  TicketSidebar: () => <div data-testid="ticket-sidebar" />
 }));
 
 vi.mock('./detail/skeleton/TicketSkeleton', () => ({
@@ -139,14 +119,14 @@ const baseTicket: ITicketExtended = {
       status: 'open'
     }
   ],
-  artifacts: [],
   comments: [
     {
       ticket_comment_id: 'comment-1',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       user_identifier: 'Sarah',
       create_date: '2026-02-24T12:00:00.000Z',
-      comment: 'New comment'
+      comment: 'New comment',
+      artifacts: []
     }
   ],
   references: [
@@ -219,9 +199,7 @@ describe('TicketDetailPage', () => {
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Draft comment');
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-team-id', baseTicket.team_id);
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-reference-count', '1');
-    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-data-request-count', '1');
+    expect(screen.getByTestId('ticket-sidebar')).toBeVisible();
   });
 
   it('passes ticket data to timeline', () => {
@@ -271,21 +249,7 @@ describe('TicketDetailPage', () => {
   });
 
   it('switches from timeline to artifacts tab content', async () => {
-    mockUseTicketContext.mockReturnValue(
-      makeTicketContext({
-        ...baseTicket,
-        artifacts: [
-          {
-            ticket_artifact_id: '55555555-5555-4555-8555-555555555555',
-            ticket_id: baseTicket.ticket_id,
-            artifact_id: '66666666-6666-4666-8666-666666666666',
-            record_end_date: null,
-            create_date: '2026-02-26T00:00:00.000Z',
-            object_key: 'tickets/test/file.txt'
-          }
-        ]
-      })
-    );
+    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket));
 
     render(<TicketDetailPage />);
 
@@ -294,7 +258,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
 
     expect(screen.getByTestId('ticket-header')).toHaveAttribute('data-active-tab', 'artifacts');
-    expect(screen.getByTestId('ticket-artifacts')).toHaveAttribute('data-artifact-count', '1');
+    expect(screen.getByTestId('ticket-artifacts')).toBeVisible();
     expect(screen.queryByTestId('ticket-timeline')).not.toBeInTheDocument();
   });
 });

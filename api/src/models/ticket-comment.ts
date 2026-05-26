@@ -1,11 +1,13 @@
 import { z } from 'zod';
+import { TicketArtifact } from './ticket-artifact';
 
 export const TicketComment = z.object({
   ticket_comment_id: z.string().uuid(),
   ticket_id: z.string().uuid(),
   user_identifier: z.string(),
   create_date: z.string(),
-  comment: z.string()
+  comment: z.string(),
+  artifacts: z.array(TicketArtifact)
 });
 
 export type TicketComment = z.infer<typeof TicketComment>;
