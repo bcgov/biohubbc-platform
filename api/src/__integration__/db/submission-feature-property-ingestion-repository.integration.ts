@@ -132,24 +132,24 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
    */
   async function seedSourceAndConfig(
     sourceType = 'sample_period',
-    allowedTargetType: string | null = 'sample_site',
+    allowedTargetType: string | string[] | null = 'sample_site',
     allowMultiple = false
   ): Promise<{
     submissionId: number;
     uploadId: string;
     sourceFeatureId: number;
     featureTypePropertyId: number;
-    allowedFeatureTypeId: number | null;
+    allowedFeatureTypeIds: number[];
   }> {
     const { submissionId, uploadId } = await seedUpload();
     const sourceFeatureId = await createTestFeature(connection, submissionId, sourceType, {});
-    const { featureTypePropertyId, allowedFeatureTypeId } = await createFeatureTypeProperty(
+    const { featureTypePropertyId, allowedFeatureTypeIds } = await createFeatureTypeProperty(
       connection,
       sourceType,
       allowedTargetType,
       allowMultiple
     );
-    return { submissionId, uploadId, sourceFeatureId, featureTypePropertyId, allowedFeatureTypeId };
+    return { submissionId, uploadId, sourceFeatureId, featureTypePropertyId, allowedFeatureTypeIds };
   }
 
   /** All grouped error rows for an upload scope. */

@@ -47,23 +47,23 @@ export async function featureTypeIdByName(connection: IDBConnection, name: strin
 
 /**
  * Create a synthetic `feature`-typed feature_property and assign it to a source feature type via
- * feature_type_property with an allowed target type. Mirrors download-parquet's
- * insertCodeFeatureProperty but for the 'feature' property type plus the allowed-target column.
- *
- * Idempotently ensures the 'feature' feature_property_type exists, so each suite is self-contained.
+ * feature_type_property, then declare its allowed target feature types in
+ * `feature_type_property_feature`. Idempotently ensures the 'feature' feature_property_type exists,
+ * so each suite is self-contained.
  *
  * @param sourceFeatureTypeName Feature type the property is attached to (the referencing feature).
- * @param allowedTargetFeatureTypeName Allowed target feature type name, or null for "no permitted target".
+ * @param allowedTargetFeatureTypeNames Allowed target feature type name(s). Pass a single string,
+ *   an array of names, or null for "no permitted target".
  * @param allowMultiple Whether the property may carry multiple references.
- * @returns The new feature_type_property_id, the resolved allowedFeatureTypeId (or null), and the
- *   feature_property.name to use as the data.properties key on source features.
+ * @returns The new feature_type_property_id, the resolved allowed feature_type_ids (empty when no
+ *   targets), and the feature_property.name to use as the data.properties key on source features.
  */
 export async function createFeatureTypeProperty(
   connection: IDBConnection,
   sourceFeatureTypeName: string,
-  allowedTargetFeatureTypeName: string | null,
+  allowedTargetFeatureTypeNames: string | string[] | null,
   allowMultiple = false
-): Promise<{ featureTypePropertyId: number; allowedFeatureTypeId: number | null; propertyName: string }> {
+): Promise<{ featureTypePropertyId: number; allowedFeatureTypeIds: number[]; propertyName: string }> {
   const systemUserId = connection.systemUserId();
 
   await connection.sql(SQL`
@@ -86,15 +86,11 @@ export async function createFeatureTypeProperty(
   `);
   const featurePropertyId = fpResult.rows[0].feature_property_id;
 
-  const allowedFeatureTypeId =
-    allowedTargetFeatureTypeName === null ? null : await featureTypeIdByName(connection, allowedTargetFeatureTypeName);
-
   const ftpResult = await connection.sql(SQL`
     INSERT INTO feature_type_property (
       feature_type_id,
       feature_property_id,
       allow_multiple,
-      allowed_referenced_feature_type_id,
       record_effective_date,
       create_user
     )
@@ -102,14 +98,35 @@ export async function createFeatureTypeProperty(
       (SELECT feature_type_id FROM feature_type WHERE name = ${sourceFeatureTypeName} LIMIT 1),
       ${featurePropertyId},
       ${allowMultiple},
-      ${allowedFeatureTypeId},
       now(),
       ${systemUserId}
     )
     RETURNING feature_type_property_id;
   `);
+  const featureTypePropertyId: number = ftpResult.rows[0].feature_type_property_id;
 
-  return { featureTypePropertyId: ftpResult.rows[0].feature_type_property_id, allowedFeatureTypeId, propertyName };
+  const targetNames =
+    allowedTargetFeatureTypeNames === null
+      ? []
+      : Array.isArray(allowedTargetFeatureTypeNames)
+      ? allowedTargetFeatureTypeNames
+      : [allowedTargetFeatureTypeNames];
+
+  const allowedFeatureTypeIds: number[] = [];
+  for (const targetName of targetNames) {
+    const targetId = await featureTypeIdByName(connection, targetName);
+    allowedFeatureTypeIds.push(targetId);
+    await connection.sql(SQL`
+      INSERT INTO feature_type_property_feature (
+        feature_type_property_id,
+        target_feature_type_id,
+        create_user
+      )
+      VALUES (${featureTypePropertyId}, ${targetId}, ${systemUserId});
+    `);
+  }
+
+  return { featureTypePropertyId, allowedFeatureTypeIds, propertyName };
 }
 
 /**

@@ -10,8 +10,8 @@
 // for the whole upload.
 //
 // Scope C — no production catalog is touched. Each test mints a SYNTHETIC `feature`-typed
-// feature_property + feature_type_property (with allowed_referenced_feature_type_id) and uses
-// pre-seeded feature types for the source/target features. The chosen types (mortality,
+// feature_property + feature_type_property (with allowed targets in feature_type_property_feature)
+// and uses pre-seeded feature types for the source/target features. The chosen types (mortality,
 // observation_subcount, species_observation) carry NO required catalog properties, so the full
 // pipeline reaches the canonical-insert phase without unrelated MISSING_REQUIRED_PROPERTY errors
 // from the seeded type's other required fields.
@@ -127,7 +127,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
    */
   async function seedFeatureScenario(config?: {
     sourceFeatureTypeName?: string;
-    allowedTargetFeatureTypeName?: string | null;
+    allowedTargetFeatureTypeName?: string | string[] | null;
     allowMultiple?: boolean;
   }): Promise<FeatureScenario> {
     const submissionId = await createTestSubmission(connection);

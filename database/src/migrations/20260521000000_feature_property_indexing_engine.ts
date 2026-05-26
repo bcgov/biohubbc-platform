@@ -3,8 +3,9 @@ import type { Knex } from 'knex';
 /**
  * Schema support for the feature-reference property indexing engine:
  *
- * 1. Adds `feature_type_property.allowed_referenced_feature_type_id` so feature-valued
- *    properties declare the single feature type their `feature::<id>` references may resolve to.
+ * 1. Adds the `feature_type_property_feature` join table so feature-valued properties may declare
+ *    one or more allowed target feature types. The `feature::<id>` reference syntax carries no
+ *    type, so the allowed targets are read from this table.
  * 2. Adds a uniqueness guarantee on the canonical `submission_feature_property_feature` table.
  * 3. Adds the UNLOGGED upload-scoped `submission_upload_staging_feature_candidate` staging table
  *    mirroring the sibling code/taxon candidate tables.
@@ -18,18 +19,53 @@ export async function up(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     --------------------------------------------------------------------------------
-    -- Allowed-target type for feature-valued properties.
+    -- Allowed target feature types for feature-valued properties.
     --------------------------------------------------------------------------------
-    ALTER TABLE feature_type_property
-      ADD COLUMN allowed_referenced_feature_type_id integer;
+    CREATE TABLE feature_type_property_feature (
+      feature_type_property_feature_id uuid DEFAULT gen_random_uuid() NOT NULL,
+      feature_type_property_id integer NOT NULL,
+      target_feature_type_id integer NOT NULL,
+      record_end_date timestamptz(6),
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
+      CONSTRAINT feature_type_property_feature_pk PRIMARY KEY (feature_type_property_feature_id),
+      CONSTRAINT feature_type_property_feature_fk1
+        FOREIGN KEY (feature_type_property_id) REFERENCES feature_type_property(feature_type_property_id),
+      CONSTRAINT feature_type_property_feature_fk2
+        FOREIGN KEY (target_feature_type_id) REFERENCES feature_type(feature_type_id)
+    );
 
-    ALTER TABLE feature_type_property
-      ADD CONSTRAINT feature_type_property_fk3
-      FOREIGN KEY (allowed_referenced_feature_type_id)
-      REFERENCES feature_type(feature_type_id);
+    -- Disallow duplicate (property, target) rows while a record is active.
+    CREATE UNIQUE INDEX feature_type_property_feature_nuk1
+      ON feature_type_property_feature(feature_type_property_id, target_feature_type_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX feature_type_property_feature_idx1
+      ON feature_type_property_feature(feature_type_property_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX feature_type_property_feature_idx2
+      ON feature_type_property_feature(target_feature_type_id)
+      WHERE record_end_date IS NULL;
 
-    COMMENT ON COLUMN feature_type_property.allowed_referenced_feature_type_id IS
-      'For feature-valued properties, the single feature type a reference is allowed to resolve to. The feature::<id> reference syntax carries no type, so the allowed target type is read from here. Null for non-feature properties.';
+    COMMENT ON TABLE  feature_type_property_feature IS 'For a feature-valued feature_type_property, the set of feature types a feature::<id> reference is allowed to resolve to. A property with no active rows here permits no targets.';
+    COMMENT ON COLUMN feature_type_property_feature.feature_type_property_feature_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN feature_type_property_feature.feature_type_property_id IS 'Foreign key to the feature_type_property table — the feature-valued property whose allowed target type is being declared.';
+    COMMENT ON COLUMN feature_type_property_feature.target_feature_type_id IS 'Foreign key to the feature_type table — a feature type that a feature::<id> reference is allowed to resolve to.';
+    COMMENT ON COLUMN feature_type_property_feature.record_end_date IS 'Date/time when this allowed-target association was ended (soft delete).';
+    COMMENT ON COLUMN feature_type_property_feature.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN feature_type_property_feature.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN feature_type_property_feature.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN feature_type_property_feature.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN feature_type_property_feature.revision_count IS 'Revision count used for concurrency control.';
+
+    CREATE TRIGGER audit_feature_type_property_feature
+      BEFORE INSERT OR UPDATE OR DELETE ON feature_type_property_feature
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_feature_type_property_feature
+      AFTER INSERT OR UPDATE OR DELETE ON feature_type_property_feature
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     --------------------------------------------------------------------------------
     -- Uniqueness on canonical feature-reference property values (table is empty).
@@ -77,7 +113,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_upload_staging_feature_candidate.referenced_submission_feature_id IS
       'The within-upload feature the source_id resolved to; null when unresolved. Resolution is intentionally upload-scoped — cross-upload references are not resolved even though the canonical FK permits them.';
     COMMENT ON COLUMN submission_upload_staging_feature_candidate.referenced_feature_type_id IS
-      'The resolved target feature type, used to validate against the property allowed target type.';
+      'The resolved target feature type, used to validate against the property allowed target types.';
   `);
 }
 
@@ -97,10 +133,8 @@ export async function down(knex: Knex): Promise<void> {
       DROP CONSTRAINT IF EXISTS submission_feature_property_feature_uk1;
 
     --------------------------------------------------------------------------------
-    -- Drop allowed-target type for feature-valued properties.
+    -- Drop allowed-target feature type join table.
     --------------------------------------------------------------------------------
-    ALTER TABLE feature_type_property
-      DROP CONSTRAINT IF EXISTS feature_type_property_fk3,
-      DROP COLUMN IF EXISTS allowed_referenced_feature_type_id;
+    DROP TABLE IF EXISTS feature_type_property_feature;
   `);
 }

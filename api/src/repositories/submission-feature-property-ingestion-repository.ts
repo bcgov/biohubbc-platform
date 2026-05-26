@@ -1296,11 +1296,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * - `INVALID_FEATURE_REFERENCE_TYPE`: the reference resolved, but the target feature's type is not allowed for this property
    * - `INVALID_FEATURE_REFERENCE_SELF`: the reference resolved to the feature's own row
    *
-   * The allowed target feature type is read from the property definition
-   * (`allowed_referenced_feature_type_id`) — the `feature::<id>` value itself carries no type — so a
-   * reference that resolves to a feature of any other type is rejected. An `allowed_referenced_feature_type_id`
-   * of NULL means the property authored no permitted target, so every reference is rejected (a feature-typed
-   * property with no authored target accepts nothing).
+   * The allowed target feature types are read from `feature_type_property_feature` — the
+   * `feature::<id>` value itself carries no type — so a reference that resolves to a feature whose
+   * type is not in the property's allowed-target set is rejected. A property with no active
+   * `feature_type_property_feature` rows has no permitted targets, so every reference is rejected
+   * (a feature-typed property with no authored targets accepts nothing).
    *
    * A feature-valued property must not reference its own feature. A self-reference is recorded as
    * `INVALID_FEATURE_REFERENCE_SELF` so the fail-fast gate blocks the entire upload, mirroring how a
@@ -1353,9 +1353,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND c.is_format_valid
           AND c.referenced_submission_feature_id IS NOT NULL
           AND c.referenced_submission_feature_id <> c.submission_feature_id
-          AND (
-            ftp.allowed_referenced_feature_type_id IS NULL
-            OR c.referenced_feature_type_id <> ftp.allowed_referenced_feature_type_id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM feature_type_property_feature ftpf
+            WHERE ftpf.feature_type_property_id = c.feature_type_property_id
+              AND ftpf.target_feature_type_id = c.referenced_feature_type_id
+              AND ftpf.record_end_date IS NULL
           )
       ),
       self_reference AS (
@@ -1979,8 +1982,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid resolved feature references into `submission_feature_property_feature`.
    *
-   * Inserts only candidate rows with valid format whose reference resolved to a target feature of the
-   * type allowed by the property definition (`allowed_referenced_feature_type_id`).
+   * Inserts only candidate rows with valid format whose reference resolved to a target feature
+   * whose type is in the property's allowed-target set (`feature_type_property_feature`).
    *
    * Feature-valued *properties* land only in `submission_feature_property_feature`; `data.content`
    * relationships land only in `submission_feature_feature`. These are two distinct channels and must
@@ -2026,8 +2029,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
         AND c.is_format_valid
         AND c.referenced_submission_feature_id IS NOT NULL
-        AND c.referenced_feature_type_id = ftp.allowed_referenced_feature_type_id
         AND c.referenced_submission_feature_id <> c.submission_feature_id
+        AND EXISTS (
+          SELECT 1
+          FROM feature_type_property_feature ftpf
+          WHERE ftpf.feature_type_property_id = c.feature_type_property_id
+            AND ftpf.target_feature_type_id = c.referenced_feature_type_id
+            AND ftpf.record_end_date IS NULL
+        )
       ON CONFLICT (
         submission_feature_id,
         feature_type_property_id,
