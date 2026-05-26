@@ -127,7 +127,7 @@ describe('paths/download/index', () => {
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-1', export_id: null });
+        .resolves({ download_id: 'download-uuid-1' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -151,16 +151,18 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-1');
       expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
       expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
     });
 
-    it('uses the authenticated user as requestedBy and returns a null export_url', async () => {
+    it('uses the authenticated user as requestedBy and returns only download fields', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-auth', export_id: null });
+        .resolves({ download_id: 'download-uuid-auth' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -175,18 +177,20 @@ describe('paths/download/index', () => {
       expect(createDownloadRequestStub.firstCall.args[0]).to.include({ requestedBy: 42 });
 
       expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.have.property('export_id', null);
-      expect(mockRes.jsonValue).to.have.property('export_url', null);
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-auth');
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
     });
 
-    it('runs anonymously with requestedBy null and returns a populated export_url', async () => {
+    it('runs anonymously with requestedBy null and returns only download fields', async () => {
       const dbConnectionObj = getMockDBConnection();
       const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-anon', export_id: 'export-uuid-anon' });
+        .resolves({ download_id: 'download-uuid-anon' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       // No keycloak_token — unauthenticated request
@@ -204,9 +208,10 @@ describe('paths/download/index', () => {
 
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-anon');
-      expect(mockRes.jsonValue).to.have.property('export_id', 'export-uuid-anon');
-      expect(mockRes.jsonValue).to.have.property('export_url').that.is.a('string');
-      expect(mockRes.jsonValue.export_url).to.match(/\/api\/download-export\/export-uuid-anon$/);
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-anon$/);
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
     });
 
     it('passes through a null expression to the service', async () => {
@@ -215,7 +220,7 @@ describe('paths/download/index', () => {
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-2', export_id: null });
+        .resolves({ download_id: 'download-uuid-2' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';

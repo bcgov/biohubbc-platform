@@ -192,16 +192,6 @@ POST.apiDoc = {
               download_url: {
                 type: 'string',
                 description: 'Fully-qualified API URL the caller can poll for status'
-              },
-              export_id: {
-                type: 'string',
-                format: 'uuid',
-                nullable: true
-              },
-              export_url: {
-                type: 'string',
-                nullable: true,
-                description: 'Anon export status URL; null for authenticated'
               }
             }
           }
@@ -222,11 +212,10 @@ POST.apiDoc = {
  * to them; authorization is re-evaluated at export time against `requested_by`, so queuing
  * early grants no extra access later.
  *
- * The two callers also differ in how they retrieve their package. An anonymous caller has no
- * Downloads UI and no user identity to look the download up by, so the response hands back an
- * `export_url` for the auto-created default export — that URL is the caller's only credential.
- * An authenticated caller gets `export_url: null` and drives the explicit two-call export flow
- * (create export, then poll it) from the Downloads UI.
+ * The response shape is `{ download_id, download_url }` for both callers. The download UUID is
+ * the credential for the anonymous caller, who watches status on the public download page; the
+ * authenticated caller drives the explicit two-call export flow (create export, then poll it)
+ * from the Downloads UI.
  *
  * Delegates the business orchestration (expression tree → policy → download → team link →
  * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing, the
@@ -256,7 +245,7 @@ export function createDownload(): RequestHandler {
 
       const downloadService = new DownloadService(connection);
 
-      const { download_id, export_id } = await downloadService.createDownloadRequest({
+      const { download_id } = await downloadService.createDownloadRequest({
         name,
         description: description ?? null,
         featureTypes,
@@ -268,9 +257,7 @@ export function createDownload(): RequestHandler {
 
       return res.status(201).json({
         download_id,
-        download_url: `${getApiBaseUrl()}/api/download/${download_id}`,
-        export_id,
-        export_url: export_id ? `${getApiBaseUrl()}/api/download-export/${export_id}` : null
+        download_url: `${getApiBaseUrl()}/api/download/${download_id}`
       });
     } catch (error) {
       defaultLog.error({ label: 'createDownload', message: 'error', error });

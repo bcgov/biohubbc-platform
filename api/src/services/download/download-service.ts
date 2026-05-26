@@ -1,4 +1,3 @@
-import { DEFAULT_MAX_PART_SIZE_BYTES } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
@@ -23,14 +22,9 @@ export interface CreateDownloadRequestPayload {
 
 /**
  * Result of creating a download request.
- *
- * `export_id` is non-null only for anonymous requests, where the default export is
- * created up front so the single returned status URL is stable; it is null for
- * authenticated requests, which create their export later through the UI.
  */
 export interface CreateDownloadRequestResult {
   download_id: string;
-  export_id: string | null;
 }
 
 /**
@@ -118,17 +112,15 @@ export class DownloadService extends DBService {
    * seeded from the same identity at creation: the person the content is filtered for is exactly
    * the person granted access. They diverge only later, via claim.
    *
-   * Anonymous downloads (requestedBy NULL) get no team link — the UUID is the access credential
-   * — and a default export is created at request time so the single returned status URL is
-   * stable, since an anonymous user has no UI to request an export later.
+   * An anonymous caller's only handle is the download UUID itself; the public download page lets
+   * them watch status, and any later export is a separate user-initiated action.
    *
    * Authorization is enforced at export time, not create time — the worker re-evaluates
    * visibility against `requested_by`, so a user cannot export data they no longer have access
    * to by queuing a download earlier.
    *
    * @param {CreateDownloadRequestPayload} payload - Request payload.
-   * @return {Promise<CreateDownloadRequestResult>} The created download identifier and, for
-   * anonymous requests, the up-front export identifier.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier.
    * @memberof DownloadService
    */
   async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<CreateDownloadRequestResult> {
@@ -151,18 +143,7 @@ export class DownloadService extends DBService {
       requestedBy: payload.requestedBy
     });
 
-    let export_id: string | null = null;
-    if (payload.requestedBy === null) {
-      // Anonymous: no team (UUID is the credential); create the default export up front so the
-      // single returned status URL is stable — anon has no UI to request an export later.
-      const exportRecord = await this.downloadExportRepository.createDownloadExport({
-        download_id,
-        format: 'csv',
-        mode: 'per_feature_type',
-        max_part_size_bytes: DEFAULT_MAX_PART_SIZE_BYTES
-      });
-      export_id = exportRecord.download_export_id;
-    } else {
+    if (payload.requestedBy !== null) {
       await this.linkDownloadToNewTeam(
         download_id,
         payload.requestedBy,
@@ -170,10 +151,11 @@ export class DownloadService extends DBService {
         'Team automatically created for download'
       );
     }
+    // Anonymous: no team link — UUID is the credential.
 
     await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
 
-    return { download_id, export_id };
+    return { download_id };
   }
 
   /**

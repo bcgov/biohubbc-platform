@@ -17,7 +17,6 @@ import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
-import { DEFAULT_MAX_PART_SIZE_BYTES } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
@@ -127,10 +126,10 @@ describe('Download services (integration)', function () {
       });
     }
 
-    it('anonymous request: writes requested_by NULL, no team, and one default csv export', async () => {
+    it('anonymous request: writes requested_by NULL, no team, and no export', async () => {
       stubPublish();
 
-      const { download_id, export_id } = await downloadService.createDownloadRequest({
+      const { download_id } = await downloadService.createDownloadRequest({
         name: `Anon request ${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Anonymous download request',
         featureTypes: ['dataset'],
@@ -151,17 +150,11 @@ describe('Download services (integration)', function () {
       `);
       expect(teamRows.rowCount).to.equal(0);
 
-      // Exactly one default export is created up front so the returned status URL is stable.
+      // No export is created at request time — any later export is a separate user action.
       const exportRows = await connection.sql(SQL`
-        SELECT download_export_id, mode, format, max_part_size_bytes, status
-        FROM download_export WHERE download_id = ${download_id};
+        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
       `);
-      expect(exportRows.rowCount).to.equal(1);
-      expect(exportRows.rows[0].download_export_id).to.equal(export_id);
-      expect(exportRows.rows[0].mode).to.equal('per_feature_type');
-      expect(exportRows.rows[0].format).to.equal('csv');
-      expect(String(exportRows.rows[0].max_part_size_bytes)).to.equal(DEFAULT_MAX_PART_SIZE_BYTES);
-      expect(exportRows.rows[0].status).to.equal(DownloadStatusEnum.PENDING);
+      expect(exportRows.rowCount).to.equal(0);
     });
 
     it('authenticated request: writes requested_by, a single-member team, and no up-front export', async () => {
@@ -169,7 +162,7 @@ describe('Download services (integration)', function () {
 
       const systemUserId = connection.systemUserId();
 
-      const { download_id, export_id } = await downloadService.createDownloadRequest({
+      const { download_id } = await downloadService.createDownloadRequest({
         name: `Auth request ${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Authenticated download request',
         featureTypes: ['dataset'],
@@ -190,8 +183,7 @@ describe('Download services (integration)', function () {
       `);
       expect(teamRows.rowCount).to.equal(1);
 
-      // No up-front export — authenticated users create exports later through the UI.
-      expect(export_id).to.be.null;
+      // No up-front export — exports are created later by user action.
       const exportRows = await connection.sql(SQL`
         SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
       `);

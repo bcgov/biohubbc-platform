@@ -4,10 +4,8 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
-import { DEFAULT_MAX_PART_SIZE_BYTES } from '../../constants/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
-import { DownloadExportRecord } from '../../models/download-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
@@ -202,20 +200,8 @@ describe('DownloadService', () => {
       ...overrides
     });
 
-    const mockExportRecord: DownloadExportRecord = {
-      download_export_id: 'export-uuid-1',
-      download_id: 'download-uuid-1',
-      format: 'csv',
-      status: 'pending',
-      max_part_size_bytes: DEFAULT_MAX_PART_SIZE_BYTES,
-      mode: 'per_feature_type',
-      started_at: null,
-      completed_at: null,
-      error_message: null
-    };
-
     it('orchestrates expression → policy → download → team link → publish in order for an authenticated user', async () => {
-      // Verifies: authenticated path links a team, creates NO up-front export (export_id null),
+      // Verifies: authenticated path links a team, never creates an export at request time,
       // and runs the steps in the required order ending with the worker publish.
 
       // Step 1: Stub each orchestration dependency in sequence
@@ -242,8 +228,8 @@ describe('DownloadService', () => {
       // Step 3: Run the authenticated create request
       const result = await service.createDownloadRequest(basePayload());
 
-      // Step 4: Authenticated requests return a null export_id (the export is requested later via UI)
-      expect(result).to.eql({ download_id: 'download-uuid-1', export_id: null });
+      // Step 4: Authenticated requests return the download id only
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
 
       // Step 5: Verify each dependency received the values the service decided to pass
       expect(writeExpressionTreeStub).to.have.been.calledOnceWith(validExpression);
@@ -262,7 +248,7 @@ describe('DownloadService', () => {
       expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
       expect(linkStub.firstCall.args[1]).to.equal(42);
 
-      // Step 6: The authenticated path must NOT create an up-front export
+      // Step 6: The request flow must NOT create an export — that is a separate user action
       expect(createExportStub).to.not.have.been.called;
 
       // Step 7: Verify the worker job was queued exactly once with the new download id
@@ -276,19 +262,18 @@ describe('DownloadService', () => {
       expect(linkStub).to.have.been.calledBefore(publishStub);
     });
 
-    it('creates a default export and skips the team link for an anonymous request (requestedBy null)', async () => {
-      // Verifies: the anonymous branch creates the default CSV export up front (so the single
-      // returned status URL is stable), does NOT link a team, and returns the new export_id.
+    it('skips the team link and does not create an export for an anonymous request (requestedBy null)', async () => {
+      // Verifies: the anonymous branch returns the download id only, does NOT link a team, and
+      // does NOT create an export — the UUID is the credential and any later export is a
+      // separate user-initiated action.
 
       // Step 1: Stub the orchestration dependencies up to the download insert
       sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid-1' });
       sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid-1' });
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-1' });
 
-      // Step 2: Stub the export repo to return the seeded export record
-      const createExportStub = sinon
-        .stub(DownloadExportRepository.prototype, 'createDownloadExport')
-        .resolves(mockExportRecord);
+      // Step 2: Stub the export repo to detect any (wrong) call
+      const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
       const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',
         jobId: 'job-1'
@@ -305,17 +290,11 @@ describe('DownloadService', () => {
       // Step 5: Anonymous downloads get no team — the UUID is the credential
       expect(linkStub).to.not.have.been.called;
 
-      // Step 6: The default export is created with the CSV / per-feature-type contract and the default part size
-      expect(createExportStub).to.have.been.calledOnce;
-      expect(createExportStub.firstCall.args[0]).to.eql({
-        download_id: 'download-uuid-1',
-        format: 'csv',
-        mode: 'per_feature_type',
-        max_part_size_bytes: DEFAULT_MAX_PART_SIZE_BYTES
-      });
+      // Step 6: No export is created at request time — that is a separate user-initiated action
+      expect(createExportStub).to.not.have.been.called;
 
-      // Step 7: The returned export_id comes from the seeded export record
-      expect(result).to.eql({ download_id: 'download-uuid-1', export_id: 'export-uuid-1' });
+      // Step 7: The result is the download id only
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
 
       // Step 8: The worker job is still queued exactly once
       expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'download-uuid-1' });
