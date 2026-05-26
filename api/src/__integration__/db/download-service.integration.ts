@@ -61,11 +61,12 @@ describe('Download services (integration)', function () {
    */
   async function createPolicyDownload(opts?: {
     name?: string;
+    description?: string | null;
     featureTypes?: string[];
   }): Promise<{ download_id: string; policy_id: string }> {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
-      description: null,
+      description: opts?.description ?? null,
       featureTypes: opts?.featureTypes ?? ['dataset'],
       expressionId: null
     });
@@ -208,6 +209,37 @@ describe('Download services (integration)', function () {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
+    });
+  });
+
+  describe('findDownloadById — policy join', () => {
+    it('returns joined policy name and description when both are populated', async () => {
+      const { download_id } = await createPolicyDownload({
+        name: 'Policy with both fields',
+        description: 'A described policy'
+      });
+
+      const record = await downloadRepo.findDownloadById(download_id);
+      expect(record).to.not.be.null;
+      expect(record!.name).to.equal('Policy with both fields');
+      expect(record!.description).to.equal('A described policy');
+    });
+
+    it('returns description: null when the policy description is NULL', async () => {
+      const { download_id } = await createPolicyDownload({
+        name: 'Policy without description',
+        description: null
+      });
+
+      const record = await downloadRepo.findDownloadById(download_id);
+      expect(record).to.not.be.null;
+      expect(record!.name).to.equal('Policy without description');
+      expect(record!.description).to.be.null;
+    });
+
+    it('returns null for an unknown downloadId', async () => {
+      const record = await downloadRepo.findDownloadById('00000000-0000-0000-0000-000000000000');
+      expect(record).to.be.null;
     });
   });
 
