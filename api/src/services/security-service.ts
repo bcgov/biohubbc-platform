@@ -1,18 +1,18 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
-import { SecurityCategoryWithRuleCount } from '../models/security-category';
-import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
+import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
+import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
 import {
-  ArtifactPersecution,
-  PersecutionAndHarmSecurity,
-  SECURITY_APPLIED_STATUS,
-  SecurityCategoryRecord,
-  SecurityRepository,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
+  SecurityRuleWithFeatureCount,
+  SecuritySearchFilters
+} from '../models/security-rule';
+import {
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
-} from '../repositories/security-repository';
+} from '../models/submission-feature-security';
+import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
