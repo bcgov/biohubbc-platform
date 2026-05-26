@@ -36,15 +36,12 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
   const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } = useTicketEditDialog({
     ticket
   });
-  const { isSavingStatus, requestStatusChange } = useOptimisticTicketHandlers({
-    ticket,
-    userIdentifier: biohubUserWrapper.userIdentifier
-  });
+  const { isSavingStatus, requestStatusChange } = useOptimisticTicketHandlers({ ticket });
 
   // Open the close/reopen confirmation dialog and dispatch status update on confirm.
   const handleStatusActionClick = () => {
     const nextStatus: TicketStatus = ticket.status === 'open' ? 'closed' : 'open';
-    requestStatusChange(nextStatus);
+    requestStatusChange(nextStatus, biohubUserWrapper.userIdentifier);
   };
 
   // Open full ticket description in a dialog when "Read more" is clicked.

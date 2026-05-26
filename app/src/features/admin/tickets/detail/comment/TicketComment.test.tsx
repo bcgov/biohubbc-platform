@@ -12,7 +12,6 @@ vi.mock('hooks/useContext', () => ({
 }));
 
 const baseProps: Omit<ComponentProps<typeof TicketComment>, 'comment'> = {
-  artifacts: [],
   setComment: vi.fn(),
   isSaving: false,
   isUploadingAttachment: false,
@@ -77,29 +76,29 @@ describe('TicketComment', () => {
   it('renders attached image markdown in preview', async () => {
     const user = userEvent.setup();
 
+    render(<TicketComment {...baseProps} comment="![diagram.png](/artifact/05c4063e-a344-42a6-89f8-b15161789cda)" />);
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(screen.getByText('diagram.png')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'diagram.png' })).not.toBeInTheDocument();
+  });
+
+  it('renders unresolved artifact markdown as a non-interactive file link in preview', async () => {
+    const user = userEvent.setup();
+
     render(
-      <TicketComment
-        {...baseProps}
-        artifacts={[
-          {
-            ticket_artifact_id: '05c4063e-a344-42a6-89f8-b15161789cda',
-            ticket_id: '22222222-2222-4222-8222-222222222222',
-            artifact_id: '11111111-1111-4111-8111-111111111111',
-            record_end_date: null,
-            create_date: '2026-02-25T00:00:00.000Z',
-            object_key: 'tickets/ticket-id/upload/upload-id/diagram.png'
-          }
-        ]}
-        comment="![diagram.png](/artifact/05c4063e-a344-42a6-89f8-b15161789cda)"
-      />
+      <TicketComment {...baseProps} comment="[copied artifact](/artifact/05c4063e-a344-42a6-89f8-b15161789cda)" />
     );
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
 
-    expect(screen.getByRole('button', { name: 'diagram.png' })).toBeVisible();
+    expect(screen.getByText('copied artifact')).toBeVisible();
+    expect(screen.queryByText('File not found')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'copied artifact' })).not.toBeInTheDocument();
   });
 
-  it('keeps comment button behavior unchanged', async () => {
+  it('submits comments and shows loading state while saving', async () => {
     const user = userEvent.setup();
     const onAddComment = vi.fn().mockResolvedValue(undefined);
     const { rerender } = render(<TicketComment {...baseProps} onAddComment={onAddComment} comment="   " />);
@@ -114,6 +113,7 @@ describe('TicketComment', () => {
 
     rerender(<TicketComment {...baseProps} onAddComment={onAddComment} isSaving={true} comment="ready" />);
     expect(screen.getByRole('button', { name: 'Comment' })).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeVisible();
   });
 
   it('disables attachment upload while the comment is saving', () => {

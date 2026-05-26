@@ -8,6 +8,7 @@ import { initDBConstants } from './database/db-constants';
 import { ensureHTTPError, HTTP400, HTTP500 } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
 import { initPgBoss } from './queue/pg-boss-service';
+import { authenticateRequestApiKey } from './request-handlers/security/api-key-authentication';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
 import { initRequestStorage } from './utils/async-request-storage';
 import { scanFileForVirus } from './utils/file-utils';
@@ -117,6 +118,10 @@ const openAPIFramework = initialize({
     OptionalBearer: async function (req: any) {
       // authenticates the request bearer token, if one exists, for endpoints that specify `OptionalBearer` security
       return authenticateRequestOptional(req);
+    },
+    ApiKey: async function (req: any) {
+      // authenticates the request using an X-API-Key header, for endpoints that specify `ApiKey` security
+      return authenticateRequestApiKey(req);
     }
   },
   errorTransformer: function (_, ajvError: object): object {

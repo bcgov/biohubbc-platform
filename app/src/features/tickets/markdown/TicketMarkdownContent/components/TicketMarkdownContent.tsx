@@ -29,10 +29,10 @@ interface ITicketMarkdownContentProps extends BoxProps {
 }
 
 /**
- * Render ticket comment markdown.
+ * Render persisted ticket comment markdown.
  *
- * Pass ticket-level `artifacts` so `/artifact/{ticket_artifact_id}` links can
- * resolve to files. Missing file links render as `File not found`.
+ * Pass comment `artifacts` so `/artifact/{ticket_artifact_id}` links can
+ * resolve to files. Unresolved file links render as missing-artifact labels.
  *
  * @param {ITicketMarkdownContentProps} props Markdown renderer props and root Box props.
  * @return {JSX.Element}

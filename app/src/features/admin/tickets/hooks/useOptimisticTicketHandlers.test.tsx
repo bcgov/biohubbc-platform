@@ -8,6 +8,7 @@ const mockUpdateTicketStatus = vi.fn();
 const mockSetYesNoDialog = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetTicketData = vi.fn();
+let mockTicketData: ITicketExtended;
 
 const baseDataRequest: DataRequestResponse = {
   data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -31,7 +32,6 @@ const baseTicket: ITicketExtended = {
   status: 'open',
   statuses: [],
   comments: [],
-  artifacts: [],
   references: [],
   ticket_system_users: [],
   data_requests: []
@@ -53,7 +53,7 @@ vi.mock('hooks/useContext', () => ({
   useTicketContext: () => ({
     ticketId: baseTicket.ticket_id,
     ticketDataLoader: {
-      data: null,
+      data: mockTicketData,
       setData: mockSetTicketData
     }
   })
@@ -62,6 +62,7 @@ vi.mock('hooks/useContext', () => ({
 describe('useOptimisticTicketHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTicketData = baseTicket;
   });
 
   it('shows snackbar and blocks close confirmation when ticket has requested data requests', () => {
@@ -70,15 +71,12 @@ describe('useOptimisticTicketHandlers', () => {
       data_requests: [baseDataRequest]
     };
 
-    const { result } = renderHook(() =>
-      useOptimisticTicketHandlers({
-        ticket: ticketWithUnaddressedDataRequest,
-        userIdentifier: 'test-user'
-      })
-    );
+    mockTicketData = ticketWithUnaddressedDataRequest;
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithUnaddressedDataRequest }));
 
     act(() => {
-      result.current.requestStatusChange('closed');
+      result.current.requestStatusChange('closed', 'test-user');
     });
 
     expect(mockSetSnackbar).toHaveBeenCalledWith({
@@ -99,15 +97,12 @@ describe('useOptimisticTicketHandlers', () => {
       ]
     };
 
-    const { result } = renderHook(() =>
-      useOptimisticTicketHandlers({
-        ticket: ticketWithActionedDataRequest,
-        userIdentifier: 'test-user'
-      })
-    );
+    mockTicketData = ticketWithActionedDataRequest;
+
+    const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithActionedDataRequest }));
 
     act(() => {
-      result.current.requestStatusChange('closed');
+      result.current.requestStatusChange('closed', 'test-user');
     });
 
     expect(mockSetSnackbar).not.toHaveBeenCalled();

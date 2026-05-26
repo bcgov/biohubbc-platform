@@ -63,7 +63,8 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
         id: comment.ticket_comment_id,
         create_date: comment.create_date,
         user_identifier: comment.user_identifier,
-        comment: comment.comment
+        comment: comment.comment,
+        artifacts: comment.artifacts
       })
     ),
     ...ticket.data_requests.map(
@@ -123,7 +124,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
               ticketCommentId={item.id}
               author={item.user_identifier}
               comment={item.comment}
-              artifacts={ticket.artifacts}
+              artifacts={item.artifacts}
               onArtifactLinkClick={onArtifactLinkClick}
               onEdit={onEditComment}
               onDelete={onDeleteComment}

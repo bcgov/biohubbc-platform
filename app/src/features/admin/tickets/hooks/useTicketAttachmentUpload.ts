@@ -5,32 +5,25 @@ import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 
-interface IUseTicketAttachmentUploadProps {
-  ticketId: string;
-}
-
 /**
  * Ticket attachment upload behavior shared by new and edited comments.
  *
- * @param {IUseTicketAttachmentUploadProps} props Hook props.
  * @returns Ticket attachment upload state and helper.
  */
-export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps) => {
-  const { ticketId } = props;
+export const useTicketAttachmentUpload = () => {
   const api = useApi();
   const config = useConfigContext();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const { ticketId } = useTicketContext();
   const { runSerialized } = useSerializedAsync();
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   /**
-   * Upload a selected file as a ticket attachment and cache the resulting artifact.
+   * Upload a selected file as a ticket attachment.
    *
    * Comment create and edit flows call this before inserting markdown into their respective text fields. The helper
    * validates the configured file-size limit, initializes the ticket upload, uploads the file to object storage through
-   * the shared object-storage API, completes the ticket upload, and adds the returned artifact to cached ticket details
-   * when it is not already present.
+   * the shared object-storage API, completes the ticket upload, and returns the ticket artifact to the caller.
    *
    * @param {File} file File selected by the user.
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails.
@@ -69,18 +62,6 @@ export const useTicketAttachmentUpload = (props: IUseTicketAttachmentUploadProps
         const ticketArtifact = await api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, {
           status: 'uploaded'
         });
-
-        const latestTicket = ticketDataLoader.data;
-        if (latestTicket) {
-          ticketDataLoader.setData({
-            ...latestTicket,
-            artifacts: latestTicket.artifacts.some(
-              (artifact) => artifact.ticket_artifact_id === ticketArtifact.ticket_artifact_id
-            )
-              ? latestTicket.artifacts
-              : [...latestTicket.artifacts, ticketArtifact]
-          });
-        }
 
         return ticketArtifact;
       } catch (caughtError) {

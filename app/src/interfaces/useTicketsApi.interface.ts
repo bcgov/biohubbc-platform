@@ -30,6 +30,7 @@ export interface ITicketCommentLog {
   user_identifier: string;
   create_date: string;
   comment: string;
+  artifacts: ITicketArtifact[];
 }
 
 export interface ITicketArtifact {
@@ -79,7 +80,6 @@ export interface ITicketSystemUser {
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
-  artifacts: ITicketArtifact[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
   ticket_system_users: ITicketSystemUser[];
