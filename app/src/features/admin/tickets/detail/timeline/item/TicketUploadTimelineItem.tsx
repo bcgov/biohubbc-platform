@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { TicketTimelineItem } from './layout/TicketTimelineItem';
 import { TicketUploadDecisionRow } from './upload/decision/TicketUploadDecisionRow';
+import { TicketUploadReviewRequestRow } from './upload/review/TicketUploadReviewRequestRow';
 import { TicketUploadReviewRow } from './upload/review/TicketUploadReviewRow';
 import { TicketUploadStatusRow } from './upload/status/TicketUploadStatusRow';
 import { ITicketUploadTimelineItemProps } from './upload/TicketUploadTimelineItem.interface';
@@ -28,22 +29,36 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
 
         <TicketUploadStatusRow upload={upload} />
 
-        <TicketUploadReviewRow
-          label="Validation"
-          scope="validation"
-          upload={upload}
-          review={upload.reviews.validation}
-          onRequestReview={onRequestReview}
-          onUpdateReview={onUpdateReview}
-        />
-        <TicketUploadReviewRow
-          label="Security Review"
-          scope="security"
-          upload={upload}
-          review={upload.reviews.security}
-          onRequestReview={onRequestReview}
-          onUpdateReview={onUpdateReview}
-        />
+        {upload.reviews.validation ? (
+          <TicketUploadReviewRow
+            label="Validation"
+            upload={upload}
+            review={upload.reviews.validation}
+            onUpdateReview={onUpdateReview}
+          />
+        ) : (
+          <TicketUploadReviewRequestRow
+            label="Validation"
+            scope="validation"
+            upload={upload}
+            onRequestReview={onRequestReview}
+          />
+        )}
+        {upload.reviews.security ? (
+          <TicketUploadReviewRow
+            label="Security Review"
+            upload={upload}
+            review={upload.reviews.security}
+            onUpdateReview={onUpdateReview}
+          />
+        ) : (
+          <TicketUploadReviewRequestRow
+            label="Security Review"
+            scope="security"
+            upload={upload}
+            onRequestReview={onRequestReview}
+          />
+        )}
 
         <TicketUploadDecisionRow
           upload={upload}

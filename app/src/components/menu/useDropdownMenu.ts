@@ -22,7 +22,6 @@ export const useDropdownMenu = (
     () => flattenedItems.find((item) => item.value === value)?.label ?? value,
     [flattenedItems, value]
   );
-  const hasEnabledMenuItems = flattenedItems.some((item) => !item.disabled);
 
   const handleClose = () => setAnchorEl(null);
   const handleOpen = (element: HTMLElement) => setAnchorEl(element);
@@ -35,7 +34,6 @@ export const useDropdownMenu = (
     anchorEl,
     open,
     selectedLabel,
-    hasEnabledMenuItems,
     handleClose,
     handleOpen,
     handleSelect

@@ -21,15 +21,20 @@ export interface ITicketUploadTimelineItemProps {
 
 export interface ITicketUploadReviewRowProps {
   label: string;
-  scope: SubmissionUploadReviewScope;
   upload: TicketSubmissionUploadResponse;
-  review: TicketSubmissionUploadReviewResponse | null;
-  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
+  review: TicketSubmissionUploadReviewResponse;
   onUpdateReview: (
     upload: TicketSubmissionUploadResponse,
     review: TicketSubmissionUploadReviewResponse,
     status: SubmissionUploadReviewTaskStatus
   ) => void;
+}
+
+export interface ITicketUploadReviewRequestRowProps {
+  label: string;
+  scope: SubmissionUploadReviewScope;
+  upload: TicketSubmissionUploadResponse;
+  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
 }
 
 export interface ITicketUploadStatusRowProps {

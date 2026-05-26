@@ -1,6 +1,8 @@
+import { mdiMenuDown } from '@mdi/js';
+import Icon from '@mdi/react';
 import Button from '@mui/material/Button';
 import { IDropdownButtonProps } from './DropdownButton.interface';
-import { DropdownMenu, DropdownMenuIcon } from './menu/DropdownMenu';
+import { DropdownMenu } from './menu/DropdownMenu';
 import { useDropdownMenu } from './menu/useDropdownMenu';
 
 /**
@@ -22,17 +24,21 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
   return (
     <>
       <Button
-        className="DropdownButton-root"
         variant="outlined"
         size={size}
         {...buttonProps}
         onClick={(event) => handleOpen(event.currentTarget)}
-        endIcon={<DropdownMenuIcon />}
+        endIcon={<Icon path={mdiMenuDown} size={1} />}
         sx={{
           minWidth: size === 'small' ? 128 : 180,
           justifyContent: 'space-between',
           textTransform: 'none',
           backgroundColor: 'grey.50',
+          '&.Mui-disabled': {
+            color: 'action.disabled',
+            backgroundColor: 'action.disabledBackground',
+            borderColor: 'action.disabledBackground'
+          },
           ...(size === 'small'
             ? {
                 height: 34,

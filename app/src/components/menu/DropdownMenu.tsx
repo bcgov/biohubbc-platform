@@ -1,4 +1,3 @@
-import { mdiMenuDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -6,15 +5,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import type { IDropdownMenuProps } from './DropdownMenu.interface';
-
-/**
- * Down-chevron icon used by dropdown menu trigger buttons.
- * Use this with a size that matches the surrounding button treatment.
- *
- * @param {{ size?: number }} props
- * @return {*}
- */
-export const DropdownMenuIcon = ({ size = 1 }: { size?: number }) => <Icon path={mdiMenuDown} size={size} />;
 
 /**
  * Reusable grouped menu for dropdown controls.

@@ -100,7 +100,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     ...ticket.submission_uploads.map(
       (upload): UploadEvent => ({
         kind: 'upload',
-        id: upload.submission_upload_id,
+        id: `${upload.submission_uuid}-${upload.submission_upload_id}`,
         create_date: upload.create_date,
         upload
       })

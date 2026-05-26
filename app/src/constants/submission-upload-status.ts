@@ -43,55 +43,64 @@ export const SUBMISSION_UPLOAD_REVIEW_STATUS_LABELS: Record<SubmissionUploadRevi
   deleted: 'Deleted'
 };
 
-export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS: Record<SubmissionUploadReviewTaskStatus, string> = {
-  pending: 'Pending',
-  requested: 'Ready for review',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  blocked: 'Blocked',
-  skipped: 'Skipped',
-  cancelled: 'Cancelled'
+export const SUBMISSION_UPLOAD_REVIEW_STATUS_BUTTON_COLORS: Partial<
+  Record<SubmissionUploadReviewStatus, 'success' | 'error'>
+> = {
+  approved: 'success',
+  denied: 'error'
 };
 
-const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_ICONS: Record<SubmissionUploadReviewTaskStatus, string> = {
-  pending: mdiCircleMedium,
-  requested: mdiCircleMedium,
-  in_progress: mdiProgressClock,
-  completed: mdiCheck,
-  blocked: mdiBlockHelper,
-  skipped: mdiSkipNext,
-  cancelled: mdiCancel
-};
-
-export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_OPTIONS = Object.entries(
-  SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_LABELS
-).map(([value, label]) => ({
-  value,
-  label,
-  iconPath: SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_ICONS[value as SubmissionUploadReviewTaskStatus]
-}));
-
-export const SUBMISSION_UPLOAD_FINAL_DECISION_OPTIONS = [
+export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_OPTIONS: {
+  value: SubmissionUploadReviewTaskStatus;
+  label: string;
+  iconPath: string;
+}[] = [
   {
-    value: 'approved',
-    label: 'Accept',
+    value: 'pending',
+    label: 'Pending',
+    iconPath: mdiCircleMedium
+  },
+  {
+    value: 'requested',
+    label: 'Requested',
+    iconPath: mdiCircleMedium
+  },
+  {
+    value: 'in_progress',
+    label: 'In progress',
+    iconPath: mdiProgressClock
+  },
+  {
+    value: 'completed',
+    label: 'Completed',
     iconPath: mdiCheck
   },
   {
-    value: 'denied',
-    label: 'Reject',
-    iconPath: mdiClose
+    value: 'blocked',
+    label: 'Blocked',
+    iconPath: mdiBlockHelper
+  },
+  {
+    value: 'skipped',
+    label: 'Skipped',
+    iconPath: mdiSkipNext
+  },
+  {
+    value: 'cancelled',
+    label: 'Cancelled',
+    iconPath: mdiCancel
   }
 ];
 
-export const SUBMISSION_UPLOAD_REVIEW_ACTION_BUTTON_SX = {
-  bgcolor: 'grey.200',
-  color: 'text.primary',
-  '&:hover': {
-    bgcolor: 'grey.300'
-  },
-  '&.Mui-disabled': {
-    bgcolor: 'action.disabledBackground',
-    color: 'text.disabled'
-  }
+export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_BUTTON_COLORS: Record<
+  SubmissionUploadReviewTaskStatus,
+  'primary' | 'success' | 'warning' | null
+> = {
+  pending: null,
+  requested: 'primary',
+  in_progress: 'warning',
+  completed: 'success',
+  blocked: null,
+  skipped: null,
+  cancelled: null
 };
