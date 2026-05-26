@@ -191,7 +191,11 @@ describe('DownloadPolicyService (integration)', function () {
         expressionId: rootExpressionId
       });
 
-      const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+      const { download_id } = await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: connection.systemUserId()
+      });
 
       const linkRows = await connection.sql(SQL`
         SELECT pse.expression_id
@@ -216,10 +220,18 @@ describe('DownloadPolicyService (integration)', function () {
         expressionId: null
       });
 
-      await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+      await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: connection.systemUserId()
+      });
 
       try {
-        await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+        await downloadService.createDownload({
+          policyId: policy_id,
+          format: 'parquet',
+          requestedBy: connection.systemUserId()
+        });
         expect.fail('Expected unique-violation on duplicate policy_id');
       } catch (error: any) {
         const pgMessage = error.errors?.[0]?.message ?? error.message ?? '';
@@ -256,7 +268,11 @@ describe('DownloadPolicyService (integration)', function () {
         featureTypes: ['dataset'],
         expressionId: null
       });
-      await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+      await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: connection.systemUserId()
+      });
 
       try {
         await connection.sql(SQL`DELETE FROM policy WHERE policy_id = ${policy_id};`);

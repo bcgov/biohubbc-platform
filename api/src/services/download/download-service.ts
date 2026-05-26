@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadDetailRecord, DownloadId, DownloadListRecord } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -17,7 +17,14 @@ export interface CreateDownloadRequestPayload {
   description: string | null;
   featureTypes: string[];
   expression: ExpressionTree | null;
-  systemUserId: number;
+  requestedBy: number | null;
+}
+
+/**
+ * Result of creating a download request.
+ */
+export interface CreateDownloadRequestResult {
+  download_id: string;
 }
 
 /**
@@ -92,23 +99,31 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Create a download request end-to-end for an authenticated user.
+   * Create a download request end-to-end for an authenticated or anonymous user.
    *
    * Persists the optional expression tree, creates the owning download policy, creates the
-   * download record, links a fresh team to the download for the requesting user, and queues
-   * the worker job. The caller (route handler) wraps this in a single transaction so a
-   * mid-flow failure leaves no orphan rows.
+   * download record, wires up access for the requester, and queues the worker job. The caller
+   * (route handler) wraps this in a single transaction so a mid-flow failure leaves no orphan
+   * rows.
    *
-   * Authorization is enforced at export time, not create time. The user's authorization is
-   * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
-   * create-time would let users export data they no longer have access to by simply queuing
-   * a download earlier.
+   * `requestedBy` is the security identity the export is built with: it is persisted to
+   * `download.requested_by` (which drives the parquet security filter) and, for authenticated
+   * requests, used to seed the single-member team. requested_by and the single-member team are
+   * seeded from the same identity at creation: the person the content is filtered for is exactly
+   * the person granted access. They diverge only later, via claim.
+   *
+   * An anonymous caller's only handle is the download UUID itself; the public download page lets
+   * them watch status, and any later export is a separate user-initiated action.
+   *
+   * Authorization is enforced at export time, not create time — the worker re-evaluates
+   * visibility against `requested_by`, so a user cannot export data they no longer have access
+   * to by queuing a download earlier.
    *
    * @param {CreateDownloadRequestPayload} payload - Request payload.
-   * @return {Promise<DownloadId>} The created download identifier.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier.
    * @memberof DownloadService
    */
-  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<DownloadId> {
+  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<CreateDownloadRequestResult> {
     let expressionId: string | null = null;
     if (payload.expression !== null) {
       const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
@@ -122,14 +137,21 @@ export class DownloadService extends DBService {
       expressionId
     });
 
-    const { download_id } = await this.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await this.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: payload.requestedBy
+    });
 
-    await this.linkDownloadToNewTeam(
-      download_id,
-      payload.systemUserId,
-      `Team for download ${download_id}`,
-      'Team automatically created for download'
-    );
+    if (payload.requestedBy !== null) {
+      await this.linkDownloadToNewTeam(
+        download_id,
+        payload.requestedBy,
+        `Team for download ${download_id}`,
+        'Team automatically created for download'
+      );
+    }
+    // Anonymous: no team link — UUID is the credential.
 
     await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
 
@@ -140,10 +162,10 @@ export class DownloadService extends DBService {
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord | null>}
+   * @return {Promise<DownloadDetailRecord | null>}
    * @memberof DownloadService
    */
-  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
     return this.downloadRepository.findDownloadById(downloadId);
   }
 
@@ -235,10 +257,10 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID.
    * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
-   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
+   * @return {Promise<DownloadDetailRecord>} The download record (avoids a second fetch by the caller).
    * @memberof DownloadService
    */
-  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
+  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadDetailRecord> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
 
     if (!download) {

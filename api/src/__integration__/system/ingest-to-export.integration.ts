@@ -159,7 +159,8 @@ describe('Ingest → Download → Export (system integration)', function () {
     const downloadService = new DownloadService(connection);
     const { download_id: downloadId } = await downloadService.createDownload({
       policyId: policy_id,
-      format: 'parquet'
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
     });
 
     // Run the download (Parquet) pipeline.

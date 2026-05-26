@@ -4,7 +4,7 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
-import type { DownloadRecord } from '../models/download';
+import type { DownloadDetailRecord } from '../models/download';
 import type { SubmissionUpload } from '../models/submission-upload';
 import type { SubmissionValidationRecord } from '../models/submission-validation';
 import { DownloadService } from '../services/download/download-service';
@@ -554,7 +554,7 @@ describe('publisher', () => {
   });
 
   describe('publishProcessDownloadJob', () => {
-    const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
+    const createMockDownload = (overrides: Partial<DownloadDetailRecord> = {}): DownloadDetailRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
       download_status: 'pending',
       format: 'parquet',
@@ -563,6 +563,8 @@ describe('publisher', () => {
       completed_at: null,
       downloaded_at: null,
       create_date: '2025-01-01T00:00:00Z',
+      name: 'Test download',
+      description: null,
       ...overrides
     });
 

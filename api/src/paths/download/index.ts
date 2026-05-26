@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { CreateDownloadRequestBody } from '../../models/download';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -147,10 +147,7 @@ export function getDownloads(): RequestHandler {
   };
 }
 
-export const POST: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  createDownload()
-];
+export const POST: Operation = [createDownload()];
 
 POST.apiDoc = {
   description:
@@ -158,7 +155,7 @@ POST.apiDoc = {
   tags: ['download'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
@@ -206,16 +203,23 @@ POST.apiDoc = {
 };
 
 /**
- * Create a download request.
+ * Create a download request. Anonymous-capable: a missing bearer token is allowed.
+ *
+ * Without a bearer token the request runs on the shared API-user connection and `requestedBy`
+ * is null. A null `requested_by` is the security identity "anonymous" — the parquet packaging
+ * filters to only unsecured data, so an anonymous caller can never pull secured records. An
+ * authenticated request runs on that user's connection and scopes the package to data visible
+ * to them; authorization is re-evaluated at export time against `requested_by`, so queuing
+ * early grants no extra access later.
+ *
+ * The response shape is `{ download_id, download_url }` for both callers. The download UUID is
+ * the credential for the anonymous caller, who watches status on the public download page; the
+ * authenticated caller drives the explicit two-call export flow (create export, then poll it)
+ * from the Downloads UI.
  *
  * Delegates the business orchestration (expression tree → policy → download → team link →
- * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing,
- * the transaction boundary, and response shaping.
- *
- * Authorization is enforced at export time, not create time. The user's authorization is
- * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
- * create-time would let users export data they no longer have access to by simply queuing
- * a download earlier.
+ * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing, the
+ * connection choice, the transaction boundary, and response shaping.
  *
  * @return {RequestHandler}
  */
@@ -231,10 +235,13 @@ export function createDownload(): RequestHandler {
     }
     const { name, description, featureTypes, expression } = parseResult.data;
 
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
+
+      const requestedBy = isAuthenticated ? connection.systemUserId() : null;
 
       const downloadService = new DownloadService(connection);
 
@@ -243,7 +250,7 @@ export function createDownload(): RequestHandler {
         description: description ?? null,
         featureTypes,
         expression,
-        systemUserId: connection.systemUserId()
+        requestedBy
       });
 
       await connection.commit();

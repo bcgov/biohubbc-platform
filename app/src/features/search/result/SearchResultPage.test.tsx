@@ -1,5 +1,6 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -31,6 +32,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('hooks/useApi');
+vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 vi.mock('./hooks/useSearchResults');
 vi.mock('./header/SearchResultSearch', () => ({
@@ -65,6 +67,7 @@ vi.mock('./header/SearchResultSearch', () => ({
 import { useSearchResults } from './hooks/useSearchResults';
 
 const mockUseApi = useApi as Mock;
+const mockUseAuthStateContext = useAuthStateContext as Mock;
 const mockUseCodesContext = useCodesContext as Mock;
 const mockUseCartContext = useCartContext as Mock;
 const mockUseDialogContext = useDialogContext as Mock;
@@ -102,6 +105,10 @@ describe('SearchResultPage', () => {
     });
 
     mockGetAvailableUsers.mockResolvedValue({ users: [] });
+    // Default to authenticated: the create-download tests below assert the authenticated
+    // snackbar + Downloads-sidebar path. Anonymous-branch behavior is covered in
+    // useSearchResultDownload.test.tsx.
+    mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload },
       dataRequest: { createDataRequest: mockCreateDataRequest },
