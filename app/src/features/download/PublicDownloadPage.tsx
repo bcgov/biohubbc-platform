@@ -47,8 +47,7 @@ export const PublicDownloadPage = () => {
     if (downloadId) {
       downloadDataLoader.load(downloadId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [downloadId]);
+  }, [downloadId, downloadDataLoader]);
 
   const download = downloadDataLoader.data;
   const apiError = downloadDataLoader.error as APIError | undefined;
