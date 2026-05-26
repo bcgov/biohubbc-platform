@@ -1,13 +1,15 @@
-import { mdiCheck, mdiClose } from '@mdi/js';
+import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import {
+  SUBMISSION_UPLOAD_JOB_STATUS_COLORS,
   SUBMISSION_UPLOAD_JOB_STATUS_LABELS,
+  SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICON_COLORS,
+  SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICONS,
   TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES
 } from 'constants/submission-upload-status';
-import { SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interface';
 
@@ -20,26 +22,11 @@ import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interfa
 export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
   const { upload } = props;
 
-  const statusColorByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
-    indexed: 'success.main',
-    invalid: 'error.main',
-    failed: 'error.main'
-  };
-  const terminalIconByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
-    indexed: mdiCheck,
-    invalid: mdiClose,
-    failed: mdiClose
-  };
-  const terminalIconColorByStatus: Partial<Record<SubmissionUploadJobStatus, string>> = {
-    indexed: appTheme.palette.success.main,
-    invalid: appTheme.palette.error.main,
-    failed: appTheme.palette.error.main
-  };
-
   const isTerminalUploadStatus = TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES.includes(upload.upload_status);
-  const statusColor = statusColorByStatus[upload.upload_status] ?? 'primary.main';
-  const terminalStatusIcon = terminalIconByStatus[upload.upload_status] ?? mdiClose;
-  const terminalStatusColor = terminalIconColorByStatus[upload.upload_status] ?? appTheme.palette.error.main;
+  const statusColor = SUBMISSION_UPLOAD_JOB_STATUS_COLORS[upload.upload_status] ?? 'primary.main';
+  const terminalStatusIcon = SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICONS[upload.upload_status] ?? mdiClose;
+  const terminalStatusColor =
+    SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICON_COLORS[upload.upload_status] ?? appTheme.palette.error.main;
 
   return (
     <Box

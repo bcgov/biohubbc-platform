@@ -23,6 +23,24 @@ export const useTicketTimelineUploadActions = () => {
   const { ticketDataLoader } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
 
+  const updateCachedSubmissionUpload = (
+    submissionUploadId: string,
+    updateUpload: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
+  ): void => {
+    const latestTicket = ticketDataLoader.data;
+
+    if (!latestTicket) {
+      return;
+    }
+
+    ticketDataLoader.setData({
+      ...latestTicket,
+      submission_uploads: latestTicket.submission_uploads.map((upload) =>
+        upload.submission_upload_id === submissionUploadId ? updateUpload(upload) : upload
+      )
+    });
+  };
+
   /**
    * Replaces the cached final review status for one upload after the backend accepts or denies it.
    * This is only used for the upload-level decision row and intentionally leaves scoped review tasks unchanged.
@@ -35,18 +53,7 @@ export const useTicketTimelineUploadActions = () => {
     submissionUploadId: string,
     reviewStatus: TicketSubmissionUploadResponse['review_status']
   ): void => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      submission_uploads: latestTicket.submission_uploads.map((upload) =>
-        upload.submission_upload_id === submissionUploadId ? { ...upload, review_status: reviewStatus } : upload
-      )
-    });
+    updateCachedSubmissionUpload(submissionUploadId, (upload) => ({ ...upload, review_status: reviewStatus }));
   };
 
   /**
@@ -57,28 +64,13 @@ export const useTicketTimelineUploadActions = () => {
    * @returns {void}
    */
   const setCachedUploadReview = (review: TicketSubmissionUploadReviewResponse): void => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      submission_uploads: latestTicket.submission_uploads.map((upload) => {
-        if (upload.submission_upload_id !== review.submission_upload_id) {
-          return upload;
-        }
-
-        return {
-          ...upload,
-          reviews: {
-            ...upload.reviews,
-            [review.scope]: review
-          }
-        };
-      })
-    });
+    updateCachedSubmissionUpload(review.submission_upload_id, (upload) => ({
+      ...upload,
+      reviews: {
+        ...upload.reviews,
+        [review.scope]: review
+      }
+    }));
   };
 
   /**

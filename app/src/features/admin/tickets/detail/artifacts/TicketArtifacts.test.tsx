@@ -83,6 +83,7 @@ const ticket: ITicketExtended = {
   artifacts: [ticketArtifact],
   references: [],
   data_requests: [],
+  submission_uploads: [],
   ticket_system_users: []
 };
 
