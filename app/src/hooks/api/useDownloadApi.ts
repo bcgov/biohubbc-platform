@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import {
   CreateDownloadRequest,
   CreateDownloadResponse,
+  DownloadDetail,
   DownloadListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -35,5 +36,17 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { getDownloads, createDownload };
+  /**
+   * Get the detail record for a single download by id. Powers the public
+   * download page — status, header name, description, and lifecycle timestamps.
+   *
+   * @param {string} downloadId
+   * @return {Promise<DownloadDetail>}
+   */
+  const getDownload = async (downloadId: string): Promise<DownloadDetail> => {
+    const { data } = await axios.get<DownloadDetail>(`/api/download/${downloadId}`);
+    return data;
+  };
+
+  return { getDownloads, createDownload, getDownload };
 };
