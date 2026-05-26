@@ -5,7 +5,6 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadRecord } from '../../__mocks__/download';
 import { SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
-import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
@@ -58,7 +57,6 @@ describe('DownloadExportService', () => {
         sinon
           .stub(DownloadService.prototype, 'getAuthorizedDownload')
           .resolves(createMockDownloadRecord({ download_status: status }));
-        sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
 
         const service = new DownloadExportService(getMockDBConnection());
 
@@ -71,32 +69,10 @@ describe('DownloadExportService', () => {
       });
     });
 
-    it('throws HTTP409 when the parent download is teamless (anonymous)', async () => {
-      // An authenticated holder of an anonymous download's UUID must claim it before requesting
-      // additional exports — anonymous downloads keep exactly one auto-chained default export.
-      sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(false);
-      const repoStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
-
-      const service = new DownloadExportService(getMockDBConnection());
-
-      try {
-        await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
-        expect.fail('Expected throw');
-      } catch (err) {
-        expect(err).to.be.instanceOf(HTTP409);
-      }
-
-      expect(repoStub).to.not.have.been.called;
-    });
-
     it('applies default max_part_size_bytes "524288000" when the request omits it', async () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -111,7 +87,6 @@ describe('DownloadExportService', () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -126,7 +101,6 @@ describe('DownloadExportService', () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
@@ -143,7 +117,6 @@ describe('DownloadExportService', () => {
       const authStub = sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      sinon.stub(DownloadService.prototype, 'isDownloadClaimedByTeam').resolves(true);
       sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport').resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
@@ -154,96 +127,34 @@ describe('DownloadExportService', () => {
   });
 
   describe('getAuthorizedExport', () => {
-    it('propagates HTTP403 from getAuthorizedDownload for an anonymous user on a team-scoped parent', async () => {
-      // Verifies: export access mirrors download access — a null user on a team-scoped parent is
-      // rejected by getAuthorizedDownload, and getAuthorizedExport delegates to it (no longer
-      // short-circuits on null).
-
-      // Step 1: Stub the export fetch to return a record, and the download auth to reject
-      sinon.stub(DownloadExportRepository.prototype, 'getDownloadExportById').resolves(mockExportRecord);
-      const authStub = sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
-        .rejects(new HTTP403('Access denied'));
-
-      const service = new DownloadExportService(getMockDBConnection());
-
-      // Step 2: Call with no security identity
-      try {
-        await service.getAuthorizedExport(EXPORT_ID, null);
-        expect.fail('Expected throw');
-      } catch (err) {
-        // Step 3: The HTTP403 from the download auth propagates unchanged
-        expect(err).to.be.instanceOf(HTTP403);
-      }
-
-      // Step 4: The team-auth check WAS delegated (with the parent download id and the null user)
-      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, null);
-    });
-
-    it('returns the export record for an anonymous user on a teamless parent', async () => {
-      // Verifies: a teamless (anonymous) parent is reachable by UUID alone — getAuthorizedDownload
-      // resolves for a null user, so the export record is returned.
-
-      // Step 1: Stub the export fetch and a resolving download auth
-      sinon.stub(DownloadExportRepository.prototype, 'getDownloadExportById').resolves(mockExportRecord);
-      const authStub = sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
-        .resolves(createMockDownloadRecord({ download_id: DOWNLOAD_ID }));
-
-      const service = new DownloadExportService(getMockDBConnection());
-
-      // Step 2: Call with no security identity
-      const result = await service.getAuthorizedExport(EXPORT_ID, null);
-
-      // Step 3: The team-auth check was delegated with the null user
-      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, null);
-
-      // Step 4: The fetched export record is returned
-      expect(result).to.equal(mockExportRecord);
-    });
-
-    it('delegates to DownloadService.getAuthorizedDownload with the export record download_id', async () => {
-      // Verifies: the parent download id pulled from the export record drives the team-auth check.
-
-      // Step 1: Stub the export fetch and a resolving download auth
-      sinon.stub(DownloadExportRepository.prototype, 'getDownloadExportById').resolves(mockExportRecord);
-      const authStub = sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
-        .resolves(createMockDownloadRecord({ download_id: DOWNLOAD_ID }));
-
-      const service = new DownloadExportService(getMockDBConnection());
-
-      // Step 2: Call as an authenticated user
-      const result = await service.getAuthorizedExport(EXPORT_ID, 42);
-
-      // Step 3: Auth was delegated with the parent id and the user, and the export record is returned
-      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, 42);
-      expect(result).to.equal(mockExportRecord);
-    });
-
-    it('propagates ApiNotFoundError and skips the team-auth check when the export is missing', async () => {
-      // Verifies: a missing export surfaces ApiNotFoundError from the fetch before any team-auth
-      // check runs — getAuthorizedDownload must not be called for a non-existent export.
-
-      // Step 1: Stub the export fetch to reject as missing
-      sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .rejects(new ApiNotFoundError('Download export not found'));
+    it('throws HTTP403 when systemUserId is null; does not call getAuthorizedDownload', async () => {
+      const getStub = sinon.stub(DownloadExportRepository.prototype, 'getDownloadExportById');
       const authStub = sinon.stub(DownloadService.prototype, 'getAuthorizedDownload');
 
       const service = new DownloadExportService(getMockDBConnection());
 
-      // Step 2: Call for a missing export
       try {
-        await service.getAuthorizedExport(EXPORT_ID, 42);
+        await service.getAuthorizedExport(EXPORT_ID, null);
         expect.fail('Expected throw');
       } catch (err) {
-        // Step 3: The not-found error propagates
-        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect(err).to.be.instanceOf(HTTP403);
       }
 
-      // Step 4: The team-auth check is never reached
+      expect(getStub).to.not.have.been.called;
       expect(authStub).to.not.have.been.called;
+    });
+
+    it('delegates to DownloadService.getAuthorizedDownload with the export record download_id', async () => {
+      sinon.stub(DownloadExportRepository.prototype, 'getDownloadExportById').resolves(mockExportRecord);
+      const authStub = sinon
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .resolves(createMockDownloadRecord({ download_id: DOWNLOAD_ID }));
+
+      const service = new DownloadExportService(getMockDBConnection());
+      const result = await service.getAuthorizedExport(EXPORT_ID, 42);
+
+      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, 42);
+      expect(result).to.equal(mockExportRecord);
     });
   });
 

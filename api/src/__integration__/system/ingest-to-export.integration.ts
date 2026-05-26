@@ -162,9 +162,6 @@ describe('Ingest → Download → Export (system integration)', function () {
       format: 'parquet',
       requestedBy: connection.systemUserId()
     });
-    // Mirror the authenticated create flow: link a team so the download is claimed. Explicit
-    // export creation requires a team-scoped (claimed) download — teamless = anonymous.
-    await downloadService.linkDownloadToNewTeam(downloadId, systemUserId, 'ingest-to-export team', '');
 
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);

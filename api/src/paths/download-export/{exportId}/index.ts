@@ -1,20 +1,24 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { getDBConnection } from '../../../database/db';
 import { DownloadStatusEnum } from '../../../models/download-status';
 import { DownloadExportDetailResponseSchema } from '../../../openapi/schemas/download-export';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../services/download/download-export-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/download-export/{exportId}');
 
-export const GET: Operation = [getDownloadExportDetail()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
+  getDownloadExportDetail()
+];
 
 GET.apiDoc = {
   description: 'Get a download export by ID, including presigned part URLs when ready',
   tags: ['download'],
-  security: [{ OptionalBearer: [] }],
+  security: [{ Bearer: [] }],
   parameters: [
     {
       in: 'path',
@@ -38,13 +42,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get a download export by ID. Anonymous-capable: a missing bearer token is allowed.
- *
- * This is the credential an anonymous caller is handed at create time (they have no Downloads
- * UI to navigate from), so it must be reachable without authentication. A teamless export —
- * one whose parent download was never claimed — is public-by-link: the UUID alone grants
- * access. An export whose parent is team-scoped still requires team membership, so passing a
- * null `systemUserId` into `getAuthorizedExport` makes it throw HTTP403 for those parents.
+ * Get a download export by ID.
  *
  * `parts[]` is populated only when `status === 'ready'`. Non-ready statuses
  * (pending / processing / failed / downloaded) return an empty array so
@@ -54,13 +52,12 @@ GET.apiDoc = {
  */
 export function getDownloadExportDetail(): RequestHandler {
   return async (req, res) => {
-    const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const systemUserId = connection.systemUserId();
       const exportId = req.params.exportId;
 
       const exportService = new DownloadExportService(connection);

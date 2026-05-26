@@ -50,18 +50,12 @@ export class DownloadExportService extends DBService {
    * ticket ships the single-shape contract; a future denormalized-mode addition
    * opens `mode` at the request layer.
    *
-   * Export *creation* is the gated write path and, by design, diverges from the
-   * anon-capable read paths below (`getAuthorizedExport` and the detail/list
-   * endpoints): a teamless UUID can *read* an export but cannot *create* one.
-   *
    * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and
    * require team membership on the parent download — delegates to
    * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
-   * exactly one place. Teamless (anonymous) downloads are rejected with 409:
-   * they get exactly one auto-chained default export and have no UI to request
-   * more, so explicit creation must come after claiming. Only `ready` downloads
-   * can export; `pending` / `processing` / `failed` parents surface 409 and the
-   * client retries after the parent finishes.
+   * exactly one place. Only `ready` downloads can export; `pending` /
+   * `processing` / `failed` parents surface 409 and the client retries after
+   * the parent finishes.
    *
    * Does NOT publish the pg-boss job — route handlers publish inside the same
    * transaction as the insert so enqueue and row creation succeed together.
@@ -77,15 +71,6 @@ export class DownloadExportService extends DBService {
 
     // Throws HTTP403 / HTTP404 as appropriate.
     const download = await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
-
-    // Anonymous (teamless) downloads get exactly one auto-chained default export and have no UI
-    // to request more — and the parquet→export auto-chain assumes that single export. Refuse
-    // explicit creation on a teamless download: an authenticated holder of the anon UUID must
-    // claim it first (which links a team) before requesting additional exports.
-    const isClaimed = await this.downloadService.isDownloadClaimedByTeam(downloadId);
-    if (!isClaimed) {
-      throw new HTTP409('Anonymous downloads cannot create additional exports — claim the download first');
-    }
 
     if (download.download_status !== DownloadStatusEnum.READY) {
       throw new HTTP409('Download is not ready — cannot export');
@@ -116,14 +101,17 @@ export class DownloadExportService extends DBService {
   /**
    * Authorize a user for an export.
    *
-   * Export access mirrors download access: a teamless (anonymous) parent is
-   * reachable by UUID alone; a team-scoped parent requires team membership. The
-   * UUID is not a credential for a claimed download. Delegates the team-membership
-   * check to `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
-   * exactly one place — that helper returns for a teamless parent and throws HTTP403
-   * for a team-scoped parent when `systemUserId` is null.
+   * Exports are authenticated-only — the Parquet download is the unauthenticated
+   * path and anonymous UUID holders must `PUT /api/download/:id` to claim
+   * before they can export. Delegates team-membership checks to
+   * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
+   * exactly one place.
    */
   async getAuthorizedExport(exportId: string, systemUserId: number | null): Promise<DownloadExportRecord> {
+    if (systemUserId === null) {
+      throw new HTTP403('Access denied');
+    }
+
     const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
     await this.downloadService.getAuthorizedDownload(exportRecord.download_id, systemUserId);
 

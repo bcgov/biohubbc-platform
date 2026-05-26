@@ -1,9 +1,12 @@
-import { mdiHelpCircleOutline, mdiRefresh } from '@mdi/js';
+import { mdiContentCopy, mdiHelpCircleOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useState } from 'react';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
@@ -11,7 +14,7 @@ import { useApi } from 'hooks/useApi';
 import { APIError } from 'hooks/api/useAxios';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { PublicDownloadPageContent } from './PublicDownloadPageContent';
 
 /**
@@ -59,27 +62,58 @@ export const PublicDownloadPage = () => {
     <LoadingGuard isLoading={downloadDataLoader.isLoading && !download} isLoadingFallback={<SkeletonPage />}>
       {download ? (
         <>
-          <PageHeader
-            label="Download"
-            subheader={download.name}
-            buttons={
-              <IconButton
-                title="Refresh"
-                onClick={() => downloadId && downloadDataLoader.refresh(downloadId)}
-                disabled={downloadDataLoader.isLoading}>
-                <Icon path={mdiRefresh} size={0.8} />
-              </IconButton>
-            }
-          />
+          <PageHeader label="Download" subheader={download.name} />
           <Container maxWidth="md" sx={{ py: 4 }}>
-            <Typography color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.85rem', mb: 2 }}>
-              id: {download.download_id}
-            </Typography>
-            <PublicDownloadPageContent download={download} />
+            <ShareLinkRow />
+            <PublicDownloadPageContent
+              download={download}
+              isRefreshing={downloadDataLoader.isLoading}
+              onRefresh={() => downloadId && downloadDataLoader.refresh(downloadId)}
+            />
           </Container>
         </>
       ) : null}
     </LoadingGuard>
+  );
+};
+
+/**
+ * Read-only field showing the current page URL with a one-click copy button.
+ * The URL is the credential — sharing it grants access — so the page exposes
+ * it as a first-class affordance instead of asking the user to grab it from
+ * the address bar.
+ */
+const ShareLinkRow = () => {
+  const [copied, setCopied] = useState(false);
+  const location = useLocation();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const url = `${origin}${location.pathname}`;
+
+  const handleCopy = async () => {
+    if (!url) {
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <Box display="flex" alignItems="center" gap={1} mb={3}>
+      <TextField
+        size="small"
+        fullWidth
+        label="Share link"
+        value={url}
+        slotProps={{ input: { readOnly: true } }}
+        onFocus={(e) => e.target.select()}
+      />
+      <Tooltip title={copied ? 'Copied!' : 'Copy link'} placement="top">
+        <IconButton onClick={handleCopy} aria-label="Copy share link">
+          <Icon path={mdiContentCopy} size={0.9} />
+        </IconButton>
+      </Tooltip>
+    </Box>
   );
 };
 

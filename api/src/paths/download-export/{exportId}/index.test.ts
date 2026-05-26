@@ -49,29 +49,6 @@ describe('paths/download-export/{exportId}/index', () => {
       expect(mockRes.jsonValue).to.eql({ ...exportRecord, parts: [] });
     });
 
-    it('authorizes with a null systemUserId for an unauthenticated request', async () => {
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
-
-      const exportRecord = makeExportRecord({ status: 'pending' });
-      const authStub = sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').resolves(exportRecord);
-      sinon.stub(DownloadExportService.prototype, 'listExportPartUrls');
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      // No keycloak_token — unauthenticated request
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { exportId: exportRecord.download_export_id };
-
-      await getDownloadExportDetail()(mockReq, mockRes, mockNext);
-
-      // Anonymous requests run on the shared API-user connection and pass a null identity so a
-      // team-scoped parent still throws HTTP403 inside getAuthorizedExport.
-      expect(dbConnStub).to.not.have.been.called;
-      expect(authStub).to.have.been.calledOnceWith(exportRecord.download_export_id, null);
-      expect(mockRes.statusValue).to.equal(200);
-    });
-
     it('should return 200 with record and populated parts when status is ready', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);

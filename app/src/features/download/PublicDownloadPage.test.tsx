@@ -98,12 +98,11 @@ describe('PublicDownloadPage', () => {
   it('refreshes the data loader when the Refresh button is clicked', async () => {
     mockGetDownload.mockResolvedValue(makeDownload({ status: 'pending' }));
 
-    const { getByTitle, findByTitle } = renderAt(`/download/${DOWNLOAD_ID}`);
+    const { findByRole } = renderAt(`/download/${DOWNLOAD_ID}`);
 
-    // Wait for the header to mount (data resolved + LoadingGuard releases).
-    await findByTitle('Refresh');
+    const refreshButton = await findByRole('button', { name: /refresh/i });
 
-    fireEvent.click(getByTitle('Refresh'));
+    fireEvent.click(refreshButton);
 
     await waitFor(() => {
       expect(mockGetDownload).toHaveBeenCalledTimes(2);
@@ -182,14 +181,15 @@ describe('PublicDownloadPage', () => {
     expect(container.textContent).not.toMatch(/A description of/);
   });
 
-  it('renders the download id below the subheader as monospace', async () => {
+  it('exposes the current page URL as a readonly share-link field', async () => {
     mockGetDownload.mockResolvedValue(makeDownload());
 
-    const { getByText } = renderAt(`/download/${DOWNLOAD_ID}`);
+    const { findByLabelText } = renderAt(`/download/${DOWNLOAD_ID}`);
 
-    await waitFor(() => {
-      expect(getByText(`id: ${DOWNLOAD_ID}`)).toBeVisible();
-    });
+    const input = (await findByLabelText('Share link')) as HTMLInputElement;
+    expect(input).toBeVisible();
+    expect(input.readOnly).toBe(true);
+    expect(input.value).toContain(`/download/${DOWNLOAD_ID}`);
   });
 
   it('renders identically regardless of auth state (no AuthStateContext usage)', async () => {
