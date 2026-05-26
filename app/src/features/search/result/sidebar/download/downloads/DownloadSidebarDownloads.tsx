@@ -7,6 +7,7 @@ import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
+import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { DownloadFeatureCard } from '../feature/DownloadFeatureCard';
 
@@ -18,7 +19,7 @@ const PAGE_SIZE = 10;
  * terminal. Exported (not inlined) so the card can share the same definition via sibling
  * import.
  */
-export const isExportReady = (status: string): boolean => status === 'ready';
+export const isExportReady = (status: DownloadExportStatus): boolean => status === 'ready';
 
 /**
  * Inject a hidden iframe that triggers a browser download of the given URL, then clean it up
@@ -70,6 +71,9 @@ export const DownloadSidebarDownloads = () => {
    * Create a new CSV export for a ready download, then refresh the list. The refresh replays
    * the backend's pre-join (`download.exports`) — the new pending export row surfaces via that
    * refresh, so we need no separate cache or version bumper.
+   * Failures open the standard export error dialog.
+   *
+   * @param {string} downloadId - Download request id to export.
    */
   const handleCreateExport = async (downloadId: string) => {
     try {
@@ -87,9 +91,11 @@ export const DownloadSidebarDownloads = () => {
   };
 
   /**
-   * Fetch the export detail, find the matching part-zip, and iframe-inject its presigned URL.
-   * A missing part (should never happen — `part_count` is the source of truth) surfaces the
-   * same "Download Error" dialog as any other failure.
+   * Downloads a single export part by resolving a fresh presigned URL first.
+   * A missing part uses the same "Download Error" dialog as API failures.
+   *
+   * @param {string} exportId - Export id containing the requested part.
+   * @param {number} chunkId - One-based part id to download.
    */
   const handleDownloadExportPart = async (exportId: string, chunkId: number) => {
     try {
@@ -111,9 +117,11 @@ export const DownloadSidebarDownloads = () => {
   };
 
   /**
-   * Download every part of a ready export. Makes ONE `getExport` call — the detail response
-   * carries all part URLs — then iframe-injects each in order. N parts does not mean N round-
-   * trips.
+   * Downloads every part for a ready multi-part export.
+   * Fetches export detail once, then iframe-injects each part URL in backend
+   * order. No iframe downloads start if detail fetch fails.
+   *
+   * @param {string} exportId - Export id whose parts should all be downloaded.
    */
   const handleDownloadExportAllParts = async (exportId: string) => {
     try {
@@ -133,15 +141,10 @@ export const DownloadSidebarDownloads = () => {
   };
 
   /**
-   * Stub rebuild handler — today's zero-row-edge-case surface AND tomorrow's S3-TTL-rebuild
-   * surface.
+   * Handles the rebuild affordance for ready exports with no available parts.
+   * Currently shows an explanatory dialog; the rebuild API is not wired yet.
    *
-   * Today: tells the user there's nothing to download (no rows matched the download filter).
-   * Future (S3 TTL ticket): body swaps to
-   *   `await biohubApi.downloadExport.rebuildExport(exportId);`
-   *   `await downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });`
-   * and the row transitions back through `pending → processing → ready` with fresh part-zips.
-   * The card's rebuild branch does not change — only this handler grows.
+   * @param {string} _exportId - Export id reserved for the future rebuild request.
    */
   const handleRebuildExport = async (_exportId: string) => {
     dialogContext.setErrorDialog({

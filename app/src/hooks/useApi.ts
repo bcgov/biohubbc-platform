@@ -1,5 +1,6 @@
 import { useConfigContext } from 'hooks/useContext';
 import useAdminApi from './api/useAdminApi';
+import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import { useCartApi } from './api/useCartApi';
@@ -66,6 +67,8 @@ export const useApi = () => {
 
   const dataRequest = useDataRequestApi(apiAxios);
 
+  const apiKeys = useApiKeysApi(apiAxios);
+
   const objectStorage = useObjectStorageApi();
 
   return {
@@ -87,6 +90,7 @@ export const useApi = () => {
     teamPolicies,
     tickets,
     dataRequest,
+    apiKeys,
     objectStorage
   };
 };

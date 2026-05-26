@@ -37,14 +37,14 @@ export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
 export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['ticket_artifact_id', 'ticket_id', 'artifact_id', 'record_end_date', 'create_date', 'key'],
+  required: ['ticket_artifact_id', 'ticket_id', 'artifact_id', 'record_end_date', 'create_date', 'object_key'],
   properties: {
     ticket_artifact_id: { type: 'string', format: 'uuid' },
     ticket_id: { type: 'string', format: 'uuid' },
     artifact_id: { type: 'string', format: 'uuid' },
     record_end_date: { type: 'string', format: 'date-time', nullable: true },
     create_date: { type: 'string', format: 'date-time' },
-    key: { type: 'string', description: 'Artifact object storage key.' }
+    object_key: { type: 'string', description: 'Artifact object storage key.' }
   }
 };
 
@@ -339,6 +339,18 @@ export const TicketListResponseSchema: OpenAPIV3.SchemaObject = {
     tickets: {
       type: 'array',
       items: TicketSchema
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+export const TicketArtifactListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['artifacts', 'pagination'],
+  properties: {
+    artifacts: {
+      type: 'array',
+      items: TicketArtifactSchema
     },
     pagination: paginationResponseSchema
   }

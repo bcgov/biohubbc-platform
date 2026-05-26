@@ -1,14 +1,12 @@
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureProperty } from '../models/feature-property';
-import { SubmissionFeaturePropertyFilters, SubmissionFeatureSignedUrlPayload } from '../models/submission-feature';
+import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { SubmissionFeatureRepository } from '../repositories/submission-feature-repository';
 import {
   RelatedSubmissionFeature,
   SubmissionFeature,
   SubmissionFeatureRecord
 } from '../repositories/submission-repository';
-import { getS3SignedURL } from '../utils/file-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
@@ -113,29 +111,5 @@ export class SubmissionFeatureService extends DBService {
     ]);
 
     return { properties, total };
-  }
-
-  /**
-   * Generate a signed URL for a submission feature artifact key.
-   *
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @returns {Promise<string>}
-   * @memberof SubmissionFeatureService
-   */
-  async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const artifactKey = payload.isAdmin
-      ? await this.submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey(payload)
-      : await this.submissionFeatureRepository.getSubmissionFeatureArtifactKey(payload);
-
-    const signedUrl = await getS3SignedURL(artifactKey);
-
-    if (!signedUrl) {
-      throw new ApiGeneralError(
-        `Failed to generate signed URL for "${payload.submissionFeatureObj.key}":"${payload.submissionFeatureObj.value}"`,
-        ['SubmissionFeatureRepository->getSubmissionFeatureSignedUrl', 'getS3SignedUrl returned NULL']
-      );
-    }
-
-    return signedUrl;
   }
 }

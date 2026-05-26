@@ -8,6 +8,8 @@ import {
   ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
+  IGetTicketArtifactsQueryParams,
+  IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ISubmissionUploadReviewStatusResponse,
   ITicketSystemUser,
@@ -185,6 +187,25 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     payload: ICompleteTicketUploadRequest
   ): Promise<ITicketArtifact> => {
     const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/upload/${uploadId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Get paginated ticket attachment artifacts for an admin ticket detail view.
+   *
+   * @param {string} ticketId
+   * @param {IGetTicketArtifactsQueryParams} [params]
+   * @return {Promise<IGetTicketArtifactsResponse>}
+   */
+  const getTicketArtifacts = async (
+    ticketId: string,
+    params?: IGetTicketArtifactsQueryParams
+  ): Promise<IGetTicketArtifactsResponse> => {
+    const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
 
     return data;
   };
@@ -384,6 +405,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicketComment,
     createTicketUpload,
     completeTicketUpload,
+    getTicketArtifacts,
     getTicketArtifactDownloadUrl,
     updateSubmissionUploadReviewStatus,
     updateSubmissionUploadReview,

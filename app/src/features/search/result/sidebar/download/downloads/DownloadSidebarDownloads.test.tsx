@@ -1,5 +1,4 @@
 import { cleanup, fireEvent, waitFor } from '@testing-library/react';
-import { DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 import { makeDownload, makeExport } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { DownloadSidebarDownloads, isExportReady, triggerIframeDownload } from './DownloadSidebarDownloads';
@@ -38,10 +37,9 @@ describe('DownloadSidebarDownloads', () => {
       { status: 'pending', expected: false },
       { status: 'processing', expected: false },
       { status: 'ready', expected: true },
-      { status: 'failed', expected: false },
-      { status: 'downloaded', expected: false }
+      { status: 'failed', expected: false }
     ] as const)('returns $expected for status "$status"', ({ status, expected }) => {
-      expect(isExportReady(status as DownloadExportStatus)).toBe(expected);
+      expect(isExportReady(status)).toBe(expected);
     });
   });
 

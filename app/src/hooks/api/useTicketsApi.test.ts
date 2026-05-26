@@ -8,6 +8,7 @@ import {
   ICreateTicketSystemUser,
   ICreateTicketUploadRequest,
   ICreateTicketUploadResponse,
+  IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ITicket,
   ITicketArtifact,
@@ -202,7 +203,7 @@ describe('useTicketsApi', () => {
       artifact_id: '55555555-5555-4555-8555-555555555555',
       record_end_date: null,
       create_date: '2026-02-25T00:00:00.000Z',
-      key: 'tickets/notes.txt'
+      object_key: 'tickets/notes.txt'
     };
 
     mock.onPut(`/api/administrative/tickets/${ticketId}/upload/${uploadId}`, payload).reply(200, response);
@@ -290,6 +291,42 @@ describe('useTicketsApi', () => {
     const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionUuid, submissionUploadId, payload);
 
     expect(result).toEqual(response);
+  });
+
+  it('getTicketArtifacts fetches paginated ticket artifacts', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const response: IGetTicketArtifactsResponse = {
+      artifacts: [
+        {
+          ticket_artifact_id: '44444444-4444-4444-8444-444444444444',
+          ticket_id: ticketId,
+          artifact_id: '55555555-5555-4555-8555-555555555555',
+          record_end_date: null,
+          create_date: '2026-02-25T00:00:00.000Z',
+          object_key: 'tickets/notes.txt'
+        }
+      ],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10, sort: 'create_date', order: 'desc' }
+    };
+
+    mock.onGet(`/api/administrative/tickets/${ticketId}/artifact`).reply(200, response);
+
+    const result = await useTicketsApi(axios).getTicketArtifacts(ticketId, {
+      search: 'notes',
+      page: 1,
+      limit: 10,
+      sort: 'create_date',
+      order: 'desc'
+    });
+
+    expect(result).toEqual(response);
+    expect(mock.history.get[0].params).toEqual({
+      search: 'notes',
+      page: 1,
+      limit: 10,
+      sort: 'create_date',
+      order: 'desc'
+    });
   });
 
   it('createTicketReference posts payload and returns reference row', async () => {

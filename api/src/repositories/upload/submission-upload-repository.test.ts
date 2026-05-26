@@ -207,6 +207,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
       expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
       expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
     });
 
     it('selects validation from the lateral validation alias', async () => {

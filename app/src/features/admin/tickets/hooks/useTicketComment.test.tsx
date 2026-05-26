@@ -48,7 +48,7 @@ const makeTicketArtifact = (fileName: string): ITicketArtifact => ({
   artifact_id: '11111111-1111-4111-8111-111111111111',
   record_end_date: null,
   create_date: '2026-02-25T00:00:00.000Z',
-  key: `tickets/ticket-id/upload/upload-id/${fileName}`
+  object_key: `tickets/ticket-id/upload/upload-id/${fileName}`
 });
 
 const setupUploadHook = (ticketArtifact: ITicketArtifact) => {
@@ -129,7 +129,7 @@ describe('useTicketComment', () => {
   });
 
   it('falls back to image markdown for known image extensions without MIME types', async () => {
-    setupUploadHook(makeTicketArtifact('field-photo.jpg'));
+    const { createTicketUpload, uploadFileToUrl } = setupUploadHook(makeTicketArtifact('field-photo.jpg'));
     const { result } = renderHook(() => useTicketComment());
     const file = new File(['image'], 'field-photo.jpg', { type: '' });
 
@@ -138,6 +138,16 @@ describe('useTicketComment', () => {
     });
 
     expect(result.current.comment).toBe(`![field-photo.jpg](/artifact/${ticketArtifactId})`);
+    expect(createTicketUpload).toHaveBeenCalledWith(ticketId, {
+      file_name: 'field-photo.jpg',
+      byte_size: 5,
+      content_type: 'application/octet-stream'
+    });
+    expect(uploadFileToUrl).toHaveBeenCalledWith({
+      url: 'https://object-store.example/upload',
+      file,
+      contentType: 'application/octet-stream'
+    });
   });
 
   it('appends link markdown for non-image files', async () => {

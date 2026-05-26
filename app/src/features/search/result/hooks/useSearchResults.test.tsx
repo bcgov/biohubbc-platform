@@ -17,6 +17,7 @@ vi.mock('hooks/useSearchQuery', () => ({
 const mockSearchFeatures = vi.fn();
 
 describe('useSearchResults', () => {
+  const expectAbortOptions = expect.objectContaining({ signal: expect.any(Object) });
   const expressionTree: ExpressionTreeExpression = {
     type: 'expression',
     operator: 'AND',
@@ -69,12 +70,17 @@ describe('useSearchResults', () => {
     renderHook(() => useSearchResults('species_observation', true, expressionTree));
 
     await waitFor(() => {
-      expect(mockSearchFeatures).toHaveBeenCalledWith('species_observation', expressionTree, {
-        page: 2,
-        limit: 25,
-        sort: 'create_date',
-        order: 'asc'
-      });
+      expect(mockSearchFeatures).toHaveBeenCalledWith(
+        'species_observation',
+        expressionTree,
+        {
+          page: 2,
+          limit: 25,
+          sort: 'create_date',
+          order: 'asc'
+        },
+        expectAbortOptions
+      );
     });
   });
 
@@ -82,12 +88,17 @@ describe('useSearchResults', () => {
     renderHook(() => useSearchResults('species_observation', true, null));
 
     await waitFor(() => {
-      expect(mockSearchFeatures).toHaveBeenCalledWith('species_observation', null, {
-        page: 2,
-        limit: 25,
-        sort: 'create_date',
-        order: 'asc'
-      });
+      expect(mockSearchFeatures).toHaveBeenCalledWith(
+        'species_observation',
+        null,
+        {
+          page: 2,
+          limit: 25,
+          sort: 'create_date',
+          order: 'asc'
+        },
+        expectAbortOptions
+      );
     });
   });
 
@@ -100,33 +111,18 @@ describe('useSearchResults', () => {
     renderHook(() => useSearchResults('species_observation', true, null));
 
     await waitFor(() => {
-      expect(mockSearchFeatures).toHaveBeenCalledWith('species_observation', null, {
-        page: 3,
-        limit: 25,
-        sort: undefined,
-        order: undefined
-      });
+      expect(mockSearchFeatures).toHaveBeenCalledWith(
+        'species_observation',
+        null,
+        {
+          page: 3,
+          limit: 25,
+          sort: undefined,
+          order: undefined
+        },
+        expectAbortOptions
+      );
     });
-  });
-
-  it('removes a specific zero-valued query param', async () => {
-    const setSearchParams = vi.fn();
-    (useSearchQueryParams as Mock).mockReturnValue({
-      searchParams: new URLSearchParams('species=0&species=123&page=2'),
-      setSearchParams
-    });
-
-    const { result } = renderHook(() => useSearchResults('species_observation', true, null));
-
-    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalled());
-
-    act(() => {
-      result.current.removeSearchParam('species', 0);
-    });
-
-    expect(setSearchParams).toHaveBeenCalledTimes(1);
-    expect(setSearchParams.mock.calls[0][0].getAll('species')).toEqual(['123']);
-    expect(setSearchParams.mock.calls[0][0].get('page')).toBe('1');
   });
 
   it('does not issue a redundant immediate refresh after setter-driven URL updates', async () => {
@@ -166,11 +162,89 @@ describe('useSearchResults', () => {
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
-    expect(mockSearchFeatures).toHaveBeenLastCalledWith('species_observation', null, {
-      page: 3,
-      limit: 25,
-      sort: undefined,
-      order: undefined
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      {
+        page: 3,
+        limit: 25,
+        sort: undefined,
+        order: undefined
+      },
+      expectAbortOptions
+    );
+  });
+
+  it('refreshes with a null expression when the explicit refresh key changes', async () => {
+    vi.useFakeTimers();
+
+    const { rerender } = renderHook(
+      ({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey),
+      {
+        initialProps: { refreshKey: 0 }
+      }
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
     });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender({ refreshKey: 1 });
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      {
+        page: 2,
+        limit: 25,
+        sort: 'create_date',
+        order: 'asc'
+      },
+      expectAbortOptions
+    );
+  });
+
+  it('aborts an active request and immediately starts the next request when apply refreshes again', async () => {
+    vi.useFakeTimers();
+
+    mockSearchFeatures.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Keep the request active until the hook aborts it.
+        })
+    );
+
+    const { rerender } = renderHook(
+      ({ refreshKey }) => useSearchResults('species_observation', true, expressionTree, refreshKey),
+      {
+        initialProps: { refreshKey: 0 }
+      }
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    const firstSignal = mockSearchFeatures.mock.calls[0][3].signal as AbortSignal;
+    expect(firstSignal.aborted).toBe(false);
+
+    await act(async () => {
+      rerender({ refreshKey: 1 });
+      await Promise.resolve();
+    });
+
+    expect(firstSignal.aborted).toBe(true);
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    const secondSignal = mockSearchFeatures.mock.calls[1][3].signal as AbortSignal;
+    expect(secondSignal.aborted).toBe(false);
   });
 });

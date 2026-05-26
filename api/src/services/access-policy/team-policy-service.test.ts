@@ -33,7 +33,10 @@ describe('TeamPolicyService', () => {
 
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -46,11 +49,35 @@ describe('TeamPolicyService', () => {
         policyIds: ['33333333-3333-3333-3333-333333333333']
       });
       expect(insertStub).to.have.been.calledWith(input);
-      expect(grantScopesStub).to.have.been.calledOnce;
-      expect(grantScopesStub).to.have.been.calledWith(
+      expect(materializeStub).to.have.been.calledOnceWith('33333333-3333-3333-3333-333333333333');
+      expect(grantStub).to.have.been.calledOnceWith(
         '22222222-2222-2222-2222-222222222222',
         '33333333-3333-3333-3333-333333333333'
       );
+      expect(result).to.eql(mockTeamPolicy);
+    });
+
+    it('should skip the team grant when the policy has no ALLOW statements to materialize', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      };
+
+      sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(false);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+
+      const result = await service.createTeamPolicy({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      });
+
+      expect(materializeStub).to.have.been.calledOnce;
+      expect(grantStub).to.not.have.been.called;
       expect(result).to.eql(mockTeamPolicy);
     });
 
@@ -67,7 +94,10 @@ describe('TeamPolicyService', () => {
         .stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId')
         .resolves([existingTeamPolicy]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -80,7 +110,8 @@ describe('TeamPolicyService', () => {
         policyIds: ['33333333-3333-3333-3333-333333333333']
       });
       expect(insertStub).to.not.have.been.called;
-      expect(grantScopesStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(grantStub).to.not.have.been.called;
       expect(result).to.eql({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -122,7 +153,10 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -134,12 +168,15 @@ describe('TeamPolicyService', () => {
       });
 
       expect(insertStub).to.have.been.calledTwice;
-      expect(grantScopesStub).to.have.been.calledTwice;
-      expect(grantScopesStub.firstCall).to.have.been.calledWith(
+      expect(materializeStub).to.have.been.calledTwice;
+      expect(materializeStub.firstCall).to.have.been.calledWith('33333333-3333-3333-3333-333333333333');
+      expect(materializeStub.secondCall).to.have.been.calledWith('55555555-5555-5555-5555-555555555555');
+      expect(grantStub).to.have.been.calledTwice;
+      expect(grantStub.firstCall).to.have.been.calledWith(
         '22222222-2222-2222-2222-222222222222',
         '33333333-3333-3333-3333-333333333333'
       );
-      expect(grantScopesStub.secondCall).to.have.been.calledWith(
+      expect(grantStub.secondCall).to.have.been.calledWith(
         '22222222-2222-2222-2222-222222222222',
         '55555555-5555-5555-5555-555555555555'
       );
@@ -174,7 +211,10 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -190,9 +230,9 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
-      // Scope grant only for the newly created policy, not the pre-existing one
-      expect(grantScopesStub).to.have.been.calledOnce;
-      expect(grantScopesStub).to.have.been.calledWith(
+      // Materialize + grant only for the newly created policy, not the pre-existing one
+      expect(materializeStub).to.have.been.calledOnceWith('55555555-5555-5555-5555-555555555555');
+      expect(grantStub).to.have.been.calledOnceWith(
         '22222222-2222-2222-2222-222222222222',
         '55555555-5555-5555-5555-555555555555'
       );
@@ -218,14 +258,18 @@ describe('TeamPolicyService', () => {
       ]);
 
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
-      const grantScopesStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamScopesForPolicy').resolves();
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333'
       ]);
 
       expect(insertStub).to.not.have.been.called;
-      expect(grantScopesStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(grantStub).to.not.have.been.called;
       expect(result).to.eql([]);
     });
   });

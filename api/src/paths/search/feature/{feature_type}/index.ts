@@ -60,7 +60,7 @@ export function searchFeatures(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const featureType = req.params.feature_type;
+      const featureType = req.params.feature_type?.trim().toLowerCase();
       const pagination = makePaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
 

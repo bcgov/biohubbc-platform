@@ -14,14 +14,27 @@ import {
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 
 interface SearchResultCardProps {
+  /** Result row represented by this card. */
   result: SearchFeatureResultWithRelevancy;
+  /** Whether the result is already in the cart. */
   isInCart: boolean;
+  /** Opens the selected result's feature detail page. */
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
-  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Adds this result to the cart. */
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
+  /** Removes this result from the cart by submission feature id. */
   onRemoveFromCart?: (featureId: number) => void;
 }
 
+/**
+ * Displays a single search result in list/card mode.
+ *
+ * Displays one result summary with secured state, feature-type chip, and the
+ * cart action matching current cart membership.
+ *
+ * @param {SearchResultCardProps} props - Result row, cart state, and card action callbacks.
+ * @returns {JSX.Element} Search result card.
+ */
 export const SearchResultCard = ({
   result,
   isInCart,
@@ -30,7 +43,7 @@ export const SearchResultCard = ({
   onRemoveFromCart
 }: SearchResultCardProps) => {
   return (
-    <Card elevation={0} key={result.uuid}>
+    <Card elevation={0}>
       <CardActionArea onClick={() => onClick(result)}>
         <CardHeader
           title={

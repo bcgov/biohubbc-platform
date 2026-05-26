@@ -34,8 +34,8 @@ export const TicketCommentEditForm = (props: ITicketCommentEditFormProps) => {
       comment={values.comment}
       artifacts={artifacts}
       setComment={(comment) => setFieldValue('comment', comment)}
-      isSaving={isSaving}
       isUploadingAttachment={isUploadingAttachment}
+      disabled={isSaving}
       onUploadAttachment={(file) => onUploadAttachment(file, appendMarkdownLink)}
     />
   );
