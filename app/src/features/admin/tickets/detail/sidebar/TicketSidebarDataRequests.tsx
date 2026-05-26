@@ -9,35 +9,29 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { useMemo, useState } from 'react';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
-interface ITicketSidebarDataRequestsProps {
-  dataRequests: DataRequestResponse[];
-}
-
 /**
  * Data request sidebar section and create dialog.
  *
- * @param {ITicketSidebarDataRequestsProps} props
  * @return {*}
  */
-export const TicketSidebarDataRequests = (props: ITicketSidebarDataRequestsProps) => {
-  const { dataRequests } = props;
+export const TicketSidebarDataRequests = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId, ticketDataLoader } = useTicketContext();
+  const ticket = ticketDataLoader.data;
   const { biohubUserWrapper } = useAuthStateContext();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const orderedDataRequests = useMemo(
-    () => [...dataRequests].sort((a, b) => (a.create_date ?? '').localeCompare(b.create_date ?? '')),
-    [dataRequests]
-  );
+  const orderedDataRequests = useMemo(() => {
+    const requests = ticket?.data_requests ?? [];
+    return [...requests].sort((a, b) => (a.create_date ?? '').localeCompare(b.create_date ?? ''));
+  }, [ticket?.data_requests]);
 
   const handleCreateDataRequest = async (values: CreateDataRequestDialogValues) => {
     const requestedBy = biohubUserWrapper.systemUserId;

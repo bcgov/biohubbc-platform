@@ -4,25 +4,23 @@ import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicket, ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 
-interface IUseOptimisticTicketHandlersProps {
-  ticket: ITicketExtended;
-  userIdentifier?: string;
-}
-
 interface IHandleOptimisticTicketUpdateOptions {
   buildOptimisticTicket: (currentTicket: ITicketExtended) => ITicketExtended;
   handleUpdate: () => Promise<ITicket>;
-  onCommit: (optimisticTicket: ITicketExtended, updatedTicket: ITicket) => void;
+}
+
+interface IUseOptimisticTicketHandlersProps {
+  ticket: ITicketExtended;
 }
 
 /**
  * Optimistic mutation handlers for ticket detail updates (status + generic ticket update mutations).
  *
- * @param {IUseOptimisticTicketHandlersProps} props
+ * @param {IUseOptimisticTicketHandlersProps} props Hook props.
  * @return {*}
  */
 export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersProps) => {
-  const { ticket, userIdentifier } = props;
+  const { ticket } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId, ticketDataLoader } = useTicketContext();
@@ -78,12 +76,13 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
    */
   const handleOptimisticTicketUpdate = useCallback(
     async (options: IHandleOptimisticTicketUpdateOptions) => {
-      const { buildOptimisticTicket, handleUpdate, onCommit } = options;
-      const { previousTicket, optimisticTicket } = applyOptimisticUpdate(buildOptimisticTicket);
+      const { buildOptimisticTicket, handleUpdate } = options;
+      const optimisticUpdate = applyOptimisticUpdate(buildOptimisticTicket);
+      const { previousTicket, optimisticTicket } = optimisticUpdate;
 
       try {
         const updatedTicket = await handleUpdate();
-        onCommit(optimisticTicket, updatedTicket);
+        commitOptimisticUpdate(optimisticTicket, updatedTicket);
 
         return updatedTicket;
       } catch (error) {
@@ -91,21 +90,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
         throw error;
       }
     },
-    [applyOptimisticUpdate, rollbackOptimisticUpdate]
-  );
-
-  /**
-   * Default optimistic commit strategy that preserves timeline/comments/references from optimistic state.
-   *
-   * @param {ITicketExtended} optimisticTicket
-   * @param {ITicket} updatedTicket
-   * @return {*}
-   */
-  const handleCommitOptimisticUpdate = useCallback(
-    (optimisticTicket: ITicketExtended, updatedTicket: ITicket) => {
-      commitOptimisticUpdate(optimisticTicket, updatedTicket);
-    },
-    [commitOptimisticUpdate]
+    [applyOptimisticUpdate, commitOptimisticUpdate, rollbackOptimisticUpdate]
   );
 
   /**
@@ -115,14 +100,15 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
    * @return {*}
    */
   const updateStatus = useCallback(
-    async (nextStatus: TicketStatus) => {
+    async (nextStatus: TicketStatus, userIdentifier: string | undefined) => {
       closeConfirmationDialog();
 
-      const { previousTicket, optimisticTicket } = applyOptimisticUpdate((currentTicket) => ({
+      const optimisticUpdate = applyOptimisticUpdate((currentTicket) => ({
         ...currentTicket,
         status: nextStatus,
         statuses: buildOptimisticStatuses(currentTicket, nextStatus, userIdentifier)
       }));
+      const { previousTicket, optimisticTicket } = optimisticUpdate;
 
       try {
         setIsSavingStatus(true);
@@ -145,8 +131,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
       commitOptimisticUpdate,
       dialogContext,
       rollbackOptimisticUpdate,
-      ticketId,
-      userIdentifier
+      ticketId
     ]
   );
 
@@ -157,7 +142,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
    * @return {*}
    */
   const requestStatusChange = useCallback(
-    (nextStatus: TicketStatus) => {
+    (nextStatus: TicketStatus, userIdentifier: string | undefined) => {
       const currentTicket = getCurrentTicket();
       const hasUnaddressedDataRequests = currentTicket.data_requests.some(
         (dataRequest) => dataRequest.status === PolicyStatus.REQUESTED || dataRequest.status === PolicyStatus.REVIEWED
@@ -171,7 +156,9 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
         return;
       }
 
-      dialogContext.setYesNoDialog(buildStatusChangeDialogConfig(nextStatus, closeConfirmationDialog, updateStatus));
+      dialogContext.setYesNoDialog(
+        buildStatusChangeDialogConfig(nextStatus, userIdentifier, closeConfirmationDialog, updateStatus)
+      );
     },
     [closeConfirmationDialog, dialogContext, getCurrentTicket, updateStatus]
   );
@@ -179,12 +166,15 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   return {
     isSavingStatus,
     requestStatusChange,
-    handleCommitOptimisticUpdate,
     handleOptimisticTicketUpdate
   };
 };
 
-const buildOptimisticStatuses = (ticket: ITicketExtended, nextStatus: TicketStatus, userIdentifier?: string) => {
+const buildOptimisticStatuses = (
+  ticket: ITicketExtended,
+  nextStatus: TicketStatus,
+  userIdentifier: string | undefined
+) => {
   if (!userIdentifier) {
     return ticket.statuses;
   }
@@ -203,8 +193,9 @@ const buildOptimisticStatuses = (ticket: ITicketExtended, nextStatus: TicketStat
 
 const buildStatusChangeDialogConfig = (
   nextStatus: TicketStatus,
+  userIdentifier: string | undefined,
   closeConfirmationDialog: () => void,
-  updateStatus: (nextStatus: TicketStatus) => void
+  updateStatus: (nextStatus: TicketStatus, userIdentifier: string | undefined) => void
 ) => {
   const isClosing = nextStatus === 'closed';
 
@@ -216,6 +207,6 @@ const buildStatusChangeDialogConfig = (
       : 'Are you sure you want to reopen this ticket?',
     onClose: closeConfirmationDialog,
     onNo: closeConfirmationDialog,
-    onYes: () => updateStatus(nextStatus)
+    onYes: () => updateStatus(nextStatus, userIdentifier)
   };
 };

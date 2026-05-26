@@ -6,9 +6,8 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
-import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
-import { ITicketSystemUser, ITicketReference, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 import { useEffect, useState } from 'react';
 import { TicketSidebarSystemUsers } from './TicketSidebarSystemUsers';
 import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
@@ -16,25 +15,16 @@ import { TicketSidebarReferences } from './TicketSidebarReferences';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
 import { TicketSidebarUploads } from './TicketSidebarUploads';
 
-interface ITicketSidebarProps {
-  ticketId: string;
-  teamId: string;
-  ticketSystemUsers: ITicketSystemUser[];
-  references: ITicketReference[];
-  dataRequests: DataRequestResponse[];
-}
-
 /**
  * Renders the team sidebar for ticket context.
  *
- * @param {ITicketSidebarProps} props
  * @return {*}
  */
-export const TicketSidebar = (props: ITicketSidebarProps) => {
-  const { ticketId, teamId, ticketSystemUsers, references, dataRequests } = props;
+export const TicketSidebar = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
+  const ticket = ticketDataLoader.data;
   const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
   const [isTicketSystemUserDialogOpen, setIsTicketSystemUserDialogOpen] = useState(false);
 
@@ -50,10 +40,16 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   };
 
   useEffect(() => {
-    teamMembersLoader.load(teamId);
-  }, [teamId, teamMembersLoader]);
+    if (ticket?.team_id) {
+      teamMembersLoader.load(ticket.team_id);
+    }
+  }, [ticket?.team_id, teamMembersLoader]);
 
   const members = teamMembersLoader.data?.members ?? [];
+
+  if (!ticket) {
+    return null;
+  }
 
   // Optimistically insert a member into local state unless already present.
   const handleMemberAdd = (member: ITeamMember) => {
@@ -89,7 +85,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         ...currentData,
         members: currentData.members.filter((member) => member.team_member_id !== teamMemberId)
       },
-      mutation: () => api.teams.deleteTeamMember(teamId, teamMemberId),
+      mutation: () => api.teams.deleteTeamMember(ticket.team_id, teamMemberId),
       onRollback: showApiErrorSnackbar
     }));
   };
@@ -186,7 +182,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   return (
     <Stack spacing={5}>
       <TicketSidebarSystemUsers
-        ticketSystemUsers={ticketSystemUsers}
+        ticketSystemUsers={ticket.ticket_system_users}
         onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}
         onUpdateTicketSystemUserStatus={handleUpdateTicketSystemUserStatus}
         onRemoveTicketSystemUser={handleConfirmRemoveTicketSystemUser}
@@ -197,13 +193,13 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         onOpenDialog={() => setIsParticipantsDialogOpen(true)}
         onRemoveUser={handleRemoveUser}
       />
-      <TicketSidebarDataRequests dataRequests={dataRequests} />
+      <TicketSidebarDataRequests />
       <TicketSidebarUploads />
-      <TicketSidebarReferences references={references} />
+      <TicketSidebarReferences />
 
       <TicketTeamDialog
         open={isParticipantsDialogOpen}
-        teamId={teamId}
+        teamId={ticket.team_id}
         members={members}
         onClose={() => setIsParticipantsDialogOpen(false)}
         onMemberAdd={handleMemberAdd}
@@ -211,7 +207,6 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
       />
       <TicketSystemUserDialog
         open={isTicketSystemUserDialogOpen}
-        ticketId={ticketId}
         onClose={() => setIsTicketSystemUserDialogOpen(false)}
       />
     </Stack>

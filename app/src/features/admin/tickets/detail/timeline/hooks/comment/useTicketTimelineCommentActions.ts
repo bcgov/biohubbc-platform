@@ -4,31 +4,24 @@ import { useTicketCommentCache } from 'features/admin/tickets/hooks/useTicketCom
 import { downloadTicketArtifact } from 'features/admin/tickets/utils/ticketArtifactDownload';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext } from 'hooks/useContext';
-import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { ITicketArtifact, ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
 import { useRef, useState } from 'react';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 import { ITicketCommentEditFormValues } from '../../comment/edit/TicketCommentEditForm.interface';
 
-interface IUseTicketTimelineCommentActionsProps {
-  ticket: ITicketExtended;
-}
-
 /**
  * Comment edit, delete, download, and upload handlers for the ticket timeline.
  *
- * @param {IUseTicketTimelineCommentActionsProps} props Hook props.
  * @returns Timeline comment action state and handlers.
  */
-export const useTicketTimelineCommentActions = (props: IUseTicketTimelineCommentActionsProps) => {
-  const { ticket } = props;
+export const useTicketTimelineCommentActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const { removeCachedComment, replaceCachedComment } = useTicketCommentCache();
-  const { isUploadingAttachment: isUploadingCommentAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({
-    ticketId: ticket.ticket_id
-  });
+  const { isUploadingAttachment: isUploadingCommentAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
   const [selectedComment, setSelectedComment] = useState<ITicketCommentLog | null>(null);
   const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -46,7 +39,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
    */
   const handleTicketArtifactDownload = async (artifact: ITicketArtifact) => {
     await downloadTicketArtifact({
-      ticketId: ticket.ticket_id,
+      ticketId,
       artifact,
       getDownloadUrl: api.tickets.getTicketArtifactDownloadUrl,
       setSnackbar: dialogContext.setSnackbar
@@ -57,7 +50,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
    * Upload an attachment selected from the edit-comment dialog and append its markdown reference to the form.
    *
    * The edit form passes `appendMarkdownLink` so this hook can reuse the ticket upload flow while letting Formik own the
-   * comment field. Successful uploads also patch the cached ticket artifact list so previews can resolve the new link.
+   * comment field.
    *
    * @param {File} file File selected by the user in the edit-comment dialog.
    * @param {(markdownLink: string) => void} appendMarkdownLink Callback that inserts markdown into the edit form.
@@ -77,14 +70,16 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
   /**
    * Open the edit-comment dialog for the selected timeline comment.
    *
-   * Timeline items pass only the comment identifier. This handler resolves the full comment from the rendered ticket so
-   * the edit dialog receives stable initial form values.
+   * Timeline items pass only the comment identifier. This handler resolves the full comment from the current cached
+   * ticket so the edit dialog receives stable initial form values, including comments just added to the cache.
    *
    * @param {string} ticketCommentId Timeline comment identifier selected from the context menu.
    * @returns {void}
    */
   const handleOpenEditCommentDialog = (ticketCommentId: string) => {
-    const comment = ticket.comments.find((ticketComment) => ticketComment.ticket_comment_id === ticketCommentId);
+    const comment = ticketDataLoader.data?.comments.find(
+      (ticketComment) => ticketComment.ticket_comment_id === ticketCommentId
+    );
 
     if (!comment) {
       return;
@@ -131,13 +126,9 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
     try {
       isSavingCommentRef.current = true;
       setIsSavingComment(true);
-      const updatedComment = await api.tickets.updateTicketComment(
-        ticket.ticket_id,
-        selectedComment.ticket_comment_id,
-        {
-          comment: trimmedComment
-        }
-      );
+      const updatedComment = await api.tickets.updateTicketComment(ticketId, selectedComment.ticket_comment_id, {
+        comment: values.comment
+      });
 
       replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
 
@@ -171,7 +162,7 @@ export const useTicketTimelineCommentActions = (props: IUseTicketTimelineComment
 
     try {
       isDeletingCommentRef.current = true;
-      await api.tickets.deleteTicketComment(ticket.ticket_id, ticketCommentId);
+      await api.tickets.deleteTicketComment(ticketId, ticketCommentId);
       removeCachedComment(ticketCommentId);
     } catch (error) {
       const apiError = error as APIError;
