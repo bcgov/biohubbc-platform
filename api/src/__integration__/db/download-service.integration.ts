@@ -1,6 +1,6 @@
 // Integration test for the request-time download services — verifies that
 // `createDownload` writes a policy-driven download row, `getDownloadSource`
-// returns `{ policy_id, create_user }` for the pipeline, status transitions
+// returns `{ policy_id, requested_by }` for the pipeline, status transitions
 // behave, and the team-based access flows (`claimDownload`,
 // `getAuthorizedDownload`, `getDownloadsByTeamMembership`) still work after
 // the cart→policy refactor.
@@ -15,6 +15,7 @@
 
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
@@ -48,6 +49,7 @@ describe('Download services (integration)', function () {
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -59,15 +61,20 @@ describe('Download services (integration)', function () {
    */
   async function createPolicyDownload(opts?: {
     name?: string;
+    description?: string | null;
     featureTypes?: string[];
   }): Promise<{ download_id: string; policy_id: string }> {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
-      description: null,
+      description: opts?.description ?? null,
       featureTypes: opts?.featureTypes ?? ['dataset'],
       expressionId: null
     });
-    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await downloadService.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
+    });
     return { download_id, policy_id };
   }
 
@@ -107,13 +114,91 @@ describe('Download services (integration)', function () {
     });
   });
 
+  describe('createDownloadRequest', () => {
+    /**
+     * Stub the pg-boss publish so the request never reaches the real queue from
+     * inside the rolled-back test transaction. The DB-side wiring (policy,
+     * download, team/export rows) is exactly what these tests verify.
+     */
+    function stubPublish(): void {
+      sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+    }
+
+    it('anonymous request: writes requested_by NULL, no team, and no export', async () => {
+      stubPublish();
+
+      const { download_id } = await downloadService.createDownloadRequest({
+        name: `Anon request ${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: 'Anonymous download request',
+        featureTypes: ['dataset'],
+        expression: null,
+        requestedBy: null
+      });
+
+      // requested_by IS NULL — asserted at the DB level to catch a silent NULL→number leak.
+      const downloadRow = await connection.sql(SQL`
+        SELECT requested_by FROM download WHERE download_id = ${download_id};
+      `);
+      expect(downloadRow.rowCount).to.equal(1);
+      expect(downloadRow.rows[0].requested_by).to.be.null;
+
+      // Anonymous downloads get no team link — the UUID is the access credential.
+      const teamRows = await connection.sql(SQL`
+        SELECT download_team_id FROM download_team WHERE download_id = ${download_id};
+      `);
+      expect(teamRows.rowCount).to.equal(0);
+
+      // No export is created at request time — any later export is a separate user action.
+      const exportRows = await connection.sql(SQL`
+        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
+      `);
+      expect(exportRows.rowCount).to.equal(0);
+    });
+
+    it('authenticated request: writes requested_by, a single-member team, and no up-front export', async () => {
+      stubPublish();
+
+      const systemUserId = connection.systemUserId();
+
+      const { download_id } = await downloadService.createDownloadRequest({
+        name: `Auth request ${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: 'Authenticated download request',
+        featureTypes: ['dataset'],
+        expression: null,
+        requestedBy: systemUserId
+      });
+
+      // requested_by carries the security identity the export is later filtered for.
+      const downloadRow = await connection.sql(SQL`
+        SELECT requested_by FROM download WHERE download_id = ${download_id};
+      `);
+      expect(downloadRow.rowCount).to.equal(1);
+      expect(downloadRow.rows[0].requested_by).to.equal(systemUserId);
+
+      // Authenticated requests seed a single-member team from the same identity.
+      const teamRows = await connection.sql(SQL`
+        SELECT download_team_id FROM download_team WHERE download_id = ${download_id};
+      `);
+      expect(teamRows.rowCount).to.equal(1);
+
+      // No up-front export — exports are created later by user action.
+      const exportRows = await connection.sql(SQL`
+        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
+      `);
+      expect(exportRows.rowCount).to.equal(0);
+    });
+  });
+
   describe('getDownloadSource', () => {
-    it('returns policy_id and create_user for an existing download', async () => {
+    it('returns policy_id and requested_by for an existing download', async () => {
       const { download_id, policy_id } = await createPolicyDownload();
 
       const source = await downloadRepo.getDownloadSource(download_id);
       expect(source.policy_id).to.equal(policy_id);
-      expect(source.create_user).to.equal(connection.systemUserId());
+      expect(source.requested_by).to.equal(connection.systemUserId());
     });
 
     it('throws ApiNotFoundError when the download does not exist', async () => {
@@ -124,6 +209,37 @@ describe('Download services (integration)', function () {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
+    });
+  });
+
+  describe('findDownloadById — policy join', () => {
+    it('returns joined policy name and description when both are populated', async () => {
+      const { download_id } = await createPolicyDownload({
+        name: 'Policy with both fields',
+        description: 'A described policy'
+      });
+
+      const record = await downloadRepo.findDownloadById(download_id);
+      expect(record).to.not.be.null;
+      expect(record!.name).to.equal('Policy with both fields');
+      expect(record!.description).to.equal('A described policy');
+    });
+
+    it('returns description: null when the policy description is NULL', async () => {
+      const { download_id } = await createPolicyDownload({
+        name: 'Policy without description',
+        description: null
+      });
+
+      const record = await downloadRepo.findDownloadById(download_id);
+      expect(record).to.not.be.null;
+      expect(record!.name).to.equal('Policy without description');
+      expect(record!.description).to.be.null;
+    });
+
+    it('returns null for an unknown downloadId', async () => {
+      const record = await downloadRepo.findDownloadById('00000000-0000-0000-0000-000000000000');
+      expect(record).to.be.null;
     });
   });
 

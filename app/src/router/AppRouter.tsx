@@ -1,6 +1,7 @@
 import { CartContextProvider } from 'contexts/cartContext';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
+import { PublicDownloadPage } from 'features/download/PublicDownloadPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -107,6 +108,17 @@ export const AppRouter = () => {
           <BaseLayout>
             <PageTitle title="Access Denied" description="You don't have permission to access this page" />
             <AccessDenied />
+          </BaseLayout>
+        }
+      />
+
+      {/* Public download landing page — the UUID is the credential, no auth guard. */}
+      <Route
+        path="/download/:downloadId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Download" description="Download status and details" />
+            <PublicDownloadPage />
           </BaseLayout>
         }
       />

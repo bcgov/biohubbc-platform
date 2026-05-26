@@ -3,6 +3,7 @@ import MockAdapter from 'axios-mock-adapter';
 import {
   CreateDownloadRequest,
   CreateDownloadResponse,
+  DownloadDetail,
   DownloadListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
@@ -90,6 +91,36 @@ describe('useDownloadApi', () => {
       mock.onPost('/api/download').reply(400, { message: 'Validation failed' });
 
       await expect(useDownloadApi(axios).createDownload(mockRequest)).rejects.toThrow();
+    });
+  });
+
+  describe('getDownload', () => {
+    it('should send GET to /api/download/<id> and return response', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+      const mockResponse: DownloadDetail = {
+        download_id: downloadId,
+        status: 'ready',
+        name: 'Moose download',
+        description: 'Moose observations in the Skeena',
+        started_at: '2026-03-01T00:01:00Z',
+        completed_at: '2026-03-01T00:02:00Z',
+        downloaded_at: null
+      };
+
+      mock.onGet(`/api/download/${downloadId}`).reply(200, mockResponse);
+
+      const result = await useDownloadApi(axios).getDownload(downloadId);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}`);
+    });
+
+    it('should propagate rejection on 404', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+
+      mock.onGet(`/api/download/${downloadId}`).reply(404, { message: 'Not found' });
+
+      await expect(useDownloadApi(axios).getDownload(downloadId)).rejects.toThrow();
     });
   });
 });

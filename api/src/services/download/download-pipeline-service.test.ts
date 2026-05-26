@@ -142,7 +142,7 @@ describe('DownloadPipelineService', () => {
   // Shared test data for Parquet tests
   const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
   const TEST_POLICY_ID = '11111111-1111-1111-1111-111111111111';
-  const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, create_user: 7 };
+  const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: 7 };
 
   const stmt = (
     urn_feature_type: string,
@@ -310,7 +310,11 @@ describe('DownloadPipelineService', () => {
 
       expect(readTreeStub).to.have.been.calledOnceWith(expressionId);
       expect(validateStub).to.have.been.calledOnceWith(mockTree);
-      expect(buildExprSubqueryStub).to.have.been.calledOnceWith('observation', normalizedTree, TEST_SOURCE.create_user);
+      expect(buildExprSubqueryStub).to.have.been.calledOnceWith(
+        'observation',
+        normalizedTree,
+        TEST_SOURCE.requested_by
+      );
       expect(buildBroadStub).to.not.have.been.called;
     });
 
@@ -336,10 +340,10 @@ describe('DownloadPipelineService', () => {
 
       expect(readTreeStub).to.not.have.been.called;
       expect(buildExprSubqueryStub).to.not.have.been.called;
-      expect(buildBroadStub).to.have.been.calledOnceWith('observation', TEST_SOURCE.create_user);
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', TEST_SOURCE.requested_by);
     });
 
-    it('passes source.create_user (the policy creator) — NOT the worker identity — through to the security filter', async () => {
+    it('passes source.requested_by (the requesting user) — NOT the worker identity — through to the security filter', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
       stubParquetPipeline();
@@ -349,18 +353,18 @@ describe('DownloadPipelineService', () => {
         .returns(subqueryStub('SELECT broad', []));
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
 
-      const policyCreatorId = 999;
-      const sourceWithCreator: DownloadSource = { policy_id: TEST_POLICY_ID, create_user: policyCreatorId };
+      const requestingUserId = 999;
+      const sourceWithRequester: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: requestingUserId };
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
-        source: sourceWithCreator,
+        source: sourceWithRequester,
         properties: mockProperties,
         featureTypeName: 'observation',
         statement: stmt('observation', null)
       });
 
-      expect(buildBroadStub).to.have.been.calledOnceWith('observation', policyCreatorId);
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', requestingUserId);
     });
 
     it('streams features through the writer and uploads with deterministic S3 key', async () => {

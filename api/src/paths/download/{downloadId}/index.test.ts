@@ -6,12 +6,12 @@ import { claimDownloadForCurrentUser, findDownloadById } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
-import { DownloadRecord } from '../../../models/download';
+import { DownloadDetailRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
 
 chai.use(sinonChai);
 
-const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
+const makeDownloadRecord = (overrides: Partial<DownloadDetailRecord> = {}): DownloadDetailRecord => ({
   download_id: 'aaaa0000-0000-0000-0000-000000000001',
   download_status: 'ready',
   format: 'parquet',
@@ -20,6 +20,8 @@ const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRe
   completed_at: '2025-01-01T00:01:00Z',
   downloaded_at: null,
   create_date: '2025-01-01T00:00:00Z',
+  name: 'Test download',
+  description: 'Test description',
   ...overrides
 });
 
@@ -51,9 +53,36 @@ describe('paths/download/{downloadId}/index', () => {
       expect(mockRes.jsonValue).to.eql({
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
         status: 'ready',
+        name: 'Test download',
+        description: 'Test description',
         started_at: '2025-01-01T00:00:00Z',
         completed_at: '2025-01-01T00:01:00Z',
         downloaded_at: null
+      });
+    });
+
+    it('should return 200 with description: null when policy description is null', async () => {
+      const dbConnectionObj = getMockDBConnection();
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const mockDownload = makeDownloadRecord({ description: null });
+
+      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.keycloak_token = 'token';
+      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+
+      const requestHandler = findDownloadById();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.include({
+        name: 'Test download',
+        description: null
       });
     });
 

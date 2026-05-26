@@ -5,11 +5,12 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
-import { DownloadRecord } from '../../models/download';
+import { DownloadDetailRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { publisherDependencies } from '../publisher';
 import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,
@@ -44,7 +45,7 @@ describe('process-download-job', () => {
     return mockDBConnection;
   };
 
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
+  const createMockDownloadRecord = (overrides?: Partial<DownloadDetailRecord>): DownloadDetailRecord => ({
     download_id: 'dl-1',
     download_status: DownloadStatusEnum.PENDING,
     format: 'parquet',
@@ -53,6 +54,8 @@ describe('process-download-job', () => {
     completed_at: null,
     downloaded_at: null,
     create_date: '2026-01-01T00:00:00.000Z',
+    name: 'Test download',
+    description: null,
     ...overrides
   });
 
@@ -69,7 +72,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
 
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
-      const source = { policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 };
+      const source = { policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 };
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
@@ -130,7 +133,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
 
       const obsProps: CsvPropertyDefinition[] = [
         { feature_property_name: 'count', feature_property_type_name: 'number' }
@@ -167,7 +170,7 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -196,7 +199,7 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -254,7 +257,7 @@ describe('process-download-job', () => {
       const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
-        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', create_user: 1 });
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
       schemaLookup.set('a', []);
@@ -278,6 +281,53 @@ describe('process-download-job', () => {
       // Only the first transition (to PROCESSING) was called; the READY transition never runs
       expect(transitionStub).to.have.been.calledOnce;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+    });
+
+    const stubPgBoss = () => {
+      const sendStub = sinon.stub().resolves('mock-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      sinon.stub(publisherDependencies, 'getPgBoss').returns({ send: sendStub, createQueue: createQueueStub } as any);
+      return sendStub;
+    };
+
+    it('does not auto-enqueue an export for an anonymous download (requested_by null)', async () => {
+      setupMockConnection();
+      const sendStub = stubPgBoss();
+
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: null });
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: [],
+        statements: []
+      });
+
+      await processDownloadJobHandler([createMockJob('dl-1')]);
+
+      expect(sendStub).to.not.have.been.called;
+    });
+
+    it('does not auto-enqueue an export for an authenticated download (requested_by set)', async () => {
+      setupMockConnection();
+      const sendStub = stubPgBoss();
+
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 42 });
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: [],
+        statements: []
+      });
+
+      await processDownloadJobHandler([createMockJob('dl-1')]);
+
+      expect(sendStub).to.not.have.been.called;
     });
   });
 

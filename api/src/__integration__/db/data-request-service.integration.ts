@@ -300,7 +300,10 @@ describe('DataRequestService (integration)', function () {
       const dataRequest = await service.createDataRequestForTicket(ticket.ticket_id, {
         requested_by: requester,
         reason: 'I4 admin/legacy flow — deny-all baseline must be preserved',
-        system_user_ids: [collaborator]
+        // The admin ticket flow (`POST /api/tickets/{ticketId}/data-request`) passes the picker
+        // selection through verbatim. To put the requester on the access list, the caller
+        // includes them explicitly — see service docstring.
+        system_user_ids: [requester, collaborator]
       });
 
       // Single DENY statement covering all feature types.
@@ -344,9 +347,11 @@ describe('DataRequestService (integration)', function () {
         priority: 'medium'
       });
 
+      // The admin ticket flow passes the picker selection through verbatim. An empty picker
+      // produces empty teams — the requester is not auto-unioned in. See service docstring.
       const dataRequest = await service.createDataRequestForTicket(ticket.ticket_id, {
         requested_by: requester,
-        reason: 'I5 empty picker — requester must still be a member of both teams',
+        reason: 'I5 empty picker — admin flow does not auto-union the requester',
         system_user_ids: [],
         featureTypes: ['dataset'],
         expression: null

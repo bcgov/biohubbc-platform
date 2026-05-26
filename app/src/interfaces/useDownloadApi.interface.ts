@@ -3,11 +3,17 @@ import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 /**
+ * Lifecycle status of a download. Mirrors the backend `download.download_status`
+ * enum and the GET /api/download/:downloadId `status` field.
+ */
+export type DownloadStatus = 'pending' | 'processing' | 'ready' | 'downloaded' | 'failed';
+
+/**
  * A download record as returned by GET /api/download.
  */
 export interface DownloadRecord {
   download_id: string;
-  download_status: 'pending' | 'processing' | 'ready' | 'downloaded' | 'failed';
+  download_status: DownloadStatus;
   create_date: string;
   feature_count: number;
   started_at: string | null;
@@ -19,6 +25,23 @@ export interface DownloadRecord {
    * Empty array when the download has no exports.
    */
   exports: DownloadExport[];
+}
+
+/**
+ * A download detail record as returned by GET /api/download/:downloadId.
+ *
+ * The route renames `download_status` to `status` and joins the owning policy
+ * to surface `name` (always present) and `description` (nullable) for the
+ * public download page header.
+ */
+export interface DownloadDetail {
+  download_id: string;
+  status: DownloadStatus;
+  name: string;
+  description: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  downloaded_at: string | null;
 }
 
 /**

@@ -145,7 +145,8 @@ describe('Download Export pipeline (integration)', function () {
     });
     const { download_id: downloadId } = await downloadService.createDownload({
       policyId: policy_id,
-      format: 'parquet'
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
     });
 
     // Transition pending → ready directly via the repo (no pipeline work to do here).
