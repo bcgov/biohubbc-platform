@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadDetailRecord, DownloadId, DownloadListRecord } from '../../models/download';
 import { DownloadExportListRow } from '../../models/download-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -162,10 +162,10 @@ export class DownloadService extends DBService {
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord | null>}
+   * @return {Promise<DownloadDetailRecord | null>}
    * @memberof DownloadService
    */
-  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
     return this.downloadRepository.findDownloadById(downloadId);
   }
 
@@ -257,10 +257,10 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID.
    * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
-   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
+   * @return {Promise<DownloadDetailRecord>} The download record (avoids a second fetch by the caller).
    * @memberof DownloadService
    */
-  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
+  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadDetailRecord> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
 
     if (!download) {

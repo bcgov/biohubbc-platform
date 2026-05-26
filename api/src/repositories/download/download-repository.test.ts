@@ -199,6 +199,67 @@ describe('DownloadRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('create_date');
     });
+
+    it('SQL LEFT JOINs the policy table for name and description', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.match(/LEFT JOIN\s+policy/i);
+      expect(sqlText).to.include('p.name');
+      expect(sqlText).to.include('p.description');
+    });
+
+    it('returns the joined detail row when policy description is non-null', async () => {
+      const mockRow = {
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
+        download_status: DownloadStatusEnum.READY,
+        format: 'parquet',
+        metadata: null,
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        downloaded_at: null,
+        create_date: '2026-01-01T00:00:00.000Z',
+        name: 'My download',
+        description: 'A nice description'
+      };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([mockRow], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(result).to.not.be.null;
+      expect(result?.name).to.equal('My download');
+      expect(result?.description).to.equal('A nice description');
+    });
+
+    it('returns the joined detail row when policy description is null', async () => {
+      const mockRow = {
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
+        download_status: DownloadStatusEnum.READY,
+        format: 'parquet',
+        metadata: null,
+        started_at: null,
+        completed_at: null,
+        downloaded_at: null,
+        create_date: '2026-01-01T00:00:00.000Z',
+        name: 'My download',
+        description: null
+      };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([mockRow], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(result).to.not.be.null;
+      expect(result?.name).to.equal('My download');
+      expect(result?.description).to.be.null;
+    });
   });
 
   describe('getDownloadsByTeamMembership', () => {

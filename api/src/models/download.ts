@@ -16,6 +16,20 @@ export const DownloadRecord = z.object({
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
 /**
+ * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
+ * `DownloadRecord` with the owning policy's display fields (`name`,
+ * `description`), which are joined in via `LEFT JOIN biohub.policy` on the
+ * detail query only. The LIST query does not join `policy`, so the base
+ * `DownloadRecord` stays untouched and the list-row schemas (built off
+ * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
+ */
+export const DownloadDetailRecord = DownloadRecord.extend({
+  name: z.string(),
+  description: z.string().nullable()
+});
+export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
+
+/**
  * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
  * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
  */

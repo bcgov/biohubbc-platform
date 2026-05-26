@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
-import { DownloadRecord } from '../../models/download';
+import { DownloadDetailRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -45,7 +45,7 @@ describe('process-download-job', () => {
     return mockDBConnection;
   };
 
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
+  const createMockDownloadRecord = (overrides?: Partial<DownloadDetailRecord>): DownloadDetailRecord => ({
     download_id: 'dl-1',
     download_status: DownloadStatusEnum.PENDING,
     format: 'parquet',
@@ -54,6 +54,8 @@ describe('process-download-job', () => {
     completed_at: null,
     downloaded_at: null,
     create_date: '2026-01-01T00:00:00.000Z',
+    name: 'Test download',
+    description: null,
     ...overrides
   });
 

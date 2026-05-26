@@ -7,10 +7,10 @@ import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetim
 import {
   CreateDownload,
   DownloadArtifactInfo,
+  DownloadDetailRecord,
   DownloadId,
   DownloadListRecordBase,
   DownloadListRow,
-  DownloadRecord,
   DownloadSource,
   HasTeams,
   IsAuthorized
@@ -159,28 +159,36 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get a download record by ID.
+   * Get a download record by ID, including the owning policy's display fields.
+   *
+   * LEFT JOINs `biohub.policy` so the detail page can show the policy name and
+   * description without a second round-trip. `policy_id` is NOT NULL on
+   * `download`, so the join is effectively inner — the LEFT is defensive
+   * against any future relaxation of that constraint.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord | null>}
+   * @return {Promise<DownloadDetailRecord | null>}
    * @memberof DownloadRepository
    */
-  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
     const sql = SQL`
       SELECT
-        download_id,
-        download_status,
-        format,
-        metadata,
-        started_at,
-        completed_at,
-        downloaded_at,
-        create_date
-      FROM download
-      WHERE download_id = ${downloadId};
+        d.download_id,
+        d.download_status,
+        d.format,
+        d.metadata,
+        d.started_at,
+        d.completed_at,
+        d.downloaded_at,
+        d.create_date,
+        p.name,
+        p.description
+      FROM download d
+      LEFT JOIN policy p ON p.policy_id = d.policy_id
+      WHERE d.download_id = ${downloadId};
     `;
 
-    const response = await this.connection.sql(sql, DownloadRecord);
+    const response = await this.connection.sql(sql, DownloadDetailRecord);
 
     return response.rows[0] ?? null;
   }
@@ -191,11 +199,11 @@ export class DownloadRepository extends BaseRepository {
    * `get*` throws on missing row (codebase convention — companion to `findDownloadById`).
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord>}
+   * @return {Promise<DownloadDetailRecord>}
    * @throws {ApiNotFoundError} when no download matches the given ID.
    * @memberof DownloadRepository
    */
-  async getDownloadById(downloadId: string): Promise<DownloadRecord> {
+  async getDownloadById(downloadId: string): Promise<DownloadDetailRecord> {
     const download = await this.findDownloadById(downloadId);
 
     if (!download) {
