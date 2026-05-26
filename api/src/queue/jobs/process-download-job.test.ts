@@ -6,13 +6,10 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { DownloadRecord } from '../../models/download';
-import { DownloadExportListRow } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
-import { JobQueues } from '../jobs';
 import { publisherDependencies } from '../publisher';
 import {
   IProcessDownloadJobData,
@@ -284,20 +281,6 @@ describe('process-download-job', () => {
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
     });
 
-    const makeExportListRow = (overrides?: Partial<DownloadExportListRow>): DownloadExportListRow => ({
-      download_export_id: 'eeee0000-0000-0000-0000-000000000001',
-      download_id: 'dl-1',
-      format: 'csv',
-      status: DownloadStatusEnum.PENDING,
-      max_part_size_bytes: '524288000',
-      mode: 'per_feature_type',
-      started_at: null,
-      completed_at: null,
-      error_message: null,
-      part_count: 0,
-      ...overrides
-    });
-
     const stubPgBoss = () => {
       const sendStub = sinon.stub().resolves('mock-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -305,7 +288,7 @@ describe('process-download-job', () => {
       return sendStub;
     };
 
-    it('auto-enqueues the default export for an anonymous download (requested_by null)', async () => {
+    it('does not auto-enqueue an export for an anonymous download (requested_by null)', async () => {
       setupMockConnection();
       const sendStub = stubPgBoss();
 
@@ -320,16 +303,9 @@ describe('process-download-job', () => {
         statements: []
       });
 
-      const defaultExport = makeExportListRow();
-      sinon.stub(DownloadExportService.prototype, 'listExportsByDownloadId').resolves([defaultExport]);
-
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      expect(sendStub).to.have.been.calledOnce;
-      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
-      expect(sendStub.firstCall.args[1]).to.deep.equal({
-        downloadExportId: defaultExport.download_export_id
-      });
+      expect(sendStub).to.not.have.been.called;
     });
 
     it('does not auto-enqueue an export for an authenticated download (requested_by set)', async () => {
@@ -347,11 +323,8 @@ describe('process-download-job', () => {
         statements: []
       });
 
-      const listExportsStub = sinon.stub(DownloadExportService.prototype, 'listExportsByDownloadId').resolves([]);
-
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      expect(listExportsStub).to.not.have.been.called;
       expect(sendStub).to.not.have.been.called;
     });
   });
