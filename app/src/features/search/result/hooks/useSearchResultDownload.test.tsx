@@ -7,13 +7,18 @@ import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { Mock, vi } from 'vitest';
-import { DownloadUrlDisplay } from '../components/DownloadUrlDisplay';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 import { useSearchResultDownload } from './useSearchResultDownload';
 
 vi.mock('hooks/useApi');
 vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
+
+const mockNavigate = vi.fn();
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 const mockCreateDownload = vi.fn();
 const mockCheckout = vi.fn();
@@ -105,7 +110,7 @@ describe('useSearchResultDownload', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
-  it('H2: anonymous success opens a persistent OK dialog and does not switch view or snackbar', async () => {
+  it('H2: anonymous success navigates to the public download page without dialog or snackbar', async () => {
     setupAuth(false);
     mockCreateDownload.mockResolvedValueOnce({
       download_id: 'download-uuid',
@@ -122,46 +127,10 @@ describe('useSearchResultDownload', () => {
       await result.current.handleCreateDownload(formValues);
     });
 
-    expect(mockSetOkDialog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        dialogTitle: 'Download created'
-      })
-    );
-    // The returned export_url is the anon user's only credential — assert it is actually
-    // threaded into DownloadUrlDisplay, not just that some dialog opened.
-    const okDialogArg = mockSetOkDialog.mock.calls[0][0];
-    expect(okDialogArg.dialogContent.type).toBe(DownloadUrlDisplay);
-    expect(okDialogArg.dialogContent.props.url).toBe('http://localhost/api/download-export/export-uuid');
-    expect(result.current.downloadView).not.toBe(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
-    expect(mockSetSnackbar).not.toHaveBeenCalled();
-    expect(result.current.isCreateDownloadDialogOpen).toBe(false);
-  });
-
-  it('H5: anonymous success with a missing export_url surfaces an error snackbar, not an empty URL dialog', async () => {
-    setupAuth(false);
-    mockCreateDownload.mockResolvedValueOnce({
-      download_id: 'download-uuid',
-      download_url: 'http://localhost/api/download/download-uuid',
-      export_id: null,
-      export_url: null
-    });
-
-    const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
-    );
-
-    await act(async () => {
-      await result.current.handleCreateDownload(formValues);
-    });
-
+    expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
     expect(mockSetOkDialog).not.toHaveBeenCalled();
-    expect(mockSetSnackbar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        snackbarMessage: 'Download created, but no status URL was returned. Please try again.'
-      })
-    );
+    expect(mockSetSnackbar).not.toHaveBeenCalled();
+    expect(result.current.downloadView).not.toBe(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
   });
 

@@ -8,7 +8,7 @@ import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { useCallback, useEffect, useState } from 'react';
-import { DownloadUrlDisplay } from '../components/DownloadUrlDisplay';
+import { useNavigate } from 'react-router';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -39,6 +39,7 @@ export const useSearchResultDownload = ({
   pagination
 }: UseSearchResultDownloadProps) => {
   const api = useApi();
+  const navigate = useNavigate();
   const { auth } = useAuthStateContext();
   const { checkout } = useCartContext();
   const dialogContext = useDialogContext();
@@ -80,9 +81,10 @@ export const useSearchResultDownload = ({
    * Submits the create-download form for the current expression search.
    * Serialized to prevent duplicate downloads. On success the dialog closes and
    * the outcome branches on authentication: authenticated users switch to the
-   * Downloads sidebar with a success snackbar, while anonymous users get a
-   * persistent dialog carrying their export status URL. Failure keeps the
-   * dialog open and shows the API error. State updates are skipped after unmount.
+   * Downloads sidebar with a success snackbar, while anonymous users are
+   * navigated to the public download page at `/download/:downloadId`, where they
+   * can monitor status and obtain their export. Failure keeps the dialog open
+   * and shows the API error. State updates are skipped after unmount.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name, description, and feature types.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
@@ -108,25 +110,8 @@ export const useSearchResultDownload = ({
               open: true,
               snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
             });
-          } else if (response.export_url) {
-            // Anonymous users have no Downloads sidebar; the returned export status URL is their
-            // only credential, so it is surfaced in a persistent dialog rather than a transient snackbar.
-            dialogContext.setOkDialog({
-              open: true,
-              dialogTitle: 'Download created',
-              dialogText:
-                'Your download is being prepared. Use this URL to check its status and get download links when ready.',
-              dialogContent: <DownloadUrlDisplay url={response.export_url} />,
-              onClose: () => dialogContext.setOkDialog({ open: false })
-            });
           } else {
-            // The anonymous create contract always returns an export status URL — the only
-            // credential an anon user gets. If it is missing, an empty URL box would strand them
-            // silently, so surface it as an error instead.
-            dialogContext.setSnackbar({
-              open: true,
-              snackbarMessage: 'Download created, but no status URL was returned. Please try again.'
-            });
+            navigate(`/download/${response.download_id}`);
           }
         } catch (error) {
           if (!isMounted()) {
@@ -142,7 +127,7 @@ export const useSearchResultDownload = ({
           }
         }
       }),
-    [api.download, auth.isAuthenticated, dialogContext, expressionTree, runSerialized, isMounted]
+    [api.download, auth.isAuthenticated, dialogContext, expressionTree, navigate, runSerialized, isMounted]
   );
 
   /**
