@@ -143,9 +143,10 @@ export function timeStringToMillis(s: string): number {
  * `_number`, etc.). This function bridges those type names to Parquet column types so
  * downstream consumers (DuckDB, QGIS, pandas) get native typed columns instead of strings.
  *
- * `array`, `object`, and `artifact_key` types have dynamic internal structure (arrays of
- * objects, nested JSON, file paths). No typed table exists for them — they fall back to
- * UTF8 (JSON-stringified) for Parquet output. `spatial` maps to BYTE_ARRAY for WKB encoding.
+ * `array` and `object` types have dynamic internal structure (arrays of objects, nested
+ * JSON). They serialize as Parquet's JSON LogicalType — `BYTE_ARRAY` annotated with
+ * `originalType=JSON` so readers that honour the annotation auto-deserialize. `artifact_key`
+ * is a file path string and stays UTF8. `spatial` maps to `BYTE_ARRAY` for WKB encoding.
  *
  * @param typeName - The feature property type name from `feature_type_property`.
  * @returns The Parquet type string.
@@ -177,11 +178,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       // GeoParquet WKB-encoded geometry — each spatial property gets its own BYTE_ARRAY column
       return 'BYTE_ARRAY';
     case 'array':
-      // Dynamic internal structure — JSON-stringified for Parquet output
-      return 'UTF8';
     case 'object':
-      // Dynamic internal structure — JSON-stringified for Parquet output
-      return 'UTF8';
+      // Dynamic internal structure — JSON-stringified for Parquet output. The
+      // JSON LogicalType (BYTE_ARRAY with originalType=JSON) is physically
+      // identical to UTF8 on the wire, but readers that honour the annotation
+      // (DuckDB, pyarrow, Spark) auto-deserialize the cell instead of leaving
+      // it as a string. Readers that ignore the annotation see the same bytes
+      // as before.
+      return 'JSON';
     case 'artifact_key':
       // File path string — no special encoding needed
       return 'UTF8';

@@ -51,12 +51,14 @@ describe('parquet-utils', () => {
       expect(propertyTypeToParquetType('spatial')).to.equal('BYTE_ARRAY');
     });
 
-    it('should map array to UTF8 (JSON-stringified fallback)', () => {
-      expect(propertyTypeToParquetType('array')).to.equal('UTF8');
+    it('should map array to JSON LogicalType (BYTE_ARRAY + originalType=JSON)', () => {
+      // Physical bytes are identical to UTF8 — readers that honour the annotation
+      // (DuckDB, pyarrow, Spark) auto-deserialize; others see the same string.
+      expect(propertyTypeToParquetType('array')).to.equal('JSON');
     });
 
-    it('should map object to UTF8 (JSON-stringified fallback)', () => {
-      expect(propertyTypeToParquetType('object')).to.equal('UTF8');
+    it('should map object to JSON LogicalType (BYTE_ARRAY + originalType=JSON)', () => {
+      expect(propertyTypeToParquetType('object')).to.equal('JSON');
     });
 
     it('should map artifact_key to UTF8 (file path string)', () => {
@@ -262,6 +264,22 @@ describe('parquet-utils', () => {
       expect(field.repetitionType).to.equal('REPEATED');
       // UTF8 elements — downstream readers UNNEST into a string column.
       expect(field.originalType).to.equal('UTF8');
+    });
+
+    it('should annotate object and array columns with the JSON LogicalType', () => {
+      // JSON LogicalType is BYTE_ARRAY with originalType=JSON. Physical bytes
+      // are identical to UTF8 (the encoder still JSON.stringify's), but the
+      // annotation lets honouring readers auto-deserialize the cell.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'tags', feature_property_type_name: 'array' },
+        { feature_property_name: 'meta', feature_property_type_name: 'object' }
+      ];
+      const schema = buildParquetSchema(properties);
+
+      expect(schema.fields['tags'].originalType).to.equal('JSON');
+      expect(schema.fields['tags'].primitiveType).to.equal('BYTE_ARRAY');
+      expect(schema.fields['meta'].originalType).to.equal('JSON');
+      expect(schema.fields['meta'].primitiveType).to.equal('BYTE_ARRAY');
     });
 
     it('should throw when a datetime expansion collides with a sibling property name', () => {
