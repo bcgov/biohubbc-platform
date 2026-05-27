@@ -1,11 +1,17 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICreateSecurityCategoryRequest,
+  ICreateSecurityReasonRequest,
   IListPersecutionHarmResponse,
   IPatchFeatureSecurityRules,
   ISecureDataAccessRequestForm,
   ISecurityCategoriesResponse,
+  ISecurityCategory,
+  ISecurityReason,
   ISecurityReasonsResponse,
-  ISubmissionFeatureSecurityRulesSummaryResponse
+  ISubmissionFeatureSecurityRulesSummaryResponse,
+  IUpdateSecurityCategoryRequest,
+  IUpdateSecurityReasonRequest
 } from 'interfaces/useSecurityApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
@@ -191,6 +197,78 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Create a new security category.
+   *
+   * @param {ICreateSecurityCategoryRequest} body
+   * @return {Promise<ISecurityCategory>}
+   */
+  const createSecurityCategory = async (body: ICreateSecurityCategoryRequest): Promise<ISecurityCategory> => {
+    const { data } = await axios.post('/api/administrative/security/categories', body);
+    return data;
+  };
+
+  /**
+   * Update an existing security category.
+   *
+   * @param {number} securityCategoryId
+   * @param {IUpdateSecurityCategoryRequest} body
+   * @return {Promise<ISecurityCategory>}
+   */
+  const updateSecurityCategory = async (
+    securityCategoryId: number,
+    body: IUpdateSecurityCategoryRequest
+  ): Promise<ISecurityCategory> => {
+    const { data } = await axios.put(`/api/administrative/security/categories/${securityCategoryId}`, body);
+    return data;
+  };
+
+  /**
+   * Delete a security category.
+   *
+   * @param {number} securityCategoryId
+   * @return {Promise<void>}
+   */
+  const deleteSecurityCategory = async (securityCategoryId: number): Promise<void> => {
+    await axios.delete(`/api/administrative/security/categories/${securityCategoryId}`);
+  };
+
+  /**
+   * Create a new security reason.
+   *
+   * @param {ICreateSecurityReasonRequest} body
+   * @return {Promise<ISecurityReason>}
+   */
+  const createSecurityReason = async (body: ICreateSecurityReasonRequest): Promise<ISecurityReason> => {
+    const { data } = await axios.post('/api/administrative/security/reasons', body);
+    return data;
+  };
+
+  /**
+   * Update an existing security reason.
+   *
+   * @param {number} securityRuleId
+   * @param {IUpdateSecurityReasonRequest} body
+   * @return {Promise<ISecurityReason>}
+   */
+  const updateSecurityReason = async (
+    securityRuleId: number,
+    body: IUpdateSecurityReasonRequest
+  ): Promise<ISecurityReason> => {
+    const { data } = await axios.put(`/api/administrative/security/reasons/${securityRuleId}`, body);
+    return data;
+  };
+
+  /**
+   * Delete a security reason.
+   *
+   * @param {number} securityRuleId
+   * @return {Promise<void>}
+   */
+  const deleteSecurityReason = async (securityRuleId: number): Promise<void> => {
+    await axios.delete(`/api/administrative/security/reasons/${securityRuleId}`);
+  };
+
   return {
     patchSecurityRulesOnSubmission,
     sendSecureArtifactAccessRequest,
@@ -200,7 +278,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
     getSubmissionFeatureSecuritySummary,
     getActiveSecurityRulesWithCategories,
     getSecurityCategories,
-    getSecurityReasons
+    getSecurityReasons,
+    createSecurityCategory,
+    updateSecurityCategory,
+    deleteSecurityCategory,
+    createSecurityReason,
+    updateSecurityReason,
+    deleteSecurityReason
   };
 };
 

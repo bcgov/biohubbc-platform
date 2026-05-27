@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getSecurityCategories } from '.';
+import { createSecurityCategory, getSecurityCategories } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
@@ -131,6 +131,39 @@ describe('administrative/security/categories', () => {
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }
+    });
+  });
+
+  describe('POST/createSecurityCategory', () => {
+    it('creates a security category and returns 201', async () => {
+      const mockCategory = {
+        security_category_id: 1,
+        name: 'New Category',
+        description: 'A new category'
+      };
+
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(SecurityService.prototype, 'createSecurityCategory').resolves(mockCategory);
+
+      const requestHandler = createSecurityCategory();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.body = { name: 'New Category', description: 'A new category' };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(SecurityService.prototype.createSecurityCategory).to.have.been.calledOnceWith({
+        name: 'New Category',
+        description: 'A new category'
+      });
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.eql(mockCategory);
     });
   });
 });

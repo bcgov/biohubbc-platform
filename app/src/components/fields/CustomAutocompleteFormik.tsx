@@ -10,6 +10,7 @@ export interface ICustomAutocompleteFormikProps<T extends string | number> exten
 > {
   id: string;
   name: string;
+  required?: boolean;
   onChange?: (event: SyntheticEvent<Element, Event>, option: ICustomAutocompleteOption<T> | null) => void;
 }
 
@@ -22,7 +23,7 @@ export interface ICustomAutocompleteFormikProps<T extends string | number> exten
  */
 const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutocompleteFormikProps<T>) => {
   const { touched, errors, setFieldValue, values, submitCount } = useFormikContext<any>();
-  const { id, name, options, onChange, label, ...rest } = props;
+  const { id, name, options, onChange, label, required, ...rest } = props;
 
   const currentValue = get(values, name) as T | undefined;
   const selectedOption = options.find((option) => option.value === currentValue) ?? null;
@@ -42,7 +43,9 @@ const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutoc
         onChange?.(event, option);
         setFieldValue(name, option?.value);
       }}
-      renderInput={(params) => <CustomTextField {...params} label={label} error={showError} helperText={helperText} />}
+      renderInput={(params) => (
+        <CustomTextField {...params} label={label} required={required} error={showError} helperText={helperText} />
+      )}
     />
   );
 };

@@ -1,15 +1,24 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
-import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
 import {
+  CreateSecurityCategory,
+  SecurityCategory,
+  SecurityCategoryRecord,
+  SecurityCategoryWithRuleCount,
+  UpdateSecurityCategory
+} from '../models/security-category';
+import {
+  CreateSecurityReason,
+  SecurityReason,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
   SecurityRuleWithFeatureCount,
-  SecuritySearchFilters
+  SecuritySearchFilters,
+  UpdateSecurityReason
 } from '../models/security-rule';
 import {
   SubmissionFeatureSecurityRecord,
@@ -593,14 +602,19 @@ export class SecurityRepository extends BaseRepository {
     const query = knex
       .select(
         'sr.security_rule_id',
+        'sr.security_category_id',
+        'sc.name as category_name',
         'sr.name',
         'sr.description',
         knex.raw('COUNT(sfs.submission_feature_security_id)::integer AS feature_count')
       )
       .from('security_rule as sr')
+      .innerJoin('security_category as sc', function () {
+        this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sc.record_end_date');
+      })
       .leftJoin('submission_feature_security as sfs', 'sfs.security_rule_id', 'sr.security_rule_id')
       .whereNull('sr.record_end_date')
-      .groupBy('sr.security_rule_id', 'sr.name', 'sr.description');
+      .groupBy('sr.security_rule_id', 'sr.security_category_id', 'sc.name', 'sr.name', 'sr.description');
 
     if (filters?.search) {
       query.whereILike('sr.name', `%${filters.search}%`);
@@ -638,5 +652,270 @@ export class SecurityRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to get security rules count');
     }
     return response.rows[0].count;
+  }
+
+  /**
+   * Insert a new security category record.
+   *
+   * @param {CreateSecurityCategory} data
+   * @return {*}  {Promise<SecurityCategory>}
+   * @memberof SecurityRepository
+   */
+  async insertSecurityCategory(data: CreateSecurityCategory): Promise<SecurityCategory> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_category')
+      .insert({
+        name: data.name,
+        description: data.description
+      })
+      .returning(['security_category_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, SecurityCategory);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert security category', [
+        'SecurityRepository->insertSecurityCategory',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active security category by ID.
+   *
+   * @param {number} securityCategoryId - The ID of the category to retrieve.
+   * @return {Promise<SecurityCategory>} The active security category record.
+   * @throws {ApiNotFoundError} If no active category exists for the ID.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof SecurityRepository
+   */
+  async getSecurityCategory(securityCategoryId: number): Promise<SecurityCategory> {
+    const knex = getKnex();
+    const query = knex
+      .from('security_category')
+      .select(['security_category_id', 'name', 'description'])
+      .whereNull('record_end_date')
+      .where('security_category_id', securityCategoryId);
+
+    const response = await this.connection.knex(query, SecurityCategory);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Security category not found', [
+        'SecurityRepository->getSecurityCategory',
+        { securityCategoryId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SecurityRepository->getSecurityCategory',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update an active security category record.
+   *
+   * @param {number} securityCategoryId
+   * @param {UpdateSecurityCategory} data
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityRepository
+   */
+  async updateSecurityCategory(securityCategoryId: number, data: UpdateSecurityCategory): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_category')
+      .update({
+        name: data.name,
+        description: data.description
+      })
+      .whereNull('record_end_date')
+      .where('security_category_id', securityCategoryId);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update security category', [
+        'SecurityRepository->updateSecurityCategory',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Soft delete an active security category record.
+   *
+   * @param {number} securityCategoryId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityRepository
+   */
+  async deleteSecurityCategory(securityCategoryId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_category')
+      .update({ record_end_date: knex.fn.now() })
+      .whereNull('record_end_date')
+      .where('security_category_id', securityCategoryId)
+      .returning(['security_category_id']);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to delete security category', [
+        'SecurityRepository->deleteSecurityCategory',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Count active security rules belonging to a category.
+   *
+   * @param {number} securityCategoryId
+   * @return {*}  {Promise<number>}
+   * @memberof SecurityRepository
+   */
+  async getActiveSecurityRuleCountByCategory(securityCategoryId: number): Promise<number> {
+    const knex = getKnex();
+    const query = knex
+      .select(knex.raw('count(*)::integer as count'))
+      .from('security_rule')
+      .whereNull('record_end_date')
+      .where('security_category_id', securityCategoryId);
+
+    const response = await this.connection.knex(query, CountResult);
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get security rule count for category');
+    }
+    return response.rows[0].count;
+  }
+
+  /**
+   * Insert a new security rule record.
+   *
+   * @param {CreateSecurityReason} data
+   * @return {*}  {Promise<SecurityReason>}
+   * @memberof SecurityRepository
+   */
+  async insertSecurityRule(data: CreateSecurityReason): Promise<SecurityReason> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_rule')
+      .insert({
+        security_category_id: data.security_category_id,
+        name: data.name,
+        description: data.description,
+        policy_id: null
+      })
+      .returning(['security_rule_id', 'security_category_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, SecurityReason);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert security rule', [
+        'SecurityRepository->insertSecurityRule',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active security rule by ID.
+   *
+   * @param {number} securityRuleId - The ID of the rule to retrieve.
+   * @return {Promise<SecurityReason>} The active security rule record.
+   * @throws {ApiNotFoundError} If no active rule exists for the ID.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof SecurityRepository
+   */
+  async getSecurityRule(securityRuleId: number): Promise<SecurityReason> {
+    const knex = getKnex();
+    const query = knex
+      .from('security_rule')
+      .select(['security_rule_id', 'security_category_id', 'name', 'description'])
+      .whereNull('record_end_date')
+      .where('security_rule_id', securityRuleId);
+
+    const response = await this.connection.knex(query, SecurityReason);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Security reason not found', [
+        'SecurityRepository->getSecurityRule',
+        { securityRuleId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SecurityRepository->getSecurityRule',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update an active security rule record.
+   *
+   * @param {number} securityRuleId
+   * @param {UpdateSecurityReason} data
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityRepository
+   */
+  async updateSecurityRule(securityRuleId: number, data: UpdateSecurityReason): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_rule')
+      .update({
+        security_category_id: data.security_category_id,
+        name: data.name,
+        description: data.description
+      })
+      .whereNull('record_end_date')
+      .where('security_rule_id', securityRuleId);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update security rule', [
+        'SecurityRepository->updateSecurityRule',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Soft delete an active security rule record.
+   *
+   * @param {number} securityRuleId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityRepository
+   */
+  async deleteSecurityRule(securityRuleId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('security_rule')
+      .update({ record_end_date: knex.fn.now() })
+      .whereNull('record_end_date')
+      .where('security_rule_id', securityRuleId)
+      .returning(['security_rule_id']);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to delete security rule', [
+        'SecurityRepository->deleteSecurityRule',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 }

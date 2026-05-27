@@ -86,7 +86,16 @@ describe('useSecurityApi', () => {
   describe('getSecurityReasons', () => {
     it('requests paginated security reasons with search params', async () => {
       const response = {
-        reasons: [{ security_rule_id: 1, name: 'reason', description: 'desc', feature_count: 2 }],
+        reasons: [
+          {
+            security_rule_id: 1,
+            security_category_id: 2,
+            category_name: 'Health',
+            name: 'reason',
+            description: 'desc',
+            feature_count: 2
+          }
+        ],
         pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
       };
 
@@ -99,6 +108,72 @@ describe('useSecurityApi', () => {
       expect(actualResult).toEqual(response);
 
       expect(mock.history.get[0].params).toEqual({ ...searchParams, ...pagination });
+    });
+  });
+
+  describe('createSecurityCategory', () => {
+    it('posts a new security category', async () => {
+      const body = { name: 'New Category', description: 'Description' };
+      const response = { security_category_id: 1, ...body };
+
+      mock.onPost('/api/administrative/security/categories').reply(201, response);
+
+      const actualResult = await useSecurityApi(axios).createSecurityCategory(body);
+      expect(actualResult).toEqual(response);
+    });
+  });
+
+  describe('updateSecurityCategory', () => {
+    it('puts an updated security category', async () => {
+      const body = { name: 'Updated', description: 'Updated desc' };
+      const response = { security_category_id: 1, ...body };
+
+      mock.onPut('/api/administrative/security/categories/1').reply(200, response);
+
+      const actualResult = await useSecurityApi(axios).updateSecurityCategory(1, body);
+      expect(actualResult).toEqual(response);
+    });
+  });
+
+  describe('deleteSecurityCategory', () => {
+    it('deletes a security category', async () => {
+      mock.onDelete('/api/administrative/security/categories/1').reply(200);
+
+      await useSecurityApi(axios).deleteSecurityCategory(1);
+      expect(mock.history.delete).toHaveLength(1);
+    });
+  });
+
+  describe('createSecurityReason', () => {
+    it('posts a new security reason', async () => {
+      const body = { name: 'New Reason', description: 'Description', security_category_id: 2 };
+      const response = { security_rule_id: 1, ...body };
+
+      mock.onPost('/api/administrative/security/reasons').reply(201, response);
+
+      const actualResult = await useSecurityApi(axios).createSecurityReason(body);
+      expect(actualResult).toEqual(response);
+    });
+  });
+
+  describe('updateSecurityReason', () => {
+    it('puts an updated security reason', async () => {
+      const body = { name: 'Updated', description: 'Updated desc', security_category_id: 2 };
+      const response = { security_rule_id: 1, ...body };
+
+      mock.onPut('/api/administrative/security/reasons/1').reply(200, response);
+
+      const actualResult = await useSecurityApi(axios).updateSecurityReason(1, body);
+      expect(actualResult).toEqual(response);
+    });
+  });
+
+  describe('deleteSecurityReason', () => {
+    it('deletes a security reason', async () => {
+      mock.onDelete('/api/administrative/security/reasons/1').reply(200);
+
+      await useSecurityApi(axios).deleteSecurityReason(1);
+      expect(mock.history.delete).toHaveLength(1);
     });
   });
 });

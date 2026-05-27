@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getSecurityReasons } from '.';
+import { createSecurityReason, getSecurityReasons } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
@@ -131,6 +131,41 @@ describe('administrative/security/reasons', () => {
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }
+    });
+  });
+
+  describe('POST/createSecurityReason', () => {
+    it('creates a security reason and returns 201', async () => {
+      const mockReason = {
+        security_rule_id: 1,
+        security_category_id: 2,
+        name: 'New Reason',
+        description: 'A new reason'
+      };
+
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(SecurityService.prototype, 'createSecurityReason').resolves(mockReason);
+
+      const requestHandler = createSecurityReason();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.body = { name: 'New Reason', description: 'A new reason', security_category_id: 2 };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(SecurityService.prototype.createSecurityReason).to.have.been.calledOnceWith({
+        name: 'New Reason',
+        description: 'A new reason',
+        security_category_id: 2
+      });
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.eql(mockReason);
     });
   });
 });

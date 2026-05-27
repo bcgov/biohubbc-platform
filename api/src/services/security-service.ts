@@ -1,12 +1,22 @@
 import { IDBConnection } from '../database/db';
+import { ApiConflictError } from '../errors/api-error';
 import { HTTP403 } from '../errors/http-error';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
-import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
 import {
+  CreateSecurityCategory,
+  SecurityCategory,
+  SecurityCategoryRecord,
+  SecurityCategoryWithRuleCount,
+  UpdateSecurityCategory
+} from '../models/security-category';
+import {
+  CreateSecurityReason,
+  SecurityReason,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
   SecurityRuleWithFeatureCount,
-  SecuritySearchFilters
+  SecuritySearchFilters,
+  UpdateSecurityReason
 } from '../models/security-rule';
 import {
   SubmissionFeatureSecurityRecord,
@@ -539,5 +549,113 @@ export class SecurityService extends DBService {
    */
   async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
     return this.securityRepository.getSecurityRulesCount(filters);
+  }
+
+  /**
+   * Create a security category record.
+   *
+   * @param {CreateSecurityCategory} data
+   * @return {*}  {Promise<SecurityCategory>}
+   * @memberof SecurityService
+   */
+  async createSecurityCategory(data: CreateSecurityCategory): Promise<SecurityCategory> {
+    return this.securityRepository.insertSecurityCategory(data);
+  }
+
+  /**
+   * Get a single active security category by ID.
+   *
+   * @param {number} securityCategoryId - The ID of the category to retrieve.
+   * @return {Promise<SecurityCategory>} The active security category record.
+   * @throws {ApiNotFoundError} If no active category exists for the ID.
+   * @memberof SecurityService
+   */
+  getSecurityCategory(securityCategoryId: number): Promise<SecurityCategory> {
+    return this.securityRepository.getSecurityCategory(securityCategoryId);
+  }
+
+  /**
+   * Update a security category record by ID.
+   *
+   * @param {number} securityCategoryId
+   * @param {UpdateSecurityCategory} data
+   * @return {*}  {Promise<SecurityCategory>}
+   * @memberof SecurityService
+   */
+  async updateSecurityCategory(securityCategoryId: number, data: UpdateSecurityCategory): Promise<SecurityCategory> {
+    await this.securityRepository.updateSecurityCategory(securityCategoryId, data);
+    return this.securityRepository.getSecurityCategory(securityCategoryId);
+  }
+
+  /**
+   * Soft-delete a security category by ID.
+   *
+   * @param {number} securityCategoryId - The ID of the category to delete.
+   * @return {Promise<void>}
+   * @throws {ApiConflictError} If the category has active child reasons.
+   * @throws {ApiExecuteSQLError} If the delete does not affect exactly one row.
+   * @memberof SecurityService
+   */
+  async deleteSecurityCategory(securityCategoryId: number): Promise<void> {
+    const ruleCount = await this.securityRepository.getActiveSecurityRuleCountByCategory(securityCategoryId);
+
+    if (ruleCount > 0) {
+      throw new ApiConflictError('Cannot delete a security category that has active reasons', [
+        'SecurityService->deleteSecurityCategory',
+        { securityCategoryId, ruleCount }
+      ]);
+    }
+
+    await this.securityRepository.deleteSecurityCategory(securityCategoryId);
+  }
+
+  /**
+   * Create a security reason (rule) record.
+   *
+   * @param {CreateSecurityReason} data - Reason fields required to create the record.
+   * @return {Promise<SecurityReason>} The created security reason.
+   * @throws {ApiNotFoundError} If the referenced security category does not exist.
+   * @memberof SecurityService
+   */
+  async createSecurityReason(data: CreateSecurityReason): Promise<SecurityReason> {
+    await this.securityRepository.getSecurityCategory(data.security_category_id);
+    return this.securityRepository.insertSecurityRule(data);
+  }
+
+  /**
+   * Get a single active security reason by ID.
+   *
+   * @param {number} securityRuleId - The ID of the reason to retrieve.
+   * @return {Promise<SecurityReason>} The active security reason record.
+   * @throws {ApiNotFoundError} If no active reason exists for the ID.
+   * @memberof SecurityService
+   */
+  getSecurityReason(securityRuleId: number): Promise<SecurityReason> {
+    return this.securityRepository.getSecurityRule(securityRuleId);
+  }
+
+  /**
+   * Update a security reason record by ID.
+   *
+   * @param {number} securityRuleId
+   * @param {UpdateSecurityReason} data
+   * @return {*}  {Promise<SecurityReason>}
+   * @memberof SecurityService
+   */
+  async updateSecurityReason(securityRuleId: number, data: UpdateSecurityReason): Promise<SecurityReason> {
+    await this.securityRepository.getSecurityCategory(data.security_category_id);
+    await this.securityRepository.updateSecurityRule(securityRuleId, data);
+    return this.securityRepository.getSecurityRule(securityRuleId);
+  }
+
+  /**
+   * Soft-delete a security reason by ID.
+   *
+   * @param {number} securityRuleId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityService
+   */
+  async deleteSecurityReason(securityRuleId: number): Promise<void> {
+    await this.securityRepository.deleteSecurityRule(securityRuleId);
   }
 }
