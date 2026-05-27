@@ -2311,6 +2311,71 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record duplicate `source_id` errors for the upload.
+   *
+   * A duplicate-source-id error is recorded once per `source_id` value that appears in
+   * two or more active rows of `submission_feature` within the same upload. NULL
+   * `source_id` rows are excluded — Postgres NULL semantics make them non-equal, and
+   * the downstream `feature::<source_id>` resolver cannot match NULLs either, so they
+   * cannot produce the resolution ambiguity this check prevents.
+   *
+   * One row per distinct duplicated `source_id` is written so that the colliding
+   * identifier is recoverable from `details->>'source_id'`. `count` is the literal
+   * duplicate-row count (e.g., three colliding rows → `count = 3`), matching the
+   * semantics of the sibling `recordUnresolvedParentErrors` method.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          submission_upload_id,
+          source_id,
+          COUNT(*)::integer AS count
+        FROM submission_feature
+        -- source_id IS NOT NULL is defensive — parser already rejects empty strings at parse time.
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_end_date IS NULL
+          AND source_id IS NOT NULL
+        GROUP BY submission_upload_id, source_id
+        HAVING COUNT(*) > 1
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        NULL::text,
+        NULL::integer,
+        'DUPLICATE_FEATURE_SOURCE_ID',
+        'Multiple active submission_feature rows share the same source_id within this upload',
+        count,
+        jsonb_build_object('source_id', source_id)
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Get total number of ingestion error rows for one upload.
    *
    * Returns the aggregated sum of `submission_feature_error.count` rather than row

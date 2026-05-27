@@ -269,6 +269,31 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId', () => {
+    it('records one duplicate-source-id error per colliding source_id, excluding NULLs', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('grouped_errors AS');
+      expect(sqlText).to.include("'DUPLICATE_FEATURE_SOURCE_ID'");
+      expect(sqlText).to.include('HAVING COUNT(*) > 1');
+      expect(sqlText).to.include('source_id IS NOT NULL');
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.include("jsonb_build_object('source_id', source_id)");
+      expect(sqlText).to.include('ON CONFLICT');
+      expect(sqlText).to.match(
+        /ON CONFLICT\s*\(\s*submission_upload_id,\s*error_code,\s*feature_type_property_id,\s*property_name\s*\)/
+      );
+      expect(sqlText).to.not.include('NULLIF');
+      expect(sqlText).to.not.include('submission_feature_id');
+    });
+  });
+
   describe('recordMissingRequiredPropertyErrorsBySubmissionUploadId', () => {
     it('uses an indexable raw-property anti-lookup for present required properties', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
