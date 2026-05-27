@@ -109,6 +109,16 @@ describe('parquet-utils', () => {
       expect(result).to.have.length(1);
       expect(result[0]).to.deep.equal({ name: 'geometry', parquetType: 'BYTE_ARRAY' });
     });
+
+    it('should return a UTF8 column flagged as repeated for a feature property (native Parquet LIST)', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'child_features',
+        feature_property_type_name: 'feature'
+      });
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.deep.equal({ name: 'child_features', parquetType: 'UTF8', repeated: true });
+    });
   });
 
   describe('dateStringToParquet', () => {
@@ -238,6 +248,20 @@ describe('parquet-utils', () => {
       expect(sfid.primitiveType).to.equal('INT64');
       // optional=false in @dsnp/parquetjs surfaces as REQUIRED on the schema field.
       expect(sfid.repetitionType).to.equal('REQUIRED');
+    });
+
+    it('should mark a feature-typed column as REPEATED in the Parquet schema (native LIST)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const schema = buildParquetSchema(properties);
+
+      const field = schema.fields['child_features'];
+      expect(field).to.exist;
+      // `repeated: true` in @dsnp/parquetjs surfaces as REPEATED on the schema field.
+      expect(field.repetitionType).to.equal('REPEATED');
+      // UTF8 elements — downstream readers UNNEST into a string column.
+      expect(field.originalType).to.equal('UTF8');
     });
 
     it('should throw when a datetime expansion collides with a sibling property name', () => {
@@ -435,6 +459,54 @@ describe('parquet-utils', () => {
       expect(row['centroid']).to.be.instanceOf(Buffer);
       // Different geometries should produce different WKB
       expect(Buffer.compare(row['geometry'] as Buffer, row['centroid'] as Buffer)).to.not.equal(0);
+    });
+
+    it('should pass through a single-element feature array unchanged for the Parquet LIST writer', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: ['urn:1'] }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:1']);
+    });
+
+    it('should preserve order in a multi-element feature array', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: ['urn:1', 'urn:2'] }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:1', 'urn:2']);
+    });
+
+    it('should pass through an empty feature array as [] (not null) so the LIST writer emits an empty list', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: [] }), properties);
+
+      expect(row['child_features']).to.deep.equal([]);
+    });
+
+    it('should defensively wrap a non-array feature scalar in a single-element array', () => {
+      // Contract drift defense: the hydrator guarantees arrays of URN strings,
+      // but a malformed cell from upstream should land in Parquet as a valid
+      // one-element list rather than crash the LIST writer mid-file.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: 'urn:x' }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:x']);
+    });
+
+    it('should set null for a missing feature property key (the shared null guard runs before encoding)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({}), properties);
+
+      expect(row['child_features']).to.be.null;
     });
 
     it('should set null for null property values', () => {

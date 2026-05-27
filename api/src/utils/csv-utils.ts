@@ -125,6 +125,7 @@ export function flattenFeatureWithParent(
  * - array → delegate to flattenArray()
  * - artifact_key → files/{submissionFeatureId}_{filename}
  * - object → JSON.stringify(value)
+ * - feature → JSON.stringify(value), '' for null/undefined
  * - null/undefined → empty string
  *
  * @param data - The feature's JSONB data.
@@ -171,6 +172,9 @@ export function flattenFeatureBySchema(
         result[prop.feature_property_name] = Array.isArray(value) ? flattenArray(value) : toStringOrEmpty(value);
         break;
       case 'object':
+        result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
+        break;
+      case 'feature':
         result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
         break;
       default:

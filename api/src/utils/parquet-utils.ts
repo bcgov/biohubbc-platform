@@ -22,10 +22,15 @@ import type { CsvPropertyDefinition } from './csv-utils';
  *
  * Most property types map 1:1 (one property -> one column). `datetime`
  * expands to two — see {@link expandPropertyToColumns}.
+ *
+ * `repeated` marks the column as a native Parquet LIST (the schema field gets
+ * `repetitionType === 'REPEATED'`), used by `feature` properties so downstream
+ * readers see an array column they can UNNEST without JSON parsing.
  */
 export interface FeatureColumnSpec {
   name: string;
   parquetType: FieldDefinition['type'];
+  repeated?: boolean;
 }
 
 /**
@@ -60,6 +65,20 @@ export interface FeatureColumnSpec {
  *   two-element (`<name>_date`, `<name>_time`) for datetime.
  */
 export function expandPropertyToColumns(prop: CsvPropertyDefinition): FeatureColumnSpec[] {
+  if (prop.feature_property_type_name === 'feature') {
+    // Native Parquet LIST<UTF8> preserves the columnar shape of cross-feature
+    // references so downstream readers (DuckDB, pyarrow, Spark) can UNNEST
+    // directly — no per-row JSON.parse on a stringified array, no loss of
+    // per-element predicate pushdown. The `repeated` flag becomes
+    // `repetitionType: 'REPEATED'` on the Parquet schema field.
+    //
+    // The defensive normalization in `encodePropertyValue` (scalar → single-
+    // element array) handles contract drift from upstream: the hydrator
+    // guarantees arrays of URN strings today, but a malformed cell should
+    // land in Parquet as a valid one-element list rather than crash the
+    // writer mid-file.
+    return [{ name: prop.feature_property_name, parquetType: 'UTF8', repeated: true }];
+  }
   if (prop.feature_property_type_name === 'datetime') {
     // Native Parquet logical types — DATE (INT32 days-since-epoch) and TIME_MILLIS
     // (INT32 ms-since-midnight). DuckDB / pandas / arrow read these as native
@@ -209,7 +228,9 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
 
   for (const prop of properties) {
     for (const col of expandPropertyToColumns(prop)) {
-      fields[col.name] = { type: col.parquetType, optional: true };
+      fields[col.name] = col.repeated
+        ? { type: col.parquetType, repeated: true }
+        : { type: col.parquetType, optional: true };
     }
   }
 
@@ -273,6 +294,11 @@ function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unkno
     case 'array':
     case 'object':
       return JSON.stringify(value);
+    case 'feature':
+      // `feature` columns are native Parquet LIST<UTF8>; the writer expects an
+      // array. Defensive normalization: a scalar from upstream contract drift
+      // lands as a one-element list rather than crashing the writer mid-file.
+      return Array.isArray(value) ? value : [String(value)];
     default:
       // string, number, boolean, code, taxon, artifact_key — pass through directly
       return value;
