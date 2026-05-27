@@ -4,9 +4,10 @@
 // preserves the deny-all baseline for the administrative ticket-bound flow.
 //
 // Also verifies:
-//   - The requester is always a member of both auto-created teams (the
-//     `system_user_ids` picker captures additional collaborators, not the
-//     canonical access list).
+//   - The service treats `system_user_ids` as the canonical team membership and
+//     does NOT auto-add the requester. The search route unions `requested_by`
+//     into `system_user_ids` before calling (covered at the route layer in
+//     paths/data-request); the admin ticket flow passes the picker as-is.
 //   - Unknown feature-type names are rejected with HTTP400 before any DB
 //     write, leaving no partial state behind.
 //   - A failure mid-way through `createDataRequestForTicket` rolls back the
@@ -145,12 +146,12 @@ describe('DataRequestService (integration)', function () {
       const collaborator = await createUser('I1-coll');
       const expression = buildExpression('I1-tree');
 
+      // The search route unions `requested_by` into `system_user_ids` before calling the service
+      // (paths/data-request/index.ts), so the service receives the requester as part of the
+      // canonical member list. Mirror that here.
       const dataRequest = await service.createDataRequest({
         requested_by: requester,
         reason: 'I1 search-driven happy path covering the full row shape',
-        // Mirror the user-facing route (`POST /api/data-request`): the caller is responsible for
-        // prepending the requester onto `system_user_ids`. The service intentionally does not
-        // union the requester back in — see service docstring.
         system_user_ids: [requester, collaborator],
         featureTypes: ['dataset'],
         expression
@@ -210,7 +211,7 @@ describe('DataRequestService (integration)', function () {
       const dataRequestTeamId = drRows.rows[0].team_id as string;
       expect(policyTeamId).to.not.equal(dataRequestTeamId);
 
-      // Each auto-created team has exactly the requester + collaborator union (no duplicates).
+      // Each auto-created team has exactly the deduped `system_user_ids` the service was given.
       expect(await teamMemberIds(dataRequestTeamId)).to.deep.equal([requester, collaborator].sort((a, b) => a - b));
       expect(await teamMemberIds(policyTeamId)).to.deep.equal([requester, collaborator].sort((a, b) => a - b));
 
@@ -285,7 +286,7 @@ describe('DataRequestService (integration)', function () {
   });
 
   describe('createDataRequestForTicket (legacy ticket-bound flow)', () => {
-    it('I4: empty `featureTypes` preserves the deny-all baseline; both auto-created teams contain the supplied access list verbatim', async () => {
+    it('I4: empty `featureTypes` preserves the deny-all baseline; the admin flow seeds both teams from the picker selection as-is (requester not auto-added)', async () => {
       const requester = await createUser('I4-req');
       const collaborator = await createUser('I4-coll');
 
@@ -322,7 +323,9 @@ describe('DataRequestService (integration)', function () {
       `);
       expect(links.rows[0].n).to.equal(0);
 
-      // Both DR-owned teams contain the requester + collaborator union (latent-bug fix coverage).
+      // The admin ticket flow passes the picker selection as-is and does NOT auto-add the
+      // requester (see DataRequestService contract + paths/tickets/{ticketId}/data-request).
+      // Both DR-owned teams therefore contain exactly the picker selection.
       const dataRequestTeamId = dataRequest.team_id;
       const policyTeamRows = await connection.sql(SQL`
         SELECT team_id FROM team_policy WHERE policy_id = ${dataRequest.policy_id};
@@ -330,12 +333,12 @@ describe('DataRequestService (integration)', function () {
       expect(policyTeamRows.rowCount).to.equal(1);
       const policyTeamId = policyTeamRows.rows[0].team_id as string;
 
-      const expectedMembers = [requester, collaborator].sort((a, b) => a - b);
+      const expectedMembers = [collaborator];
       expect(await teamMemberIds(dataRequestTeamId)).to.deep.equal(expectedMembers);
       expect(await teamMemberIds(policyTeamId)).to.deep.equal(expectedMembers);
     });
 
-    it('I5: empty `system_user_ids` produces empty teams (the service does not auto-add the requester; callers control the access list)', async () => {
+    it('I5: empty `system_user_ids` in the admin flow yields empty teams (the picker is the canonical access list; the requester is not auto-added)', async () => {
       const requester = await createUser('I5-req');
 
       const ticket = await ticketService.createTicket({
@@ -359,6 +362,7 @@ describe('DataRequestService (integration)', function () {
       `);
       expect(policyTeamRows.rowCount).to.equal(1);
 
+      // The admin flow does not auto-add the requester, so an empty picker yields empty teams.
       expect(await teamMemberIds(dataRequest.team_id)).to.deep.equal([]);
       expect(await teamMemberIds(policyTeamRows.rows[0].team_id as string)).to.deep.equal([]);
     });
