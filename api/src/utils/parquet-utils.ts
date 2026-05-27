@@ -168,6 +168,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       throw new Error(
         `propertyTypeToParquetType: 'datetime' has no single Parquet type — use expandPropertyToColumns to get DATE + TIME_MILLIS`
       );
+    case 'feature':
+      // `feature` cannot map to a single primitive — it emits a native LIST<UTF8>
+      // (UTF8 with `repeated: true`) via `expandPropertyToColumns`. Reaching this
+      // case means a caller bypassed the helper and asked for a scalar type;
+      // silently returning UTF8 would erase the list shape from the Parquet footer.
+      throw new Error(
+        `propertyTypeToParquetType: 'feature' has no single Parquet type — use expandPropertyToColumns to get a repeated UTF8 column`
+      );
     case 'code':
       // Code properties arrive pre-resolved: the cursor JOIN resolves FK -> display label
       return 'UTF8';

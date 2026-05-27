@@ -172,8 +172,6 @@ export function flattenFeatureBySchema(
         result[prop.feature_property_name] = Array.isArray(value) ? flattenArray(value) : toStringOrEmpty(value);
         break;
       case 'object':
-        result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
-        break;
       case 'feature':
         result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
         break;
