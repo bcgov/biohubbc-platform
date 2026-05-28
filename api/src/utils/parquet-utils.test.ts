@@ -1,9 +1,9 @@
 import parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
+import { describe, it } from 'mocha';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'mocha';
 import wkx from 'wkx';
 
 import { ParquetFeatureData } from '../models/download';
