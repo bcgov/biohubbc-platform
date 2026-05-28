@@ -611,17 +611,17 @@ export class DownloadRepository extends BaseRepository {
        * - `submission_feature_property_feature` has no soft-delete column, so no `p`-side filter is needed.
        */
       feature: `SELECT
-  p.submission_feature_id,
-  fp.name,
-  jsonb_agg(sf.urn ORDER BY sf.submission_feature_id) AS value
- FROM submission_feature_property_feature p
- INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
- INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
- INNER JOIN submission_feature sf
-   ON sf.submission_feature_id = p.referenced_submission_feature_id
-  AND sf.record_end_date IS NULL
- WHERE p.submission_feature_id = ANY($1)
- GROUP BY p.submission_feature_id, fp.name`
+        p.submission_feature_id,
+        fp.name,
+        jsonb_agg(sf.urn ORDER BY sf.submission_feature_id) AS value
+      FROM submission_feature_property_feature p
+      INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+      INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      INNER JOIN submission_feature sf
+        ON sf.submission_feature_id = p.referenced_submission_feature_id
+        AND sf.record_end_date IS NULL
+      WHERE p.submission_feature_id = ANY($1)
+      GROUP BY p.submission_feature_id, fp.name`
     };
 
     // Query only the typed tables for property types present in this batch
