@@ -42,7 +42,7 @@ import {
 import {
   createTestFeature,
   createTestSubmission,
-  getOrCreateIntegrationTicketId
+  createTestUploadWithFeatures
 } from '../helpers/test-submission-helpers';
 
 describe('SubmissionFeaturePropertyIngestionRepository (integration)', function () {
@@ -174,83 +174,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
   }
 
   /**
-   * Seed one `submission_upload` plus N `submission_feature` rows under it, each row
-   * parameterized by `(source_id, record_end_date)`.
-   *
-   * The helper exists so duplicate-detection scenarios can be expressed as a flat list
-   * of feature shapes — every test needs exactly one upload with a handful of feature
-   * rows, and inlining the FK chain (submission → upload → submission_upload →
-   * submission_feature plus the ticket lookup) in every test would obscure the
-   * scenario under test.
-   *
-   * Inserts run directly via `connection.sql` to bypass any logic in the repository
-   * under test.
-   */
-  async function seedUploadWithFeatures(
-    connection: IDBConnection,
-    features: Array<{ source_id: string | null; record_end_date?: string | null }>
-  ): Promise<{ submissionUploadId: string }> {
-    const systemUserId = connection.systemUserId();
-
-    const submissionId = await createTestSubmission(connection);
-
-    const uploadResult = await connection.sql(SQL`
-      INSERT INTO upload (upload_status, record_end_date, create_user)
-      VALUES ('completed', now(), ${systemUserId})
-      RETURNING upload_id;
-    `);
-    const uploadId = uploadResult.rows[0].upload_id;
-
-    const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
-
-    const bridgeResult = await connection.sql(SQL`
-      INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-      VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
-      RETURNING submission_upload_id;
-    `);
-    const submissionUploadId = bridgeResult.rows[0].submission_upload_id as string;
-
-    if (features.length === 0) {
-      return { submissionUploadId };
-    }
-
-    const featureTypeResult = await connection.sql(SQL`
-      SELECT feature_type_id FROM feature_type WHERE name = 'dataset' LIMIT 1;
-    `);
-    const featureTypeId = featureTypeResult.rows[0].feature_type_id;
-
-    for (const feature of features) {
-      const dataJson = JSON.stringify({ source_id: feature.source_id });
-      await connection.sql(SQL`
-        INSERT INTO submission_feature (
-          submission_id,
-          submission_upload_id,
-          feature_type_id,
-          source_id,
-          record_end_date,
-          data,
-          data_byte_size,
-          create_user
-        )
-        VALUES (
-          ${submissionId},
-          ${submissionUploadId},
-          ${featureTypeId},
-          ${feature.source_id},
-          ${feature.record_end_date ?? null},
-          ${dataJson}::jsonb,
-          octet_length(${dataJson}::jsonb::text) + 500,
-          ${systemUserId}
-        );
-      `);
-    }
-
-    return { submissionUploadId };
-  }
-
-  /**
    * Read back DUPLICATE_FEATURE_SOURCE_ID rows for an upload, ordered by source_id
-   * (NULLs last) for deterministic assertion order.
+   * for deterministic assertion order.
    */
   async function getDuplicateErrors(submissionUploadId: string): Promise<
     Array<{
@@ -928,7 +853,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
   describe('recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId', () => {
     it('records one error row with count=3 when three active rows share one source_id', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, [
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
         { source_id: 'A' },
         { source_id: 'A' },
         { source_id: 'A' }
@@ -945,7 +871,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('records one row per distinct duplicated source_id with correct counts', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, [
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
         { source_id: 'A' },
         { source_id: 'A' },
         { source_id: 'B' },
@@ -970,7 +897,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('records zero rows when every source_id is unique', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, [
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
         { source_id: 'A' },
         { source_id: 'B' },
         { source_id: 'C' }
@@ -983,7 +911,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('treats NULL source_ids as non-duplicates and records no error rows', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, [
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
         { source_id: null },
         { source_id: null }
       ]);
@@ -995,7 +924,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('ignores soft-deleted rows when checking for duplicates', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, [
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
         { source_id: 'A' },
         { source_id: 'A', record_end_date: '2026-01-01' }
       ]);
@@ -1007,7 +937,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('records zero rows and does not throw for an empty upload', async () => {
-      const { submissionUploadId } = await seedUploadWithFeatures(connection, []);
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', []);
 
       await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
 

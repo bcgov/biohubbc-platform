@@ -270,7 +270,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
   });
 
   describe('recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId', () => {
-    it('records one duplicate-source-id error per colliding source_id, excluding NULLs', async () => {
+    async function runAndGetSqlText(): Promise<string> {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
@@ -278,18 +278,38 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       await repository.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub.calledOnce).to.equal(true);
-      const sqlText = sqlStub.firstCall.args[0].text as string;
+      return sqlStub.firstCall.args[0].text as string;
+    }
+
+    it('groups by source_id and emits one error row per collision', async () => {
+      const sqlText = await runAndGetSqlText();
+
       expect(sqlText).to.include('grouped_errors AS');
-      expect(sqlText).to.include("'DUPLICATE_FEATURE_SOURCE_ID'");
       expect(sqlText).to.include('HAVING COUNT(*) > 1');
+    });
+
+    it('excludes NULL source_ids and soft-deleted feature rows from the grouping', async () => {
+      const sqlText = await runAndGetSqlText();
+
       expect(sqlText).to.include('source_id IS NOT NULL');
       expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.not.include('NULLIF');
+    });
+
+    it('labels rows DUPLICATE_FEATURE_SOURCE_ID and stores source_id in details jsonb', async () => {
+      const sqlText = await runAndGetSqlText();
+
+      expect(sqlText).to.include("'DUPLICATE_FEATURE_SOURCE_ID'");
       expect(sqlText).to.include("jsonb_build_object('source_id', source_id)");
+    });
+
+    it('upserts on the property-keyed unique index without writing submission_feature_id', async () => {
+      const sqlText = await runAndGetSqlText();
+
       expect(sqlText).to.include('ON CONFLICT');
       expect(sqlText).to.match(
         /ON CONFLICT\s*\(\s*submission_upload_id,\s*error_code,\s*feature_type_property_id,\s*property_name\s*\)/
       );
-      expect(sqlText).to.not.include('NULLIF');
       expect(sqlText).to.not.include('submission_feature_id');
     });
   });
