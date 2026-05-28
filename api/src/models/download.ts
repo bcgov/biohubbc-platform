@@ -16,6 +16,20 @@ export const DownloadRecord = z.object({
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
 /**
+ * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
+ * `DownloadRecord` with the owning policy's display fields (`name`,
+ * `description`), which are joined in via `LEFT JOIN biohub.policy` on the
+ * detail query only. The LIST query does not join `policy`, so the base
+ * `DownloadRecord` stays untouched and the list-row schemas (built off
+ * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
+ */
+export const DownloadDetailRecord = DownloadRecord.extend({
+  name: z.string(),
+  description: z.string().nullable()
+});
+export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
+
+/**
  * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
  * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
  */
@@ -64,23 +78,42 @@ export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
  * Minimal projection of a download record for export-time pipeline evaluation.
  *
  * `policy_id` resolves to the policy whose statements drive what to export.
- * `create_user` carries the policy creator's identity so the pipeline can
- * apply the security filter at export time using the user's authorization
- * scope at the moment of export — not at create time.
+ * `requested_by` is the security identity the export is built with: the
+ * requesting user for an authenticated download. It drives the parquet security
+ * filter — the pipeline judges feature visibility against this identity's
+ * authorization scope. Distinct from the audit `create_user` (who inserted the
+ * row); for an authenticated download they coincide, but the security filter
+ * must read `requested_by` so the identity stays decoupled from the inserting
+ * connection's grants.
+ *
+ * `requested_by` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const DownloadSource = z.object({
   policy_id: z.string().uuid(),
-  create_user: z.number()
+  requested_by: z.number().nullable()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
 /**
  * Payload for creating a new download record. The download's feature set is
  * defined by the referenced policy; format is the export wire format.
+ *
+ * `requestedBy` is the security identity the resulting export is filtered for —
+ * persisted to `download.requested_by` and used by the parquet pipeline, not the
+ * audit `create_user`.
+ *
+ * `requestedBy` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const CreateDownload = z.object({
   policyId: z.string().uuid(),
-  format: z.string()
+  format: z.string(),
+  requestedBy: z.number().nullable()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 

@@ -49,6 +49,7 @@ export interface ITicketCommentLog {
   user_identifier: string;
   create_date: string;
   comment: string;
+  artifacts: ITicketArtifact[];
 }
 
 export interface ITicketArtifact {
@@ -134,7 +135,6 @@ export interface TicketSubmissionUploadResponse {
 export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
-  artifacts: ITicketArtifact[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
   submission_uploads: TicketSubmissionUploadResponse[];

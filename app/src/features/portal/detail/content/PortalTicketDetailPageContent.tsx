@@ -44,7 +44,6 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
               {ticket.status === 'open' ? (
                 <TicketComment
                   comment={comment}
-                  artifacts={ticket.artifacts}
                   setComment={setComment}
                   isSaving={isSavingComment}
                   isUploadingAttachment={isUploadingAttachment}

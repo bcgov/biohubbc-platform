@@ -1,5 +1,10 @@
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
-import { ITicketExtended, TicketStatus, TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
+import {
+  ITicketArtifact,
+  ITicketExtended,
+  TicketStatus,
+  TicketSubmissionUploadResponse
+} from 'interfaces/useTicketsApi.interface';
 
 export interface ITicketTimelineProps {
   ticket: ITicketExtended;
@@ -22,6 +27,7 @@ export interface CommentEvent extends TimelineEventBase {
   kind: 'comment';
   user_identifier: string;
   comment: string;
+  artifacts: ITicketArtifact[];
 }
 
 export interface DataRequestEvent extends TimelineEventBase {

@@ -129,7 +129,7 @@ export class DownloadPipelineService extends DBService {
    * Feature types come back in `urn_feature_type` ASC order so the downstream loop
    * produces a stable, alphabetic sequence of Parquet files.
    *
-   * @param {DownloadSource} source - The download source (policy_id + create_user).
+   * @param {DownloadSource} source - The download source (policy_id + requested_by).
    * @return {Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[]; statements: ActivePolicyStatementWithExpression[] }>}
    * @memberof DownloadPipelineService
    */
@@ -172,12 +172,13 @@ export class DownloadPipelineService extends DBService {
    * for this feature type. When `expression_id` is set, the expression tree drives
    * the feature-id subquery; when null, a broad subquery over the whole feature
    * type is used. In both branches the security filter is applied for
-   * `source.create_user` so visibility is judged at export time against the policy
-   * creator's authorization scope.
+   * `source.requested_by` so visibility is judged at export time against the
+   * requesting user's authorization scope — not the audit `create_user` or the
+   * worker's own connection grants.
    *
    * @param {object} payload
    * @param {string} payload.downloadId - The download ID.
-   * @param {DownloadSource} payload.source - The download source (policy_id + create_user).
+   * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
    * @param {ActivePolicyStatementWithExpression} payload.statement - The active policy statement for this feature type.
@@ -212,14 +213,14 @@ export class DownloadPipelineService extends DBService {
     // for the two consumers of the evaluator.
     let subquery: Knex.QueryBuilder;
     if (statement.expression_id === null) {
-      subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.create_user);
+      subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by);
     } else {
       const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
       const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
       subquery = expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
         featureTypeName,
         normalizedTree,
-        source.create_user
+        source.requested_by
       );
     }
 

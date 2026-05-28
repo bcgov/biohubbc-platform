@@ -12,7 +12,7 @@ export const useTicketCommentCache = () => {
   /**
    * Append a comment to the cached ticket details.
    *
-   * Used after optimistic creates. If ticket details are not loaded, the cache is left unchanged.
+   * Used after the API returns a created comment. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {ITicketCommentLog} newComment Comment to append.
    * @returns {void}
@@ -33,7 +33,7 @@ export const useTicketCommentCache = () => {
   /**
    * Remove a comment from the cached ticket details.
    *
-   * Used by create rollback and persisted deletes. If ticket details are not loaded, the cache is left unchanged.
+   * Used by persisted deletes. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {string} ticketCommentId Comment identifier to remove.
    * @returns {void}

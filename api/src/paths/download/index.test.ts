@@ -143,7 +143,7 @@ describe('paths/download/index', () => {
         description: 'A description',
         featureTypes: ['observation'],
         expression: validExpression,
-        systemUserId: 42
+        requestedBy: 42
       });
       expect(commitStub).to.have.been.calledOnce;
 
@@ -151,6 +151,67 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-1');
       expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
       expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-1$/);
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
+    });
+
+    it('uses the authenticated user as requestedBy and returns only download fields', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-auth' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody();
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      // Authenticated requests run on the user's connection, never the shared API-user one.
+      expect(apiUserStub).to.not.have.been.called;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ requestedBy: 42 });
+
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-auth');
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
+    });
+
+    it('runs anonymously with requestedBy null and returns only download fields', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-anon' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      // No keycloak_token — unauthenticated request
+      mockReq.keycloak_token = undefined as any;
+      mockReq.body = validBody();
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      // Anonymous requests run on the shared API-user connection, never a user-scoped one.
+      expect(apiUserStub).to.have.been.calledOnce;
+      expect(dbConnStub).to.not.have.been.called;
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ requestedBy: null });
+
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.have.property('download_id', 'download-uuid-anon');
+      expect(mockRes.jsonValue).to.have.property('download_url').that.is.a('string');
+      expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-anon$/);
+      expect(mockRes.jsonValue).to.not.have.property('export_id');
+      expect(mockRes.jsonValue).to.not.have.property('export_url');
     });
 
     it('passes through a null expression to the service', async () => {

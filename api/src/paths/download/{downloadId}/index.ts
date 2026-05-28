@@ -72,7 +72,7 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['download_id', 'status'],
+            required: ['download_id', 'status', 'name'],
             properties: {
               download_id: {
                 type: 'string',
@@ -81,6 +81,13 @@ GET.apiDoc = {
               status: {
                 type: 'string',
                 enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+              },
+              name: {
+                type: 'string'
+              },
+              description: {
+                type: 'string',
+                nullable: true
               },
               started_at: {
                 type: 'string',
@@ -130,6 +137,8 @@ export function findDownloadById(): RequestHandler {
       return res.status(200).json({
         download_id: download.download_id,
         status: download.download_status,
+        name: download.name,
+        description: download.description,
         started_at: download.started_at,
         completed_at: download.completed_at,
         downloaded_at: download.downloaded_at

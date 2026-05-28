@@ -143,7 +143,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       );
 
       // Phase 6: FK reference validation/resolution diagnostics.
-      currentPhase = 'record code, taxon, and artifact resolution errors';
+      currentPhase = 'record code, taxon, artifact, and feature resolution errors';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -158,6 +158,12 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordArtifactPropertyResolutionErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
+      await this.submissionFeaturePropertyIngestionRepository.recordFeaturePropertyResolutionErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
+      await this.submissionFeaturePropertyIngestionRepository.recordCircularFeatureReferenceErrorsBySubmissionUploadId(
         submissionUploadId
       );
 
@@ -275,6 +281,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.insertCodePropertiesBySubmissionUploadId(
         submissionUploadId
       );
+      await this.submissionFeaturePropertyIngestionRepository.insertFeaturePropertiesBySubmissionUploadId(
+        submissionUploadId
+      );
       await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
         submissionUploadId
       );
@@ -389,6 +398,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
     await this.submissionFeaturePropertyIngestionRepository.populateArtifactCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.populateFeatureCandidateStagingBySubmissionUploadId(
       submissionUploadId
     );
   }

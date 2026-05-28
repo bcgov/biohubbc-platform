@@ -72,7 +72,6 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses,
       comments,
-      artifacts: [],
       references,
       data_requests: [],
       submission_uploads: [],
@@ -168,7 +167,8 @@ describe('useTicketsApi', () => {
       ticket_id: ticketId,
       user_identifier: 'Sarah',
       create_date: '2026-02-25T00:00:00.000Z',
-      comment: 'New comment'
+      comment: 'New comment',
+      artifacts: []
     };
 
     mock.onPost(`/api/administrative/tickets/${ticketId}/comment`, payload).reply(200, commentItem);
@@ -412,7 +412,6 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses: [],
       comments: [],
-      artifacts: [],
       references: [],
       data_requests: [],
       submission_uploads: [],

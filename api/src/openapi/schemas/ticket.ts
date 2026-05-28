@@ -19,21 +19,6 @@ const SubmissionUploadReviewTaskStatusEnum = [
   'cancelled'
 ];
 
-export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['ticket_comment_id', 'ticket_id', 'user_identifier', 'create_date', 'comment'],
-  properties: {
-    ticket_comment_id: { type: 'string', format: 'uuid' },
-    ticket_id: { type: 'string', format: 'uuid' },
-    user_identifier: { type: 'string' },
-    create_date: { type: 'string', format: 'date-time' },
-    comment: {
-      type: 'string',
-      description: 'Markdown-formatted comment text'
-    }
-  }
-};
-
 export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
@@ -121,6 +106,26 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const TicketCommentSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['ticket_comment_id', 'ticket_id', 'user_identifier', 'create_date', 'comment', 'artifacts'],
+  properties: {
+    ticket_comment_id: { type: 'string', format: 'uuid' },
+    ticket_id: { type: 'string', format: 'uuid' },
+    user_identifier: { type: 'string' },
+    create_date: { type: 'string', format: 'date-time' },
+    comment: {
+      type: 'string',
+      description: 'Markdown-formatted comment text'
+    },
+    artifacts: {
+      type: 'array',
+      description: 'Active ticket artifacts referenced by this comment markdown.',
+      items: TicketArtifactSchema
+    }
+  }
+};
+
 export const TicketReferenceSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
@@ -179,7 +184,6 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'status',
     'statuses',
     'comments',
-    'artifacts',
     'references',
     'data_requests',
     'submission_uploads',
@@ -212,11 +216,6 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     comments: {
       type: 'array',
       items: TicketCommentSchema
-    },
-    artifacts: {
-      type: 'array',
-      description: 'Active artifacts attached to the ticket.',
-      items: TicketArtifactSchema
     },
     references: {
       type: 'array',

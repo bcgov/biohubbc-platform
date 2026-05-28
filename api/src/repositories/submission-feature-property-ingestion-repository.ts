@@ -104,6 +104,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         USING upload_features uf
         WHERE sfptx.submission_feature_id = uf.submission_feature_id
         RETURNING 1
+      ),
+      delete_feature AS (
+        DELETE FROM submission_feature_property_feature sfpf
+        USING upload_features uf
+        WHERE sfpf.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
       )
       SELECT 1;
     `;
@@ -406,6 +412,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Clear upload-scoped feature candidate rows.
+   *
+   * Feature candidates store parsed feature::<source_id> references and the
+   * within-upload features they resolved to.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async clearFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      DELETE FROM submission_upload_staging_feature_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Clear upload property working-set staging tables in one SQL round trip.
    *
    * Removes both:
@@ -437,8 +460,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Clear all complex-type candidate staging tables in one SQL round trip.
    *
-   * Removes upload-scoped rows from datetime, spatial, code, taxon, and artifact
-   * candidate tables so candidate generation phases can rerun idempotently.
+   * Removes upload-scoped rows from datetime, spatial, code, taxon, artifact, and
+   * feature candidate tables so candidate generation phases can rerun idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -467,6 +490,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       ),
       clear_artifact AS (
         DELETE FROM submission_upload_staging_artifact_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_feature AS (
+        DELETE FROM submission_upload_staging_feature_candidate
         WHERE submission_upload_id = ${submissionUploadId}::uuid
         RETURNING 1
       )
@@ -869,6 +897,68 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Create `submission_upload_staging_feature_candidate` with parsed feature references and resolved targets.
+   *
+   * Expected format is a strict two-part reference `feature::<source_id>`. Source ids
+   * never contain `::`, so any other shape (`feature::`, `features::x`, `feature::a::b`)
+   * is malformed and rejected.
+   *
+   * Feature references resolve only against active features in the same upload, matching
+   * by `source_id`; cross-upload references are intentionally not resolved even though the
+   * foreign key permits them. The resolved target feature and its type are captured so later
+   * phases can validate the allowed target type and insert canonical rows.
+   *
+   * Rows remain in candidate staging even when unresolved so later phases can emit
+   * aggregated resolution errors.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async populateFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO submission_upload_staging_feature_candidate (
+        submission_upload_id, submission_feature_id, property_name, feature_type_property_id,
+        raw_value, is_format_valid, parsed_source_id,
+        referenced_submission_feature_id, referenced_feature_type_id
+      )
+      WITH valid_property_values AS (
+        SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
+               v.feature_type_property_id, v.property_type_name, v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+      ),
+      candidates AS (
+        SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
+               v.feature_type_property_id,
+               v.logical_value AS raw_value,
+               regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
+        FROM valid_property_values v
+        WHERE v.property_type_name = 'feature'
+          AND jsonb_typeof(v.logical_value) = 'string'
+      ),
+      parsed AS (
+        SELECT c.*,
+          (cardinality(c.parts) = 2 AND c.parts[1] = 'feature' AND btrim(c.parts[2]) <> '') AS is_format_valid,
+          CASE WHEN cardinality(c.parts) = 2 AND c.parts[1] = 'feature' AND btrim(c.parts[2]) <> ''
+               THEN btrim(c.parts[2]) ELSE NULL END AS parsed_source_id
+        FROM candidates c
+      )
+      SELECT
+        p.submission_upload_id, p.submission_feature_id, p.property_name, p.feature_type_property_id,
+        p.raw_value, p.is_format_valid, p.parsed_source_id,
+        target.submission_feature_id AS referenced_submission_feature_id,
+        target.feature_type_id        AS referenced_feature_type_id
+      FROM parsed p
+      LEFT JOIN submission_feature target
+        ON p.is_format_valid
+       AND target.submission_upload_id = ${submissionUploadId}::uuid
+       AND target.record_end_date IS NULL
+       AND target.source_id = p.parsed_source_id;
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Record missing required-property errors for features in an upload.
    *
    * Requiredness is evaluated by feature type against active metadata. A required property is
@@ -1006,7 +1096,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_upload_id = ${submissionUploadId}::uuid
           AND (
           (
-            v.property_type_name IN ('string', 'datetime', 'code', 'artifact_key')
+            v.property_type_name IN ('string', 'datetime', 'code', 'artifact_key', 'feature')
             AND jsonb_typeof(v.logical_value) <> 'string'
           )
           OR (
@@ -1048,7 +1138,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             'spatial',
             'artifact_key',
             'code',
-            'taxon'
+            'taxon',
+            'feature'
           )
       ),
       grouped_errors AS (
@@ -1162,6 +1253,254 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           aggregated.feature_type_property_id,
           aggregated.error_code,
           aggregated.error_message
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Record malformed, unresolved, type-mismatched, or self-referencing feature property references.
+   *
+   * This phase writes four grouped error categories:
+   * - `INVALID_FEATURE_REFERENCE_FORMAT`: value does not match the expected `feature::<source_id>` shape
+   * - `UNRESOLVED_FEATURE_REFERENCE`: format is valid but no feature with that `source_id` exists in the upload
+   * - `INVALID_FEATURE_REFERENCE_TYPE`: the reference resolved, but the target feature's type is not allowed for this property
+   * - `INVALID_FEATURE_REFERENCE_SELF`: the reference resolved to the feature's own row
+   *
+   * The allowed target feature types are read from `feature_type_property_feature` — the
+   * `feature::<id>` value itself carries no type — so a reference that resolves to a feature whose
+   * type is not in the property's allowed-target set is rejected. A property with no active
+   * `feature_type_property_feature` rows has no permitted targets, so every reference is rejected
+   * (a feature-typed property with no authored targets accepts nothing).
+   *
+   * A feature-valued property must not reference its own feature. A self-reference is recorded as
+   * `INVALID_FEATURE_REFERENCE_SELF` so the fail-fast gate blocks the entire upload, mirroring how a
+   * self-referencing `data.content` relationship is rejected. A self-reference is reported only once, as
+   * SELF: the type-mismatch branch carries a `referenced_submission_feature_id <> submission_feature_id`
+   * guard so it never also counts a self-reference as a TYPE error.
+   *
+   * Counts are aggregated and upserted into `submission_feature_error`.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async recordFeaturePropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH format_errors AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'INVALID_FEATURE_REFERENCE_FORMAT'::text AS error_code,
+          'Feature property value must match feature::<source_id>'::text AS error_message
+        FROM submission_upload_staging_feature_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT c.is_format_valid
+      ),
+      unresolved AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'UNRESOLVED_FEATURE_REFERENCE'::text AS error_code,
+          'Failed to resolve feature reference source_id within upload'::text AS error_message
+        FROM submission_upload_staging_feature_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.is_format_valid
+          AND c.referenced_submission_feature_id IS NULL
+      ),
+      type_mismatch AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'INVALID_FEATURE_REFERENCE_TYPE'::text AS error_code,
+          'Referenced feature type is not allowed for this property'::text AS error_message
+        FROM submission_upload_staging_feature_candidate c
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_property_id = c.feature_type_property_id
+         AND ftp.record_end_date IS NULL
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.is_format_valid
+          AND c.referenced_submission_feature_id IS NOT NULL
+          AND c.referenced_submission_feature_id <> c.submission_feature_id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM feature_type_property_feature ftpf
+            WHERE ftpf.feature_type_property_id = c.feature_type_property_id
+              AND ftpf.target_feature_type_id = c.referenced_feature_type_id
+              AND ftpf.record_end_date IS NULL
+          )
+      ),
+      self_reference AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'INVALID_FEATURE_REFERENCE_SELF'::text AS error_code,
+          'Feature property cannot reference its own feature'::text AS error_message
+        FROM submission_upload_staging_feature_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.is_format_valid
+          AND c.referenced_submission_feature_id IS NOT NULL
+          AND c.referenced_submission_feature_id = c.submission_feature_id
+      ),
+      grouped_errors AS (
+        SELECT
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message,
+          COUNT(*)::integer AS count
+        FROM (
+          SELECT * FROM format_errors
+          UNION ALL
+          SELECT * FROM unresolved
+          UNION ALL
+          SELECT * FROM type_mismatch
+          UNION ALL
+          SELECT * FROM self_reference
+        ) AS aggregated
+        GROUP BY
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Record feature property references that participate in a circular dependency.
+   *
+   * Feature-valued property references form a directed graph over features: an edge `a -> b` means
+   * feature `a` has a feature-valued property pointing at feature `b`. These references must not form a
+   * cycle of length two or more (`a -> b -> a`, directly or transitively); a cycle would corrupt
+   * downstream closure traversal, so every property whose reference participates in a cycle is recorded
+   * as `CIRCULAR_FEATURE_REFERENCE` and the fail-fast gate blocks the entire upload.
+   *
+   * Single-feature self-loops are handled separately by the self-reference rule and are excluded from
+   * the edge set here. The scope is the property-feature channel only; cycles routed through
+   * `data.content` relationships or parent/child edges are not considered.
+   *
+   * Detection computes transitive reachability over the edge set with a set-based recursive CTE
+   * (`UNION`, not `UNION ALL`): each step adds only new `(origin, node)` reachability pairs, so the
+   * working set is bounded by the number of distinct pairs (<= N^2) and the recursion terminates with
+   * no depth cap — cycles of any length are detected, not just short ones. An edge `a -> b` is part of
+   * a cycle when `b` can reach `a`. The work is upload-scoped and runs off the HTTP request flow.
+   *
+   * Counts are aggregated and upserted into `submission_feature_error`.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async recordCircularFeatureReferenceErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH RECURSIVE edges AS (
+        SELECT
+          c.submission_feature_id AS src,
+          c.referenced_submission_feature_id AS dst
+        FROM submission_upload_staging_feature_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.is_format_valid
+          AND c.referenced_submission_feature_id IS NOT NULL
+          AND c.referenced_submission_feature_id <> c.submission_feature_id
+      ),
+      reachable AS (
+        SELECT e.src AS origin, e.dst AS node
+        FROM edges e
+        UNION
+        SELECT r.origin, e.dst
+        FROM reachable r
+        JOIN edges e ON e.src = r.node
+      ),
+      cyclic AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id
+        FROM submission_upload_staging_feature_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.is_format_valid
+          AND c.referenced_submission_feature_id IS NOT NULL
+          AND c.referenced_submission_feature_id <> c.submission_feature_id
+          AND EXISTS (
+            SELECT 1 FROM reachable r
+            WHERE r.origin = c.referenced_submission_feature_id
+              AND r.node = c.submission_feature_id
+          )
+      ),
+      grouped_errors AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'CIRCULAR_FEATURE_REFERENCE'::text AS error_code,
+          'Feature property references form a circular dependency'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM cyclic c
+        GROUP BY c.submission_upload_id, c.property_name, c.feature_type_property_id
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
@@ -1635,6 +1974,75 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
         AND c.is_format_valid
         AND c.contributor_codeset_code_id IS NOT NULL;
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Insert valid resolved feature references into `submission_feature_property_feature`.
+   *
+   * Inserts only candidate rows with valid format whose reference resolved to a target feature
+   * whose type is in the property's allowed-target set (`feature_type_property_feature`).
+   *
+   * Feature-valued *properties* land only in `submission_feature_property_feature`; `data.content`
+   * relationships land only in `submission_feature_feature`. These are two distinct channels and must
+   * never cross-write into each other's table.
+   *
+   * A multi-valued property may submit the same reference more than once; the unique constraint plus
+   * `ON CONFLICT DO NOTHING` keeps exactly one canonical row per `(source feature, property, referenced
+   * feature)` so downstream traversal does not double-count.
+   *
+   * Self-references are also rejected upstream with an error so the upload is blocked, but they remain
+   * excluded here (`referenced_submission_feature_id <> submission_feature_id`) as a hard guard so a
+   * self-loop — which would corrupt downstream closure traversal — can never be written.
+   *
+   * Resolution happens once at staging time; this insert runs later in the job. As a staleness guard
+   * it rejoins `submission_feature` for both endpoints with `record_end_date IS NULL`, so if a source
+   * or target feature is soft-deleted between staging and insert, no canonical row pointing at (or
+   * from) an inactive feature can land.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async insertFeaturePropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO submission_feature_property_feature (
+        submission_feature_id,
+        feature_type_property_id,
+        referenced_submission_feature_id
+      )
+      SELECT
+        c.submission_feature_id,
+        c.feature_type_property_id,
+        c.referenced_submission_feature_id
+      FROM submission_upload_staging_feature_candidate c
+      JOIN feature_type_property ftp
+        ON ftp.feature_type_property_id = c.feature_type_property_id
+       AND ftp.record_end_date IS NULL
+      JOIN submission_feature src
+        ON src.submission_feature_id = c.submission_feature_id
+       AND src.record_end_date IS NULL
+      JOIN submission_feature tgt
+        ON tgt.submission_feature_id = c.referenced_submission_feature_id
+       AND tgt.record_end_date IS NULL
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.is_format_valid
+        AND c.referenced_submission_feature_id IS NOT NULL
+        AND c.referenced_submission_feature_id <> c.submission_feature_id
+        AND EXISTS (
+          SELECT 1
+          FROM feature_type_property_feature ftpf
+          WHERE ftpf.feature_type_property_id = c.feature_type_property_id
+            AND ftpf.target_feature_type_id = c.referenced_feature_type_id
+            AND ftpf.record_end_date IS NULL
+        )
+      ON CONFLICT (
+        submission_feature_id,
+        feature_type_property_id,
+        referenced_submission_feature_id
+      )
+      DO NOTHING;
     `;
 
     await this.connection.sql(sql);

@@ -6,7 +6,6 @@ import { IDBConnection } from '../database/db';
 import { DataRequest } from '../models/data-request';
 import { Team } from '../models/team';
 import { Ticket, TicketFilters } from '../models/ticket';
-import { TicketArtifact } from '../models/ticket-artifact';
 import { TicketComment } from '../models/ticket-comment';
 import { TicketReference } from '../models/ticket-reference';
 import { TicketStatus } from '../models/ticket-status';
@@ -14,7 +13,6 @@ import { TicketCommentRepository } from '../repositories/ticket-comment-reposito
 import { TicketRepository } from '../repositories/ticket-repository';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
-import { TicketArtifactService } from './ticket-artifact-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
@@ -167,17 +165,8 @@ describe('TicketService', () => {
           ticket_id: mockTicket.ticket_id,
           user_identifier: 'Bob',
           create_date: '2026-02-25T01:00:00.000Z',
-          comment: 'New comment'
-        }
-      ];
-      const artifactLog: TicketArtifact[] = [
-        {
-          ticket_artifact_id: '77777777-7777-4777-8777-777777777777',
-          ticket_id: mockTicket.ticket_id,
-          artifact_id: '88888888-8888-4888-8888-888888888888',
-          record_end_date: null,
-          create_date: '2026-02-25T01:30:00.000Z',
-          object_key: 'tickets/abc/file.txt'
+          comment: 'New comment',
+          artifacts: []
         }
       ];
       const referenceLog: TicketReference[] = [
@@ -197,9 +186,6 @@ describe('TicketService', () => {
       const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket);
       const getStatusLogStub = sinon.stub(TicketStatusService.prototype, 'getTicketStatus').resolves(statusLog);
       const getCommentLogStub = sinon.stub(TicketCommentRepository.prototype, 'getTicketComments').resolves(commentLog);
-      const getArtifactLogStub = sinon
-        .stub(TicketArtifactService.prototype, 'getTicketArtifacts')
-        .resolves(artifactLog);
       const getReferenceLogStub = sinon
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
@@ -216,7 +202,6 @@ describe('TicketService', () => {
       expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getStatusLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
-      expect(getArtifactLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getSubmissionUploadsStub).to.have.been.calledWith(mockTicket.ticket_id);
@@ -225,7 +210,6 @@ describe('TicketService', () => {
         ...mockTicket,
         statuses: statusLog,
         comments: commentLog,
-        artifacts: artifactLog,
         references: referenceLog,
         data_requests: [],
         submission_uploads: [],

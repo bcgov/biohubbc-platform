@@ -13,7 +13,6 @@ import { ITicketSystemUserFormValues, TicketSystemUserForm } from './form/Ticket
 
 interface ITicketSystemUserDialogProps {
   open: boolean;
-  ticketId: string;
   onClose: () => void;
 }
 
@@ -28,10 +27,10 @@ const TicketSystemUserFormInitialValues: ITicketSystemUserFormValues = {
  * @return {*}
  */
 export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
-  const { open, ticketId, onClose } = props;
+  const { open, onClose } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
   const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const showApiError = useCallback(

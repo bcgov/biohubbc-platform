@@ -29,7 +29,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleCloseEditCommentDialog,
     handleSaveEditedComment,
     handleConfirmDeleteComment
-  } = useTicketTimelineCommentActions({ ticket });
+  } = useTicketTimelineCommentActions();
   const {
     updatingDataRequestId,
     isEditPolicyDialogOpen,
@@ -96,7 +96,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           component={{
             element: (
               <TicketCommentEditForm
-                artifacts={ticket.artifacts}
                 isSaving={isSavingComment}
                 isUploadingAttachment={isUploadingCommentAttachment}
                 onUploadAttachment={handleEditCommentUploadAttachment}

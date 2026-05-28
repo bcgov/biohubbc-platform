@@ -4,9 +4,9 @@ import Stack from '@mui/material/Stack';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext } from 'hooks/useContext';
+import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IGetTicketArtifactsResponse, ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { IGetTicketArtifactsResponse, ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useCallback } from 'react';
 import { useTicketAttachmentUpload } from '../../hooks/useTicketAttachmentUpload';
 import { downloadTicketArtifact } from '../../utils/ticketArtifactDownload';
@@ -14,23 +14,18 @@ import { getTicketArtifactMarkdown } from '../../utils/ticketArtifactMarkdown';
 import { TicketArtifactUpload } from '../TicketArtifactUpload';
 import { TicketArtifactsTable } from './table/TicketArtifactsTable';
 
-interface ITicketArtifactsProps {
-  ticket: ITicketExtended;
-}
-
 /**
  * Artifacts panel for ticket attachments.
  *
- * @param {ITicketArtifactsProps} props
  * @return {*}
  */
-export const TicketArtifacts = (props: ITicketArtifactsProps) => {
-  const { ticket } = props;
+export const TicketArtifacts = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload({ ticketId: ticket.ticket_id });
+  const { ticketId } = useTicketContext();
+  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
   const ticketArtifactsGrid = useServerPaginatedDataGrid<ITicketArtifact, IGetTicketArtifactsResponse>({
-    fetcher: (search, pagination) => api.tickets.getTicketArtifacts(ticket.ticket_id, { search, ...pagination }),
+    fetcher: (search, pagination) => api.tickets.getTicketArtifacts(ticketId, { search, ...pagination }),
     extractData: (response) => response.artifacts,
     extractTotal: (response) => response.pagination.total,
     defaultSort: { field: 'create_date', sort: 'desc' }
@@ -45,12 +40,12 @@ export const TicketArtifacts = (props: ITicketArtifactsProps) => {
   const handleDownloadArtifact = useCallback(
     (artifact: ITicketArtifact) =>
       downloadTicketArtifact({
-        ticketId: ticket.ticket_id,
+        ticketId,
         artifact,
         getDownloadUrl: api.tickets.getTicketArtifactDownloadUrl,
         setSnackbar: dialogContext.setSnackbar
       }),
-    [api.tickets, dialogContext, ticket.ticket_id]
+    [api.tickets, dialogContext, ticketId]
   );
 
   /**
