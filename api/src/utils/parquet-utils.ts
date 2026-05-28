@@ -144,9 +144,11 @@ export function timeStringToMillis(s: string): number {
  * downstream consumers (DuckDB, QGIS, pandas) get native typed columns instead of strings.
  *
  * `array` and `object` types have dynamic internal structure (arrays of objects, nested
- * JSON). They serialize as Parquet's JSON LogicalType — `BYTE_ARRAY` annotated with
- * `originalType=JSON` so readers that honour the annotation auto-deserialize. `artifact_key`
- * is a file path string and stays UTF8. `spatial` maps to `BYTE_ARRAY` for WKB encoding.
+ * JSON). They serialize as UTF8 — the caller JSON-stringifies and consumers `JSON.parse`
+ * the cell. The Parquet JSON LogicalType was tempting (DuckDB/pyarrow auto-deserialize)
+ * but @dsnp/parquetjs's shredder unwraps `Array.isArray(value)` regardless of annotation,
+ * so a raw array on a non-REPEATED JSON cell throws at write time. `artifact_key` is a
+ * file path string and stays UTF8. `spatial` maps to `BYTE_ARRAY` for WKB encoding.
  *
  * @param typeName - The feature property type name from `feature_type_property`.
  * @returns The Parquet type string.
@@ -187,13 +189,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       return 'BYTE_ARRAY';
     case 'array':
     case 'object':
-      // Dynamic internal structure — JSON-stringified for Parquet output. The
-      // JSON LogicalType (BYTE_ARRAY with originalType=JSON) is physically
-      // identical to UTF8 on the wire, but readers that honour the annotation
-      // (DuckDB, pyarrow, Spark) auto-deserialize the cell instead of leaving
-      // it as a string. Readers that ignore the annotation see the same bytes
-      // as before.
-      return 'JSON';
+      // JSON-encoded UTF8 string. The Parquet `JSON` LogicalType was tempting
+      // here (DuckDB/pyarrow auto-deserialize), but @dsnp/parquetjs's shredder
+      // unconditionally unwraps `Array.isArray(value)` into multiple per-row
+      // values regardless of column annotation — passing a raw array to a
+      // non-REPEATED JSON cell throws "too many values for field" at write
+      // time. UTF8 + caller-side `JSON.stringify` sidesteps the shred-layer
+      // mismatch; consumers `JSON.parse` the cell themselves.
+      return 'UTF8';
     case 'artifact_key':
       // File path string — no special encoding needed
       return 'UTF8';
