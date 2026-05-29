@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { ApiConflictError, ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import {
   AdminFeatureTypeProperty,
@@ -216,35 +216,43 @@ export class FeatureTypePropertyRepository extends BaseRepository {
   // ---------------------------------------------------------------------------
 
   /**
+   * Find an active feature type property record matching the given feature type and feature property.
+   *
+   * Returns `null` when no active assignment exists; callers are responsible for deciding whether
+   * that constitutes a conflict.
+   *
+   * @param {number} featureTypeId - The feature type identifier.
+   * @param {number} featurePropertyId - The feature property identifier.
+   * @return {Promise<{ feature_type_property_id: number } | null>} The matching record, or `null` if none exists.
+   * @memberof FeatureTypePropertyRepository
+   */
+  async findActiveFeatureTypePropertyByFeatureTypeAndProperty(
+    featureTypeId: number,
+    featurePropertyId: number
+  ): Promise<{ feature_type_property_id: number } | null> {
+    const knex = getKnex();
+    const query = knex
+      .from('feature_type_property')
+      .select('feature_type_property_id')
+      .whereNull('record_end_date')
+      .where({ feature_type_id: featureTypeId, feature_property_id: featurePropertyId })
+      .first();
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * Insert a new feature type property record.
    *
    * @param {CreateFeatureTypePropertyRecord} data - Data for the record to insert.
    * @return {Promise<number>} The new feature_type_property_id.
-   * @throws {ApiConflictError} If the feature property is already assigned to the feature type.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof FeatureTypePropertyRepository
    */
   async insertFeatureTypeProperty(data: CreateFeatureTypePropertyRecord): Promise<number> {
     const knex = getKnex();
-
-    const existingQuery = knex
-      .from('feature_type_property')
-      .select('feature_type_property_id')
-      .whereNull('record_end_date')
-      .where({
-        feature_type_id: data.feature_type_id,
-        feature_property_id: data.feature_property_id
-      })
-      .first();
-
-    const existingResult = await this.connection.knex(existingQuery);
-
-    if ((existingResult.rowCount ?? 0) > 0) {
-      throw new ApiConflictError('Feature property is already assigned to this feature type', [
-        'FeatureTypePropertyRepository->insertFeatureTypeProperty',
-        { feature_type_id: data.feature_type_id, feature_property_id: data.feature_property_id }
-      ]);
-    }
 
     const query = knex
       .table('feature_type_property')

@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
+import { ApiNotFoundError } from '../errors/api-error';
 import { AdminFeatureTypeProperty } from '../models/feature-type-property';
 import { FeatureTypePropertyRepository } from './feature-type-property-repository';
 
@@ -23,17 +23,32 @@ describe('FeatureTypePropertyRepository admin CRUD', () => {
     sinon.restore();
   });
 
+  describe('findActiveFeatureTypePropertyByFeatureTypeAndProperty', () => {
+    it('returns the record when an active assignment exists', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async () => ({ rowCount: 1, rows: [{ feature_type_property_id: 99 }] } as unknown as QueryResult<any>)
+      });
+      const repository = new FeatureTypePropertyRepository(mockConnection);
+
+      const result = await repository.findActiveFeatureTypePropertyByFeatureTypeAndProperty(10, 20);
+      expect(result).to.eql({ feature_type_property_id: 99 });
+    });
+
+    it('returns null when no active assignment exists', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async () => ({ rowCount: 0, rows: [] } as unknown as QueryResult<any>)
+      });
+      const repository = new FeatureTypePropertyRepository(mockConnection);
+
+      const result = await repository.findActiveFeatureTypePropertyByFeatureTypeAndProperty(10, 20);
+      expect(result).to.be.null;
+    });
+  });
+
   describe('insertFeatureTypeProperty', () => {
     it('returns the new feature_type_property_id', async () => {
-      let callCount = 0;
       const mockConnection = getMockDBConnection({
-        knex: async () => {
-          callCount += 1;
-          if (callCount === 1) {
-            return { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
-          }
-          return { rowCount: 1, rows: [{ feature_type_property_id: 1 }] } as unknown as QueryResult<any>;
-        }
+        knex: async () => ({ rowCount: 1, rows: [{ feature_type_property_id: 1 }] } as unknown as QueryResult<any>)
       });
       const repository = new FeatureTypePropertyRepository(mockConnection);
 
@@ -43,26 +58,6 @@ describe('FeatureTypePropertyRepository admin CRUD', () => {
       });
 
       expect(result).to.equal(1);
-    });
-
-    it('throws ApiConflictError when assignment already exists', async () => {
-      const mockConnection = getMockDBConnection({
-        knex: async () => ({ rowCount: 1, rows: [{ feature_type_property_id: 99 }] } as unknown as QueryResult<any>)
-      });
-      const repository = new FeatureTypePropertyRepository(mockConnection);
-
-      try {
-        await repository.insertFeatureTypeProperty({
-          feature_type_id: 10,
-          feature_property_id: 20
-        });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-        expect((error as ApiConflictError).message).to.equal(
-          'Feature property is already assigned to this feature type'
-        );
-      }
     });
   });
 

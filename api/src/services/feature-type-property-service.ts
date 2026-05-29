@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { ApiConflictError } from '../errors/api-error';
 import {
   AdminFeatureTypeProperty,
   CreateFeatureTypePropertyRecord,
@@ -20,6 +21,8 @@ import { DBService } from './db-service';
  */
 export class FeatureTypePropertyService extends DBService {
   featureTypePropertyRepository: FeatureTypePropertyRepository;
+  featureTypeRepository: FeatureTypeRepository;
+  featurePropertyRepository: FeaturePropertyRepository;
 
   /**
    * Build a feature-type-property service.
@@ -30,6 +33,8 @@ export class FeatureTypePropertyService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.featureTypePropertyRepository = new FeatureTypePropertyRepository(connection);
+    this.featureTypeRepository = new FeatureTypeRepository(connection);
+    this.featurePropertyRepository = new FeaturePropertyRepository(connection);
   }
 
   /**
@@ -73,11 +78,22 @@ export class FeatureTypePropertyService extends DBService {
    * @memberof FeatureTypePropertyService
    */
   async createFeatureTypeProperty(data: CreateFeatureTypePropertyRecord): Promise<AdminFeatureTypeProperty> {
-    const featureTypeRepository = new FeatureTypeRepository(this.connection);
-    const featurePropertyRepository = new FeaturePropertyRepository(this.connection);
+    await Promise.all([
+      this.featureTypeRepository.getFeatureType(data.feature_type_id),
+      this.featurePropertyRepository.getFeatureProperty(data.feature_property_id)
+    ]);
 
-    await featureTypeRepository.getFeatureType(data.feature_type_id);
-    await featurePropertyRepository.getFeatureProperty(data.feature_property_id);
+    const existing = await this.featureTypePropertyRepository.findActiveFeatureTypePropertyByFeatureTypeAndProperty(
+      data.feature_type_id,
+      data.feature_property_id
+    );
+
+    if (existing) {
+      throw new ApiConflictError('Feature property is already assigned to this feature type', [
+        'FeatureTypePropertyService->createFeatureTypeProperty',
+        { feature_type_id: data.feature_type_id, feature_property_id: data.feature_property_id }
+      ]);
+    }
 
     const featureTypePropertyId = await this.featureTypePropertyRepository.insertFeatureTypeProperty(data);
     return this.featureTypePropertyRepository.getAdminFeatureTypeProperty(featureTypePropertyId, data.feature_type_id);

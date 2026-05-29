@@ -41,6 +41,42 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
+   * Get a single active feature property type record by ID.
+   *
+   * @param {number} featurePropertyTypeId - The ID of the feature property type to retrieve.
+   * @return {Promise<{ feature_property_type_id: number }>} The active feature property type record.
+   * @throws {ApiNotFoundError} If no active feature property type exists for the given ID.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeaturePropertyRepository
+   */
+  async getFeaturePropertyTypeById(featurePropertyTypeId: number): Promise<{ feature_property_type_id: number }> {
+    const knex = getKnex();
+    const query = knex
+      .from('feature_property_type')
+      .select('feature_property_type_id')
+      .whereNull('record_end_date')
+      .where('feature_property_type_id', featurePropertyTypeId);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property type not found', [
+        'FeaturePropertyRepository->getFeaturePropertyTypeById',
+        { featurePropertyTypeId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeaturePropertyRepository->getFeaturePropertyTypeById',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Insert a new feature property record.
    *
    * @param {CreateFeatureProperty} data - The data for the feature property to insert.
@@ -159,7 +195,6 @@ export class FeaturePropertyRepository extends BaseRepository {
     const query = knex
       .table('feature_property')
       .update({
-        feature_property_type_id: data.feature_property_type_id,
         name: data.name,
         display_name: data.display_name,
         description: data.description,

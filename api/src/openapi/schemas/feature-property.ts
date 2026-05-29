@@ -120,11 +120,6 @@ export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdateFeaturePropertyRequest',
   type: 'object',
   properties: {
-    feature_property_type_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Foreign key to the feature_property_type table'
-    },
     name: {
       type: 'string',
       maxLength: 100,

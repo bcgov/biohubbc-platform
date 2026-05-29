@@ -25,6 +25,33 @@ describe('FeaturePropertyRepository', () => {
     sinon.restore();
   });
 
+  describe('getFeaturePropertyTypeById', () => {
+    it('returns the feature property type record when found', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ feature_property_type_id: 2 }]
+      } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repository = new FeaturePropertyRepository(mockConnection);
+
+      const result = await repository.getFeaturePropertyTypeById(2);
+      expect(result).to.eql({ feature_property_type_id: 2 });
+    });
+
+    it('throws ApiNotFoundError when no active type exists for the given ID', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repository = new FeaturePropertyRepository(mockConnection);
+
+      try {
+        await repository.getFeaturePropertyTypeById(999);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
+  });
+
   describe('insertFeatureProperty', () => {
     it('returns the new feature_property_id', async () => {
       const mockResponse = { rowCount: 1, rows: [{ feature_property_id: 1 }] } as unknown as Promise<QueryResult<any>>;

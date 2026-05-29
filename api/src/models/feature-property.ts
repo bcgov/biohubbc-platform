@@ -61,7 +61,6 @@ export interface CreateFeatureProperty {
 
 /** Partial fields accepted when updating a feature property. */
 export interface UpdateFeatureProperty {
-  feature_property_type_id?: number;
   name?: string;
   display_name?: string;
   description?: string | null;

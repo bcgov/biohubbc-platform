@@ -31,10 +31,12 @@ export class FeaturePropertyService extends DBService {
    *
    * @param {CreateFeatureProperty} data - Feature property fields required to create the record.
    * @return {Promise<FeatureProperty>} The created feature property (with resolved type_name).
+   * @throws {ApiNotFoundError} If the referenced feature_property_type_id does not exist.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof FeaturePropertyService
    */
   async createFeatureProperty(data: CreateFeatureProperty): Promise<FeatureProperty> {
+    await this.featurePropertyRepository.getFeaturePropertyTypeById(data.feature_property_type_id);
     const featurePropertyId = await this.featurePropertyRepository.insertFeatureProperty(data);
     return this.featurePropertyRepository.getFeatureProperty(featurePropertyId);
   }
