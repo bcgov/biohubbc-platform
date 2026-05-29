@@ -580,6 +580,17 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ child_features: '["urn:1","urn:2"]' });
     });
 
+    it('should pass a scalar feature value through unquoted', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const data = { child_features: 'urn:1' };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: 'urn:1' });
+    });
+
     it('should emit empty string for a null feature value', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
