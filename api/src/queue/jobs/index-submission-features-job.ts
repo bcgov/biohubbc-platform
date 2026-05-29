@@ -5,7 +5,16 @@ import { SubmissionFeaturePropertyIngestionService } from '../../services/ingest
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
+import { publishRebuildSubmissionFeatureClosureJob } from '../publisher';
 import { withConnection } from '../with-connection';
+
+export interface IndexSubmissionFeaturesJobDependencies {
+  publishRebuildSubmissionFeatureClosureJob: typeof publishRebuildSubmissionFeatureClosureJob;
+}
+
+export const indexSubmissionFeaturesJobDependencies: IndexSubmissionFeaturesJobDependencies = {
+  publishRebuildSubmissionFeatureClosureJob
+};
 
 /**
  * Payload carried by each `index-submission-features` queue job.
@@ -163,6 +172,16 @@ async function finalizeIndexSubmissionFeaturesStage(
     }
 
     await submissionUploadService.transitionSubmissionUploadToIndexed(submissionUploadId);
+
+    // Queue the closure rebuild only on success, in the same transaction as the `indexed` transition.
+    // There is no upload status that tracks closure freshness, so binding the enqueue to this commit is
+    // what guarantees that reaching `indexed` always implies a rebuild was queued — an `invalid` outcome
+    // leaves any prior closure rows untouched until re-indexing succeeds. The rebuild is derived and
+    // idempotent, so the retry triggered by a rollback on any failure here is safe.
+    await indexSubmissionFeaturesJobDependencies.publishRebuildSubmissionFeatureClosureJob(connection, {
+      submissionId,
+      submissionUploadId
+    });
 
     defaultLog.info({
       label: 'finalizeIndexSubmissionFeaturesStage',
