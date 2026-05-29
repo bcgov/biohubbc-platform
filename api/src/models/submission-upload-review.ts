@@ -30,6 +30,7 @@ export type SubmissionUploadReview = z.infer<typeof SubmissionUploadReview>;
 export const CreateSubmissionUploadReview = z.object({
   submission_upload_id: z.string().uuid(),
   scope: SubmissionUploadReviewScopeSchema,
+  status: SubmissionUploadReviewStatusSchema,
   requested_by: z.number().int().positive().nullable()
 });
 export type CreateSubmissionUploadReview = z.infer<typeof CreateSubmissionUploadReview>;

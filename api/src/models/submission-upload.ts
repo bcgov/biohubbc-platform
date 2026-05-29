@@ -57,6 +57,12 @@ export interface SubmissionUploadFilters {
   role?: UploadArtifactRoleEnum;
 }
 
+export const TicketSubmissionUploadReviews = z.object({
+  validation: SubmissionUploadReview.nullable(),
+  security: SubmissionUploadReview.nullable()
+});
+export type TicketSubmissionUploadReviews = z.infer<typeof TicketSubmissionUploadReviews>;
+
 export const TicketSubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
   submission_uuid: z.string().uuid(),
@@ -69,6 +75,6 @@ export const TicketSubmissionUpload = z.object({
   upload_status: SubmissionUploadJobStatus,
   review_status: SubmissionUploadStatusTypeEnum,
   validation: TicketSubmissionValidation.nullable(),
-  reviews: z.array(SubmissionUploadReview)
+  reviews: TicketSubmissionUploadReviews
 });
 export type TicketSubmissionUpload = z.infer<typeof TicketSubmissionUpload>;

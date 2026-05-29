@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import {
   ICompleteTicketUploadRequest,
   ICreateTicketCommentRequest,
+  ICreateSubmissionUploadReviewRequest,
   ICreateTicketUploadRequest,
   ICreateTicketUploadResponse,
   ICreateTicketSystemUser,
@@ -10,6 +11,7 @@ import {
   IGetTicketArtifactsQueryParams,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
+  ISubmissionUploadReviewStatusResponse,
   ITicketSystemUser,
   ITicket,
   ITicketArtifact,
@@ -18,8 +20,11 @@ import {
   ITicketExtended,
   ITicketArtifactDownloadResponse,
   ITicketsQueryParams,
+  IUpdateSubmissionUploadReviewRequest,
+  IUpdateSubmissionUploadReviewStatusRequest,
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
+  TicketSubmissionUploadReviewResponse,
   IUpdateTicketCommentRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -222,6 +227,74 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Update final review status for a submission upload.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {IUpdateSubmissionUploadReviewStatusRequest} payload
+   * @return {Promise<ISubmissionUploadReviewStatusResponse>}
+   */
+  const updateSubmissionUploadReviewStatus = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    payload: IUpdateSubmissionUploadReviewStatusRequest
+  ): Promise<ISubmissionUploadReviewStatusResponse> => {
+    const { data } = await axios.patch<ISubmissionUploadReviewStatusResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
+   * Update a scoped submission upload review task.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {string} submissionUploadReviewId
+   * @param {IUpdateSubmissionUploadReviewRequest} payload
+   * @return {Promise<TicketSubmissionUploadReviewResponse>}
+   */
+  const updateSubmissionUploadReview = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    submissionUploadReviewId: string,
+    payload: IUpdateSubmissionUploadReviewRequest
+  ): Promise<TicketSubmissionUploadReviewResponse> => {
+    const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
+   * Request a new scoped submission upload review task.
+   *
+   * The backend closes any active review for the requested scope before creating
+   * the replacement review row.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {ICreateSubmissionUploadReviewRequest} payload
+   * @return {Promise<TicketSubmissionUploadReviewResponse>}
+   */
+  const insertSubmissionUploadReview = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    payload: ICreateSubmissionUploadReviewRequest
+  ): Promise<TicketSubmissionUploadReviewResponse> => {
+    const { data } = await axios.post<TicketSubmissionUploadReviewResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
    * Add a reference from the source ticket to a target ticket.
    *
    * @param {string} ticketId
@@ -334,6 +407,9 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     completeTicketUpload,
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
+    updateSubmissionUploadReviewStatus,
+    updateSubmissionUploadReview,
+    insertSubmissionUploadReview,
     createTicketReference,
     deleteTicketReference,
     getTicketsForUser,

@@ -32,6 +32,7 @@ const makeTicket = (): ITicketExtended => ({
   comments: [],
   references: [],
   data_requests: [],
+  submission_uploads: [],
   ticket_system_users: []
 });
 

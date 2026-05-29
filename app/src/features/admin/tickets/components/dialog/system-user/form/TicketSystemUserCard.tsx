@@ -4,10 +4,11 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { DropdownButton, IDropdownButtonItemGroup } from 'components/DropdownButton';
+import { DropdownButton } from 'components/DropdownButton';
+import { IDropdownMenuItemGroup } from 'components/menu/DropdownMenu.interface';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
-export interface ITicketSystemUserCardProps {
+interface ITicketSystemUserCardProps {
   systemUserId: number;
   userIdentifier: string;
   status: TicketSystemUserStatus;
@@ -33,7 +34,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
     onChangeStatus,
     onRemoveTicketSystemUser
   } = props;
-  const statusOptionGroups: IDropdownButtonItemGroup[] = [
+  const statusOptionGroups: IDropdownMenuItemGroup[] = [
     {
       groupId: 'status-options',
       items: statusOptions.map((statusOption) => ({

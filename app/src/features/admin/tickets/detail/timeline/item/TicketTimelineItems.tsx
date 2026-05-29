@@ -7,12 +7,20 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
 import { IAddPolicyFormValues } from 'features/admin/policies/components/AddPolicyForm';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import {
+  ITicketArtifact,
+  ITicketExtended,
+  SubmissionUploadReviewScope,
+  SubmissionUploadReviewTaskStatus,
+  TicketSubmissionUploadResponse,
+  TicketSubmissionUploadReviewResponse
+} from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
-import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent } from '../TicketTimeline.interface';
+import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
 import { TicketTimelineCommentItem } from './comment/TicketTimelineCommentItem';
 import { TicketTimelineDataRequestItem } from './data-request/TicketTimelineDataRequestItem';
 import { TicketTimelineStatusItem } from './status/TicketTimelineStatusItem';
+import { TicketUploadTimelineItem } from './TicketUploadTimelineItem';
 
 interface ITicketTimelineItemsProps {
   ticket: ITicketExtended;
@@ -25,6 +33,17 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
+  onRequestSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
+  onUpdateSubmissionUploadReview: (
+    upload: TicketSubmissionUploadResponse,
+    review: TicketSubmissionUploadReviewResponse,
+    status: SubmissionUploadReviewTaskStatus
+  ) => void;
+  onConfirmSubmissionUploadReviewStatusUpdate: (
+    upload: TicketSubmissionUploadResponse,
+    status: 'approved' | 'denied'
+  ) => void;
+  onConfirmSubmissionUploadReviewStatusReset: (upload: TicketSubmissionUploadResponse) => void;
 }
 
 /**
@@ -44,7 +63,11 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onViewPolicy,
     onViewFinalizedPolicy,
     onConfirmDataRequestStatusUpdate,
-    onConfirmResetToReviewed
+    onConfirmResetToReviewed,
+    onRequestSubmissionUploadReview,
+    onUpdateSubmissionUploadReview,
+    onConfirmSubmissionUploadReviewStatusUpdate,
+    onConfirmSubmissionUploadReviewStatusReset
   } = props;
 
   const timelineEvents: TimelineEvent[] = [
@@ -73,6 +96,14 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
         id: dataRequest.data_request_id,
         create_date: dataRequest.create_date ?? '',
         data_request: dataRequest
+      })
+    ),
+    ...ticket.submission_uploads.map(
+      (upload): UploadEvent => ({
+        kind: 'upload',
+        id: `${upload.submission_uuid}-${upload.submission_upload_id}`,
+        create_date: upload.create_date,
+        upload
       })
     )
   ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime());
@@ -115,6 +146,28 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
           )
         };
 
+      case 'upload':
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS.upload} size={0.75} />,
+          children: (
+            <TicketUploadTimelineItem
+              upload={item.upload}
+              dateLabel={
+                getRelativeTimeLabel(item.create_date, {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                }) ?? ''
+              }
+              onRequestReview={onRequestSubmissionUploadReview}
+              onUpdateReview={onUpdateSubmissionUploadReview}
+              onAccept={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
+              onReject={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}
+              onResetDecision={onConfirmSubmissionUploadReviewStatusReset}
+            />
+          )
+        };
+
       case 'comment':
         return {
           id: item.id,
@@ -140,13 +193,13 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
 
       case 'status': {
         const isFirstOpenStatus = index === firstOpenStatusIndex;
-        let message = `${item.user_identifier} reopened the ticket`;
+        const getStatusMessage = () => {
+          if (item.status === 'closed') {
+            return `${item.user_identifier} closed the ticket`;
+          }
 
-        if (item.status === 'closed') {
-          message = `${item.user_identifier} closed the ticket`;
-        } else if (isFirstOpenStatus) {
-          message = `${item.user_identifier} opened the ticket`;
-        }
+          return `${item.user_identifier} ${isFirstOpenStatus ? 'opened' : 'reopened'} the ticket`;
+        };
 
         const statusKey: 'open' | 'closed' = item.status === 'closed' ? 'closed' : 'open';
 
@@ -155,7 +208,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
           icon: <Icon path={TICKET_TIMELINE_ICONS[statusKey]} size={0.75} />,
           children: (
             <TicketTimelineStatusItem
-              message={message}
+              message={getStatusMessage()}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {
                   maxRelativeDays: 30,
