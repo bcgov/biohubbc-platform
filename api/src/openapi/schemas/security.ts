@@ -50,6 +50,7 @@ export const SecurityCategoryWithRuleCountSchema: OpenAPIV3.SchemaObject = {
     description: {
       type: 'string',
       maxLength: 500,
+      nullable: true,
       description: 'Description of the security category'
     },
     rule_count: {
@@ -173,6 +174,7 @@ export const SecurityRuleWithFeatureCountSchema: OpenAPIV3.SchemaObject = {
     description: {
       type: 'string',
       maxLength: 500,
+      nullable: true,
       description: 'Description of the security rule'
     },
     feature_count: {
