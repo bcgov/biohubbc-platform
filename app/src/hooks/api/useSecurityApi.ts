@@ -34,6 +34,7 @@ export interface ISecurityRuleAndCategory {
   security_rule_id: number;
   name: string;
   description: string;
+  is_active: boolean;
   record_effective_date: string;
   record_end_date: string;
   security_category_id: number;

@@ -44,6 +44,7 @@ GET.apiDoc = {
                 'security_rule_id',
                 'name',
                 'description',
+                'is_active',
                 'record_effective_date',
                 'record_end_date',
                 'security_category_id',
@@ -66,6 +67,9 @@ GET.apiDoc = {
                 },
                 description: {
                   type: 'string'
+                },
+                is_active: {
+                  type: 'boolean'
                 },
                 record_effective_date: {
                   type: 'string'

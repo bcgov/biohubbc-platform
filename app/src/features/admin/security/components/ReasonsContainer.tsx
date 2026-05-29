@@ -1,5 +1,6 @@
 import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
@@ -173,7 +174,8 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       await biohubApi.security.createSecurityReason({
         name: values.name,
         description: values.description,
-        security_category_id: values.security_category_id
+        security_category_id: values.security_category_id,
+        is_active: values.is_active
       });
 
       setOpenAddReasonDialog(false);
@@ -212,7 +214,8 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       await biohubApi.security.updateSecurityReason(editingReason.security_rule_id, {
         name: values.name,
         description: values.description,
-        security_category_id: values.security_category_id
+        security_category_id: values.security_category_id,
+        is_active: values.is_active
       });
 
       setOpenEditReasonDialog(false);
@@ -248,7 +251,8 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     return {
       name: editingReason.name,
       description: editingReason.description || '',
-      security_category_id: editingReason.security_category_id
+      security_category_id: editingReason.security_category_id,
+      is_active: editingReason.is_active
     };
   };
 
@@ -270,6 +274,21 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       headerName: 'Category',
       flex: 1,
       minWidth: 150
+    },
+    {
+      field: 'is_active',
+      headerName: 'Status',
+      width: 120,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Chip
+          label={params.value ? 'Active' : 'Inactive'}
+          size="small"
+          color={params.value ? 'success' : 'default'}
+          sx={{ fontWeight: 700 }}
+        />
+      )
     },
     {
       field: 'feature_count',

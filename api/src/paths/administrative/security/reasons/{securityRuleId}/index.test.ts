@@ -19,7 +19,8 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
     security_rule_id: 1,
     security_category_id: 2,
     name: 'Research',
-    description: 'Research reason'
+    description: 'Research reason',
+    is_active: true
   };
 
   describe('GET/getSecurityReason', () => {
@@ -47,14 +48,15 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityRuleId: '1' };
-      mockReq.body = { name: 'Updated', description: 'Research reason', security_category_id: 2 };
+      mockReq.body = { name: 'Updated', description: 'Research reason', security_category_id: 2, is_active: false };
 
       await updateSecurityReason()(mockReq, mockRes, mockNext);
 
       expect(SecurityRuleService.prototype.updateSecurityRule).to.have.been.calledOnceWith(1, {
         name: 'Updated',
         description: 'Research reason',
-        security_category_id: 2
+        security_category_id: 2,
+        is_active: false
       });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(updatedReason);

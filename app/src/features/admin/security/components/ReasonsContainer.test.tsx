@@ -25,6 +25,7 @@ vi.mock('@mui/x-data-grid', () => ({
             <span>{row.description}</span>
             <span>{row.category_name}</span>
             <span>{row.feature_count}</span>
+            {columns.find((c) => c.field === 'is_active')?.renderCell?.({ row, value: row.is_active } as never)}
             {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}
           </div>
         ))
@@ -43,7 +44,17 @@ const mockReasons: ISecurityReasonWithFeatureCount[] = [
     category_name: 'Health',
     name: 'Research',
     description: 'Research reason',
+    is_active: true,
     feature_count: 4
+  },
+  {
+    security_rule_id: 2,
+    security_category_id: 2,
+    category_name: 'Health',
+    name: 'Inactive Rule',
+    description: 'Disabled reason',
+    is_active: false,
+    feature_count: 0
   }
 ];
 
@@ -98,6 +109,13 @@ describe('ReasonsContainer', () => {
     vi.clearAllMocks();
   });
 
+  it('renders Active and Inactive status chips', () => {
+    const { getByText } = renderComponent({ reasons: mockReasons, rowCount: 2 });
+
+    expect(getByText('Active')).toBeVisible();
+    expect(getByText('Inactive')).toBeVisible();
+  });
+
   it('opens add dialog when Add button is clicked', async () => {
     const { getByRole, getByText } = renderComponent();
 
@@ -136,7 +154,8 @@ describe('ReasonsContainer', () => {
       expect(mockCreateSecurityReason).toHaveBeenCalledWith({
         name: 'New Reason',
         description: 'A new reason',
-        security_category_id: 2
+        security_category_id: 2,
+        is_active: true
       });
     });
 

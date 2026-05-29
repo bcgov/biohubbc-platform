@@ -146,7 +146,7 @@ describe('useSecurityApi', () => {
 
   describe('createSecurityReason', () => {
     it('posts a new security reason', async () => {
-      const body = { name: 'New Reason', description: 'Description', security_category_id: 2 };
+      const body = { name: 'New Reason', description: 'Description', security_category_id: 2, is_active: true };
       const response = { security_rule_id: 1, ...body };
 
       mock.onPost('/api/administrative/security/reasons').reply(201, response);
@@ -158,7 +158,7 @@ describe('useSecurityApi', () => {
 
   describe('updateSecurityReason', () => {
     it('puts an updated security reason', async () => {
-      const body = { name: 'Updated', description: 'Updated desc', security_category_id: 2 };
+      const body = { name: 'Updated', description: 'Updated desc', security_category_id: 2, is_active: false };
       const response = { security_rule_id: 1, ...body };
 
       mock.onPut('/api/administrative/security/reasons/1').reply(200, response);
