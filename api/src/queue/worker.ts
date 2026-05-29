@@ -26,6 +26,11 @@ import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
+import {
+  IRebuildSubmissionFeatureClosureJobData,
+  rebuildSubmissionFeatureClosureFailedHandler,
+  rebuildSubmissionFeatureClosureJobHandler
+} from './jobs/rebuild-submission-feature-closure-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/worker');
@@ -50,6 +55,8 @@ export interface WorkerDependencies {
   indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
   computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
   computeScopeAnchorsFailedHandler: typeof computeScopeAnchorsFailedHandler;
+  rebuildSubmissionFeatureClosureJobHandler: typeof rebuildSubmissionFeatureClosureJobHandler;
+  rebuildSubmissionFeatureClosureFailedHandler: typeof rebuildSubmissionFeatureClosureFailedHandler;
 }
 
 export const workerDependencies: WorkerDependencies = {
@@ -65,7 +72,9 @@ export const workerDependencies: WorkerDependencies = {
   indexSubmissionFeaturesJobHandler,
   indexSubmissionFeaturesFailedHandler,
   computeScopeAnchorsJobHandler,
-  computeScopeAnchorsFailedHandler
+  computeScopeAnchorsFailedHandler,
+  rebuildSubmissionFeatureClosureJobHandler,
+  rebuildSubmissionFeatureClosureFailedHandler
 };
 
 /**
@@ -211,6 +220,33 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IComputeScopeAnchorsJobData>(
     JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
     workerDependencies.computeScopeAnchorsFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singletonKey uniqueness for queued (created) jobs.
+  // Without this, the default 'standard' policy ignores singletonKey entirely,
+  // and two concurrent rebuilds for the same upload would both run.
+  await boss.createQueue(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE, {
+    deadLetter: JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register rebuild submission feature closure job handler
+  await boss.work<IRebuildSubmissionFeatureClosureJobData>(
+    JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE,
+    workerDependencies.rebuildSubmissionFeatureClosureJobHandler
+  );
+
+  // Register dead letter queue handler for failed rebuild submission feature closure jobs
+  await boss.work<IRebuildSubmissionFeatureClosureJobData>(
+    JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED,
+    workerDependencies.rebuildSubmissionFeatureClosureFailedHandler
   );
 
   defaultLog.info({

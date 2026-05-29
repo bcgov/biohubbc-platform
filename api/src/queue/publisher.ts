@@ -12,6 +12,7 @@ import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-feature
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadExportJobData } from './jobs/process-download-export-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
+import { IRebuildSubmissionFeatureClosureJobData } from './jobs/rebuild-submission-feature-closure-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -637,6 +638,83 @@ export const publishComputeScopeAnchorsJob = async (
       label: 'publishComputeScopeAnchorsJob',
       message: 'Failed to publish job',
       securityScopeId: data.securityScopeId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Options for rebuild submission feature closure jobs.
+ * Same timeout as indexing — the rebuild is a single PG function call (DELETE + recursive-CTE INSERT)
+ * scoped to one upload and should complete within minutes.
+ */
+const REBUILD_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 10 // 10 minutes
+};
+
+/**
+ * Publish a rebuild submission feature closure job to the queue.
+ *
+ * Queues the async reachability-closure rebuild for a submission upload. Uses the caller's
+ * DB connection via pg-boss's `db` option so the job insert participates in
+ * the same transaction — if the caller rolls back, the job is never visible.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IRebuildSubmissionFeatureClosureJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishRebuildSubmissionFeatureClosureJob = async (
+  connection: IDBConnection,
+  data: IRebuildSubmissionFeatureClosureJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    const mergedOptions = { ...REBUILD_SUBMISSION_FEATURE_CLOSURE_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+
+    // Use singletonKey to prevent duplicate concurrent closure rebuilds for the same submission upload.
+    // Pass caller's connection via db option so job insert is part of the same transaction
+    const jobId = await boss.send(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE, data, {
+      ...mergedOptions,
+      singletonKey: `closure-rebuild-${data.submissionUploadId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishRebuildSubmissionFeatureClosureJob',
+        message: 'Rebuild submission feature closure job published',
+        jobId,
+        submissionId: data.submissionId,
+        submissionUploadId: data.submissionUploadId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishRebuildSubmissionFeatureClosureJob',
+      message: 'Job not published (duplicate or throttled)',
+      submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this submission upload' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishRebuildSubmissionFeatureClosureJob',
+      message: 'Failed to publish job',
+      submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId,
       error
     });
     throw error;

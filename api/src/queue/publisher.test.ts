@@ -17,7 +17,8 @@ import {
   publishMalwareScanJob,
   publishProcessDownloadExportJob,
   publishProcessDownloadJob,
-  publishProcessSubmissionFeaturesJob
+  publishProcessSubmissionFeaturesJob,
+  publishRebuildSubmissionFeatureClosureJob
 } from './publisher';
 
 type MockPgBoss = Pick<PgBoss, 'send' | 'createQueue'>;
@@ -894,6 +895,122 @@ describe('publisher', () => {
       try {
         await publishProcessDownloadExportJob(mockConnection, {
           downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+        });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
+    });
+  });
+
+  describe('publishRebuildSubmissionFeatureClosureJob', () => {
+    it('publishes a job to the correct queue with a per-upload singletonKey', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('closure-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const data = { submissionId: 777, submissionUploadId: 'sub-upload-uuid-closure-1' };
+      await publishRebuildSubmissionFeatureClosureJob(mockConnection, data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('closure-rebuild-sub-upload-uuid-closure-1');
+    });
+
+    it('uses rebuild closure options with 10 minute timeout and retry backoff', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('closure-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-closure-1'
+      });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+    });
+
+    it('passes db option using caller connection for transactional job insert', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockConnection = getMockDBConnection({ query: queryStub });
+      const sendStub = sinon.stub().resolves('closure-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-closure-1'
+      });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+
+      await options.db.executeSql('SELECT 1', [42]);
+      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+    });
+
+    it('returns published status with jobId when boss.send returns a job ID', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('closure-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const result = await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-closure-1'
+      });
+
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('closure-job-id');
+    });
+
+    it('returns duplicate status when boss.send returns null', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const result = await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: 'sub-upload-uuid-closure-1'
+      });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this submission upload'
+      );
+    });
+
+    it('throws when pg-boss throws', async () => {
+      const mockConnection = getMockDBConnection();
+      sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      try {
+        await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+          submissionId: 777,
+          submissionUploadId: 'sub-upload-uuid-closure-1'
         });
         expect.fail('expected publisher to throw');
       } catch (error) {

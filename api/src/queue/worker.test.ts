@@ -8,6 +8,7 @@ import * as malwareScanJob from './jobs/malware-scan-job';
 import * as processDownloadExportJob from './jobs/process-download-export-job';
 import * as processDownloadJob from './jobs/process-download-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
+import * as rebuildSubmissionFeatureClosureJob from './jobs/rebuild-submission-feature-closure-job';
 import { registerWorkers, workerDependencies } from './worker';
 
 describe('worker', () => {
@@ -25,13 +26,14 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(12);
+      expect(createQueueStub.callCount).to.equal(14);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_EXPORT)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.INDEX_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
 
       expect(
         workStub.calledWith(
@@ -79,6 +81,18 @@ describe('worker', () => {
           computeScopeAnchorsJob.computeScopeAnchorsFailedHandler
         )
       ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE,
+          rebuildSubmissionFeatureClosureJob.rebuildSubmissionFeatureClosureJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED,
+          rebuildSubmissionFeatureClosureJob.rebuildSubmissionFeatureClosureFailedHandler
+        )
+      ).to.be.true;
     });
 
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
@@ -91,8 +105,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 12 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED
-      expect(createQueueStub.callCount).to.equal(12);
+      // 14 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, REBUILD_SUBMISSION_FEATURE_CLOSURE + FAILED
+      expect(createQueueStub.callCount).to.equal(14);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -105,6 +119,9 @@ describe('worker', () => {
       expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
       expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      // Rebuild closure DLQ is created before its main queue
+      expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -239,6 +256,50 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('configures dead letter queue + policy:short for rebuild-submission-feature-closure', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // policy: 'short' — without it pg-boss ignores singletonKey, so two
+      // concurrent rebuilds for the same upload would both run.
+      const closureQueueCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(closureQueueCall).to.not.be.undefined;
+
+      const queueConfig = closureQueueCall?.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
+    });
+
+    it('registers the rebuild submission feature closure job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Rebuild closure handlers are registered after compute scope anchors handlers
+      expect(workStub.getCall(12).args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(workStub.getCall(12).args[1]).to.equal(
+        rebuildSubmissionFeatureClosureJob.rebuildSubmissionFeatureClosureJobHandler
+      );
+
+      expect(workStub.getCall(13).args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(workStub.getCall(13).args[1]).to.equal(
+        rebuildSubmissionFeatureClosureJob.rebuildSubmissionFeatureClosureFailedHandler
+      );
     });
   });
 });
