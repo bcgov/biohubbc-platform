@@ -2321,11 +2321,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * One row per distinct duplicated `source_id` is written so that the colliding
    * identifier is recoverable from `details->>'source_id'`. `count` is the literal
-   * duplicate-row count (e.g., three colliding rows → `count = 3`), matching the
-   * semantics of the sibling `recordUnresolvedParentErrors` method.
+   * duplicate-row count (e.g., three colliding rows → `count = 3`).
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2335,9 +2335,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           source_id,
           COUNT(*)::integer AS count
         FROM submission_feature
-        -- source_id IS NOT NULL is defensive — parser already rejects empty strings at parse time.
         WHERE submission_upload_id = ${submissionUploadId}::uuid
           AND record_end_date IS NULL
+          -- Load-bearing, not defensive: GROUP BY collapses all NULL source_id rows into a
+          -- single group, so omitting this would make HAVING COUNT(*) > 1 report distinct
+          -- NULL-source_id features as a false duplicate collision.
           AND source_id IS NOT NULL
         GROUP BY submission_upload_id, source_id
         HAVING COUNT(*) > 1
