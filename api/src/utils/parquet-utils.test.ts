@@ -1,5 +1,9 @@
+import parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import wkx from 'wkx';
 
 import { ParquetFeatureData } from '../models/download';
@@ -51,11 +55,15 @@ describe('parquet-utils', () => {
       expect(propertyTypeToParquetType('spatial')).to.equal('BYTE_ARRAY');
     });
 
-    it('should map array to UTF8 (JSON-stringified fallback)', () => {
+    it('should map array to UTF8 (JSON-encoded string)', () => {
+      // The Parquet `JSON` LogicalType is incompatible with arrays in @dsnp/parquetjs:
+      // the shredder unwraps `Array.isArray(value)` regardless of annotation, so a
+      // raw array on a non-REPEATED JSON cell throws "too many values for field".
+      // UTF8 + caller-side `JSON.stringify` sidesteps the mismatch.
       expect(propertyTypeToParquetType('array')).to.equal('UTF8');
     });
 
-    it('should map object to UTF8 (JSON-stringified fallback)', () => {
+    it('should map object to UTF8 (JSON-encoded string)', () => {
       expect(propertyTypeToParquetType('object')).to.equal('UTF8');
     });
 
@@ -108,6 +116,16 @@ describe('parquet-utils', () => {
 
       expect(result).to.have.length(1);
       expect(result[0]).to.deep.equal({ name: 'geometry', parquetType: 'BYTE_ARRAY' });
+    });
+
+    it('should return a UTF8 column flagged as repeated for a feature property (native Parquet LIST)', () => {
+      const result = expandPropertyToColumns({
+        feature_property_name: 'child_features',
+        feature_property_type_name: 'feature'
+      });
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.deep.equal({ name: 'child_features', parquetType: 'UTF8', repeated: true });
     });
   });
 
@@ -238,6 +256,33 @@ describe('parquet-utils', () => {
       expect(sfid.primitiveType).to.equal('INT64');
       // optional=false in @dsnp/parquetjs surfaces as REQUIRED on the schema field.
       expect(sfid.repetitionType).to.equal('REQUIRED');
+    });
+
+    it('should mark a feature-typed column as REPEATED in the Parquet schema (native LIST)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const schema = buildParquetSchema(properties);
+
+      const field = schema.fields['child_features'];
+      expect(field).to.exist;
+      // `repeated: true` in @dsnp/parquetjs surfaces as REPEATED on the schema field.
+      expect(field.repetitionType).to.equal('REPEATED');
+      // UTF8 elements — downstream readers UNNEST into a string column.
+      expect(field.originalType).to.equal('UTF8');
+    });
+
+    it('should emit object and array columns as UTF8 (JSON-encoded strings)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'tags', feature_property_type_name: 'array' },
+        { feature_property_name: 'meta', feature_property_type_name: 'object' }
+      ];
+      const schema = buildParquetSchema(properties);
+
+      expect(schema.fields['tags'].originalType).to.equal('UTF8');
+      expect(schema.fields['tags'].primitiveType).to.equal('BYTE_ARRAY');
+      expect(schema.fields['meta'].originalType).to.equal('UTF8');
+      expect(schema.fields['meta'].primitiveType).to.equal('BYTE_ARRAY');
     });
 
     it('should throw when a datetime expansion collides with a sibling property name', () => {
@@ -381,7 +426,7 @@ describe('parquet-utils', () => {
       expect(row['file']).to.equal('uploads/photo.jpg');
     });
 
-    it('should JSON-stringify array values', () => {
+    it('should JSON-stringify array values for the UTF8 cell', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'tags', feature_property_type_name: 'array' }
       ];
@@ -390,7 +435,7 @@ describe('parquet-utils', () => {
       expect(row['tags']).to.equal('[1,2,3]');
     });
 
-    it('should JSON-stringify object values', () => {
+    it('should JSON-stringify object values for the UTF8 cell', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'meta', feature_property_type_name: 'object' }
       ];
@@ -435,6 +480,54 @@ describe('parquet-utils', () => {
       expect(row['centroid']).to.be.instanceOf(Buffer);
       // Different geometries should produce different WKB
       expect(Buffer.compare(row['geometry'] as Buffer, row['centroid'] as Buffer)).to.not.equal(0);
+    });
+
+    it('should pass through a single-element feature array unchanged for the Parquet LIST writer', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: ['urn:1'] }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:1']);
+    });
+
+    it('should preserve order in a multi-element feature array', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: ['urn:1', 'urn:2'] }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:1', 'urn:2']);
+    });
+
+    it('should pass through an empty feature array as [] (not null) so the LIST writer emits an empty list', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: [] }), properties);
+
+      expect(row['child_features']).to.deep.equal([]);
+    });
+
+    it('should defensively wrap a non-array feature scalar in a single-element array', () => {
+      // Contract drift defense: the hydrator guarantees arrays of URN strings,
+      // but a malformed cell from upstream should land in Parquet as a valid
+      // one-element list rather than crash the LIST writer mid-file.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({ child_features: 'urn:x' }), properties);
+
+      expect(row['child_features']).to.deep.equal(['urn:x']);
+    });
+
+    it('should set null for a missing feature property key (the shared null guard runs before encoding)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = featureToRow(makeFeature({}), properties);
+
+      expect(row['child_features']).to.be.null;
     });
 
     it('should set null for null property values', () => {
@@ -946,6 +1039,111 @@ describe('parquet-utils', () => {
 
       expect(result.type).to.equal('Point');
       expect(result.coordinates).to.deep.equal([5, 10]);
+    });
+  });
+
+  // End-to-end round-trip: write real Parquet bytes via @dsnp/parquetjs, read
+  // them back via ParquetReader, assert the decoded cell shape matches input.
+  //
+  // The earlier `featureToRow`-output tests asserted what the writer received
+  // (the intermediate object), not what the columnar layer did with it. When
+  // `array`/`object` columns moved from `'UTF8'` to `'JSON'` (logical type),
+  // parquetjs began running its own `JSON.stringify` in `toPrimitive_JSON` on
+  // top of any pre-stringify the encoder did — silently double-encoding the
+  // cell. The pre-existing tests passed because they stopped one layer above
+  // the bug. This suite exercises that seam.
+  describe('Parquet round-trip via @dsnp/parquetjs', () => {
+    async function roundTrip(
+      properties: CsvPropertyDefinition[],
+      featureData: Record<string, unknown>
+    ): Promise<Record<string, unknown>> {
+      const tmpFile = path.join(os.tmpdir(), `parquet-utils-roundtrip-${Date.now()}-${Math.random()}.parquet`);
+      try {
+        const schema = buildParquetSchema(properties);
+        const writer = await parquetjs.ParquetWriter.openFile(schema, tmpFile);
+        await writer.appendRow(
+          featureToRow({ uuid: 'u-1', parent_uuid: null, submission_feature_id: 1, data: featureData }, properties)
+        );
+        await writer.close();
+
+        const reader = await parquetjs.ParquetReader.openFile(tmpFile);
+        const cursor = reader.getCursor();
+        const row = (await cursor.next()) as Record<string, unknown> | null;
+        await reader.close();
+        if (!row) {
+          throw new Error('round-trip read returned no rows');
+        }
+        return row;
+      } finally {
+        await fs.unlink(tmpFile).catch(() => undefined);
+      }
+    }
+
+    it('array column round-trips as a JSON-encoded UTF8 string (no double-encoding)', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'tags', feature_property_type_name: 'array' }
+      ];
+      const row = await roundTrip(properties, { tags: [1, 2, 3] });
+
+      // Cell is a UTF8 string that single-`JSON.parse`s back to the original
+      // array. If the writer double-encoded, the cell would be `'"[1,2,3]"'`
+      // (quoted) and `JSON.parse` would return the string `'[1,2,3]'` instead.
+      expect(row['tags']).to.equal('[1,2,3]');
+      expect(JSON.parse(row['tags'] as string)).to.deep.equal([1, 2, 3]);
+    });
+
+    it('object column round-trips as a JSON-encoded UTF8 string (no double-encoding)', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'meta', feature_property_type_name: 'object' }
+      ];
+      const row = await roundTrip(properties, { meta: { key: 'value', n: 42 } });
+
+      expect(row['meta']).to.equal('{"key":"value","n":42}');
+      expect(JSON.parse(row['meta'] as string)).to.deep.equal({ key: 'value', n: 42 });
+    });
+
+    it('feature column round-trips to the original URN array (native LIST<UTF8>)', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = await roundTrip(properties, {
+        child_features: ['urn:1:observation:42', 'urn:1:observation:43']
+      });
+      expect(row['child_features']).to.deep.equal(['urn:1:observation:42', 'urn:1:observation:43']);
+    });
+
+    it('feature column with one referenced row round-trips as a length-1 array (uniform shape)', async () => {
+      // Spec UO-3 / EC-3: `allow_multiple = false` cells must still surface as
+      // an array, not a bare string — downstream parsers should not have to
+      // branch on schema metadata to decode the cell.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = await roundTrip(properties, { child_features: ['urn:1:observation:42'] });
+      expect(row['child_features']).to.deep.equal(['urn:1:observation:42']);
+    });
+
+    it('feature column with no value round-trips as null (spec EC-1)', async () => {
+      // Spec EC-1: a feature-typed property with zero referenced rows exports
+      // as `null` (Parquet). `featureToRow` maps a missing key to `null`, and
+      // parquetjs preserves that on read for the REPEATED column.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = await roundTrip(properties, {});
+      expect(row['child_features']).to.be.null;
+    });
+
+    it('feature column defensively normalizes a scalar from upstream drift to a one-element array', async () => {
+      // The encoder's `Array.isArray(value) ? value : [String(value)]` fallback
+      // exists for contract drift — the hydrator guarantees arrays today, but a
+      // malformed cell should land as a valid one-element list rather than
+      // crash the writer mid-file. This pins that escape hatch end-to-end.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const row = await roundTrip(properties, { child_features: 'urn:1:observation:42' });
+      expect(row['child_features']).to.deep.equal(['urn:1:observation:42']);
     });
   });
 });

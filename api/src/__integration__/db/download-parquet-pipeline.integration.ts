@@ -33,6 +33,10 @@ import { DownloadPolicyService } from '../../services/download/download-policy-s
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import {
+  createFeatureTypeProperty,
+  insertSubmissionFeaturePropertyFeature
+} from '../helpers/test-feature-property-helpers';
 import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -530,6 +534,163 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(rows).to.have.length(1);
       expect(rows[0].data.species).to.be.a('string');
       expect(rows[0].data.species).to.include('Ursus arctos');
+    });
+
+    describe('feature properties', () => {
+      it('hydrates a single feature reference into a length-1 URN array', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-1'
+        });
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId
+        );
+
+        const refRow = await connection.sql(SQL`
+          SELECT urn FROM submission_feature WHERE submission_feature_id = ${referencedFeatureId};
+        `);
+        const urnR1 = refRow.rows[0].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-single');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnR1]);
+      });
+
+      it('orders multiple feature references ASC by referenced_submission_feature_id', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureId1 = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-1'
+        });
+        const referencedFeatureId2 = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-2'
+        });
+        // Sanity: ids are inserted in ascending order
+        expect(referencedFeatureId1).to.be.lessThan(referencedFeatureId2);
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        // Insert link rows in REVERSE order to prove the SQL's ORDER BY does the work
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId2
+        );
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId1
+        );
+
+        const refRows = await connection.sql(SQL`
+          SELECT submission_feature_id, urn FROM submission_feature
+          WHERE submission_feature_id = ANY(${[referencedFeatureId1, referencedFeatureId2]})
+          ORDER BY submission_feature_id ASC;
+        `);
+        const urnR1 = refRows.rows[0].urn;
+        const urnR2 = refRows.rows[1].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-multi');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnR1, urnR2]);
+      });
+
+      it('returns null when a feature property is requested but no link rows exist', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+
+        const { propertyName } = await createFeatureTypeProperty(connection, 'capture', 'observation_subcount', true);
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-none');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.be.null;
+      });
+
+      it('excludes soft-deleted referenced features from the URN array', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureLiveId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'live'
+        });
+        const referencedFeatureDeletedId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'soft-deleted'
+        });
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureLiveId
+        );
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureDeletedId
+        );
+
+        // Soft-delete one referenced feature
+        await connection.sql(SQL`
+          UPDATE submission_feature
+          SET record_end_date = now()
+          WHERE submission_feature_id = ${referencedFeatureDeletedId};
+        `);
+
+        const liveRow = await connection.sql(SQL`
+          SELECT urn FROM submission_feature WHERE submission_feature_id = ${referencedFeatureLiveId};
+        `);
+        const urnLive = liveRow.rows[0].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-soft-deleted');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnLive]);
+      });
     });
 
     it('returns geometry as GeoJSON object', async () => {

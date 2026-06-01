@@ -156,6 +156,40 @@ export async function getSubmissionFeatureErrors(
   return result.rows;
 }
 
+/**
+ * Insert a single link row into `submission_feature_property_feature`, tying a source
+ * feature to one referenced feature via a `feature`-typed feature_type_property.
+ *
+ * The link table has no `value` column — the "value" of a feature-typed property is
+ * the set of referenced submission_feature_ids carried by these rows. FK semantics:
+ * both `submission_feature_id` (source) and `referenced_submission_feature_id` point
+ * at `biohub.submission_feature`, and `feature_type_property_id` must be a property
+ * declared on the source feature's type.
+ */
+export async function insertSubmissionFeaturePropertyFeature(
+  connection: IDBConnection,
+  sourceSubmissionFeatureId: number,
+  featureTypePropertyId: number,
+  referencedSubmissionFeatureId: number
+): Promise<void> {
+  const systemUserId = connection.systemUserId();
+
+  await connection.sql(SQL`
+    INSERT INTO submission_feature_property_feature (
+      submission_feature_id,
+      feature_type_property_id,
+      referenced_submission_feature_id,
+      create_user
+    )
+    VALUES (
+      ${sourceSubmissionFeatureId},
+      ${featureTypePropertyId},
+      ${referencedSubmissionFeatureId},
+      ${systemUserId}
+    );
+  `);
+}
+
 /** Fetch canonical property-feature rows for a source feature, ordered by referenced feature. */
 export async function getPropertyFeatureRows(
   connection: IDBConnection,
