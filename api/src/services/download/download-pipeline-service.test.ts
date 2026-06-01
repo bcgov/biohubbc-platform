@@ -156,7 +156,7 @@ describe('DownloadPipelineService', () => {
   describe('resolveParquetSchema', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
-        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset', description: null },
         properties: [
           {
             feature_type_property_id: 1,
@@ -171,7 +171,12 @@ describe('DownloadPipelineService', () => {
         ]
       },
       {
-        feature_type: { feature_type_id: 2, name: 'observation', display_name: 'Observation' },
+        feature_type: {
+          feature_type_id: 2,
+          name: 'observation',
+          display_name: 'Observation',
+          description: null
+        },
         properties: [
           {
             feature_type_property_id: 2,
