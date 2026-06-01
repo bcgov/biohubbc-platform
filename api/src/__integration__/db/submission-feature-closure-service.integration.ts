@@ -1,7 +1,7 @@
 // Service-level integration tests for the derived submission-feature reachability closure.
 //
 // Drives SubmissionFeatureClosureService.computeClosureForUpload(submissionUploadId) against a real
-// database and asserts on the rows the recompute function writes into submission_feature_closure. The
+// database and asserts on the rows the recompute writes into submission_feature_closure. The
 // closure is the "evidence" reach used by search: reachability over the UNION of two edge kinds —
 // parent (submission_feature.parent_*) and property (submission_feature_property_feature) — plus a
 // self row for every active feature in the upload. Content edges (submission_feature_feature) are
