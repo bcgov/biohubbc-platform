@@ -48,6 +48,8 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
    *
    * Audit fields, including `create_user`, are set by database triggers from
    * the current connection context.
+   * Callers that create a replacement scoped review must first end any active
+   * same-scope row so the active-row unique index is not violated.
    *
    * @param {string} submissionUuid - The submission UUID.
    * @param {CreateSubmissionUploadReview} params - Review row values.
@@ -68,7 +70,7 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
       SELECT
         su.submission_upload_id,
         ${params.scope}::submission_upload_review_scope,
-        'requested'::submission_upload_review_status,
+        ${params.status}::submission_upload_review_status,
         ${params.requested_by}
       FROM
         submission_upload su
@@ -105,6 +107,49 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Soft delete any active review rows for a submission upload and scope.
+   *
+   * This supports replacement review requests while preserving history. The
+   * database also enforces a partial unique index over active
+   * `(submission_upload_id, scope)` rows, so callers should run this in the same
+   * transaction immediately before inserting the replacement review.
+   *
+   * @param {string} submissionUuid - The submission UUID.
+   * @param {string} submissionUploadId - The submission upload ID.
+   * @param {CreateSubmissionUploadReview['scope']} scope - Review scope to replace.
+   * @return {Promise<number>} Number of active rows soft-deleted.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async softDeleteActiveSubmissionUploadReviewsByScope(
+    submissionUuid: string,
+    submissionUploadId: string,
+    scope: CreateSubmissionUploadReview['scope']
+  ): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload_review sur
+      SET
+        record_end_date = now()
+      FROM
+        submission_upload su
+      INNER JOIN
+        submission s
+      ON
+        s.submission_id = su.submission_id
+      WHERE
+        sur.submission_upload_id = su.submission_upload_id
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND s.uuid = ${submissionUuid}
+        AND sur.scope = ${scope}::submission_upload_review_scope
+        AND su.record_end_date IS NULL
+        AND sur.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount ?? 0;
   }
 
   /**

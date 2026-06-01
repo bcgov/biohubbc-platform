@@ -59,13 +59,14 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
       submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
     };
-    mockReq.body = { scope: 'security' };
+    mockReq.body = { scope: 'security', status: 'requested' };
 
     await insertSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       scope: SubmissionUploadReviewScope.SECURITY,
+      status: SubmissionUploadReviewStatus.REQUESTED,
       requested_by: 7
     });
     expect(mockRes.statusValue).to.equal(201);

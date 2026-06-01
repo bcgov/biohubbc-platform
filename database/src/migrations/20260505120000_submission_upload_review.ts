@@ -72,7 +72,7 @@ export async function up(knex: Knex): Promise<void> {
       ON submission_upload_status(submission_upload_id, create_date DESC, submission_upload_status_id DESC);
 
     -- Prevents duplicate active review tasks for the same upload/scope.
-    CREATE UNIQUE INDEX submission_upload_review_nuk1
+    CREATE UNIQUE INDEX IF NOT EXISTS submission_upload_review_nuk1
       ON submission_upload_review(submission_upload_id, scope)
       WHERE record_end_date IS NULL;
 
@@ -109,6 +109,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS submission_upload_status_idx2;
     DROP INDEX IF EXISTS submission_validation_idx5;
     DROP INDEX IF EXISTS submission_upload_idx2;
+    DROP INDEX IF EXISTS submission_upload_review_nuk1;
     DROP TRIGGER IF EXISTS journal_submission_upload_review ON submission_upload_review;
     DROP TRIGGER IF EXISTS audit_submission_upload_review ON submission_upload_review;
     DROP TABLE IF EXISTS submission_upload_review CASCADE;

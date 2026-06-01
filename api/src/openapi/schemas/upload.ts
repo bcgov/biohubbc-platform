@@ -232,9 +232,13 @@ export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
 export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['scope'],
+  required: ['scope', 'status'],
   properties: {
-    scope: { type: 'string', enum: ['validation', 'security'] }
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: {
+      type: 'string',
+      enum: ['pending', 'requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled']
+    }
   }
 };
 
