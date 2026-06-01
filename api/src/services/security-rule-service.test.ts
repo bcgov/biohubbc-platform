@@ -90,9 +90,12 @@ describe('SecurityRuleService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityRuleService(mockDBConnection);
 
-      sinon.stub(SecurityRuleRepository.prototype, 'getActiveAppliedFeatureCount').resolves(0);
+      const countStub = sinon.stub(SecurityRuleRepository.prototype, 'getActiveAppliedFeatureCount').resolves(0);
 
-      await service.assertSecurityRuleIsUnused(1);
+      const result = await service.assertSecurityRuleIsUnused(1);
+
+      expect(countStub).to.have.been.calledOnceWith(1);
+      expect(result).to.be.undefined;
     });
 
     it('throws ApiConflictError when count > 0', async () => {

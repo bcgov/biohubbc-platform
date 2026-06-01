@@ -157,7 +157,9 @@ describe('SecurityRuleRepository', () => {
       });
 
       const repo = new SecurityRuleRepository(mockDBConnection);
-      await repo.deleteSecurityRule(1);
+      const result = await repo.deleteSecurityRule(1);
+
+      expect(result).to.be.undefined;
     });
 
     it('throws ApiExecuteSQLError if rowCount !== 1', async () => {

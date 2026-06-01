@@ -79,7 +79,9 @@ describe('SecurityCategoryRepository', () => {
       });
 
       const repo = new SecurityCategoryRepository(mockDBConnection);
-      await repo.updateSecurityCategory(1, { name: 'Updated', description: 'Updated desc' });
+      const result = await repo.updateSecurityCategory(1, { name: 'Updated', description: 'Updated desc' });
+
+      expect(result).to.be.undefined;
     });
 
     it('throws ApiExecuteSQLError if rowCount !== 1', async () => {
@@ -105,7 +107,9 @@ describe('SecurityCategoryRepository', () => {
       });
 
       const repo = new SecurityCategoryRepository(mockDBConnection);
-      await repo.deleteSecurityCategory(1);
+      const result = await repo.deleteSecurityCategory(1);
+
+      expect(result).to.be.undefined;
     });
 
     it('throws ApiExecuteSQLError if rowCount !== 1', async () => {
