@@ -1,7 +1,7 @@
 // Service-level integration tests for the derived submission-feature reachability closure.
 //
-// Drives SubmissionFeatureClosureService.rebuildClosureForUpload(submissionUploadId) against a real
-// database and asserts on the rows the rebuild function writes into submission_feature_closure. The
+// Drives SubmissionFeatureClosureService.computeClosureForUpload(submissionUploadId) against a real
+// database and asserts on the rows the recompute function writes into submission_feature_closure. The
 // closure is the "evidence" reach used by search: reachability over the UNION of two edge kinds —
 // parent (submission_feature.parent_*) and property (submission_feature_property_feature) — plus a
 // self row for every active feature in the upload. Content edges (submission_feature_feature) are
@@ -43,7 +43,7 @@ function expectedPairs(pairs: [number, number][]): string[] {
     .map(([source, target]) => `${source}-${target}`);
 }
 
-describe('SubmissionFeatureClosureService — closure rebuild (integration)', function () {
+describe('SubmissionFeatureClosureService — closure recompute (integration)', function () {
   this.timeout(15000);
 
   let connection: IDBConnection;
@@ -67,7 +67,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
   /**
    * Insert one submission_feature bound to a SPECIFIC upload, returning its submission_feature_id.
    *
-   * The closure rebuild is upload-scoped and only walks edges whose BOTH endpoints are active
+   * The closure recompute is upload-scoped and only walks edges whose BOTH endpoints are active
    * features of the same upload, so a parent + its children must share one submission_upload_id.
    * createTestFeature / createTestFeaturesInBulk each mint their OWN upload internally and cannot
    * place a parent and child under one upload, so the closure suite inserts features directly.
@@ -205,7 +205,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     await insertContentEdge(f2, f4);
     await insertPropertyEdge(f2, f3, propertyLabelId);
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     expect(insertedCount).to.equal(9);
     expect(await getScopedClosurePairs([f1, f2, f3, f4])).to.deep.equal(
@@ -223,7 +223,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     );
   });
 
-  // Idempotency: the rebuild is DELETE-then-INSERT scoped to the upload, so a second run reproduces
+  // Idempotency: the recompute is DELETE-then-INSERT scoped to the upload, so a second run reproduces
   // the same rows rather than duplicating or accumulating them. Guards the leading DELETE.
   it('2: idempotent rerun — identical insertedCount and identical scoped row set', async () => {
     const submissionId = await createTestSubmission(connection);
@@ -232,10 +232,10 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     const f1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
     const f2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f1 });
 
-    const first = await service.rebuildClosureForUpload(uploadId);
+    const first = await service.computeClosureForUpload(uploadId);
     const firstPairs = await getScopedClosurePairs([f1, f2]);
 
-    const second = await service.rebuildClosureForUpload(uploadId);
+    const second = await service.computeClosureForUpload(uploadId);
     const secondPairs = await getScopedClosurePairs([f1, f2]);
 
     expect(second.insertedCount).to.equal(first.insertedCount);
@@ -258,7 +258,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     await insertPropertyEdge(b, c, propertyLabelId);
     await insertPropertyEdge(c, a, propertyLabelId);
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     expect(insertedCount).to.equal(9);
     const pairs = await getScopedClosurePairs([a, b, c]);
@@ -291,7 +291,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     const b = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, recordEndDate: true });
     await insertPropertyEdge(a, b, propertyLabelId);
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     expect(insertedCount).to.equal(1);
     expect(await getScopedClosurePairs([a, b])).to.deep.equal(expectedPairs([[a, a]]));
@@ -305,7 +305,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     expect(bRows.rows).to.have.lengthOf(0);
   });
 
-  // Intra-upload filter: a property edge from A (in U1) to X (in U2) crosses uploads, so the rebuild
+  // Intra-upload filter: a property edge from A (in U1) to X (in U2) crosses uploads, so the recompute
   // of U1 drops it (X is not an active feature of U1). A's closure is just its self row, and the
   // cross-upload pair (A, X) never appears. Guards the af_tgt join on the property_edges CTE.
   it('5: cross-upload edge filtered — pair (A, X) absent from U1 closure', async () => {
@@ -318,7 +318,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     const x = await insertFeatureRow({ submissionId, submissionUploadId: uploadTwo });
     await insertPropertyEdge(a, x, propertyLabelId);
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadOne);
+    const { insertedCount } = await service.computeClosureForUpload(uploadOne);
 
     expect(insertedCount).to.equal(1);
     expect(await getScopedClosurePairs([a, x])).to.deep.equal(expectedPairs([[a, a]]));
@@ -333,24 +333,24 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     // One feature, then deactivated, so the upload has zero ACTIVE features.
     const f1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, recordEndDate: true });
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     expect(insertedCount).to.equal(0);
     expect(await getScopedClosurePairs([f1])).to.deep.equal([]);
   });
 
-  // Stale-row removal: a feature with closure rows is deactivated, then the upload is rebuilt. The
+  // Stale-row removal: a feature with closure rows is deactivated, then the upload is recomputed. The
   // leading DELETE scopes by submission_upload_id (not active-only), so the now-inactive feature's
   // prior rows are removed even though it is no longer in the active universe.
-  it('7: rebuild removes a deactivated feature’s stale rows', async () => {
+  it('7: recompute removes a deactivated feature’s stale rows', async () => {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
 
     const f1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
     const f2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f1 });
 
-    const firstRebuild = await service.rebuildClosureForUpload(uploadId);
-    expect(firstRebuild.insertedCount).to.equal(3); // F1 self, F2 self, F2->F1
+    const firstRecompute = await service.computeClosureForUpload(uploadId);
+    expect(firstRecompute.insertedCount).to.equal(3); // F1 self, F2 self, F2->F1
     expect(await getScopedClosurePairs([f1, f2])).to.deep.equal(
       expectedPairs([
         [f1, f1],
@@ -359,13 +359,13 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
       ])
     );
 
-    // Deactivate F2 and rebuild: its self row and its parent edge to F1 must disappear.
+    // Deactivate F2 and recompute: its self row and its parent edge to F1 must disappear.
     await connection.sql(SQL`
       UPDATE submission_feature SET record_end_date = now() WHERE submission_feature_id = ${f2};
     `);
 
-    const secondRebuild = await service.rebuildClosureForUpload(uploadId);
-    expect(secondRebuild.insertedCount).to.equal(1); // only F1 self remains
+    const secondRecompute = await service.computeClosureForUpload(uploadId);
+    expect(secondRecompute.insertedCount).to.equal(1); // only F1 self remains
     expect(await getScopedClosurePairs([f1, f2])).to.deep.equal(expectedPairs([[f1, f1]]));
 
     const f2Rows = await connection.sql(SQL`
@@ -390,7 +390,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     await insertPropertyEdge(f2, f4, propertyLabelId); // F2 -> F4 (property); reachable F2 -> F4 -> F3 via parent
     await insertPropertyEdge(f2, f3, propertyLabelId); // F2 -> F3 (direct property)
 
-    await service.rebuildClosureForUpload(uploadId);
+    await service.computeClosureForUpload(uploadId);
 
     const f2ToF3 = await connection.sql(SQL`
       SELECT count(*)::integer AS count
@@ -403,7 +403,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
   // Content exclusion: a content edge F1->F2 (submission_feature_feature) must NOT produce a closure
   // pair — content is deliberately outside the evidence reach (closing over parent + content is
   // O(N^2)). Only the two self rows survive; (F1, F2) is absent. Guards against content creeping back
-  // into the rebuild's edge union.
+  // into the recompute's edge union.
   it('9: content edge excluded — produces no closure pair', async () => {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
@@ -412,7 +412,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     const f2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
     await insertContentEdge(f1, f2);
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     expect(insertedCount).to.equal(2); // F1 self, F2 self — the content edge contributes nothing
     expect(await getScopedClosurePairs([f1, f2])).to.deep.equal(
@@ -441,7 +441,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
       await insertContentEdge(parent, child); // the would-be explosion source; must be ignored
     }
 
-    const { insertedCount } = await service.rebuildClosureForUpload(uploadId);
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
 
     // Linear, not quadratic: (k + 1) self rows + k (child -> parent) edges.
     expect(insertedCount).to.equal(2 * k + 1);
@@ -474,7 +474,7 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
     await insertPropertyEdge(f2, f3, propertyLabelId); // cross-branch reference, not ancestry
     await insertPropertyEdge(f3, f1, propertyLabelId); // same pair as the F3->F1 parent edge
 
-    await service.rebuildClosureForUpload(uploadId);
+    await service.computeClosureForUpload(uploadId);
 
     expect(await getIsAncestor(f2, f1)).to.equal(true); // parent
     expect(await getIsAncestor(f2, f3)).to.equal(false); // property only

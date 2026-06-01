@@ -12,13 +12,13 @@ describe('SubmissionFeatureClosureService', () => {
     sinon.restore();
   });
 
-  describe('rebuildClosureForUpload', () => {
+  describe('computeClosureForUpload', () => {
     it('should wrap the repository row count in insertedCount', async () => {
-      const stub = sinon.stub(SubmissionFeatureClosureRepository.prototype, 'rebuildClosureForUpload').resolves(5);
+      const stub = sinon.stub(SubmissionFeatureClosureRepository.prototype, 'computeClosureForUpload').resolves(5);
 
       const service = new SubmissionFeatureClosureService(getMockDBConnection());
 
-      const result = await service.rebuildClosureForUpload('cb7d9e3a-4f12-4c1b-9d4a-1e2f3a4b5c6d');
+      const result = await service.computeClosureForUpload('cb7d9e3a-4f12-4c1b-9d4a-1e2f3a4b5c6d');
 
       expect(stub).to.have.been.calledOnceWith('cb7d9e3a-4f12-4c1b-9d4a-1e2f3a4b5c6d');
       expect(result).to.eql({ insertedCount: 5 });

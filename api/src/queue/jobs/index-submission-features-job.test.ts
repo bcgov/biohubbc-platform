@@ -57,7 +57,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
     sinon
-      .stub(indexSubmissionFeaturesJobDependencies, 'publishRebuildSubmissionFeatureClosureJob')
+      .stub(indexSubmissionFeaturesJobDependencies, 'publishComputeSubmissionFeatureClosureJob')
       .resolves({ status: 'published', jobId: 'job-xyz' });
   });
 
@@ -71,7 +71,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
     const publishStub =
-      indexSubmissionFeaturesJobDependencies.publishRebuildSubmissionFeatureClosureJob as sinon.SinonStub;
+      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
     expect(toIndexingStub.calledWith('submission-upload-1')).to.be.true;
     expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
     expect(toIndexedStub.calledWith('submission-upload-1')).to.be.true;
@@ -80,7 +80,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       submissionId: 777,
       submissionUploadId: 'submission-upload-1'
     });
-    // The closure rebuild must be queued only after the upload reaches `indexed`.
+    // The closure recompute must be queued only after the upload reaches `indexed`.
     expect(toIndexedStub.calledBefore(publishStub)).to.be.true;
   });
 
@@ -98,9 +98,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     const publishStub =
-      indexSubmissionFeaturesJobDependencies.publishRebuildSubmissionFeatureClosureJob as sinon.SinonStub;
+      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
-    // An invalid outcome must not enqueue a closure rebuild — prior closure rows stay untouched.
+    // An invalid outcome must not enqueue a closure recompute — prior closure rows stay untouched.
     expect(publishStub.notCalled).to.be.true;
   });
 

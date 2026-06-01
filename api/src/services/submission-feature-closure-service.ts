@@ -18,10 +18,10 @@ export class SubmissionFeatureClosureService extends DBService {
   }
 
   /**
-   * Rebuild the directed reachability closure for a single upload.
+   * Recompute the directed reachability closure for a single upload.
    *
    * The closure is reachability over the union of parent and property (feature-reference) edges,
-   * rebuilt wholesale for the upload so it always reflects the upload's current feature graph rather
+   * recomputed wholesale for the upload so it always reflects the upload's current feature graph rather
    * than an accumulation of prior states. Content edges are intentionally excluded (closing over
    * parent + content is O(N^2)). Reachability is stored forward only, so there is no reverse
    * `(target, source)` index — nothing performs a "who reaches Y" down-probe. Each row carries
@@ -35,7 +35,7 @@ export class SubmissionFeatureClosureService extends DBService {
    * @return {Promise<{ insertedCount: number }>} The number of closure rows written.
    * @memberof SubmissionFeatureClosureService
    */
-  async rebuildClosureForUpload(submissionUploadId: string): Promise<{ insertedCount: number }> {
-    return { insertedCount: await this.submissionFeatureClosureRepository.rebuildClosureForUpload(submissionUploadId) };
+  async computeClosureForUpload(submissionUploadId: string): Promise<{ insertedCount: number }> {
+    return { insertedCount: await this.submissionFeatureClosureRepository.computeClosureForUpload(submissionUploadId) };
   }
 }

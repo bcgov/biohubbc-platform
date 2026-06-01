@@ -11,10 +11,10 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionFeatureClosureRepository extends BaseRepository {
   /**
-   * Rebuild the directed reachability closure for a single upload.
+   * Recompute the directed reachability closure for a single upload.
    *
-   * Delegates to the canonical `biohub.rebuild_submission_feature_closure` PG function, which owns
-   * the closure-rebuild logic so it stays consistent no matter what triggers it. The function is a
+   * Delegates to the canonical `biohub.compute_submission_feature_closure` PG function, which owns
+   * the closure-recompute logic so it stays consistent no matter what triggers it. The function is a
    * wholesale DELETE + INSERT for the upload's rows, making it idempotent — rerunning it converges
    * on the same state rather than accumulating duplicates.
    *
@@ -27,8 +27,8 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * @return {Promise<number>} The number of closure rows written.
    * @memberof SubmissionFeatureClosureRepository
    */
-  async rebuildClosureForUpload(submissionUploadId: string): Promise<number> {
-    const sqlStatement = SQL`SELECT biohub.rebuild_submission_feature_closure(${submissionUploadId}) AS inserted_count`;
+  async computeClosureForUpload(submissionUploadId: string): Promise<number> {
+    const sqlStatement = SQL`SELECT biohub.compute_submission_feature_closure(${submissionUploadId}) AS inserted_count`;
 
     const response = await this.connection.sql(sqlStatement, z.object({ inserted_count: z.number().int() }));
 

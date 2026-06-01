@@ -9,13 +9,13 @@ describe('SubmissionFeatureClosureRepository', () => {
     sinon.restore();
   });
 
-  describe('rebuildClosureForUpload', () => {
+  describe('computeClosureForUpload', () => {
     it('returns the inserted_count from the returned row', async () => {
       const repository = new SubmissionFeatureClosureRepository(
         getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([{ inserted_count: 5 }])) })
       );
 
-      const result = await repository.rebuildClosureForUpload('11111111-1111-1111-1111-111111111111');
+      const result = await repository.computeClosureForUpload('11111111-1111-1111-1111-111111111111');
 
       expect(result).to.equal(5);
     });
@@ -24,7 +24,7 @@ describe('SubmissionFeatureClosureRepository', () => {
       const sqlSpy = sinon.spy(() => Promise.resolve(mockQueryResult([{ inserted_count: 5 }])));
       const repository = new SubmissionFeatureClosureRepository(getMockDBConnection({ sql: sqlSpy }));
 
-      await repository.rebuildClosureForUpload('11111111-1111-1111-1111-111111111111');
+      await repository.computeClosureForUpload('11111111-1111-1111-1111-111111111111');
 
       expect(sqlSpy).to.have.been.calledOnce;
     });
@@ -34,7 +34,7 @@ describe('SubmissionFeatureClosureRepository', () => {
         getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([{ inserted_count: 0 }])) })
       );
 
-      const result = await repository.rebuildClosureForUpload('11111111-1111-1111-1111-111111111111');
+      const result = await repository.computeClosureForUpload('11111111-1111-1111-1111-111111111111');
 
       expect(result).to.equal(0);
     });

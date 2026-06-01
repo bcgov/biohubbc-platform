@@ -12,13 +12,13 @@ import { SubmissionValidationService } from '../services/submission-validation-s
 import { JobQueues } from './jobs';
 import {
   publishComputeScopeAnchorsJob,
+  publishComputeSubmissionFeatureClosureJob,
   publisherDependencies,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
   publishProcessDownloadExportJob,
   publishProcessDownloadJob,
-  publishProcessSubmissionFeaturesJob,
-  publishRebuildSubmissionFeatureClosureJob
+  publishProcessSubmissionFeaturesJob
 } from './publisher';
 
 type MockPgBoss = Pick<PgBoss, 'send' | 'createQueue'>;
@@ -903,7 +903,7 @@ describe('publisher', () => {
     });
   });
 
-  describe('publishRebuildSubmissionFeatureClosureJob', () => {
+  describe('publishComputeSubmissionFeatureClosureJob', () => {
     it('publishes a job to the correct queue with a per-upload singletonKey', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('closure-job-id');
@@ -913,19 +913,19 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const data = { submissionId: 777, submissionUploadId: 'sub-upload-uuid-closure-1' };
-      await publishRebuildSubmissionFeatureClosureJob(mockConnection, data);
+      await publishComputeSubmissionFeatureClosureJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
-      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
       expect(sendStub.calledOnce).to.be.true;
-      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.REBUILD_SUBMISSION_FEATURE_CLOSURE);
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
       expect(sendStub.firstCall.args[1]).to.deep.equal(data);
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('closure-rebuild-sub-upload-uuid-closure-1');
+      expect(options.singletonKey).to.equal('closure-recompute-sub-upload-uuid-closure-1');
     });
 
-    it('uses rebuild closure options with 10 minute timeout and retry backoff', async () => {
+    it('uses recompute closure options with 10 minute timeout and retry backoff', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('closure-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -933,7 +933,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+      await publishComputeSubmissionFeatureClosureJob(mockConnection, {
         submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
@@ -954,7 +954,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+      await publishComputeSubmissionFeatureClosureJob(mockConnection, {
         submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
@@ -975,7 +975,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const result = await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+      const result = await publishComputeSubmissionFeatureClosureJob(mockConnection, {
         submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
@@ -992,7 +992,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const result = await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+      const result = await publishComputeSubmissionFeatureClosureJob(mockConnection, {
         submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
@@ -1008,7 +1008,7 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
-        await publishRebuildSubmissionFeatureClosureJob(mockConnection, {
+        await publishComputeSubmissionFeatureClosureJob(mockConnection, {
           submissionId: 777,
           submissionUploadId: 'sub-upload-uuid-closure-1'
         });

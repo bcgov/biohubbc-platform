@@ -2,7 +2,7 @@ import type { Knex } from 'knex';
 
 /**
  * Adds the derived reachability table `submission_feature_closure` and the
- * `rebuild_submission_feature_closure` function that repopulates it for a single upload.
+ * `compute_submission_feature_closure` function that repopulates it for a single upload.
  *
  * The closure is the transitive closure over a submission_feature's parent and property
  * (feature-reference) edges — the "evidence" reach used by search. Content edges
@@ -34,8 +34,8 @@ export async function up(knex: Knex): Promise<void> {
     -- Create table
     ----------------------------------------------------------------------------------------
 
-    -- No audit columns and no audit/journal triggers: this is fully-derived data, rebuilt
-    -- wholesale (DELETE + INSERT) by rebuild_submission_feature_closure and never updated in
+    -- No audit columns and no audit/journal triggers: this is fully-derived data, recomputed
+    -- wholesale (DELETE + INSERT) by compute_submission_feature_closure and never updated in
     -- place. Audit columns would carry no information (create_user is always the system user,
     -- update_date/update_user/revision_count are never set) and the journal trigger would double
     -- every write at the projected ~1B-row scale. This matches the schema's other derived tables
@@ -63,16 +63,16 @@ export async function up(knex: Knex): Promise<void> {
     -- Table and column comments
     ----------------------------------------------------------------------------------------
 
-    COMMENT ON TABLE submission_feature_closure IS 'Derived reachability (transitive-closure) table over submission_feature parent and property (feature-reference) edges — the evidence reach used by search. Content edges (submission_feature_feature) are intentionally excluded: content is the parent tree reversed, so closing over (parent + content) produces the complete same-upload digraph (O(N^2)). It stores every directed (source, target) edge reachable through parent and property edges, so search can replace recursive traversal with an indexed forward probe by source. Reachability is stored forward only; the composite (source, target) primary key is the single index, because both auth and search probe forward by source and nothing performs a who-reaches-Y down-probe. The same table also serves authorization: rows flagged is_ancestor=true are the pure parent-ancestry subset (security cascades up the parent tree only, not across feature references), so auth consumers read WHERE is_ancestor while search reads all rows. The composite (source, target) primary key is the storage choice: reachability is (source, target)-unique by definition, so the natural composite PK saves a surrogate column and an extra index at the projected ~1B-row scale. There is intentionally no feature_type_property_id column: that label is meaningful only on direct property edges and meaningless on composed rows, so typed-traversal queries join back to submission_feature_property_feature. There are intentionally no audit columns and no audit/journal triggers: this is fully-derived data rebuilt wholesale by rebuild_submission_feature_closure and never updated in place, matching the schema''s other derived tables (security_scope_anchor, team_security_scope).';
+    COMMENT ON TABLE submission_feature_closure IS 'Derived reachability (transitive-closure) table over submission_feature parent and property (feature-reference) edges — the evidence reach used by search. Content edges (submission_feature_feature) are intentionally excluded: content is the parent tree reversed, so closing over (parent + content) produces the complete same-upload digraph (O(N^2)). It stores every directed (source, target) edge reachable through parent and property edges, so search can replace recursive traversal with an indexed forward probe by source. Reachability is stored forward only; the composite (source, target) primary key is the single index, because both auth and search probe forward by source and nothing performs a who-reaches-Y down-probe. The same table also serves authorization: rows flagged is_ancestor=true are the pure parent-ancestry subset (security cascades up the parent tree only, not across feature references), so auth consumers read WHERE is_ancestor while search reads all rows. The composite (source, target) primary key is the storage choice: reachability is (source, target)-unique by definition, so the natural composite PK saves a surrogate column and an extra index at the projected ~1B-row scale. There is intentionally no feature_type_property_id column: that label is meaningful only on direct property edges and meaningless on composed rows, so typed-traversal queries join back to submission_feature_property_feature. There are intentionally no audit columns and no audit/journal triggers: this is fully-derived data recomputed wholesale by compute_submission_feature_closure and never updated in place, matching the schema''s other derived tables (security_scope_anchor, team_security_scope).';
     COMMENT ON COLUMN submission_feature_closure.source_submission_feature_id IS 'Foreign key to the submission_feature row at the source end of a reachable (source, target) edge.';
     COMMENT ON COLUMN submission_feature_closure.target_submission_feature_id IS 'Foreign key to the submission_feature row at the target end of a reachable (source, target) edge.';
     COMMENT ON COLUMN submission_feature_closure.is_ancestor IS 'True when the target is reachable from the source by a pure parent-edge (ancestry) path. The is_ancestor=true subset is the authorization reach (security cascades up the parent tree only); all rows together are the evidence/search reach. Self-loops are ancestry (true); an edge reachable only through a feature-reference (property) edge is false; an edge reachable both ways is true.';
 
     ----------------------------------------------------------------------------------------
-    -- Rebuild function
+    -- Recompute function
     ----------------------------------------------------------------------------------------
 
-    CREATE OR REPLACE FUNCTION biohub.rebuild_submission_feature_closure(p_submission_upload_id uuid)
+    CREATE OR REPLACE FUNCTION biohub.compute_submission_feature_closure(p_submission_upload_id uuid)
     RETURNS integer
     LANGUAGE plpgsql
     VOLATILE
@@ -88,18 +88,18 @@ export async function up(knex: Knex): Promise<void> {
       -- its ancestors) and search (gather what a feature reaches) probe by source, so there is no
       -- reverse index and no stored down direction. Intra-upload only
       -- (cross-upload edges are silently dropped, matching the feature-property indexing engine's
-      -- resolution rule); self-loops are included; DELETE-then-INSERT in one txn makes the rebuild
+      -- resolution rule); self-loops are included; DELETE-then-INSERT in one txn makes the recompute
       -- idempotent under retry; UNION (not UNION ALL) in the recursive CTE terminates cycles
       -- (property edges may cycle) and dedupes multi-path edges.
       --
-      -- The same rebuild serves authorization too. is_ancestor marks the pure parent-ancestry subset
+      -- The same recompute serves authorization too. is_ancestor marks the pure parent-ancestry subset
       -- (security cascades up the parent tree only, not across references). We compute TWO closures:
       -- the ancestry closure (parent-only, transitive) and the evidence closure (parent + property,
       -- transitive; a superset). Every evidence edge is stored; is_ancestor is true iff that edge is
       -- also in the ancestry closure. Auth reads WHERE is_ancestor; search reads all rows.
 
-      -- Scope the rebuild to features that belong to the target upload. DELETE precedes INSERT inside
-      -- the function's implicit transaction so the rebuild is idempotent under retry. Source-only is
+      -- Scope the recompute to features that belong to the target upload. DELETE precedes INSERT inside
+      -- the function's implicit transaction so the recompute is idempotent under retry. Source-only is
       -- sufficient: every closure row has BOTH endpoints in one upload (the edge CTEs below join
       -- af_src AND af_tgt to active_features), so matching by source already identifies all of the
       -- upload's rows. sf is upload-wide (not active-only), so a deactivated feature's stale rows are
@@ -192,10 +192,10 @@ export async function down(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     ----------------------------------------------------------------------------------------
-    -- Drop rebuild function
+    -- Drop recompute function
     ----------------------------------------------------------------------------------------
 
-    DROP FUNCTION IF EXISTS biohub.rebuild_submission_feature_closure(uuid);
+    DROP FUNCTION IF EXISTS biohub.compute_submission_feature_closure(uuid);
 
     ----------------------------------------------------------------------------------------
     -- Drop tables
