@@ -32,6 +32,17 @@ import { SubmissionFeatureClosureService } from '../../services/submission-featu
 import { createFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
 
+/**
+ * Normalize an unordered set of [source, target] pairs to "source-target" strings, sorted numerically by
+ * source then target to match the SQL `ORDER BY source_submission_feature_id, target_submission_feature_id`
+ * used by getScopedClosurePairs. A default string sort would diverge once ids cross a digit boundary.
+ */
+function expectedPairs(pairs: [number, number][]): string[] {
+  return [...pairs]
+    .sort(([source1, target1], [source2, target2]) => source1 - source2 || target1 - target2)
+    .map(([source, target]) => `${source}-${target}`);
+}
+
 describe('SubmissionFeatureClosureService — closure rebuild (integration)', function () {
   this.timeout(15000);
 
@@ -173,11 +184,6 @@ describe('SubmissionFeatureClosureService — closure rebuild (integration)', fu
   async function createPropertyEdgeLabel(): Promise<number> {
     const { featureTypePropertyId } = await createFeatureTypeProperty(connection, 'mortality', 'observation_subcount');
     return featureTypePropertyId;
-  }
-
-  /** Normalize an unordered set of [source, target] pairs to sorted "source-target" strings for comparison. */
-  function expectedPairs(pairs: [number, number][]): string[] {
-    return pairs.map(([source, target]) => `${source}-${target}`).sort();
   }
 
   // --- scenarios -----------------------------------------------------------
