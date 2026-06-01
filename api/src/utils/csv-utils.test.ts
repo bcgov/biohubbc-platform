@@ -569,6 +569,58 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ metadata: '{"key":"value"}' });
     });
 
+    it('should JSON-stringify a feature array of URN strings', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const data = { child_features: ['urn:1', 'urn:2'] };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: '["urn:1","urn:2"]' });
+    });
+
+    it('should pass a scalar feature value through unquoted', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+      const data = { child_features: 'urn:1' };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: 'urn:1' });
+    });
+
+    it('should emit empty string for a null feature value', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+
+      const result = flattenFeatureBySchema({ child_features: null }, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: '' });
+    });
+
+    it('should emit empty string for an undefined feature value', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+
+      const result = flattenFeatureBySchema({}, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: '' });
+    });
+
+    it('should JSON-stringify an empty feature array as "[]"', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'child_features', feature_property_type_name: 'feature' }
+      ];
+
+      const result = flattenFeatureBySchema({ child_features: [] }, properties, 100);
+
+      expect(result).to.deep.equal({ child_features: '[]' });
+    });
+
     it('should return empty strings for null/undefined values', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'name', feature_property_type_name: 'string' },
