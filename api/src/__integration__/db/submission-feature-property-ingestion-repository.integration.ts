@@ -1,7 +1,7 @@
-// Integration tests for SubmissionFeaturePropertyIngestionRepository — drives three methods that
-// read ALREADY-RESOLVED candidate rows from the UNLOGGED staging table
-// (submission_upload_staging_feature_candidate) directly, so each branch/gate is observable in
-// isolation (no service, no populate/resolve step, no Phase 9 gate):
+// Integration tests for SubmissionFeaturePropertyIngestionRepository — drives several error-recording
+// and property-insertion methods so each branch/gate is observable in isolation (no service, no
+// populate/resolve step, no Phase 9 gate). The first three read ALREADY-RESOLVED candidate rows from
+// the UNLOGGED staging table (submission_upload_staging_feature_candidate) directly:
 //
 //   - recordFeaturePropertyResolutionErrorsBySubmissionUploadId — groups four error categories into
 //     submission_feature_error: INVALID_FEATURE_REFERENCE_FORMAT, UNRESOLVED_FEATURE_REFERENCE,
@@ -11,7 +11,12 @@
 //   - insertFeaturePropertiesBySubmissionUploadId — gated INSERT…SELECT into
 //     submission_feature_property_feature with ON CONFLICT DO NOTHING.
 //
-// Fixtures hand-populate the staging table directly: the candidate's submission_upload_id is just a
+// The last method instead reads canonical submission_feature rows directly (not the staging table):
+//
+//   - recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId — flags source_id collisions within an
+//     upload, recording one DUPLICATE_FEATURE_SOURCE_ID row per duplicated source_id.
+//
+// Fixtures for the staging-driven methods hand-populate the staging table directly: the candidate's submission_upload_id is just a
 // filter key (the UNLOGGED staging table has no FK), so each test mints its own uuid. The canonical
 // tables DO have FKs, so real submission_feature rows and a feature_type_property config row are
 // created per test.
@@ -34,7 +39,11 @@ import {
   getPropertyFeatureRows as fetchPropertyFeatureRows,
   getSubmissionFeatureErrors
 } from '../helpers/test-feature-property-helpers';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import {
+  createTestFeature,
+  createTestSubmission,
+  createTestUploadWithFeatures
+} from '../helpers/test-submission-helpers';
 
 describe('SubmissionFeaturePropertyIngestionRepository (integration)', function () {
   this.timeout(15000);
@@ -162,6 +171,37 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     sourceFeatureId: number
   ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
+  }
+
+  /**
+   * Read back DUPLICATE_FEATURE_SOURCE_ID rows for an upload, ordered by source_id
+   * for deterministic assertion order.
+   */
+  async function getDuplicateErrors(submissionUploadId: string): Promise<
+    Array<{
+      count: number;
+      property_name: string | null;
+      feature_type_property_id: number | null;
+      source_id: string | null;
+    }>
+  > {
+    const result = await connection.sql<{
+      count: number;
+      property_name: string | null;
+      feature_type_property_id: number | null;
+      source_id: string | null;
+    }>(SQL`
+      SELECT
+        count,
+        property_name,
+        feature_type_property_id,
+        details->>'source_id' AS source_id
+      FROM submission_feature_error
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND error_code = 'DUPLICATE_FEATURE_SOURCE_ID'
+      ORDER BY details->>'source_id';
+    `);
+    return result.rows;
   }
 
   // --- recordFeaturePropertyResolutionErrorsBySubmissionUploadId -----------
@@ -806,6 +846,104 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await repo.insertFeaturePropertiesBySubmissionUploadId(uploadId);
 
       expect(await getPropertyFeatureRows(sourceFeatureId)).to.have.lengthOf(0);
+    });
+  });
+
+  // --- recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId ------------
+
+  describe('recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId', () => {
+    it('records one error row with count=3 when three active rows share one source_id', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+        { source_id: 'A' },
+        { source_id: 'A' },
+        { source_id: 'A' }
+      ]);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(1);
+      expect(errors[0].count).to.equal(3);
+      expect(errors[0].source_id).to.equal('A');
+      expect(errors[0].property_name).to.equal(null);
+      expect(errors[0].feature_type_property_id).to.equal(null);
+    });
+
+    it('records one row per distinct duplicated source_id with correct counts', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+        { source_id: 'A' },
+        { source_id: 'A' },
+        { source_id: 'B' },
+        { source_id: 'B' },
+        { source_id: 'B' }
+      ]);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(2);
+
+      expect(errors[0].source_id).to.equal('A');
+      expect(errors[0].count).to.equal(2);
+      expect(errors[0].property_name).to.equal(null);
+      expect(errors[0].feature_type_property_id).to.equal(null);
+
+      expect(errors[1].source_id).to.equal('B');
+      expect(errors[1].count).to.equal(3);
+      expect(errors[1].property_name).to.equal(null);
+      expect(errors[1].feature_type_property_id).to.equal(null);
+    });
+
+    it('records zero rows when every source_id is unique', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+        { source_id: 'A' },
+        { source_id: 'B' },
+        { source_id: 'C' }
+      ]);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(0);
+    });
+
+    it('treats NULL source_ids as non-duplicates and records no error rows', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+        { source_id: null },
+        { source_id: null }
+      ]);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(0);
+    });
+
+    it('ignores soft-deleted rows when checking for duplicates', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+        { source_id: 'A' },
+        { source_id: 'A', record_end_date: '2026-01-01' }
+      ]);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(0);
+    });
+
+    it('records zero rows and does not throw for an empty upload', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', []);
+
+      await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
+
+      const errors = await getDuplicateErrors(submissionUploadId);
+      expect(errors).to.have.length(0);
     });
   });
 });

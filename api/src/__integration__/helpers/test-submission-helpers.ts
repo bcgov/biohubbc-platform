@@ -165,6 +165,88 @@ export async function createTestFeaturesInBulk(
 }
 
 /**
+ * Insert one `submission_upload` plus N `submission_feature` rows under it, each row
+ * parameterized by `(source_id, record_end_date, data?)`.
+ *
+ * Unlike `createTestFeaturesInBulk` — which inserts homogeneous features via
+ * `generate_series` and is tuned for large counts — this helper supports
+ * heterogeneous per-row data. Use it for tests that need control over
+ * `source_id` and `record_end_date` to exercise NULL handling, soft-delete
+ * semantics, or other per-row variation.
+ *
+ * @param connection Active database connection (transaction-scoped).
+ * @param submissionId Submission to attach the upload and features to.
+ * @param featureTypeName Feature type name (must exist in seed data).
+ * @param features Per-row feature shapes. Empty array creates the upload with no features.
+ * @returns The created `submission_upload_id`.
+ */
+export async function createTestUploadWithFeatures(
+  connection: IDBConnection,
+  submissionId: number,
+  featureTypeName: string,
+  features: Array<{
+    source_id: string | null;
+    record_end_date?: string | null;
+    data?: Record<string, unknown>;
+  }>
+): Promise<string> {
+  const systemUserId = connection.systemUserId();
+
+  const uploadResult = await connection.sql(SQL`
+    INSERT INTO upload (upload_status, record_end_date, create_user)
+    VALUES ('completed', now(), ${systemUserId})
+    RETURNING upload_id;
+  `);
+  const uploadId = uploadResult.rows[0].upload_id;
+
+  const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+
+  const bridgeResult = await connection.sql(SQL`
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    RETURNING submission_upload_id;
+  `);
+  const submissionUploadId = bridgeResult.rows[0].submission_upload_id as string;
+
+  if (features.length === 0) {
+    return submissionUploadId;
+  }
+
+  const featureTypeResult = await connection.sql(SQL`
+    SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1;
+  `);
+  const featureTypeId = featureTypeResult.rows[0].feature_type_id;
+
+  for (const feature of features) {
+    const dataJson = JSON.stringify(feature.data ?? {});
+    await connection.sql(SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        feature_type_id,
+        source_id,
+        record_end_date,
+        data,
+        data_byte_size,
+        create_user
+      )
+      VALUES (
+        ${submissionId},
+        ${submissionUploadId},
+        ${featureTypeId},
+        ${feature.source_id},
+        ${feature.record_end_date ?? null},
+        ${dataJson}::jsonb,
+        octet_length(${dataJson}::jsonb::text) + 500,
+        ${systemUserId}
+      );
+    `);
+  }
+
+  return submissionUploadId;
+}
+
+/**
  * Get an existing integration ticket for a submission or create one if missing.
  *
  * This helper supports integration tests that insert into `submission_upload` directly now that

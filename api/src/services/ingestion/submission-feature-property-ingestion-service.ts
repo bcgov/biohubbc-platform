@@ -176,6 +176,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
+      await this.submissionFeaturePropertyIngestionRepository.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
       await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
         submissionUploadId
       );

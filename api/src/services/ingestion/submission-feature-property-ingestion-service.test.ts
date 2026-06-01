@@ -145,6 +145,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const parentErrorsStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'recordUnresolvedParentErrorsBySubmissionUploadId')
       .resolves();
+    const duplicateSourceIdErrorsStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId'
+      )
+      .resolves();
 
     const errorCountStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
@@ -162,6 +168,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(requestDefaultReviewsStub.calledOnceWith(99, '550e8400-e29b-41d4-a716-446655440000', 11)).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
+    expect(duplicateSourceIdErrorsStub.calledOnce).to.equal(true);
     expect(outcome).to.eql({ status: 'ok' });
 
     sinon.assert.callOrder(
@@ -174,6 +181,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       codeErrorsStub,
       taxonErrorsStub,
       artifactErrorsStub,
+      duplicateSourceIdErrorsStub,
       parentErrorsStub,
       referenceErrorsStub,
       datetimeErrorsStub,
@@ -310,6 +318,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon.stub(FeatureIngestionRepository.prototype, 'updateSubmissionFeatureParentsBySubmissionUploadId').resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'recordUnresolvedParentErrorsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId'
+      )
       .resolves();
 
     sinon
