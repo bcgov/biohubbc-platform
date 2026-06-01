@@ -20,9 +20,11 @@ export interface IRebuildSubmissionFeatureClosureJobData {
 /**
  * Rebuild submission feature closure job handler.
  *
- * The closure is the precomputed directed reachability over the union of an upload's parent,
- * content, and property edges. It is rebuilt wholesale for one upload so search can replace
- * recursive edge traversal with two indexed probes against a flat `(source, target)` table.
+ * The closure is the precomputed directed reachability over the union of an upload's parent and
+ * property (feature-reference) edges. It is rebuilt wholesale for one upload so search can replace
+ * recursive edge traversal with two indexed probes against a flat `(source, target)` table. Content
+ * edges are intentionally excluded (parent + content is O(N^2)). Reachability is stored forward only,
+ * so there is no reverse `(target, source)` index — nothing performs a "who reaches Y" down-probe.
  *
  * On failure the handler logs and rethrows so pg-boss applies its retry policy — the rebuild is
  * idempotent (it deletes the upload's prior closure rows before reinserting), so a retry is safe.
