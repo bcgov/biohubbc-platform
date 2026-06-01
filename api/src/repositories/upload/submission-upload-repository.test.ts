@@ -209,6 +209,33 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
       expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
     });
+
+    it('selects validation from the lateral validation alias', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('validation.validation');
+    });
+
+    it('returns scoped reviews as explicit keyed objects', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
+
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('json_object_agg');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review validation_review');
+      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review security_review');
+      expect(sqlStub.firstCall.args[0].text).to.contain("'validation'");
+      expect(sqlStub.firstCall.args[0].text).to.contain("'security'");
+    });
   });
 
   describe('insertSubmissionUpload', () => {

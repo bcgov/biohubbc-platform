@@ -24,12 +24,14 @@ describe('SubmissionUploadReviewRepository', () => {
       const result = await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
+        status: SubmissionUploadReviewStatus.REQUESTED,
         requested_by: 7
       });
 
       expect(result).to.eql(review);
       expect(sqlStub.calledOnce).to.equal(true);
       expect(sqlStub.firstCall.args[0].text).not.to.contain('ON CONFLICT');
+      expect(sqlStub.firstCall.args[0].text).to.contain('::submission_upload_review_status');
     });
 
     it('throws ApiNotFoundError when the submission upload does not belong to the submission', async () => {
@@ -40,6 +42,7 @@ describe('SubmissionUploadReviewRepository', () => {
         await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
           scope: SubmissionUploadReviewScope.SECURITY,
+          status: SubmissionUploadReviewStatus.REQUESTED,
           requested_by: 7
         });
 
@@ -50,6 +53,24 @@ describe('SubmissionUploadReviewRepository', () => {
       }
 
       expect(sqlStub.calledOnce).to.equal(true);
+    });
+
+    it('soft deletes active review rows for a scope before a replacement insert', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [] } as QueryResult<SubmissionUploadReview>);
+      const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.softDeleteActiveSubmissionUploadReviewsByScope(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        SubmissionUploadReviewScope.SECURITY
+      );
+
+      expect(result).to.equal(1);
+      expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('UPDATE submission_upload_review sur');
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sur.scope =');
+      expect(sqlStub.firstCall.args[0].text).to.contain('sur.record_end_date IS NULL');
     });
   });
 

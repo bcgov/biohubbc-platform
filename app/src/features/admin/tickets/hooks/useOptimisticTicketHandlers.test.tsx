@@ -34,7 +34,8 @@ const baseTicket: ITicketExtended = {
   comments: [],
   references: [],
   ticket_system_users: [],
-  data_requests: []
+  data_requests: [],
+  submission_uploads: []
 };
 
 vi.mock('hooks/useApi', () => ({

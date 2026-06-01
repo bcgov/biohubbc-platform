@@ -95,8 +95,13 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     review_status: { type: 'string', enum: SubmissionUploadReviewStatusEnum },
     validation: { ...TicketSubmissionValidationSchema, nullable: true },
     reviews: {
-      type: 'array',
-      items: TicketSubmissionUploadReviewSchema
+      type: 'object',
+      additionalProperties: false,
+      required: ['validation', 'security'],
+      properties: {
+        validation: { ...TicketSubmissionUploadReviewSchema, nullable: true },
+        security: { ...TicketSubmissionUploadReviewSchema, nullable: true }
+      }
     }
   }
 };

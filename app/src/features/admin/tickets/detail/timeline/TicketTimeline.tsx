@@ -6,6 +6,7 @@ import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditFo
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
+import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
 
@@ -45,6 +46,12 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleCloseViewPolicyDialog,
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
+  const {
+    handleRequestSubmissionUploadReview,
+    handleUpdateSubmissionUploadReview,
+    handleConfirmSubmissionUploadReviewStatusUpdate,
+    handleConfirmSubmissionUploadReviewStatusReset
+  } = useTicketTimelineUploadActions();
 
   return (
     <>
@@ -59,6 +66,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onViewFinalizedPolicy={handleOpenViewPolicyDialog}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
+        onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
+        onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
+        onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
+        onConfirmSubmissionUploadReviewStatusReset={handleConfirmSubmissionUploadReviewStatusReset}
       />
 
       {selectedPolicy && (
