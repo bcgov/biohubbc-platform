@@ -2,14 +2,14 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { PolicyEffect } from '../models/policy-statement';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
-import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
+import { SecurityRuleRepository } from '../repositories/security-rule-repository';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { DBService } from './db-service';
 
 export class SecurityRuleExpressionService extends DBService {
   securityRuleExpressionRepository: SecurityRuleExpressionRepository;
-  securityRepository: SecurityRepository;
+  securityRuleRepository: SecurityRuleRepository;
   policyStatementRepository: PolicyStatementRepository;
   policyStatementExpressionService: PolicyStatementExpressionService;
 
@@ -21,7 +21,7 @@ export class SecurityRuleExpressionService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.securityRuleExpressionRepository = new SecurityRuleExpressionRepository(connection);
-    this.securityRepository = new SecurityRepository(connection);
+    this.securityRuleRepository = new SecurityRuleRepository(connection);
     this.policyStatementRepository = new PolicyStatementRepository(connection);
     this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
   }
@@ -90,7 +90,7 @@ export class SecurityRuleExpressionService extends DBService {
    * @memberof SecurityRuleExpressionService
    */
   private async getActiveSecurityRuleById(securityRuleId: number): Promise<{ policy_id: string | null }> {
-    const activeRules = await this.securityRepository.getActiveSecurityRules();
+    const activeRules = await this.securityRuleRepository.getActiveSecurityRules();
     const activeRule = activeRules.find((rule) => rule.security_rule_id === securityRuleId);
 
     if (!activeRule) {

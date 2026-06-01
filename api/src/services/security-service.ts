@@ -1,23 +1,6 @@
 import { IDBConnection } from '../database/db';
-import { ApiConflictError } from '../errors/api-error';
 import { HTTP403 } from '../errors/http-error';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
-import {
-  CreateSecurityCategory,
-  SecurityCategory,
-  SecurityCategoryRecord,
-  SecurityCategoryWithRuleCount,
-  UpdateSecurityCategory
-} from '../models/security-category';
-import {
-  CreateSecurityReason,
-  SecurityReason,
-  SecurityRuleAndCategory,
-  SecurityRuleRecord,
-  SecurityRuleWithFeatureCount,
-  SecuritySearchFilters,
-  UpdateSecurityReason
-} from '../models/security-rule';
 import {
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
@@ -25,7 +8,6 @@ import {
 import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
@@ -149,7 +131,7 @@ export class SecurityService extends DBService {
   /**
    * Apply security rules to all selected artifacts.
    *
-   * @param {SecurityReason[]} securityReasons
+   * @param {number[]} securityReasonIds
    * @param {Artifact[]} selectedArtifacts
    * @return {*}  {(Promise<({ artifact_persecution_id: number } | undefined)[]>)}
    * @memberof SecurityService
@@ -464,198 +446,5 @@ export class SecurityService extends DBService {
     submissionFeatureIds?: number[]
   ): Promise<SubmissionFeatureSecurityRulesSummary> {
     return this.securityRepository.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
-  }
-
-  /**
-   * Gets a list of all active security rules. A security rule is active if it has not
-   * been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    return this.securityRepository.getActiveSecurityRules();
-  }
-
-  /**
-   * Gets a list of all active security rules with associated categories. A security rule is
-   * active if it has not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityService
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    return this.securityRepository.getActiveRulesAndCategories();
-  }
-
-  /**
-   * Gets a list of all active security categories. A security category is active if it has
-   * not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityCategoryRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
-    return this.securityRepository.getActiveSecurityCategories();
-  }
-
-  /**
-   * Gets paginated security categories with a count of associated active rules.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesWithRuleCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityCategoryWithRuleCount[]> {
-    return this.securityRepository.getSecurityCategoriesWithRuleCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security categories matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityCategoriesCount(filters);
-  }
-
-  /**
-   * Gets paginated security rules with a count of associated submission features.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityRuleWithFeatureCount[]> {
-    return this.securityRepository.getSecurityRulesWithFeatureCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security rules matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityRulesCount(filters);
-  }
-
-  /**
-   * Create a security category record.
-   *
-   * @param {CreateSecurityCategory} data
-   * @return {*}  {Promise<SecurityCategory>}
-   * @memberof SecurityService
-   */
-  async createSecurityCategory(data: CreateSecurityCategory): Promise<SecurityCategory> {
-    return this.securityRepository.insertSecurityCategory(data);
-  }
-
-  /**
-   * Get a single active security category by ID.
-   *
-   * @param {number} securityCategoryId - The ID of the category to retrieve.
-   * @return {Promise<SecurityCategory>} The active security category record.
-   * @throws {ApiNotFoundError} If no active category exists for the ID.
-   * @memberof SecurityService
-   */
-  getSecurityCategory(securityCategoryId: number): Promise<SecurityCategory> {
-    return this.securityRepository.getSecurityCategory(securityCategoryId);
-  }
-
-  /**
-   * Update a security category record by ID.
-   *
-   * @param {number} securityCategoryId
-   * @param {UpdateSecurityCategory} data
-   * @return {*}  {Promise<SecurityCategory>}
-   * @memberof SecurityService
-   */
-  async updateSecurityCategory(securityCategoryId: number, data: UpdateSecurityCategory): Promise<SecurityCategory> {
-    await this.securityRepository.updateSecurityCategory(securityCategoryId, data);
-    return this.securityRepository.getSecurityCategory(securityCategoryId);
-  }
-
-  /**
-   * Soft-delete a security category by ID.
-   *
-   * @param {number} securityCategoryId - The ID of the category to delete.
-   * @return {Promise<void>}
-   * @throws {ApiConflictError} If the category has active child reasons.
-   * @throws {ApiExecuteSQLError} If the delete does not affect exactly one row.
-   * @memberof SecurityService
-   */
-  async deleteSecurityCategory(securityCategoryId: number): Promise<void> {
-    const ruleCount = await this.securityRepository.getActiveSecurityRuleCountByCategory(securityCategoryId);
-
-    if (ruleCount > 0) {
-      throw new ApiConflictError('Cannot delete a security category that has active reasons', [
-        'SecurityService->deleteSecurityCategory',
-        { securityCategoryId, ruleCount }
-      ]);
-    }
-
-    await this.securityRepository.deleteSecurityCategory(securityCategoryId);
-  }
-
-  /**
-   * Create a security reason (rule) record.
-   *
-   * @param {CreateSecurityReason} data - Reason fields required to create the record.
-   * @return {Promise<SecurityReason>} The created security reason.
-   * @throws {ApiNotFoundError} If the referenced security category does not exist.
-   * @memberof SecurityService
-   */
-  async createSecurityReason(data: CreateSecurityReason): Promise<SecurityReason> {
-    await this.securityRepository.getSecurityCategory(data.security_category_id);
-    return this.securityRepository.insertSecurityRule(data);
-  }
-
-  /**
-   * Get a single active security reason by ID.
-   *
-   * @param {number} securityRuleId - The ID of the reason to retrieve.
-   * @return {Promise<SecurityReason>} The active security reason record.
-   * @throws {ApiNotFoundError} If no active reason exists for the ID.
-   * @memberof SecurityService
-   */
-  getSecurityReason(securityRuleId: number): Promise<SecurityReason> {
-    return this.securityRepository.getSecurityRule(securityRuleId);
-  }
-
-  /**
-   * Update a security reason record by ID.
-   *
-   * @param {number} securityRuleId
-   * @param {UpdateSecurityReason} data
-   * @return {*}  {Promise<SecurityReason>}
-   * @memberof SecurityService
-   */
-  async updateSecurityReason(securityRuleId: number, data: UpdateSecurityReason): Promise<SecurityReason> {
-    await this.securityRepository.getSecurityCategory(data.security_category_id);
-    await this.securityRepository.updateSecurityRule(securityRuleId, data);
-    return this.securityRepository.getSecurityRule(securityRuleId);
-  }
-
-  /**
-   * Soft-delete a security reason by ID.
-   *
-   * @param {number} securityRuleId
-   * @return {*}  {Promise<void>}
-   * @memberof SecurityService
-   */
-  async deleteSecurityReason(securityRuleId: number): Promise<void> {
-    await this.securityRepository.deleteSecurityRule(securityRuleId);
   }
 }

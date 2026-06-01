@@ -2,11 +2,11 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { UpdateSecurityReason } from '../../../../../models/security-rule';
+import { UpdateSecurityRule } from '../../../../../models/security-rule';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { SecurityReasonSchema, UpdateSecurityReasonRequestSchema } from '../../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../../services/security-service';
+import { SecurityRuleService } from '../../../../../services/security-rule-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/security/reasons/{securityRuleId}');
@@ -61,8 +61,8 @@ export function getSecurityReason(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.getSecurityReason(securityRuleId);
+      const securityRuleService = new SecurityRuleService(connection);
+      const result = await securityRuleService.getSecurityRule(securityRuleId);
 
       await connection.commit();
 
@@ -114,13 +114,13 @@ export function updateSecurityReason(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const securityRuleId = Number(req.params.securityRuleId);
-    const payload = req.body as UpdateSecurityReason;
+    const payload = req.body as UpdateSecurityRule;
 
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.updateSecurityReason(securityRuleId, payload);
+      const securityRuleService = new SecurityRuleService(connection);
+      const result = await securityRuleService.updateSecurityRule(securityRuleId, payload);
 
       await connection.commit();
 
@@ -173,8 +173,8 @@ export function deleteSecurityReason(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      await securityService.deleteSecurityReason(securityRuleId);
+      const securityRuleService = new SecurityRuleService(connection);
+      await securityRuleService.deleteSecurityRule(securityRuleId);
 
       await connection.commit();
 

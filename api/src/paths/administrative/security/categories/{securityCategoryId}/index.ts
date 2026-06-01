@@ -6,7 +6,7 @@ import { UpdateSecurityCategory } from '../../../../../models/security-category'
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { SecurityCategorySchema, UpdateSecurityCategoryRequestSchema } from '../../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../../services/security-service';
+import { SecurityCategoryService } from '../../../../../services/security-category-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/security/categories/{securityCategoryId}');
@@ -61,8 +61,8 @@ export function getSecurityCategory(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.getSecurityCategory(securityCategoryId);
+      const securityCategoryService = new SecurityCategoryService(connection);
+      const result = await securityCategoryService.getSecurityCategory(securityCategoryId);
 
       await connection.commit();
 
@@ -119,8 +119,8 @@ export function updateSecurityCategory(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.updateSecurityCategory(securityCategoryId, payload);
+      const securityCategoryService = new SecurityCategoryService(connection);
+      const result = await securityCategoryService.updateSecurityCategory(securityCategoryId, payload);
 
       await connection.commit();
 
@@ -173,8 +173,8 @@ export function deleteSecurityCategory(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      await securityService.deleteSecurityCategory(securityCategoryId);
+      const securityCategoryService = new SecurityCategoryService(connection);
+      await securityCategoryService.deleteSecurityCategory(securityCategoryId);
 
       await connection.commit();
 

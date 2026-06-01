@@ -43,22 +43,22 @@ export const SecurityRuleWithFeatureCount = z.object({
 
 export type SecurityRuleWithFeatureCount = z.infer<typeof SecurityRuleWithFeatureCount>;
 
-export const SecurityReason = z.object({
+export const SecurityRule = z.object({
   security_rule_id: z.number(),
   security_category_id: z.number(),
   name: z.string(),
   description: z.string().nullable()
 });
 
-export type SecurityReason = z.infer<typeof SecurityReason>;
+export type SecurityRule = z.infer<typeof SecurityRule>;
 
-export interface CreateSecurityReason {
+export interface CreateSecurityRule {
   name: string;
   description: string;
   security_category_id: number;
 }
 
-export interface UpdateSecurityReason {
+export interface UpdateSecurityRule {
   name: string;
   description: string;
   security_category_id: number;

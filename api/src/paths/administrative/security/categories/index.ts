@@ -11,7 +11,7 @@ import {
   SecurityCategorySchema
 } from '../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../services/security-service';
+import { SecurityCategoryService } from '../../../../services/security-category-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
@@ -75,11 +75,11 @@ export function getSecurityCategories(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
+      const securityCategoryService = new SecurityCategoryService(connection);
 
       const [categories, count] = await Promise.all([
-        securityService.getSecurityCategoriesWithRuleCount(filters, pagination),
-        securityService.getSecurityCategoriesCount(filters)
+        securityCategoryService.getSecurityCategoriesWithRuleCount(filters, pagination),
+        securityCategoryService.getSecurityCategoriesCount(filters)
       ]);
 
       await connection.commit();
@@ -135,8 +135,8 @@ export function createSecurityCategory(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.createSecurityCategory({ name, description });
+      const securityCategoryService = new SecurityCategoryService(connection);
+      const result = await securityCategoryService.createSecurityCategory({ name, description });
 
       await connection.commit();
 

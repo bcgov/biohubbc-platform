@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { CreateSecurityReason } from '../../../../models/security-rule';
+import { CreateSecurityRule } from '../../../../models/security-rule';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../../openapi/schemas/pagination';
 import {
@@ -11,7 +11,7 @@ import {
   SecurityReasonsListResponseSchema
 } from '../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../services/security-service';
+import { SecurityRuleService } from '../../../../services/security-rule-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
@@ -74,12 +74,12 @@ export function getSecurityReasons(): RequestHandler {
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
+      const securityRuleService = new SecurityRuleService(connection);
       const pagination = makePaginationOptionsFromRequest(req);
 
       const [reasons, count] = await Promise.all([
-        securityService.getSecurityRulesWithFeatureCount(filters, pagination),
-        securityService.getSecurityRulesCount(filters)
+        securityRuleService.getSecurityRulesWithFeatureCount(filters, pagination),
+        securityRuleService.getSecurityRulesCount(filters)
       ]);
 
       await connection.commit();
@@ -130,13 +130,13 @@ POST.apiDoc = {
 export function createSecurityReason(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const { name, description, security_category_id } = req.body as CreateSecurityReason;
+    const { name, description, security_category_id } = req.body as CreateSecurityRule;
 
     try {
       await connection.open();
 
-      const securityService = new SecurityService(connection);
-      const result = await securityService.createSecurityReason({ name, description, security_category_id });
+      const securityRuleService = new SecurityRuleService(connection);
+      const result = await securityRuleService.createSecurityRule({ name, description, security_category_id });
 
       await connection.commit();
 

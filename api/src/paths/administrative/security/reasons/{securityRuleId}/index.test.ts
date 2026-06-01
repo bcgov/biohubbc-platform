@@ -4,8 +4,8 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
-import { SecurityReason } from '../../../../../models/security-rule';
-import { SecurityService } from '../../../../../services/security-service';
+import { SecurityRule } from '../../../../../models/security-rule';
+import { SecurityRuleService } from '../../../../../services/security-rule-service';
 import { deleteSecurityReason, getSecurityReason, updateSecurityReason } from './index';
 
 chai.use(sinonChai);
@@ -15,7 +15,7 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
     sinon.restore();
   });
 
-  const mockReason: SecurityReason = {
+  const mockReason: SecurityRule = {
     security_rule_id: 1,
     security_category_id: 2,
     name: 'Research',
@@ -26,7 +26,7 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
     it('returns 200 with reason details', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getSecurityReason').resolves(mockReason);
+      sinon.stub(SecurityRuleService.prototype, 'getSecurityRule').resolves(mockReason);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityRuleId: '1' };
@@ -43,7 +43,7 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
       const updatedReason = { ...mockReason, name: 'Updated' };
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'updateSecurityReason').resolves(updatedReason);
+      sinon.stub(SecurityRuleService.prototype, 'updateSecurityRule').resolves(updatedReason);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityRuleId: '1' };
@@ -51,7 +51,7 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
 
       await updateSecurityReason()(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.updateSecurityReason).to.have.been.calledOnceWith(1, {
+      expect(SecurityRuleService.prototype.updateSecurityRule).to.have.been.calledOnceWith(1, {
         name: 'Updated',
         description: 'Research reason',
         security_category_id: 2
@@ -65,14 +65,14 @@ describe('administrative/security/reasons/{securityRuleId}', () => {
     it('returns 200 when reason is deleted', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'deleteSecurityReason').resolves();
+      sinon.stub(SecurityRuleService.prototype, 'deleteSecurityRule').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityRuleId: '1' };
 
       await deleteSecurityReason()(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.deleteSecurityReason).to.have.been.calledOnceWith(1);
+      expect(SecurityRuleService.prototype.deleteSecurityRule).to.have.been.calledOnceWith(1);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue.message).to.equal('Security reason deleted successfully');
     });

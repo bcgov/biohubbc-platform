@@ -6,7 +6,7 @@ import { createSecurityReason, getSecurityReasons } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
-import { SecurityService } from '../../../../services/security-service';
+import { SecurityRuleService } from '../../../../services/security-rule-service';
 
 import { makePaginationOptionsFromRequest } from '../../../../utils/pagination';
 
@@ -59,10 +59,10 @@ describe('administrative/security/reasons', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
+        .stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount')
         .resolves(mockReasons as any);
 
-      const countStub = sinon.stub(SecurityService.prototype, 'getSecurityRulesCount').resolves(1 as any);
+      const countStub = sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesCount').resolves(1 as any);
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -93,9 +93,9 @@ describe('administrative/security/reasons', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
+        .stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount')
         .resolves(mockReasons as any);
-      sinon.stub(SecurityService.prototype, 'getSecurityRulesCount').resolves(2 as any);
+      sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesCount').resolves(2 as any);
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -118,7 +118,7 @@ describe('administrative/security/reasons', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
+      sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -150,7 +150,7 @@ describe('administrative/security/reasons', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'createSecurityReason').resolves(mockReason);
+      sinon.stub(SecurityRuleService.prototype, 'createSecurityRule').resolves(mockReason);
 
       const requestHandler = createSecurityReason();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -159,7 +159,7 @@ describe('administrative/security/reasons', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.createSecurityReason).to.have.been.calledOnceWith({
+      expect(SecurityRuleService.prototype.createSecurityRule).to.have.been.calledOnceWith({
         name: 'New Reason',
         description: 'A new reason',
         security_category_id: 2

@@ -6,7 +6,7 @@ import { createSecurityCategory, getSecurityCategories } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
-import { SecurityService } from '../../../../services/security-service';
+import { SecurityCategoryService } from '../../../../services/security-category-service';
 
 import { makePaginationOptionsFromRequest } from '../../../../utils/pagination';
 
@@ -59,10 +59,10 @@ describe('administrative/security/categories', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withRuleCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount')
+        .stub(SecurityCategoryService.prototype, 'getSecurityCategoriesWithRuleCount')
         .resolves(mockCategories as any);
 
-      const countStub = sinon.stub(SecurityService.prototype, 'getSecurityCategoriesCount').resolves(3 as any);
+      const countStub = sinon.stub(SecurityCategoryService.prototype, 'getSecurityCategoriesCount').resolves(3 as any);
 
       const requestHandler = getSecurityCategories();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -93,9 +93,9 @@ describe('administrative/security/categories', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withRuleCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount')
+        .stub(SecurityCategoryService.prototype, 'getSecurityCategoriesWithRuleCount')
         .resolves(mockCategories as any);
-      sinon.stub(SecurityService.prototype, 'getSecurityCategoriesCount').resolves(1 as any);
+      sinon.stub(SecurityCategoryService.prototype, 'getSecurityCategoriesCount').resolves(1 as any);
 
       const requestHandler = getSecurityCategories();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -118,7 +118,9 @@ describe('administrative/security/categories', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount').rejects(new Error('Service error'));
+      sinon
+        .stub(SecurityCategoryService.prototype, 'getSecurityCategoriesWithRuleCount')
+        .rejects(new Error('Service error'));
 
       const requestHandler = getSecurityCategories();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -149,7 +151,7 @@ describe('administrative/security/categories', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'createSecurityCategory').resolves(mockCategory);
+      sinon.stub(SecurityCategoryService.prototype, 'createSecurityCategory').resolves(mockCategory);
 
       const requestHandler = createSecurityCategory();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -158,7 +160,7 @@ describe('administrative/security/categories', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.createSecurityCategory).to.have.been.calledOnceWith({
+      expect(SecurityCategoryService.prototype.createSecurityCategory).to.have.been.calledOnceWith({
         name: 'New Category',
         description: 'A new category'
       });

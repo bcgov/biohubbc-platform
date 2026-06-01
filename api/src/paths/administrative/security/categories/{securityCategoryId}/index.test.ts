@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { SecurityCategory } from '../../../../../models/security-category';
-import { SecurityService } from '../../../../../services/security-service';
+import { SecurityCategoryService } from '../../../../../services/security-category-service';
 import { deleteSecurityCategory, getSecurityCategory, updateSecurityCategory } from './index';
 
 chai.use(sinonChai);
@@ -25,7 +25,7 @@ describe('administrative/security/categories/{securityCategoryId}', () => {
     it('returns 200 with category details', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getSecurityCategory').resolves(mockCategory);
+      sinon.stub(SecurityCategoryService.prototype, 'getSecurityCategory').resolves(mockCategory);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityCategoryId: '1' };
@@ -42,7 +42,7 @@ describe('administrative/security/categories/{securityCategoryId}', () => {
       const updatedCategory = { ...mockCategory, name: 'Updated' };
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'updateSecurityCategory').resolves(updatedCategory);
+      sinon.stub(SecurityCategoryService.prototype, 'updateSecurityCategory').resolves(updatedCategory);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityCategoryId: '1' };
@@ -50,7 +50,7 @@ describe('administrative/security/categories/{securityCategoryId}', () => {
 
       await updateSecurityCategory()(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.updateSecurityCategory).to.have.been.calledOnceWith(1, {
+      expect(SecurityCategoryService.prototype.updateSecurityCategory).to.have.been.calledOnceWith(1, {
         name: 'Updated',
         description: 'Health category'
       });
@@ -63,14 +63,14 @@ describe('administrative/security/categories/{securityCategoryId}', () => {
     it('returns 200 when category is deleted', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'deleteSecurityCategory').resolves();
+      sinon.stub(SecurityCategoryService.prototype, 'deleteSecurityCategory').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { securityCategoryId: '1' };
 
       await deleteSecurityCategory()(mockReq, mockRes, mockNext);
 
-      expect(SecurityService.prototype.deleteSecurityCategory).to.have.been.calledOnceWith(1);
+      expect(SecurityCategoryService.prototype.deleteSecurityCategory).to.have.been.calledOnceWith(1);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue.message).to.equal('Security category deleted successfully');
     });
