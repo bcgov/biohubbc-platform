@@ -49,7 +49,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
   feature_type: {
     feature_type_id: 1,
     name: 'animal',
-    display_name: 'Animal'
+    display_name: 'Animal',
+    description: null
   },
   properties: [
     {

@@ -22,7 +22,8 @@ describe('CodeRepository', () => {
       const mockRow: FeatureType = {
         feature_type_id: 1,
         name: 'dataset',
-        display_name: 'Dataset'
+        display_name: 'Dataset',
+        description: null
       };
 
       const mockQueryResponse = {
@@ -52,7 +53,8 @@ describe('CodeRepository', () => {
         feature_type: {
           feature_type_id: 1,
           name: 'dataset',
-          display_name: 'Dataset'
+          display_name: 'Dataset',
+          description: null
         },
         properties: [
           {

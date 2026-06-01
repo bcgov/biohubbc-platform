@@ -191,7 +191,12 @@ describe('DownloadExportPipelineService', () => {
   describe('runExport', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
-        feature_type: { feature_type_id: 1, name: 'observation', display_name: 'Observation' },
+        feature_type: {
+          feature_type_id: 1,
+          name: 'observation',
+          display_name: 'Observation',
+          description: null
+        },
         properties: [
           {
             feature_type_property_id: 1,
@@ -766,7 +771,12 @@ describe('DownloadExportPipelineService', () => {
   describe('runExport per-part file refs', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
-        feature_type: { feature_type_id: 1, name: 'observation', display_name: 'Observation' },
+        feature_type: {
+          feature_type_id: 1,
+          name: 'observation',
+          display_name: 'Observation',
+          description: null
+        },
         properties: [
           {
             feature_type_property_id: 1,
