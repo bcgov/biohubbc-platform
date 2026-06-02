@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import {
@@ -34,6 +34,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.open = sinon.stub().resolves();
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.release = sinon.stub();
+    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
@@ -56,6 +57,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = sinon.stub();
+    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
