@@ -22,12 +22,17 @@ export interface IComputeSubmissionFeatureClosureJobData {
  *
  * The closure is the precomputed directed reachability over the union of an upload's parent and
  * property (feature-reference) edges. It is recomputed wholesale for one upload so search can replace
- * recursive edge traversal with two indexed probes against a flat `(source, target)` table. Content
- * edges are intentionally excluded (parent + content is O(N^2)). Reachability is stored forward only,
- * so there is no reverse `(target, source)` index — nothing performs a "who reaches Y" down-probe.
+ * recursive edge traversal with indexed probes against a flat `(source, target)` table. Content edges
+ * are intentionally excluded (parent + content is O(N^2)). Reachability is stored as directed
+ * `(source, target)` rows probed in both directions: the `(source, target)` primary key serves the
+ * forward probe (what an evidence feature reaches), and the secondary `(target, source)` index serves
+ * search's reverse "who reaches Y" down-probe.
  *
- * On failure the handler logs and rethrows so pg-boss applies its retry policy — the recompute is
- * idempotent (it deletes the upload's prior closure rows before reinserting), so a retry is safe.
+ * Each upload's recompute is single-flight: a `pg_try_advisory_xact_lock` keyed on the upload id guards
+ * the DELETE-all + recursive-CTE INSERT, so an expiry-retry that overlaps its own still-running original
+ * skips rather than contending. On failure the handler logs and rethrows so pg-boss applies its retry
+ * policy — the recompute is idempotent (it deletes the upload's prior closure rows before reinserting),
+ * so a retry is safe.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -48,6 +53,23 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 
     try {
       await withConnection(async (conn) => {
+        // Single-flight per upload — the recompute is DELETE-all + recursive-CTE INSERT in one
+        // transaction. An expiry-retry overlapping its own still-running original would contend/corrupt.
+        // xact-scoped advisory lock (distinct seed from indexing); skip if another recompute holds it.
+        const lock = await conn.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1::text, 1)) AS locked', [
+          submissionUploadId
+        ]);
+        if (!lock.rows[0].locked) {
+          defaultLog.warn({
+            label: 'computeSubmissionFeatureClosureJobHandler',
+            message: 'another closure recompute holds the advisory lock for this upload; skipping',
+            jobId: job.id,
+            submissionId,
+            submissionUploadId
+          });
+          return;
+        }
+
         const result = await new SubmissionFeatureClosureService(conn).computeClosureForUpload(submissionUploadId);
 
         defaultLog.info({
