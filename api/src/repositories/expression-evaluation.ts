@@ -16,10 +16,16 @@ import { buildSecurityFilter } from './sql-fragments';
  * subqueries returning matching submission_feature_id values for an anchor
  * feature type.
  *
+ * Each predicate compiles into a bounded recursive content walk plus closure
+ * probes: a `WITH RECURSIVE` CTE walks the `submission_feature_feature` content
+ * (`data.content`) edges the closure deliberately omits, and the precomputed
+ * `submission_feature_closure` table is probed from every content-reached node
+ * to resolve parent-ancestry and property-reference reach with indexed joins.
+ *
  * Read-time evaluator shared by the search wrapper (POST /api/search/feature)
  * and the download pipeline (POST /api/download). Both paths consume the same
  * emitted SQL, so a single substrate keeps semantics — including security
- * filtering and graph traversal — identical across both consumers.
+ * filtering — identical across both consumers.
  *
  * Inputs are assumed to be normalized: semantic validation runs at write time
  * inside `writeExpressionTree`. These functions only emit SQL.
@@ -99,7 +105,7 @@ export const dependencies = {
  * Recursively builds a target submission_feature_id query for an expression-tree clause.
  *
  * Every child query returns target feature IDs for the route feature type. Predicate clauses first find evidence
- * features that directly satisfy the predicate and then project those evidence features through the graph to target
+ * features that directly satisfy the predicate and then project those evidence features to related target
  * features. Expression clauses combine child target sets with INTERSECT for AND and UNION for OR.
  */
 function buildExpressionTargetIdsQuery(
@@ -136,8 +142,8 @@ function buildExpressionTargetIdsQuery(
 /**
  * Wraps target ID queries before set operations.
  *
- * Predicate clauses use their own WITH RECURSIVE traversal CTEs. PostgreSQL accepts those CTEs inside a derived
- * table, but not directly as a parenthesized INTERSECT/UNION operand.
+ * Predicate clauses carry a `WITH RECURSIVE` CTE (the bounded content-edge walk). PostgreSQL accepts a WITH-bearing
+ * query inside a derived table, but not directly as a parenthesized INTERSECT/UNION operand, so the wrap is required.
  */
 function wrapTargetIdsQuery(query: Knex.QueryBuilder, knex: Knex, alias: string): Knex.QueryBuilder {
   return knex.select('submission_feature_id').from(query.as(alias));
@@ -212,15 +218,32 @@ function buildPredicateEvidenceIdsQuery(
 /**
  * Projects evidence feature IDs to the requested target feature type.
  *
- * Depth 0 returns evidence that is already the target type. root_feature_id preserves which evidence feature seeded
- * the traversal. path prevents cycles. The route anchor feature type is applied after traversal so every predicate
- * leaf contributes a target set, not an evidence set.
+ * Relatedness is the union of two reachability sources:
+ *   (a) the precomputed `submission_feature_closure` reachability — parent-ancestry plus property-reference, in
+ *       BOTH directions; and
+ *   (b) a bounded recursive walk over `submission_feature_feature` content (`data.content`) edges, which the
+ *       closure deliberately omits because closing over content would make the closure the complete O(N^2)
+ *       same-upload digraph.
  *
- * The security filter is applied a second time to the projected target rows. Filtering only the evidence is not
- * sufficient: graph traversal can reach a secured target feature from an unsecured evidence feature, which would
- * leak the target id to any consumer that uses this subquery directly (e.g. the download pipeline). The search
- * wrapper used to bear this responsibility alone via a final outer-query filter; landing it here ensures every
- * consumer of the subquery sees the same target-level security boundary.
+ * The walk starts from the evidence features and follows content edges out to MAX_SEARCH_GRAPH_DEPTH hops,
+ * cycle-guarded by the visited path. Every content-reached node is then probed against the closure in BOTH
+ * directions (forward by source: its ancestors + referenced features; reverse by target: its descendants +
+ * referencing features), so a predicate that filters one feature type resolves results deeper or shallower in the
+ * hierarchy, and content cross-references chain transitively into the closure reach. A forward-only or one-hop
+ * probe would silently drop the common "filter the container, return the contained" search and multi-hop content
+ * chains. Because `content_reach` is seeded from the evidence, probing the closure from `content_reach` already
+ * covers the closure reach of the evidence features themselves — no separate evidence-to-closure probe is needed.
+ *
+ * `is_ancestor` is NOT consulted here. That flag marks the authorization (parent-ancestry) subset only; search
+ * relatedness uses the full reachability set, so every closure row counts.
+ *
+ * The three reachability selects are combined with UNION (not UNION ALL) so a feature reachable through more than
+ * one path is counted once — a downstream count(*) wrap must not double-count it.
+ *
+ * The security filter is re-applied to the resolved target rows, not only the evidence. Relatedness can reach a
+ * secured target feature from unsecured evidence, which would leak the target id to any consumer that uses this
+ * subquery directly (e.g. the download pipeline). Applying it here protects every consumer of this shared
+ * subquery — search and download alike — with the same target-level security boundary.
  */
 function projectEvidenceToTargetIdsQuery(
   anchorFeatureType: string,
@@ -228,16 +251,37 @@ function projectEvidenceToTargetIdsQuery(
   knex: Knex,
   systemUserId?: number | null
 ): Knex.QueryBuilder {
+  // reachable set: the content-reached nodes themselves, plus the closure probed in both directions from every
+  // content-reached node. Inlined here (not a top-level CTE) because it must reference the content_reach CTE.
+  // UNION (not UNION ALL) dedups a feature reachable via more than one path — a count(*) wrap must not double-count.
+  const reachable = knex
+    .select('content_reach.feature_id as submission_feature_id')
+    .from('content_reach')
+    .union([
+      // closure forward: ancestors + referenced features of every content-reached node
+      knex
+        .select('c.target_submission_feature_id as submission_feature_id')
+        .from('submission_feature_closure as c')
+        .join('content_reach as cr', 'cr.feature_id', 'c.source_submission_feature_id'),
+      // closure reverse: descendants + referencing features of every content-reached node
+      knex
+        .select('c.source_submission_feature_id as submission_feature_id')
+        .from('submission_feature_closure as c')
+        .join('content_reach as cr', 'cr.feature_id', 'c.target_submission_feature_id')
+    ]);
+
   const query = knex
     .queryBuilder()
     .with('evidence', evidenceQuery.clone())
-    .with('edges', (qb) => {
-      qb.select('from_feature_id', 'to_feature_id').from(buildGraphEdgesQuery(knex).as('graph_edges'));
+    // content (data.content) edges, bidirectional, active-guarded — excluded from the closure, walked here
+    .with('content_edges', (qb) => {
+      qb.select('from_feature_id', 'to_feature_id').from(buildContentEdgesQuery(knex).as('content_feature_edges'));
     })
-    .withRecursive('connected_features', (qb) => {
+    // recursive content walk: from each evidence feature, follow content edges out to MAX_SEARCH_GRAPH_DEPTH hops,
+    // cycle-guarded by the visited path. parent/property transitivity is NOT walked here — the closure handles it.
+    .withRecursive('content_reach', (qb) => {
       qb.select(
-        'evidence.submission_feature_id as root_feature_id',
-        'evidence.submission_feature_id as connected_feature_id',
+        'evidence.submission_feature_id as feature_id',
         knex.raw('ARRAY[evidence.submission_feature_id] as path'),
         knex.raw('0 as depth')
       )
@@ -245,21 +289,20 @@ function projectEvidenceToTargetIdsQuery(
         .unionAll([
           knex
             .select(
-              'connected_features.root_feature_id',
-              'edges.to_feature_id as connected_feature_id',
-              knex.raw('connected_features.path || edges.to_feature_id as path'),
-              knex.raw('connected_features.depth + 1 as depth')
+              'content_edges.to_feature_id as feature_id',
+              knex.raw('content_reach.path || content_edges.to_feature_id as path'),
+              knex.raw('content_reach.depth + 1 as depth')
             )
-            .from('connected_features')
-            .join('edges', 'edges.from_feature_id', 'connected_features.connected_feature_id')
-            .where('connected_features.depth', '<', MAX_SEARCH_GRAPH_DEPTH)
-            .whereRaw('NOT edges.to_feature_id = ANY(connected_features.path)')
+            .from('content_reach')
+            .join('content_edges', 'content_edges.from_feature_id', 'content_reach.feature_id')
+            .where('content_reach.depth', '<', MAX_SEARCH_GRAPH_DEPTH)
+            .whereRaw('NOT content_edges.to_feature_id = ANY(content_reach.path)')
         ]);
     })
     .distinct()
-    .select('connected_features.connected_feature_id as submission_feature_id')
-    .from('connected_features')
-    .join('submission_feature as sf', 'sf.submission_feature_id', 'connected_features.connected_feature_id')
+    .select('sf.submission_feature_id')
+    .from(reachable.as('reachable'))
+    .join('submission_feature as sf', 'sf.submission_feature_id', 'reachable.submission_feature_id')
     .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
     .where('ft.name', anchorFeatureType)
     .whereNull('sf.record_end_date')
@@ -274,25 +317,14 @@ function projectEvidenceToTargetIdsQuery(
 }
 
 /**
- * Builds normalized direct graph edges as from_feature_id -> to_feature_id.
+ * Builds the bidirectional content (`data.content`) edges that the closure deliberately omits, so the search-time
+ * recursion can walk them, emitted as from_feature_id -> to_feature_id.
  *
- * This intentionally uses direct relationships only. The recursive traversal in projectEvidenceToTargetIdsQuery
- * expands over these edges with a depth bound and cycle checks.
+ * `submission_feature_feature` stores direct content edges only and has no record_end_date column. Active-record
+ * filtering is applied to the source and target submission_feature rows instead, because either endpoint may
+ * reference a soft-deleted feature.
  */
-function buildGraphEdgesQuery(knex: Knex): Knex.QueryBuilder {
-  return buildSubmissionFeatureRelationshipEdgesQuery(knex).unionAll([
-    buildParentChildEdgesQuery(knex),
-    buildDatasetSubmissionMembershipEdgesQuery(knex)
-  ]);
-}
-
-/**
- * Builds bidirectional edges from explicit submission_feature_feature relationships.
- *
- * `submission_feature_feature` stores direct edges only and has no record_end_date column. Active-record filtering is
- * applied to the source and target submission_feature rows instead.
- */
-function buildSubmissionFeatureRelationshipEdgesQuery(knex: Knex): Knex.QueryBuilder {
+function buildContentEdgesQuery(knex: Knex): Knex.QueryBuilder {
   const forward = knex('submission_feature_feature as sff')
     .select('sff.source_feature_id as from_feature_id', 'sff.target_feature_id as to_feature_id')
     .join('submission_feature as source_sf', 'source_sf.submission_feature_id', 'sff.source_feature_id')
@@ -308,66 +340,6 @@ function buildSubmissionFeatureRelationshipEdgesQuery(knex: Knex): Knex.QueryBui
     .whereNull('target_sf.record_end_date');
 
   return forward.unionAll([reverse]);
-}
-
-/**
- * Builds bidirectional parent/child feature edges.
- *
- * Parent-child links are columns on submission_feature, so active-record filtering is applied to both endpoint rows.
- */
-function buildParentChildEdgesQuery(knex: Knex): Knex.QueryBuilder {
-  const parentToChild = knex('submission_feature as child_sf')
-    .select(
-      'child_sf.parent_submission_feature_id as from_feature_id',
-      'child_sf.submission_feature_id as to_feature_id'
-    )
-    .join('submission_feature as parent_sf', 'parent_sf.submission_feature_id', 'child_sf.parent_submission_feature_id')
-    .whereNotNull('child_sf.parent_submission_feature_id')
-    .whereNull('child_sf.record_end_date')
-    .whereNull('parent_sf.record_end_date');
-
-  const childToParent = knex('submission_feature as child_sf')
-    .select(
-      'child_sf.submission_feature_id as from_feature_id',
-      'child_sf.parent_submission_feature_id as to_feature_id'
-    )
-    .join('submission_feature as parent_sf', 'parent_sf.submission_feature_id', 'child_sf.parent_submission_feature_id')
-    .whereNotNull('child_sf.parent_submission_feature_id')
-    .whereNull('child_sf.record_end_date')
-    .whereNull('parent_sf.record_end_date');
-
-  return parentToChild.unionAll([childToParent]);
-}
-
-/**
- * Builds synthetic dataset-to-same-submission feature edges in both directions.
- *
- * Dataset synthetic edges intentionally connect dataset features to other features in the same submission. This
- * supports dataset-level predicates returning target features from that submission. This can be high fanout for
- * submissions with many features and should be monitored.
- */
-function buildDatasetSubmissionMembershipEdgesQuery(knex: Knex): Knex.QueryBuilder {
-  const datasetToRelated = knex('submission_feature as dataset_sf')
-    .select('dataset_sf.submission_feature_id as from_feature_id', 'related_sf.submission_feature_id as to_feature_id')
-    .join('feature_type as dataset_ft', 'dataset_ft.feature_type_id', 'dataset_sf.feature_type_id')
-    .join('submission_feature as related_sf', 'related_sf.submission_id', 'dataset_sf.submission_id')
-    .where('dataset_ft.name', 'dataset')
-    .whereRaw('related_sf.submission_feature_id != dataset_sf.submission_feature_id')
-    .whereNull('dataset_ft.record_end_date')
-    .whereNull('dataset_sf.record_end_date')
-    .whereNull('related_sf.record_end_date');
-
-  const relatedToDataset = knex('submission_feature as dataset_sf')
-    .select('related_sf.submission_feature_id as from_feature_id', 'dataset_sf.submission_feature_id as to_feature_id')
-    .join('feature_type as dataset_ft', 'dataset_ft.feature_type_id', 'dataset_sf.feature_type_id')
-    .join('submission_feature as related_sf', 'related_sf.submission_id', 'dataset_sf.submission_id')
-    .where('dataset_ft.name', 'dataset')
-    .whereRaw('related_sf.submission_feature_id != dataset_sf.submission_feature_id')
-    .whereNull('dataset_ft.record_end_date')
-    .whereNull('dataset_sf.record_end_date')
-    .whereNull('related_sf.record_end_date');
-
-  return datasetToRelated.unionAll([relatedToDataset]);
 }
 
 /**
