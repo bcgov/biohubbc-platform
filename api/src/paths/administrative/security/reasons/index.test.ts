@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getSecurityReasons } from '.';
+import { createSecurityReason, getSecurityReasons } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ApiError } from '../../../../errors/api-error';
-import { SecurityService } from '../../../../services/security-service';
+import { SecurityRuleService } from '../../../../services/security-rule-service';
 
 import { makePaginationOptionsFromRequest } from '../../../../utils/pagination';
 
@@ -59,10 +59,10 @@ describe('administrative/security/reasons', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
+        .stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount')
         .resolves(mockReasons as any);
 
-      const countStub = sinon.stub(SecurityService.prototype, 'getSecurityRulesCount').resolves(1 as any);
+      const countStub = sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesCount').resolves(1 as any);
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -93,9 +93,9 @@ describe('administrative/security/reasons', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
-        .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
+        .stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount')
         .resolves(mockReasons as any);
-      sinon.stub(SecurityService.prototype, 'getSecurityRulesCount').resolves(2 as any);
+      sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesCount').resolves(2 as any);
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -118,7 +118,7 @@ describe('administrative/security/reasons', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
+      sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
 
       const requestHandler = getSecurityReasons();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -131,6 +131,41 @@ describe('administrative/security/reasons', () => {
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }
+    });
+  });
+
+  describe('POST/createSecurityReason', () => {
+    it('creates a security reason and returns 201', async () => {
+      const mockReason = {
+        security_rule_id: 1,
+        security_category_id: 2,
+        name: 'New Reason',
+        description: 'A new reason'
+      };
+
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(SecurityRuleService.prototype, 'createSecurityRule').resolves(mockReason);
+
+      const requestHandler = createSecurityReason();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.body = { name: 'New Reason', description: 'A new reason', security_category_id: 2 };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(SecurityRuleService.prototype.createSecurityRule).to.have.been.calledOnceWith({
+        name: 'New Reason',
+        description: 'A new reason',
+        security_category_id: 2
+      });
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.eql(mockReason);
     });
   });
 });

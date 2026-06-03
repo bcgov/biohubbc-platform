@@ -34,12 +34,35 @@ export type SecurityRuleAndCategory = z.infer<typeof SecurityRuleAndCategory>;
 
 export const SecurityRuleWithFeatureCount = z.object({
   security_rule_id: z.number(),
+  security_category_id: z.number(),
+  category_name: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   feature_count: z.number()
 });
 
 export type SecurityRuleWithFeatureCount = z.infer<typeof SecurityRuleWithFeatureCount>;
+
+export const SecurityRule = z.object({
+  security_rule_id: z.number(),
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string().nullable()
+});
+
+export type SecurityRule = z.infer<typeof SecurityRule>;
+
+export interface CreateSecurityRule {
+  name: string;
+  description: string;
+  security_category_id: number;
+}
+
+export interface UpdateSecurityRule {
+  name: string;
+  description: string;
+  security_category_id: number;
+}
 
 export interface SecuritySearchFilters {
   search?: string;

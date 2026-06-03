@@ -23,3 +23,21 @@ export const SecurityCategoryWithRuleCount = z.object({
 });
 
 export type SecurityCategoryWithRuleCount = z.infer<typeof SecurityCategoryWithRuleCount>;
+
+export const SecurityCategory = z.object({
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string().nullable()
+});
+
+export type SecurityCategory = z.infer<typeof SecurityCategory>;
+
+export interface CreateSecurityCategory {
+  name: string;
+  description: string;
+}
+
+export interface UpdateSecurityCategory {
+  name: string;
+  description: string;
+}
