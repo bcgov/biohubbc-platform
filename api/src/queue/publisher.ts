@@ -646,8 +646,9 @@ export const publishComputeScopeAnchorsJob = async (
 
 /**
  * Options for compute submission feature closure jobs.
- * Same timeout as indexing — the recompute is a single PG function call (DELETE + recursive-CTE INSERT)
- * scoped to one upload and should complete within minutes.
+ * The recompute is a single PG function call (DELETE + recursive-CTE INSERT) scoped to one upload.
+ * Generous 2 hour expiry covers worst-case recompute on the largest closures without the job
+ * expiring mid-flight.
  */
 const COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
   retryLimit: 3,

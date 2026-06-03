@@ -925,7 +925,7 @@ describe('publisher', () => {
       expect(options.singletonKey).to.equal('closure-recompute-sub-upload-uuid-closure-1');
     });
 
-    it('uses recompute closure options with 10 minute timeout and retry backoff', async () => {
+    it('uses recompute closure options with 2 hour timeout and retry backoff', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('closure-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -942,7 +942,7 @@ describe('publisher', () => {
       expect(options.retryLimit).to.equal(3);
       expect(options.retryDelay).to.equal(60);
       expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60 * 2); // 2 hours
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
