@@ -32,9 +32,11 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import {
   createFeatureTypeProperty,
+  createTestUpload,
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
 import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
@@ -164,6 +166,53 @@ describe('Download Parquet pipeline (integration)', function () {
       requestedBy: connection.systemUserId()
     });
     return download_id;
+  }
+
+  /**
+   * Insert ONE submission_feature bound to a SPECIFIC upload, resolving feature_type_id by name.
+   *
+   * The export security filter resolves "is this feature secured" via the precomputed closure
+   * (isEffectivelySecuredViaClosure), which needs the feature's closure SELF-LOOP. That self-loop only
+   * exists after computeClosureForUpload runs for the feature's upload. createTestFeature mints a NEW
+   * upload per call and never rebuilds the closure, so a feature secured that way reads as unsecured and
+   * is NOT stripped. The security tests therefore seed features directly under a SHARED upload via
+   * createTestUpload + this helper, then rebuild the closure AFTER securing and BEFORE the subquery.
+   *
+   * @returns The new submission_feature_id.
+   */
+  async function insertFeatureRow(params: {
+    submissionId: number;
+    submissionUploadId: string;
+    featureTypeName: string;
+    parentFeatureId?: number;
+  }): Promise<number> {
+    const systemUserId = connection.systemUserId();
+
+    const result = await connection.sql(SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        feature_type_id,
+        parent_submission_feature_id,
+        data,
+        data_byte_size,
+        record_effective_date,
+        create_user
+      )
+      VALUES (
+        ${params.submissionId},
+        ${params.submissionUploadId}::uuid,
+        (SELECT feature_type_id FROM feature_type WHERE name = ${params.featureTypeName} LIMIT 1),
+        ${params.parentFeatureId ?? null},
+        '{}'::jsonb,
+        500,
+        now(),
+        ${systemUserId}
+      )
+      RETURNING submission_feature_id;
+    `);
+
+    return result.rows[0].submission_feature_id;
   }
 
   /**
@@ -1038,10 +1087,26 @@ describe('Download Parquet pipeline (integration)', function () {
       // AC #4 — an anonymous download must never package secured data. Two same-type
       // features in one submission; one is secured. The anonymous identity used to
       // build the export must strip the secured id while keeping the unsecured one.
+      //
+      // The export security filter (isEffectivelySecuredViaClosure) reads the precomputed closure, so
+      // the secured feature is only recognised as secured once its closure self-loop exists. Seed both
+      // siblings under a SHARED upload and rebuild the closure AFTER securing — without the rebuild the
+      // empty closure reads securedId as unsecured and it would leak into the anonymous export.
       const submissionId = await createTestSubmission(connection);
-      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public sibling' });
-      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured sibling' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const unsecuredId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const securedId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedId);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
       const { policy_id } = await policyService.createDownloadPolicy({
         name: `pq-sec-anon-${Date.now()}-${randomUUID().slice(0, 8)}`,
@@ -1066,10 +1131,26 @@ describe('Download Parquet pipeline (integration)', function () {
       // AC #5 — a user with a scope grant to the secured feature still gets it in
       // their export. Same fixture as the anon case, but the export is built with the
       // granted user's id as requested_by.
+      //
+      // The closure rebuild is load-bearing here too: it makes isEffectivelySecuredViaClosure recognise
+      // securedId as secured (Branch 1 fails), so visibility now hinges on the scope grant (Branch 2's
+      // closure-anchor probe). WITHOUT the rebuild this test would pass spuriously — an empty closure
+      // reads securedId as unsecured, so it would be "visible" regardless of any grant.
       const submissionId = await createTestSubmission(connection);
-      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public sibling' });
-      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured sibling' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const unsecuredId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const securedId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedId);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'pq-export-access-team');

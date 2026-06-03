@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecuredViaClosure } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
@@ -16,8 +16,8 @@ import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 export class CartSubmissionFeatureRepository extends BaseRepository {
   /**
    * Add unsecured submission features to an active cart (anonymous path).
-   * Walks up the ancestor chain from each candidate feature; if any ancestor has an
-   * active submission_feature_security row, the feature is excluded.
+   * Reads the precomputed closure ancestry for each candidate; if the feature or any
+   * ancestor has an active submission_feature_security row, the feature is excluded.
    * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
    *
    * @param {string} cartId - The ID of the cart
@@ -42,7 +42,12 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        WHERE NOT ${isEffectivelySecured('wf.submission_feature_id')}
+        -- The closure has no row for soft-deleted features, so an inactive id would slip past
+        -- the security check (no row to mark it secured). Exclude inactive ids explicitly here
+        -- rather than relying on the security fragment to reject them.
+        JOIN submission_feature sf ON sf.submission_feature_id = wf.submission_feature_id
+          AND sf.record_end_date IS NULL
+        WHERE NOT ${isEffectivelySecuredViaClosure('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
@@ -59,7 +64,8 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   /**
    * Add submission features to an active cart with scope-based access check (authenticated path).
    * Allows features that are unsecured OR where the user has scope access via
-   * security_scope_anchor → team_security_scope → team_member.
+   * security_scope_anchor → team_security_scope → team_member, resolved through the
+   * precomputed closure ancestry.
    * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
    *
    * @param {string} cartId - The ID of the cart
@@ -89,6 +95,11 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
+        -- The closure has no row for soft-deleted features, so an inactive id would slip past
+        -- the security check (no row to mark it secured). Exclude inactive ids explicitly here
+        -- rather than relying on the security fragment to reject them.
+        JOIN submission_feature sf ON sf.submission_feature_id = wf.submission_feature_id
+          AND sf.record_end_date IS NULL
         WHERE
           ${isAccessibleToUser('wf.submission_feature_id')}
       )
@@ -168,7 +179,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    * Get all submission features in an active cart with pagination, optionally filtered by submission feature ID.
    * Returns ALL features in the cart — authorization was enforced at insert time, not on read.
    * The `secured` field reflects current effective security status (feature or any ancestor has
-   * an active submission_feature_security row), computed via a bulk recursive CTE.
+   * an active submission_feature_security row), read from the precomputed closure ancestry.
    *
    * @param {string} cartId - The ID of the cart
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options
@@ -197,7 +208,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
 
     const paginatedPageQuery = this.applyPagination(pageQuery, pagination);
 
-    // Step 2: Join feature metadata, check security via per-row correlated EXISTS
+    // Step 2: Join feature metadata, check security via per-row closure-ancestry EXISTS
     const query = knex
       .with('page', paginatedPageQuery)
       .select(
@@ -206,7 +217,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`${isEffectivelySecured('sf.submission_feature_id')} AS secured`)
+        knex.raw(`${isEffectivelySecuredViaClosure('sf.submission_feature_id')} AS secured`)
       )
       .from('page')
       .join('submission_feature as sf', 'sf.submission_feature_id', 'page.submission_feature_id')

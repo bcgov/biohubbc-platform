@@ -328,16 +328,34 @@ describe('expression-evaluation (integration)', function () {
       // the accessible type and an empty set for the inaccessible type. The pipeline still
       // completes (one Parquet per statement, some empty) — "5 in, 5 files, 1 empty" is a
       // valid, deliberate outcome, not a failure.
+      // The broad subquery's security filter resolves "is this feature secured" via the closure
+      // (isEffectivelySecuredViaClosure), so the secured `restricted` feature only reads as secured
+      // once its closure self-loop exists. Seed it under a shared upload and rebuild the closure
+      // BEFORE the subquery; otherwise an empty closure reads it as unsecured and it is NOT stripped.
       const submissionAccessible = await createTestSubmission(connection);
-      const accessible = await createTestFeature(connection, submissionAccessible, 'sample_site', { name: 'visible' });
+      const uploadAccessible = await createTestUpload(connection, submissionAccessible);
+      const accessible = await insertFeatureRow({
+        submissionId: submissionAccessible,
+        submissionUploadId: uploadAccessible,
+        featureTypeName: 'sample_site'
+      });
 
       const submissionRestricted = await createTestSubmission(connection);
-      const restricted = await createTestFeature(connection, submissionRestricted, 'capture', { comment: 'hidden' });
+      const uploadRestricted = await createTestUpload(connection, submissionRestricted);
+      const restricted = await insertFeatureRow({
+        submissionId: submissionRestricted,
+        submissionUploadId: uploadRestricted,
+        featureTypeName: 'capture'
+      });
 
       // Apply a security rule. With systemUserId=null (anonymous), the security filter
       // strips any secured feature — the same mechanism that strips features from a
       // statement whose policy creator lacks the matching team grant.
       await secureFeature(restricted);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(uploadAccessible);
+      await closure.computeClosureForUpload(uploadRestricted);
 
       // Per-statement subquery for the type the user CAN see → returns the row.
       const accessibleIds = await runSubquery(buildBroadFeatureTypeSubquery('sample_site', null));
@@ -411,18 +429,34 @@ describe('expression-evaluation (integration)', function () {
 
     it('security filter excludes features the user cannot read', async () => {
       // Evidence-side security: a secured candidate is dropped before projection, so it never reaches
-      // the result even as its own self-match.
+      // the result even as its own self-match. The drop is driven by the closure-based security filter
+      // (isEffectivelySecuredViaClosure), so each feature is seeded under its OWN upload and its closure
+      // self-loop is rebuilt BEFORE the subquery — without the self-loop the secured feature reads as
+      // unsecured and would NOT be stripped. Separate uploads keep the OR-tree reach narrow (each
+      // feature only self-matches; no shared upload means no incidental closure relatedness between them).
       const submissionOpen = await createTestSubmission(connection);
-      const open = await createTestFeature(connection, submissionOpen, 'sample_site', { name: 'Open-secfilter' });
+      const uploadOpen = await createTestUpload(connection, submissionOpen);
+      const open = await insertFeatureRow({
+        submissionId: submissionOpen,
+        submissionUploadId: uploadOpen,
+        featureTypeName: 'sample_site'
+      });
       await indexNameProperty(open, 'Open-secfilter');
 
       const submissionSecured = await createTestSubmission(connection);
-      const secured = await createTestFeature(connection, submissionSecured, 'sample_site', {
-        name: 'Secured-secfilter'
+      const uploadSecured = await createTestUpload(connection, submissionSecured);
+      const secured = await insertFeatureRow({
+        submissionId: submissionSecured,
+        submissionUploadId: uploadSecured,
+        featureTypeName: 'sample_site'
       });
       await indexNameProperty(secured, 'Secured-secfilter');
 
       await secureFeature(secured);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(uploadOpen);
+      await closure.computeClosureForUpload(uploadSecured);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
