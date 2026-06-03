@@ -189,10 +189,13 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
       expect(sql).to.include('"sf"."record_end_date" is null');
 
-      // The old graph-edge machinery is gone (only the content-edge recursion remains).
+      // The synthetic dataset↔same-submission membership edge is walked alongside content edges.
+      expect(sql).to.include('as "dataset_sf"');
+      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+
+      // The old graph-edge union machinery is gone (parent/child reach now comes from the closure).
       expect(sql).to.not.include('connected_features');
       expect(sql).to.not.include('graph_edges');
-      expect(sql).to.not.include('dataset_sf');
       expect(sql).to.not.include('parent_submission_feature_id as');
       expect(sql).to.not.include('root_feature_id');
     });
@@ -321,8 +324,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"content_reach"."depth" < 6');
       expect(sql).to.include(' union ');
       expect(sql).to.include('"ft"."name" = \'species_observation\'');
+      expect(sql).to.include('as "dataset_sf"');
       expect(sql).to.not.include('connected_features');
-      expect(sql).to.not.include('dataset_sf');
     });
   });
 
