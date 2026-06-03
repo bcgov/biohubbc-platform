@@ -653,7 +653,7 @@ const COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
-  expireInSeconds: 60 * 10 // 10 minutes
+  expireInSeconds: 60 * 60 * 2 // 2 hours
 };
 
 /**
