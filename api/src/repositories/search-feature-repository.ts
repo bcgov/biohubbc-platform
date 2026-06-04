@@ -5,7 +5,7 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isEffectivelySecuredViaClosure } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -127,7 +127,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        knex.raw(`${isEffectivelySecuredViaClosure('expression_results.submission_feature_id')} AS is_secured`),
+        knex.raw(`${isEffectivelySecured('expression_results.submission_feature_id')} AS is_secured`),
         'relevancy_score',
         'create_date'
       );

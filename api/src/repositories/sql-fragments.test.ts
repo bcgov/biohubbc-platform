@@ -1,16 +1,16 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { isAccessibleToUser, isEffectivelySecured, isEffectivelySecuredViaClosure } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 
 describe('sql-fragments', () => {
-  describe('isEffectivelySecuredViaClosure', () => {
+  describe('isEffectivelySecured', () => {
     it('reads the precomputed closure ancestry instead of a recursive parent walk', () => {
       // Verifies: the closure-based fragment probes submission_feature_closure on the
       // ancestry subset (is_ancestor = true), joins security on the target id, and gates
       // on the effective date — without any recursive CTE.
 
       // Step 1: Build the fragment for a feature id expression and lowercase for token matching
-      const sql = isEffectivelySecuredViaClosure('wf.submission_feature_id').toLowerCase();
+      const sql = isEffectivelySecured('wf.submission_feature_id').toLowerCase();
 
       // Step 2: Verify it reads the closure ancestry (source side keyed to the candidate feature)
       expect(sql).to.include('submission_feature_closure');
@@ -30,7 +30,7 @@ describe('sql-fragments', () => {
       // Verifies: the closure fragment is fully self-contained SQL with no `?` to bind
 
       // Step 1: Build the fragment
-      const sql = isEffectivelySecuredViaClosure('wf.submission_feature_id');
+      const sql = isEffectivelySecured('wf.submission_feature_id');
 
       // Step 2: Count `?` placeholders — must be none
       expect((sql.match(/\?/g) || []).length).to.equal(0);
@@ -75,31 +75,6 @@ describe('sql-fragments', () => {
 
       // Step 2: Count `?` placeholders — must be exactly one (the system user id)
       expect((sql.match(/\?/g) || []).length).to.equal(1);
-    });
-  });
-
-  describe('isEffectivelySecured (recursive, scope-anchor job)', () => {
-    it('still walks live parent pointers with a recursive CTE', () => {
-      // Verifies: the recursive fragment consumed by the scope-anchor recompute job was left
-      // intact (it must resolve ancestry from live submission_feature parent pointers because
-      // the closure may be stale/absent when the job runs).
-
-      // Step 1: Build the fragment and lowercase for token matching
-      const sql = isEffectivelySecured('wf.submission_feature_id').toLowerCase();
-
-      // Step 2: Verify it still uses the recursive ancestor walk
-      expect(sql).to.include('with recursive');
-      expect(sql).to.include('ancestor_chain');
-    });
-
-    it('contains zero bound placeholders', () => {
-      // Verifies: the recursive fragment is fully self-contained SQL with no `?` to bind
-
-      // Step 1: Build the fragment
-      const sql = isEffectivelySecured('wf.submission_feature_id');
-
-      // Step 2: Count `?` placeholders — must be none
-      expect((sql.match(/\?/g) || []).length).to.equal(0);
     });
   });
 });

@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isAccessibleToUser, isEffectivelySecuredViaClosure } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
@@ -47,7 +47,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         -- rather than relying on the security fragment to reject them.
         JOIN submission_feature sf ON sf.submission_feature_id = wf.submission_feature_id
           AND sf.record_end_date IS NULL
-        WHERE NOT ${isEffectivelySecuredViaClosure('wf.submission_feature_id')}
+        WHERE NOT ${isEffectivelySecured('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
@@ -217,7 +217,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`${isEffectivelySecuredViaClosure('sf.submission_feature_id')} AS secured`)
+        knex.raw(`${isEffectivelySecured('sf.submission_feature_id')} AS secured`)
       )
       .from('page')
       .join('submission_feature as sf', 'sf.submission_feature_id', 'page.submission_feature_id')

@@ -172,7 +172,7 @@ describe('Download Parquet pipeline (integration)', function () {
    * Insert ONE submission_feature bound to a SPECIFIC upload, resolving feature_type_id by name.
    *
    * The export security filter resolves "is this feature secured" via the precomputed closure
-   * (isEffectivelySecuredViaClosure), which needs the feature's closure SELF-LOOP. That self-loop only
+   * (isEffectivelySecured), which needs the feature's closure SELF-LOOP. That self-loop only
    * exists after computeClosureForUpload runs for the feature's upload. createTestFeature mints a NEW
    * upload per call and never rebuilds the closure, so a feature secured that way reads as unsecured and
    * is NOT stripped. The security tests therefore seed features directly under a SHARED upload via
@@ -1088,7 +1088,7 @@ describe('Download Parquet pipeline (integration)', function () {
       // features in one submission; one is secured. The anonymous identity used to
       // build the export must strip the secured id while keeping the unsecured one.
       //
-      // The export security filter (isEffectivelySecuredViaClosure) reads the precomputed closure, so
+      // The export security filter (isEffectivelySecured) reads the precomputed closure, so
       // the secured feature is only recognised as secured once its closure self-loop exists. Seed both
       // siblings under a SHARED upload and rebuild the closure AFTER securing — without the rebuild the
       // empty closure reads securedId as unsecured and it would leak into the anonymous export.
@@ -1132,7 +1132,7 @@ describe('Download Parquet pipeline (integration)', function () {
       // their export. Same fixture as the anon case, but the export is built with the
       // granted user's id as requested_by.
       //
-      // The closure rebuild is load-bearing here too: it makes isEffectivelySecuredViaClosure recognise
+      // The closure rebuild is load-bearing here too: it makes isEffectivelySecured recognise
       // securedId as secured (Branch 1 fails), so visibility now hinges on the scope grant (Branch 2's
       // closure-anchor probe). WITHOUT the rebuild this test would pass spuriously — an empty closure
       // reads securedId as unsecured, so it would be "visible" regardless of any grant.

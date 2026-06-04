@@ -1,6 +1,6 @@
 // Integration test for cart submission feature security — verifies the read-paths-only security swap:
 // "is this feature secured / accessible" is resolved via the precomputed submission_feature_closure
-// (the `isEffectivelySecuredViaClosure` / `isAccessibleToUser` SQL fragments), NOT a live recursive
+// (the `isEffectivelySecured` / `isAccessibleToUser` SQL fragments), NOT a live recursive
 // parent walk. The cart insert reads that closure to gate secured features, computes the `secured`
 // flag on read, and counts all features regardless of security status.
 //
@@ -223,7 +223,7 @@ describe('Cart submission feature security (integration)', function () {
 
     it('should exclude a directly secured feature', async () => {
       // Directly secured feature under a shared upload: rebuild the closure so the feature's SELF-LOOP
-      // exists, then isEffectivelySecuredViaClosure resolves its own security rule and excludes it.
+      // exists, then isEffectivelySecured resolves its own security rule and excludes it.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const featureId = await insertFeatureRow({
@@ -271,7 +271,7 @@ describe('Cart submission feature security (integration)', function () {
 
     it('should exclude an inactive (soft-deleted) secured id — anonymous (Risk 1 active-guard)', async () => {
       // RISK 1 GUARD. Secure the feature, then soft-delete it. The closure rebuild now writes NO self-loop
-      // for it (inactive features are excluded from the active universe), so isEffectivelySecuredViaClosure
+      // for it (inactive features are excluded from the active universe), so isEffectivelySecured
       // finds nothing and would read it as UNSECURED. The cart repo's `JOIN submission_feature ...
       // record_end_date IS NULL` active-guard is what excludes the id here — without that guard the empty
       // closure would let the soft-deleted secured id slip into the cart.
@@ -528,7 +528,7 @@ describe('Cart submission feature security (integration)', function () {
     });
 
     it('should reflect security changes after feature was added to cart', async () => {
-      // The read-side `secured` column uses isEffectivelySecuredViaClosure, so the closure must carry the
+      // The read-side `secured` column uses isEffectivelySecured, so the closure must carry the
       // feature's self-loop for the rule to be seen. The closure is rebuilt up front (the feature is active
       // throughout); only the security ROW is added after the cart insert.
       const submissionId = await createTestSubmission(connection);

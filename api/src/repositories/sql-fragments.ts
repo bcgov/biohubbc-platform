@@ -9,52 +9,10 @@
 import { Knex } from 'knex';
 
 /**
- * Per-row "effectively secured" check that resolves ancestry by walking UP the
- * live `submission_feature` parent pointers with a recursive CTE: a feature is
- * effectively secured when it or any ancestor has an active security rule whose
- * feature is past its effective date.
- *
- * Returns an `EXISTS (...)` SQL expression suitable for use in WHERE clauses
- * or as a SELECT column (returns boolean).
- *
- * This intentionally walks live parent pointers rather than reading the derived
- * `submission_feature_closure` table. It is consumed by the scope-anchor recompute
- * job (`security-scope-repository.ts`), which can run BEFORE the closure has been
- * rebuilt for an upload — so the closure may be stale or absent at that point and
- * cannot be trusted. Resolving ancestry directly from `submission_feature` parent
- * pointers is the only correct source there. Read paths (search / cart / download)
- * must NOT use this; they use `isEffectivelySecuredViaClosure`, which reads the
- * precomputed closure and avoids the per-row recursive walk.
- *
- * Cost is O(tree_depth) per row (~3–5 levels), bounded by the feature
- * hierarchy depth regardless of total feature count.
- *
- * @param featureIdExpr SQL expression for the starting submission_feature_id
- *   (e.g. 'wf.submission_feature_id', 'candidate.submission_feature_id')
- */
-export function isEffectivelySecured(featureIdExpr: string): string {
-  return `EXISTS (
-    WITH RECURSIVE ancestor_chain(id) AS (
-      SELECT ${featureIdExpr}
-      UNION ALL
-      SELECT p.parent_submission_feature_id
-      FROM ancestor_chain ac
-      JOIN submission_feature p ON p.submission_feature_id = ac.id
-      WHERE p.parent_submission_feature_id IS NOT NULL
-        AND p.record_end_date IS NULL
-    )
-    SELECT 1 FROM ancestor_chain ac
-    JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
-    JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = ac.id
-    WHERE sfs.record_end_date IS NULL
-      AND sf_sec.record_effective_date <= now()
-  )`;
-}
-
-/**
- * Closure-based "effectively secured" check for the hot read paths (search / cart /
- * download): a feature is effectively secured when it or an ancestor has an active
- * security rule that is past its effective date.
+ * Closure-based "effectively secured" check used on every security-resolving path —
+ * the hot read paths (search / cart / download) and the scope-anchor recompute write
+ * path: a feature is effectively secured when it or an ancestor has an active security
+ * rule that is past its effective date.
  *
  * Instead of a per-row recursive parent walk, this reads the precomputed
  * `submission_feature_closure` ancestry subset — `is_ancestor = true`, which is the
@@ -64,19 +22,21 @@ export function isEffectivelySecured(featureIdExpr: string): string {
  * `target_submission_feature_id`. This matters because it runs on every search, cart,
  * and download request.
  *
- * Requires the closure to be populated for the feature's upload. This is always true on
- * read paths: features only become searchable after indexing rebuilds the closure, so
- * any feature reaching this check already has its closure rows (at minimum the
- * self-loop). Callers that operate on un-indexed or possibly-inactive ids (e.g. raw
- * id arrays) must filter to active features first, since the closure has no row for
- * soft-deleted features.
+ * Requires the closure to be populated for the feature's upload. This holds on every
+ * caller: features only become searchable after indexing rebuilds the closure, and the
+ * anchor recompute write path is only ever triggered for already-indexed submissions
+ * (applying a security rule or approving a policy never changes a feature's ancestry,
+ * so the closure built at index time is still current). Any feature reaching this check
+ * therefore already has its closure rows (at minimum the self-loop). Callers that
+ * operate on un-indexed or possibly-inactive ids (e.g. raw id arrays) must filter to
+ * active features first, since the closure has no row for soft-deleted features.
  *
  * Returns an `EXISTS (...)` SQL expression (returns boolean) with zero `?` placeholders.
  *
  * @param featureIdExpr SQL expression for the starting submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'expression_results.submission_feature_id')
  */
-export function isEffectivelySecuredViaClosure(featureIdExpr: string): string {
+export function isEffectivelySecured(featureIdExpr: string): string {
   return `EXISTS (
     SELECT 1
     FROM submission_feature_closure c
@@ -101,7 +61,7 @@ export function isEffectivelySecuredViaClosure(featureIdExpr: string): string {
  *
  * This reads the precomputed `submission_feature_closure` ancestry subset
  * (`is_ancestor = true`) instead of doing a recursive parent walk. Branch 1 reuses
- * `isEffectivelySecuredViaClosure`; Branch 2 probes the closure for an ancestor that is
+ * `isEffectivelySecured`; Branch 2 probes the closure for an ancestor that is
  * a scope anchor the user's team can reach. Both are cheap PK-served closure probes
  * (`source_submission_feature_id`), so the old concern of walking the ancestor chain
  * twice no longer applies — there is no recursive walk at all.
@@ -114,7 +74,7 @@ export function isAccessibleToUser(featureIdExpr: string): string {
     SELECT 1
     WHERE
       -- Branch 1: feature is NOT effectively secured
-      NOT ${isEffectivelySecuredViaClosure(featureIdExpr)}
+      NOT ${isEffectivelySecured(featureIdExpr)}
       -- Branch 2: user has a team scope grant via an ancestor that is a scope anchor
       OR EXISTS (
         SELECT 1
@@ -141,7 +101,7 @@ export function isAccessibleToUser(featureIdExpr: string): string {
  * For anonymous users (systemUserId is null), only unsecured features pass.
  *
  * Composes the closure-based read-path fragments above:
- * - `isEffectivelySecuredViaClosure` — a feature is "effectively secured" only when it or an
+ * - `isEffectivelySecured` — a feature is "effectively secured" only when it or an
  *   ancestor has an active security rule AND the feature is past its `record_effective_date`,
  *   resolved via the precomputed closure ancestry subset.
  * - `isAccessibleToUser` — probes the same closure ancestry for a scope anchor the user's team
@@ -172,7 +132,7 @@ export function buildSecurityFilter(
 
   if (!systemUserId) {
     // Anonymous: only unsecured features
-    return knex.raw(`NOT ${isEffectivelySecuredViaClosure(submissionFeatureIdColumn)}`);
+    return knex.raw(`NOT ${isEffectivelySecured(submissionFeatureIdColumn)}`);
   }
 
   // Authenticated: feature is unsecured OR user has team scope grant (indexed closure lookups)
