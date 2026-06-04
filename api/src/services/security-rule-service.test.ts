@@ -31,7 +31,8 @@ describe('SecurityRuleService', () => {
       const result = await service.createSecurityRule({
         name: 'rule-a',
         description: 'desc',
-        security_category_id: 2
+        security_category_id: 2,
+        is_active: true
       });
 
       expect(getCategoryStub).to.have.been.calledOnceWith(2);
@@ -49,7 +50,12 @@ describe('SecurityRuleService', () => {
       const insertStub = sinon.stub(SecurityRuleRepository.prototype, 'insertSecurityRule').resolves();
 
       try {
-        await service.createSecurityRule({ name: 'rule-a', description: 'desc', security_category_id: 999 });
+        await service.createSecurityRule({
+          name: 'rule-a',
+          description: 'desc',
+          security_category_id: 999,
+          is_active: true
+        });
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Security category not found');

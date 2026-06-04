@@ -35,6 +35,7 @@ export class SecurityRuleRepository extends BaseRepository {
         policy_id,
         name,
         description,
+        is_active,
         record_effective_date,
         record_end_date,
         create_date,
@@ -44,6 +45,38 @@ export class SecurityRuleRepository extends BaseRepository {
         revision_count
       FROM security_rule
       WHERE record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityRuleRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets security rules eligible for automatic screening.
+   * A rule is screenable when it is not soft-deleted and is_active is true.
+   *
+   * Future automatic screening must use this method (not getActiveSecurityRules).
+   *
+   * @return {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRuleRepository
+   */
+  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
+    const sql = SQL`
+      SELECT
+        security_rule_id,
+        policy_id,
+        name,
+        description,
+        is_active,
+        record_effective_date,
+        record_end_date,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count
+      FROM security_rule
+      WHERE record_end_date IS NULL
+        AND is_active = true;
     `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
     return response.rows;
@@ -62,6 +95,7 @@ export class SecurityRuleRepository extends BaseRepository {
         sr.policy_id,
         sr.name,
         sr.description,
+        sr.is_active,
         sr.record_effective_date,
         sr.record_end_date,
         sc.security_category_id,
@@ -99,6 +133,7 @@ export class SecurityRuleRepository extends BaseRepository {
         'sc.name as category_name',
         'sr.name',
         'sr.description',
+        'sr.is_active',
         knex.raw('COUNT(sfs.submission_feature_security_id)::integer AS feature_count')
       )
       .from('security_rule as sr')
@@ -109,7 +144,14 @@ export class SecurityRuleRepository extends BaseRepository {
         this.on('sfs.security_rule_id', '=', 'sr.security_rule_id').andOnNull('sfs.record_end_date');
       })
       .whereNull('sr.record_end_date')
-      .groupBy('sr.security_rule_id', 'sr.security_category_id', 'sc.name', 'sr.name', 'sr.description');
+      .groupBy(
+        'sr.security_rule_id',
+        'sr.security_category_id',
+        'sc.name',
+        'sr.name',
+        'sr.description',
+        'sr.is_active'
+      );
 
     if (filters?.search) {
       query.whereILike('sr.name', `%${filters.search}%`);
@@ -160,15 +202,18 @@ export class SecurityRuleRepository extends BaseRepository {
    */
   async insertSecurityRule(data: CreateSecurityRule): Promise<SecurityRule> {
     const knex = getKnex();
+    const insertData = {
+      security_category_id: data.security_category_id,
+      name: data.name,
+      description: data.description,
+      is_active: data.is_active,
+      policy_id: null
+    };
+
     const query = knex
       .table('security_rule')
-      .insert({
-        security_category_id: data.security_category_id,
-        name: data.name,
-        description: data.description,
-        policy_id: null
-      })
-      .returning(['security_rule_id', 'security_category_id', 'name', 'description']);
+      .insert(insertData)
+      .returning(['security_rule_id', 'security_category_id', 'name', 'description', 'is_active']);
 
     const response = await this.connection.knex(query, SecurityRule);
 
@@ -195,7 +240,7 @@ export class SecurityRuleRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .from('security_rule')
-      .select(['security_rule_id', 'security_category_id', 'name', 'description'])
+      .select(['security_rule_id', 'security_category_id', 'name', 'description', 'is_active'])
       .whereNull('record_end_date')
       .where('security_rule_id', securityRuleId);
 
@@ -234,7 +279,8 @@ export class SecurityRuleRepository extends BaseRepository {
       .update({
         security_category_id: data.security_category_id,
         name: data.name,
-        description: data.description
+        description: data.description,
+        is_active: data.is_active
       })
       .whereNull('record_end_date')
       .where('security_rule_id', securityRuleId);

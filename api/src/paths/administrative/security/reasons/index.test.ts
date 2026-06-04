@@ -140,7 +140,8 @@ describe('administrative/security/reasons', () => {
         security_rule_id: 1,
         security_category_id: 2,
         name: 'New Reason',
-        description: 'A new reason'
+        description: 'A new reason',
+        is_active: true
       };
 
       const mockDBConnection = getMockDBConnection({
@@ -162,7 +163,8 @@ describe('administrative/security/reasons', () => {
       expect(SecurityRuleService.prototype.createSecurityRule).to.have.been.calledOnceWith({
         name: 'New Reason',
         description: 'A new reason',
-        security_category_id: 2
+        security_category_id: 2,
+        is_active: undefined
       });
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.eql(mockReason);

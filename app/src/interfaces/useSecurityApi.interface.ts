@@ -106,6 +106,7 @@ export interface ISecurityReasonWithFeatureCount {
   category_name: string;
   name: string;
   description: string | null;
+  is_active: boolean;
   feature_count: number;
 }
 
@@ -114,18 +115,21 @@ export interface ISecurityReason {
   security_category_id: number;
   name: string;
   description: string | null;
+  is_active: boolean;
 }
 
 export interface ICreateSecurityReasonRequest {
   name: string;
   description: string;
   security_category_id: number;
+  is_active: boolean;
 }
 
 export interface IUpdateSecurityReasonRequest {
   name: string;
   description: string;
   security_category_id: number;
+  is_active: boolean;
 }
 
 export interface ISecurityReasonsResponse {

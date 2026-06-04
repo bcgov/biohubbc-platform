@@ -54,6 +54,7 @@ describe('administrative/security/rules', () => {
           policy_id: 'f4b2f372-98b2-4faa-b98e-91ea2296e370',
           name: 'Caribou',
           description: 'Sensitive data',
+          is_active: true,
           record_effective_date: '2026-01-01',
           record_end_date: null,
           security_category_id: 1,

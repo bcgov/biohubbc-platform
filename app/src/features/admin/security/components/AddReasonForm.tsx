@@ -1,7 +1,10 @@
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import CustomAutocompleteFormik from 'components/fields/CustomAutocompleteFormik';
 import { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
+import { useFormikContext } from 'formik';
 import yup from 'utils/YupSchema';
 
 /**
@@ -14,6 +17,8 @@ export interface IAddReasonFormValues {
   description: string;
   /** Selected security category ID */
   security_category_id: number | undefined;
+  /** Whether the rule is enabled for automatic security screening */
+  is_active: boolean;
 }
 
 /**
@@ -22,7 +27,8 @@ export interface IAddReasonFormValues {
 export const AddReasonFormInitialValues: IAddReasonFormValues = {
   name: '',
   description: '',
-  security_category_id: undefined
+  security_category_id: undefined,
+  is_active: true
 };
 
 /**
@@ -31,7 +37,8 @@ export const AddReasonFormInitialValues: IAddReasonFormValues = {
 export const AddReasonFormYupSchema = yup.object().shape({
   name: yup.string().required('Name is required').max(100, 'Name must be 100 characters or less'),
   description: yup.string().required('Description is required').max(500, 'Description must be 500 characters or less'),
-  security_category_id: yup.number().required('Category is required')
+  security_category_id: yup.number().required('Category is required'),
+  is_active: yup.boolean()
 });
 
 interface IAddReasonFormProps {
@@ -49,6 +56,7 @@ interface IAddReasonFormProps {
  */
 export const AddReasonForm = (props: IAddReasonFormProps) => {
   const { categoryOptions } = props;
+  const { values, setFieldValue } = useFormikContext<IAddReasonFormValues>();
 
   return (
     <Stack gap={2} sx={{ pt: 1, minWidth: { xs: 300, sm: 520 } }}>
@@ -67,6 +75,16 @@ export const AddReasonForm = (props: IAddReasonFormProps) => {
         label="Category"
         required
         options={categoryOptions}
+      />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={values.is_active}
+            onChange={(_, checked) => setFieldValue('is_active', checked)}
+            color="primary"
+          />
+        }
+        label={values.is_active ? 'Active' : 'Inactive'}
       />
     </Stack>
   );

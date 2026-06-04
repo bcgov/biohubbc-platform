@@ -130,13 +130,18 @@ POST.apiDoc = {
 export function createSecurityReason(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const { name, description, security_category_id } = req.body as CreateSecurityRule;
+    const { name, description, security_category_id, is_active } = req.body as CreateSecurityRule;
 
     try {
       await connection.open();
 
       const securityRuleService = new SecurityRuleService(connection);
-      const result = await securityRuleService.createSecurityRule({ name, description, security_category_id });
+      const result = await securityRuleService.createSecurityRule({
+        name,
+        description,
+        security_category_id,
+        is_active
+      });
 
       await connection.commit();
 

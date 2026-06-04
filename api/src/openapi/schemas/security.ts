@@ -151,7 +151,15 @@ export const UpdateSecurityCategoryRequestSchema: OpenAPIV3.SchemaObject = {
 export const SecurityRuleWithFeatureCountSchema: OpenAPIV3.SchemaObject = {
   title: 'SecurityRuleWithFeatureCount',
   type: 'object',
-  required: ['security_rule_id', 'security_category_id', 'category_name', 'name', 'description', 'feature_count'],
+  required: [
+    'security_rule_id',
+    'security_category_id',
+    'category_name',
+    'name',
+    'description',
+    'is_active',
+    'feature_count'
+  ],
   properties: {
     security_rule_id: {
       type: 'integer',
@@ -177,6 +185,10 @@ export const SecurityRuleWithFeatureCountSchema: OpenAPIV3.SchemaObject = {
       nullable: true,
       description: 'Description of the security rule'
     },
+    is_active: {
+      type: 'boolean',
+      description: 'Whether the rule is enabled for automatic security screening'
+    },
     feature_count: {
       type: 'integer',
       description: 'Number of submission features secured by this rule'
@@ -190,7 +202,7 @@ export const SecurityRuleWithFeatureCountSchema: OpenAPIV3.SchemaObject = {
 export const SecurityReasonSchema: OpenAPIV3.SchemaObject = {
   title: 'SecurityReason',
   type: 'object',
-  required: ['security_rule_id', 'security_category_id', 'name', 'description'],
+  required: ['security_rule_id', 'security_category_id', 'name', 'description', 'is_active'],
   properties: {
     security_rule_id: {
       type: 'integer',
@@ -210,6 +222,10 @@ export const SecurityReasonSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       nullable: true,
       description: 'Description of the security rule'
+    },
+    is_active: {
+      type: 'boolean',
+      description: 'Whether the rule is enabled for automatic security screening'
     }
   }
 };
@@ -236,6 +252,10 @@ export const CreateSecurityReasonRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'integer',
       minimum: 1,
       description: 'ID of the security category this reason belongs to'
+    },
+    is_active: {
+      type: 'boolean',
+      description: 'Whether the rule is enabled for automatic security screening (defaults to true)'
     }
   }
 };
@@ -246,7 +266,7 @@ export const CreateSecurityReasonRequestSchema: OpenAPIV3.SchemaObject = {
 export const UpdateSecurityReasonRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdateSecurityReasonRequest',
   type: 'object',
-  required: ['name', 'description', 'security_category_id'],
+  required: ['name', 'description', 'security_category_id', 'is_active'],
   properties: {
     name: {
       type: 'string',
@@ -262,6 +282,10 @@ export const UpdateSecurityReasonRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'integer',
       minimum: 1,
       description: 'ID of the security category this reason belongs to'
+    },
+    is_active: {
+      type: 'boolean',
+      description: 'Whether the rule is enabled for automatic security screening'
     }
   }
 };
