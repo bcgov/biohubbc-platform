@@ -15,3 +15,10 @@ export const DEFAULT_MAX_PART_SIZE_BYTES = '524288000';
  * a code change. Larger = fewer round trips but higher peak heap per batch.
  */
 export const DOWNLOAD_FEATURE_BATCH_SIZE = getNumberEnv('DOWNLOAD_FEATURE_BATCH_SIZE', 5000);
+
+/**
+ * Cache-invalidation key for the export-artifact-group layer. Written into every new group and
+ * part of its dedupe key. Bump whenever the CSV/zip packing logic changes so the next identical
+ * request misses the stale `ready` group and rebuilds.
+ */
+export const EXPORTER_VERSION = 1;
