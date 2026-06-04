@@ -3,12 +3,17 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
+import {
+  createMockDownloadExportListRow,
+  createMockDownloadRecord,
+  createMockDownloadVersion
+} from '../../__mocks__/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
 import { ExpressionTree } from '../../models/expression-tree';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { DownloadPolicyService } from './download-policy-service';
@@ -215,6 +220,10 @@ describe('DownloadService', () => {
         .stub(DownloadRepository.prototype, 'createDownload')
         .resolves({ download_id: 'download-uuid-1' });
       const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+      const createVersionStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
+      const setCurrentStub = sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',
         jobId: 'job-1'
@@ -255,11 +264,60 @@ describe('DownloadService', () => {
       expect(publishStub).to.have.been.calledOnce;
       expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
 
-      // Step 8: Verify the required call order
+      // Step 8: Verify the required call order — the version is materialized between the
+      // download insert and the team link, and the publish is last.
       expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
       expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
-      expect(createDownloadStub).to.have.been.calledBefore(linkStub);
+      expect(createDownloadStub).to.have.been.calledBefore(createVersionStub);
+      expect(createVersionStub).to.have.been.calledBefore(setCurrentStub);
+      expect(setCurrentStub).to.have.been.calledBefore(linkStub);
       expect(linkStub).to.have.been.calledBefore(publishStub);
+    });
+
+    it('materializes a download version and points the download at it before publishing', async () => {
+      // Verifies: createDownloadRequest creates the version off the new download_id, flips the
+      // current-version pointer with the returned version id, and orders both writes between the
+      // download insert and the worker publish (version must exist before the pointer UPDATE).
+
+      // Step 1: Stub the orchestration dependencies up to the download insert
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid-1' });
+      sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid-1' });
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'download-uuid-1' });
+
+      // Step 2: Stub the version repo — createDownloadVersion returns the new version row, and the
+      // pointer UPDATE resolves.
+      const createVersionStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
+      const setCurrentStub = sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
+
+      // Step 3: Stub the team link + publish (the tail of the flow)
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      // Step 4: Run the create request
+      await service.createDownloadRequest(basePayload());
+
+      // Step 5: Both version writes fire exactly once
+      expect(createVersionStub).to.have.been.calledOnce;
+      expect(setCurrentStub).to.have.been.calledOnce;
+
+      // Step 6: The version is created off the download_id returned by createDownload, and the
+      // pointer is set with that download_id + the returned version id.
+      expect(createVersionStub).to.have.been.calledOnceWith('download-uuid-1');
+      expect(setCurrentStub).to.have.been.calledOnceWith('download-uuid-1', 'ver-1');
+
+      // Step 7: Ordering — download insert → version create → set-current → publish
+      expect(createDownloadStub).to.have.been.calledBefore(createVersionStub);
+      expect(createVersionStub).to.have.been.calledBefore(setCurrentStub);
+      expect(setCurrentStub).to.have.been.calledBefore(publishStub);
     });
 
     it('skips the team link and does not create an export for an anonymous request (requestedBy null)', async () => {
@@ -274,6 +332,10 @@ describe('DownloadService', () => {
 
       // Step 2: Stub the export repo to detect any (wrong) call
       const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
+      sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',
         jobId: 'job-1'
@@ -309,6 +371,10 @@ describe('DownloadService', () => {
         .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
         .resolves({ policy_id: 'policy-uuid-2' });
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-2' });
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-2', download_id: 'download-uuid-2' }));
+      sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       sinon.stub(service, 'linkDownloadToNewTeam').resolves();
       sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',

@@ -15,6 +15,7 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -163,6 +164,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
+    // Materialize the download's version and point the download at it. The parquet pipeline links
+    // each artifact to this version, and runExport discovers feature types from it.
+    // NOTE (Phase 7): this is the minimal real version-row wiring needed for the round-trip to
+    // compile and run; the full download_artifact → download_version_artifact assertion migration
+    // is completed in the Phase 7 integration pass.
+    const downloadVersionRepo = new DownloadVersionRepository(connection);
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    const downloadVersionId = version.download_version_id;
+    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
+
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
     await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
@@ -174,6 +185,7 @@ describe('Ingest → Download → Export (system integration)', function () {
       const featureTypeName = statement.urn_feature_type;
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: schemaLookup.get(featureTypeName) ?? [],
         featureTypeName,

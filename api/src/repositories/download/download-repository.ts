@@ -181,6 +181,7 @@ export class DownloadRepository extends BaseRepository {
         d.completed_at,
         d.downloaded_at,
         d.create_date,
+        d.current_download_version_id,
         p.name,
         p.description
       FROM download d

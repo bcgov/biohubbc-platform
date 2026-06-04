@@ -213,6 +213,17 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('p.description');
     });
 
+    it('SQL selects the current_download_version_id pointer', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('current_download_version_id');
+    });
+
     it('returns the joined detail row when policy description is non-null', async () => {
       const mockRow = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
@@ -223,6 +234,7 @@ describe('DownloadRepository', () => {
         completed_at: '2026-01-01T00:01:00.000Z',
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
+        current_download_version_id: 'dddd0000-0000-0000-0000-000000000001',
         name: 'My download',
         description: 'A nice description'
       };
@@ -247,6 +259,7 @@ describe('DownloadRepository', () => {
         completed_at: null,
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
+        current_download_version_id: null,
         name: 'My download',
         description: null
       };

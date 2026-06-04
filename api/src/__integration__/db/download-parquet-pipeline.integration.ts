@@ -27,6 +27,7 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
@@ -119,6 +120,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   let connection: IDBConnection;
   let downloadRepo: DownloadRepository;
+  let downloadVersionRepo: DownloadVersionRepository;
   let pipelineService: DownloadPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
@@ -132,6 +134,7 @@ describe('Download Parquet pipeline (integration)', function () {
     connection = getAPIUserDBConnection();
     await connection.open();
     downloadRepo = new DownloadRepository(connection);
+    downloadVersionRepo = new DownloadVersionRepository(connection);
     pipelineService = new DownloadPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
@@ -164,6 +167,23 @@ describe('Download Parquet pipeline (integration)', function () {
       requestedBy: connection.systemUserId()
     });
     return download_id;
+  }
+
+  /**
+   * Helper: materialize a download_version for the given download and point the
+   * download at it, returning the version id. The Parquet pipeline links each
+   * produced artifact to this version via download_version_artifact, so the
+   * writeFeatureTypeParquet tests below need a real version row (FK target).
+   *
+   * NOTE (Phase 7): these specs still assert against the legacy `download_artifact`
+   * link table; migrating those runtime assertions to `download_version_artifact`
+   * is completed in the Phase 7 integration pass. This helper exists so the calls
+   * compile and have a valid version FK in the meantime.
+   */
+  async function createDownloadVersionFor(downloadId: string): Promise<string> {
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, version.download_version_id);
+    return version.download_version_id;
   }
 
   /**
@@ -872,10 +892,12 @@ describe('Download Parquet pipeline (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
       const downloadId = await createPolicyDownload(['dataset']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -923,11 +945,13 @@ describe('Download Parquet pipeline (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
       const downloadId = await createPolicyDownload(['dataset']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       // Call 1
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -949,6 +973,7 @@ describe('Download Parquet pipeline (integration)', function () {
       // Call 2 — same download, same feature type
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -976,10 +1001,12 @@ describe('Download Parquet pipeline (integration)', function () {
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
       await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
       const downloadId = await createPolicyDownload(['dataset', 'capture']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -987,6 +1014,7 @@ describe('Download Parquet pipeline (integration)', function () {
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'capture',

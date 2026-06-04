@@ -6,6 +6,7 @@ import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
@@ -50,6 +51,7 @@ export class DownloadService extends DBService {
    * would loop at construction time.
    */
   downloadExportRepository: DownloadExportRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   teamService: TeamService;
   expressionTreeService: ExpressionTreeService;
   downloadPolicyService: DownloadPolicyService;
@@ -71,6 +73,7 @@ export class DownloadService extends DBService {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.teamService = new TeamService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.downloadPolicyService = new DownloadPolicyService(connection);
@@ -142,6 +145,14 @@ export class DownloadService extends DBService {
       format: 'parquet',
       requestedBy: payload.requestedBy
     });
+
+    // A download materializes exactly one version at request time. The version is the temporal
+    // axis the parquet/export pipeline links artifacts to, and `current_download_version_id`
+    // points at it. The version must exist before the pointer UPDATE references it; both writes
+    // ride the route's transaction so a mid-flow failure rolls back the download and its version
+    // together.
+    const version = await this.downloadVersionRepository.createDownloadVersion(download_id);
+    await this.downloadVersionRepository.setCurrentDownloadVersion(download_id, version.download_version_id);
 
     if (payload.requestedBy !== null) {
       await this.linkDownloadToNewTeam(

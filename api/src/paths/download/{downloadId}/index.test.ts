@@ -20,6 +20,7 @@ const makeDownloadRecord = (overrides: Partial<DownloadDetailRecord> = {}): Down
   completed_at: '2025-01-01T00:01:00Z',
   downloaded_at: null,
   create_date: '2025-01-01T00:00:00Z',
+  current_download_version_id: 'dddd0000-0000-0000-0000-000000000001',
   name: 'Test download',
   description: 'Test description',
   ...overrides

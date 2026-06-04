@@ -45,6 +45,8 @@ describe('process-download-job', () => {
     return mockDBConnection;
   };
 
+  const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000001';
+
   const createMockDownloadRecord = (overrides?: Partial<DownloadDetailRecord>): DownloadDetailRecord => ({
     download_id: 'dl-1',
     download_status: DownloadStatusEnum.PENDING,
@@ -54,6 +56,7 @@ describe('process-download-job', () => {
     completed_at: null,
     downloaded_at: null,
     create_date: '2026-01-01T00:00:00.000Z',
+    current_download_version_id: DOWNLOAD_VERSION_ID,
     name: 'Test download',
     description: null,
     ...overrides
@@ -104,22 +107,27 @@ describe('process-download-job', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
 
-      // writeFeatureTypeParquet called once per statement, in statements order
+      // writeFeatureTypeParquet called once per statement, in statements order. Each payload
+      // threads the download's materialized version id (read from current_download_version_id)
+      // so the produced artifacts link to that version.
       expect(writeStub).to.have.been.calledThrice;
       expect(writeStub.firstCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'a',
         statement: statements[0]
       });
       expect(writeStub.secondCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'b',
         statement: statements[1]
       });
       expect(writeStub.thirdCall.args[0]).to.deep.include({
         downloadId: 'dl-1',
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'c',
         statement: statements[2]
@@ -246,6 +254,31 @@ describe('process-download-job', () => {
         expect((error as Error).message).to.equal('Download dl-1 not found');
       }
 
+      expect(transitionStub).to.not.have.been.called;
+      expect(writeStub).to.not.have.been.called;
+    });
+
+    it('throws (and does no work) when the download has no materialized version (current_download_version_id null)', async () => {
+      // Verifies: the non-null guard. A download being processed must already have a materialized
+      // version; a null pointer means the create transaction never wired one up, so the worker
+      // refuses to proceed rather than write artifacts with no version to link them to.
+      setupMockConnection();
+
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ current_download_version_id: null }));
+
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
+
+      try {
+        await processDownloadJobHandler([createMockJob('dl-1')]);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Download dl-1 has no materialized version — cannot process');
+      }
+
+      // Guard fires before any status transition or parquet write.
       expect(transitionStub).to.not.have.been.called;
       expect(writeStub).to.not.have.been.called;
     });

@@ -24,6 +24,7 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
  * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
  */
 export const DownloadDetailRecord = DownloadRecord.extend({
+  current_download_version_id: z.string().uuid().nullable(),
   name: z.string(),
   description: z.string().nullable()
 });

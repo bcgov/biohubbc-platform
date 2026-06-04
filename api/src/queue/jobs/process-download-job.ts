@@ -63,6 +63,14 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         throw new Error(`Download ${downloadId} not found`);
       }
 
+      // A download being processed must have a materialized version — it is created at request
+      // time. Guarding here narrows the type to string so it can be threaded into the parquet
+      // writes, which link each artifact to this version.
+      if (download.current_download_version_id === null) {
+        throw new Error(`Download ${downloadId} has no materialized version — cannot process`);
+      }
+      const downloadVersionId = download.current_download_version_id;
+
       const currentStatus = download.download_status;
 
       // Already complete — pg-boss re-fired a finished job, or the DLQ ran after
@@ -114,6 +122,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
           const properties = schemaLookup.get(featureTypeName) ?? [];
           await new DownloadPipelineService(connection).writeFeatureTypeParquet({
             downloadId,
+            downloadVersionId,
             source,
             properties,
             featureTypeName,

@@ -9,6 +9,7 @@ import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
@@ -20,6 +21,23 @@ import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
+
+/**
+ * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
+ *
+ * `downloadId` keys the deterministic S3 object key; `downloadVersionId` is the
+ * temporal axis the produced artifact is linked to in `download_version_artifact`,
+ * so the export pipeline can rediscover the version's Parquet files without
+ * re-running the original search.
+ */
+export interface WriteFeatureTypeParquetPayload {
+  downloadId: string;
+  downloadVersionId: string;
+  source: DownloadSource;
+  properties: CsvPropertyDefinition[];
+  featureTypeName: string;
+  statement: ActivePolicyStatementWithExpression;
+}
 
 /**
  * Background processing pipeline for downloads.
@@ -36,6 +54,7 @@ import { ArtifactService } from '../upload/artifact-service';
  */
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   expressionTreeService: ExpressionTreeService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
@@ -43,6 +62,7 @@ export class DownloadPipelineService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
@@ -159,9 +179,12 @@ export class DownloadPipelineService extends DBService {
    * would require re-downloading the S3 object.
    *
    * Writes the artifact row (`format='parquet'`, `artifact_status='uploaded'`, real
-   * checksum + byte_size + uploaded_at) and the download_artifact link inside the
-   * caller's transaction — the worker wraps each feature type in its own
-   * `withConnection`, so a mid-job retry replays the whole per-type transaction.
+   * checksum + byte_size + uploaded_at) and the download_version_artifact link inside
+   * the caller's transaction — the worker wraps each feature type in its own
+   * `withConnection`, so a mid-job retry replays the whole per-type transaction. The
+   * artifact is linked to `downloadVersionId` (the download's materialized version),
+   * not the download directly, so the export pipeline can rediscover the version's
+   * Parquet files.
    *
    * Code and taxon properties arrive pre-resolved from the cursor JOIN. Parquet
    * files are standalone — GIS consumers have no database access.
@@ -176,8 +199,9 @@ export class DownloadPipelineService extends DBService {
    * requesting user's authorization scope — not the audit `create_user` or the
    * worker's own connection grants.
    *
-   * @param {object} payload
+   * @param {WriteFeatureTypeParquetPayload} payload
    * @param {string} payload.downloadId - The download ID.
+   * @param {string} payload.downloadVersionId - The download's materialized version; the produced artifact is linked to it.
    * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
@@ -185,14 +209,8 @@ export class DownloadPipelineService extends DBService {
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
-  async writeFeatureTypeParquet(payload: {
-    downloadId: string;
-    source: DownloadSource;
-    properties: CsvPropertyDefinition[];
-    featureTypeName: string;
-    statement: ActivePolicyStatementWithExpression;
-  }): Promise<void> {
-    const { downloadId, source, properties, featureTypeName, statement } = payload;
+  async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<void> {
+    const { downloadId, downloadVersionId, source, properties, featureTypeName, statement } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
@@ -326,7 +344,7 @@ export class DownloadPipelineService extends DBService {
       format: 'parquet'
     });
 
-    await this.downloadRepository.createDownloadArtifact(downloadId, artifact_id);
+    await this.downloadVersionRepository.createDownloadVersionArtifact(downloadVersionId, artifact_id, featureTypeName);
   }
 
   /**

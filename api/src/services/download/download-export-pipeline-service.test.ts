@@ -11,6 +11,7 @@ import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -20,6 +21,7 @@ chai.use(sinonChai);
 
 const EXPORT_ID = 'dddd0000-0000-0000-0000-000000000001';
 const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
+const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000099';
 
 /**
  * Test factory: build a DownloadExportRecord with sensible defaults. Callers
@@ -135,13 +137,28 @@ describe('DownloadExportPipelineService', () => {
   });
 
   describe('listExportFeatureTypes', () => {
+    it('reads the version artifacts from the version id, not the download id', async () => {
+      // Verifies: discovery queries the version's link table by downloadVersionId, decoupling the
+      // artifact set from the download id (the download id is only used to validate the key shape).
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const listStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .resolves([]);
+
+      await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
+
+      expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_VERSION_ID);
+    });
+
     it('returns empty array when no artifacts exist', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'listDownloadArtifactsByDownloadId').resolves([]);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([]);
 
-      const result = await service.listExportFeatureTypes(DOWNLOAD_ID);
+      const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
       expect(result).to.deep.equal([]);
     });
@@ -150,7 +167,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'listDownloadArtifactsByDownloadId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           object_key: `downloads/${DOWNLOAD_ID}/dataset/data.parquet`
@@ -161,7 +178,7 @@ describe('DownloadExportPipelineService', () => {
         }
       ]);
 
-      const result = await service.listExportFeatureTypes(DOWNLOAD_ID);
+      const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
       expect(result).to.have.members(['dataset', 'observation']);
       expect(result).to.have.lengthOf(2);
@@ -171,7 +188,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'listDownloadArtifactsByDownloadId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           object_key: `downloads/${DOWNLOAD_ID}/observation/data.parquet`
@@ -182,8 +199,34 @@ describe('DownloadExportPipelineService', () => {
         }
       ]);
 
-      const result = await service.listExportFeatureTypes(DOWNLOAD_ID);
+      const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
+      expect(result).to.deep.equal(['observation']);
+    });
+
+    it('parses keys against the download id — a version artifact keyed under a different download yields no feature type', async () => {
+      // Verifies: even though artifacts are discovered from the version link table, the Parquet key
+      // still embeds the download id, and the parse validates against `downloadId`. A key shaped for
+      // a *different* download id (`downloads/<other>/observation/...`) must not surface as a feature
+      // type for this download, while a key with the right download id does.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const otherDownloadId = 'ffff0000-0000-0000-0000-000000000999';
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+        {
+          artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
+          object_key: `downloads/${DOWNLOAD_ID}/observation/data.parquet`
+        },
+        {
+          artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
+          object_key: `downloads/${otherDownloadId}/dataset/data.parquet`
+        }
+      ]);
+
+      const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
+
+      // Only the key matching DOWNLOAD_ID resolves to a feature type; the foreign-download key is dropped.
       expect(result).to.deep.equal(['observation']);
     });
   });
@@ -212,18 +255,22 @@ describe('DownloadExportPipelineService', () => {
       }
     ];
 
-    it('transitions PROCESSING then READY on happy path', async () => {
+    it('transitions PROCESSING then READY on happy path and discovers feature types from the download version', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
         .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
         .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ current_download_version_id: DOWNLOAD_VERSION_ID }));
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
-      sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
+      const listStub = sinon
+        .stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes')
+        .resolves(['observation']);
       sinon
         .stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport')
         .resolves({ finalPart: 1, chunksWritten: 1, fileRefs: [] });
@@ -241,6 +288,43 @@ describe('DownloadExportPipelineService', () => {
       ]);
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
+
+      // Discovery is keyed by the download's materialized version — the download id is passed
+      // alongside only so the key parse can validate against it.
+      expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
+    });
+
+    it('throws (and does no discovery) when the parent download has no materialized version (current_download_version_id null)', async () => {
+      // Verifies: the non-null guard in runExport. A download being exported owns the parquet
+      // artifacts via its version; a null pointer means there is nothing to discover, so the
+      // export fails loud before listExportFeatureTypes is ever consulted.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
+        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ current_download_version_id: null }));
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      const listStub = sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves([]);
+      const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
+
+      try {
+        await service.runExport(EXPORT_ID);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.include('has no materialized version');
+      }
+
+      // Only the PROCESSING transition fired; feature-type discovery never ran.
+      expect(transitionStub.calledOnce).to.be.true;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(listStub.called).to.be.false;
+      expect(writeStub.called).to.be.false;
     });
 
     it('throws when no Parquet artifacts exist for the download (avoids empty-zip output)', async () => {

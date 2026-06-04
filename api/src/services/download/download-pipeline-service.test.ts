@@ -17,6 +17,7 @@ import {
   PolicyStatementRepository
 } from '../../repositories/authorization/policy-statement-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
@@ -141,6 +142,7 @@ describe('DownloadPipelineService', () => {
 
   // Shared test data for Parquet tests
   const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
+  const TEST_DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000001';
   const TEST_POLICY_ID = '11111111-1111-1111-1111-111111111111';
   const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: 7 };
 
@@ -271,7 +273,7 @@ describe('DownloadPipelineService', () => {
       const insertArtifactStub = sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .resolves({ artifact_id: 'bbbb0000-0000-0000-0000-000000000001' } as any);
-      const linkStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
+      const linkStub = sinon.stub(DownloadVersionRepository.prototype, 'createDownloadVersionArtifact').resolves();
       return { mockWriter, openStreamStub, uploadStub, insertArtifactStub, linkStub };
     };
 
@@ -307,6 +309,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -337,6 +340,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -363,6 +367,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: sourceWithRequester,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -396,6 +401,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -418,6 +424,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockSpatialProperties,
         featureTypeName: 'observation',
@@ -439,6 +446,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -458,6 +466,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -506,6 +515,7 @@ describe('DownloadPipelineService', () => {
       try {
         await service.writeFeatureTypeParquet({
           downloadId: TEST_DOWNLOAD_ID,
+          downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           source: TEST_SOURCE,
           properties: mockProperties,
           featureTypeName: 'observation',
@@ -558,6 +568,7 @@ describe('DownloadPipelineService', () => {
       try {
         await service.writeFeatureTypeParquet({
           downloadId: TEST_DOWNLOAD_ID,
+          downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           source: TEST_SOURCE,
           properties: mockProperties,
           featureTypeName: 'observation',
@@ -596,6 +607,7 @@ describe('DownloadPipelineService', () => {
       try {
         await service.writeFeatureTypeParquet({
           downloadId: TEST_DOWNLOAD_ID,
+          downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           source: TEST_SOURCE,
           properties: mockProperties,
           featureTypeName: 'observation',
@@ -629,6 +641,7 @@ describe('DownloadPipelineService', () => {
       try {
         await service.writeFeatureTypeParquet({
           downloadId: TEST_DOWNLOAD_ID,
+          downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           source: TEST_SOURCE,
           properties: mockProperties,
           featureTypeName: 'observation',
@@ -642,7 +655,10 @@ describe('DownloadPipelineService', () => {
       expect(uploadStub).to.not.have.been.called;
     });
 
-    it('inserts the download_artifact link after the artifact row is created', async () => {
+    it('links the artifact to the download version (not the download) after the artifact row is created', async () => {
+      // Verifies: the produced artifact is linked via createDownloadVersionArtifact against the
+      // version id — keyed by feature type — and that the link write happens after the artifact
+      // row exists (the FK requires the artifact first).
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub, linkStub } = stubParquetPipeline();
@@ -652,6 +668,7 @@ describe('DownloadPipelineService', () => {
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         source: TEST_SOURCE,
         properties: mockProperties,
         featureTypeName: 'observation',
@@ -660,8 +677,10 @@ describe('DownloadPipelineService', () => {
 
       expect(insertArtifactStub).to.have.been.calledOnce;
       expect(linkStub).to.have.been.calledOnce;
-      expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
+      // (downloadVersionId, artifact_id, featureTypeName) — version-keyed, not download-keyed.
+      expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_VERSION_ID);
       expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
+      expect(linkStub.firstCall.args[2]).to.equal('observation');
       expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
     });
   });

@@ -9,6 +9,7 @@ import { DownloadExportRecord } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import {
   buildSchemaHeaders,
   CsvPropertyDefinition,
@@ -81,12 +82,14 @@ export interface PartArchiverBundle {
 export class DownloadExportPipelineService extends DBService {
   downloadExportRepository: DownloadExportRepository;
   downloadRepository: DownloadRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadExportRepository = new DownloadExportRepository(connection);
     this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.artifactService = new ArtifactService(connection);
   }
 
@@ -151,15 +154,22 @@ export class DownloadExportPipelineService extends DBService {
   }
 
   /**
-   * Discover which feature-type Parquet artifacts exist for a download.
+   * Discover which feature-type Parquet artifacts exist for a download's
+   * materialized version.
    *
-   * Parquet keys follow `downloads/{downloadId}/{featureTypeName}/data.parquet`
-   * — anything else (including our own part-zip artifacts) is silently skipped
-   * via `parseFeatureTypeFromParquetKey` returning null. Deduped because
-   * download artifacts can accrete across retries.
+   * Artifacts are discovered from the version's `download_version_artifact`
+   * links, so a re-run of the parquet pipeline against the same version is the
+   * unit of discovery. The Parquet object key, however, still embeds the
+   * download id (`downloads/{downloadId}/{featureTypeName}/data.parquet`), so the
+   * key parse is validated against `downloadId`, not the version id — anything
+   * else (including our own part-zip artifacts) is silently skipped via
+   * `parseFeatureTypeFromParquetKey` returning null. Deduped because version
+   * artifacts can accrete across retries.
    */
-  async listExportFeatureTypes(downloadId: string): Promise<string[]> {
-    const artifacts = await this.downloadRepository.listDownloadArtifactsByDownloadId(downloadId);
+  async listExportFeatureTypes(downloadId: string, downloadVersionId: string): Promise<string[]> {
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
+      downloadVersionId
+    );
 
     const featureTypes = new Set<string>();
     for (const artifact of artifacts) {
@@ -626,8 +636,15 @@ export class DownloadExportPipelineService extends DBService {
     const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
     const download = await this.downloadRepository.getDownloadById(exportRecord.download_id);
 
+    // A download being exported must have a materialized version — it is created at request
+    // time and owns the parquet artifacts. Discovery reads the version's link table, so a
+    // missing pointer means there is nothing to export.
+    if (download.current_download_version_id === null) {
+      throw new Error(`Export ${exportId}: parent download ${download.download_id} has no materialized version`);
+    }
+
     const schemaLookup = await this.buildSchemaLookup();
-    const featureTypes = await this.listExportFeatureTypes(download.download_id);
+    const featureTypes = await this.listExportFeatureTypes(download.download_id, download.current_download_version_id);
 
     // Fail loud if the parent download has no Parquet artifacts — otherwise the
     // archiver finalizes an empty zip (just the central-directory record) and the
