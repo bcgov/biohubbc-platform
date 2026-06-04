@@ -197,17 +197,22 @@ describe('Ingest → Download → Export (system integration)', function () {
     ]);
 
     // Run the export (CSV) pipeline.
+    // NOTE (Phase 7): this spec compiles against the new resolve-or-create service contract, but
+    // the runtime assertions below still reference the OLD `download_export_artifact` table and the
+    // OLD `runExport(exportId)` pipeline. The full assertion migration to the version-export
+    // tables + group-keyed pipeline is completed in the Phase 7 integration pass; this is wired
+    // only to keep the production typecheck green.
     const exportService = new DownloadExportService(connection);
-    const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {});
+    const exportRecord = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
     const exportPipelineService = new DownloadExportPipelineService(connection);
-    await exportPipelineService.runExport(exportRecord.download_export_id);
+    await exportPipelineService.runExport(exportRecord.download_version_export_id);
 
     // Locate the part-zip on S3 and extract chunk1.csv.
     const artifacts = await connection.sql(SQL`
       SELECT a.bucket, a.object_key
       FROM download_export_artifact dea
       INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-      WHERE dea.download_export_id = ${exportRecord.download_export_id}
+      WHERE dea.download_export_id = ${exportRecord.download_version_export_id}
         AND dea.record_end_date IS NULL
       ORDER BY dea.chunk_id ASC;
     `);
@@ -215,7 +220,7 @@ describe('Ingest → Download → Export (system integration)', function () {
 
     const storageService = new ObjectStorageService();
     const zip = await downloadZipFromS3(storageService, artifacts.rows[0].object_key);
-    const chunkEntryName = `biohub-export-${exportRecord.download_export_id}/telemetry/chunk1.csv`;
+    const chunkEntryName = `biohub-export-${exportRecord.download_version_export_id}/telemetry/chunk1.csv`;
     const csv = zipEntryText(zip, chunkEntryName);
     expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 

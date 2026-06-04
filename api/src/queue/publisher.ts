@@ -116,6 +116,31 @@ const PROCESS_DOWNLOAD_EXPORT_OPTIONS: IPublishOptions = {
 };
 
 /**
+ * Job data for the version-export packaging worker (Phase 5).
+ *
+ * Keyed on the shared artifact group rather than a per-user export: N user requests for the same
+ * export shape resolve onto one group, and the worker packages that group exactly once.
+ */
+export interface IProcessDownloadVersionExportJobData {
+  /** The download_version_export_artifact_group ID to package. */
+  downloadVersionExportArtifactGroupId: string;
+}
+
+/**
+ * Options for process download version export jobs.
+ *
+ * Identical budget to `PROCESS_DOWNLOAD_EXPORT` — exports read already-finalized Parquet artifacts
+ * (the expensive feature-gathering work is done) and the bounded work is read-one-row-group /
+ * write-one-CSV-chunk / upload-one-zip per feature type, sequentially.
+ */
+const PROCESS_DOWNLOAD_VERSION_EXPORT_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 // 1 hour
+};
+
+/**
  * Publish a process submission features job to the queue.
  *
  * Queues slow operations (indexing, regions) for submission feature processing.
@@ -486,6 +511,79 @@ export const publishProcessDownloadExportJob = async (
       label: 'publishProcessDownloadExportJob',
       message: 'Failed to publish job',
       downloadExportId: data.downloadExportId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Publish a process download version export job to the queue.
+ *
+ * Queues async CSV export packaging for a shared artifact group. The job is keyed on the group
+ * (`singletonKey: export-group-{id}`), so N user exports that attach to the same group trigger
+ * exactly one packaging run — the dedupe winner enqueues, every later attach reuses the in-flight
+ * or finished group without re-queueing.
+ *
+ * The caller (the request-time service) creates the export row and resolves the group inside an
+ * open transaction and passes the same connection here; pg-boss's `db` option makes the job insert
+ * participate in that transaction, so the row and the job either both commit or both roll back — no
+ * ghost jobs and no orphaned exports.
+ *
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishProcessDownloadVersionExportJob = async (
+  connection: IDBConnection,
+  data: IProcessDownloadVersionExportJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    const mergedOptions = { ...PROCESS_DOWNLOAD_VERSION_EXPORT_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
+
+    // Insert the job in the same transaction as the business data via the
+    // `db` option. Prevents ghost jobs (job exists but data rolled back) and
+    // lost jobs (data committed but job never sent).
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
+    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT, data, {
+      ...mergedOptions,
+      singletonKey: `export-group-${data.downloadVersionExportArtifactGroupId}`,
+      db
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishProcessDownloadVersionExportJob',
+        message: 'Process download version export job published',
+        jobId,
+        downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishProcessDownloadVersionExportJob',
+      message: 'Job not published (duplicate or throttled)',
+      downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this export artifact group' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishProcessDownloadVersionExportJob',
+      message: 'Failed to publish job',
+      downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId,
       error
     });
     throw error;

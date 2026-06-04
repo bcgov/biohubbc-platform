@@ -1,9 +1,16 @@
-import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
+import { DEFAULT_MAX_PART_SIZE_BYTES, EXPORTER_VERSION, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
-import { CreateDownloadExportRequest, DownloadExportListRow, DownloadExportRecord } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
+import {
+  CreateDownloadVersionExportRequest,
+  DownloadVersionExportListRow,
+  DownloadVersionExportRecord,
+  DownloadVersionExportRow
+} from '../../models/download-version-export';
+import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
+import { publishProcessDownloadVersionExportJob } from '../../queue/publisher';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadService } from './download-service';
@@ -21,50 +28,69 @@ export interface DownloadExportPart {
 }
 
 /**
- * Request-time service for download exports.
+ * Request-time service for download version exports.
  *
- * Owns the CRUD operations called by path handlers: create-with-defaults,
- * list, get, authorize, and presigned-URL assembly. Background pipeline work
- * lives in `DownloadExportPipelineService`.
+ * Owns the operations called by path handlers: resolve-or-create the shared artifact group +
+ * create the per-user export, list, get, authorize, and presigned-URL assembly. Background
+ * packaging work lives in the version-export pipeline service.
  *
  * @export
  * @class DownloadExportService
  * @extends {DBService}
  */
 export class DownloadExportService extends DBService {
-  downloadExportRepository: DownloadExportRepository;
   downloadService: DownloadService;
+  downloadVersionExportRepository: DownloadVersionExportRepository;
+
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   *
+   * Wrapped in a thunk because `queue/publisher` imports `DownloadService` (which this service
+   * composes) back, so a direct function reference here would be in TDZ when the module cycle
+   * resolves through publisher first. Resolving at call time sidesteps the cycle.
+   */
+  static readonly dependencies = {
+    publishProcessDownloadVersionExportJob: (
+      ...args: Parameters<typeof publishProcessDownloadVersionExportJob>
+    ): ReturnType<typeof publishProcessDownloadVersionExportJob> => publishProcessDownloadVersionExportJob(...args)
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
     this.downloadService = new DownloadService(connection);
+    this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
   }
 
   /**
    * Create a CSV export for a ready download.
    *
-   * `max_part_size_bytes` lives per-export so a single download can be re-exported
-   * at different part sizes without re-running the Parquet pipeline. `format` is
-   * hard-coded to `'csv'` and `mode` to `'per_feature_type'` here because this
-   * ticket ships the single-shape contract; a future denormalized-mode addition
-   * opens `mode` at the request layer.
+   * Many user export requests for the same shape resolve onto a single physical artifact set keyed
+   * by (version, format, mode, max_part_size_bytes, exporter_version): a second identical request
+   * attaches to an already-`ready` group with no pipeline re-run. Each request still gets its own
+   * `download_version_export` row (per-user provenance), but lifecycle state lives on the shared
+   * group.
    *
-   * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and
-   * require team membership on the parent download — delegates to
-   * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
-   * exactly one place. Only `ready` downloads can export; `pending` /
-   * `processing` / `failed` parents surface 409 and the client retries after
-   * the parent finishes.
+   * The publish rides the route's connection so the export-row create and the job enqueue commit
+   * atomically — and it fires only when the resolver materialized genuinely new work
+   * (`shouldEnqueue`); attaching to an in-flight or finished group never re-queues.
    *
-   * Does NOT publish the pg-boss job — route handlers publish inside the same
-   * transaction as the insert so enqueue and row creation succeed together.
+   * `max_part_size_bytes` lives per-export so a single download can be re-exported at different part
+   * sizes without re-running the Parquet pipeline. `format` is hard-coded to `'csv'` and `mode` to
+   * `'per_feature_type'` here because this ticket ships the single-shape contract; a future
+   * denormalized-mode addition opens `mode` at the request layer.
+   *
+   * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and require team
+   * membership on the parent download — delegates to `DownloadService.getAuthorizedDownload` so the
+   * team-auth rule lives in exactly one place. Only `ready` downloads with a materialized version
+   * can export; `pending` / `processing` / `failed` parents surface 409 and the client retries
+   * after the parent finishes.
    */
-  async createDownloadExport(
+  async createDownloadVersionExport(
     downloadId: string,
     systemUserId: number | null,
-    request: CreateDownloadExportRequest
-  ): Promise<DownloadExportRecord> {
+    request: CreateDownloadVersionExportRequest,
+    connection: IDBConnection
+  ): Promise<DownloadVersionExportRecord> {
     if (systemUserId === null) {
       throw new HTTP403('Access denied');
     }
@@ -76,44 +102,138 @@ export class DownloadExportService extends DBService {
       throw new HTTP409('Download is not ready — cannot export');
     }
 
-    return this.downloadExportRepository.createDownloadExport({
-      download_id: downloadId,
-      format: 'csv',
-      mode: 'per_feature_type',
-      max_part_size_bytes: request.max_part_size_bytes ?? DEFAULT_MAX_PART_SIZE_BYTES
+    if (download.current_download_version_id === null) {
+      throw new HTTP409('Download has no materialized version');
+    }
+
+    const downloadVersionId = download.current_download_version_id;
+
+    // Single-shape contract — `as const` is required so the literals satisfy the
+    // `z.literal('csv')` / `z.literal('per_feature_type')` payload fields (a bare const widens to
+    // `string`).
+    const format = 'csv' as const;
+    const mode = 'per_feature_type' as const;
+    const maxPartSizeBytes = request.max_part_size_bytes ?? DEFAULT_MAX_PART_SIZE_BYTES;
+
+    const { group, shouldEnqueue } = await this.resolveOrCreateActiveExportArtifactGroup(
+      downloadVersionId,
+      format,
+      mode,
+      maxPartSizeBytes,
+      EXPORTER_VERSION
+    );
+
+    const exportRow = await this.downloadVersionExportRepository.createDownloadVersionExport({
+      download_version_id: downloadVersionId,
+      format,
+      mode,
+      max_part_size_bytes: maxPartSizeBytes,
+      download_version_export_artifact_group_id: group.download_version_export_artifact_group_id
     });
+
+    if (shouldEnqueue) {
+      await DownloadExportService.dependencies.publishProcessDownloadVersionExportJob(connection, {
+        downloadVersionExportArtifactGroupId: group.download_version_export_artifact_group_id
+      });
+    }
+
+    return assembleExportRecord(exportRow, group, downloadId);
+  }
+
+  /**
+   * Resolve the active artifact group for an export shape, materializing one when none is usable.
+   *
+   * - `ready` / `pending` / `processing` → reuse the existing group (no new job): the work is done
+   *   or in flight, so a second identical request rides it.
+   * - `failed` → end the dead group (its `error_message` is preserved as failure history) and
+   *   create a fresh one; never reuse a failed group's id/key prefix, which risks contaminating the
+   *   retry with the aborted run's zip parts.
+   * - none → create.
+   *
+   * The create uses `ON CONFLICT DO NOTHING` + re-select so two racing identical requests converge
+   * on one group; `shouldEnqueue` is true only for genuinely new work.
+   */
+  private async resolveOrCreateActiveExportArtifactGroup(
+    downloadVersionId: string,
+    format: string,
+    mode: string,
+    maxPartSizeBytes: string,
+    exporterVersion: number
+  ): Promise<{ group: DownloadVersionExportArtifactGroupRecord; shouldEnqueue: boolean }> {
+    const existing = await this.downloadVersionExportRepository.findActiveExportArtifactGroup(
+      downloadVersionId,
+      format,
+      mode,
+      maxPartSizeBytes,
+      exporterVersion
+    );
+
+    if (existing) {
+      if (existing.status === DownloadStatusEnum.FAILED) {
+        await this.downloadVersionExportRepository.endExportArtifactGroup(
+          existing.download_version_export_artifact_group_id
+        );
+        // Fall through to create a fresh group.
+      } else {
+        return { group: existing, shouldEnqueue: false };
+      }
+    }
+
+    await this.downloadVersionExportRepository.createExportArtifactGroup({
+      downloadVersionId,
+      format,
+      mode,
+      maxPartSizeBytes,
+      exporterVersion
+    });
+
+    const group = await this.downloadVersionExportRepository.findActiveExportArtifactGroup(
+      downloadVersionId,
+      format,
+      mode,
+      maxPartSizeBytes,
+      exporterVersion
+    );
+
+    // The partial-unique insert serializes at the DB, so this immediate re-select always finds
+    // exactly one active row (race-safe) — the `!` is intentional, never null here.
+    return { group: group!, shouldEnqueue: true };
   }
 
   /**
    * List exports for a download, newest first, with `part_count` per row.
    */
-  async listExportsByDownloadId(downloadId: string): Promise<DownloadExportListRow[]> {
-    return this.downloadExportRepository.listDownloadExportsByDownloadId(downloadId);
+  async listDownloadVersionExportsByDownloadId(downloadId: string): Promise<DownloadVersionExportListRow[]> {
+    return this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadId(downloadId);
   }
 
   /**
    * Get an export by ID, throwing if not found.
    */
-  async getExportById(exportId: string): Promise<DownloadExportRecord> {
-    return this.downloadExportRepository.getDownloadExportById(exportId);
+  async getDownloadVersionExportById(exportId: string): Promise<DownloadVersionExportRecord> {
+    return this.downloadVersionExportRepository.getDownloadVersionExportById(exportId);
   }
 
   /**
-   * Authorize a user for an export.
+   * Authorize a user for an export under a specific parent download.
    *
-   * Exports are authenticated-only — the Parquet download is the unauthenticated
-   * path and anonymous UUID holders must `PUT /api/download/:id` to claim
-   * before they can export. Delegates team-membership checks to
-   * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
-   * exactly one place.
+   * Authorizes against the parent download (the team-membership rule lives in exactly one place —
+   * `DownloadService.getAuthorizedDownload`), then loads the export and confirms it belongs to that
+   * download. Exports are authenticated-only — the Parquet download is the unauthenticated path and
+   * anonymous UUID holders must `PUT /api/download/:id` to claim before they can export.
    */
-  async getAuthorizedExport(exportId: string, systemUserId: number | null): Promise<DownloadExportRecord> {
-    if (systemUserId === null) {
+  async getAuthorizedExport(
+    downloadId: string,
+    exportId: string,
+    systemUserId: number | null
+  ): Promise<DownloadVersionExportRecord> {
+    await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
+
+    const exportRecord = await this.downloadVersionExportRepository.getDownloadVersionExportById(exportId);
+
+    if (exportRecord.download_id !== downloadId) {
       throw new HTTP403('Access denied');
     }
-
-    const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
-    await this.downloadService.getAuthorizedDownload(exportRecord.download_id, systemUserId);
 
     return exportRecord;
   }
@@ -133,7 +253,7 @@ export class DownloadExportService extends DBService {
    * random hex, which is meaningless to a human scanning a file list.
    */
   async listExportPartUrls(exportId: string, startedAt: string | null): Promise<DownloadExportPart[]> {
-    const artifacts = await this.downloadExportRepository.listDownloadExportArtifactsByExportId(exportId);
+    const artifacts = await this.downloadVersionExportRepository.listExportArtifactGroupArtifactsByExportId(exportId);
     const objectStorageService = new ObjectStorageService();
     const timestampPrefix = formatDownloadTimestampPrefix(startedAt);
 
@@ -153,6 +273,29 @@ export class DownloadExportService extends DBService {
       })
     );
   }
+}
+
+/**
+ * Compose the full export record for the create path from the inserted row, the in-hand artifact
+ * group, and the parent download id.
+ *
+ * Pure — no I/O. Lifecycle status/timing/error live on the group, never the per-user export, and
+ * `download_id` is the parent already resolved by the caller — so the create path needs no
+ * JOIN-on-RETURNING to build the same shape `findDownloadVersionExportById` returns.
+ */
+function assembleExportRecord(
+  exportRow: DownloadVersionExportRow,
+  group: DownloadVersionExportArtifactGroupRecord,
+  downloadId: string
+): DownloadVersionExportRecord {
+  return {
+    ...exportRow,
+    download_id: downloadId,
+    status: group.status,
+    started_at: group.started_at,
+    completed_at: group.completed_at,
+    error_message: group.error_message
+  };
 }
 
 /**

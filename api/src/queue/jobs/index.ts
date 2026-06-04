@@ -42,6 +42,16 @@ export const JobQueues = {
    */
   PROCESS_DOWNLOAD_EXPORT_FAILED: 'process-download-export-failed',
   /**
+   * Process download version export job queue for async CSV export packaging keyed on the shared
+   * artifact group — one packaging run per group, regardless of how many user exports attach to it.
+   */
+  PROCESS_DOWNLOAD_VERSION_EXPORT: 'process-download-version-export',
+  /**
+   * Dead letter queue for failed download version export jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED: 'process-download-version-export-failed',
+  /**
    * Index submission features job queue for async search indexing after validation.
    */
   INDEX_SUBMISSION_FEATURES: 'index-submission-features',
