@@ -1,0 +1,181 @@
+import SQL from 'sql-template-strings';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { DownloadArtifactInfo } from '../../models/download';
+import { DownloadVersionRecord } from '../../models/download-version';
+import { BaseRepository } from '../base-repository';
+
+/**
+ * A repository class for accessing download version data.
+ *
+ * A download_version is the temporal axis of a download: re-running the same
+ * invariant policy at a later point creates a new version that re-snapshots the
+ * download to pick up newly uploaded features. The policy itself is never
+ * recorded per version — only the materialized artifacts are.
+ *
+ * @export
+ * @class DownloadVersionRepository
+ * @extends {BaseRepository}
+ */
+export class DownloadVersionRepository extends BaseRepository {
+  /**
+   * Create a new download version row.
+   *
+   * Returns the thin record so the caller can immediately set it as the
+   * download's current version without a follow-up SELECT.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @return {Promise<DownloadVersionRecord>}
+   * @memberof DownloadVersionRepository
+   */
+  async createDownloadVersion(downloadId: string): Promise<DownloadVersionRecord> {
+    const sql = SQL`
+      INSERT INTO download_version (download_id)
+      VALUES (${downloadId})
+      RETURNING
+        download_version_id,
+        download_id;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadVersionRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert download version record', [
+        'DownloadVersionRepository->createDownloadVersion',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Point a download at its currently-materialized version.
+   *
+   * The download row is inserted before its version within the create
+   * transaction; this flips the pointer once the version exists.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The version to mark current.
+   * @return {Promise<void>}
+   * @memberof DownloadVersionRepository
+   */
+  async setCurrentDownloadVersion(downloadId: string, downloadVersionId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE download
+      SET current_download_version_id = ${downloadVersionId}
+      WHERE download_id = ${downloadId};
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to set current download version', [
+        'DownloadVersionRepository->setCurrentDownloadVersion',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Link a raw artifact to a download version.
+   *
+   * Idempotent — the Parquet pipeline writes one link per feature-type Parquet
+   * file, and re-running the pipeline for the same version must not duplicate
+   * active rows. The `ON CONFLICT … WHERE record_end_date IS NULL DO NOTHING`
+   * clause matches the table's partial unique index so a re-insert on a still-
+   * active link is a silent no-op (rowCount 0 is a valid outcome, no throw).
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {string} artifactId - The artifact ID.
+   * @param {(string | null)} featureTypeName - The feature type this artifact belongs to, or null.
+   * @return {Promise<void>}
+   * @memberof DownloadVersionRepository
+   */
+  async createDownloadVersionArtifact(
+    downloadVersionId: string,
+    artifactId: string,
+    featureTypeName: string | null
+  ): Promise<void> {
+    const sql = SQL`
+      INSERT INTO download_version_artifact (download_version_id, artifact_id, feature_type_name)
+      VALUES (${downloadVersionId}, ${artifactId}, ${featureTypeName})
+      ON CONFLICT (download_version_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * List the active raw artifacts for a download version, joined to `artifact`
+   * for the S3 `object_key`.
+   *
+   * Used by the export pipeline to discover which Parquet files the version
+   * produced without re-running the original search. Bounded by feature-type
+   * count for the version (tens at worst), so no pagination needed.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadArtifactInfo[]>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionArtifactsByDownloadVersionId(downloadVersionId: string): Promise<DownloadArtifactInfo[]> {
+    const sql = SQL`
+      SELECT
+        a.artifact_id,
+        a.object_key
+      FROM download_version_artifact dva
+      INNER JOIN artifact a ON a.artifact_id = dva.artifact_id
+      WHERE dva.download_version_id = ${downloadVersionId}
+        AND dva.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadArtifactInfo);
+    return response.rows;
+  }
+
+  /**
+   * Get a download version record by ID.
+   *
+   * `find*` returns null on missing (codebase convention — companion to
+   * `getDownloadVersionById`).
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionRecord | null>}
+   * @memberof DownloadVersionRepository
+   */
+  async findDownloadVersionById(downloadVersionId: string): Promise<DownloadVersionRecord | null> {
+    const sql = SQL`
+      SELECT
+        download_version_id,
+        download_id
+      FROM download_version
+      WHERE download_version_id = ${downloadVersionId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadVersionRecord);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get a download version record by ID, throwing if not found.
+   *
+   * Used by the worker to resolve the owning `download_id` from a version.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionRecord>}
+   * @throws {ApiNotFoundError} when no version matches the given ID.
+   * @memberof DownloadVersionRepository
+   */
+  async getDownloadVersionById(downloadVersionId: string): Promise<DownloadVersionRecord> {
+    const record = await this.findDownloadVersionById(downloadVersionId);
+
+    if (!record) {
+      throw new ApiNotFoundError('Download version not found', [
+        'DownloadVersionRepository->getDownloadVersionById',
+        `no download_version with id ${downloadVersionId}`
+      ]);
+    }
+
+    return record;
+  }
+}
