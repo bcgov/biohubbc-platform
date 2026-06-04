@@ -7,10 +7,9 @@
 // then expands them to the anchor feature type through two reachability sources combined with UNION:
 //
 //   content_reach  = a bounded recursive walk SEEDED FROM the evidence (depth 0), following the BIDIRECTIONAL
-//                    edges the closure omits — submission_feature_feature content edges AND synthetic
-//                    dataset↔same-submission membership edges (both endpoints active) — cap depth < 6 in the
-//                    recursive step (deepest node reached is 6 edges from the seed), cycle-guarded by the
-//                    visited path. content_reach ALWAYS includes the evidence itself.
+//                    submission_feature_feature content edges the closure omits (both endpoints active) — cap
+//                    depth < 6 in the recursive step (deepest node reached is 6 edges from the seed),
+//                    cycle-guarded by the visited path. content_reach ALWAYS includes the evidence itself.
 //   reachable      = content_reach
 //                    ∪ closureForward = { c.target : c.source ∈ content_reach }  (ancestors + referenced)
 //                    ∪ closureReverse = { c.source : c.target ∈ content_reach }  (descendants + referencing)
@@ -32,8 +31,6 @@
 //      because M ∈ content_reach and the closure is probed from content_reach.
 //   5. ACCEPTED, INTENTIONAL GAP: the reverse order (closure-ancestor of E, then THAT ancestor's content
 //      edge) is NOT recovered — the content walk seeds only from evidence, not from closure results.
-//   6. Dataset MEMBERSHIP reach (dataset ↔ every same-submission feature) is walked at read time like
-//      content — closure-independent, needing only a shared submission_id (not an upload or a rebuild).
 //
 // UO#5 / API-shape acceptance rows are exercised at the route layer and are out of scope for this
 // evaluator suite, which pins the emitted-SQL reachability semantics directly.
@@ -329,7 +326,7 @@ describe('expression-evaluation (integration)', function () {
       // completes (one Parquet per statement, some empty) — "5 in, 5 files, 1 empty" is a
       // valid, deliberate outcome, not a failure.
       // The broad subquery's security filter resolves "is this feature secured" via the closure
-      // (isEffectivelySecuredViaClosure), so the secured `restricted` feature only reads as secured
+      // (isEffectivelySecured), so the secured `restricted` feature only reads as secured
       // once its closure self-loop exists. Seed it under a shared upload and rebuild the closure
       // BEFORE the subquery; otherwise an empty closure reads it as unsecured and it is NOT stripped.
       const submissionAccessible = await createTestSubmission(connection);
@@ -430,7 +427,7 @@ describe('expression-evaluation (integration)', function () {
     it('security filter excludes features the user cannot read', async () => {
       // Evidence-side security: a secured candidate is dropped before projection, so it never reaches
       // the result even as its own self-match. The drop is driven by the closure-based security filter
-      // (isEffectivelySecuredViaClosure), so each feature is seeded under its OWN upload and its closure
+      // (isEffectivelySecured), so each feature is seeded under its OWN upload and its closure
       // self-loop is rebuilt BEFORE the subquery — without the self-loop the secured feature reads as
       // unsecured and would NOT be stripped. Separate uploads keep the OR-tree reach narrow (each
       // feature only self-matches; no shared upload means no incidental closure relatedness between them).
@@ -718,11 +715,12 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Dataset membership fan-out is restored. D(dataset) with a real descendant Y(animal, parent=D) and an
-     * UNCONNECTED same-submission X(animal, no parent). Evidence=D reaches Y via closureReverse AND reaches X
-     * via the restored dataset→every-feature-in-submission membership edge.
+     * Dataset membership fan-out has been removed. D(dataset) with a real descendant Y(animal, parent=D) and an
+     * UNCONNECTED same-submission X(animal, no parent). Evidence=D reaches Y via closureReverse (Y is D's
+     * descendant) but no longer reaches X — the synthetic dataset→every-feature-in-submission membership edge is
+     * gone, so an unconnected same-submission feature is unreachable from dataset evidence.
      */
-    it('8: dataset evidence reaches descendants and unconnected same-submission features via membership', async () => {
+    it('8: dataset evidence reaches descendants via closure but not unconnected same-submission features', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
 
@@ -746,22 +744,19 @@ describe('expression-evaluation (integration)', function () {
       const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId()));
 
       expect(ids.has(y)).to.equal(true);
-      expect(ids.has(x)).to.equal(true);
+      expect(ids.has(x)).to.equal(false);
     });
 
     /**
      * Empty-closure behaviour, two halves. (a) Without computeClosureForUpload, closure ancestor reach is
      * empty: A(sample_site) ← E(sample_site), evidence=E, anchor=sample_site → A ABSENT (the closure is what
-     * carries ancestor reach). A NON-dataset ancestor is used deliberately — the dataset membership edge is
-     * closure-independent, so a dataset ancestor would be reachable here and mask the closure dependence.
-     * (b) The content walk works WITHOUT a closure: E2(sample_site) ─content→ M(animal), evidence=E2,
-     * anchor=animal → M PRESENT. Distinct uploads keep the halves clean.
+     * carries ancestor reach). (b) The content walk works WITHOUT a closure: E2(sample_site) ─content→ M(animal),
+     * evidence=E2, anchor=animal → M PRESENT. Distinct uploads keep the halves clean.
      */
     it('9: empty closure — closure ancestor reach absent, content reach still works', async () => {
       const submissionId = await createTestSubmission(connection);
 
-      // (a) closure ancestor reach needs the closure — do NOT rebuild it. NON-dataset ancestor so the dataset
-      // membership edge (closure-independent) can't mask the closure dependence.
+      // (a) closure ancestor reach needs the closure — do NOT rebuild it.
       const uploadA = await createTestUpload(connection, submissionId);
       const ancestorSite = await insertFeatureRow({
         submissionId,
@@ -805,12 +800,11 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * AND/OR compose over closure-related features. Two datasets in separate SUBMISSIONS each have a child
-     * sample_site: D1 ← S1, D2 ← S2. Separate submissions (not just uploads) so the dataset membership edge —
-     * which keys on submission_id — cannot cross-link them. An OR of [D1.name, D2.name] anchored at sample_site
-     * UNIONs the two descendant reaches (S1 and S2). An AND INTERSECTs them — no sample_site is a descendant of
-     * both datasets, so the intersection is empty. The raw combinator is already pinned by the self-match AND/OR
-     * tests; this guards that it composes correctly when leaves resolve THROUGH closure relatedness.
+     * AND/OR compose over closure-related features. Two datasets in separate submissions each have a child
+     * sample_site: D1 ← S1, D2 ← S2. An OR of [D1.name, D2.name] anchored at sample_site UNIONs the two
+     * descendant reaches (S1 and S2). An AND INTERSECTs them — no sample_site is a descendant of both datasets,
+     * so the intersection is empty. The raw combinator is already pinned by the self-match AND/OR tests; this
+     * guards that it composes correctly when leaves resolve THROUGH closure relatedness.
      */
     it('10: AND/OR compose over closure-related features (union widens, intersect narrows)', async () => {
       const submissionOne = await createTestSubmission(connection);

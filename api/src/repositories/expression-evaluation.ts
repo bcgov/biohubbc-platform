@@ -221,9 +221,9 @@ function buildPredicateEvidenceIdsQuery(
  * Relatedness is the union of two reachability sources:
  *   (a) the precomputed `submission_feature_closure` reachability — parent-ancestry plus property-reference, in
  *       BOTH directions; and
- *   (b) a bounded recursive walk over the edges the closure deliberately omits — `submission_feature_feature`
- *       content (`data.content`) edges and the synthetic dataset↔same-submission membership edges — both excluded
- *       from the closure because closing over them would make the closure the complete O(N^2) same-upload digraph.
+ *   (b) a bounded recursive walk over the `submission_feature_feature` content (`data.content`) edges the closure
+ *       deliberately omits — excluded from the closure because closing over them would make the closure the
+ *       complete O(N^2) same-upload digraph.
  *
  * The walk starts from the evidence features and follows those edges out to MAX_SEARCH_GRAPH_DEPTH hops,
  * cycle-guarded by the visited path. Every content-reached node is then probed against the closure in BOTH
@@ -273,16 +273,10 @@ function projectEvidenceToTargetIdsQuery(
   const query = knex
     .queryBuilder()
     .with('evidence', evidenceQuery.clone())
-    // edges the closure deliberately omits, walked here: bidirectional content (data.content) edges and
-    // bidirectional synthetic dataset↔same-submission membership edges. Both builders are active-guarded.
+    // edges the closure deliberately omits, walked here: bidirectional content (data.content) edges.
+    // The builder is active-guarded.
     .with('content_edges', (qb) => {
-      qb.select('from_feature_id', 'to_feature_id')
-        .from(buildContentEdgesQuery(knex).as('content_feature_edges'))
-        .unionAll([
-          knex
-            .select('from_feature_id', 'to_feature_id')
-            .from(buildDatasetSubmissionMembershipEdgesQuery(knex).as('dataset_membership_edges'))
-        ]);
+      qb.select('from_feature_id', 'to_feature_id').from(buildContentEdgesQuery(knex).as('content_feature_edges'));
     })
     // recursive content walk: from each evidence feature, follow content edges out to MAX_SEARCH_GRAPH_DEPTH hops,
     // cycle-guarded by the visited path. parent/property transitivity is NOT walked here — the closure handles it.
@@ -347,37 +341,6 @@ function buildContentEdgesQuery(knex: Knex): Knex.QueryBuilder {
     .whereNull('target_sf.record_end_date');
 
   return forward.unionAll([reverse]);
-}
-
-/**
- * Builds synthetic dataset-to-same-submission feature edges in both directions.
- *
- * Dataset synthetic edges intentionally connect dataset features to other features in the same submission. This
- * supports dataset-level predicates returning target features from that submission. This can be high fanout for
- * submissions with many features and should be monitored.
- */
-function buildDatasetSubmissionMembershipEdgesQuery(knex: Knex): Knex.QueryBuilder {
-  const datasetToRelated = knex('submission_feature as dataset_sf')
-    .select('dataset_sf.submission_feature_id as from_feature_id', 'related_sf.submission_feature_id as to_feature_id')
-    .join('feature_type as dataset_ft', 'dataset_ft.feature_type_id', 'dataset_sf.feature_type_id')
-    .join('submission_feature as related_sf', 'related_sf.submission_id', 'dataset_sf.submission_id')
-    .where('dataset_ft.name', 'dataset')
-    .whereRaw('related_sf.submission_feature_id != dataset_sf.submission_feature_id')
-    .whereNull('dataset_ft.record_end_date')
-    .whereNull('dataset_sf.record_end_date')
-    .whereNull('related_sf.record_end_date');
-
-  const relatedToDataset = knex('submission_feature as dataset_sf')
-    .select('related_sf.submission_feature_id as from_feature_id', 'dataset_sf.submission_feature_id as to_feature_id')
-    .join('feature_type as dataset_ft', 'dataset_ft.feature_type_id', 'dataset_sf.feature_type_id')
-    .join('submission_feature as related_sf', 'related_sf.submission_id', 'dataset_sf.submission_id')
-    .where('dataset_ft.name', 'dataset')
-    .whereRaw('related_sf.submission_feature_id != dataset_sf.submission_feature_id')
-    .whereNull('dataset_ft.record_end_date')
-    .whereNull('dataset_sf.record_end_date')
-    .whereNull('related_sf.record_end_date');
-
-  return datasetToRelated.unionAll([relatedToDataset]);
 }
 
 /**
