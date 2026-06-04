@@ -10,11 +10,32 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionFeatureClosureRepository extends BaseRepository {
   /**
-   * Recompute the directed reachability closure for a single upload.
+   * Delete the closure rows for a single upload.
    *
-   * Wholesale DELETE + recursive-CTE INSERT, scoped to the upload's features. Both statements run on
-   * the caller's connection (one transaction), so the recompute is atomic and idempotent under retry —
-   * rerunning converges on the same rows rather than accumulating duplicates.
+   * Scoped by source: every closure row has BOTH endpoints in one upload (the edge CTEs in
+   * {@link computeClosureForUpload} join af_src AND af_tgt to the upload's active features), so matching
+   * by source already identifies all of the upload's rows — and it matches on the primary key, so no
+   * reverse index is needed. submission_feature is upload-wide (not active-only), so a deactivated
+   * feature's stale rows are swept too.
+   *
+   * The service pairs this with {@link computeClosureForUpload} in one transaction (delete then insert);
+   * that ordering is what makes the wholesale recompute idempotent under retry.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @return {Promise<void>}
+   * @memberof SubmissionFeatureClosureRepository
+   */
+  async deleteClosureForUpload(submissionUploadId: string): Promise<void> {
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_closure c
+      USING submission_feature sf
+      WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.source_submission_feature_id = sf.submission_feature_id;
+    `);
+  }
+
+  /**
+   * Compute and insert the directed reachability closure for a single upload.
    *
    * Closure = reachability over an upload's parent and property (feature-reference) edges — the
    * "evidence" reach used by search. Content edges (submission_feature_feature) are deliberately
@@ -25,6 +46,9 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * security cascades up the parent tree only); auth reads WHERE is_ancestor, search reads all rows.
    * See submission_feature_closure's table comment for the full rationale.
    *
+   * Insert only — the service deletes the upload's prior rows first (see {@link deleteClosureForUpload}),
+   * so this runs against an empty slice for the upload and never accumulates duplicates.
+   *
    * Returns the number of closure rows written. An upload whose features are all inactive legitimately
    * writes zero rows, so a count of 0 is a valid result, not a failure.
    *
@@ -33,19 +57,6 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * @memberof SubmissionFeatureClosureRepository
    */
   async computeClosureForUpload(submissionUploadId: string): Promise<number> {
-    // Scope to features in the target upload. Source-only is sufficient: every closure row has BOTH
-    // endpoints in one upload (the edge CTEs below join af_src AND af_tgt to active_features), so
-    // matching by source already identifies all of the upload's rows — and it uses the primary key, so
-    // no reverse index is needed. submission_feature is upload-wide (not active-only), so a deactivated
-    // feature's stale rows are swept too. DELETE precedes INSERT in the same transaction, making the
-    // recompute idempotent under retry.
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_closure c
-      USING submission_feature sf
-      WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-        AND c.source_submission_feature_id = sf.submission_feature_id;
-    `);
-
     // Compute TWO closures and store every evidence edge: the ancestry closure (parent-only,
     // transitive) is the authorization reach; the evidence closure (parent + property, transitive) is
     // the search reach and a superset. is_ancestor is true iff the edge is also in the ancestry closure.

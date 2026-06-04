@@ -31,6 +31,12 @@ export class SubmissionFeatureClosureService extends DBService {
    * the search/evidence reach, while the `is_ancestor = true` subset (pure parent-ancestry) is the
    * authorization reach.
    *
+   * Recomputed wholesale: the upload's prior closure rows are deleted, then the closure is recomputed
+   * from the upload's current feature graph. The caller runs both statements in one transaction (the job
+   * handler's `withConnection`), so the recompute is atomic and idempotent under retry — a
+   * deleted-but-not-yet-reinserted state is never visible to another reader, and rerunning converges on
+   * the same rows rather than accumulating duplicates.
+   *
    * The returned `insertedCount` is log context only — no caller consumes it as a value, and a count
    * of zero is a valid result for an upload whose features are all inactive.
    *
@@ -39,6 +45,10 @@ export class SubmissionFeatureClosureService extends DBService {
    * @memberof SubmissionFeatureClosureService
    */
   async computeClosureForUpload(submissionUploadId: string): Promise<{ insertedCount: number }> {
-    return { insertedCount: await this.submissionFeatureClosureRepository.computeClosureForUpload(submissionUploadId) };
+    await this.submissionFeatureClosureRepository.deleteClosureForUpload(submissionUploadId);
+
+    const insertedCount = await this.submissionFeatureClosureRepository.computeClosureForUpload(submissionUploadId);
+
+    return { insertedCount };
   }
 }
