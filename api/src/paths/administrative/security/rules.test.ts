@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
-import { SecurityService } from '../../../services/security-service';
+import { SecurityRuleService } from '../../../services/security-rule-service';
 import { getActiveSecurityRules } from './rules';
 
 chai.use(sinonChai);
@@ -54,6 +54,7 @@ describe('administrative/security/rules', () => {
           policy_id: 'f4b2f372-98b2-4faa-b98e-91ea2296e370',
           name: 'Caribou',
           description: 'Sensitive data',
+          is_active: true,
           record_effective_date: '2026-01-01',
           record_end_date: null,
           security_category_id: 1,
@@ -64,7 +65,7 @@ describe('administrative/security/rules', () => {
         }
       ];
 
-      sinon.stub(SecurityService.prototype, 'getActiveRulesAndCategories').resolves(mockRules as any);
+      sinon.stub(SecurityRuleService.prototype, 'getActiveRulesAndCategories').resolves(mockRules as any);
 
       const requestHandler = getActiveSecurityRules();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -86,7 +87,7 @@ describe('administrative/security/rules', () => {
       });
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(SecurityService.prototype, 'getActiveRulesAndCategories').rejects(new Error('Service error'));
+      sinon.stub(SecurityRuleService.prototype, 'getActiveRulesAndCategories').rejects(new Error('Service error'));
 
       const requestHandler = getActiveSecurityRules();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

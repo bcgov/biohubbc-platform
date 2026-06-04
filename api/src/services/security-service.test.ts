@@ -788,34 +788,4 @@ describe('SecurityService', () => {
       expect(response.length).to.be.greaterThan(0);
     });
   });
-
-  describe('getSecurityRulesForSubmissionFeatures', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('getActiveSecurityRules', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new SecurityService(mockDBConnection);
-
-      const applySecurity = sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
-        {
-          security_rule_id: 1,
-          name: '',
-          description: '',
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-      const response = await service.getActiveSecurityRules();
-
-      expect(applySecurity).to.be.calledOnce;
-      expect(response.length).to.be.greaterThan(0);
-    });
-  });
 });
