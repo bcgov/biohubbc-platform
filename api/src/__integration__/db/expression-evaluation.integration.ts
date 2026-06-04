@@ -295,6 +295,34 @@ describe('expression-evaluation (integration)', function () {
     return result.rows[0].count;
   }
 
+  /**
+   * Seed a `dataset → animal → capture` parent chain under ONE upload, index `name` on the dataset, and
+   * rebuild the closure. The common fixture for closure descendant/ancestor reach tests anchored on the
+   * dataset name.
+   */
+  async function seedDatasetAnimalCaptureChain(
+    name: string
+  ): Promise<{ submissionId: number; uploadId: string; d: number; a: number; c: number }> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+    const a = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'animal',
+      parentFeatureId: d
+    });
+    const c = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'capture',
+      parentFeatureId: a
+    });
+    await indexNameProperty(d, name, DATASET_NAME_FTP_ID);
+    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+    return { submissionId, uploadId, d, a, c };
+  }
+
   /** Mint a real feature_type_property usable as a property-edge label, from source type to target type. */
   async function mintPropertyEdgeLabel(sourceFeatureType: string, targetFeatureType: string): Promise<number> {
     const { featureTypePropertyId } = await createFeatureTypeProperty(connection, sourceFeatureType, targetFeatureType);
@@ -478,25 +506,7 @@ describe('expression-evaluation (integration)', function () {
      * because the closure is probed in BOTH directions.
      */
     it('1: descendant reach — anchor below evidence is recovered via closureReverse', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, submissionId);
-
-      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-      const a = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'animal',
-        parentFeatureId: d
-      });
-      const c = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'capture',
-        parentFeatureId: a
-      });
-      await indexNameProperty(d, 'Caribou Study', DATASET_NAME_FTP_ID);
-
-      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+      const { c } = await seedDatasetAnimalCaptureChain('Caribou Study');
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -871,25 +881,7 @@ describe('expression-evaluation (integration)', function () {
      * (dataset). The anchor type is the sole result filter over the reachable set.
      */
     it('11: anchor type filters the reachable set to one type', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, submissionId);
-
-      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-      const a = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'animal',
-        parentFeatureId: d
-      });
-      const c = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'capture',
-        parentFeatureId: a
-      });
-      await indexNameProperty(d, 'cross-type', DATASET_NAME_FTP_ID);
-
-      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+      const { d, a, c } = await seedDatasetAnimalCaptureChain('cross-type');
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -1025,9 +1017,11 @@ describe('expression-evaluation (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
 
+      // Chain of 8 nodes: indices 0-5 sample_site, 6 animal, 7 telemetry — the animal/telemetry anchors
+      // isolate the node at depth 6 (reachable) from the node at depth 7 (truncated).
+      const nodeTypes = [...Array.from({ length: 6 }, () => 'sample_site'), 'animal', 'telemetry'];
       const nodes: number[] = [];
-      for (let i = 0; i < 8; i++) {
-        const featureTypeName = i < 6 ? 'sample_site' : i === 6 ? 'animal' : 'telemetry';
+      for (const featureTypeName of nodeTypes) {
         nodes.push(await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName }));
       }
       for (let i = 0; i < nodes.length - 1; i++) {
