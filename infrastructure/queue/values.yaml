@@ -58,6 +58,28 @@ app:
     fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
     fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
 
+  # Ingestion pipeline — queue memory and DB-write tuning knobs
+  ingestion:
+    featureBatchSize: "10000" # INGESTION_FEATURE_BATCH_SIZE: features buffered per archive ingest batch
+    contributorCodeBatchSize: null # INGESTION_CONTRIBUTOR_CODE_BATCH_SIZE: contributor codes per DB insert batch (optional, omitted when unset)
+    mediaBatchBytes: null # INGESTION_MEDIA_BATCH_BYTES: max buffered media bytes before flush (optional, omitted when unset)
+    mediaBatchFiles: null # INGESTION_MEDIA_BATCH_FILES: max buffered media files before flush (optional, omitted when unset)
+
+  # Security scope anchor maintenance
+  security:
+    scopeAnchorBatchSize: "5000" # SECURITY_SCOPE_ANCHOR_BATCH_SIZE: anchor rows per keyset page
+
+  # Upload pipeline — archive ingest controls (queue-consumed)
+  uploadIngestion:
+    featureBatchMaxBytes: "52428800" # UPLOAD_FEATURE_BATCH_MAX_BYTES: heap bound for feature batch buffering
+    mediaConcurrency: null # UPLOAD_ARCHIVE_MEDIA_CONCURRENCY: concurrent media uploads while streaming one archive (optional, omitted when unset)
+    jobBatchSize: null # UPLOAD_JOB_BATCH_SIZE: jobs fetched per worker polling cycle (optional, omitted when unset)
+    jsonFileMaxBytes: "104857600" # UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES: max bytes per features/codes JSON entry
+
+  # Download pipeline — memory-impacting tuning knobs (DOWNLOAD_* prefix)
+  download:
+    featureBatchSize: 5000 # Rows per FETCH for streaming download cursors. Larger = fewer round trips, higher peak heap.
+
 # Openshift Resources
 # Can scale horizontally - pg-boss uses advisory locks to coordinate maintenance
 replicas: ""

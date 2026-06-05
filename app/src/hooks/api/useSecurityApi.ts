@@ -3,9 +3,12 @@ import {
   IListPersecutionHarmResponse,
   IPatchFeatureSecurityRules,
   ISecureDataAccessRequestForm,
+  ISecurityCategoriesResponse,
+  ISecurityReasonsResponse,
   ISubmissionFeatureSecurityRulesSummaryResponse
 } from 'interfaces/useSecurityApi.interface';
 import qs from 'qs';
+import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
 export interface ISecurityRule {
   security_rule_id: number;
@@ -154,6 +157,40 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Gets paginated security categories with associated rule counts.
+   *
+   * @param {ApiSearchParams} [searchParams]
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {Promise<ISecurityCategoriesResponse>}
+   */
+  const getSecurityCategories = async (
+    searchParams?: ApiSearchParams,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<ISecurityCategoriesResponse> => {
+    const params = { ...searchParams, ...pagination };
+    const { data } = await axios.get('/api/administrative/security/categories', { params });
+
+    return data;
+  };
+
+  /**
+   * Gets paginated security reasons with associated feature counts.
+   *
+   * @param {ApiSearchParams} [searchParams]
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {Promise<ISecurityReasonsResponse>}
+   */
+  const getSecurityReasons = async (
+    searchParams?: ApiSearchParams,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<ISecurityReasonsResponse> => {
+    const params = { ...searchParams, ...pagination };
+    const { data } = await axios.get('/api/administrative/security/reasons', { params });
+
+    return data;
+  };
+
   return {
     patchSecurityRulesOnSubmission,
     sendSecureArtifactAccessRequest,
@@ -161,7 +198,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
     applySecurityReasonsToArtifacts,
     patchSecurityRulesOnSubmissionFeatures,
     getSubmissionFeatureSecuritySummary,
-    getActiveSecurityRulesWithCategories
+    getActiveSecurityRulesWithCategories,
+    getSecurityCategories,
+    getSecurityReasons
   };
 };
 

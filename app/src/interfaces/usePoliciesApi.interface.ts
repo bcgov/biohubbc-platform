@@ -1,12 +1,26 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
 
+export enum PolicyStatus {
+  REQUESTED = 'requested',
+  REVIEWED = 'reviewed',
+  APPROVED = 'approved',
+  DENIED = 'denied'
+}
+
 /**
- * Policy with statements and conditions (API response).
+ * Policy response shape without statements.
  */
-export interface IPolicy {
+export interface IPolicySummary {
   policy_id: string;
   name: string;
   description: string | null;
+  status: PolicyStatus;
+}
+
+/**
+ * Policy with statements and conditions (API response).
+ */
+export interface IPolicy extends IPolicySummary {
   statements: IPolicyStatement[];
 }
 
@@ -46,6 +60,7 @@ export interface IPoliciesResponse {
 export interface ICreatePolicyRequest {
   name: string;
   description?: string;
+  status?: PolicyStatus;
   statements: ICreatePolicyStatementRequest[];
 }
 
@@ -73,5 +88,13 @@ export interface ICreatePolicyConditionRequest {
 export interface IUpdatePolicyRequest {
   name: string;
   description?: string;
+  status?: PolicyStatus;
   statements: ICreatePolicyStatementRequest[];
+}
+
+/**
+ * Update policy status request payload.
+ */
+export interface IUpdatePolicyStatusRequest {
+  status: PolicyStatus;
 }

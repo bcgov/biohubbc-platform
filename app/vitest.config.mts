@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
     'import.meta.env.VITE_API_PORT': JSON.stringify(env.VITE_API_PORT),
     'import.meta.env.VITE_MAX_UPLOAD_NUM_FILES': JSON.stringify(env.VITE_MAX_UPLOAD_NUM_FILES),
     'import.meta.env.VITE_MAX_UPLOAD_FILE_SIZE': JSON.stringify(env.VITE_MAX_UPLOAD_FILE_SIZE),
+    'import.meta.env.VITE_MAX_UPLOAD_TARBALL_SIZE': JSON.stringify(env.VITE_MAX_UPLOAD_TARBALL_SIZE),
     'import.meta.env.VITE_SITEMINDER_LOGOUT_URL': JSON.stringify(env.VITE_SITEMINDER_LOGOUT_URL),
     'import.meta.env.VITE_KEYCLOAK_HOST': JSON.stringify(env.VITE_KEYCLOAK_HOST),
     'import.meta.env.VITE_KEYCLOAK_REALM': JSON.stringify(env.VITE_KEYCLOAK_REALM),

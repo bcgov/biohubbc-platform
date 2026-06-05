@@ -181,6 +181,19 @@ biohub-platform-queue:
       level: debug
       levelFile: debug
       fileMaxFiles: 2  # Smaller for PR environments
+    # Ingestion/security/upload tuning (optional queue overrides)
+    # ingestion:
+    #   featureBatchSize: "10000"
+    #   contributorCodeBatchSize: ""
+    #   mediaBatchBytes: ""
+    #   mediaBatchFiles: ""
+    # security:
+    #   scopeAnchorBatchSize: "5000"
+    # uploadIngestion:
+    #   featureBatchMaxBytes: "52428800"
+    #   mediaConcurrency: ""
+    #   jobBatchSize: ""
+    #   jsonFileMaxBytes: "104857600"
 
   # Openshift Resources
   # Workers can scale horizontally - maintenance is handled by queue-supervisor

@@ -3,9 +3,12 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
-import { CodeRepository, FeaturePropertyCode, FeatureTypeCode } from './code-repository';
+import { ApiNotFoundError } from '../errors/api-error';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
+import { CodeRepository } from './code-repository';
 
 chai.use(sinonChai);
 
@@ -16,10 +19,11 @@ describe('CodeRepository', () => {
     });
 
     it('should return rows if succeeds', async () => {
-      const mockRow: FeatureTypeCode = {
+      const mockRow: FeatureType = {
         feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_type_display_name: 'Dataset'
+        name: 'dataset',
+        display_name: 'Dataset',
+        description: null
       };
 
       const mockQueryResponse = {
@@ -45,15 +49,25 @@ describe('CodeRepository', () => {
     });
 
     it('should return rows if succeeds', async () => {
-      const mockRow: FeatureTypeCode & FeaturePropertyCode = {
-        feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_type_display_name: 'Dataset',
-        feature_property_id: 2,
-        feature_property_name: 'name',
-        feature_property_display_name: 'Name',
-        feature_property_type_id: 3,
-        feature_property_type_name: 'string'
+      const mockRow: FeatureTypeWithProperties = {
+        feature_type: {
+          feature_type_id: 1,
+          name: 'dataset',
+          display_name: 'Dataset',
+          description: null
+        },
+        properties: [
+          {
+            feature_type_property_id: 2,
+            name: 'name',
+            display_name: 'Name',
+            description: 'Name',
+            type_name: FEATURE_PROPERTY_TYPE.STRING,
+            required_value: true,
+            calculated_value: false,
+            allow_multiple: false
+          }
+        ]
       };
 
       const mockQueryResponse = {
@@ -103,15 +117,15 @@ describe('CodeRepository', () => {
     });
 
     it('should return row if succeeds', async () => {
-      const mockRow: FeatureTypeCode & FeaturePropertyCode = {
-        feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_type_display_name: 'Dataset',
-        feature_property_id: 2,
-        feature_property_name: 'name',
-        feature_property_display_name: 'Name',
-        feature_property_type_id: 3,
-        feature_property_type_name: 'string'
+      const mockRow: FeatureTypeProperty = {
+        feature_type_property_id: 2,
+        name: 'name',
+        display_name: 'Name',
+        description: 'Name',
+        type_name: FEATURE_PROPERTY_TYPE.STRING,
+        required_value: true,
+        calculated_value: false,
+        allow_multiple: false
       };
 
       const mockQueryResponse = {

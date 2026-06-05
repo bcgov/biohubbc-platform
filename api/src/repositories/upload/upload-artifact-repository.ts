@@ -1,6 +1,13 @@
 import { SQL } from 'sql-template-strings';
+import z from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
+import { Artifact } from '../../models/artifact';
+import {
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact,
+  UploadArtifactRoleEnum
+} from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
 export class UploadArtifactRepository extends BaseRepository {
@@ -19,11 +26,13 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
         upload_artifact
       WHERE
-        upload_artifact_id = ${uploadArtifactId};
+        upload_artifact_id = ${uploadArtifactId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
@@ -57,9 +66,12 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
-        upload_artifact;
+        upload_artifact
+      WHERE
+        record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
@@ -67,38 +79,113 @@ export class UploadArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new upload artifact into the database.
+   * List active artifacts for an upload and role.
    *
-   * @param {CreateUploadArtifact} uploadArtifact - The upload artifact data to insert.
-   * @returns {Promise<{ upload_artifact_id: string }>} - The inserted upload artifact ID.
-   * @throws {ApiExecuteSQLError} - Throws an error if the insertion fails.
+   * @param {string} uploadId - Upload session UUID.
+   * @param {UploadArtifactRoleEnum} role - Upload artifact role.
+   * @returns {Promise<Artifact[]>} Active artifacts linked to the upload and role.
+   * @memberof UploadArtifactRepository
    */
-  async insertUploadArtifact(uploadArtifact: CreateUploadArtifact): Promise<{ upload_artifact_id: string }> {
+  async getArtifactsByUploadId(uploadId: string, role: UploadArtifactRoleEnum): Promise<Artifact[]> {
+    const sqlStatement = SQL`
+      SELECT
+        a.artifact_id,
+        a.artifact_status,
+        a.bucket,
+        a.object_key,
+        a.byte_size,
+        a.checksum_sha256,
+        a.uploaded_at,
+        a.format
+      FROM upload_artifact ua
+      JOIN artifact a
+        ON a.artifact_id = ua.artifact_id
+      WHERE ua.upload_id = ${uploadId}
+        AND ua.role = ${role}::upload_artifact_role
+        AND ua.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, Artifact);
+
+    return response.rows;
+  }
+
+  /**
+   * Insert upload artifact records in bulk.
+   *
+   * @param {CreateUploadArtifact[]} uploadArtifacts
+   * @returns {Promise<{ upload_artifact_id: string }[]>}
+   * @throws {ApiExecuteSQLError}
+   */
+  async insertUploadArtifacts(uploadArtifacts: CreateUploadArtifact[]): Promise<{ upload_artifact_id: string }[]> {
+    if (!uploadArtifacts.length) {
+      return [];
+    }
+
+    const uploadIds = uploadArtifacts.map((item) => item.upload_id);
+    const artifactIds = uploadArtifacts.map((item) => item.artifact_id);
+    const roles = uploadArtifacts.map((item) => item.role);
+    const uploadArchiveIds = uploadArtifacts.map((item) => item.upload_archive_id);
+    const paths = uploadArtifacts.map((item) => item.path ?? null);
+
     const sqlStatement = SQL`
       INSERT INTO upload_artifact (
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
-      ) VALUES (
-        ${uploadArtifact.upload_id},
-        ${uploadArtifact.artifact_id},
-        ${uploadArtifact.role},
-        ${uploadArtifact.upload_archive_id}
+        upload_archive_id,
+        path
       )
+      SELECT *
+      FROM UNNEST(
+        ${uploadIds}::uuid[],
+        ${artifactIds}::uuid[],
+        ${roles}::upload_artifact_role[],
+        ${uploadArchiveIds}::uuid[],
+        ${paths}::text[]
+      )
+      ON CONFLICT (upload_id, artifact_id)
+      WHERE record_end_date IS NULL
+      DO UPDATE SET
+        role = EXCLUDED.role,
+        upload_archive_id = EXCLUDED.upload_archive_id,
+        path = EXCLUDED.path,
+        record_end_date = NULL
       RETURNING upload_artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ upload_artifact_id: z.string().uuid() }));
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert upload artifact record', [
-        'UploadArtifactRepository->insertUploadArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
+    if (response.rowCount !== uploadArtifacts.length) {
+      throw new ApiExecuteSQLError('Failed to insert upload artifact records', [
+        'UploadArtifactRepository->insertUploadArtifacts',
+        `rowCount was ${response.rowCount}, expected ${uploadArtifacts.length}`
       ]);
     }
 
-    return response.rows[0];
+    return response.rows;
+  }
+
+  /**
+   * Soft-delete active upload_artifact rows for one upload.
+   *
+   * Used as pre-ingest idempotency cleanup to avoid uniqueness conflicts when
+   * reprocessing the same upload.
+   *
+   * @param {string} uploadId
+   * @returns {Promise<void>}
+   * @memberof UploadArtifactRepository
+   */
+  async deleteUploadArtifactsByUploadId(uploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE upload_artifact
+      SET
+        record_end_date = NOW()
+      WHERE upload_id = ${uploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 
   /**
@@ -119,9 +206,11 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id = COALESCE(${uploadArtifact.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArtifact.artifact_id}, artifact_id),
         role = COALESCE(${uploadArtifact.role}, role),
-        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id)
+        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id),
+        path = COALESCE(${uploadArtifact.path ?? null}, path)
       WHERE
         upload_artifact_id = ${uploadArtifactId}
+        AND record_end_date IS NULL
       RETURNING upload_artifact_id;
     `;
 

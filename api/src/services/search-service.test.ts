@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { IDBConnection } from '../database/db';
 import { SearchFeatureResult, SearchSubmissionResult, SearchTaxonResult } from '../models/search';
 import { SearchRepository } from '../repositories/search-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SearchService } from './search-service';
 import { WithCount } from './search-service.interface';
 

@@ -38,6 +38,10 @@ spec:
               value: {{ .Values.app.requestLimits.uploadNumFiles | quote }}
             - name: VITE_MAX_UPLOAD_FILE_SIZE
               value: {{ .Values.app.requestLimits.uploadFileSize | quote }}
+            - name: VITE_MAX_UPLOAD_TARBALL_SIZE
+              value: {{ .Values.app.requestLimits.uploadTarballSize | quote }}
+            - name: VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE
+              value: {{ .Values.app.requestLimits.ticketAttachmentFileSize | quote }}
             - name: NODE_ENV
               value: {{ .Values.app.nodeEnv }}
             - name: VITE_NODE_ENV

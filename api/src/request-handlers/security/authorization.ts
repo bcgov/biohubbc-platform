@@ -7,6 +7,22 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('request-handlers/security/authorization');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention: for authorization-handler tests, stub this bag instead of
+ * stubbing imported module namespace exports directly.
+ */
+export interface AuthorizationDependencies {
+  getAPIUserDBConnection: typeof getAPIUserDBConnection;
+  authorizeRequest: (req: Request) => Promise<boolean>;
+}
+
+export const authorizationDependencies: AuthorizationDependencies = {
+  getAPIUserDBConnection,
+  authorizeRequest: (req: Request) => authorizeRequest(req)
+};
+
 export type AuthorizationSchemeCallback = (req: Request) => AuthorizationScheme;
 
 /**
@@ -23,7 +39,7 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
   return async (req, _, next) => {
     req.authorization_scheme = authorizationSchemeCallback(req);
 
-    const isAuthorized = await authorizeRequest(req);
+    const isAuthorized = await authorizationDependencies.authorizeRequest(req);
 
     if (!isAuthorized) {
       defaultLog.warn({ label: 'authorize', message: 'User is not authorized' });
@@ -45,7 +61,7 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
  * @return {*}  {Promise<boolean>}
  */
 export const authorizeRequest = async (req: Request): Promise<boolean> => {
-  const connection = getAPIUserDBConnection();
+  const connection = authorizationDependencies.getAPIUserDBConnection();
 
   try {
     const authorizationScheme: AuthorizationScheme = req.authorization_scheme;
@@ -62,9 +78,10 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
       keycloakToken: req.keycloak_token
     });
 
-    const isAuthorized =
-      (await authorizationService.authorizeSystemAdministrator()) ||
-      (await authorizationService.executeAuthorizationScheme(authorizationScheme));
+    // Execute both auth pathways because `authorizationService.executeAuthorizationScheme` has side effects that mutate the `req`, which may be required by endpoints
+    const isSystemAdministrator = await authorizationService.authorizeSystemAdministrator();
+    const isSchemeAuthorized = await authorizationService.executeAuthorizationScheme(authorizationScheme);
+    const isAuthorized = isSystemAdministrator || isSchemeAuthorized;
 
     // Add the system_user to the request for future use, if needed
     req.system_user = authorizationService.systemUser;

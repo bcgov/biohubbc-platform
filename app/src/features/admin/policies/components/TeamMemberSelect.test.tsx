@@ -34,7 +34,7 @@ describe('TeamMemberSelect', () => {
   it('loads available users on mount', async () => {
     const mockOnChange = vi.fn();
 
-    render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+    render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
 
     await waitFor(() => {
       expect(mockGetAvailableUsers).toHaveBeenCalled();
@@ -44,17 +44,17 @@ describe('TeamMemberSelect', () => {
   it('renders autocomplete input with correct label', async () => {
     const mockOnChange = vi.fn();
 
-    const { getByLabelText } = render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+    const { getByLabelText } = render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
 
     await waitFor(() => {
       expect(getByLabelText('Team Members')).toBeVisible();
     });
   });
 
-  it('renders with no selected users when selectedUserIds is empty', async () => {
+  it('renders with no selected users when selectedUsers is empty', async () => {
     const mockOnChange = vi.fn();
 
-    const { queryByRole } = render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+    const { queryByRole } = render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
 
     await waitFor(() => {
       // No chips should be rendered when no users are selected
@@ -63,16 +63,14 @@ describe('TeamMemberSelect', () => {
     });
   });
 
-  it('displays selected users as chips when selectedUserIds and initialUsers are provided', async () => {
+  it('displays selected users as chips', async () => {
     const mockOnChange = vi.fn();
-    const initialUsers = [
+    const selectedUsers = [
       { system_user_id: 1, user_identifier: 'alice' },
       { system_user_id: 2, user_identifier: 'bob' }
     ];
 
-    const { getByText } = render(
-      <TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} initialUsers={initialUsers} />
-    );
+    const { getByText } = render(<TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />);
 
     await waitFor(() => {
       expect(getByText('alice')).toBeVisible();
@@ -80,23 +78,21 @@ describe('TeamMemberSelect', () => {
     });
   });
 
-  it('displays user_identifier for selected users with initialUsers', async () => {
+  it('displays user_identifier for selected users', async () => {
     const mockOnChange = vi.fn();
-    const initialUsers = [{ system_user_id: 3, user_identifier: 'charlie' }];
+    const selectedUsers = [{ system_user_id: 3, user_identifier: 'charlie' }];
 
-    const { getByText } = render(
-      <TeamMemberSelect selectedUserIds={[3]} onChange={mockOnChange} initialUsers={initialUsers} />
-    );
+    const { getByText } = render(<TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />);
 
     await waitFor(() => {
       expect(getByText('charlie')).toBeVisible();
     });
   });
 
-  it('calls onChange with user IDs when selection changes', async () => {
+  it('calls onChange with full user objects when selection changes', async () => {
     const mockOnChange = vi.fn();
 
-    const { getByLabelText, getByRole } = render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+    const { getByLabelText, getByRole } = render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
 
     // Wait for users to load
     await waitFor(() => {
@@ -118,9 +114,9 @@ describe('TeamMemberSelect', () => {
     const options = within(listbox).getAllByRole('option');
     fireEvent.click(options[0]);
 
-    // Verify onChange was called with the selected user ID
+    // Verify onChange was called with the full user object
     await waitFor(() => {
-      expect(mockOnChange).toHaveBeenCalledWith([1]);
+      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 1, user_identifier: 'alice' }]);
     });
   });
 
@@ -128,7 +124,7 @@ describe('TeamMemberSelect', () => {
     const mockOnChange = vi.fn();
 
     const { getByLabelText, getByRole, getByText } = render(
-      <TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />
+      <TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />
     );
 
     // Wait for users to load
@@ -154,13 +150,13 @@ describe('TeamMemberSelect', () => {
 
   it('removes user when chip is deleted', async () => {
     const mockOnChange = vi.fn();
-    const initialUsers = [
+    const selectedUsers = [
       { system_user_id: 1, user_identifier: 'alice' },
       { system_user_id: 2, user_identifier: 'bob' }
     ];
 
     const { getAllByTestId, getByText } = render(
-      <TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} initialUsers={initialUsers} />
+      <TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />
     );
 
     // Wait for chips to render
@@ -175,14 +171,14 @@ describe('TeamMemberSelect', () => {
 
     // Verify onChange was called without the removed user
     await waitFor(() => {
-      expect(mockOnChange).toHaveBeenCalledWith([2]);
+      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 2, user_identifier: 'bob' }]);
     });
   });
 
   it('passes search parameter to API when typing', async () => {
     const mockOnChange = vi.fn();
 
-    const { getByLabelText } = render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+    const { getByLabelText } = render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
 
     // Wait for initial load
     await waitFor(() => {
@@ -210,10 +206,10 @@ describe('TeamMemberSelect', () => {
     mockGetAvailableUsers.mockResolvedValueOnce({ users: mockUsers });
 
     const mockOnChange = vi.fn();
-    const initialUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
+    const selectedUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
 
     const { getAllByText, getByLabelText, queryByRole } = render(
-      <TeamMemberSelect selectedUserIds={[1]} onChange={mockOnChange} initialUsers={initialUsers} />
+      <TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />
     );
 
     // Wait for initial load
@@ -242,7 +238,7 @@ describe('TeamMemberSelect', () => {
       { timeout: 500 }
     );
 
-    // Alice should still be visible as a chip because she's selected (cached)
+    // Alice should still be visible as a chip because she's selected
     // Use getAllByText since alice may appear as chip and in dropdown
     const aliceElements = getAllByText('alice');
     expect(aliceElements.length).toBeGreaterThan(0);

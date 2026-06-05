@@ -5,6 +5,7 @@ import {
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
@@ -25,7 +26,9 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
-        ticket_id
+        status,
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -34,17 +37,60 @@ export class SubmissionUploadRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+    const methodLabel = 'SubmissionUploadRepository->getSubmissionUpload';
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Submission upload not found', [
-        'SubmissionUploadRepository->getSubmissionUpload',
-        { submissionUploadId }
-      ]);
+      throw new ApiNotFoundError('Submission upload not found', [methodLabel, { submissionUploadId }]);
     }
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
-        'SubmissionUploadRepository->getSubmissionUpload',
+        methodLabel,
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get and lock a single active submission_upload record by ID.
+   *
+   * Uses `FOR UPDATE` to serialize concurrent workers attempting to start
+   * process-stage work for the same submission_upload_id.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record.
+   * @returns {Promise<SubmissionUpload>} - The locked submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   */
+  async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_upload_id,
+        submission_id,
+        upload_id,
+        status,
+        ticket_id,
+        comment
+      FROM
+        submission_upload
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      FOR UPDATE;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+    const methodLabel = 'SubmissionUploadRepository->getSubmissionUploadWithLock';
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [methodLabel, { submissionUploadId }]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        methodLabel,
         `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
@@ -71,7 +117,9 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.submission_upload_id,
         su.submission_id,
         su.upload_id,
+        su.status,
         su.ticket_id,
+        su.comment,
         su.record_end_date
       FROM
         submission_upload su
@@ -120,12 +168,15 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_upload_id',
         'submission_upload.submission_id',
         'submission_upload.upload_id',
-        'submission_upload.ticket_id'
+        'submission_upload.status',
+        'submission_upload.ticket_id',
+        'submission_upload.comment'
       )
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
       .where('submission_upload.submission_id', submissionId)
-      .whereNull('submission_upload.record_end_date');
+      .whereNull('submission_upload.record_end_date')
+      .whereNull('ua.record_end_date');
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -136,6 +187,115 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, SubmissionUpload);
 
+    return response.rows;
+  }
+
+  /**
+   * Find ticket-scoped submission upload timeline records.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<TicketSubmissionUpload[]>}
+   */
+  async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        s.uuid AS submission_uuid,
+        su.upload_id,
+        su.create_date,
+        s.name AS submission_name,
+        s.description AS submission_description,
+        su.comment AS submission_comment,
+        submitter.user_identifier AS submitted_by_identifier,
+        su.status AS upload_status,
+        sus.status AS review_status,
+        sv.validation,
+        json_build_object(
+          'validation',
+          CASE
+            WHEN validation_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', validation_review.submission_upload_review_id,
+              'submission_upload_id', validation_review.submission_upload_id,
+              'scope', validation_review.scope,
+              'status', validation_review.status,
+              'requested_by', validation_review.requested_by
+            )
+          END,
+          'security',
+          CASE
+            WHEN security_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', security_review.submission_upload_review_id,
+              'submission_upload_id', security_review.submission_upload_id,
+              'scope', security_review.scope,
+              'status', security_review.status,
+              'requested_by', security_review.requested_by
+            )
+          END
+        ) AS reviews
+      FROM
+        submission_upload su
+      INNER JOIN
+        submission s
+      ON
+        s.submission_id = su.submission_id
+      LEFT JOIN
+        "system_user" submitter
+      ON
+        submitter.system_user_id = s.system_user_id
+      INNER JOIN LATERAL (
+        SELECT
+          sus.status
+        FROM
+          submission_upload_status sus
+        WHERE
+          sus.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sus.create_date DESC,
+          sus.submission_upload_status_id DESC
+        LIMIT 1
+      ) sus ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          json_build_object(
+            'submission_validation_id', sv.submission_validation_id,
+            'job_id', sv.job_id,
+            'status', sv.status,
+            'metadata', sv.metadata,
+            'started_at', sv.started_at,
+            'ended_at', sv.ended_at,
+            'create_date', sv.create_date
+          ) AS validation
+        FROM
+          submission_validation sv
+        WHERE
+          sv.submission_upload_id = su.submission_upload_id
+        ORDER BY
+          sv.create_date DESC
+        LIMIT 1
+      ) sv ON TRUE
+      LEFT JOIN
+        submission_upload_review validation_review
+      ON
+        validation_review.submission_upload_id = su.submission_upload_id
+        AND validation_review.scope = 'validation'
+        AND validation_review.record_end_date IS NULL
+      LEFT JOIN
+        submission_upload_review security_review
+      ON
+        security_review.submission_upload_id = su.submission_upload_id
+        AND security_review.scope = 'security'
+        AND security_review.record_end_date IS NULL
+      WHERE
+        su.ticket_id = ${ticketId}
+        AND su.record_end_date IS NULL
+        AND s.record_end_date IS NULL
+      ORDER BY
+        su.create_date ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketSubmissionUpload);
     return response.rows;
   }
 
@@ -151,11 +311,15 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id
+        ticket_id,
+        status,
+        comment
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
-        ${submissionUpload.ticket_id}
+        ${submissionUpload.ticket_id},
+        ${submissionUpload.status},
+        ${submissionUpload.comment ?? null}
       )
       RETURNING submission_upload_id;
     `;
@@ -190,14 +354,19 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id
+        ticket_id,
+        status,
+        comment
       )
       SELECT
         ${submissionId},
         ua.upload_id,
-        ${ticketId}
+        ${ticketId},
+        'uploaded'::submission_upload_job_status,
+        NULL
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
+        AND ua.record_end_date IS NULL
       RETURNING submission_upload_id;
     `;
 
@@ -232,6 +401,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
+        status = COALESCE(${submissionUpload.status}, status),
         ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
@@ -264,7 +434,9 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
-        ticket_id
+        status,
+        ticket_id,
+        comment
       FROM
         submission_upload
       WHERE
@@ -302,7 +474,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -326,7 +499,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET record_end_date = NOW()
       WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -335,21 +509,24 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Hard-delete a submission_upload record by ID.
+   * Soft-delete a single active submission_upload record by ID.
    *
-   * @param {string} submissionUploadId - The ID of the submission_upload record to delete.
-   * @throws {ApiExecuteSQLError} - If the deletion fails.
+   * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @throws {ApiExecuteSQLError} - If the soft-delete fails.
    */
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      DELETE FROM submission_upload
-      WHERE submission_upload_id = ${submissionUploadId};
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to delete submission_upload record', [
+      throw new ApiExecuteSQLError('Failed to soft-delete submission_upload record', [
         'SubmissionUploadRepository->deleteSubmissionUpload',
         `rowCount was ${response.rowCount}, expected 1`
       ]);

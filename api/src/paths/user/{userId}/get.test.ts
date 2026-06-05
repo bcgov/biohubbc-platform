@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { UserService } from '../../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as user from './get';
 
 chai.use(sinonChai);
@@ -17,7 +17,7 @@ describe('user', () => {
 
     it('catches and re-throws an error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -42,7 +42,7 @@ describe('user', () => {
     it('finds user by Id and returns 200 and requestHandler on success', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

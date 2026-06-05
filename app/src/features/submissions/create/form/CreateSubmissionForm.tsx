@@ -7,10 +7,12 @@ import { IUploadHandler } from 'components/attachments/FileUploadItem';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { AttachmentValidExtensions } from 'constants/attachments';
 import { useFormikContext } from 'formik';
+import { useConfigContext } from 'hooks/useContext';
 import { ICreateSubmissionForm } from './CreateSubmissionForm.interface';
 
 export const CreateSubmissionForm = () => {
   const { errors, setFieldError, setFieldValue } = useFormikContext<ICreateSubmissionForm>();
+  const config = useConfigContext();
 
   const uploadHandler: IUploadHandler = async (
     file: File,
@@ -21,10 +23,10 @@ export const CreateSubmissionForm = () => {
       return;
     }
 
-    const isJson = file.name.toLowerCase().endsWith('.json');
+    const isTar = file.name.toLowerCase().endsWith('.tar');
 
-    if (!isJson) {
-      setFieldError('file', 'Only .json files are supported');
+    if (!isTar) {
+      setFieldError('file', 'Only .tar files are supported');
       return;
     }
 
@@ -54,7 +56,8 @@ export const CreateSubmissionForm = () => {
       <FileUpload
         uploadHandler={uploadHandler}
         dropZoneProps={{
-          acceptedFileExtensions: [AttachmentValidExtensions.JSON]
+          maxFileSize: config.MAX_UPLOAD_TARBALL_SIZE,
+          acceptedFileExtensions: [AttachmentValidExtensions.TAR]
         }}
       />
     </Box>

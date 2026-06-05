@@ -1,4 +1,4 @@
-import { mdiDatabase, mdiFileOutline, mdiMapMarker, mdiWifiMarker } from '@mdi/js';
+import { mdiDatabase, mdiFileOutline, mdiMapMarker, mdiTerrain, mdiWifiMarker } from '@mdi/js';
 
 /**
  * Significant feature types that are preferentially displayed in search results
@@ -7,7 +7,8 @@ export enum PRIORITY_FEATURE_TYPE {
   DATASET = 'dataset',
   SPECIES_OBSERVATION = 'species_observation',
   TELEMETRY = 'telemetry',
-  REPORT = 'report'
+  REPORT = 'report',
+  HABITAT_FEATURE = 'habitat_feature'
 }
 
 /**
@@ -19,7 +20,7 @@ export const FEATURE_TYPE_CONFIG: Record<PRIORITY_FEATURE_TYPE, { label: string;
     icon: mdiDatabase
   },
   species_observation: {
-    label: 'Species observations',
+    label: 'Observations',
     icon: mdiMapMarker
   },
   telemetry: {
@@ -27,7 +28,11 @@ export const FEATURE_TYPE_CONFIG: Record<PRIORITY_FEATURE_TYPE, { label: string;
     icon: mdiWifiMarker
   },
   report: {
-    label: 'Report',
+    label: 'Reports',
     icon: mdiFileOutline
+  },
+  habitat_feature: {
+    label: 'Habitat Features',
+    icon: mdiTerrain
   }
 };

@@ -156,6 +156,7 @@ const getOrCreateLoggerSingleton = (loggerName: string): winston.Logger => {
 
   const transports: winston.transport[] = [];
   const transportTypes = getTransportTypes();
+  const isTestMode = ['test', 'test-watch', 'coverage'].includes(process.env.npm_lifecycle_event ?? '');
 
   if (transportTypes.includes('file')) {
     transports.push(
@@ -178,7 +179,7 @@ const getOrCreateLoggerSingleton = (loggerName: string): winston.Logger => {
   if (transportTypes.includes('console')) {
     transports.push(
       new winston.transports.Console({
-        level: process.env.LOG_LEVEL || 'debug',
+        level: process.env.LOG_LEVEL || (isTestMode ? 'silent' : 'debug'),
         format: consoleFormat
       })
     );

@@ -1,10 +1,77 @@
 import { SQL } from 'sql-template-strings';
 import z from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { BaseRepository } from '../base-repository';
 
 export class ArtifactRepository extends BaseRepository {
+  /**
+   * Insert artifact records in bulk without mutating existing rows and return
+   * the persisted records for all input keys.
+   *
+   * @param {CreateArtifact[]} artifacts
+   * @returns {Promise<Artifact[]>}
+   */
+  async insertArtifacts(artifacts: CreateArtifact[]): Promise<Artifact[]> {
+    if (!artifacts.length) {
+      return [];
+    }
+
+    const buckets = artifacts.map((artifact) => artifact.bucket);
+    const artifactStatuses = artifacts.map((artifact) => artifact.artifact_status);
+    const objectKeys = artifacts.map((artifact) => artifact.object_key);
+    const byteSizes = artifacts.map((artifact) => artifact.byte_size);
+    const checksums = artifacts.map((artifact) => artifact.checksum_sha256 ?? null);
+    const uploadedAts = artifacts.map((artifact) => artifact.uploaded_at ?? null);
+    const formats = artifacts.map((artifact) => artifact.format);
+
+    const sqlStatement = SQL`
+      INSERT INTO artifact (
+        bucket,
+        object_key,
+        byte_size,
+        artifact_status,
+        checksum_sha256,
+        uploaded_at,
+        format
+      )
+      SELECT *
+      FROM UNNEST(
+        ${buckets}::text[],
+        ${objectKeys}::text[],
+        ${byteSizes}::bigint[],
+        ${artifactStatuses}::artifact_status[],
+        ${checksums}::text[],
+        ${uploadedAts}::timestamptz[],
+        ${formats}::text[]
+      ) AS t(
+        bucket,
+        object_key,
+        byte_size,
+        artifact_status,
+        checksum_sha256,
+        uploaded_at,
+        format
+      )
+      ON CONFLICT (bucket, object_key) DO UPDATE
+      SET
+        bucket = artifact.bucket
+      RETURNING
+        artifact_id,
+        artifact_status,
+        bucket,
+        object_key,
+        byte_size,
+        checksum_sha256,
+        uploaded_at,
+        format;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, Artifact);
+
+    return response.rows;
+  }
+
   /**
    * Get a single artifact by ID.
    *
@@ -22,7 +89,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key,
         byte_size,
         checksum_sha256,
-        uploaded_at
+        uploaded_at,
+        format
       FROM
         artifact
       WHERE
@@ -46,6 +114,52 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
+   * Look up `byte_size` for many artifacts in one round-trip, keyed by
+   * `(bucket, object_key)`. Used by the export pipeline to project the size
+   * of binary attachments that will be appended to a part-zip *after* the
+   * CSV-byte rollover check, so the part can roll before the binaries push
+   * it past `max_part_size_bytes`.
+   *
+   * Filters `byte_size IS NOT NULL` so unuploaded / pending rows contribute
+   * zero to the projection rather than poisoning it. Missing keys are
+   * absent from the returned map — the caller treats absence as zero, since
+   * the streaming path already writes a `.error.txt` placeholder for
+   * objects that aren't fetchable.
+   *
+   * @param {string} bucket - The S3 bucket the keys live in.
+   * @param {string[]} objectKeys - Object keys to look up.
+   * @returns {Promise<Map<string, number>>} - object_key → byte_size.
+   */
+  async getArtifactByteSizesByObjectKeys(bucket: string, objectKeys: string[]): Promise<Map<string, number>> {
+    if (objectKeys.length === 0) {
+      return new Map();
+    }
+
+    const sqlStatement = SQL`
+      SELECT
+        object_key,
+        byte_size
+      FROM
+        artifact
+      WHERE
+        bucket = ${bucket}
+        AND object_key = ANY(${objectKeys}::text[])
+        AND byte_size IS NOT NULL;
+    `;
+
+    const response = await this.connection.sql(
+      sqlStatement,
+      z.object({ object_key: z.string(), byte_size: z.number().int().nonnegative() })
+    );
+
+    const result = new Map<string, number>();
+    for (const row of response.rows) {
+      result.set(row.object_key, row.byte_size);
+    }
+    return result;
+  }
+
+  /**
    * Get all artifact records.
    *
    * @returns {Promise<Artifact[]>} - Array of all artifact records.
@@ -60,7 +174,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key,
         byte_size,
         checksum_sha256,
-        uploaded_at
+        uploaded_at,
+        format
       FROM
         artifact;
     `;
@@ -71,13 +186,13 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new artifact record.
+   * Insert or resolve a single artifact by key and return the persisted row in
+   * one statement.
    *
-   * @param {CreateArtifact} artifact - The artifact data to insert.
-   * @returns {Promise<{ artifact_id: string }>} - The newly created artifact ID.
-   * @throws {ApiExecuteSQLError} - If the insert fails.
+   * @param {CreateArtifact} artifact
+   * @returns {Promise<Artifact>}
    */
-  async insertArtifact(artifact: CreateArtifact): Promise<{ artifact_id: string }> {
+  async insertArtifact(artifact: CreateArtifact): Promise<Artifact> {
     const sqlStatement = SQL`
       INSERT INTO artifact (
         bucket,
@@ -85,31 +200,42 @@ export class ArtifactRepository extends BaseRepository {
         byte_size,
         artifact_status,
         checksum_sha256,
-        uploaded_at
-      ) VALUES (
-        ${artifact.bucket},
-        ${artifact.object_key},
-        ${artifact.byte_size ?? null},
-        ${artifact.artifact_status},
-        ${artifact.checksum_sha256 ?? null},
-        ${artifact.uploaded_at ?? null}
+        uploaded_at,
+        format
       )
-      ON CONFLICT (bucket, object_key) DO NOTHING
-      RETURNING artifact_id;
+      VALUES (
+        ${artifact.bucket}::text,
+        ${artifact.object_key}::text,
+        ${artifact.byte_size ?? null}::bigint,
+        ${artifact.artifact_status}::artifact_status,
+        ${artifact.checksum_sha256 ?? null}::text,
+        ${artifact.uploaded_at ?? null}::timestamptz,
+        ${artifact.format}::text
+      )
+      ON CONFLICT (bucket, object_key) DO UPDATE
+      SET
+        bucket = artifact.bucket
+      RETURNING
+        artifact_id,
+        artifact_status,
+        bucket,
+        object_key,
+        byte_size,
+        checksum_sha256,
+        uploaded_at,
+        format;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, Artifact);
 
-    if (response.rowCount === 1) {
-      return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert artifact record', [
+        'ArtifactRepository->insertArtifact',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
     }
 
-    // Conflict: return existing artifact_id
-    const existing = await this.connection.sql(SQL`
-      SELECT artifact_id FROM artifact WHERE bucket = ${artifact.bucket} AND object_key = ${artifact.object_key};
-    `);
-
-    return existing.rows[0];
+    return response.rows[0];
   }
 
   /**
@@ -129,7 +255,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key = COALESCE(${artifact.object_key}, object_key),
         byte_size = COALESCE(${artifact.byte_size}, byte_size),
         checksum_sha256 = COALESCE(${artifact.checksum_sha256}, checksum_sha256),
-        uploaded_at = COALESCE(${artifact.uploaded_at}, uploaded_at)
+        uploaded_at = COALESCE(${artifact.uploaded_at}, uploaded_at),
+        format = COALESCE(${artifact.format}, format)
       WHERE
         artifact_id = ${artifactId}
       RETURNING artifact_id;
@@ -173,6 +300,54 @@ export class ArtifactRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to update artifact record', [
         'ArtifactRepository->updateArtifactsByUploadId',
         `rowCount was ${response.rowCount}, expected > 0`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Update multiple artifacts by id in one statement.
+   *
+   * @param {BatchUpdateArtifact[]} artifacts - Row-level updates keyed by artifact id.
+   * @returns {Promise<{ artifact_id: string }[]>}
+   * @throws {ApiExecuteSQLError}
+   */
+  async updateArtifactsByIds(artifacts: BatchUpdateArtifact[]): Promise<{ artifact_id: string }[]> {
+    if (!artifacts.length) {
+      return [];
+    }
+
+    const artifactIds = artifacts.map((artifact) => artifact.artifact_id);
+    const artifactStatuses = artifacts.map((artifact) => artifact.artifact_status ?? null);
+    const checksums = artifacts.map((artifact) => artifact.checksum_sha256 ?? null);
+    const uploadedAts = artifacts.map((artifact) => artifact.uploaded_at ?? null);
+
+    const sqlStatement = SQL`
+      UPDATE artifact AS a
+      SET
+        artifact_status = COALESCE(u.artifact_status::artifact_status, a.artifact_status),
+        checksum_sha256 = COALESCE(u.checksum_sha256, a.checksum_sha256),
+        uploaded_at = COALESCE(u.uploaded_at::timestamptz, a.uploaded_at)
+      FROM (
+        SELECT *
+        FROM UNNEST(
+          ${artifactIds}::uuid[],
+          ${artifactStatuses}::text[],
+          ${checksums}::text[],
+          ${uploadedAts}::text[]
+        ) AS t(artifact_id, artifact_status, checksum_sha256, uploaded_at)
+      ) AS u
+      WHERE a.artifact_id = u.artifact_id
+      RETURNING a.artifact_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+
+    if (response.rowCount !== artifacts.length) {
+      throw new ApiExecuteSQLError('Failed to update artifact records', [
+        'ArtifactRepository->updateArtifactsByIds',
+        `rowCount was ${response.rowCount}, expected ${artifacts.length}`
       ]);
     }
 

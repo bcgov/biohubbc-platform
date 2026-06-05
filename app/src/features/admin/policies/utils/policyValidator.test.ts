@@ -1,4 +1,4 @@
-import { FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
+import { FeatureTypeWithProperties } from 'interfaces/useCodesApi.interface';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import {
   ISubmissionFeatureForReview,
@@ -43,49 +43,60 @@ const createMockSubmission = (id: number): SubmissionRecordWithSecurityAndRootFe
 /**
  * Create a mock feature type with properties for testing.
  *
- * @returns {FeatureTypeWithFeaturePropertiesCode} Mock feature type
+ * @returns {FeatureTypeWithProperties} Mock feature type
  */
-const createMockFeatureType = (): FeatureTypeWithFeaturePropertiesCode => ({
+const createMockFeatureType = (): FeatureTypeWithProperties => ({
   feature_type: {
     feature_type_id: 1,
-    feature_type_name: 'animal',
-    feature_type_display_name: 'Animal'
+    name: 'animal',
+    display_name: 'Animal',
+    description: null
   },
-  feature_type_properties: [
+  properties: [
     {
-      feature_property_id: 1,
-      feature_property_name: 'species',
-      feature_property_display_name: 'Species',
-      feature_property_type_id: 1,
-      feature_property_type_name: 'string'
+      feature_type_property_id: 1,
+      name: 'species',
+      display_name: 'Species',
+      description: 'Species',
+      type_name: 'string',
+      required_value: false,
+      calculated_value: false
     },
     {
-      feature_property_id: 2,
-      feature_property_name: 'count',
-      feature_property_display_name: 'Count',
-      feature_property_type_id: 2,
-      feature_property_type_name: 'number'
+      feature_type_property_id: 2,
+      name: 'count',
+      display_name: 'Count',
+      description: 'Count',
+      type_name: 'number',
+      required_value: false,
+      calculated_value: false
     },
     {
-      feature_property_id: 3,
-      feature_property_name: 'observed_date',
-      feature_property_display_name: 'Observed Date',
-      feature_property_type_id: 3,
-      feature_property_type_name: 'datetime'
+      feature_type_property_id: 3,
+      name: 'observed_date',
+      display_name: 'Observed Date',
+      description: 'Observed date',
+      type_name: 'datetime',
+      required_value: false,
+      calculated_value: false
     },
     {
-      feature_property_id: 4,
-      feature_property_name: 'is_verified',
-      feature_property_display_name: 'Is Verified',
-      feature_property_type_id: 4,
-      feature_property_type_name: 'boolean'
+      feature_type_property_id: 4,
+      name: 'is_verified',
+      display_name: 'Is Verified',
+      description: 'Is verified',
+      type_name: 'boolean',
+      required_value: false,
+      calculated_value: false
     },
     {
-      feature_property_id: 5,
-      feature_property_name: 'location',
-      feature_property_display_name: 'Location',
-      feature_property_type_id: 5,
-      feature_property_type_name: 'spatial'
+      feature_type_property_id: 5,
+      name: 'location',
+      display_name: 'Location',
+      description: 'Location',
+      type_name: 'spatial',
+      required_value: false,
+      calculated_value: false
     }
   ]
 });

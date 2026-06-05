@@ -1,92 +1,34 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
+import { TicketFilters } from '../../models/ticket';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
-import { CreateTicketRequestSchema, TicketListResponseSchema, TicketSchema } from '../../openapi/schemas/ticket';
+import { TicketListResponseSchema } from '../../openapi/schemas/ticket';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { TeamMemberService } from '../../services/access-policy/team-member-service';
 import { TicketService } from '../../services/ticket-service';
 import { getLogger } from '../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
-const defaultLog = getLogger('paths/tickets');
-
-export const POST: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [
-      {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-        discriminator: 'SystemRole'
-      }
-    ]
-  })),
-  createTicket()
-];
+const defaultLog = getLogger('paths/portal/tickets');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [
-      {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-        discriminator: 'SystemRole'
-      }
-    ]
+    and: [{ discriminator: 'SystemUser' }]
   })),
-  getTickets()
+  getTicketsForUser()
 ];
 
-POST.apiDoc = {
-  description: 'Create a ticket',
-  tags: ['tickets'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
-  requestBody: {
-    content: {
-      'application/json': {
-        schema: CreateTicketRequestSchema
-      }
-    }
-  },
-  responses: {
-    201: {
-      description: 'Ticket created successfully',
-      content: {
-        'application/json': {
-          schema: TicketSchema
-        }
-      }
-    },
-    ...defaultErrorResponses
-  }
-};
-
 GET.apiDoc = {
-  description: 'List tickets by team ID, optionally filtered by status or search text',
-  tags: ['tickets'],
+  description: 'List tickets accessible to the current user via team membership',
+  tags: ['portal'],
   security: [
     {
       Bearer: []
     }
   ],
   parameters: [
-    {
-      in: 'query',
-      name: 'team_id',
-      required: false,
-      schema: {
-        type: 'string',
-        format: 'uuid'
-      },
-      description: 'Optional team filter. If omitted, returns tickets across all teams.'
-    },
     {
       in: 'query',
       name: 'status',
@@ -120,45 +62,30 @@ GET.apiDoc = {
   }
 };
 
-export function createTicket(): RequestHandler {
+/**
+ * Get tickets accessible to the authenticated user via team membership.
+ *
+ * @return {RequestHandler}
+ */
+export function getTicketsForUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
+
+    const pagination = makePaginationOptionsFromRequest(req);
 
     try {
       await connection.open();
 
-      const ticketService = new TicketService(connection);
-      const ticket = await ticketService.createTicket(req.body);
+      const systemUserId = connection.systemUserId();
 
-      await connection.commit();
+      const teamMemberService = new TeamMemberService(connection);
+      const teamIds = await teamMemberService.getTeamIdsBySystemUserId(systemUserId);
 
-      return res.status(201).json(ticket);
-    } catch (error) {
-      defaultLog.error({ label: 'createTicket', message: 'error', error });
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  };
-}
-
-export function getTickets(): RequestHandler {
-  return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
-
-    try {
-      await connection.open();
+      const filters: TicketFilters = { ...req.query, team_ids: teamIds };
 
       const ticketService = new TicketService(connection);
-      const teamId = req.query.team_id as string | undefined;
-      const status = req.query.status as 'open' | 'closed' | undefined;
-      const search = req.query.search as string | undefined;
-      const pagination = makePaginationOptionsFromRequest(req);
-      const filters = { team_id: teamId, status, search };
-
       const [tickets, count] = await Promise.all([
-        ticketService.getTickets(filters, ensureCompletePaginationOptions(pagination)),
+        ticketService.getTickets(filters, pagination),
         ticketService.getTicketsCount(filters)
       ]);
 
@@ -169,7 +96,7 @@ export function getTickets(): RequestHandler {
         pagination: makePaginationResponse(count, pagination)
       });
     } catch (error) {
-      defaultLog.error({ label: 'getTickets', message: 'error', error });
+      defaultLog.error({ label: 'getTicketsForUser', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

@@ -1,0 +1,64 @@
+import { Box, Container, Stack } from '@mui/material';
+import { PageSection } from 'components/section/PageSection';
+import { TicketComment } from 'features/admin/tickets/detail/comment/TicketComment';
+import { TicketTimeline } from 'features/admin/tickets/detail/timeline/TicketTimeline';
+import { PortalTicketHeader } from '../header/PortalTicketHeader';
+import { PortalTicketSidebar } from '../sidebar/PortalTicketSidebar';
+import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageContent.interface';
+
+/**
+ * Render portal ticket detail content including timeline, comment editor and sidebar.
+ *
+ * @param {IPortalTicketDetailPageContentProps} props
+ * @returns {JSX.Element}
+ */
+export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageContentProps) => {
+  const {
+    ticket,
+    isLoading,
+    comment,
+    setComment,
+    isSavingComment,
+    isUploadingAttachment,
+    onAddComment,
+    onUploadAttachment
+  } = props;
+
+  return (
+    <>
+      <PortalTicketHeader ticket={ticket} />
+
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <PageSection id="ticket-detail-content" label="Ticket Details">
+          <Stack
+            sx={{
+              p: { xs: 2, md: 3 },
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 7,
+              alignItems: 'flex-start'
+            }}>
+            <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
+              <TicketTimeline ticket={ticket} isLoading={isLoading} />
+              {ticket.status === 'open' ? (
+                <TicketComment
+                  comment={comment}
+                  setComment={setComment}
+                  isSaving={isSavingComment}
+                  isUploadingAttachment={isUploadingAttachment}
+                  onAddComment={onAddComment}
+                  onUploadAttachment={onUploadAttachment}
+                />
+              ) : null}
+            </Stack>
+
+            <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
+              <PortalTicketSidebar teamId={ticket.team_id} ticketSystemUsers={ticket.ticket_system_users} />
+            </Box>
+          </Stack>
+        </PageSection>
+      </Container>
+    </>
+  );
+};

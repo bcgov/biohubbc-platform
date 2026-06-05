@@ -1,5 +1,11 @@
 import { IDBConnection } from '../../database/db';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
+import { Artifact } from '../../models/artifact';
+import {
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact,
+  UploadArtifactRoleEnum
+} from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
 import { DBService } from '../db-service';
 
@@ -39,14 +45,37 @@ export class UploadArtifactService extends DBService {
   }
 
   /**
-   * Inserts a new upload artifact record.
+   * List active artifacts for an upload and role.
    *
-   * @param {CreateUploadArtifact} uploadArtifact The upload artifact data to insert
-   * @return {Promise<{ upload_artifact_id: string }>} The newly created upload artifact ID
+   * @param {string} uploadId - Upload session UUID.
+   * @param {UploadArtifactRoleEnum} role - Expected artifact role for the caller's workflow.
+   * @returns {Promise<Artifact[]>} Active artifacts linked through upload_artifact.
    * @memberof UploadArtifactService
    */
-  async insertUploadArtifact(uploadArtifact: CreateUploadArtifact): Promise<{ upload_artifact_id: string }> {
-    return this.uploadArtifactServiceRepository.insertUploadArtifact(uploadArtifact);
+  async getArtifactsByUploadId(uploadId: string, role: UploadArtifactRoleEnum): Promise<Artifact[]> {
+    return this.uploadArtifactServiceRepository.getArtifactsByUploadId(uploadId, role);
+  }
+
+  /**
+   * Inserts upload artifact records in bulk.
+   *
+   * @param {CreateUploadArtifact[]} uploadArtifacts
+   * @returns {Promise<{ upload_artifact_id: string }[]>}
+   * @memberof UploadArtifactService
+   */
+  async insertUploadArtifacts(uploadArtifacts: CreateUploadArtifact[]): Promise<{ upload_artifact_id: string }[]> {
+    return this.uploadArtifactServiceRepository.insertUploadArtifacts(uploadArtifacts);
+  }
+
+  /**
+   * Delete archive-derived upload artifact rows for one upload.
+   *
+   * @param {string} uploadId
+   * @returns {Promise<void>}
+   * @memberof UploadArtifactService
+   */
+  async deleteUploadArtifactsByUploadId(uploadId: string): Promise<void> {
+    return this.uploadArtifactServiceRepository.deleteUploadArtifactsByUploadId(uploadId);
   }
 
   /**

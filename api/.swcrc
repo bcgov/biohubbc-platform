@@ -1,0 +1,19 @@
+{
+  "$schema": "https://swc.rs/schema.json",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": false,
+      "decorators": false
+    },
+    "target": "es2023",
+    "keepClassNames": true,
+    "baseUrl": "./src"
+  },
+  "module": {
+    "type": "es6",
+    "resolveFully": true
+  },
+  "sourceMaps": false,
+  "exclude": [".*\\.test\\.ts$", ".*\\.spec\\.ts$", ".*\\.integration\\.ts$", "__mocks__", "__integration__"]
+}

@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { SecurityService } from '../../../services/security-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as apply from './apply';
 
 chai.use(sinonChai);
@@ -21,7 +21,7 @@ describe('apply', () => {
         systemUserId: () => 1000
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const applySecurityRulesToArtifactsStub = sinon
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
@@ -52,7 +52,7 @@ describe('apply', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

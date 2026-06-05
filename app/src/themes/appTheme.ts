@@ -82,10 +82,25 @@ const appTheme = createTheme({
     },
     MuiAlert: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           fontSize: '0.9rem',
-          padding: '12px 20px'
-        },
+          padding: '8px 16px',
+          '&.MuiAlert-standard': {
+            border: `1px solid ${alpha(theme.palette.primary.dark, 0.25)}`
+          },
+          '&.MuiAlert-standard.MuiAlert-colorError, &.MuiAlert-standardError': {
+            borderColor: alpha(theme.palette.error.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorInfo, &.MuiAlert-standardInfo': {
+            borderColor: alpha(theme.palette.info.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorSuccess, &.MuiAlert-standardSuccess': {
+            borderColor: alpha(theme.palette.success.dark, 0.25)
+          },
+          '&.MuiAlert-standard.MuiAlert-colorWarning, &.MuiAlert-standardWarning': {
+            borderColor: alpha(theme.palette.warning.dark, 0.25)
+          }
+        }),
         icon: {
           marginRight: '1rem'
         }
@@ -99,13 +114,15 @@ const appTheme = createTheme({
     MuiAlertTitle: {
       styleOverrides: {
         root: {
-          fontWeight: 700
+          fontWeight: 700,
+          fontSize: '0.9rem'
         }
       }
     },
     MuiButton: {
       defaultProps: {
-        disableElevation: true
+        disableElevation: true,
+        disableRipple: true
       },
       styleOverrides: {
         root: ({ theme }) => ({
@@ -157,17 +174,26 @@ const appTheme = createTheme({
             fontSize: '1.2rem'
           }
         }),
-        contained: ({ theme }) => ({
-          color: theme.palette.primary.contrastText,
-          backgroundColor: theme.palette.primary.main,
-          '&:hover': {
-            backgroundColor: theme.palette.primary.dark
-          },
-          '&.Mui-disabled': {
-            color: theme.palette.action.disabled,
-            backgroundColor: theme.palette.action.disabledBackground
-          }
-        }),
+        contained: ({ theme, ownerState }) => {
+          const { main, dark, contrastText } = {
+            ...theme.palette.primary,
+            ...(theme.palette[ownerState.color as keyof typeof theme.palette] as
+              | { main: string; dark?: string; contrastText?: string }
+              | undefined)
+          };
+
+          return {
+            color: contrastText,
+            backgroundColor: main,
+            '&:hover': {
+              backgroundColor: dark
+            },
+            '&.Mui-disabled': {
+              color: theme.palette.action.disabled,
+              backgroundColor: theme.palette.action.disabledBackground
+            }
+          };
+        },
         outlined: ({ theme }) => ({
           borderWidth: 1,
           borderColor: 'currentColor',
@@ -213,6 +239,18 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiListItemIcon: {
+      styleOverrides: {
+        root: {
+          minWidth: 34,
+          '& .MuiSvgIcon-root, & svg': {
+            width: '1.25rem !important',
+            height: '1.25rem !important',
+            fontSize: '1.25rem'
+          }
+        }
+      }
+    },
     MuiLink: {
       styleOverrides: {
         root: {
@@ -230,7 +268,22 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.8125rem',
-          lineHeight: 1.35
+          lineHeight: 1.35,
+          '& .MuiBreadcrumbs-ol': {
+            alignItems: 'center',
+            flexWrap: 'nowrap'
+          },
+          '& .MuiBreadcrumbs-li': {
+            minWidth: 0
+          },
+          '& .MuiBreadcrumbs-li > *': {
+            fontSize: '0.8125rem',
+            lineHeight: 1.35,
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }
         },
         li: {
           fontSize: 'inherit',
@@ -291,14 +344,21 @@ const appTheme = createTheme({
           },
           '& .MuiInputBase-input': {
             padding: '8px 0',
-            color: theme.palette.text.primary
+            color: theme.palette.text.primary,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           },
           '& .MuiInputBase-input::placeholder': {
             color: theme.palette.text.secondary,
-            opacity: 0.7
+            opacity: 0.7,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           },
           '& .MuiInputAdornment-positionStart': {
-            color: alpha(theme.palette.text.secondary, 0.78),
+            color: alpha(theme.palette.text.secondary, 0.5),
             '& .MuiSvgIcon-root, & svg': {
               color: 'inherit'
             }
@@ -314,6 +374,18 @@ const appTheme = createTheme({
             color: theme.palette.error.main
           }
         })
+      }
+    },
+    MuiList: {
+      styleOverrides: {
+        root: { padding: 0 }
+      }
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          padding: '8px'
+        }
       }
     },
     MuiAutocomplete: {
@@ -367,13 +439,21 @@ const appTheme = createTheme({
     MuiInputBase: {
       styleOverrides: {
         root: ({ theme }) => ({
-          color: theme.palette.text.primary
+          color: theme.palette.text.primary,
+          fontSize: '0.9rem'
         }),
         input: ({ theme }) => ({
           color: theme.palette.text.primary,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           '&::placeholder': {
             color: theme.palette.text.secondary,
-            opacity: 0.7
+            opacity: 0.7,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }
         })
       }
@@ -388,6 +468,12 @@ const appTheme = createTheme({
           '&:hover .MuiOutlinedInput-notchedOutline': {
             borderColor: theme.palette.text.secondary
           },
+          '&.Mui-disabled .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(0, 0, 0, 0.23)'
+          },
+          '&.Mui-disabled:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(0, 0, 0, 0.23)'
+          },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: theme.palette.primary.main,
             borderWidth: '2px'
@@ -399,6 +485,11 @@ const appTheme = createTheme({
       styleOverrides: {
         root: ({ theme }) => ({
           color: theme.palette.text.secondary,
+          display: 'block',
+          maxWidth: 'calc(100% - 24px)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           '&.Mui-focused': {
             color: theme.palette.primary.main
           },
@@ -515,7 +606,7 @@ const appTheme = createTheme({
             border: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
-            padding: '6px 12px'
+            padding: '4px 10px'
           }
         }
       }
@@ -559,6 +650,7 @@ const appTheme = createTheme({
           fontWeight: 700,
           color: theme.palette.text.secondary,
           opacity: 0.8,
+          textTransform: 'none',
           padding: theme.spacing(0, 2),
           '&.Mui-selected': {
             color: theme.palette.primary.main,

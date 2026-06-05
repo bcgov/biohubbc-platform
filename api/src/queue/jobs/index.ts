@@ -32,6 +32,16 @@ export const JobQueues = {
    */
   PROCESS_DOWNLOAD_FAILED: 'process-download-failed',
   /**
+   * Process download export job queue for async CSV export packaging over an
+   * already-ready download's per-feature-type Parquet artifacts.
+   */
+  PROCESS_DOWNLOAD_EXPORT: 'process-download-export',
+  /**
+   * Dead letter queue for failed download export jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  PROCESS_DOWNLOAD_EXPORT_FAILED: 'process-download-export-failed',
+  /**
    * Index submission features job queue for async search indexing after validation.
    */
   INDEX_SUBMISSION_FEATURES: 'index-submission-features',
@@ -39,7 +49,16 @@ export const JobQueues = {
    * Dead letter queue for failed index-submission-features jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed'
+  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed',
+  /**
+   * Compute scope anchors queue for async anchor computation after scope creation.
+   */
+  COMPUTE_SCOPE_ANCHORS: 'compute-scope-anchors',
+  /**
+   * Dead letter queue for failed compute-scope-anchors jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  COMPUTE_SCOPE_ANCHORS_FAILED: 'compute-scope-anchors-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

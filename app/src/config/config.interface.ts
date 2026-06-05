@@ -11,4 +11,6 @@ export interface IConfig {
   SITEMINDER_LOGOUT_URL: string;
   MAX_UPLOAD_NUM_FILES: number;
   MAX_UPLOAD_FILE_SIZE: number;
+  MAX_UPLOAD_TARBALL_SIZE: number;
+  MAX_TICKET_ATTACHMENT_FILE_SIZE: number;
 }

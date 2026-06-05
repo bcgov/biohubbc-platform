@@ -3,10 +3,10 @@ import { afterEach, describe, it } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { startUpload } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from '../../../../services/upload/upload-ingestion-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -21,7 +21,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const mockUploadResponse: PresignedUploadUrlResponse = {
       submissionId: 'mock-submission-uuid',
@@ -30,11 +30,10 @@ describe('archive upload handler', () => {
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',
       key: 'mock-key',
-      partSizeBytes: 5242880,
       partCount: 2,
       presignedUrls: [
-        { partNumber: 1, url: 'https://example.com/part1' },
-        { partNumber: 2, url: 'https://example.com/part2' }
+        { partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 5242880 },
+        { partNumber: 2, url: 'https://example.com/part2', partSizeBytes: 1234 }
       ]
     };
 
@@ -81,7 +80,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const error = new Error('Upload failed');
     sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
@@ -116,7 +115,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').resolves({
       submissionId: 'mock-submission-uuid',
@@ -125,9 +124,8 @@ describe('archive upload handler', () => {
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',
       key: 'mock-key',
-      partSizeBytes: 5242880,
       partCount: 1,
-      presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1' }]
+      presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 12345 }]
     } as PresignedUploadUrlResponse);
 
     const requestHandler = startUpload();

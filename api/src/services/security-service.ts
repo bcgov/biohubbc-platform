@@ -1,18 +1,22 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
+import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
+import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
 import {
-  ArtifactPersecution,
-  PersecutionAndHarmSecurity,
-  SecurityCategoryRecord,
-  SecurityRepository,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
-  SECURITY_APPLIED_STATUS,
+  SecurityRuleWithFeatureCount,
+  SecuritySearchFilters
+} from '../models/security-rule';
+import {
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
-} from '../repositories/security-repository';
+} from '../models/submission-feature-security';
+import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
 import { UserService } from './user-service';
@@ -29,6 +33,14 @@ export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
   userService: UserService;
+  securityScopeService: SecurityScopeService;
+
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    getS3SignedURL
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -36,6 +48,7 @@ export class SecurityService extends DBService {
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
     this.userService = new UserService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -263,7 +276,7 @@ export class SecurityService extends DBService {
 
     const artifact = await this.artifactService.getArtifactById(artifactId);
 
-    return getS3SignedURL(artifact.key);
+    return SecurityService.dependencies.getS3SignedURL(artifact.key);
   }
 
   /**
@@ -335,6 +348,11 @@ export class SecurityService extends DBService {
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
    *
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
+   * added and removed rules idempotently.
+   *
+   * @param {number} submissionId ID of the submission the features belong to.
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
    * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
    * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
@@ -342,6 +360,7 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(
+    submissionId: number,
     submissionFeatureIds: number[],
     applyRuleIds: number[],
     removeRuleIds: number[]
@@ -359,11 +378,18 @@ export class SecurityService extends DBService {
     if (applyRuleIds.length > 0) {
       await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
     }
+
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
    * Patches security rules applied or removed for all features of a submission.
    * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
+   *
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
+   * added and removed rules idempotently.
    *
    * @param {number} submissionId
    * @param {number[]} applyRuleIds IDs of rules to apply
@@ -392,32 +418,9 @@ export class SecurityService extends DBService {
     if (applyRuleIds?.length) {
       await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
     }
-  }
 
-  /**
-   * Removes the given security rules from the given set of submission feature ids. If
-   * no security rules ID is provided, all security rules will be removed for the given set
-   * of subission features.
-   *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} [removeRuleIds]
-   *
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
-   * @memberof SecurityService
-   */
-  async removeSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: number[],
-    removeRuleIds?: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!submissionFeatureIds.length) {
-      return [];
-    }
-
-    if (!removeRuleIds) {
-      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
-    }
-
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
@@ -484,5 +487,57 @@ export class SecurityService extends DBService {
    */
   async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
     return this.securityRepository.getActiveSecurityCategories();
+  }
+
+  /**
+   * Gets paginated security categories with a count of associated active rules.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @param {ApiPaginationOptions} [pagination]
+   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
+   * @memberof SecurityService
+   */
+  async getSecurityCategoriesWithRuleCount(
+    filters?: SecuritySearchFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<SecurityCategoryWithRuleCount[]> {
+    return this.securityRepository.getSecurityCategoriesWithRuleCount(filters, pagination);
+  }
+
+  /**
+   * Gets total count of active security categories matching optional filters.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @return {*}  {Promise<number>}
+   * @memberof SecurityService
+   */
+  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
+    return this.securityRepository.getSecurityCategoriesCount(filters);
+  }
+
+  /**
+   * Gets paginated security rules with a count of associated submission features.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @param {ApiPaginationOptions} [pagination]
+   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
+   * @memberof SecurityService
+   */
+  async getSecurityRulesWithFeatureCount(
+    filters?: SecuritySearchFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<SecurityRuleWithFeatureCount[]> {
+    return this.securityRepository.getSecurityRulesWithFeatureCount(filters, pagination);
+  }
+
+  /**
+   * Gets total count of active security rules matching optional filters.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @return {*}  {Promise<number>}
+   * @memberof SecurityService
+   */
+  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
+    return this.securityRepository.getSecurityRulesCount(filters);
   }
 }

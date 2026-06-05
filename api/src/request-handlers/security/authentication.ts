@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { decode, verify } from 'jsonwebtoken';
+import jsonwebtoken from 'jsonwebtoken';
 import { JwksClient } from 'jwks-rsa';
 import { HTTP401 } from '../../errors/http-error';
 import { getLogger } from '../../utils/logger';
@@ -43,7 +43,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     }
 
     // Decode token without verifying signature
-    const decodedToken = decode(tokenString, { complete: true, json: true });
+    const decodedToken = jsonwebtoken.decode(tokenString, { complete: true, json: true });
 
     if (!decodedToken) {
       defaultLog.warn({ label: 'authenticate', message: 'decoded token was null' });
@@ -72,7 +72,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verify(tokenString, signingKey, {
+    const verifiedToken = jsonwebtoken.verify(tokenString, signingKey, {
       issuer: KEYCLOAK_ISSUER
     });
 

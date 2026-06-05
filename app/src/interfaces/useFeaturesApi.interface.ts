@@ -1,3 +1,5 @@
+import { ApiPaginationResponseParams } from 'types/pagination';
+
 export interface IRelatedSubmissionFeature {
   submission_feature_id: number;
   feature_type_name: string;
@@ -22,4 +24,19 @@ export interface ISubmissionFeature {
 export interface ISubmissionFeatureResponse {
   feature: ISubmissionFeature;
   relatedFeatures: IRelatedSubmissionFeature[];
+}
+
+export interface IFeaturePropertyRow {
+  id: string;
+  property: string;
+  value: string;
+}
+
+export interface SubmissionFeaturePropertyFilters {
+  search?: string;
+}
+
+export interface ISubmissionFeaturePropertiesResponse {
+  properties: IFeaturePropertyRow[];
+  pagination: ApiPaginationResponseParams;
 }

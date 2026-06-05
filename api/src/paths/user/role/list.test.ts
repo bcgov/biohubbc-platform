@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { ApiGeneralError } from '../../../errors/api-error';
 import { UserService } from '../../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as list from './list';
 
 chai.use(sinonChai);
@@ -23,7 +23,7 @@ describe('roles', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -48,7 +48,7 @@ describe('roles', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const mockResponse = [
         {

@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { Team } from '../../models/team';
-import { TeamMemberWithUser } from '../../models/team-member';
+import { TeamMember, TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';
 import { TeamService } from './team-service';
 
@@ -145,43 +145,61 @@ describe('TeamService', () => {
     expect(result).to.equal(3);
   });
 
-  it('updateTeam calls repository.updateTeam, creates team members, and then getTeam', async () => {
-    const mockTeam: Team = {
-      team_id: '11111111-1111-1111-1111-111111111111',
-      name: 'Engineering',
-      description: 'Team description',
-      member_count: 2
-    };
+  it('updateTeam syncs members — adds new, removes absent, keeps existing', async () => {
+    const teamId = '11111111-1111-1111-1111-111111111111';
+    const mockTeam: Team = { team_id: teamId, name: 'Engineering', description: 'Team description', member_count: 2 };
 
-    const systemUserIds = [101, 102];
+    // Current members: 101 and 102. Desired: 102 and 103.
+    // Expected: remove 101, keep 102, add 103.
+    const currentMembers: TeamMember[] = [
+      { team_member_id: 'aaaa-aaaa', system_user_id: 101, team_id: teamId },
+      { team_member_id: 'bbbb-bbbb', system_user_id: 102, team_id: teamId }
+    ];
 
     const updateStub = sinon.stub(TeamRepository.prototype, 'updateTeam').resolves();
     const getStub = sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
+    const getMembersStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembers').resolves(currentMembers);
     const createMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves();
+    const deleteMemberStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser').resolves();
 
-    const result = await service.updateTeam('11111111-1111-1111-1111-111111111111', {
+    const result = await service.updateTeam(teamId, {
       name: 'Engineering',
       description: 'Team description',
-      system_user_ids: systemUserIds
+      system_user_ids: [102, 103]
     });
 
-    expect(updateStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111', {
-      name: 'Engineering',
-      description: 'Team description',
-      system_user_ids: systemUserIds
-    });
+    expect(updateStub).to.have.been.calledOnce;
+    expect(getMembersStub).to.have.been.calledWith(teamId);
 
-    expect(createMemberStub).to.have.been.calledTwice;
-    expect(createMemberStub.getCall(0)).to.have.been.calledWith({
-      team_id: '11111111-1111-1111-1111-111111111111',
-      system_user_id: 101
-    });
-    expect(createMemberStub.getCall(1)).to.have.been.calledWith({
-      team_id: '11111111-1111-1111-1111-111111111111',
-      system_user_id: 102
-    });
+    // 101 removed
+    expect(deleteMemberStub).to.have.been.calledOnce;
+    expect(deleteMemberStub).to.have.been.calledWith({ team_id: teamId, system_user_id: 101 });
 
-    expect(getStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+    // 103 added (102 already exists, not re-added)
+    expect(createMemberStub).to.have.been.calledOnce;
+    expect(createMemberStub).to.have.been.calledWith({ team_id: teamId, system_user_id: 103 });
+
+    expect(getStub).to.have.been.calledWith(teamId);
+    expect(result).to.eql(mockTeam);
+  });
+
+  it('updateTeam skips member sync when system_user_ids is not provided', async () => {
+    const teamId = '11111111-1111-1111-1111-111111111111';
+    const mockTeam: Team = { team_id: teamId, name: 'Renamed', description: 'desc', member_count: 1 };
+
+    const updateStub = sinon.stub(TeamRepository.prototype, 'updateTeam').resolves();
+    const getStub = sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
+    const getMembersStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembers');
+    const createMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember');
+    const deleteMemberStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser');
+
+    const result = await service.updateTeam(teamId, { name: 'Renamed', description: 'desc' });
+
+    expect(updateStub).to.have.been.calledOnce;
+    expect(getMembersStub).to.not.have.been.called;
+    expect(createMemberStub).to.not.have.been.called;
+    expect(deleteMemberStub).to.not.have.been.called;
+    expect(getStub).to.have.been.calledWith(teamId);
     expect(result).to.eql(mockTeam);
   });
 

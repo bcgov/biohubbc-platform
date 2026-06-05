@@ -1,226 +1,315 @@
 import { IDBConnection } from '../database/db';
-import { HTTP404 } from '../errors/http-error';
+import { HTTP400 } from '../errors/http-error';
 import {
   CreateDataRequest,
-  CreateTeamPolicyParams,
+  CreateDataRequestPayload,
+  DataRequest,
   DataRequestFilters,
-  DataRequestWithStatus,
-  FlatDataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
-import { DataRequestStatusEnum } from '../models/data-request-status';
-import { PolicyEffect } from '../models/policy-statement';
+import { CreatePolicyStatementPayload, PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import {
-  _generateDataRequestPolicyName,
-  _generateDataRequestTeamName,
-  _getDataRequestPolicyExpiryDate,
-  _transformFlatDataRequestToNested
-} from '../utils/data-request';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
+import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
 import { PolicyService } from './access-policy/policy-service';
+import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
-import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
+import { ExpressionTreeService } from './expression-tree-service';
 import { TicketService } from './ticket-service';
 
 /**
- * Service for managing data requests.
+ * Service for data-request operations and request-scoped team/policy creation.
+ *
+ * @export
+ * @class DataRequestService
+ * @extends {DBService}
  */
 export class DataRequestService extends DBService {
   dataRequestRepository: DataRequestRepository;
+  policyService: PolicyService;
+  teamService: TeamService;
+  teamPolicyService: TeamPolicyService;
+  teamMemberService: TeamMemberService;
+  expressionTreeService: ExpressionTreeService;
+  policyStatementExpressionService: PolicyStatementExpressionService;
+  featureIngestionRepository: FeatureIngestionRepository;
 
   /**
-   * Initializes the DataRequestService with a database connection.
+   * Creates an instance of DataRequestService.
    *
-   * @param {IDBConnection} connection
+   * @param {IDBConnection} connection - Database connection object.
    * @memberof DataRequestService
    */
   constructor(connection: IDBConnection) {
     super(connection);
     this.dataRequestRepository = new DataRequestRepository(connection);
+    this.policyService = new PolicyService(connection);
+    this.teamService = new TeamService(connection);
+    this.teamPolicyService = new TeamPolicyService(connection);
+    this.teamMemberService = new TeamMemberService(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
+    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**
-   * Returns a specific data_request by its ID without an authorization check
+   * Find a data request by ID.
    *
-   * @param {string} dataRequestId
-   * @return {Promise<FlatDataRequestWithStatus | null>}
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<(DataRequest | null)>} Data request or null.
    * @memberof DataRequestService
    */
-  async findDataRequestById(dataRequestId: string): Promise<FlatDataRequestWithStatus | null> {
-    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
-    return dataRequest;
+  async findDataRequestById(dataRequestId: string): Promise<DataRequest | null> {
+    return this.dataRequestRepository.findDataRequestById(dataRequestId);
   }
 
   /**
-   * Returns a specific data_request and user must be authorized
+   * Get a data request by ID.
    *
-   * @param {string} dataRequestId
-   * @return {Promise<DataRequestWithStatus>}
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<DataRequest>} Data request record.
    * @memberof DataRequestService
    */
-  async getDataRequestById(dataRequestId: string): Promise<DataRequestWithStatus> {
-    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
-
-    return _transformFlatDataRequestToNested(dataRequest);
+  async getDataRequestById(dataRequestId: string): Promise<DataRequest> {
+    return this.dataRequestRepository.getDataRequestById(dataRequestId);
   }
 
   /**
-   * Find all data requests without user scoping, optionally filtered by date range, requested_by, team_id, or status.
+   * Find data requests with optional filters.
    *
-   * @param {DataRequestFilters} [filters]
-   * @return {Promise<DataRequestWithStatus[]>}
+   * @param {DataRequestFilters} [filters] - Optional query filters.
+   * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestService
    */
-  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {
-    const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
-    return dataRequests.map(_transformFlatDataRequestToNested);
+  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
+    return this.dataRequestRepository.findDataRequests(filters);
   }
 
   /**
-   * Find all data requests in teams the user is a member of, optionally filtered by date range, requested_by, team_id, or status.
+   * Find data requests visible to one or more system users via team membership.
    *
-   * @param {number} systemUserId
-   * @param {DataRequestFilters} [filters]
-   * @return {Promise<DataRequestWithStatus[]>}
+   * @param {number[]} systemUserIds - System user identifiers.
+   * @param {DataRequestFilters} [filters] - Optional query filters.
+   * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestService
    */
-  async findDataRequestsBySystemUserId(
-    systemUserId: number,
+  async findDataRequestsByTeamMembership(
+    systemUserIds: number[],
     filters?: DataRequestFilters
-  ): Promise<DataRequestWithStatus[]> {
-    const dataRequests = await this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserId, filters);
-    return dataRequests.map(_transformFlatDataRequestToNested);
+  ): Promise<DataRequest[]> {
+    return this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserIds, filters);
   }
 
   /**
-   * Create a new data request.
+   * Find data requests for a ticket.
    *
-   * Creates a team for the requester, a ticket, a wildcard access policy expiring in 30 days
-   * linked to the team, and auto-approves the request.
-   *
-   * @param {CreateDataRequest} payload
-   * @return {Promise<DataRequestWithStatus>}
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestService
    */
-  async createDataRequest(payload: CreateDataRequest): Promise<DataRequestWithStatus> {
-    let teamId = payload.team_id;
-    if (!teamId) {
-      const team = await this.createTeam(payload.requested_by);
-      teamId = team.team_id;
-    }
+  async findDataRequestsByTicketId(ticketId: string): Promise<DataRequest[]> {
+    return this.dataRequestRepository.findDataRequestsByTicketId(ticketId);
+  }
 
-    const ticketSubject = `Data Request - ${payload.reason.split(' ').slice(0, 10).join(' ')}`;
+  /**
+   * Create a data request by first creating a new ticket.
+   *
+   * @param {CreateDataRequestPayload} payload - Create payload.
+   * @return {Promise<DataRequest>} Created data request.
+   * @memberof DataRequestService
+   */
+  async createDataRequest(payload: CreateDataRequestPayload): Promise<DataRequest> {
+    // Non-administrative flow: create a new ticket first, then attach the request artifacts to that ticket.
     const ticketService = new TicketService(this.connection);
     const ticket = await ticketService.createTicket({
-      subject: ticketSubject,
-      description: null,
+      subject: this._generateTicketSubject(payload.reason, payload.featureTypes),
+      description: payload.reason,
       priority: 'medium'
     });
 
-    const payloadWithIds = { ...payload, team_id: teamId, ticket_id: ticket.ticket_id };
-
-    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithIds);
-
-    const policy = await this.createPolicy(dataRequest.data_request_id);
-    await this.createTeamPolicy({ teamId, policyId: policy.policy_id });
-
-    const dataRequestStatusService = new DataRequestStatusService(this.connection);
-    // initially defaults status to APPROVED for development
-    const dataRequestStatus = await dataRequestStatusService.createDataRequestStatus(
-      dataRequest.data_request_id,
-      DataRequestStatusEnum.enum.APPROVED,
-      undefined
-    );
-
-    return {
-      ...dataRequest,
-      data_request_status: dataRequestStatus
-    };
+    // Reuse the shared ticket-owned workflow once a ticket identifier is known.
+    return this.createDataRequestForTicket(ticket.ticket_id, payload);
   }
 
   /**
-   * Update an existing data request.
+   * Create a data request for an existing ticket.
    *
-   * @param {string} dataRequestId
-   * @param {UpdateDataRequest} payload
+   * Business rules this method encodes:
+   *
+   * - **`system_user_ids` is the canonical access list for both teams.** The caller
+   *   decides who belongs in the data-request and policy teams; the service does not
+   *   union the requester back in. The user-facing route (`POST /api/data-request`) is
+   *   responsible for adding `requested_by` into `system_user_ids` before calling, since
+   *   in that flow the requester is the principal subject. The admin ticket flow
+   *   (`POST /api/tickets/{ticketId}/data-request`) intentionally passes the admin's
+   *   picker selection as-is and does not auto-add anyone.
+   * - **One expression tree, many statement links.** When `featureTypes` is supplied
+   *   with a non-null expression, the expression tree is persisted once and linked to
+   *   every per-feature-type statement using the same `expression_id`. This keeps
+   *   `expression_tree` row counts proportional to requests, not to statements.
+   * - **Pre-validate feature-type names against the live catalog.** A typo or stale
+   *   frontend identifier would otherwise produce a policy describing an empty slice;
+   *   failing fast keeps the transaction from creating half-built request artifacts.
+   * - **Empty/omitted `featureTypes` preserves the deny-all baseline.** The
+   *   administrative ticket-bound flow has no expression context and needs the
+   *   reviewer-authored baseline; the reviewer hand-authors a real policy during the
+   *   requested → reviewed → approved lifecycle.
+   *
+   * @param {string} ticketId - Existing ticket identifier.
+   * @param {CreateDataRequestPayload} payload - Ticket-owned create payload.
+   * @return {Promise<DataRequest>} Created data request.
+   * @memberof DataRequestService
+   */
+  async createDataRequestForTicket(ticketId: string, payload: CreateDataRequestPayload): Promise<DataRequest> {
+    const [dataRequestTeam, policyTeam] = await Promise.all([
+      this._createTeamWithMembers(payload.system_user_ids),
+      this._createTeamWithMembers(payload.system_user_ids)
+    ]);
+
+    // Branch on whether the caller supplied an explicit feature-type scope.
+    const featureTypes = payload.featureTypes ?? [];
+    let statements: CreatePolicyStatementPayload[];
+    let expressionId: string | null = null;
+
+    if (featureTypes.length > 0) {
+      // Pre-validate feature-type names against the live catalog. A typo or stale frontend
+      // identifier would otherwise produce a policy describing an empty slice; failing fast
+      // keeps the transaction from creating half-built request artifacts.
+      const active = await this.featureIngestionRepository.getActiveFeatureTypeMap();
+      const known = new Set(active.map((row) => row.name));
+      const unknown = featureTypes.filter((name) => !known.has(name));
+      if (unknown.length > 0) {
+        throw new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes: unknown }]);
+      }
+
+      // Persist the expression once, link to every statement (one tree, many links). We do NOT
+      // put `expression` on the CreatePolicyStatementPayload elements — PolicyService would then
+      // call writeExpressionTree per statement, producing duplicate expression_tree rows.
+      if (payload.expression !== null && payload.expression !== undefined) {
+        const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
+        expressionId = result.expression_id;
+      }
+
+      statements = featureTypes.map((featureType) => ({
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: `urn:*:${featureType}:*`
+      }));
+    } else {
+      // Admin ticket-bound flow has no expression context. Preserve today's deny-all baseline
+      // so the reviewer can hand-author a real policy during the requested → reviewed → approved
+      // lifecycle.
+      statements = [{ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }];
+    }
+
+    const policy = await this.policyService.createPolicyWithStatements(
+      {
+        name: _generateDataRequestPolicyName(),
+        description: 'Auto-generated policy for ticket-linked data request',
+        status: 'requested'
+      },
+      statements
+    );
+
+    if (expressionId !== null) {
+      for (const statement of policy.statements) {
+        await this.policyStatementExpressionService.replacePolicyStatementExpression(
+          statement.policy_statement_id,
+          expressionId
+        );
+      }
+    }
+
+    // Explicitly associate the policy team with the policy so membership grants policy visibility/control.
+    await this.teamPolicyService.createTeamPolicy({
+      team_id: policyTeam.team_id,
+      policy_id: policy.policy_id
+    });
+
+    const payloadWithIds: CreateDataRequest = {
+      requested_by: payload.requested_by,
+      reason: payload.reason,
+      team_id: dataRequestTeam.team_id,
+      ticket_id: ticketId,
+      policy_id: policy.policy_id
+    };
+
+    const dataRequest = await this.dataRequestRepository.createDataRequest(payloadWithIds);
+
+    return this.getDataRequestById(dataRequest.data_request_id);
+  }
+
+  /**
+   * Update mutable data-request fields.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @param {UpdateDataRequest} payload - Update payload.
    * @return {Promise<void>}
    * @memberof DataRequestService
    */
   async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<void> {
-    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
-
-    if (!dataRequest) {
-      throw new HTTP404('Data request not found');
-    }
-
-    return await this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
+    return this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
   }
 
   /**
-   * Soft delete a data request by setting the record_end_date.
+   * Soft delete a data request.
    *
-   * @param {string} dataRequestId
+   * @param {string} dataRequestId - Data request UUID.
    * @return {Promise<void>}
    * @memberof DataRequestService
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
-    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+    await this.dataRequestRepository.deleteDataRequest(dataRequestId);
+  }
 
-    if (!dataRequest) {
-      throw new HTTP404('Data request not found');
+  /**
+   * Generate a stable subject for auto-created data request tickets.
+   *
+   * When a feature-type scope is supplied, the scope appears in the subject so reviewers
+   * can identify the requested slice without opening the ticket body. The reason excerpt
+   * (up to 10 words) is appended after an em-dash when present. When no scope is supplied,
+   * the legacy `Data Request - <excerpt>` format is preserved.
+   *
+   * @private
+   * @param {string} reason - Request reason.
+   * @param {string[]} [featureTypes] - Optional feature-type scope for the request.
+   * @return {string} Ticket subject — scope-prefixed when feature types are supplied, otherwise the legacy format.
+   * @memberof DataRequestService
+   */
+  private _generateTicketSubject(reason: string, featureTypes?: string[]): string {
+    const trimmed = reason.trim();
+    const excerpt = trimmed ? trimmed.split(/\s+/).slice(0, 10).join(' ') : '';
+
+    if (featureTypes && featureTypes.length > 0) {
+      const joined = featureTypes.join(', ');
+      return excerpt ? `Data Request: ${joined} — ${excerpt}` : `Data Request: ${joined}`;
     }
 
-    return this.dataRequestRepository.deleteDataRequest(dataRequestId);
+    return excerpt ? `Data Request - ${excerpt}` : 'Data Request';
   }
 
   /**
-   * Creates a Team and TeamMember for the system user
-   * returns the Team
+   * Create a request-scoped team and populate it with provided members.
    *
-   * @param {number} requestedBy - system user id
-   * @return {Promise<Team>} team to use for the data request
    * @private
+   * @param {number[]} systemUserIds - Team member system user identifiers.
+   * @return {Promise<Team>} Created team.
+   * @memberof DataRequestService
    */
-  private async createTeam(requestedBy: number): Promise<Team> {
-    const teamService = new TeamService(this.connection);
-    const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
-    const teamMemberService = new TeamMemberService(this.connection);
-    await teamMemberService.createTeamMember({ system_user_id: requestedBy, team_id: team.team_id });
-    return team;
-  }
+  private async _createTeamWithMembers(systemUserIds: number[]): Promise<Team> {
+    const team = await this.teamService.createTeam({ name: _generateDataRequestTeamName() });
+    // Remove duplicate incoming member identifiers to avoid duplicate team-member inserts.
+    const uniqueMemberIds = [...new Set(systemUserIds)];
 
-  /**
-   * Creates an access policy for a data request (expires in 30 days).
-   *
-   * @param {string} dataRequestId
-   * @return {Promise<{ policy_id: string }>}
-   * @private
-   */
-  private async createPolicy(dataRequestId: string): Promise<{ policy_id: string }> {
-    const policyService = new PolicyService(this.connection);
-    return policyService.createPolicyWithStatements(
-      {
-        name: _generateDataRequestPolicyName(),
-        description: `Auto-generated policy for data request ${dataRequestId}`,
-        record_end_date: _getDataRequestPolicyExpiryDate()
-      },
-      [{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }]
+    await Promise.all(
+      uniqueMemberIds.map((systemUserId) =>
+        this.teamMemberService.createTeamMember({ system_user_id: systemUserId, team_id: team.team_id })
+      )
     );
-  }
 
-  /**
-   * Links a team to a policy by creating a team policy record.
-   *
-   * @param {CreateTeamPolicyParams} params
-   * @return {Promise<void>}
-   * @private
-   */
-  private async createTeamPolicy(params: CreateTeamPolicyParams): Promise<void> {
-    const teamPolicyService = new TeamPolicyService(this.connection);
-    await teamPolicyService.createTeamPolicy({ team_id: params.teamId, policy_id: params.policyId });
+    return team;
   }
 }

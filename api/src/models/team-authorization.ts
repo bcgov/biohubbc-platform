@@ -13,3 +13,10 @@ export const DataRequestRecord = z.object({
 });
 
 export type DataRequestRecord = z.infer<typeof DataRequestRecord>;
+
+export const TicketRecord = z.object({
+  ticket_id: z.string().uuid(),
+  record_end_date: z.string().nullable()
+});
+
+export type TicketRecord = z.infer<typeof TicketRecord>;

@@ -13,7 +13,8 @@ import { IDBConnection } from '../database/db';
 export const registerMockDBConnection = (config?: Partial<IDBConnection>): IDBConnection => {
   const mockDBConnection = getMockDBConnection(config);
 
-  sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+  // Preferred seam: stub dbDependencies for DB connection behavior in tests.
+  sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
   return mockDBConnection;
 };

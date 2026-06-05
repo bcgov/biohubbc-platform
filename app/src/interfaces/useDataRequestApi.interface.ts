@@ -1,12 +1,17 @@
-export interface CreateDataRequestPayload {
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+
+export interface CreateTicketDataRequestPayload {
+  requested_by: number;
   reason: string;
+  system_user_ids: number[];
 }
 
-export interface DataRequestStatus {
-  data_request_status_id: string;
-  data_request_id: string;
-  comment_id: string | null;
-  request_status: 'REQUESTED' | 'APPROVED' | 'DENIED';
+export interface CreateDataRequestPayload {
+  reason: string;
+  system_user_ids: number[];
+  featureTypes: string[];
+  expression: ExpressionTreeExpression | null;
 }
 
 export interface DataRequestResponse {
@@ -14,5 +19,8 @@ export interface DataRequestResponse {
   reason: string;
   team_id: string;
   requested_by: number;
-  data_request_status: DataRequestStatus;
+  ticket_id: string;
+  policy_id: string;
+  status: PolicyStatus;
+  create_date: string;
 }

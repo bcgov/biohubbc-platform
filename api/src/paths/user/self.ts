@@ -17,6 +17,21 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/user/self');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const selfDependencies = {
+  getAPIUserDBConnection,
+  getUserGuid,
+  getUserIdentifier,
+  getUserIdentitySource,
+  getDisplayName,
+  getEmail,
+  getGivenName,
+  getFamilyName,
+  getAgency
+};
+
 export const PUT: Operation = [upsertUser()];
 
 PUT.apiDoc = {
@@ -76,13 +91,13 @@ PUT.apiDoc = {
 export function upsertUser(): RequestHandler {
   return async (req, res) => {
     // Use API user connection since the user may not exist yet
-    const connection = getAPIUserDBConnection();
+    const connection = selfDependencies.getAPIUserDBConnection();
 
     try {
       // Extract user details from JWT token
-      const userGuid = getUserGuid(req.keycloak_token);
-      const userIdentifier = getUserIdentifier(req.keycloak_token);
-      const identitySource = getUserIdentitySource(req.keycloak_token);
+      const userGuid = selfDependencies.getUserGuid(req.keycloak_token);
+      const userIdentifier = selfDependencies.getUserIdentifier(req.keycloak_token);
+      const identitySource = selfDependencies.getUserIdentitySource(req.keycloak_token);
 
       if (!userGuid) {
         throw new HTTP400('Failed to identify user GUID from token');
@@ -94,11 +109,11 @@ export function upsertUser(): RequestHandler {
 
       // Extract profile fields from token
       const profile: IUserProfile = {
-        displayName: getDisplayName(req.keycloak_token),
-        email: getEmail(req.keycloak_token),
-        givenName: getGivenName(req.keycloak_token),
-        familyName: getFamilyName(req.keycloak_token),
-        agency: getAgency(req.keycloak_token)
+        displayName: selfDependencies.getDisplayName(req.keycloak_token),
+        email: selfDependencies.getEmail(req.keycloak_token),
+        givenName: selfDependencies.getGivenName(req.keycloak_token),
+        familyName: selfDependencies.getFamilyName(req.keycloak_token),
+        agency: selfDependencies.getAgency(req.keycloak_token)
       };
 
       await connection.open();

@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { TicketContextProvider } from 'contexts/ticketContext';
+import { AdminTicketContextProvider } from 'contexts/ticketContext';
 import { TicketDetailPage } from 'features/admin/tickets/TicketDetailPage';
 import { TicketsPage } from 'features/admin/tickets/TicketsPage';
 
@@ -25,10 +25,10 @@ export const TicketsRouter = () => {
       <Route
         path="/:ticketId"
         element={
-          <TicketContextProvider>
+          <AdminTicketContextProvider>
             <PageTitle title="Ticket Details" description="View and manage ticket details" />
             <TicketDetailPage />
-          </TicketContextProvider>
+          </AdminTicketContextProvider>
         }
       />
 

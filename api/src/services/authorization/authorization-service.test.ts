@@ -2,12 +2,12 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { Cart, CartStatus } from '../../models/cart';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { CartService } from '../cart-service';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { UserService } from '../user-service';
@@ -317,10 +317,8 @@ describe('authorizeByContributor', function () {
     expect(result).to.be.false;
   });
 
-  it('returns false when system user id cannot be resolved from connection', async function () {
-    const mockDBConnection = getMockDBConnection({
-      systemUserId: () => null as unknown as number
-    });
+  it('returns false when no system user is available on the authorization context', async function () {
+    const mockDBConnection = getMockDBConnection();
     const findContributorSystemUserStub = sinon.stub(
       ContributorSystemUserService.prototype,
       'findContributorSystemUser'
@@ -337,15 +335,14 @@ describe('authorizeByContributor', function () {
   });
 
   it('returns false when no contributor mapping exists for system user', async function () {
-    const mockDBConnection = getMockDBConnection({
-      systemUserId: () => 9
-    });
+    const mockDBConnection = getMockDBConnection();
     const findContributorSystemUserStub = sinon
       .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
       .resolves(null);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { sub: 'some-guid' }
+      keycloakToken: { sub: 'some-guid' },
+      systemUser: { system_user_id: 9 } as SystemUserExtended
     });
 
     const result = await authorizationService.authorizeByContributor();
@@ -355,9 +352,7 @@ describe('authorizeByContributor', function () {
   });
 
   it('returns true and sets contributorId when system user maps to contributor', async function () {
-    const mockDBConnection = getMockDBConnection({
-      systemUserId: () => 12
-    });
+    const mockDBConnection = getMockDBConnection();
     const findContributorSystemUserStub = sinon
       .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
       .resolves({
@@ -367,7 +362,8 @@ describe('authorizeByContributor', function () {
       });
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { sub: 'some-guid' }
+      keycloakToken: { sub: 'some-guid' },
+      systemUser: { system_user_id: 12 } as SystemUserExtended
     });
 
     const result = await authorizationService.authorizeByContributor();
@@ -928,7 +924,7 @@ describe('getSystemUserWithRoles', function () {
 
   it('returns null if the keycloak token is null', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
@@ -939,7 +935,7 @@ describe('getSystemUserWithRoles', function () {
 
   it('returns null if the system user identifier is null', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { preferred_username: '' }
@@ -952,7 +948,7 @@ describe('getSystemUserWithRoles', function () {
 
   it('returns a system user', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const userObjectMock = {} as unknown as SystemUserExtended;
     sinon.stub(UserService.prototype, 'getUserByGuid').resolves(userObjectMock);

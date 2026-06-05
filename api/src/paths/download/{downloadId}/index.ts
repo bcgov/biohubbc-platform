@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { DownloadStatusEnum } from '../../../models/download-status';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../services/download/download-service';
@@ -73,7 +72,7 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['download_id', 'status', 'total_fragments', 'completed_fragments'],
+            required: ['download_id', 'status', 'name'],
             properties: {
               download_id: {
                 type: 'string',
@@ -83,15 +82,11 @@ GET.apiDoc = {
                 type: 'string',
                 enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
               },
-              total_fragments: {
-                type: 'integer'
+              name: {
+                type: 'string'
               },
-              completed_fragments: {
-                type: 'integer'
-              },
-              estimated_total_size_bytes: {
+              description: {
                 type: 'string',
-                format: 'int64',
                 nullable: true
               },
               started_at: {
@@ -105,62 +100,6 @@ GET.apiDoc = {
               downloaded_at: {
                 type: 'string',
                 nullable: true
-              },
-              fragments: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['fragment_index', 'status', 'feature_count'],
-                  properties: {
-                    fragment_index: {
-                      type: 'integer'
-                    },
-                    status: {
-                      type: 'string',
-                      enum: ['pending', 'processing', 'ready', 'failed']
-                    },
-                    file_name: {
-                      type: 'string',
-                      nullable: true
-                    },
-                    file_size_bytes: {
-                      type: 'string',
-                      format: 'int64',
-                      nullable: true
-                    },
-                    estimated_size_bytes: {
-                      type: 'string',
-                      format: 'int64',
-                      nullable: true
-                    },
-                    feature_count: {
-                      type: 'integer'
-                    },
-                    started_at: {
-                      type: 'string',
-                      nullable: true
-                    },
-                    completed_at: {
-                      type: 'string',
-                      nullable: true
-                    },
-                    error_message: {
-                      type: 'string',
-                      nullable: true
-                    },
-                    url: {
-                      type: 'string',
-                      format: 'uri',
-                      nullable: true,
-                      description: 'Signed download URL. Included for anonymous users when fragment is ready.'
-                    }
-                  }
-                }
-              },
-              instructions: {
-                type: 'string',
-                nullable: true,
-                description: 'Download instructions for anonymous users when download is ready.'
               }
             }
           }
@@ -193,56 +132,16 @@ export function findDownloadById(): RequestHandler {
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
       const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
-      // Query fragments before commit (all DB calls inside transaction)
-      const fragments = await downloadService.getFragmentsByDownloadId(downloadId);
-
-      // For anonymous users with a ready download, generate signed URLs inline
-      // so they can download fragments without additional API calls.
-      const isReady = download.download_status === DownloadStatusEnum.READY;
-      const includeUrls = !isAuthenticated && isReady;
-
-      const fragmentUrls: Map<number, string> = new Map();
-      if (includeUrls) {
-        for (const f of fragments) {
-          if (f.fragment_status === DownloadStatusEnum.READY) {
-            const url = await downloadService.getFragmentSignedUrl(downloadId, f.fragment_index);
-            fragmentUrls.set(f.fragment_index, url);
-          }
-        }
-      }
-
       await connection.commit();
-
-      const fragmentsResponse = fragments.map((f) => ({
-        fragment_index: f.fragment_index,
-        status: f.fragment_status,
-        file_name: f.file_name,
-        file_size_bytes: f.file_size_bytes,
-        estimated_size_bytes: f.estimated_size_bytes,
-        feature_count: f.feature_count,
-        started_at: f.started_at,
-        completed_at: f.completed_at,
-        error_message: f.error_message,
-        ...(fragmentUrls.has(f.fragment_index) && { url: fragmentUrls.get(f.fragment_index) })
-      }));
-
-      // Build instructions for anonymous users so they know how to retrieve their files.
-      const instructions = includeUrls
-        ? `Your download is ready. Each fragment URL below is a signed link valid for 5 days. ` +
-          `Download with: curl -o <filename> "<url>"`
-        : null;
 
       return res.status(200).json({
         download_id: download.download_id,
         status: download.download_status,
-        total_fragments: download.total_fragments,
-        completed_fragments: download.completed_fragments,
-        estimated_total_size_bytes: download.estimated_total_size_bytes,
+        name: download.name,
+        description: download.description,
         started_at: download.started_at,
         completed_at: download.completed_at,
-        downloaded_at: download.downloaded_at,
-        fragments: fragmentsResponse,
-        instructions
+        downloaded_at: download.downloaded_at
       });
     } catch (error) {
       defaultLog.error({ label: 'findDownloadById', message: 'error', error });

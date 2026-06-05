@@ -1,12 +1,12 @@
 import { useApi } from 'hooks/useApi';
 import { useCodesContext, useDialogContext } from 'hooks/useContext';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
+import { FeatureTypeWithProperties } from 'interfaces/useCodesApi.interface';
 import {
   ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
  * Context object that stores information for policy editor autocomplete.
@@ -25,10 +25,10 @@ export interface IPolicyAutocompleteContext {
   /**
    * Feature types from codes context (already loaded globally).
    *
-   * @type {FeatureTypeWithFeaturePropertiesCode[]}
+   * @type {FeatureTypeWithProperties[]}
    * @memberof IPolicyAutocompleteContext
    */
-  featureTypes: FeatureTypeWithFeaturePropertiesCode[];
+  featureTypes: FeatureTypeWithProperties[];
   /**
    * Cache of submission features for autocomplete, keyed by submission ID.
    *
@@ -66,7 +66,7 @@ export const PolicyAutocompleteContext = React.createContext<IPolicyAutocomplete
  * @param {React.PropsWithChildren} props - Component props with children
  * @returns {React.ReactElement} Context provider wrapping children
  */
-export const PolicyAutocompleteContextProvider: React.FC<React.PropsWithChildren> = (props) => {
+export const PolicyAutocompleteContextProvider = (props: PropsWithChildren) => {
   const biohubApi = useApi();
   const codesContext = useCodesContext();
   const dialogContext = useDialogContext();

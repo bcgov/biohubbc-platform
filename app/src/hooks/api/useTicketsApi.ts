@@ -1,15 +1,31 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICompleteTicketUploadRequest,
   ICreateTicketCommentRequest,
+  ICreateSubmissionUploadReviewRequest,
+  ICreateTicketUploadRequest,
+  ICreateTicketUploadResponse,
+  ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
-  IGetTicketsParams,
+  IGetTicketArtifactsQueryParams,
+  IGetTicketArtifactsResponse,
   IGetTicketsResponse,
+  ISubmissionUploadReviewStatusResponse,
+  ITicketSystemUser,
   ITicket,
+  ITicketArtifact,
   ITicketCommentLog,
   ITicketReference,
-  ITicketWithHistory,
+  ITicketExtended,
+  ITicketArtifactDownloadResponse,
+  ITicketsQueryParams,
+  IUpdateSubmissionUploadReviewRequest,
+  IUpdateSubmissionUploadReviewStatusRequest,
+  IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
+  TicketSubmissionUploadReviewResponse,
+  IUpdateTicketCommentRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
@@ -24,11 +40,11 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get tickets using optional filters and pagination options.
    *
-   * @param {IGetTicketsParams} [params]
+   * @param {ITicketsQueryParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTickets = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
-    const { data } = await axios.get('/api/tickets', {
+  const getTicketsForAdmin = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+    const { data } = await axios.get('/api/administrative/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
     });
@@ -40,10 +56,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
-   * @return {*} {Promise<ITicketWithHistory>}
+   * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicket = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+  const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
 
     return data;
   };
@@ -55,7 +71,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const createTicket = async (payload: ICreateTicketRequest): Promise<ITicket> => {
-    const { data } = await axios.post('/api/tickets', payload);
+    const { data } = await axios.post('/api/administrative/tickets', payload);
 
     return data;
   };
@@ -68,7 +84,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const updateTicket = async (ticketId: string, payload: IUpdateTicketRequest): Promise<ITicket> => {
-    const { data } = await axios.put(`/api/tickets/${ticketId}`, payload);
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}`, payload);
 
     return data;
   };
@@ -80,7 +96,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<void>}
    */
   const deleteTicket = async (ticketId: string): Promise<void> => {
-    await axios.delete(`/api/tickets/${ticketId}`);
+    await axios.delete(`/api/administrative/tickets/${ticketId}`);
   };
 
   /**
@@ -91,7 +107,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const updateTicketStatus = async (ticketId: string, status: TicketStatus): Promise<ITicket> => {
-    const { data } = await axios.put(`/api/tickets/${ticketId}/status`, { status });
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/status`, { status });
 
     return data;
   };
@@ -107,7 +123,173 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     ticketId: string,
     payload: ICreateTicketCommentRequest
   ): Promise<ITicketCommentLog> => {
-    const { data } = await axios.post(`/api/tickets/${ticketId}/comment`, payload);
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/comment`, payload);
+
+    return data;
+  };
+
+  /**
+   * Update a ticket timeline comment.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketCommentId
+   * @param {IUpdateTicketCommentRequest} payload
+   * @return {*} {Promise<ITicketCommentLog>}
+   */
+  const updateTicketComment = async (
+    ticketId: string,
+    ticketCommentId: string,
+    payload: IUpdateTicketCommentRequest
+  ): Promise<ITicketCommentLog> => {
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/comment/${ticketCommentId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Remove a ticket timeline comment.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketCommentId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTicketComment = async (ticketId: string, ticketCommentId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/tickets/${ticketId}/comment/${ticketCommentId}`);
+  };
+
+  /**
+   * Initialize a ticket attachment upload.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketUploadRequest} payload
+   * @return {Promise<ICreateTicketUploadResponse>}
+   */
+  const createTicketUpload = async (
+    ticketId: string,
+    payload: ICreateTicketUploadRequest
+  ): Promise<ICreateTicketUploadResponse> => {
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/upload`, payload);
+
+    return data;
+  };
+
+  /**
+   * Finalize a ticket attachment upload and trigger async scan workflow.
+   *
+   * @param {string} ticketId
+   * @param {string} uploadId
+   * @param {ICompleteTicketUploadRequest} payload
+   * @return {Promise<ITicketArtifact>}
+   */
+  const completeTicketUpload = async (
+    ticketId: string,
+    uploadId: string,
+    payload: ICompleteTicketUploadRequest
+  ): Promise<ITicketArtifact> => {
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/upload/${uploadId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Get paginated ticket attachment artifacts for an admin ticket detail view.
+   *
+   * @param {string} ticketId
+   * @param {IGetTicketArtifactsQueryParams} [params]
+   * @return {Promise<IGetTicketArtifactsResponse>}
+   */
+  const getTicketArtifacts = async (
+    ticketId: string,
+    params?: IGetTicketArtifactsQueryParams
+  ): Promise<IGetTicketArtifactsResponse> => {
+    const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
+
+    return data;
+  };
+
+  /**
+   * Get a presigned download URL for a ticket attachment artifact.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketArtifactId
+   * @return {Promise<ITicketArtifactDownloadResponse>}
+   */
+  const getTicketArtifactDownloadUrl = async (
+    ticketId: string,
+    ticketArtifactId: string
+  ): Promise<ITicketArtifactDownloadResponse> => {
+    const { data } = await axios.get(`/api/tickets/${ticketId}/artifact/${ticketArtifactId}`);
+
+    return data;
+  };
+
+  /**
+   * Update final review status for a submission upload.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {IUpdateSubmissionUploadReviewStatusRequest} payload
+   * @return {Promise<ISubmissionUploadReviewStatusResponse>}
+   */
+  const updateSubmissionUploadReviewStatus = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    payload: IUpdateSubmissionUploadReviewStatusRequest
+  ): Promise<ISubmissionUploadReviewStatusResponse> => {
+    const { data } = await axios.patch<ISubmissionUploadReviewStatusResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
+   * Update a scoped submission upload review task.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {string} submissionUploadReviewId
+   * @param {IUpdateSubmissionUploadReviewRequest} payload
+   * @return {Promise<TicketSubmissionUploadReviewResponse>}
+   */
+  const updateSubmissionUploadReview = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    submissionUploadReviewId: string,
+    payload: IUpdateSubmissionUploadReviewRequest
+  ): Promise<TicketSubmissionUploadReviewResponse> => {
+    const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
+   * Request a new scoped submission upload review task.
+   *
+   * The backend closes any active review for the requested scope before creating
+   * the replacement review row.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @param {ICreateSubmissionUploadReviewRequest} payload
+   * @return {Promise<TicketSubmissionUploadReviewResponse>}
+   */
+  const insertSubmissionUploadReview = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    payload: ICreateSubmissionUploadReviewRequest
+  ): Promise<TicketSubmissionUploadReviewResponse> => {
+    const { data } = await axios.post<TicketSubmissionUploadReviewResponse>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`,
+      payload
+    );
 
     return data;
   };
@@ -123,7 +305,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     ticketId: string,
     payload: ICreateTicketReferenceRequest
   ): Promise<ITicketReference[]> => {
-    const { data } = await axios.post(`/api/tickets/${ticketId}/reference`, payload);
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/reference`, payload);
 
     return data;
   };
@@ -136,18 +318,104 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<void>}
    */
   const deleteTicketReference = async (ticketId: string, ticketReferenceId: string): Promise<void> => {
-    await axios.delete(`/api/tickets/${ticketId}/reference/${ticketReferenceId}`);
+    await axios.delete(`/api/administrative/tickets/${ticketId}/reference/${ticketReferenceId}`);
+  };
+
+  /**
+   * Get tickets accessible to the current user via team membership.
+   *
+   * @param {ITicketsQueryParams} [params]
+   * @return {*} {Promise<IGetTicketsResponse>}
+   */
+  const getTicketsForUser = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+    const { data } = await axios.get('/api/tickets', {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
+
+    return data;
+  };
+
+  /**
+   * Get a single ticket by ID.
+   *
+   * @param {string} ticketId
+   * @return {*} {Promise<ITicketExtended>}
+   */
+  const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
+
+    return data;
+  };
+
+  /**
+   * Assign one or more system users to a ticket.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketSystemUser[]} payload
+   * @return {*} {Promise<ITicketSystemUser[]>}
+   */
+  const createTicketSystemUsers = async (
+    ticketId: string,
+    payload: ICreateTicketSystemUser[]
+  ): Promise<ITicketSystemUser[]> => {
+    const { data } = await axios.post(`/api/tickets/${ticketId}/system-user`, payload);
+
+    return data;
+  };
+
+  /**
+   * Update ticket system user status.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @param {IUpdateTicketSystemUserStatusRequest} payload
+   * @return {*} {Promise<ITicketSystemUser>}
+   */
+  const updateTicketSystemUserStatus = async (
+    ticketId: string,
+    ticketSystemUserId: string,
+    payload: IUpdateTicketSystemUserStatusRequest
+  ): Promise<ITicketSystemUser> => {
+    const { data } = await axios.patch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Remove a ticket system user (soft delete).
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTicketSystemUser = async (ticketId: string, ticketSystemUserId: string): Promise<void> => {
+    await axios.delete(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`);
   };
 
   return {
-    getTickets,
-    getTicket,
+    getTicketsForAdmin,
+    getTicketForAdmin,
     createTicket,
     updateTicket,
     deleteTicket,
     updateTicketStatus,
     createTicketComment,
+    updateTicketComment,
+    deleteTicketComment,
+    createTicketUpload,
+    completeTicketUpload,
+    getTicketArtifacts,
+    getTicketArtifactDownloadUrl,
+    updateSubmissionUploadReviewStatus,
+    updateSubmissionUploadReview,
+    insertSubmissionUploadReview,
     createTicketReference,
-    deleteTicketReference
+    deleteTicketReference,
+    getTicketsForUser,
+    getTicketForUser,
+    createTicketSystemUsers,
+    updateTicketSystemUserStatus,
+    deleteTicketSystemUser
   };
 };

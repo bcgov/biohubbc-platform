@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
 import { SearchService } from '../../../services/search-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -28,7 +28,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose' };
@@ -53,7 +53,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'fail' };
@@ -80,7 +80,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'anything' };

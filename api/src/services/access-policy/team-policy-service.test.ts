@@ -2,9 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamPolicyService } from './team-policy-service';
 
 chai.use(sinonChai);
@@ -23,7 +24,7 @@ describe('TeamPolicyService', () => {
   });
 
   describe('createTeamPolicy', () => {
-    it('should call repository.insertTeamPolicy and return the created record', async () => {
+    it('should insert team policy and grant scopes for the policy', async () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -31,7 +32,11 @@ describe('TeamPolicyService', () => {
       };
 
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
-      const stub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
+      const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -43,11 +48,40 @@ describe('TeamPolicyService', () => {
       expect(getExistingStub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222', {
         policyIds: ['33333333-3333-3333-3333-333333333333']
       });
-      expect(stub).to.have.been.calledWith(input);
+      expect(insertStub).to.have.been.calledWith(input);
+      expect(materializeStub).to.have.been.calledOnceWith('33333333-3333-3333-3333-333333333333');
+      expect(grantStub).to.have.been.calledOnceWith(
+        '22222222-2222-2222-2222-222222222222',
+        '33333333-3333-3333-3333-333333333333'
+      );
       expect(result).to.eql(mockTeamPolicy);
     });
 
-    it('should return existing team policy and skip insert when association already exists', async () => {
+    it('should skip the team grant when the policy has no ALLOW statements to materialize', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      };
+
+      sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
+      sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(false);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+
+      const result = await service.createTeamPolicy({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      });
+
+      expect(materializeStub).to.have.been.calledOnce;
+      expect(grantStub).to.not.have.been.called;
+      expect(result).to.eql(mockTeamPolicy);
+    });
+
+    it('should return existing team policy and skip insert and scope grant when association already exists', async () => {
       const existingTeamPolicy: TeamPolicyDetails = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -60,6 +94,10 @@ describe('TeamPolicyService', () => {
         .stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId')
         .resolves([existingTeamPolicy]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -72,6 +110,8 @@ describe('TeamPolicyService', () => {
         policyIds: ['33333333-3333-3333-3333-333333333333']
       });
       expect(insertStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(grantStub).to.not.have.been.called;
       expect(result).to.eql({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -98,7 +138,7 @@ describe('TeamPolicyService', () => {
   });
 
   describe('createTeamPolicies', () => {
-    it('should create unique policies in bulk when none exist', async () => {
+    it('should create unique policies in bulk and grant scopes for each new policy', async () => {
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
 
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
@@ -113,6 +153,11 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
         '55555555-5555-5555-5555-555555555555'
@@ -123,14 +168,18 @@ describe('TeamPolicyService', () => {
       });
 
       expect(insertStub).to.have.been.calledTwice;
-      expect(insertStub.firstCall).to.have.been.calledWith({
-        team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
-      });
-      expect(insertStub.secondCall).to.have.been.calledWith({
-        team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '55555555-5555-5555-5555-555555555555'
-      });
+      expect(materializeStub).to.have.been.calledTwice;
+      expect(materializeStub.firstCall).to.have.been.calledWith('33333333-3333-3333-3333-333333333333');
+      expect(materializeStub.secondCall).to.have.been.calledWith('55555555-5555-5555-5555-555555555555');
+      expect(grantStub).to.have.been.calledTwice;
+      expect(grantStub.firstCall).to.have.been.calledWith(
+        '22222222-2222-2222-2222-222222222222',
+        '33333333-3333-3333-3333-333333333333'
+      );
+      expect(grantStub.secondCall).to.have.been.calledWith(
+        '22222222-2222-2222-2222-222222222222',
+        '55555555-5555-5555-5555-555555555555'
+      );
       expect(result).to.eql([
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
@@ -145,7 +194,7 @@ describe('TeamPolicyService', () => {
       ]);
     });
 
-    it('should skip policies that already exist and de-duplicate input policy ids', async () => {
+    it('should skip policies that already exist and only grant scopes for newly created policies', async () => {
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([
         {
           team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -162,6 +211,11 @@ describe('TeamPolicyService', () => {
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
 
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
         '33333333-3333-3333-3333-333333333333',
@@ -175,6 +229,14 @@ describe('TeamPolicyService', () => {
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
+
+      // Materialize + grant only for the newly created policy, not the pre-existing one
+      expect(materializeStub).to.have.been.calledOnceWith('55555555-5555-5555-5555-555555555555');
+      expect(grantStub).to.have.been.calledOnceWith(
+        '22222222-2222-2222-2222-222222222222',
+        '55555555-5555-5555-5555-555555555555'
+      );
+
       expect(result).to.eql([
         {
           team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -182,6 +244,33 @@ describe('TeamPolicyService', () => {
           policy_id: '55555555-5555-5555-5555-555555555555'
         }
       ]);
+    });
+
+    it('should not grant scopes when all policies already exist', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([
+        {
+          team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Team 1',
+          policy_name: 'Policy A'
+        }
+      ]);
+
+      const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+
+      const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
+        '33333333-3333-3333-3333-333333333333'
+      ]);
+
+      expect(insertStub).to.not.have.been.called;
+      expect(materializeStub).to.not.have.been.called;
+      expect(grantStub).to.not.have.been.called;
+      expect(result).to.eql([]);
     });
   });
 
@@ -269,12 +358,25 @@ describe('TeamPolicyService', () => {
   });
 
   describe('deleteTeamPolicy', () => {
-    it('should call repository.deleteTeamPolicy', async () => {
-      const stub = sinon.stub(TeamPolicyRepository.prototype, 'deleteTeamPolicy').resolves();
+    it('should fetch team_id, delete the team policy, and rebuild team security scopes', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      };
+
+      const getStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
+      const deleteStub = sinon.stub(TeamPolicyRepository.prototype, 'deleteTeamPolicy').resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       await service.deleteTeamPolicy('11111111-1111-1111-1111-111111111111');
 
-      expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+      expect(getStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+      expect(deleteStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+
+      // Rebuild called with the team_id, not the team_policy_id
+      expect(rebuildStub).to.have.been.calledOnce;
+      expect(rebuildStub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222');
     });
   });
 });

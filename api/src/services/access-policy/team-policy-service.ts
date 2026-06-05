@@ -3,21 +3,35 @@ import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } fro
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamPolicyFilters } from './team-policy-service.interface';
 
 export class TeamPolicyService extends DBService {
   teamPolicyRepository: TeamPolicyRepository;
+  securityScopeService: SecurityScopeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
-   * Create a new team policy record.
+   * Create a team policy record and materialize the access cache for the pair.
+   *
+   * Inserting a `team_policy` link is the trigger that lazily builds the
+   * normalized scope cache (`security_scope`, `policy_statement_scope`,
+   * `team_security_scope`) for the team. The materialization runs via
+   * `SecurityScopeService.materializePolicyStatementScopes` followed by
+   * `grantTeamAccessForPolicy`. The first call short-circuits when the policy
+   * is not `status='approved'` or has no `ALLOW` statements — so unapproved or
+   * empty policies create the link without granting any access.
+   *
+   * If the (team, policy) link already exists, returns the existing record
+   * without re-materializing.
    *
    * @param {CreateTeamPolicy} teamPolicyData - Data required to create a new team policy.
-   * @return {Promise<TeamPolicy>} - The created team policy record.
+   * @return {Promise<TeamPolicy>} - The created (or pre-existing) team policy record.
    * @memberof TeamPolicyService
    */
   async createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
@@ -34,7 +48,17 @@ export class TeamPolicyService extends DBService {
       };
     }
 
-    return this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+    const teamPolicy = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+
+    // Materialize the access cache for this (team, policy) pair: statement scopes
+    // (shared across teams) first, then the team's access rows that point at them.
+    // Skip the team-grant insert when there's nothing to grant.
+    const materialized = await this.securityScopeService.materializePolicyStatementScopes(teamPolicyData.policy_id);
+    if (materialized) {
+      await this.securityScopeService.grantTeamAccessForPolicy(teamPolicyData.team_id, teamPolicyData.policy_id);
+    }
+
+    return teamPolicy;
   }
 
   /**
@@ -59,11 +83,22 @@ export class TeamPolicyService extends DBService {
 
     const policyIdsToCreate = uniquePolicyIds.filter((policyId) => !existingPolicyIds.has(policyId));
 
-    return Promise.all(
+    const createdTeamPolicies = await Promise.all(
       policyIdsToCreate.map((policyId) =>
         this.teamPolicyRepository.insertTeamPolicy({ team_id: teamId, policy_id: policyId })
       )
     );
+
+    // Materialize the access cache for newly created team-policy associations.
+    // Pre-existing policies already had their cache rows materialized on first creation.
+    for (const policyId of policyIdsToCreate) {
+      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
+      if (materialized) {
+        await this.securityScopeService.grantTeamAccessForPolicy(teamId, policyId);
+      }
+    }
+
+    return createdTeamPolicies;
   }
 
   /**
@@ -128,13 +163,21 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
-   * Delete a team policy record.
+   * Delete a team policy and rebuild the team's security scope grants.
+   *
+   * Fetches the team_id before soft-deleting, because the rebuild needs to
+   * re-derive scopes from the remaining active policy chain for that team.
    *
    * @param {string} teamPolicyId - The id of the team policy to delete
    * @return {Promise<void>}
    * @memberof TeamPolicyService
    */
   async deleteTeamPolicy(teamPolicyId: string): Promise<void> {
+    const teamPolicy = await this.teamPolicyRepository.getTeamPolicy(teamPolicyId);
+
     await this.teamPolicyRepository.deleteTeamPolicy(teamPolicyId);
+
+    // Rebuild the team's scope grants from the remaining active policy chain
+    await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
   }
 }

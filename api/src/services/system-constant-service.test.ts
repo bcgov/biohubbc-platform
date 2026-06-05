@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ISystemConstant, SystemConstantRepository } from '../repositories/system-constant-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ISystemConstant, SystemConstantRepository } from '../repositories/system-constant-repository';
 import { SystemConstantService } from './system-constant-service';
 
 chai.use(sinonChai);

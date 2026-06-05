@@ -5,6 +5,13 @@ import { TaxonSearchResult } from './taxonomy-service';
 
 const defaultLog = getLogger('services/itis-service');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const itisServiceDependencies = {
+  get: axios.get
+};
+
 export type ItisSolrSearchResponse = {
   commonNames?: string[];
   kingdom: string;
@@ -57,7 +64,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
-    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -85,7 +92,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
 
-    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -106,7 +113,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
 
-    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];

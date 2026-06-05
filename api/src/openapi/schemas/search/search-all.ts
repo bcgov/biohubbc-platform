@@ -6,10 +6,11 @@ import { paginatedDataSchema } from './search';
  */
 const featureSimpleSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['submission_feature_id', 'feature_type_id', 'label'],
+  required: ['submission_feature_id', 'feature_type_id', 'feature_type_name', 'label'],
   properties: {
     submission_feature_id: { type: 'integer' },
     feature_type_id: { type: 'integer' },
+    feature_type_name: { type: 'string' },
     label: { type: 'string' }
   }
 };

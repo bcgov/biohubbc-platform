@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiGeneralError } from '../errors/api-error';
-import { FeatureProperty } from '../models/feature-type';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ApiGeneralError } from '../errors/api-error';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from './validation-repository';
 
 chai.use(sinonChai);
@@ -32,7 +32,7 @@ describe('ValidationRepository', () => {
     });
 
     it('should throw an error when select sql fails', async () => {
-      const mockQueryResponse = mockQueryResult<FeatureProperty>([], 0);
+      const mockQueryResponse = mockQueryResult<FeatureTypeProperty>([], 0);
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => mockQueryResponse
@@ -53,14 +53,16 @@ describe('ValidationRepository', () => {
 
     it('should succeed with valid data', async () => {
       // Type mock data with Zod-inferred type - TypeScript will catch field name errors
-      const mockData: FeatureProperty[] = [
+      const mockData: FeatureTypeProperty[] = [
         {
+          feature_type_property_id: 1,
           name: 'dataset',
           display_name: 'Dataset',
           description: 'asd',
           type_name: 'string',
           required_value: true,
-          calculated_value: false
+          calculated_value: false,
+          allow_multiple: false
         }
       ];
       const mockQueryResponse = mockQueryResult(mockData);

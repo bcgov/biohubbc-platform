@@ -1,8 +1,10 @@
 import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -27,11 +29,25 @@ export class SubmissionUploadService extends DBService {
    * Retrieves a single submission_upload record by its ID.
    *
    * @param {string} submissionUploadId The ID of the submission upload artifact
-   * @return {Promise<SubmissionUpload>} The submission upload artifact record
+   * @returns {Promise<SubmissionUpload>} The submission upload artifact record
    * @memberof SubmissionUploadService
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     return this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
+  }
+
+  /**
+   * Retrieves and row-locks a single submission_upload record by its ID.
+   *
+   * Use this in transactional worker gates to prevent concurrent jobs from
+   * starting for the same submission_upload_id.
+   *
+   * @param {string} submissionUploadId The ID of the submission upload artifact
+   * @returns {Promise<SubmissionUpload>} The locked submission upload record
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
+    return this.submissionUploadRepository.getSubmissionUploadWithLock(submissionUploadId);
   }
 
   /**
@@ -40,7 +56,7 @@ export class SubmissionUploadService extends DBService {
    *
    * @param {string} submissionUuid Submission UUID from path (submission.uuid)
    * @param {string} submissionUploadId Submission upload ID from path
-   * @return {Promise<SubmissionUpload>} The submission upload record
+   * @returns {Promise<SubmissionUpload>} The submission upload record
    * @throws {ApiNotFoundError} If the submission or upload does not exist, or the upload does not belong to the submission (mapped to 404 by error handler)
    * @memberof SubmissionUploadService
    */
@@ -57,7 +73,7 @@ export class SubmissionUploadService extends DBService {
    * @param {number} submissionId
    * @param {SubmissionUploadFilters} filters
    * @param {ApiPaginationOptions} pagination
-   * @return {Promise<SubmissionUpload[]>} Array of all submission upload artifacts
+   * @returns {Promise<SubmissionUpload[]>} Array of all submission upload artifacts
    * @memberof SubmissionUploadService
    */
   async getSubmissionUploadsBySubmissionId(
@@ -69,10 +85,21 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Find ticket-scoped submission upload timeline records.
+   *
+   * @param {string} ticketId Ticket UUID.
+   * @returns {Promise<TicketSubmissionUpload[]>} Submission uploads linked to the ticket.
+   * @memberof SubmissionUploadService
+   */
+  async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
+    return this.submissionUploadRepository.findSubmissionUploadsByTicketId(ticketId);
+  }
+
+  /**
    * Retrieves a submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId The upload_id to look up
-   * @return {Promise<SubmissionUpload | null>} The submission upload record
+   * @returns {Promise<SubmissionUpload | null>} The submission upload record
    * @memberof SubmissionUploadService
    */
   async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
@@ -83,7 +110,7 @@ export class SubmissionUploadService extends DBService {
    * Inserts a new submission_upload record.
    *
    * @param {CreateSubmissionUpload} submissionUpload The artifact data to insert
-   * @return {Promise<{ submission_upload_artipfact_id: string }>} Newly created artifact ID
+   * @returns {Promise<{ submission_upload_artipfact_id: string }>} Newly created artifact ID
    * @memberof SubmissionUploadService
    */
   async insertSubmissionUpload(submissionUpload: CreateSubmissionUpload): Promise<{ submission_upload_id: string }> {
@@ -95,7 +122,7 @@ export class SubmissionUploadService extends DBService {
    *
    * @param {string} submissionUploadId The ID of the artifact to update
    * @param {UpdateSubmissionUpload} submissionUpload Fields to update
-   * @return {Promise<{ submission_upload_id: string }>} Updated artifact ID
+   * @returns {Promise<{ submission_upload_id: string }>} Updated artifact ID
    * @memberof SubmissionUploadService
    */
   async updateSubmissionUpload(
@@ -106,10 +133,140 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Validate a status transition against an allowed current-status set.
+   *
+   * @private
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {SubmissionUpload['status']} currentStatus Current persisted status.
+   * @param {SubmissionUpload['status']} nextStatus Target status for transition.
+   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses Allowed source statuses.
+   * @returns {void}
+   * @memberof SubmissionUploadService
+   */
+  private assertSubmissionUploadStatusTransition(
+    submissionUploadId: string,
+    currentStatus: SubmissionUpload['status'],
+    nextStatus: SubmissionUpload['status'],
+    allowedCurrentStatuses: SubmissionUpload['status'][]
+  ): void {
+    if (!allowedCurrentStatuses.includes(currentStatus)) {
+      throw new ApiConflictError('Invalid submission upload status transition', [
+        'SubmissionUploadService->transitionSubmissionUploadStatus',
+        { submissionUploadId, currentStatus, nextStatus, allowedCurrentStatuses }
+      ]);
+    }
+  }
+
+  /**
+   * Transition submission upload status after asserting the current status is allowed.
+   *
+   * @param {string} submissionUploadId
+   * @param {SubmissionUpload['status']} nextStatus
+   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadStatus(
+    submissionUploadId: string,
+    nextStatus: SubmissionUpload['status'],
+    allowedCurrentStatuses: SubmissionUpload['status'][]
+  ): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, nextStatus, allowedCurrentStatuses);
+
+    await this.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
+  }
+
+  /**
+   * Transition to ingested when process stage completes successfully.
+   * - ingesting -> ingested
+   * - ingested -> ingested (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIngested(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'ingested') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'ingested', ['ingesting']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'ingested' });
+  }
+
+  /**
+   * Transition to invalid for deterministic validation failure.
+   * - uploaded|ingesting|ingested|indexing -> invalid
+   * - invalid -> invalid (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToInvalid(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'invalid') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'invalid', [
+      'uploaded',
+      'ingesting',
+      'ingested',
+      'indexing'
+    ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+  }
+
+  /**
+   * Transition to indexing when the indexing stage starts.
+   * - ingested -> indexing
+   * - indexing -> indexing (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIndexing(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexing') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['ingested']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexing' });
+  }
+
+  /**
+   * Transition to indexed when the indexing stage completes successfully.
+   * - indexing -> indexed
+   * - indexed -> indexed (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIndexed(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexed') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexed', ['indexing']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+  }
+
+  /**
    * Soft-deletes a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the record to soft-delete
-   * @return {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionUploadService
    */
   async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
@@ -120,7 +277,7 @@ export class SubmissionUploadService extends DBService {
    * Soft-deletes all active submission_upload records for a given submission.
    *
    * @param {number} submissionId The submission whose uploads should be soft-deleted
-   * @return {Promise<number>} The number of records soft-deleted
+   * @returns {Promise<number>} The number of records soft-deleted
    * @memberof SubmissionUploadService
    */
   async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
@@ -128,10 +285,10 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Hard-deletes a submission_upload record by ID.
+   * Soft-deletes a submission_upload record by ID.
    *
-   * @param {string} submissionUploadId The ID of the artifact to delete
-   * @return {Promise<void>}
+   * @param {string} submissionUploadId The ID of the record to soft-delete
+   * @returns {Promise<void>}
    * @memberof SubmissionUploadService
    */
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {

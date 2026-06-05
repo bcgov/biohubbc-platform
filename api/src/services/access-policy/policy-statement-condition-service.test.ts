@@ -2,13 +2,13 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import {
   CreatePolicyStatementCondition,
   PolicyConditionOperator,
   PolicyStatementCondition
 } from '../../models/policy-statement-condition';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 
 chai.use(sinonChai);

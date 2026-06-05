@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SubmissionFeaturePropertyBooleanRepository } from './submission-feature-property-boolean-repository';
 
 describe('SubmissionFeaturePropertyBooleanRepository', () => {

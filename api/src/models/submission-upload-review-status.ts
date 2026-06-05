@@ -24,10 +24,10 @@ export type CreateSubmissionUploadReviewStatus = z.infer<typeof CreateSubmission
 
 /**
  * Payload for updating a SubmissionUploadReviewStatus.
- * Admin PATCH uses only approved/denied; delete handler sets status to 'deleted'.
+ * Admin PATCH uses submitted/approved/denied; delete handler sets status to 'deleted'.
  */
 export const UpdateSubmissionUploadReviewStatus = z.object({
-  status: z.enum(['approved', 'denied', 'deleted'])
+  status: z.enum(['submitted', 'approved', 'denied', 'deleted'])
 });
 export type UpdateSubmissionUploadReviewStatus = z.infer<typeof UpdateSubmissionUploadReviewStatus>;
 

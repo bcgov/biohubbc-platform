@@ -1,24 +1,30 @@
+import * as parquetjs from '@dsnp/parquetjs';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
-import {
-  DownloadFeatureData,
-  DownloadFeatureSummary,
-  DownloadRecord,
-  DownloadSizeEstimate
-} from '../../models/download';
-import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
-import { DownloadStatusEnum } from '../../models/download-status';
-import { FeatureTypeWithFeaturePropertiesCode } from '../../repositories/code-repository';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { createMockDownloadRecord } from '../../__mocks__/download';
+import { ApiConflictError } from '../../errors/api-error';
+import { DownloadSource } from '../../models/download';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { ExpressionTree } from '../../models/expression-tree';
+import { NormalizedExpressionTreeExpression } from '../../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import {
+  ActivePolicyStatementWithExpression,
+  PolicyStatementRepository
+} from '../../repositories/authorization/policy-statement-repository';
+import { DownloadRepository } from '../../repositories/download/download-repository';
+import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
+import { ExpressionPredicateSemanticValidator } from '../expression-predicate-semantic-validator';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { ArtifactService } from '../upload/artifact-service';
 import { DownloadPipelineService } from './download-pipeline-service';
-import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
 
@@ -27,464 +33,645 @@ describe('DownloadPipelineService', () => {
     sinon.restore();
   });
 
-  // Helper: create a mock download record
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
-    download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    download_status: DownloadStatusEnum.PROCESSING,
-    metadata: null,
-    started_at: null,
-    completed_at: null,
-    downloaded_at: null,
-    total_fragments: 1,
-    completed_fragments: 0,
-    estimated_total_size_bytes: null,
-    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
-    create_date: '2025-01-01T00:00:00Z',
-    ...overrides
-  });
+  describe('transitionDownloadStatus', () => {
+    const downloadId = 'aaaa0000-0000-0000-0000-000000000042';
 
-  // Shared helpers for fragment-related tests
-  const createMockFragment = (overrides?: Partial<DownloadFragmentRecord>): DownloadFragmentRecord => ({
-    download_fragment_id: 1,
-    download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    fragment_index: 0,
-    fragment_status: DownloadStatusEnum.PENDING,
-    s3_key: null,
-    file_name: null,
-    file_size_bytes: null,
-    estimated_size_bytes: null,
-    feature_count: 2,
-    started_at: null,
-    completed_at: null,
-    error_message: null,
-    ...overrides
-  });
-
-  async function* mockFeatureStream(features: DownloadFeatureData[]): AsyncGenerator<DownloadFeatureData[]> {
-    if (features.length > 0) {
-      yield features;
-    }
-  }
-
-  describe('planDownloadIfNeeded', () => {
-    it('throws if download not found', async () => {
+    it('propagates getDownloadById throw when download does not exist (does NOT call updateDownloadStatus)', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').rejects(new Error('Download not found'));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
       try {
-        await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Download aaaa0000-0000-0000-0000-000000000042 not found');
+        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.equal('Download not found');
       }
+
+      expect(updateStub.called).to.be.false;
     });
 
-    it('skips planning when fragments already exist', async () => {
+    it('throws ApiConflictError when current status is not in allowedCurrentStatuses (illegal transition)', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([createMockFragment()]);
-      const estimateStub = sinon.stub(service, 'estimateDownloadSize');
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
-      await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
+      try {
+        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+        expect(err.message).to.equal('Invalid download status transition');
+      }
 
-      expect(estimateStub.called).to.be.false;
+      expect(updateStub.called).to.be.false;
     });
 
-    it('plans fragments when none exist', async () => {
+    it('calls updateDownloadStatus with started_at set for pending→processing', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-      const mockEstimate: DownloadSizeEstimate = { totalEstimatedBytes: 1000, features: [] };
-      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves(mockEstimate);
-      const planStub = sinon.stub(service, 'planFragments').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
-      await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
+      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
 
-      expect(estimateStub.calledOnce).to.be.true;
-      expect(planStub.calledOnce).to.be.true;
+      expect(updateStub.calledOnce).to.be.true;
+      expect(updateStub.firstCall.args[0]).to.equal(downloadId);
+      expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      expect(metadata.started_at).to.be.a('string');
+      expect(new Date(metadata.started_at!).toISOString()).to.equal(metadata.started_at);
+      expect(metadata.completed_at).to.be.undefined;
+    });
+
+    it('calls updateDownloadStatus with completed_at set for processing→ready', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+
+      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      expect(metadata.started_at).to.be.undefined;
+      expect(metadata.completed_at).to.be.a('string');
+    });
+
+    it('passes completed_at and error metadata for processing→failed', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.transitionDownloadStatus(
+        downloadId,
+        DownloadStatusEnum.FAILED,
+        [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
+        { error: 'job failed after all retries' }
+      );
+
+      const metadata = updateStub.firstCall.args[2] as {
+        error?: string;
+        started_at?: string;
+        completed_at?: string;
+      };
+      expect(metadata.error).to.equal('job failed after all retries');
+      expect(metadata.completed_at).to.be.a('string');
     });
   });
 
-  describe('getFragmentsToProcess', () => {
-    it('filters out READY fragments', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
+  // -------------------------------------------------------------------------
+  // Parquet pipeline methods
+  // -------------------------------------------------------------------------
 
-      const readyFragment = createMockFragment({
-        download_fragment_id: 1,
-        fragment_status: DownloadStatusEnum.READY
-      });
-      const pendingFragment = createMockFragment({
-        download_fragment_id: 2,
-        fragment_status: DownloadStatusEnum.PENDING
-      });
+  // Shared test data for Parquet tests
+  const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
+  const TEST_POLICY_ID = '11111111-1111-1111-1111-111111111111';
+  const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: 7 };
 
-      sinon
-        .stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId')
-        .resolves([readyFragment, pendingFragment]);
-
-      const result = await service.getFragmentsToProcess('aaaa0000-0000-0000-0000-000000000042');
-
-      expect(result).to.have.length(1);
-      expect(result[0].download_fragment_id).to.equal(2);
-    });
+  const stmt = (
+    urn_feature_type: string,
+    expression_id: string | null = null
+  ): ActivePolicyStatementWithExpression => ({
+    policy_statement_id: '22222222-2222-2222-2222-222222222222',
+    urn_feature_type,
+    expression_id
   });
 
-  describe('processFragment', () => {
-    it('continues processing when file stream fails and adds error placeholder', async () => {
-      // Verifies: Graceful degradation - S3 file error doesn't fail entire fragment
-
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const mockFragment = createMockFragment();
-      const mockFeatures: DownloadFeatureData[] = [
-        {
-          submission_feature_id: 30,
-          uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-          feature_type_name: 'file',
-          data: { file: 'uploads/missing-file.jpg', description: 'Missing file' },
-          submission_id: 1
-        }
-      ];
-
-      const updateStatusStub = sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
-      const types = [...new Set(mockFeatures.map((f) => f.feature_type_name))];
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentFeatureTypes').resolves(types);
-      sinon
-        .stub(DownloadFragmentRepository.prototype, 'streamFragmentFeaturesByType')
-        .callsFake((_fragmentId: number, typeName: string) => {
-          const typeFeatures = mockFeatures.filter((f) => f.feature_type_name === typeName);
-          return mockFeatureStream(typeFeatures);
-        });
-      sinon
-        .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
-        .resolves(
-          new Map<number, { dataset_uuid: string; dataset_name: string | null }>([
-            [1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]
-          ])
-        );
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
-        {
-          feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
-          feature_type_properties: [
-            {
-              feature_property_id: 1,
-              feature_property_name: 'artifact_key',
-              feature_property_display_name: 'Artifact Key',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'artifact_key'
-            }
-          ]
-        }
-      ];
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      sinon.stub(ObjectStorageService.prototype, 'getFileStream').rejects(new Error('NoSuchKey: File not found'));
-      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-
-      // Should NOT throw — graceful degradation
-      await service.processFragment(mockFragment, 'aaaa0000-0000-0000-0000-000000000042');
-
-      // Verify: fragment was uploaded and marked READY despite file stream failure
-      expect(uploadStub.calledOnce).to.be.true;
-      expect(updateStatusStub.calledOnce).to.be.true;
-      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-    });
-
-    it('uses multi-fragment naming pattern for downloads with multiple fragments', async () => {
-      // Verifies: S3 key uses biohub-{id}-part-{n+1}.zip when total_fragments > 1
-
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const pendingFragment = createMockFragment({
-        download_fragment_id: 5,
-        fragment_index: 1
-      });
-
-      sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentFeatureTypes').resolves(['observation']);
-      sinon.stub(DownloadFragmentRepository.prototype, 'streamFragmentFeaturesByType').callsFake(() =>
-        mockFeatureStream([
+  describe('resolveParquetSchema', () => {
+    const mockCodes: FeatureTypeWithProperties[] = [
+      {
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset', description: null },
+        properties: [
           {
-            submission_feature_id: 10,
-            uuid: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
-            feature_type_name: 'observation',
-            data: { species: 'bear' },
-            submission_id: 1
+            feature_type_property_id: 1,
+            name: 'title',
+            display_name: 'Title',
+            description: 'Title',
+            type_name: FEATURE_PROPERTY_TYPE.STRING,
+            required_value: true,
+            calculated_value: false,
+            allow_multiple: false
           }
-        ])
-      );
-      sinon
-        .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
-        .resolves(
-          new Map<number, { dataset_uuid: string; dataset_name: string | null }>([
-            [1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]
-          ])
-        );
-      sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ total_fragments: 3 }));
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
-        {
-          feature_type: {
-            feature_type_id: 2,
-            feature_type_name: 'observation',
-            feature_type_display_name: 'Observation'
-          },
-          feature_type_properties: [
-            {
-              feature_property_id: 1,
-              feature_property_name: 'species',
-              feature_property_display_name: 'Species',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
-            }
-          ]
-        }
-      ];
+        ]
+      },
+      {
+        feature_type: {
+          feature_type_id: 2,
+          name: 'observation',
+          display_name: 'Observation',
+          description: null
+        },
+        properties: [
+          {
+            feature_type_property_id: 2,
+            name: 'species',
+            display_name: 'Species',
+            description: 'Species',
+            type_name: FEATURE_PROPERTY_TYPE.STRING,
+            required_value: false,
+            calculated_value: false,
+            allow_multiple: false
+          }
+        ]
+      }
+    ];
+
+    it('returns featureTypes from active policy statements alongside the schema lookup', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const statements = [stmt('dataset'), stmt('observation', '33333333-3333-3333-3333-333333333333')];
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves(statements);
 
-      await service.processFragment(pendingFragment, 'aaaa0000-0000-0000-0000-000000000042');
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
 
-      expect(uploadStreamStub.calledOnce).to.be.true;
-      expect(uploadStreamStub.firstCall.args[3]).to.equal(
-        'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-2.zip'
+      expect(result.featureTypes).to.deep.equal(['dataset', 'observation']);
+      expect(result.statements).to.deep.equal(statements);
+      expect(result.schemaLookup.has('dataset')).to.be.true;
+      expect(result.schemaLookup.has('observation')).to.be.true;
+    });
+
+    it('preserves the SQL ORDER BY urn_feature_type ordering of statements', async () => {
+      // Repo layer is the source of ordering; service preserves whatever order it gets.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      // Repo returns rows in urn_feature_type ASC; service must not reorder them.
+      const statements = [stmt('a'), stmt('b'), stmt('c')];
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves(statements);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['a', 'b', 'c']);
+    });
+
+    it('returns empty featureTypes and statements for a policy with no active statements', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId').resolves([]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal([]);
+      expect(result.statements).to.deep.equal([]);
+    });
+  });
+
+  describe('writeFeatureTypeParquet', () => {
+    const mockProperties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'species', feature_property_type_name: 'string' }
+    ];
+
+    const mockSpatialProperties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'species', feature_property_type_name: 'string' },
+      { feature_property_name: 'location', feature_property_type_name: 'spatial' }
+    ];
+
+    // Helper: mock async generator for base feature cursor
+    async function* mockBaseCursor(batches: any[][]): AsyncGenerator<any[]> {
+      for (const batch of batches) {
+        yield batch;
+      }
+    }
+
+    // Stubs all downstream effects used by every writeFeatureTypeParquet test so
+    // each test only asserts the behavior it cares about.
+    const stubParquetPipeline = () => {
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
+      };
+      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const insertArtifactStub = sinon
+        .stub(ArtifactService.prototype, 'insertArtifact')
+        .resolves({ artifact_id: 'bbbb0000-0000-0000-0000-000000000001' } as any);
+      const linkStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
+      return { mockWriter, openStreamStub, uploadStub, insertArtifactStub, linkStub };
+    };
+
+    // A subquery stub that exposes toSQL().toNative() — the only surface the
+    // service uses on the returned Knex.QueryBuilder.
+    const subqueryStub = (sql = 'SELECT 1', bindings: any[] = []) =>
+      ({
+        toSQL: () => ({ toNative: () => ({ sql, bindings }) })
+      } as any);
+
+    it('uses the expression-tree path when statement.expression_id is set', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
+
+      const mockTree = { type: 'expression', operator: 'AND', clauses: [] } as unknown as ExpressionTree;
+      const normalizedTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: []
+      } as unknown as NormalizedExpressionTreeExpression;
+      const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(mockTree);
+      const validateStub = sinon
+        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+        .resolves(normalizedTree);
+      const buildExprSubqueryStub = sinon
+        .stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery')
+        .returns(subqueryStub('SELECT expression', []));
+      const buildBroadStub = sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery');
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      const expressionId = '44444444-4444-4444-4444-444444444444';
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', expressionId)
+      });
+
+      expect(readTreeStub).to.have.been.calledOnceWith(expressionId);
+      expect(validateStub).to.have.been.calledOnceWith(mockTree);
+      expect(buildExprSubqueryStub).to.have.been.calledOnceWith(
+        'observation',
+        normalizedTree,
+        TEST_SOURCE.requested_by
       );
+      expect(buildBroadStub).to.not.have.been.called;
     });
-  });
 
-  describe('finalizeDownload', () => {
-    it('sets READY status for single-fragment download', async () => {
+    it('uses the broad path when statement.expression_id is null', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
 
-      const readyFragment = createMockFragment({
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_size_bytes: '512'
+      const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree');
+      const buildExprSubqueryStub = sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
+      const buildBroadStub = sinon
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
 
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
-      const updateCountsStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
-      const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
-
-      await service.finalizeDownload('aaaa0000-0000-0000-0000-000000000042');
-
-      expect(updateCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000042', 1, 1);
-      expect(updateStatusStub.calledOnce).to.be.true;
-      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-      expect(updateStatusStub.firstCall.args[2]).to.have.property('completed_at').that.is.a('string');
+      expect(readTreeStub).to.not.have.been.called;
+      expect(buildExprSubqueryStub).to.not.have.been.called;
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', TEST_SOURCE.requested_by);
     });
 
-    it('sets READY status for multi-fragment download', async () => {
+    it('passes source.requested_by (the requesting user) — NOT the worker identity — through to the security filter', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
 
-      const fragment1 = createMockFragment({
-        download_fragment_id: 1,
-        fragment_status: DownloadStatusEnum.READY,
-        file_size_bytes: '1000'
+      const buildBroadStub = sinon
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      const requestingUserId = 999;
+      const sourceWithRequester: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: requestingUserId };
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: sourceWithRequester,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
       });
-      const fragment2 = createMockFragment({
-        download_fragment_id: 2,
-        fragment_status: DownloadStatusEnum.READY,
-        file_size_bytes: '2000'
-      });
 
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([fragment1, fragment2]);
-      const updateCountsStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
-      const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
-
-      await service.finalizeDownload('aaaa0000-0000-0000-0000-000000000042');
-
-      expect(updateCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000042', 2, 2);
-      expect(updateStatusStub.calledOnce).to.be.true;
-      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-      expect(updateStatusStub.firstCall.args[2]).to.have.property('completed_at').that.is.a('string');
-    });
-  });
-
-  describe('estimateDownloadSize', () => {
-    it('sums per-feature sizes from linked features', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const features: DownloadFeatureSummary[] = [
-        { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: '120', submission_id: 1 },
-        { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: '80', submission_id: 1 }
-      ];
-      sinon.stub(DownloadService.prototype, 'getDownloadFeatures').resolves(features);
-
-      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result.totalEstimatedBytes).to.equal(200);
-      expect(result.features).to.have.length(2);
+      expect(buildBroadStub).to.have.been.calledOnceWith('observation', requestingUserId);
     });
 
-    it('returns zero total for empty downloads', async () => {
+    it('streams features through the writer and uploads with deterministic S3 key', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter, uploadStub } = stubParquetPipeline();
 
-      sinon.stub(DownloadService.prototype, 'getDownloadFeatures').resolves([]);
-
-      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result.totalEstimatedBytes).to.equal(0);
-      expect(result.features).to.have.length(0);
-    });
-  });
-
-  describe('planFragments', () => {
-    it('creates multiple fragments when exceeding threshold', async () => {
-      // Verifies: Bin packing splits features across fragments based on fragment_size_bytes
-
-      // Step 1: Setup service with mock connection
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      // Step 2: Create 3 features — two fit in one bin, third needs a new bin
-      const features: DownloadFeatureSummary[] = [
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      const baseBatch = [
         {
-          submission_feature_id: 10,
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
           feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 20,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 30,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
+          data: { properties: {} },
+          parent_uuid: null
         }
       ];
-      // Step 3: Stub fragment repository methods
-      const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
-      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 } satisfies DownloadFragmentId);
-      const createFragmentFeaturesStub = sinon
-        .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
-        .resolves();
-      const updateFragmentCountsStub = sinon
-        .stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts')
-        .resolves();
-      sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([baseBatch]));
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose' }]);
 
-      // Stub findDownloadById to return record with default fragment_size_bytes
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
-        createMockDownloadRecord({
-          download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD)
-        })
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
 
-      // Step 4: Call planFragments with bin packing
-      // Feature 10 = 120MB, Feature 20 = 120MB (total 240MB > 200MB threshold), Feature 30 = 80MB
-      const oneHundredTwentyMB = 120 * 1024 * 1024;
-      const eightyMB = 80 * 1024 * 1024;
-      // Override estimated_byte_size on features for bin packing test
-      features[0].estimated_byte_size = String(oneHundredTwentyMB);
-      features[1].estimated_byte_size = String(oneHundredTwentyMB);
-      features[2].estimated_byte_size = String(eightyMB);
-      const sizeEstimate: DownloadSizeEstimate = {
-        totalEstimatedBytes: oneHundredTwentyMB * 2 + eightyMB,
-        features
-      };
-      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
-
-      // Step 5: Verify 2 fragments created — first has feature 10, then flush when 10+20 > threshold
-      // Fragment 0: feature 10 (120MB) — flush when adding 20 would exceed 200MB
-      // Fragment 1: features 20+30 (120+80=200MB)
-      expect(createFragmentStub).to.have.been.calledTwice;
-      expect(createFragmentStub.firstCall.args[1]).to.equal(0); // fragment_index 0
-      expect(createFragmentStub.secondCall.args[1]).to.equal(1); // fragment_index 1
-      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]); // first bin: feature 10
-      expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]); // second bin: features 20, 30
-      expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 2);
+      expect(mockWriter.appendRow).to.have.been.calledOnce;
+      expect(mockWriter.close).to.have.been.calledOnce;
+      expect(uploadStub).to.have.been.calledOnce;
+      expect(uploadStub.firstCall.args[3]).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
     });
 
-    it('uses custom fragment size from download record instead of default threshold', async () => {
-      // Verifies: Bin packing reads fragment_size_bytes from the download record, not the hardcoded constant
+    it('sets GeoParquet metadata on the writer when feature type has spatial properties', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter } = stubParquetPipeline();
 
-      // Step 1: Setup service with mock connection
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockSpatialProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(mockWriter.setMetadata).to.have.been.calledOnce;
+      expect(mockWriter.setMetadata.firstCall.args[0]).to.equal('geo');
+      expect(mockWriter.setMetadata.firstCall.args[1]).to.be.a('string');
+    });
+
+    it('does not set GeoParquet metadata when feature type has no spatial properties', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(mockWriter.setMetadata).to.not.have.been.called;
+    });
+
+    it('inserts artifact with uploaded status, parquet format, and the deterministic S3 key', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { insertArtifactStub } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(insertArtifactStub).to.have.been.calledOnce;
+      const payload = insertArtifactStub.firstCall.args[0];
+      expect(payload.artifact_status).to.equal('uploaded');
+      expect(payload.format).to.equal('parquet');
+      expect(payload.object_key).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
+    });
+
+    it('aborts the multipart upload and surfaces the original error when row hydration throws mid-stream', async () => {
+      // Regression test for the stream-lifecycle gap Codex flagged: a throw inside the
+      // cursor → hydrate → appendRow loop must rethrow the original error AND tear
+      // down the in-flight upload, not leave it hanging or surface as an unhandled
+      // rejection. Here the upload stub rejects with an upload-side error to
+      // simulate an S3 abort propagating back through `uploadPromise`; the original
+      // hydration error must still be the one thrown to the caller.
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      // Step 2: Create 3 features — with 1 GB threshold, all 3 fit in one fragment
-      const features: DownloadFeatureSummary[] = [
-        {
-          submission_feature_id: 10,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 20,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 30,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        }
-      ];
-      // Step 3: Stub findDownloadById with custom 1 GB fragment size
-      const oneGB = 1000 * 1024 * 1024;
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
-        createMockDownloadRecord({
-          download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          fragment_size_bytes: String(oneGB)
-        })
-      );
-
-      // Step 4: Stub fragment repository methods
-      const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
-      const createFragmentFeaturesStub = sinon
-        .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
-        .resolves();
-      const updateFragmentCountsStub = sinon
-        .stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts')
-        .resolves();
-      sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
-
-      // Step 5: Call planFragments — same features as previous test (300+300+200=800MB)
-      // With default 500MB threshold, this would create 2 fragments
-      // With custom 1GB threshold, all features fit in 1 fragment
-      const threeHundredMB = 300 * 1024 * 1024;
-      const twoHundredMB = 200 * 1024 * 1024;
-      features[0].estimated_byte_size = String(threeHundredMB);
-      features[1].estimated_byte_size = String(threeHundredMB);
-      features[2].estimated_byte_size = String(twoHundredMB);
-      const sizeEstimate: DownloadSizeEstimate = {
-        totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
-        features
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
       };
-      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
 
-      // Step 6: Verify only 1 fragment created — all features fit within 1 GB threshold
-      expect(createFragmentStub).to.have.been.calledOnce;
-      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]); // all features in one bin
-      expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 1);
+      // Upload that immediately rejects to simulate an S3 multipart abort cascading
+      // back into the await — the catch in writeFeatureTypeParquet must swallow this
+      // so the original `hydrateError` is what surfaces.
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .rejects(new Error('S3 upload aborted by caller'));
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
+      const hydrateError = new Error('hydration blew up');
+      sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      // Original error wins; upload-abort rejection is swallowed.
+      expect(caught).to.equal(hydrateError);
+      expect(uploadStub).to.have.been.calledOnce;
+    });
+
+    it('does NOT deadlock when the upload promise never settles after a hydrate error (sticky-upload guard)', async () => {
+      // Real S3/MinIO multipart uploads can swallow `passThrough.destroy(...)` and
+      // leave `uploadPromise` pending indefinitely if the SDK has buffered bytes
+      // mid-flight. Without the bounded race in finally, the worker hangs in the
+      // try/finally → withConnection never rolls back → connection state is stuck
+      // in "idle in transaction (aborted)" → pg-boss never sees a terminal state.
+      // This test pins that the cleanup completes in bounded time even when the
+      // upload promise is permanently pending.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
+      };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+
+      // Upload that never settles — simulates the sticky-multipart-upload case.
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .returns(new Promise<void>(() => undefined));
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
+      const hydrateError = new Error('hydration blew up');
+      sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
+
+      // Cap the test at well below the cleanup race deadline (5s) plus a safety
+      // margin — the assertion is "the call returns within bounded time", not
+      // "the call returns instantly".
+      const start = Date.now();
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+      const elapsed = Date.now() - start;
+
+      expect(caught).to.equal(hydrateError);
+      expect(uploadStub).to.have.been.calledOnce;
+      // Cleanup race deadline is 5s; allow 2s margin for slow CI.
+      expect(elapsed).to.be.lessThan(7000);
+    }).timeout(8000);
+
+    it('aborts the multipart upload when ParquetWriter setup throws AFTER upload startup', async () => {
+      // Pre-loop throw point regression (Codex re-eval): ParquetWriter.openStream
+      // runs after uploadPromise has been created but inside the try block. The
+      // catch must still tear down the upload; without the fix this would leak the
+      // S3 multipart context.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const writerError = new Error('parquet writer init failed');
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').rejects(writerError);
+
+      const uploadStub = sinon
+        .stub(ObjectStorageService.prototype, 'uploadStream')
+        .rejects(new Error('S3 upload aborted by caller'));
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', null)
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      // The original writer-init error wins; upload-abort rejection is swallowed.
+      expect(caught).to.equal(writerError);
+      expect(uploadStub).to.have.been.calledOnce;
+    });
+
+    it('does not start the upload when readExpressionTree fails before upload setup', async () => {
+      // The stricter form of the same fix: every cheap precondition that *can* throw
+      // (expression read, semantic validation, subquery build) runs BEFORE upload
+      // creation, so a thrown precondition leaves the worker with zero S3 state to
+      // clean up. This test pins that ordering — uploadStream is never called.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const treeError = new Error('expression tree gone');
+      sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').rejects(treeError);
+
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream');
+      sinon.stub(parquetjs.ParquetWriter, 'openStream');
+      sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
+
+      let caught: unknown;
+      try {
+        await service.writeFeatureTypeParquet({
+          downloadId: TEST_DOWNLOAD_ID,
+          source: TEST_SOURCE,
+          properties: mockProperties,
+          featureTypeName: 'observation',
+          statement: stmt('observation', '44444444-4444-4444-4444-444444444444')
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).to.equal(treeError);
+      expect(uploadStub).to.not.have.been.called;
+    });
+
+    it('inserts the download_artifact link after the artifact row is created', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { insertArtifactStub, linkStub } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(insertArtifactStub).to.have.been.calledOnce;
+      expect(linkStub).to.have.been.calledOnce;
+      expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
+      expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
+      expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
+    });
+  });
+
+  describe('service shape', () => {
+    it('does not expose searchFeatureService (Phase 2 carved that import out of the pipeline)', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      // Cast to any so the assertion documents intent rather than relying on TS narrowing
+      expect((service as any).searchFeatureService).to.be.undefined;
     });
   });
 });

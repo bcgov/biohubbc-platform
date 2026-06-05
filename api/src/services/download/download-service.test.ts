@@ -2,17 +2,17 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
-import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { DownloadId, DownloadRecord } from '../../models/download';
-import { DownloadFragmentRecord } from '../../models/download-fragment';
-import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
+import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { CreateDownload } from '../../models/download';
+import { ExpressionTree } from '../../models/expression-tree';
+import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
+import { DownloadRepository } from '../../repositories/download/download-repository';
 import { TeamService } from '../access-policy/team-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { DownloadService } from './download-service';
+import { ExpressionTreeService } from '../expression-tree-service';
+import { DownloadPolicyService } from './download-policy-service';
+import { DownloadService, groupExportsByDownloadId } from './download-service';
 
 chai.use(sinonChai);
 
@@ -36,51 +36,108 @@ describe('DownloadService', () => {
   });
 
   describe('getDownloadsByTeamMembership', () => {
-    it('delegates to repository', async () => {
+    it('short-circuits on empty page and does not fetch exports', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      const stub = sinon
+      const listStub = sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [], count: 0 });
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
-      expect(stub).to.have.been.calledOnceWith(42);
+      expect(listStub).to.have.been.calledOnceWith(42);
+      expect(exportsStub).not.to.have.been.called;
       expect(result).to.deep.equal({ downloads: [], count: 0 });
     });
 
-    it('passes through DownloadListRecord fields including create_date and feature_count', async () => {
+    it('attaches exports to each download grouped by download_id', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      const mockRecords = [
-        {
-          download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          download_status: 'ready' as const,
-          metadata: null,
-          started_at: '2025-01-01T00:00:00Z',
-          completed_at: '2025-01-01T00:01:00Z',
-          downloaded_at: null,
-          total_fragments: 1,
-          completed_fragments: 1,
-          estimated_total_size_bytes: '1000',
-          fragment_size_bytes: '524288000',
-          create_date: '2025-01-01T00:00:00Z',
-          feature_count: 5
-        }
-      ];
+      const baseA = createMockDownloadRecord({ download_id: 'a' });
+      const baseB = createMockDownloadRecord({ download_id: 'b' });
+
+      const exportA1 = createMockDownloadExportListRow({
+        download_export_id: 'ex-a1',
+        download_id: 'a',
+        part_count: 2
+      });
+      const exportA2 = createMockDownloadExportListRow({
+        download_export_id: 'ex-a2',
+        download_id: 'a',
+        part_count: 0
+      });
+      // b has no exports — service must fall through to `[]`.
 
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
-        .resolves({ downloads: mockRecords, count: 1 });
+        .resolves({ downloads: [baseA, baseB], count: 2 });
+      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([exportA1, exportA2]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
-      expect(result.downloads).to.have.length(1);
-      expect(result.downloads[0]).to.have.property('create_date', '2025-01-01T00:00:00Z');
-      expect(result.downloads[0]).to.have.property('feature_count', 5);
-      expect(result.count).to.equal(1);
+      expect(result.count).to.equal(2);
+      expect(result.downloads).to.have.length(2);
+      expect(result.downloads[0].download_id).to.equal('a');
+      expect(result.downloads[0].exports).to.deep.equal([exportA1, exportA2]);
+      expect(result.downloads[1].download_id).to.equal('b');
+      expect(result.downloads[1].exports).to.deep.equal([]);
+    });
+
+    it('preserves the download page order from the repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const first = createMockDownloadRecord({ download_id: 'first' });
+      const second = createMockDownloadRecord({ download_id: 'second' });
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: [first, second], count: 2 });
+      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+
+      const result = await service.getDownloadsByTeamMembership(42);
+
+      expect(result.downloads.map((d) => d.download_id)).to.deep.equal(['first', 'second']);
+    });
+
+    it('passes the full set of download ids to the exports batch fetch', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const ids = ['one', 'two', 'three'];
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: ids.map((id) => createMockDownloadRecord({ download_id: id })), count: 3 });
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
+
+      await service.getDownloadsByTeamMembership(42);
+
+      expect(exportsStub).to.have.been.calledOnceWith(ids);
+    });
+  });
+
+  describe('groupExportsByDownloadId (pure helper)', () => {
+    it('returns an empty map for an empty input', () => {
+      expect(groupExportsByDownloadId([])).to.deep.equal(new Map());
+    });
+
+    it('groups rows by download_id preserving input order within each group', () => {
+      const a1 = createMockDownloadExportListRow({ download_export_id: 'a1', download_id: 'a' });
+      const a2 = createMockDownloadExportListRow({ download_export_id: 'a2', download_id: 'a' });
+      const b1 = createMockDownloadExportListRow({ download_export_id: 'b1', download_id: 'b' });
+
+      const grouped = groupExportsByDownloadId([a1, a2, b1]);
+
+      expect(grouped.get('a')).to.deep.equal([a1, a2]);
+      expect(grouped.get('b')).to.deep.equal([b1]);
     });
   });
 
@@ -97,20 +154,213 @@ describe('DownloadService', () => {
     });
   });
 
-  // Helper: create a mock download record
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
-    download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    download_status: DownloadStatusEnum.PROCESSING,
-    metadata: null,
-    started_at: null,
-    completed_at: null,
-    downloaded_at: null,
-    total_fragments: 1,
-    completed_fragments: 0,
-    estimated_total_size_bytes: null,
-    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
-    create_date: '2026-01-01T00:00:00.000Z',
-    ...overrides
+  describe('createDownload', () => {
+    const mockPayload: CreateDownload = {
+      policyId: 'pppp0000-0000-0000-0000-000000000001',
+      format: 'parquet',
+      requestedBy: 42
+    };
+
+    it('delegates to downloadRepository.createDownload and returns its result', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'dl-uuid-1' });
+
+      const result = await service.createDownload(mockPayload);
+
+      expect(result).to.deep.equal({ download_id: 'dl-uuid-1' });
+      expect(createDownloadStub).to.have.been.calledOnceWith(mockPayload);
+    });
+  });
+
+  describe('createDownloadRequest', () => {
+    const validExpression: ExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 1,
+          feature_type_property_id: 2,
+          operator: 'Equals',
+          value: 'moose'
+        }
+      ]
+    };
+
+    const basePayload = (overrides: Partial<Parameters<DownloadService['createDownloadRequest']>[0]> = {}) => ({
+      name: 'My download',
+      description: 'A description',
+      featureTypes: ['observation'],
+      expression: validExpression,
+      requestedBy: 42,
+      ...overrides
+    });
+
+    it('orchestrates expression → policy → download → team link → publish in order for an authenticated user', async () => {
+      // Verifies: authenticated path links a team, never creates an export at request time,
+      // and runs the steps in the required order ending with the worker publish.
+
+      // Step 1: Stub each orchestration dependency in sequence
+      const writeExpressionTreeStub = sinon
+        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
+        .resolves({ expression_id: 'expr-uuid-1' });
+      const createDownloadPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-1' });
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'download-uuid-1' });
+      const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      // Step 2: Create the service and stub its team-link helper
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const linkStub = sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+
+      // Step 3: Run the authenticated create request
+      const result = await service.createDownloadRequest(basePayload());
+
+      // Step 4: Authenticated requests return the download id only
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
+
+      // Step 5: Verify each dependency received the values the service decided to pass
+      expect(writeExpressionTreeStub).to.have.been.calledOnceWith(validExpression);
+      expect(createDownloadPolicyStub).to.have.been.calledOnceWith({
+        name: 'My download',
+        description: 'A description',
+        featureTypes: ['observation'],
+        expressionId: 'expr-uuid-1'
+      });
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        policyId: 'policy-uuid-1',
+        format: 'parquet',
+        requestedBy: 42
+      });
+      expect(linkStub).to.have.been.calledOnce;
+      expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
+      expect(linkStub.firstCall.args[1]).to.equal(42);
+
+      // Step 6: The request flow must NOT create an export — that is a separate user action
+      expect(createExportStub).to.not.have.been.called;
+
+      // Step 7: Verify the worker job was queued exactly once with the new download id
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
+
+      // Step 8: Verify the required call order
+      expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
+      expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
+      expect(createDownloadStub).to.have.been.calledBefore(linkStub);
+      expect(linkStub).to.have.been.calledBefore(publishStub);
+    });
+
+    it('skips the team link and does not create an export for an anonymous request (requestedBy null)', async () => {
+      // Verifies: the anonymous branch returns the download id only, does NOT link a team, and
+      // does NOT create an export — the UUID is the credential and any later export is a
+      // separate user-initiated action.
+
+      // Step 1: Stub the orchestration dependencies up to the download insert
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid-1' });
+      sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid-1' });
+      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-1' });
+
+      // Step 2: Stub the export repo to detect any (wrong) call
+      const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      // Step 3: Create the service and stub the team-link helper to detect any (wrong) call
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const linkStub = sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+
+      // Step 4: Run the create request with no security identity
+      const result = await service.createDownloadRequest(basePayload({ requestedBy: null }));
+
+      // Step 5: Anonymous downloads get no team — the UUID is the credential
+      expect(linkStub).to.not.have.been.called;
+
+      // Step 6: No export is created at request time — that is a separate user-initiated action
+      expect(createExportStub).to.not.have.been.called;
+
+      // Step 7: The result is the download id only
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
+
+      // Step 8: The worker job is still queued exactly once
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'download-uuid-1' });
+    });
+
+    it('skips writeExpressionTree and passes expressionId=null when expression is null', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const writeExpressionTreeStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
+      const createDownloadPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-2' });
+      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-2' });
+      sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-2'
+      });
+
+      await service.createDownloadRequest(basePayload({ expression: null }));
+
+      expect(writeExpressionTreeStub).to.not.have.been.called;
+      expect(createDownloadPolicyStub.firstCall.args[0]).to.include({ expressionId: null });
+    });
+
+    it('propagates HTTP400 from createDownloadPolicy without queuing the job', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid' });
+      sinon
+        .stub(DownloadPolicyService.prototype, 'createDownloadPolicy')
+        .rejects(new HTTP400('Unknown feature type(s)'));
+      const createDownloadStub = sinon.stub(DownloadRepository.prototype, 'createDownload');
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob');
+
+      try {
+        await service.createDownloadRequest(basePayload());
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect(createDownloadStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      }
+    });
+
+    it('propagates errors from createDownload without linking a team or queuing the job', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid' });
+      sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid' });
+      sinon.stub(DownloadRepository.prototype, 'createDownload').rejects(new Error('Download creation failed'));
+      const linkStub = sinon.stub(service, 'linkDownloadToNewTeam').resolves();
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob');
+
+      try {
+        await service.createDownloadRequest(basePayload());
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Download creation failed');
+        expect(linkStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      }
+    });
   });
 
   describe('createDownloadTeam', () => {
@@ -123,73 +373,6 @@ describe('DownloadService', () => {
       await service.createDownloadTeam('dl-uuid', 'team-uuid');
 
       expect(stub).to.have.been.calledOnceWith('dl-uuid', 'team-uuid');
-    });
-  });
-
-  describe('createDownloadRequest', () => {
-    it('creates download without user or team fields (team linking is caller responsibility)', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ submissionFeatureIds: [10, 20] });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      const opts = createDownloadStub.firstCall.args[0];
-      expect(opts).to.not.have.property('systemUserId');
-      expect(opts).to.not.have.property('teamId');
-      expect(opts).to.not.have.property('dataRequestId');
-    });
-
-    it('passes filters to createDownload', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      const filters = { keyword: 'elk' };
-      await service.createDownloadRequest({ submissionFeatureIds: [10, 20], filters });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0]).to.have.deep.property('filters', { keyword: 'elk' });
-    });
-
-    it('omitting filters passes undefined', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ submissionFeatureIds: [10, 20] });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0].filters).to.be.undefined;
-    });
-
-    it('creates download features after download record', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      const createFeaturesStub = sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ submissionFeatureIds: [10, 20], filters: { keyword: 'elk' } });
-
-      expect(createFeaturesStub).to.have.been.calledOnce;
-      expect(createFeaturesStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000001');
-      expect(createFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20]);
     });
   });
 
@@ -302,7 +485,7 @@ describe('DownloadService', () => {
       expect(linkStub).to.have.been.calledOnceWith(
         'aaaa0000-0000-0000-0000-000000000042',
         42,
-        'Team for cart aaaa0000-0000-0000-0000-000000000042',
+        'Team for download aaaa0000-0000-0000-0000-000000000042',
         'Team created when claiming anonymous download'
       );
     });
@@ -334,208 +517,6 @@ describe('DownloadService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
       }
-    });
-  });
-
-  describe('getFragmentSignedUrl', () => {
-    it('returns signed URL for ready fragment', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const readyFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key:
-          'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
-
-      const getSignedUrlStub = sinon
-        .stub(ObjectStorageService.prototype, 'getSignedUrl')
-        .resolves('https://s3.example.com/fragment-url');
-
-      const result = await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-
-      expect(result).to.equal('https://s3.example.com/fragment-url');
-      expect(getSignedUrlStub).to.have.been.calledOnceWith(
-        BucketType.MAIN,
-        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        SIGNED_URL_EXPIRY_FRAGMENT
-      );
-    });
-
-    it('throws when fragment index is not found', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal(
-          'Fragment 0 not found for download aaaa0000-0000-0000-0000-000000000042'
-        );
-      }
-    });
-
-    it('throws when fragment is not ready', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const processingFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.PROCESSING,
-        s3_key: null,
-        file_name: null,
-        file_size_bytes: null,
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: null,
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([processingFragment]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment is not ready');
-      }
-    });
-
-    it('throws when fragment is ready but missing s3_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const readyButNoKey: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key: null,
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyButNoKey]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment record missing s3_key');
-      }
-    });
-  });
-
-  describe('getDownloadFeatures', () => {
-    it('delegates to repository', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const features = [
-        { submission_feature_id: 1, submission_id: 100, feature_type_name: 'dataset', estimated_byte_size: '500' },
-        { submission_feature_id: 2, submission_id: 100, feature_type_name: 'observation', estimated_byte_size: '300' }
-      ];
-
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatures').resolves(features);
-
-      const result = await service.getDownloadFeatures('dl-1');
-
-      expect(result).to.have.length(2);
-      expect(result[0].submission_feature_id).to.equal(1);
-      expect(result[1].submission_feature_id).to.equal(2);
-    });
-
-    it('returns empty when no features linked', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatures').resolves([]);
-
-      const result = await service.getDownloadFeatures('dl-1');
-
-      expect(result).to.deep.equal([]);
-    });
-  });
-
-  describe('filterAuthorizedFeatureIds', () => {
-    it('returns empty array when given empty input', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      const result = await service.filterAuthorizedFeatureIds([], null);
-
-      expect(result).to.deep.equal([]);
-    });
-
-    it('returns all IDs when no features are secured', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set());
-
-      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], null);
-
-      expect(result).to.deep.equal([1, 2, 3]);
-    });
-
-    it('returns only unsecured IDs for anonymous users', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      // Feature 2 is secured
-      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([2]));
-
-      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], null);
-
-      expect(result).to.deep.equal([1, 3]);
-    });
-
-    it('returns unsecured + policy-authorized secured IDs for authenticated users', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      // Features 2 and 3 are secured
-      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([2, 3]));
-      // User has policy access to feature 2 but not 3
-      sinon.stub(DownloadRepository.prototype, 'getUserAuthorizedSecuredFeatureIds').resolves(new Set([2]));
-
-      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], 5);
-
-      expect(result).to.include(1);
-      expect(result).to.include(2);
-      expect(result).to.not.include(3);
-    });
-
-    it('returns empty when all features are secured and user has no policies', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([1, 2]));
-      sinon.stub(DownloadRepository.prototype, 'getUserAuthorizedSecuredFeatureIds').resolves(new Set());
-
-      const result = await service.filterAuthorizedFeatureIds([1, 2], 5);
-
-      expect(result).to.deep.equal([]);
     });
   });
 });

@@ -1,11 +1,12 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
-import { DataRequestFilters } from '../../models/data-request';
+import { HTTP400 } from '../../errors/http-error';
+import { CreateDataRequestRequestBody, DataRequestFilters } from '../../models/data-request';
 import {
   CreateDataRequestRequestSchema,
   DataRequestListResponseSchema,
-  DataRequestWithStatusResponseSchema
+  DataRequestResponseSchema
 } from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
@@ -26,6 +27,7 @@ export const GET: Operation = [
   }),
   findDataRequests()
 ];
+
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
@@ -79,8 +81,8 @@ GET.apiDoc = {
       required: false,
       schema: {
         type: 'string',
-        enum: ['REQUESTED', 'APPROVED', 'DENIED'],
-        description: 'Filter by request status'
+        enum: ['requested', 'reviewed', 'approved', 'denied'],
+        description: 'Filter by derived policy workflow status'
       }
     }
   ],
@@ -117,7 +119,7 @@ POST.apiDoc = {
       description: 'Data request created successfully',
       content: {
         'application/json': {
-          schema: DataRequestWithStatusResponseSchema
+          schema: DataRequestResponseSchema
         }
       }
     },
@@ -141,7 +143,7 @@ export function findDataRequests(): RequestHandler {
       const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequestsBySystemUserId(systemUserId, filters);
+      const dataRequests = await dataRequestService.findDataRequestsByTeamMembership([systemUserId], filters);
 
       await connection.commit();
 
@@ -157,26 +159,44 @@ export function findDataRequests(): RequestHandler {
 }
 
 /**
- * Creates a new data request.
+ * Create a data request owned by the current user context.
+ *
+ * The request body is validated with Zod (`CreateDataRequestRequestBody`) rather than the
+ * OpenAPI schema. Two reasons: the `expression` field is a recursive discriminated
+ * union that OpenAPI cannot fully express, and `.strict()` rejects unknown keys (e.g. a stray
+ * `ui_id` on an expression node) so frontend decoder bugs surface as a 400 instead of being
+ * silently persisted into a policy.
+ *
+ * `requested_by` is injected from `connection.systemUserId()` after parse — the request body
+ * schema deliberately omits it so a client cannot impersonate another user.
  *
  * @returns {RequestHandler}
  */
 export function createDataRequest(): RequestHandler {
   return async (req, res) => {
+    const parseResult = CreateDataRequestRequestBody.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new HTTP400('Invalid request body', parseResult.error.issues);
+    }
+
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const { team_id: teamId, reason } = req.body;
+      const { reason, system_user_ids, featureTypes, expression } = parseResult.data;
 
       const dataRequestService = new DataRequestService(connection);
-
       const dataRequest = await dataRequestService.createDataRequest({
         requested_by: systemUserId,
         reason,
-        team_id: teamId
+        // The picker captures additional collaborators; the requester is the principal subject and
+        // must be a member of both the data-request and policy teams. Duplicates are deduped inside
+        // `_createTeamWithMembers` so this stays a simple prepend.
+        system_user_ids: [systemUserId, ...system_user_ids],
+        featureTypes,
+        expression
       });
 
       await connection.commit();

@@ -1,46 +1,51 @@
-import dayjs from 'dayjs';
-import { ArtifactStatusEnum } from '../../models/artifact';
-import { IFlattenedBlock } from '../../models/submission-feature';
+import {
+  INGESTION_FEATURE_BATCH_SIZE,
+  INGESTION_MEDIA_BATCH_BYTES,
+  INGESTION_MEDIA_BATCH_FILES
+} from '../../constants/ingestion';
+import { UPLOAD_ARCHIVE_MEDIA_CONCURRENCY, UPLOAD_FEATURE_BATCH_MAX_BYTES } from '../../constants/upload';
+import { IDBConnection } from '../../database/db';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
-import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
-import { getObjectStoreBucketName } from '../../utils/file-utils';
+import { withConnection } from '../../queue/with-connection';
+import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
 import { getLogger } from '../../utils/logger';
-import { DBService } from '../db-service';
+import { ContributorService } from '../contributor-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
-import { FeatureValidationService } from './feature-validation-service';
-import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
+import { UploadArtifactService } from '../upload/upload-artifact-service';
+import { CodesetIngestionService } from './codeset-ingestion-service';
+import { MediaIngestionService } from './media-ingestion-service';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
+import { IValidationResult } from './submission-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
-// Approximate per-row overhead for download size estimation: CSV delimiters, quoting,
-// and amortized column headers. Used by computeDataByteSizeMap to pre-compute data_byte_size.
-const CSV_ROW_OVERHEAD_BYTES = 500;
+export interface SubmissionIngestionDependencies {
+  streamSubmissionArchive: typeof streamSubmissionArchive;
+}
+
+export const submissionIngestionDependencies: SubmissionIngestionDependencies = {
+  streamSubmissionArchive
+};
 
 /**
- * Service for processing submission archives via two-pass architecture.
- * Pass 1: Validate (zero side effects). Pass 2: Ingest (DB + S3).
+ * Service for ingesting submission archives via streaming shallow-ingestion.
  *
  * @export
  * @class SubmissionIngestionService
- * @extends {DBService}
  */
-export class SubmissionIngestionService extends DBService {
-  featureValidationService = new FeatureValidationService(this.connection);
-  ingestionRepository = new IngestionRepository(this.connection);
-  uploadArchiveService = new UploadArchiveService(this.connection);
-  artifactService = new ArtifactService(this.connection);
+export class SubmissionIngestionService {
   objectStorageService = new ObjectStorageService();
 
   /**
-   * Process a submission archive using two-pass architecture.
-   * Pass 1 validates features and media references (zero side effects).
-   * Pass 2 uploads media to S3, creates artifact records, and ingests features.
+   * Ingest a submission archive using streaming shallow-ingestion.
+   * Deep validation and reference resolution are deferred to the indexing workflow.
    *
-   * Idempotent: safe for pg-boss retries. Existing features are soft-deleted before
-   * re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
+   * Idempotent: safe for pg-boss retries. Existing features for the current upload are
+   * soft-deleted before re-insertion, archive-derived upload_artifact rows are deleted
+   * before rebuilding, artifact inserts upsert by key, and S3 PUTs overwrite by object key.
    *
    * Caller provides the pre-resolved submission_upload bridge record to avoid redundant
    * lookups — the job handler already resolves it for logging/indexing.
@@ -51,241 +56,280 @@ export class SubmissionIngestionService extends DBService {
    * @returns {Promise<IValidationResult>} Validation result
    * @memberof SubmissionIngestionService
    */
-  async processSubmission(submissionUpload: SubmissionUpload): Promise<IValidationResult> {
+  async ingestSubmissionUpload(submissionUpload: SubmissionUpload): Promise<IValidationResult> {
     const {
       submission_upload_id: submissionUploadId,
       submission_id: submissionId,
       upload_id: uploadId
     } = submissionUpload;
+    const startTime = Date.now();
+    let featureBatchCount = 0;
+    let codesetBatchCount = 0;
+    let mediaBatchCount = 0;
+    let featureRowsPersisted = 0;
+    let mediaFilesPersisted = 0;
+    let mediaBytesPersisted = 0;
 
     // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
-    const objectKey = await this.getTarballObjectKey(uploadId);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Starting submission upload ingestion',
+      submissionUploadId,
+      submissionId,
+      uploadId
+    });
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolving tarball upload context',
+      submissionUploadId,
+      submissionId,
+      uploadId
+    });
+    const { objectKey, uploadArchiveId } = await withConnection((connection) =>
+      this.getTarballUploadContext(connection, uploadId)
+    );
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolved tarball upload context',
+      submissionUploadId,
+      uploadArchiveId,
+      objectKey
+    });
 
-    // ================================================================
-    // PASS 1: VALIDATE (zero side effects)
-    // Two-pass architecture: validate everything before writing anything,
-    // so a validation failure never leaves partial data behind.
-    // ================================================================
+    // Step 1: Remove previously-ingested feature rows for this submission upload attempt.
+    // Retries can re-run after partial success; scoping by submission_upload_id ensures
+    // we only reset rows produced by this upload attempt, not other uploads.
+    await withConnection(async (connection) => {
+      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+      await featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+    });
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Deleted existing features by submission upload id',
+      submissionUploadId
+    });
 
-    // Stream 1: parse the tarball into flat feature blocks and a set of media filenames
-    const tarStream1 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    const { allBlocks, mediaFileNames } = await extractBlocksFromArchive(tarStream1);
+    // Step 2: Soft-delete active upload_artifact links for this upload.
+    // Why delete upload_artifact rows here:
+    // - `upload_artifact` has uniqueness constraints (upload_id+artifact_id and upload_id+path for archive rows).
+    // - A retry may produce the same paths/artifacts, and pure-insert repository methods should not own conflict resolution.
+    // - Marking rows inactive once up-front keeps repository inserts deterministic.
+    // - Scope is all active rows for this upload so conflicts are fully avoided on retry.
+    await withConnection(async (connection) => {
+      const uploadArtifactService = new UploadArtifactService(connection);
+      await uploadArtifactService.deleteUploadArtifactsByUploadId(uploadId);
+    });
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Deleted existing archive-derived upload artifact rows by upload id',
+      uploadId
+    });
 
-    // Validate feature structure: types exist in feature_type, required properties present, types correct
-    const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(allBlocks);
-    if (!featureValidation.valid) {
-      return featureValidation;
-    }
+    // Step 3: Resolve contributor context used by codeset ingestion callbacks.
+    const contributorId = await withConnection(async (connection) => {
+      const contributorService = new ContributorService(connection);
+      const contributor = await contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+      return contributor.contributor_id;
+    });
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolved contributor context for codeset ingestion',
+      submissionUploadId,
+      contributorId
+    });
 
-    // Validate media integrity: every file/report block's filename must have a matching file in the archive
-    const mediaErrors = validateMediaReferences(allBlocks, mediaFileNames);
-    if (mediaErrors.length > 0) {
-      return { valid: false, errors: mediaErrors };
-    }
+    // Resolve feature-type id mapping once per ingestion run so feature batches do
+    // not re-query the mapping for every callback invocation.
+    const activeFeatureTypeMap = await withConnection(async (connection) => {
+      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+      return featureIngestionService.getActiveFeatureTypeMap();
+    });
 
-    // ================================================================
-    // PASS 2: INGEST (DB writes + S3 uploads)
-    // All validation passed — safe to write. From here, operations are
-    // idempotent: S3 PUTs overwrite, artifact inserts use ON CONFLICT DO
-    // NOTHING, and features are soft-deleted before re-insertion.
-    // ================================================================
+    // Step 4: Stream tarball once and fan out entry processing by folder:
+    // - features/* -> feature ingestion service
+    // - codes/*    -> codeset ingestion service
+    // - files/*    -> media ingestion service
+    // The parser handles batching/concurrency; callbacks persist scoped records.
+    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Starting archive stream pass',
+      submissionUploadId,
+      submissionId,
+      uploadId,
+      uploadArchiveId,
+      objectKey,
+      featureBatchSize: INGESTION_FEATURE_BATCH_SIZE,
+      featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
+      mediaBatchSize: INGESTION_MEDIA_BATCH_FILES,
+      mediaMaxBatchBytes: INGESTION_MEDIA_BATCH_BYTES,
+      mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
+    });
 
-    // Stream 2: re-stream the tarball to extract and upload media files to S3
-    // (tar streams are single-pass, so we need a fresh stream)
-    const tarStream2 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    const s3KeyPrefix = `submissions/${submissionId}/media`;
-    const uploadedMediaFiles = await extractAndUploadMedia(tarStream2, this.objectStorageService, s3KeyPrefix);
+    const { featureCount, uploadedCount, codesetFileCount } =
+      await submissionIngestionDependencies.streamSubmissionArchive(tarStream, {
+        objectStorageService: this.objectStorageService,
+        s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
+        featureBatchSize: INGESTION_FEATURE_BATCH_SIZE,
+        featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
+        mediaBatchSize: INGESTION_MEDIA_BATCH_FILES,
+        mediaMaxBatchBytes: INGESTION_MEDIA_BATCH_BYTES,
+        mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
+        ingestFeatureBatch: async (featureBatch) => {
+          featureBatchCount += 1;
+          featureRowsPersisted += featureBatch.length;
 
-    // Stamp each file/report block with its S3 artifact_key so downstream
-    // consumers (download pipeline, UI) can locate the file without a join
-    this.setArtifactKeys(allBlocks, uploadedMediaFiles);
+          await withConnection(async (connection) => {
+            const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+            await featureIngestionService.ingestFeatureBatch(
+              submissionId,
+              submissionUploadId,
+              featureBatch,
+              activeFeatureTypeMap
+            );
+          });
 
-    // Pre-compute data_byte_size per feature for download size estimation
-    // (avoids fetching full JSONB at query time — see data_byte_size column docs)
-    const dataByteSizeMap = this.computeDataByteSizeMap(allBlocks, uploadedMediaFiles);
+          if (featureBatchCount === 1 || featureBatchCount % 25 === 0) {
+            defaultLog.debug({
+              label: 'ingestSubmissionUpload',
+              message: 'Persisted feature batch',
+              submissionUploadId,
+              featureBatchCount,
+              batchSize: featureBatch.length,
+              featureRowsPersisted
+            });
+          }
+        },
+        ingestCodesets: async (codesets) => {
+          codesetBatchCount += 1;
 
-    // Create artifact records for each uploaded media file
-    for (const [, mediaFile] of uploadedMediaFiles) {
-      await this.artifactService.insertArtifact({
-        bucket: getObjectStoreBucketName(),
-        object_key: mediaFile.s3Key,
-        byte_size: mediaFile.byteSize,
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        checksum_sha256: null,
-        uploaded_at: dayjs().toISOString()
-      });
-    }
+          await withConnection(async (connection) => {
+            const codesetIngestionService = new CodesetIngestionService(connection);
+            await codesetIngestionService.persistContributorCodesets(contributorId, codesets);
+          });
 
-    // Soft-delete previous features for this upload, then insert fresh ones.
-    // Scoped by submissionUploadId (not submissionId) so re-triggering one upload
-    // doesn't wipe features from a different upload in the same submission.
-    await this.ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
-    await this.insertFlatFeatures(submissionId, submissionUploadId, allBlocks, dataByteSizeMap);
+          defaultLog.debug({
+            label: 'ingestSubmissionUpload',
+            message: 'Persisted codeset payload',
+            submissionUploadId,
+            contributorId,
+            codesetBatchCount,
+            codesetKeyCount: Object.keys(codesets).length
+          });
+        },
+        ingestMediaBatch: async (mediaFiles) => {
+          mediaBatchCount += 1;
+          mediaFilesPersisted += mediaFiles.length;
+          const batchBytes = mediaFiles.reduce((total, mediaFile) => total + mediaFile.byteSize, 0);
+          mediaBytesPersisted += batchBytes;
 
-    return { valid: true, errors: [] };
-  }
+          await withConnection(async (connection) => {
+            const mediaIngestionService = new MediaIngestionService(connection);
+            await mediaIngestionService.persistUploadedMediaBatch(
+              uploadId,
+              uploadArchiveId,
+              submissionUploadId,
+              mediaFiles
+            );
+          });
 
-  /**
-   * Insert flat features using two-pass approach.
-   * Pass 1: Insert all features with parent = NULL
-   * Pass 2: Update parent references using UUID → ID mapping
-   *
-   * @private
-   * @param {number} submissionId - The submission ID
-   * @param {string} submissionUploadId - The submission_upload_id that produced these features
-   * @param {IFlattenedBlock[]} features - Features to insert
-   * @param {Map<string, number>} dataByteSizeMap - Pre-computed byte sizes per feature UUID
-   * @memberof SubmissionIngestionService
-   */
-  private async insertFlatFeatures(
-    submissionId: number,
-    submissionUploadId: string,
-    features: IFlattenedBlock[],
-    dataByteSizeMap: Map<string, number>
-  ): Promise<void> {
-    const uuidToDbId = new Map<string, number>();
-
-    // Pass 1: Insert all features without parent references
-    for (const feature of features) {
-      const result = await this.ingestionRepository.insertSubmissionFeatureRecord(
-        submissionId,
-        submissionUploadId,
-        null, // parent set in pass 2
-        feature.id,
-        feature.type,
-        feature.properties,
-        dataByteSizeMap.get(feature.id) ?? 0
-      );
-      uuidToDbId.set(feature.id, result.submission_feature_id);
-    }
-
-    // Pass 2: Update parent references
-    for (const feature of features) {
-      if (feature.parent) {
-        const parentDbId = uuidToDbId.get(feature.parent);
-        const featureDbId = uuidToDbId.get(feature.id);
-        if (parentDbId && featureDbId) {
-          await this.ingestionRepository.updateSubmissionFeatureParent(featureDbId, parentDbId);
+          if (mediaBatchCount === 1 || mediaBatchCount % 10 === 0) {
+            defaultLog.debug({
+              label: 'ingestSubmissionUpload',
+              message: 'Persisted media batch',
+              submissionUploadId,
+              mediaBatchCount,
+              batchSize: mediaFiles.length,
+              batchBytes,
+              mediaFilesPersisted,
+              mediaBytesPersisted
+            });
+          }
         }
-      }
+      });
+
+    defaultLog.info({
+      label: 'ingestSubmissionUpload',
+      message: 'Archive stream pass completed with ingestion counts',
+      submissionUploadId,
+      submissionId,
+      featureCount,
+      uploadedCount,
+      codesetFileCount,
+      featureBatchCount,
+      codesetBatchCount,
+      mediaBatchCount,
+      featureRowsPersisted,
+      mediaFilesPersisted,
+      mediaBytesPersisted
+    });
+
+    // Step 5: Guardrail validation for malformed/empty archives.
+    // Archive must contain at least one feature payload to be considered ingestible.
+    if (featureCount === 0) {
+      throw new IngestionValidationError('No feature entries were found under features/ in the archive');
     }
+
+    defaultLog.info({
+      label: 'ingestSubmissionUpload',
+      message: 'Submission upload ingestion completed successfully',
+      submissionUploadId,
+      submissionId,
+      featureCount,
+      uploadedCount,
+      codesetFileCount,
+      featureBatchCount,
+      codesetBatchCount,
+      mediaBatchCount,
+      featureRowsPersisted,
+      mediaFilesPersisted,
+      mediaBytesPersisted,
+      elapsedMs: Date.now() - startTime
+    });
+    return {
+      valid: true,
+      errors: [],
+      metadata: {
+        errorCount: 0,
+        recordCount: 0,
+        featureCount,
+        uploadedCount,
+        codesetFileCount,
+        featureBatchCount,
+        codesetBatchCount,
+        mediaBatchCount,
+        featureRowsPersisted,
+        mediaFilesPersisted,
+        mediaBytesPersisted
+      }
+    };
   }
 
   /**
-   * Look up the S3 object key for a submission's tarball.
-   * Traverses: submission → submission_upload → upload_archive → artifact → object_key
+   * Look up the S3 object key for a submission tarball.
+   * Traverses: upload -> upload_archive -> artifact -> object_key.
    *
    * @private
+   * @param {IDBConnection} connection
    * @param {string} uploadId - The upload ID
-   * @returns {Promise<string>} The S3 object key
+   * @returns {Promise<{ objectKey: string; uploadArchiveId: string }>}
    * @memberof SubmissionIngestionService
    */
-  private async getTarballObjectKey(uploadId: string): Promise<string> {
-    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
+  private async getTarballUploadContext(
+    connection: IDBConnection,
+    uploadId: string
+  ): Promise<{ objectKey: string; uploadArchiveId: string }> {
+    const uploadArchiveService = new UploadArchiveService(connection);
+    const artifactService = new ArtifactService(connection);
+    const uploadArchives = await uploadArchiveService.getUploadArchivesByUploadId(uploadId);
     if (uploadArchives.length === 0) {
       throw new Error(`No archives found for upload ${uploadId}`);
     }
 
-    const artifact = await this.artifactService.getArtifact(uploadArchives[0].artifact_id);
-    return artifact.object_key;
+    const artifact = await artifactService.getArtifact(uploadArchives[0].artifact_id);
+    return {
+      objectKey: artifact.object_key,
+      uploadArchiveId: uploadArchives[0].upload_archive_id
+    };
   }
-
-  /**
-   * Set artifact_key on file/report blocks from uploaded media S3 keys.
-   * Mutates blocks in place.
-   *
-   * @private
-   * @param {IFlattenedBlock[]} blocks - All blocks (mutated in place)
-   * @param {Map<string, IUploadedMediaFile>} uploadedMediaFiles - Uploaded media keyed by filename
-   * @memberof SubmissionIngestionService
-   */
-  private setArtifactKeys(blocks: IFlattenedBlock[], uploadedMediaFiles: Map<string, IUploadedMediaFile>): void {
-    for (const block of blocks) {
-      if (block.type !== 'file' && block.type !== 'report') {
-        continue;
-      }
-
-      const filename = block.properties['filename'] as string | undefined;
-      if (!filename) {
-        continue;
-      }
-
-      const mediaFile = uploadedMediaFiles.get(filename);
-      if (!mediaFile) {
-        defaultLog.warn({
-          label: 'setArtifactKeys',
-          message: `Expected media file '${filename}' not found in upload results`,
-          blockId: block.id
-        });
-        continue;
-      }
-
-      block.properties['artifact_key'] = mediaFile.s3Key;
-      delete block.properties['artifact_id'];
-    }
-  }
-
-  /**
-   * Compute data_byte_size per block: JSONB + overhead + artifact file size.
-   *
-   * @private
-   * @param {IFlattenedBlock[]} blocks - All blocks
-   * @param {Map<string, IUploadedMediaFile>} uploadedMediaFiles - Uploaded media keyed by filename
-   * @returns {Map<string, number>} Byte size per block ID
-   * @memberof SubmissionIngestionService
-   */
-  private computeDataByteSizeMap(
-    blocks: IFlattenedBlock[],
-    uploadedMediaFiles: Map<string, IUploadedMediaFile>
-  ): Map<string, number> {
-    const map = new Map<string, number>();
-
-    for (const block of blocks) {
-      const jsonBytes = Buffer.byteLength(JSON.stringify(block.properties));
-
-      const filename = block.properties['filename'] as string | undefined;
-      const mediaFile = filename ? uploadedMediaFiles.get(filename) : undefined;
-      const artifactBytes = mediaFile?.byteSize ?? 0;
-
-      map.set(block.id, jsonBytes + CSV_ROW_OVERHEAD_BYTES + artifactBytes);
-    }
-
-    return map;
-  }
-}
-
-/**
- * Validate that every file/report block's filename has a matching media entry in the archive.
- *
- * @export
- * @param {IFlattenedBlock[]} blocks - All blocks from the archive
- * @param {Set<string>} mediaFileNames - Media filenames found in the archive
- * @returns {IValidationError[]} Validation errors for missing media references
- */
-export function validateMediaReferences(blocks: IFlattenedBlock[], mediaFileNames: Set<string>): IValidationError[] {
-  const errors: IValidationError[] = [];
-
-  for (const block of blocks) {
-    if (block.type !== 'file' && block.type !== 'report') {
-      continue;
-    }
-
-    const filename = block.properties['filename'] as string | undefined;
-    if (!filename) {
-      continue;
-    }
-
-    if (!mediaFileNames.has(filename)) {
-      errors.push({
-        type: ValidationErrorType.MISSING_MEDIA_FILE,
-        featureId: block.id,
-        featureType: block.type,
-        field: 'filename',
-        value: filename,
-        message: `Media file '${filename}' referenced by ${block.type} block '${block.id}' not found in archive`
-      });
-    }
-  }
-
-  return errors;
 }

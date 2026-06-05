@@ -2,27 +2,25 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiGeneralError } from '../errors/api-error';
-import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
-  SubmissionFeatureSignedUrlPayload,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
-  SubmissionRepository,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SubmissionRepository
 } from '../repositories/submission-repository';
-import * as fileUtils from '../utils/file-utils';
-import { getMockDBConnection } from '../__mocks__/db';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
@@ -103,7 +101,7 @@ describe('SubmissionService', () => {
       const parentSubmissionFeatureId = 2;
 
       const insertSubmissionFeatureRecordStub = sinon
-        .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: parentSubmissionFeatureId });
 
       const submissionFeatures: ISubmissionFeature[] = [
@@ -207,33 +205,35 @@ describe('SubmissionService', () => {
       expect(response).to.be.undefined;
 
       expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
-        null,
-        '1-1',
-        'dataset',
-        {
+        submissionUploadId: 'some-uuid',
+        parentSubmissionFeatureId: null,
+        featureSourceId: '1-1',
+        featureTypeName: 'dataset',
+        featureProperties: {
           name: 'Dataset1'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-1',
-        'sample_site',
-        {
+        featureSourceId: '2-1',
+        featureTypeName: 'sample_site',
+        featureProperties: {
           name: 'SampleSite1'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-1',
-        'observation',
-        {
+        featureSourceId: '3-1',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 11,
           geometry: {
             type: 'Feature',
@@ -243,72 +243,79 @@ describe('SubmissionService', () => {
               type: 'Point'
             }
           }
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-2',
-        'observation',
-        {
+        featureSourceId: '3-2',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 12
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-2',
-        'sample_site',
-        {
+        featureSourceId: '2-2',
+        featureTypeName: 'sample_site',
+        featureProperties: {
           name: 'SampleSite2',
           dateRange: {
             start_date: '2024-01-01',
             end_date: '2024-02-01'
           }
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-3',
-        'observation',
-        {
+        featureSourceId: '3-3',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 13
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-4',
-        'observation',
-        {
+        featureSourceId: '3-4',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 14
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-3',
-        'artifact',
-        {
+        featureSourceId: '2-3',
+        featureTypeName: 'artifact',
+        featureProperties: {
           filename: 'Artifact1.txt'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-4',
-        'artifact',
-        {
+        featureSourceId: '2-4',
+        featureTypeName: 'artifact',
+        featureProperties: {
           filename: 'Artifact2.txt'
-        }
-      );
+        },
+        dataByteSizeBytes: 0
+      });
     });
   });
 
@@ -415,7 +422,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
           contributor_id: 1,
@@ -423,12 +429,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: null,
           update_user: null,
-          revision_count: 0,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -437,7 +439,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
           contributor_id: 1,
@@ -445,12 +446,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -479,7 +476,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
           contributor_id: 1,
@@ -487,12 +483,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: null,
           update_user: null,
-          revision_count: 0,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -501,7 +493,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
           contributor_id: 1,
@@ -509,12 +500,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -543,7 +530,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           contributor_id: 1,
           system_user_id: 3,
@@ -551,12 +537,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: null,
           update_user: null,
-          revision_count: 0,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -565,7 +547,6 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
           contributor_id: 1,
@@ -573,12 +554,8 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
           create_user: 1,
-          update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
           root_feature_type_name: 'dataset',
@@ -597,6 +574,44 @@ describe('SubmissionService', () => {
       const response = await submissionService.getPublishedSubmissionsForAdmins();
 
       expect(getPublishedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getSubmissionsByUserId', () => {
+    it('should return submissions accessible to the given user', async () => {
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          submitted_timestamp: '2023-12-12',
+          contributor_id: 1,
+          system_user_id: 3,
+          name: 'name',
+          description: 'description',
+          comment: 'comment',
+          publish_timestamp: null,
+          create_user: 1,
+          update_user: null,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset',
+          regions: []
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getSubmissionsByUserIdStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionsByUserId')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+      const pagination: ApiPaginationOptions = { page: 1, limit: 10, sort: 'submitted_timestamp', order: 'desc' };
+
+      const response = await submissionService.getSubmissionsByUserId(3, pagination);
+
+      expect(getSubmissionsByUserIdStub).to.be.calledOnceWith(3, pagination);
       expect(response).to.be.eql(mockSubmissionRecords);
     });
   });
@@ -932,42 +947,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getSubmissionFeatureByUuid', () => {
-    it('finds and returns submission features', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const submissionFeature: SubmissionFeatureRecord = {
-        submission_feature_id: 2,
-        uuid: '234-456-234',
-        urn: 'urn:3:dataset:2',
-        submission_id: 3,
-        feature_type_id: 1,
-        source_id: 'source-id',
-        data: {},
-        parent_submission_feature_id: 1,
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 3,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-
-      const getSubmissionFeatureByUuidStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureByUuid')
-        .resolves(submissionFeature);
-
-      const submissionFeatureUuid = '123-456-789';
-
-      const response = await submissionService.getSubmissionFeatureByUuid(submissionFeatureUuid);
-
-      expect(getSubmissionFeatureByUuidStub).to.be.calledOnceWith(submissionFeatureUuid);
-      expect(response).to.be.eql(submissionFeature);
-    });
-  });
-
   describe('getSubmissionRootFeature', () => {
     it('finds and returns submission features', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -1082,96 +1061,6 @@ describe('SubmissionService', () => {
 
       expect(downloadPublishedSubmissionStub).to.be.calledOnceWith(submissionId);
       expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('getSubmissionFeatureSignedUrl', () => {
-    const payload: SubmissionFeatureSignedUrlPayload = {
-      isAdmin: true,
-      submissionFeatureId: 1,
-      submissionFeatureObj: { key: 'a', value: 'b' }
-    };
-
-    it('should call admin repository when isAdmin == true', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getAdminSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      await submissionService.getSubmissionFeatureSignedUrl(payload);
-
-      expect(getAdminSubmissionFeatureSignedUrlStub).to.be.calledOnceWith(payload);
-      expect(getSubmissionFeatureSignedUrlStub).to.not.be.called;
-      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
-    });
-
-    it('should call regular user repository when isAdmin == false', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getAdminSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-
-      expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-      expect(getAdminSubmissionFeatureSignedUrlStub).to.not.be.called;
-      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
-    });
-
-    it('should return signed url if no error', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedUrlStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('S3KEY');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-
-      expect(getS3SignedUrlStub).to.be.calledOnceWith('KEY');
-      expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-      expect(response).to.be.eql('S3KEY');
-    });
-
-    it('should throw error if getS3SignedURL fails to generate (null)', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedUrlStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves(null);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      try {
-        await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-      } catch (err) {
-        expect(getS3SignedUrlStub).to.be.calledOnceWith('KEY');
-        expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-        expect((err as ApiGeneralError).message).to.equal(`Failed to generate signed URL for "a":"b"`);
-      }
     });
   });
 });

@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   SearchFeatureResult,
   SearchSubmissionResult,
@@ -13,7 +14,6 @@ import {
   SearchTaxonResult,
   WithCount
 } from '../models/search';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SearchRepository } from './search-repository';
 
 chai.use(sinonChai);
@@ -26,8 +26,8 @@ describe('SearchRepository', () => {
   describe('findFeatures', () => {
     it('returns paginated feature results with data and total', async () => {
       const mockFeatureData: SearchFeatureResult[] = [
-        { submission_feature_id: 1, feature_type_id: 1, label: 'Feature1' },
-        { submission_feature_id: 2, feature_type_id: 1, label: 'Feature2' }
+        { submission_feature_id: 1, feature_type_id: 1, feature_type_name: 'dataset', label: 'Feature1' },
+        { submission_feature_id: 2, feature_type_id: 1, feature_type_name: 'dataset', label: 'Feature2' }
       ];
 
       const mockRows: WithCount<typeof SearchFeatureResult>[] = [{ data: mockFeatureData, total: 25 }];

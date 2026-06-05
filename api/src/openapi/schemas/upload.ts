@@ -8,8 +8,8 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     bytes: {
       type: 'integer',
       minimum: 1,
-      maximum: 1073741824,
-      description: 'The expected size of the file to be uploaded in bytes (max 1 GB).'
+      maximum: 10737418240,
+      description: 'The expected size of the file to be uploaded in bytes (max 10 GB).'
     },
     name: {
       type: 'string',
@@ -36,7 +36,6 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
     's3UploadId',
     'uploadArchiveId',
     'key',
-    'partSizeBytes',
     'partCount',
     'presignedUrls'
   ],
@@ -68,11 +67,6 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'S3 object key where the upload will be stored.'
     },
-    partSizeBytes: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Size of each multipart upload chunk in bytes.'
-    },
     partCount: {
       type: 'integer',
       minimum: 1,
@@ -84,7 +78,7 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['partNumber', 'url'],
+        required: ['partNumber', 'url', 'partSizeBytes'],
         properties: {
           partNumber: {
             type: 'integer',
@@ -93,6 +87,11 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
           url: {
             type: 'string',
             format: 'uri'
+          },
+          partSizeBytes: {
+            type: 'integer',
+            minimum: 1,
+            description: 'Exact byte size for this part upload.'
           }
         }
       }
@@ -111,8 +110,8 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     bytes: {
       type: 'integer',
       minimum: 1,
-      maximum: 1073741824,
-      description: 'The expected size of the file to be uploaded in bytes (max 1 GB).'
+      maximum: 10737418240,
+      description: 'The expected size of the file to be uploaded in bytes (max 10 GB).'
     },
     name: {
       type: 'string',
@@ -208,8 +207,49 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
   properties: {
     status: {
       type: 'string',
-      enum: ['approved', 'denied'],
+      enum: ['submitted', 'approved', 'denied'],
       description: 'The new review status for the submission upload.'
+    }
+  }
+};
+
+export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
+  properties: {
+    submission_upload_review_id: { type: 'string', format: 'uuid' },
+    submission_upload_id: { type: 'string', format: 'uuid' },
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: {
+      type: 'string',
+      enum: ['pending', 'requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled']
+    },
+    requested_by: { type: 'integer', minimum: 1, nullable: true }
+  }
+};
+
+export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['scope', 'status'],
+  properties: {
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: {
+      type: 'string',
+      enum: ['pending', 'requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled']
+    }
+  }
+};
+
+export const UpdateSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['pending', 'requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled']
     }
   }
 };
@@ -246,6 +286,76 @@ export const CompleteMultipartUploadRequestSchema: OpenAPIV3.SchemaObject = {
           }
         }
       }
+    }
+  }
+};
+
+export const CreateTicketUploadSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['file_name', 'byte_size'],
+  properties: {
+    file_name: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 255,
+      description: 'Attachment filename used for markdown link label.'
+    },
+    byte_size: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 15728640,
+      description: 'Attachment file size in bytes.'
+    },
+    content_type: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 255,
+      description: 'Optional attachment content type used for upload metadata.'
+    }
+  }
+};
+
+export const CreateTicketUploadResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['upload_id', 'presigned_upload_url'],
+  properties: {
+    upload_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Upload lifecycle identifier.'
+    },
+    presigned_upload_url: {
+      type: 'string',
+      format: 'uri',
+      description: 'Presigned PUT URL for direct upload to the quarantine bucket.'
+    }
+  }
+};
+
+export const CompleteTicketUploadSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['uploaded'],
+      description: 'Marks the upload as completed client-side and triggers async backend processing.'
+    }
+  }
+};
+
+export const ArtifactDownloadResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['signed_url'],
+  properties: {
+    signed_url: {
+      type: 'string',
+      format: 'uri',
+      description: 'Presigned GET URL for downloading the ticket attachment.'
     }
   }
 };

@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
+import wkx from 'wkx';
 import {
   buildCombinedHeaders,
   buildSchemaHeaders,
@@ -13,6 +14,14 @@ import {
   getOutputFilename,
   groupFeaturesByType
 } from './csv-utils';
+
+/**
+ * Helper: GeoJSON → WKB Buffer via wkx, mirroring how the Parquet writer
+ * encodes spatial values. Lets WKT-mode tests start from readable GeoJSON.
+ */
+function geoJsonToWkbBuffer(geoJson: unknown): Buffer {
+  return wkx.Geometry.parseGeoJSON(geoJson as object).toWkb();
+}
 
 describe('csv-utils', () => {
   describe('flattenObject', () => {
@@ -229,12 +238,12 @@ describe('csv-utils', () => {
       expect(buildSchemaHeaders(properties)).to.deep.equal(['name', 'count']);
     });
 
-    it('should expand spatial to decimalLatitude and decimalLongitude', () => {
+    it('should emit a single column under the property name for spatial properties', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
-      expect(buildSchemaHeaders(properties)).to.deep.equal(['decimalLatitude', 'decimalLongitude']);
+      expect(buildSchemaHeaders(properties)).to.deep.equal(['geometry']);
     });
 
     it('should map artifact_key type to filePath header', () => {
@@ -249,19 +258,37 @@ describe('csv-utils', () => {
       expect(buildSchemaHeaders([])).to.deep.equal([]);
     });
 
-    it('should preserve schema order', () => {
+    it('should preserve property name and order across mixed spatial and non-spatial columns', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'description', feature_property_type_name: 'string' },
         { feature_property_name: 'geometry', feature_property_type_name: 'spatial' },
+        { feature_property_name: 'centroid', feature_property_type_name: 'spatial' },
         { feature_property_name: 'name', feature_property_type_name: 'string' }
       ];
 
-      expect(buildSchemaHeaders(properties)).to.deep.equal([
-        'description',
-        'decimalLatitude',
-        'decimalLongitude',
-        'name'
-      ]);
+      expect(buildSchemaHeaders(properties)).to.deep.equal(['description', 'geometry', 'centroid', 'name']);
+    });
+
+    it('should expand a datetime property into two suffixed columns (no bare column)', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+
+      const result = buildSchemaHeaders(properties);
+
+      expect(result).to.deep.equal(['observed_at_date', 'observed_at_time']);
+      expect(result).to.not.include('observed_at');
+    });
+
+    it('should throw when a datetime expansion collides with a sibling property name', () => {
+      // Schema-build is the gate for collision detection; downstream consumers
+      // (flattener) trust the validated list.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observation', feature_property_type_name: 'datetime' },
+        { feature_property_name: 'observation_time', feature_property_type_name: 'number' }
+      ];
+
+      expect(() => buildSchemaHeaders(properties)).to.throw(/observation_time/);
     });
   });
 
@@ -278,14 +305,15 @@ describe('csv-utils', () => {
 
       const result = buildCombinedHeaders(parentProperties, childProperties, ['dataset_name', 'dataset_id']);
 
+      // datetime expands into two suffixed columns; the bare `timestamp` is gone.
       expect(result).to.deep.equal([
         'dataset_name',
         'dataset_id',
         'device_key',
         'animal_identifier',
-        'timestamp',
-        'decimalLatitude',
-        'decimalLongitude'
+        'timestamp_date',
+        'timestamp_time',
+        'geometry'
       ]);
     });
 
@@ -309,7 +337,7 @@ describe('csv-utils', () => {
 
       const result = buildCombinedHeaders(parentProperties, childProperties);
 
-      expect(result).to.deep.equal(['device_key', 'timestamp']);
+      expect(result).to.deep.equal(['device_key', 'timestamp_date', 'timestamp_time']);
     });
 
     it('should return only child headers when no parent and no system headers', () => {
@@ -334,14 +362,16 @@ describe('csv-utils', () => {
         { feature_property_name: 'temperature', feature_property_type_name: 'number' }
       ];
       const parentData = { device_key: 'TAG-001', animal_identifier: 'M12345' };
-      const childData = { timestamp: '2024-01-01T12:00:00Z', temperature: 22.5 };
+      // datetime arrives hydrated as two suffixed keys, not a combined ISO string.
+      const childData = { timestamp_date: '2024-01-01', timestamp_time: '12:00:00', temperature: 22.5 };
 
       const result = flattenFeatureWithParent(childData, childProperties, parentData, parentProperties, 100);
 
       expect(result).to.deep.equal({
         device_key: 'TAG-001',
         animal_identifier: 'M12345',
-        timestamp: '2024-01-01T12:00:00Z',
+        timestamp_date: '2024-01-01',
+        timestamp_time: '12:00:00',
         temperature: '22.5'
       });
     });
@@ -372,7 +402,7 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ name: 'Child Name' });
     });
 
-    it('should handle spatial properties in both parent and child', () => {
+    it('should handle spatial properties in parent and child as named WKT columns', () => {
       const parentProperties: CsvPropertyDefinition[] = [
         { feature_property_name: 'deployment_location', feature_property_type_name: 'spatial' }
       ];
@@ -380,19 +410,17 @@ describe('csv-utils', () => {
         { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
       const parentData = {
-        deployment_location: { type: 'Point', coordinates: [-120.0, 50.0] }
+        deployment_location: geoJsonToWkbBuffer({ type: 'Point', coordinates: [-120.0, 50.0] })
       };
       const childData = {
-        geometry: { type: 'Point', coordinates: [-121.5, 51.5] }
+        geometry: geoJsonToWkbBuffer({ type: 'Point', coordinates: [-121.5, 51.5] })
       };
 
       const result = flattenFeatureWithParent(childData, childProperties, parentData, parentProperties, 100);
 
-      // Child spatial overwrites parent spatial (both write to decimalLatitude/decimalLongitude)
-      expect(result).to.deep.equal({
-        decimalLatitude: '51.5',
-        decimalLongitude: '-121.5'
-      });
+      // Each spatial property keeps its own column — no collision between parent and child.
+      expect(result.deployment_location).to.match(/^POINT\(/);
+      expect(result.geometry).to.match(/^POINT\(/);
     });
   });
 
@@ -404,66 +432,97 @@ describe('csv-utils', () => {
         { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' },
         { feature_property_name: 'active', feature_property_type_name: 'boolean' }
       ];
-      const data = { name: 'Bear', count: 5, timestamp: '2024-01-01T00:00:00Z', active: true };
+      // datetime is hydrated as two suffixed keys; the flattener pulls each cell directly.
+      const data = {
+        name: 'Bear',
+        count: 5,
+        timestamp_date: '2024-01-01',
+        timestamp_time: '00:00:00',
+        active: true
+      };
 
       const result = flattenFeatureBySchema(data, properties, 100);
 
       expect(result).to.deep.equal({
         name: 'Bear',
         count: '5',
-        timestamp: '2024-01-01T00:00:00Z',
+        timestamp_date: '2024-01-01',
+        timestamp_time: '00:00:00',
         active: 'true'
       });
     });
 
-    it('should extract coordinates from a FeatureCollection', () => {
+    it('should emit two cells (date + time) for a datetime property with both components set', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
       ];
-      const data = {
-        geometry: {
-          type: 'FeatureCollection',
-          features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-124.856, 54.321] } }]
-        }
-      };
+      const data = { observed_at_date: '2024-06-15', observed_at_time: '13:45:00' };
 
       const result = flattenFeatureBySchema(data, properties, 100);
 
-      expect(result).to.deep.equal({ decimalLatitude: '54.321', decimalLongitude: '-124.856' });
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: '13:45:00'
+      });
     });
 
-    it('should extract coordinates from a bare Point', () => {
+    it('should emit empty string for the missing component of a date-only datetime', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
       ];
-      const data = { geometry: { type: 'Point', coordinates: [-130.5, 56.2] } };
+      const data = { observed_at_date: '2024-06-15', observed_at_time: null };
 
       const result = flattenFeatureBySchema(data, properties, 100);
 
-      expect(result).to.deep.equal({ decimalLatitude: '56.2', decimalLongitude: '-130.5' });
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: ''
+      });
     });
 
-    it('should return empty strings for null spatial value', () => {
+    it('should emit empty string for the missing component of a time-only datetime', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
       ];
-
-      const result = flattenFeatureBySchema({ geometry: null }, properties, 100);
-
-      expect(result).to.deep.equal({ decimalLatitude: '', decimalLongitude: '' });
-    });
-
-    it('should return empty strings when no Point found in spatial', () => {
-      const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
-      ];
-      const data = {
-        geometry: { type: 'FeatureCollection', features: [] }
-      };
+      const data = { observed_at_date: null, observed_at_time: '13:45:00' };
 
       const result = flattenFeatureBySchema(data, properties, 100);
 
-      expect(result).to.deep.equal({ decimalLatitude: '', decimalLongitude: '' });
+      expect(result).to.deep.equal({
+        observed_at_date: '',
+        observed_at_time: '13:45:00'
+      });
+    });
+
+    it('should format Date and millisecond inputs from a Parquet round-trip back to canonical strings', () => {
+      // parquetjs returns Date (UTC midnight) for native DATE columns and ms-since-midnight
+      // numbers for TIME_MILLIS columns. Both must normalize back to the SQL projection's
+      // canonical strings — without this branch the generic toStringOrEmpty path would
+      // JSON-stringify the Date and render the raw ms count.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      // 13:45:00 → (13*3600 + 45*60) * 1000 = 49_500_000.
+      const data = { observed_at_date: new Date('2024-06-15T00:00:00Z'), observed_at_time: 49_500_000 };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result).to.deep.equal({
+        observed_at_date: '2024-06-15',
+        observed_at_time: '13:45:00'
+      });
+    });
+
+    it('should zero-pad single-digit components when formatting a TIME_MILLIS millisecond input', () => {
+      // 04:05:06 → (4*3600 + 5*60 + 6) * 1000 = 14_706_000.
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'observed_at', feature_property_type_name: 'datetime' }
+      ];
+      const data = { observed_at_date: null, observed_at_time: 14_706_000 };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      expect(result.observed_at_time).to.equal('04:05:06');
     });
 
     it('should flatten arrays with semicolons', () => {
@@ -549,6 +608,151 @@ describe('csv-utils', () => {
       const result = flattenFeatureBySchema({ name: 'Réseau élévation 北极' }, properties, 100);
 
       expect(result.name).to.equal('Réseau élévation 北极');
+    });
+  });
+
+  describe('flattenFeatureBySchema spatial (WKB → WKT)', () => {
+    const spatialProps: CsvPropertyDefinition[] = [
+      { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
+    ];
+
+    /**
+     * Round-trip: encode the GeoJSON to WKB (the way the Parquet writer does),
+     * pass through flattenFeatureBySchema, parse the WKT back via wkx, and
+     * return the decoded GeoJSON for shape assertions.
+     */
+    function roundTripWkt(geoJson: object): Record<string, unknown> {
+      const wkb = geoJsonToWkbBuffer(geoJson);
+      const result = flattenFeatureBySchema({ geometry: wkb }, spatialProps, 100);
+      const wkt = result.geometry;
+      expect(wkt).to.be.a('string').and.not.equal('');
+      return wkx.Geometry.parse(wkt as string).toGeoJSON() as Record<string, unknown>;
+    }
+
+    it('round-trips a Point', () => {
+      const decoded = roundTripWkt({ type: 'Point', coordinates: [-123.3656, 48.4284] });
+
+      expect(decoded.type).to.equal('Point');
+      const coords = decoded.coordinates as number[];
+      expect(coords[0]).to.be.closeTo(-123.3656, 1e-10);
+      expect(coords[1]).to.be.closeTo(48.4284, 1e-10);
+    });
+
+    it('round-trips a LineString', () => {
+      const decoded = roundTripWkt({
+        type: 'LineString',
+        coordinates: [
+          [-120, 50],
+          [-121, 51],
+          [-122, 52]
+        ]
+      });
+
+      expect(decoded.type).to.equal('LineString');
+      expect((decoded.coordinates as number[][]).length).to.equal(3);
+    });
+
+    it('round-trips a Polygon', () => {
+      const decoded = roundTripWkt({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-120, 50],
+            [-121, 50],
+            [-121, 51],
+            [-120, 51],
+            [-120, 50]
+          ]
+        ]
+      });
+
+      expect(decoded.type).to.equal('Polygon');
+      expect((decoded.coordinates as number[][][])[0].length).to.equal(5);
+    });
+
+    it('round-trips a MultiPoint', () => {
+      const decoded = roundTripWkt({
+        type: 'MultiPoint',
+        coordinates: [
+          [-120, 50],
+          [-121, 51]
+        ]
+      });
+
+      expect(decoded.type).to.equal('MultiPoint');
+      expect((decoded.coordinates as number[][]).length).to.equal(2);
+    });
+
+    it('round-trips a MultiLineString', () => {
+      const decoded = roundTripWkt({
+        type: 'MultiLineString',
+        coordinates: [
+          [
+            [-120, 50],
+            [-121, 51]
+          ],
+          [
+            [-122, 52],
+            [-123, 53]
+          ]
+        ]
+      });
+
+      expect(decoded.type).to.equal('MultiLineString');
+      expect((decoded.coordinates as number[][][]).length).to.equal(2);
+    });
+
+    it('round-trips a MultiPolygon', () => {
+      const decoded = roundTripWkt({
+        type: 'MultiPolygon',
+        coordinates: [
+          [
+            [
+              [-120, 50],
+              [-121, 50],
+              [-121, 51],
+              [-120, 51],
+              [-120, 50]
+            ]
+          ],
+          [
+            [
+              [-130, 60],
+              [-131, 60],
+              [-131, 61],
+              [-130, 61],
+              [-130, 60]
+            ]
+          ]
+        ]
+      });
+
+      expect(decoded.type).to.equal('MultiPolygon');
+      expect((decoded.coordinates as number[][][][]).length).to.equal(2);
+    });
+
+    it('emits empty string for null spatial value', () => {
+      const result = flattenFeatureBySchema({ geometry: null }, spatialProps, 100);
+
+      expect(result).to.deep.equal({ geometry: '' });
+    });
+
+    it('emits empty string for non-Buffer spatial value', () => {
+      // Whatever the source — GeoJSON object, string, undefined — only Buffer
+      // values flow through. Anything else is empty-celled.
+      const result = flattenFeatureBySchema(
+        { geometry: { type: 'Point', coordinates: [-120, 50] } },
+        spatialProps,
+        100
+      );
+
+      expect(result).to.deep.equal({ geometry: '' });
+    });
+
+    it('emits empty string for malformed WKB buffer', () => {
+      const result = flattenFeatureBySchema({ geometry: Buffer.from([0xff, 0xff, 0xff, 0xff]) }, spatialProps, 100);
+
+      expect(result).to.deep.equal({ geometry: '' });
     });
   });
 });

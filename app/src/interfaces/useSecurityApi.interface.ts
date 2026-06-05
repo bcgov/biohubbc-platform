@@ -1,4 +1,5 @@
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
+import { ApiPaginationResponseParams } from 'types/pagination';
 
 export interface ISecureDataAccessRequestForm {
   fullName: string;
@@ -69,4 +70,28 @@ export interface ISubmissionFeatureSecurityRulesSummary {
 }
 export interface ISubmissionFeatureSecurityRulesSummaryResponse {
   rules: ISubmissionFeatureSecurityRulesSummary[];
+}
+
+export interface ISecurityCategoryWithRuleCount {
+  security_category_id: number;
+  name: string;
+  description: string | null;
+  rule_count: number;
+}
+
+export interface ISecurityCategoriesResponse {
+  categories: ISecurityCategoryWithRuleCount[];
+  pagination: ApiPaginationResponseParams;
+}
+
+export interface ISecurityReasonWithFeatureCount {
+  security_rule_id: number;
+  name: string;
+  description: string | null;
+  feature_count: number;
+}
+
+export interface ISecurityReasonsResponse {
+  reasons: ISecurityReasonWithFeatureCount[];
+  pagination: ApiPaginationResponseParams;
 }

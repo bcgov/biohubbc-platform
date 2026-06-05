@@ -1,19 +1,12 @@
-import { FeatureCollection } from 'geojson';
 import { IDBConnection } from '../database/db';
+import { ExpressionTree } from '../models/expression-tree';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { CodeService } from './code-service';
 import { DBService } from './db-service';
-import {
-  InsertDatetimeSearchableRecord,
-  InsertNumberSearchableRecord,
-  InsertSpatialSearchableRecord,
-  InsertStringSearchableRecord,
-  ISearchFeaturesFilters,
-  SearchFeatureResultWithRelevancy
-} from './search-feature-service.interface';
+import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 
 const defaultLog = getLogger('services/search-feature-service');
 
@@ -23,6 +16,7 @@ const defaultLog = getLogger('services/search-feature-service');
  */
 export class SearchFeatureService extends DBService {
   searchFeatureRepository: SearchFeatureRepository;
+  semanticValidator: ExpressionPredicateSemanticValidator;
 
   /**
    * Initializes the SearchFeatureService with a database connection.
@@ -32,155 +26,112 @@ export class SearchFeatureService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.searchFeatureRepository = new SearchFeatureRepository(connection);
+    this.semanticValidator = new ExpressionPredicateSemanticValidator(connection);
   }
 
   /**
-   * Main search method for features.
-   * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
-   * and returns results matching all criteria with aggregated relevancy scores.
+   * Search features that match an expression tree.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filter criteria
+   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
-   * @return {Promise<SearchFeatureResultWithRelevancy[]>} Array of features sorted by relevancy
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Promise<SearchFeatureResultWithRelevancy[]>}
    */
-  async searchFeatures(
-    filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+  async searchFeaturesByExpressionTree(
+    anchorFeatureType: string,
+    expressionTree: ExpressionTree | undefined,
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
-    defaultLog.debug({ label: 'searchFeatures', filters, pagination });
-    return this.searchFeatureRepository.searchFeaturesByFilters(filters, pagination);
+    defaultLog.debug({ label: 'searchFeaturesByExpressionTree', anchorFeatureType, expressionTree, pagination });
+    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
+    const normalizedExpressionTree = expressionTree
+      ? await this.semanticValidator.validateExpressionTree(expressionTree)
+      : undefined;
+    return this.searchFeatureRepository.searchFeaturesByExpressionTree(
+      anchorFeatureType,
+      normalizedExpressionTree,
+      pagination,
+      systemUserId
+    );
   }
 
   /**
-   * Gets the total count of features matching the search criteria.
-   * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
-   * and returns the count of results matching all criteria.
+   * Search features and count matching rows for a feature-type anchored expression search.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filter criteria
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; count: number }>}
+   */
+  async searchFeaturesByExpressionTreeWithCount(
+    anchorFeatureType: string,
+    expressionTree: ExpressionTree | undefined,
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
+  ): Promise<{ features: SearchFeatureResultWithRelevancy[]; count: number }> {
+    defaultLog.debug({
+      label: 'searchFeaturesByExpressionTreeWithCount',
+      anchorFeatureType,
+      expressionTree,
+      pagination
+    });
+
+    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
+    const normalizedExpressionTree = expressionTree
+      ? await this.semanticValidator.validateExpressionTree(expressionTree)
+      : undefined;
+
+    const [features, count] = await Promise.all([
+      this.searchFeatureRepository.searchFeaturesByExpressionTree(
+        anchorFeatureType,
+        normalizedExpressionTree,
+        pagination,
+        systemUserId
+      ),
+      this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
+        anchorFeatureType,
+        normalizedExpressionTree,
+        systemUserId
+      )
+    ]);
+
+    return { features, count };
+  }
+
+  /**
+   * Gets the total count of features matching an expression tree.
+   *
+   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
+   * @param {number | null} [systemUserId] - Security context
    * @return {Promise<number>} Total count of matching features
    */
-  async getSearchFeaturesCount(filters: ISearchFeaturesFilters): Promise<number> {
-    defaultLog.debug({ label: 'getSearchFeaturesCount', filters });
-    return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters);
+  async getSearchFeaturesCountByExpressionTree(
+    anchorFeatureType: string,
+    expressionTree: ExpressionTree | undefined,
+    systemUserId?: number | null
+  ): Promise<number> {
+    defaultLog.debug({ label: 'getSearchFeaturesCountByExpressionTree', anchorFeatureType, expressionTree });
+    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
+    const normalizedExpressionTree = expressionTree
+      ? await this.semanticValidator.validateExpressionTree(expressionTree)
+      : undefined;
+    return this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
+      anchorFeatureType,
+      normalizedExpressionTree,
+      systemUserId
+    );
   }
 
   /**
-   * Returns submission feature IDs matching the provided search filters.
-   * Delegates to repository for the CTE-based query.
+   * Validate that an expression-tree search target exists before delegating to the repository.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
-   * @returns {Promise<number[]>} Array of matching submission_feature_id values
-   */
-  async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
-    defaultLog.debug({ label: 'getSearchFeatureIds', filters });
-    const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
-    return rows.map((row) => row.submission_feature_id);
-  }
-
-  /**
-   * Creates search indexes for datetime, number, spatial and string properties belonging to
-   * all features found for the given submission.
-   *
-   * Deletes existing search records first for idempotency — job retries and manual re-indexing
-   * can run this multiple times for the same submission. Without delete-before-insert, duplicate
-   * records accumulate because the search tables have no unique constraint on
-   * (submission_feature_id, feature_property_id). Upsert was rejected because it can't clean up
-   * orphaned rows when properties are removed between runs.
-   *
-   * @param {number} submissionId
+   * @param {string} anchorFeatureType
    * @return {Promise<void>}
    */
-  async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
-    defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });
-
-    // Delete existing search records for idempotency (safe for retries and manual re-indexing)
-    await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
-
-    const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
-    const numberRecords: InsertNumberSearchableRecord[] = [];
-    const spatialRecords: InsertSpatialSearchableRecord[] = [];
-    const stringRecords: InsertStringSearchableRecord[] = [];
-
+  private async validateExpressionTreeTargetFeatureType(anchorFeatureType: string): Promise<void> {
     const submissionRepository = new SubmissionRepository(this.connection);
-    const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
-
-    const codeService = new CodeService(this.connection);
-    const allFeatureTypePropertyCodes = await codeService.getFeatureTypePropertyCodes();
-
-    for (const currentFeature of allFeatures) {
-      const currentFeatureProperties = Object.entries(currentFeature.data);
-
-      const applicableFeatureTypePropertyCodes = allFeatureTypePropertyCodes.find(
-        (item) => item.feature_type.feature_type_id === currentFeature.feature_type_id
-      );
-
-      if (!applicableFeatureTypePropertyCodes) {
-        continue;
-      }
-
-      for (const [currentFeaturePropertyName, currentFeaturePropertyValue] of currentFeatureProperties) {
-        const matchingFeatureProperty = applicableFeatureTypePropertyCodes.feature_type_properties.find(
-          (item) => item.feature_property_name === currentFeaturePropertyName
-        );
-
-        if (!matchingFeatureProperty || !currentFeaturePropertyValue) {
-          continue;
-        }
-
-        switch (matchingFeatureProperty.feature_property_type_name) {
-          case 'datetime':
-            datetimeRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
-              value: currentFeaturePropertyValue as string
-            });
-            break;
-
-          case 'number':
-            numberRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
-              value: currentFeaturePropertyValue as number
-            });
-            break;
-
-          case 'spatial':
-            spatialRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
-              value: currentFeaturePropertyValue as FeatureCollection
-            });
-            break;
-
-          case 'string':
-            stringRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
-              value: currentFeaturePropertyValue as string
-            });
-            break;
-        }
-      }
-    }
-
-    const promises: Promise<any>[] = [];
-
-    if (datetimeRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableDatetimeRecords(datetimeRecords));
-    }
-
-    if (numberRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableNumberRecords(numberRecords));
-    }
-
-    if (spatialRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableSpatialRecords(spatialRecords));
-    }
-
-    if (stringRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableStringRecords(stringRecords));
-    }
-
-    await Promise.all(promises);
+    await submissionRepository.getFeatureTypeIdByName(anchorFeatureType);
   }
 }

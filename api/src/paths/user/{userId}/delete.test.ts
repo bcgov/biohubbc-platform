@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { UserService } from '../../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as delete_endpoint from './delete';
 
 chai.use(sinonChai);
@@ -23,7 +23,7 @@ describe('removeSystemUser', () => {
     mockReq.params = { userId: '1' };
     mockReq.body = { roles: [1, 2] };
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       system_user_id: 1,
@@ -68,7 +68,7 @@ describe('removeSystemUser', () => {
     mockReq.params = { userId: '1' };
     mockReq.body = { roles: [1, 2] };
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       system_user_id: 1,
@@ -114,7 +114,7 @@ describe('removeSystemUser', () => {
     mockReq.params = { userId: '1' };
     mockReq.body = { roles: [1, 2] };
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       system_user_id: 1,
@@ -162,7 +162,7 @@ describe('removeSystemUser', () => {
     mockReq.params = { userId: '1' };
     mockReq.body = { roles: [1, 2] };
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       system_user_id: 1,

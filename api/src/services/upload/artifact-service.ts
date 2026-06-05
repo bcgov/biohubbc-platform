@@ -1,10 +1,18 @@
 import { IDBConnection } from '../../database/db';
-import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { ApiConflictError } from '../../errors/api-error';
+import { HTTP401, HTTP409 } from '../../errors/http-error';
+import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
+import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { DBService } from '../db-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
+  artifactSecurityRepository: ArtifactSecurityRepository;
+  objectStorageService: ObjectStorageService;
 
   /**
    * Creates an instance of ArtifactService.
@@ -15,6 +23,8 @@ export class ArtifactService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.artifactRepository = new ArtifactRepository(connection);
+    this.artifactSecurityRepository = new ArtifactSecurityRepository(connection);
+    this.objectStorageService = new ObjectStorageService();
   }
 
   /**
@@ -39,14 +49,91 @@ export class ArtifactService extends DBService {
   }
 
   /**
+   * Create a signed download URL for an artifact.
+   *
+   * Missing artifact IDs and missing artifact rows are returned as access
+   * denied so download routes do not reveal whether an artifact exists.
+   *
+   * @param {string | null | undefined} artifactId
+   * @returns {Promise<string>}
+   * @memberof ArtifactService
+   */
+  async getArtifactSignedUrl(artifactId: string | null | undefined): Promise<string> {
+    if (!artifactId) {
+      throw new HTTP401('Access Denied');
+    }
+
+    const artifact = await this.getArtifact(artifactId);
+    const latestSecurity = await this.artifactSecurityRepository.findLatestArtifactSecurityByArtifactId(artifactId);
+
+    if (!latestSecurity || latestSecurity.security === SecurityStatusEnum.PENDING) {
+      throw new HTTP409('Attachment is not ready for download yet. It is pending security scan.');
+    }
+
+    if (latestSecurity.security !== SecurityStatusEnum.CLEAN) {
+      throw new HTTP409('Attachment is not available for download because it failed security validation.');
+    }
+
+    if (artifact.bucket !== getObjectStoreBucketName()) {
+      throw new HTTP409('Attachment is not ready for download yet. It is pending promotion.');
+    }
+
+    return this.objectStorageService.getSignedUrl(BucketType.MAIN, artifact.object_key);
+  }
+
+  /**
+   * Bulk-look-up `byte_size` by `(bucket, object_key)`. See
+   * `ArtifactRepository.getArtifactByteSizesByObjectKeys` for the why.
+   *
+   * @param {string} bucket
+   * @param {string[]} objectKeys
+   * @return {Promise<Map<string, number>>} object_key → byte_size
+   * @memberof ArtifactService
+   */
+  async getArtifactByteSizesByObjectKeys(bucket: string, objectKeys: string[]): Promise<Map<string, number>> {
+    return this.artifactRepository.getArtifactByteSizesByObjectKeys(bucket, objectKeys);
+  }
+
+  /**
    * Inserts a new artifact record.
    *
    * @param {CreateArtifact} artifact The artifact data to insert
-   * @return {Promise<{ artifact_id: string }>} Newly created artifact ID
+   * @return {Promise<Artifact>} Persisted artifact row
    * @memberof ArtifactService
    */
-  async insertArtifact(artifact: CreateArtifact): Promise<{ artifact_id: string }> {
+  async insertArtifact(artifact: CreateArtifact): Promise<Artifact> {
     return this.artifactRepository.insertArtifact(artifact);
+  }
+
+  /**
+   * Inserts artifact records in bulk.
+   *
+   * @param {CreateArtifact[]} artifacts
+   * @returns {Promise<Artifact[]>}
+   * @memberof ArtifactService
+   */
+  async insertArtifacts(artifacts: CreateArtifact[]): Promise<Artifact[]> {
+    const seenKeys = new Set<string>();
+    const duplicateKeys = new Set<string>();
+
+    for (const artifact of artifacts) {
+      const compositeKey = `${artifact.bucket}\0${artifact.object_key}`;
+      if (seenKeys.has(compositeKey)) {
+        duplicateKeys.add(`${artifact.bucket}/${artifact.object_key}`);
+        continue;
+      }
+
+      seenKeys.add(compositeKey);
+    }
+
+    if (duplicateKeys.size > 0) {
+      throw new ApiConflictError('Duplicate artifact keys in bulk insert payload', [
+        'ArtifactService->insertArtifacts',
+        { duplicateKeys: [...duplicateKeys] }
+      ]);
+    }
+
+    return this.artifactRepository.insertArtifacts(artifacts);
   }
 
   /**
@@ -71,6 +158,17 @@ export class ArtifactService extends DBService {
    */
   async updateArtifactsByUploadId(uploadId: string, artifact: UpdateArtifact): Promise<{ artifact_id: string }[]> {
     return this.artifactRepository.updateArtifactsByUploadId(uploadId, artifact);
+  }
+
+  /**
+   * Updates multiple artifacts by id.
+   *
+   * @param {BatchUpdateArtifact[]} artifacts Row-level updates keyed by artifact id
+   * @return {Promise<{ artifact_id: string }[]>} Updated artifact IDs
+   * @memberof ArtifactService
+   */
+  async updateArtifactsByIds(artifacts: BatchUpdateArtifact[]): Promise<{ artifact_id: string }[]> {
+    return this.artifactRepository.updateArtifactsByIds(artifacts);
   }
 
   /**

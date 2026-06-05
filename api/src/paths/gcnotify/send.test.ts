@@ -1,10 +1,10 @@
-import axios from 'axios';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../database/db';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
+import * as db from '../../database/db';
+import { GCNotifyService } from '../../services/gcnotify-service';
 import * as notify from './send';
 
 chai.use(sinonChai);
@@ -50,7 +50,7 @@ describe('gcnotify', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -58,7 +58,7 @@ describe('gcnotify', () => {
       mockReq.body = sampleReq.body;
       process.env.GCNOTIFY_SECRET_API_KEY = 'temp';
 
-      const sendEmailGCNotification = sinon.stub(axios, 'post').resolves(sampleRes);
+      const sendEmailGCNotification = sinon.stub(GCNotifyService.dependencies, 'post').resolves(sampleRes);
 
       const requestHandler = notify.sendNotification();
 
@@ -75,7 +75,7 @@ describe('gcnotify', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -91,7 +91,7 @@ describe('gcnotify', () => {
       };
       process.env.GCNOTIFY_SECRET_API_KEY = 'temp';
 
-      const sendPhoneNumberGCNotification = sinon.stub(axios, 'post').resolves(sampleRes);
+      const sendPhoneNumberGCNotification = sinon.stub(GCNotifyService.dependencies, 'post').resolves(sampleRes);
 
       const requestHandler = notify.sendNotification();
 
