@@ -6,7 +6,6 @@ metadata:
     {{- include "clamav.labels" . | nindent 4 }}
 data:
   clamd.conf: |
-    LogFile {{ .Values.clamd.logFile }}
     LogTime {{ ternary "yes" "no" .Values.clamd.logTime }}
     LogClean {{ ternary "yes" "no" .Values.clamd.logClean }}
     LogVerbose {{ ternary "yes" "no" .Values.clamd.logVerbose }}
@@ -15,11 +14,11 @@ data:
     StreamMaxLength {{ .Values.clamd.streamMaxLength }}
     MaxFileSize {{ .Values.clamd.maxFileSize }}
     MaxScanSize {{ .Values.clamd.maxScanSize }}
+    AlertExceedsMax {{ ternary "yes" "no" .Values.clamd.alertExceedsMax }}
     MaxThreads {{ .Values.clamd.maxThreads }}
     MaxConnectionQueueLength {{ .Values.clamd.maxConnectionQueueLength }}
     ReadTimeout {{ .Values.clamd.readTimeout }}
     SelfCheck {{ .Values.clamd.selfCheck }}
-    AllowSupplementaryGroups {{ ternary "yes" "no" .Values.clamd.allowSupplementaryGroups }}
     Foreground {{ ternary "yes" "no" .Values.clamd.foreground }}
     DatabaseDirectory /var/lib/clamav
     {{- range .Values.clamd.extraDirectives }}

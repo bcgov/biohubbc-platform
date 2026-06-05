@@ -10,6 +10,6 @@ resources:
 
 clamd:
   logVerbose: true
-  streamMaxLength: 4000M
-  maxFileSize: 4000M
-  maxScanSize: 4000M
+  streamMaxLength: 2000M
+  maxFileSize: 2000M
+  maxScanSize: 2000M

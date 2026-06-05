@@ -33,7 +33,7 @@ helm upgrade --install clamav ./infrastructure/clamav \
 - `freshclam.conf` is rendered from `values.freshclam.*` into the same ConfigMap.
 - Pod restarts are automatically triggered on config changes via `checksum/config`.
 - The Service is named `clamav` (port `3310`) to preserve existing API/queue consumer settings.
-- `prod` runs a single replica to match PVC access mode constraints.
+- The PVC uses `ReadWriteMany` (`netapp-file-standard` is NFS-backed) so rolling updates attach cleanly without Multi-Attach errors.
 
 ## Cutover and cleanup
 

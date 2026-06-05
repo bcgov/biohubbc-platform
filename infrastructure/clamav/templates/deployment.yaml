@@ -58,12 +58,7 @@ spec:
             failureThreshold: 3
           volumeMounts:
             - name: clamd-config
-              mountPath: /etc/clamav/clamd.conf
-              subPath: clamd.conf
-              readOnly: true
-            - name: clamd-config
-              mountPath: /etc/clamav/freshclam.conf
-              subPath: freshclam.conf
+              mountPath: /etc/clamav
               readOnly: true
             {{- if .Values.persistence.enabled }}
             - name: clamav-db
@@ -73,9 +68,6 @@ spec:
         - name: clamd-config
           configMap:
             name: {{ include "clamav.fullname" . }}-config
-            items:
-              - key: clamd.conf
-                path: clamd.conf
         {{- if .Values.persistence.enabled }}
         - name: clamav-db
           persistentVolumeClaim:
