@@ -204,8 +204,15 @@ describe('Ingest → Download → Export (system integration)', function () {
     // only to keep the production typecheck green.
     const exportService = new DownloadExportService(connection);
     const exportRecord = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+    // The export record no longer exposes the internal artifact-group FK (it is server-only), so the
+    // group id is read straight from the row to drive the pipeline for this round-trip.
+    const exportGroup = await connection.sql(SQL`
+      SELECT download_version_export_artifact_group_id
+      FROM download_version_export
+      WHERE download_version_export_id = ${exportRecord.download_version_export_id};
+    `);
     const exportPipelineService = new DownloadExportPipelineService(connection);
-    await exportPipelineService.runExportGroup(exportRecord.download_version_export_artifact_group_id);
+    await exportPipelineService.runExportGroup(exportGroup.rows[0].download_version_export_artifact_group_id);
 
     // Locate the part-zip on S3 and extract chunk1.csv.
     const artifacts = await connection.sql(SQL`

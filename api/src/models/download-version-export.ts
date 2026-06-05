@@ -26,15 +26,22 @@ export const DownloadVersionExportRow = z.object({
 export type DownloadVersionExportRow = z.infer<typeof DownloadVersionExportRow>;
 
 /**
- * Full API shape for a version export. Extends the thin row with five query-derived fields, NONE of
- * which are columns on `download_version_export`:
+ * Full API shape for a version export — the client-facing contract.
+ *
+ * Omits the two internal FKs the thin row carries (`download_version_id` and the artifact-group id):
+ * those are temporal/dedup machinery the client never needs, so they stay server-side rather than
+ * leaking into the response. Adds five query-derived fields, NONE of which are columns on
+ * `download_version_export`:
  *
  * - `download_id` is reached through the version → download chain.
  * - `status` / `started_at` / `completed_at` / `error_message` are surfaced from the artifact GROUP
  *   via JOIN. Lifecycle state lives on the group, never the per-user export — attaching a new export
  *   to an already-`ready` group yields a `ready` export with no status write.
  */
-export const DownloadVersionExportRecord = DownloadVersionExportRow.extend({
+export const DownloadVersionExportRecord = DownloadVersionExportRow.omit({
+  download_version_id: true,
+  download_version_export_artifact_group_id: true
+}).extend({
   download_id: z.string().uuid(),
   status: DownloadStatusZod,
   started_at: z.string().nullable(),

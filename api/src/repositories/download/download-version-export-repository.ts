@@ -324,8 +324,6 @@ export class DownloadVersionExportRepository extends BaseRepository {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
-        de.download_version_id,
-        de.download_version_export_artifact_group_id,
         de.format,
         de.mode,
         de.max_part_size_bytes,
@@ -384,8 +382,6 @@ export class DownloadVersionExportRepository extends BaseRepository {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
-        de.download_version_id,
-        de.download_version_export_artifact_group_id,
         de.format,
         de.mode,
         de.max_part_size_bytes,
@@ -405,8 +401,6 @@ export class DownloadVersionExportRepository extends BaseRepository {
       WHERE dv.download_id = ${downloadId}
       GROUP BY
         de.download_version_export_id,
-        de.download_version_id,
-        de.download_version_export_artifact_group_id,
         de.format,
         de.mode,
         de.max_part_size_bytes,
@@ -444,8 +438,6 @@ export class DownloadVersionExportRepository extends BaseRepository {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
-        de.download_version_id,
-        de.download_version_export_artifact_group_id,
         de.format,
         de.mode,
         de.max_part_size_bytes,
@@ -465,8 +457,6 @@ export class DownloadVersionExportRepository extends BaseRepository {
       WHERE dv.download_id = ANY(${downloadIds})
       GROUP BY
         de.download_version_export_id,
-        de.download_version_id,
-        de.download_version_export_artifact_group_id,
         de.format,
         de.mode,
         de.max_part_size_bytes,

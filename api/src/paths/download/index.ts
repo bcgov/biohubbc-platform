@@ -72,8 +72,6 @@ GET.apiDoc = {
                         type: 'object',
                         required: [
                           'download_version_export_id',
-                          'download_version_id',
-                          'download_version_export_artifact_group_id',
                           'download_id',
                           'format',
                           'status',
@@ -86,8 +84,6 @@ GET.apiDoc = {
                         ],
                         properties: {
                           download_version_export_id: { type: 'string', format: 'uuid' },
-                          download_version_id: { type: 'string', format: 'uuid' },
-                          download_version_export_artifact_group_id: { type: 'string', format: 'uuid' },
                           download_id: { type: 'string', format: 'uuid' },
                           format: { type: 'string' },
                           status: {

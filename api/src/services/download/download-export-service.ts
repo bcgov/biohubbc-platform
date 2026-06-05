@@ -282,6 +282,10 @@ export class DownloadExportService extends DBService {
  * Pure — no I/O. Lifecycle status/timing/error live on the group, never the per-user export, and
  * `download_id` is the parent already resolved by the caller — so the create path needs no
  * JOIN-on-RETURNING to build the same shape `findDownloadVersionExportById` returns.
+ *
+ * Fields are picked explicitly rather than spread from `exportRow`: the thin row carries the
+ * internal `download_version_id` and artifact-group FKs, which are not part of the client contract —
+ * a spread would re-introduce them onto the response object past the narrowed return type.
  */
 function assembleExportRecord(
   exportRow: DownloadVersionExportRow,
@@ -289,7 +293,10 @@ function assembleExportRecord(
   downloadId: string
 ): DownloadVersionExportRecord {
   return {
-    ...exportRow,
+    download_version_export_id: exportRow.download_version_export_id,
+    format: exportRow.format,
+    mode: exportRow.mode,
+    max_part_size_bytes: exportRow.max_part_size_bytes,
     download_id: downloadId,
     status: group.status,
     started_at: group.started_at,
