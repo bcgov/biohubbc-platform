@@ -4,13 +4,12 @@ import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadRecord } from '../../__mocks__/download';
+import { createMockExportArtifactGroup } from '../../__mocks__/download';
 import { ApiConflictError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
@@ -19,66 +18,96 @@ import { DownloadExportPipelineService } from './download-export-pipeline-servic
 
 chai.use(sinonChai);
 
-const EXPORT_ID = 'dddd0000-0000-0000-0000-000000000001';
+const GROUP_ID = 'cccc0000-0000-0000-0000-000000000001';
 const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
 const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000099';
-
-/**
- * Test factory: build a DownloadExportRecord with sensible defaults. Callers
- * override the fields that matter for the specific test.
- */
-const createMockExportRecord = (overrides?: Partial<Record<string, unknown>>) => ({
-  download_export_id: EXPORT_ID,
-  download_id: DOWNLOAD_ID,
-  format: 'csv',
-  status: DownloadStatusEnum.PENDING,
-  mode: 'per_feature_type' as const,
-  max_part_size_bytes: '524288000',
-  started_at: null,
-  completed_at: null,
-  error_message: null,
-  ...overrides
-});
 
 describe('DownloadExportPipelineService', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('transitionExportStatus', () => {
+  describe('transitionGroupStatus', () => {
     it('throws ApiConflictError when current status is not in allowedCurrentStatuses (illegal transition)', async () => {
+      // Verifies: an illegal transition (ready → ready, ready not allowed) throws and never writes.
+
+      // Step 1: Stub the group fetch to return a READY group (the disallowed current status)
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.READY }) as any);
-      const updateStub = sinon.stub(DownloadExportRepository.prototype, 'updateDownloadExportStatus').resolves();
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.READY }));
+      const updateStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'updateExportArtifactGroupStatus')
+        .resolves();
 
+      // Step 2: Attempt the illegal transition
       try {
-        await service.transitionExportStatus(EXPORT_ID, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+        await service.transitionGroupStatus(GROUP_ID, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
         expect.fail('expected throw');
       } catch (err: any) {
+        // Step 3: Verify the conflict error surfaced
         expect(err).to.be.instanceOf(ApiConflictError);
         expect(err.message).to.equal('Invalid download export status transition');
       }
 
+      // Step 4: No write happened — the assertion fired before the update call
       expect(updateStub.called).to.be.false;
     });
 
-    it('sets started_at in repo call on pending→processing transition', async () => {
+    it('throws ApiConflictError on failed → processing (terminal status cannot restart)', async () => {
+      // Verifies: a terminal FAILED group cannot be transitioned to PROCESSING — an illegal restart
+      // is rejected and no update is written.
+
+      // Step 1: Stub the group fetch to return a FAILED (terminal) group
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      const updateStub = sinon.stub(DownloadExportRepository.prototype, 'updateDownloadExportStatus').resolves();
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.FAILED }));
+      const updateStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'updateExportArtifactGroupStatus')
+        .resolves();
 
-      await service.transitionExportStatus(EXPORT_ID, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+      // Step 2: Attempt the illegal failed → processing transition (only PENDING/PROCESSING allowed)
+      try {
+        await service.transitionGroupStatus(GROUP_ID, DownloadStatusEnum.PROCESSING, [
+          DownloadStatusEnum.PENDING,
+          DownloadStatusEnum.PROCESSING
+        ]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        // Step 3: Verify the conflict error surfaced
+        expect(err).to.be.instanceOf(ApiConflictError);
+        expect(err.message).to.equal('Invalid download export status transition');
+      }
 
+      // Step 4: No write happened
+      expect(updateStub.called).to.be.false;
+    });
+
+    it('sets started_at in repo call on pending→processing transition', async () => {
+      // Verifies: a pending→processing transition stamps started_at (not completed_at) on the update.
+
+      // Step 1: Stub the group fetch to return a PENDING group
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.PENDING }));
+      const updateStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'updateExportArtifactGroupStatus')
+        .resolves();
+
+      // Step 2: Perform the transition
+      await service.transitionGroupStatus(GROUP_ID, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+
+      // Step 3: Verify the params the service decided to pass to the repo
       expect(updateStub.calledOnce).to.be.true;
-      expect(updateStub.firstCall.args[0]).to.equal(EXPORT_ID);
+      expect(updateStub.firstCall.args[0]).to.equal(GROUP_ID);
       expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       const metadata = updateStub.firstCall.args[2] as {
         started_at?: string;
@@ -91,16 +120,23 @@ describe('DownloadExportPipelineService', () => {
     });
 
     it('sets completed_at in repo call on processing→ready transition', async () => {
+      // Verifies: a processing→ready transition stamps completed_at (not started_at).
+
+      // Step 1: Stub the group fetch to return a PROCESSING group
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PROCESSING }) as any);
-      const updateStub = sinon.stub(DownloadExportRepository.prototype, 'updateDownloadExportStatus').resolves();
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'updateExportArtifactGroupStatus')
+        .resolves();
 
-      await service.transitionExportStatus(EXPORT_ID, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+      // Step 2: Perform the transition
+      await service.transitionGroupStatus(GROUP_ID, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
 
+      // Step 3: Verify only completed_at is set
       const metadata = updateStub.firstCall.args[2] as {
         started_at?: string;
         completed_at?: string;
@@ -111,21 +147,28 @@ describe('DownloadExportPipelineService', () => {
     });
 
     it('sets completed_at and error_message in repo call on processing→failed transition', async () => {
+      // Verifies: a processing→failed transition stamps completed_at and re-keys error → error_message.
+
+      // Step 1: Stub the group fetch to return a PROCESSING group
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PROCESSING }) as any);
-      const updateStub = sinon.stub(DownloadExportRepository.prototype, 'updateDownloadExportStatus').resolves();
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'updateExportArtifactGroupStatus')
+        .resolves();
 
-      await service.transitionExportStatus(
-        EXPORT_ID,
+      // Step 2: Perform the failing transition with an error string
+      await service.transitionGroupStatus(
+        GROUP_ID,
         DownloadStatusEnum.FAILED,
         [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
         { error: 'oops' }
       );
 
+      // Step 3: Verify error_message + completed_at landed
       const metadata = updateStub.firstCall.args[2] as {
         started_at?: string;
         completed_at?: string;
@@ -195,7 +238,7 @@ describe('DownloadExportPipelineService', () => {
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
-          object_key: `downloads/${DOWNLOAD_ID}/exports/${EXPORT_ID}/biohub-${EXPORT_ID}-part-1.zip`
+          object_key: `downloads/${DOWNLOAD_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-1.zip`
         }
       ]);
 
@@ -231,7 +274,7 @@ describe('DownloadExportPipelineService', () => {
     });
   });
 
-  describe('runExport', () => {
+  describe('runExportGroup', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
         feature_type: {
@@ -255,19 +298,25 @@ describe('DownloadExportPipelineService', () => {
       }
     ];
 
-    it('transitions PROCESSING then READY on happy path and discovers feature types from the download version', async () => {
+    it('transitions PROCESSING then READY on happy path and discovers feature types from the pinned version', async () => {
+      // Verifies: the orchestrator resolves the version from the GROUP (group.download_version_id),
+      // discovers feature types keyed by that version, and brackets the work with
+      // PROCESSING then READY transitions.
+
+      // Step 1: Stub the group fetch + version resolution
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup({ download_version_id: DOWNLOAD_VERSION_ID }));
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ current_download_version_id: DOWNLOAD_VERSION_ID }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
-      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      // Step 2: Stub the transition + the streaming seams so no real S3/archiver runs
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       const listStub = sinon
         .stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes')
         .resolves(['observation']);
@@ -278,8 +327,10 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadExportPipelineService.prototype, 'writePartZip')
         .resolves({ artifactId: 'bbbb0000-0000-0000-0000-000000000010', byteCount: 128 });
 
-      await service.runExport(EXPORT_ID);
+      // Step 3: Run the group
+      await service.runExportGroup(GROUP_ID);
 
+      // Step 4: Verify the bracketing transitions fired in order with the right allowed-status sets
       expect(transitionStub.callCount).to.equal(2);
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       expect(transitionStub.firstCall.args[2]).to.deep.equal([
@@ -289,67 +340,41 @@ describe('DownloadExportPipelineService', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
 
-      // Discovery is keyed by the download's materialized version — the download id is passed
+      // Step 5: Discovery is keyed by the version pinned on the group; the download id is passed
       // alongside only so the key parse can validate against it.
       expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
     });
 
-    it('throws (and does no discovery) when the parent download has no materialized version (current_download_version_id null)', async () => {
-      // Verifies: the non-null guard in runExport. A download being exported owns the parquet
-      // artifacts via its version; a null pointer means there is nothing to discover, so the
-      // export fails loud before listExportFeatureTypes is ever consulted.
+    it('throws when no Parquet artifacts exist for the version (avoids empty-zip output)', async () => {
+      // Verifies: an empty feature-type discovery fails loud after PROCESSING and before any write.
+
+      // Step 1: Stub group + version resolution
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup());
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ current_download_version_id: null }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
-      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
-      const listStub = sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves([]);
-      const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
-
-      try {
-        await service.runExport(EXPORT_ID);
-        expect.fail('expected throw');
-      } catch (err: any) {
-        expect(err.message).to.include('has no materialized version');
-      }
-
-      // Only the PROCESSING transition fired; feature-type discovery never ran.
-      expect(transitionStub.calledOnce).to.be.true;
-      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
-      expect(listStub.called).to.be.false;
-      expect(writeStub.called).to.be.false;
-    });
-
-    it('throws when no Parquet artifacts exist for the download (avoids empty-zip output)', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadExportPipelineService(mockDBConnection);
-
-      sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-
-      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      // Step 2: Discovery returns no feature types
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves([]);
       const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
       const writePartStub = sinon.stub(DownloadExportPipelineService.prototype, 'writePartZip');
 
+      // Step 3: Run — expect the empty-zip guard to throw
       try {
-        await service.runExport(EXPORT_ID);
+        await service.runExportGroup(GROUP_ID);
         expect.fail('expected throw');
       } catch (err: any) {
         expect(err.message).to.include('no Parquet artifacts');
       }
 
-      // Only PROCESSING fired — READY was never reached, and no work was done.
+      // Step 4: Only PROCESSING fired — READY was never reached, and no work was done.
       expect(transitionStub.calledOnce).to.be.true;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       expect(writeStub.called).to.be.false;
@@ -357,46 +382,59 @@ describe('DownloadExportPipelineService', () => {
     });
 
     it('throws when every feature type resolves to zero rows (avoids empty-zip output)', async () => {
+      // Verifies: even with discovered feature types, a zero-row export fails loud before READY.
+
+      // Step 1: Stub group + version resolution
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
-      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      // Step 2: One feature type discovered, but the writer reports zero chunks written
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
       sinon
         .stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport')
         .resolves({ finalPart: 1, chunksWritten: 0, fileRefs: [] });
       const writePartStub = sinon.stub(DownloadExportPipelineService.prototype, 'writePartZip');
 
+      // Step 3: Run — expect the zero-rows guard to throw
       try {
-        await service.runExport(EXPORT_ID);
+        await service.runExportGroup(GROUP_ID);
         expect.fail('expected throw');
       } catch (err: any) {
         expect(err.message).to.include('zero rows');
       }
 
-      // READY never fired, and no part-zips were finalized.
+      // Step 4: READY never fired, and no part-zips were finalized.
       expect(transitionStub.calledOnce).to.be.true;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       expect(writePartStub.called).to.be.false;
     });
 
     it('propagates error from writeFeatureTypeExport and does not transition to READY', async () => {
+      // Verifies: a writer error aborts the part loop before any finalize and never reaches READY.
+
+      // Step 1: Stub group + version resolution
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
-      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      // Step 2: The writer rejects
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
       sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport').rejects(new Error('boom'));
       const writePartStub = sinon.stub(DownloadExportPipelineService.prototype, 'writePartZip').resolves({
@@ -404,18 +442,18 @@ describe('DownloadExportPipelineService', () => {
         byteCount: 0
       });
 
+      // Step 3: Run — expect the writer error to bubble up
       try {
-        await service.runExport(EXPORT_ID);
+        await service.runExportGroup(GROUP_ID);
         expect.fail('expected throw');
       } catch (err: any) {
         expect(err.message).to.equal('boom');
       }
 
-      // Only the PROCESSING transition fired — READY was never reached.
+      // Step 4: Only the PROCESSING transition fired — READY was never reached.
       expect(transitionStub.calledOnce).to.be.true;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
-      // writePartZip must not fire either — the error aborted the part loop
-      // before any finalize.
+      // writePartZip must not fire either — the error aborted the part loop before any finalize.
       expect(writePartStub.called).to.be.false;
     });
   });
@@ -493,7 +531,7 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(service as any, 'openParquetReader').resolves(reader);
 
       const result1 = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -511,7 +549,7 @@ describe('DownloadExportPipelineService', () => {
 
       archiverByPart.set(2, makeCapturingBundle(captured));
       const result2 = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -533,7 +571,7 @@ describe('DownloadExportPipelineService', () => {
 
       archiverByPart.set(3, makeCapturingBundle(captured));
       const result3 = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -550,9 +588,9 @@ describe('DownloadExportPipelineService', () => {
 
       // Three chunks captured, monotonic chunk1 → chunk2 → chunk3.
       expect(captured.map((c) => c.name)).to.deep.equal([
-        `biohub-export-${EXPORT_ID}/observation/chunk1.csv`,
-        `biohub-export-${EXPORT_ID}/observation/chunk2.csv`,
-        `biohub-export-${EXPORT_ID}/observation/chunk3.csv`
+        `biohub-export-${GROUP_ID}/observation/chunk1.csv`,
+        `biohub-export-${GROUP_ID}/observation/chunk2.csv`,
+        `biohub-export-${GROUP_ID}/observation/chunk3.csv`
       ]);
 
       // Every chunk starts with the header line — no header-less chunks even
@@ -582,7 +620,7 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(service as any, 'openParquetReader').resolves(reader);
 
       const result = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -601,7 +639,7 @@ describe('DownloadExportPipelineService', () => {
       // Exactly one chunk entry was opened — the look-ahead saw `null` and
       // closed cleanly instead of opening an empty chunk2.
       expect(captured).to.have.lengthOf(1);
-      expect(captured[0].name).to.equal(`biohub-export-${EXPORT_ID}/observation/chunk1.csv`);
+      expect(captured[0].name).to.equal(`biohub-export-${GROUP_ID}/observation/chunk1.csv`);
       expect(await captured[0].data).to.equal(
         'submission_feature_id,uuid,parent_uuid,name\n99,u-only,p-only,only-row\n'
       );
@@ -624,7 +662,7 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(service as any, 'openParquetReader').resolves(reader);
 
       await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -650,7 +688,7 @@ describe('DownloadExportPipelineService', () => {
 
       try {
         await service.writeFeatureTypeExport({
-          exportId: EXPORT_ID,
+          groupId: GROUP_ID,
           downloadId: DOWNLOAD_ID,
           featureTypeName: 'observation',
           properties,
@@ -707,7 +745,7 @@ describe('DownloadExportPipelineService', () => {
       ];
 
       const result = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
@@ -765,7 +803,7 @@ describe('DownloadExportPipelineService', () => {
       ];
 
       const result = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
@@ -806,7 +844,7 @@ describe('DownloadExportPipelineService', () => {
       ];
 
       await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
@@ -834,7 +872,7 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(service as any, 'openParquetReader').resolves(reader);
 
       const result = await service.writeFeatureTypeExport({
-        exportId: EXPORT_ID,
+        groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
         featureTypeName: 'observation',
         properties,
@@ -852,7 +890,7 @@ describe('DownloadExportPipelineService', () => {
     });
   });
 
-  describe('runExport per-part file refs', () => {
+  describe('runExportGroup per-part file refs', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
         feature_type: {
@@ -877,18 +915,24 @@ describe('DownloadExportPipelineService', () => {
     ];
 
     it('streams each part its own file refs only (per-part bookkeeping survives roll-over)', async () => {
+      // Verifies: across a roll-over, each part's binary refs stream into that part only — finalized
+      // parts' ref buckets are dropped so the per-part lookup stays bounded.
+
+      // Step 1: Stub group + version resolution + schema lookup
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadExportRepository.prototype, 'getDownloadExportById')
-        .resolves(createMockExportRecord({ status: DownloadStatusEnum.PENDING }) as any);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+        .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
+        .resolves(createMockExportArtifactGroup());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      sinon.stub(DownloadExportPipelineService.prototype, 'transitionExportStatus').resolves();
+      sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
 
-      // First call rolls (refs for part 1); second call drains (refs for part 2).
+      // Step 2: First writer call rolls (refs for part 1); second call drains (refs for part 2).
       const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
       writeStub.onFirstCall().resolves({
         finalPart: 2,
@@ -924,10 +968,11 @@ describe('DownloadExportPipelineService', () => {
         byteCount: 0n
       }));
 
-      await service.runExport(EXPORT_ID);
+      // Step 3: Run the group
+      await service.runExportGroup(GROUP_ID);
 
-      // Two streamBinariesToPart calls — one per part. Each receives only its
-      // own part's refs; finalized parts' ref buckets are dropped from the map.
+      // Step 4: Two streamBinariesToPart calls — one per part. Each receives only its own part's
+      // refs; finalized parts' ref buckets are dropped from the map.
       expect(streamStub.callCount).to.equal(2);
       const call1Refs = streamStub.firstCall.args[1] as { partIndex: number }[];
       const call2Refs = streamStub.secondCall.args[1] as { partIndex: number }[];

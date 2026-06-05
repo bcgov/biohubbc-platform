@@ -16,8 +16,8 @@ import {
   publisherDependencies,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
-  publishProcessDownloadExportJob,
   publishProcessDownloadJob,
+  publishProcessDownloadVersionExportJob,
   publishProcessSubmissionFeaturesJob
 } from './publisher';
 
@@ -794,8 +794,8 @@ describe('publisher', () => {
     });
   });
 
-  describe('publishProcessDownloadExportJob', () => {
-    it('uses singletonKey based on downloadExportId to prevent duplicates', async () => {
+  describe('publishProcessDownloadVersionExportJob', () => {
+    it('uses singletonKey based on the artifact group id to dedupe export runs', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('export-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -803,15 +803,15 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000456'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000456'
       });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('export-bbbb0000-0000-0000-0000-000000000456');
+      expect(options.singletonKey).to.equal('export-group-cccc0000-0000-0000-0000-000000000456');
     });
 
-    it('uses process download export options with 1 hour timeout', async () => {
+    it('uses process download version export options with 1 hour timeout', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('export-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -819,8 +819,8 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -839,8 +839,8 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -859,14 +859,14 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      const result = await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       expect(createQueueStub.calledOnce).to.be.true;
-      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(sendStub.calledOnce).to.be.true;
-      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('export-job-id');
     });
@@ -879,13 +879,13 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      const result = await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this download export'
+        'Job already exists for this export artifact group'
       );
     });
 
@@ -894,8 +894,8 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
-        await publishProcessDownloadExportJob(mockConnection, {
-          downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+        await publishProcessDownloadVersionExportJob(mockConnection, {
+          downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
         });
         expect.fail('expected publisher to throw');
       } catch (error) {

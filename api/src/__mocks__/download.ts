@@ -1,8 +1,7 @@
 import { DownloadDetailRecord, DownloadListRecord } from '../models/download';
-import { DownloadExportListRow } from '../models/download-export';
 import { DownloadStatusEnum } from '../models/download-status';
 import { DownloadVersionRecord } from '../models/download-version';
-import { DownloadVersionExportRow } from '../models/download-version-export';
+import { DownloadVersionExportListRow, DownloadVersionExportRow } from '../models/download-version-export';
 import { DownloadVersionExportArtifactGroupRecord } from '../models/download-version-export-artifact-group';
 
 /**
@@ -43,15 +42,19 @@ export const createMockDownloadListRecord = (overrides?: Partial<DownloadListRec
 });
 
 /**
- * Test factory: build a DownloadExportListRow (list-level export row with `part_count`).
+ * Test factory: build a DownloadVersionExportListRow (list-level export row with `part_count`).
  */
-export const createMockDownloadExportListRow = (overrides?: Partial<DownloadExportListRow>): DownloadExportListRow => ({
-  download_export_id: 'eeee0000-0000-0000-0000-000000000001',
-  download_id: 'aaaa0000-0000-0000-0000-000000000042',
+export const createMockDownloadVersionExportListRow = (
+  overrides?: Partial<DownloadVersionExportListRow>
+): DownloadVersionExportListRow => ({
+  download_version_export_id: 'eeee0000-0000-0000-0000-000000000001',
+  download_version_id: 'dddd0000-0000-0000-0000-000000000001',
+  download_version_export_artifact_group_id: 'cccc0000-0000-0000-0000-000000000001',
   format: 'csv',
-  status: DownloadStatusEnum.READY,
   mode: 'per_feature_type',
   max_part_size_bytes: '524288000',
+  download_id: 'aaaa0000-0000-0000-0000-000000000042',
+  status: DownloadStatusEnum.READY,
   started_at: '2026-01-01T00:00:00.000Z',
   completed_at: '2026-01-01T00:01:00.000Z',
   error_message: null,

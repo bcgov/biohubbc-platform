@@ -4,15 +4,15 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import {
-  createMockDownloadExportListRow,
   createMockDownloadRecord,
-  createMockDownloadVersion
+  createMockDownloadVersion,
+  createMockDownloadVersionExportListRow
 } from '../../__mocks__/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
 import { ExpressionTree } from '../../models/expression-tree';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
@@ -49,7 +49,7 @@ describe('DownloadService', () => {
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [], count: 0 });
       const exportsStub = sinon
-        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
         .resolves([]);
 
       const result = await service.getDownloadsByTeamMembership(42);
@@ -66,13 +66,13 @@ describe('DownloadService', () => {
       const baseA = createMockDownloadRecord({ download_id: 'a' });
       const baseB = createMockDownloadRecord({ download_id: 'b' });
 
-      const exportA1 = createMockDownloadExportListRow({
-        download_export_id: 'ex-a1',
+      const exportA1 = createMockDownloadVersionExportListRow({
+        download_version_export_id: 'ex-a1',
         download_id: 'a',
         part_count: 2
       });
-      const exportA2 = createMockDownloadExportListRow({
-        download_export_id: 'ex-a2',
+      const exportA2 = createMockDownloadVersionExportListRow({
+        download_version_export_id: 'ex-a2',
         download_id: 'a',
         part_count: 0
       });
@@ -81,7 +81,9 @@ describe('DownloadService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [baseA, baseB], count: 2 });
-      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([exportA1, exportA2]);
+      sinon
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
+        .resolves([exportA1, exportA2]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
@@ -103,7 +105,7 @@ describe('DownloadService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [first, second], count: 2 });
-      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+      sinon.stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds').resolves([]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
@@ -120,7 +122,7 @@ describe('DownloadService', () => {
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: ids.map((id) => createMockDownloadRecord({ download_id: id })), count: 3 });
       const exportsStub = sinon
-        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
         .resolves([]);
 
       await service.getDownloadsByTeamMembership(42);
@@ -135,9 +137,9 @@ describe('DownloadService', () => {
     });
 
     it('groups rows by download_id preserving input order within each group', () => {
-      const a1 = createMockDownloadExportListRow({ download_export_id: 'a1', download_id: 'a' });
-      const a2 = createMockDownloadExportListRow({ download_export_id: 'a2', download_id: 'a' });
-      const b1 = createMockDownloadExportListRow({ download_export_id: 'b1', download_id: 'b' });
+      const a1 = createMockDownloadVersionExportListRow({ download_version_export_id: 'a1', download_id: 'a' });
+      const a2 = createMockDownloadVersionExportListRow({ download_version_export_id: 'a2', download_id: 'a' });
+      const b1 = createMockDownloadVersionExportListRow({ download_version_export_id: 'b1', download_id: 'b' });
 
       const grouped = groupExportsByDownloadId([a1, a2, b1]);
 
@@ -206,8 +208,8 @@ describe('DownloadService', () => {
     });
 
     it('orchestrates expression → policy → download → team link → publish in order for an authenticated user', async () => {
-      // Verifies: authenticated path links a team, never creates an export at request time,
-      // and runs the steps in the required order ending with the worker publish.
+      // Verifies: authenticated path links a team and runs the steps in the required order
+      // ending with the worker publish.
 
       // Step 1: Stub each orchestration dependency in sequence
       const writeExpressionTreeStub = sinon
@@ -219,7 +221,6 @@ describe('DownloadService', () => {
       const createDownloadStub = sinon
         .stub(DownloadRepository.prototype, 'createDownload')
         .resolves({ download_id: 'download-uuid-1' });
-      const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
       const createVersionStub = sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
@@ -257,14 +258,11 @@ describe('DownloadService', () => {
       expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
       expect(linkStub.firstCall.args[1]).to.equal(42);
 
-      // Step 6: The request flow must NOT create an export — that is a separate user action
-      expect(createExportStub).to.not.have.been.called;
-
-      // Step 7: Verify the worker job was queued exactly once with the new download id
+      // Step 6: Verify the worker job was queued exactly once with the new download id
       expect(publishStub).to.have.been.calledOnce;
       expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
 
-      // Step 8: Verify the required call order — the version is materialized between the
+      // Step 7: Verify the required call order — the version is materialized between the
       // download insert and the team link, and the publish is last.
       expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
       expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
@@ -320,18 +318,16 @@ describe('DownloadService', () => {
       expect(setCurrentStub).to.have.been.calledBefore(publishStub);
     });
 
-    it('skips the team link and does not create an export for an anonymous request (requestedBy null)', async () => {
-      // Verifies: the anonymous branch returns the download id only, does NOT link a team, and
-      // does NOT create an export — the UUID is the credential and any later export is a
-      // separate user-initiated action.
+    it('skips the team link for an anonymous request (requestedBy null)', async () => {
+      // Verifies: the anonymous branch returns the download id only and does NOT link a team —
+      // the UUID is the credential and any later export is a separate user-initiated action.
 
       // Step 1: Stub the orchestration dependencies up to the download insert
       sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid-1' });
       sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid-1' });
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-1' });
 
-      // Step 2: Stub the export repo to detect any (wrong) call
-      const createExportStub = sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport');
+      // Step 2: Stub the version writes
       sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
@@ -352,13 +348,10 @@ describe('DownloadService', () => {
       // Step 5: Anonymous downloads get no team — the UUID is the credential
       expect(linkStub).to.not.have.been.called;
 
-      // Step 6: No export is created at request time — that is a separate user-initiated action
-      expect(createExportStub).to.not.have.been.called;
-
-      // Step 7: The result is the download id only
+      // Step 6: The result is the download id only
       expect(result).to.eql({ download_id: 'download-uuid-1' });
 
-      // Step 8: The worker job is still queued exactly once
+      // Step 7: The worker job is still queued exactly once
       expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'download-uuid-1' });
     });
 

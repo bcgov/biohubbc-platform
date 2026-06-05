@@ -30,13 +30,25 @@ export function parseFeatureTypeFromParquetKey(objectKey: string, downloadId: st
 /**
  * Build the deterministic S3 key for a part-zip.
  *
- * Shape: `downloads/{downloadId}/exports/{exportId}/biohub-{exportId}-part-{N}.zip`.
+ * Shape: `downloads/{downloadId}/versions/{downloadVersionId}/exports/{groupId}/biohub-{groupId}-part-{N}.zip`.
+ *
+ * The physical zip is shared across every user export that resolved to the same
+ * export-artifact group, so the key is scoped by the GROUP — and the version it
+ * belongs to — not by any individual user's export. That is why the leaf
+ * filename embeds `groupId` (not the version, and not a per-user export id):
+ * two users whose exports collapse to one group read the exact same object.
+ *
  * Named so the rule lives in exactly one place — a reorder or index drift is a
  * one-file fix and unit-testable. Pairs with the `artifact UNIQUE (bucket,
  * object_key)` constraint for retry idempotency.
  */
-export function buildPartZipKey(downloadId: string, exportId: string, partIndex: number): string {
-  return `downloads/${downloadId}/exports/${exportId}/biohub-${exportId}-part-${partIndex}.zip`;
+export function buildPartZipKey(
+  downloadId: string,
+  downloadVersionId: string,
+  groupId: string,
+  partIndex: number
+): string {
+  return `downloads/${downloadId}/versions/${downloadVersionId}/exports/${groupId}/biohub-${groupId}-part-${partIndex}.zip`;
 }
 
 /**

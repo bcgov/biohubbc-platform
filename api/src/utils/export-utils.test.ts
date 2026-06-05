@@ -31,6 +31,15 @@ describe('export-utils', () => {
       expect(result).to.be.null;
     });
 
+    it('returns null for the group-keyed part-zip export key (5 segments, not 4)', () => {
+      const result = parseFeatureTypeFromParquetKey(
+        'downloads/dl-1/versions/ver-2/exports/grp-3/biohub-grp-3-part-1.zip',
+        'dl-1'
+      );
+
+      expect(result).to.be.null;
+    });
+
     it('returns null when trailing segment is not data.parquet', () => {
       const result = parseFeatureTypeFromParquetKey(
         'downloads/aaaa0000-0000-0000-0000-000000000001/observation/other.parquet',
@@ -42,12 +51,18 @@ describe('export-utils', () => {
   });
 
   describe('buildPartZipKey', () => {
-    it('returns the exact deterministic key for part N', () => {
-      const key = buildPartZipKey('aaaa0000-0000-0000-0000-000000000001', 'dddd0000-0000-0000-0000-000000000001', 3);
+    it('returns the exact group-keyed deterministic key for part N', () => {
+      const key = buildPartZipKey('dl-1', 'ver-2', 'grp-3', 1);
 
-      expect(key).to.equal(
-        'downloads/aaaa0000-0000-0000-0000-000000000001/exports/dddd0000-0000-0000-0000-000000000001/biohub-dddd0000-0000-0000-0000-000000000001-part-3.zip'
-      );
+      expect(key).to.equal('downloads/dl-1/versions/ver-2/exports/grp-3/biohub-grp-3-part-1.zip');
+    });
+
+    it('embeds the group id (not the version id) in the leaf filename', () => {
+      const key = buildPartZipKey('dl-1', 'ver-2', 'grp-3', 1);
+      const leaf = key.split('/').pop();
+
+      expect(leaf).to.equal('biohub-grp-3-part-1.zip');
+      expect(leaf).to.not.include('ver-2');
     });
   });
 

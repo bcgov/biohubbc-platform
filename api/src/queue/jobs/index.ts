@@ -32,16 +32,6 @@ export const JobQueues = {
    */
   PROCESS_DOWNLOAD_FAILED: 'process-download-failed',
   /**
-   * Process download export job queue for async CSV export packaging over an
-   * already-ready download's per-feature-type Parquet artifacts.
-   */
-  PROCESS_DOWNLOAD_EXPORT: 'process-download-export',
-  /**
-   * Dead letter queue for failed download export jobs.
-   * Jobs are moved here after all retries are exhausted.
-   */
-  PROCESS_DOWNLOAD_EXPORT_FAILED: 'process-download-export-failed',
-  /**
    * Process download version export job queue for async CSV export packaging keyed on the shared
    * artifact group — one packaging run per group, regardless of how many user exports attach to it.
    */

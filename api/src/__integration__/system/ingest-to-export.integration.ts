@@ -205,7 +205,7 @@ describe('Ingest → Download → Export (system integration)', function () {
     const exportService = new DownloadExportService(connection);
     const exportRecord = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
     const exportPipelineService = new DownloadExportPipelineService(connection);
-    await exportPipelineService.runExport(exportRecord.download_version_export_id);
+    await exportPipelineService.runExportGroup(exportRecord.download_version_export_artifact_group_id);
 
     // Locate the part-zip on S3 and extract chunk1.csv.
     const artifacts = await connection.sql(SQL`

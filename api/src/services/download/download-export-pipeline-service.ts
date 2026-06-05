@@ -5,10 +5,9 @@ import { PassThrough } from 'node:stream';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
-import { DownloadExportRecord } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import {
   buildSchemaHeaders,
@@ -64,13 +63,15 @@ export interface PartArchiverBundle {
 /**
  * Background processing pipeline for CSV exports.
  *
- * Called exclusively by the pg-boss job handler
- * (`processDownloadExportJobHandler`). Reads the per-feature-type Parquet
- * artifacts already produced by the parent download pipeline, converts rows to
- * CSV, and rolls them into one or more part-zips whose size is bounded by the
- * per-export `max_part_size_bytes` — a read-side knob so the same download can
- * be re-exported at different part sizes without re-running the expensive
- * Parquet pipeline.
+ * Called exclusively by the pg-boss group job handler. Packages a download
+ * VERSION's per-feature-type Parquet artifacts once per export-artifact GROUP:
+ * N identical user export requests dedupe onto a single group, so they share
+ * one physical zip set instead of each re-running this expensive pipeline.
+ * Rows are converted to CSV and rolled into one or more part-zips whose size is
+ * bounded by the group's `max_part_size_bytes` — a read-side knob so the same
+ * version can be re-exported at different part sizes without re-running the
+ * Parquet pipeline. Lifecycle status and timing live on the group row, never on
+ * the per-user export.
  *
  * Request-time operations (CRUD, auth, presigned URLs) live in
  * `DownloadExportService`.
@@ -80,61 +81,67 @@ export interface PartArchiverBundle {
  * @extends {DBService}
  */
 export class DownloadExportPipelineService extends DBService {
-  downloadExportRepository: DownloadExportRepository;
-  downloadRepository: DownloadRepository;
+  downloadVersionExportRepository: DownloadVersionExportRepository;
   downloadVersionRepository: DownloadVersionRepository;
   artifactService: ArtifactService;
+  codeService: CodeService;
+  objectStorageService: ObjectStorageService;
 
   constructor(connection: IDBConnection) {
     super(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
-    this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
     this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.artifactService = new ArtifactService(connection);
+    this.codeService = new CodeService(connection);
+    this.objectStorageService = new ObjectStorageService();
   }
 
   /**
-   * Validate an export status transition against an allowed current-status set.
+   * Validate an export-artifact-group status transition against an allowed
+   * current-status set.
    *
    * Pure business-rule assertion; no I/O. Mirrors
    * `DownloadPipelineService.assertDownloadStatusTransition`.
    */
-  private assertExportStatusTransition(
-    exportId: string,
-    currentStatus: DownloadExportRecord['status'],
+  private assertGroupStatusTransition(
+    groupId: string,
+    currentStatus: DownloadVersionExportArtifactGroupRecord['status'],
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[]
   ): void {
     if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
       throw new ApiConflictError('Invalid download export status transition', [
-        'DownloadExportPipelineService->transitionExportStatus',
-        { exportId, currentStatus, nextStatus, allowedCurrentStatuses }
+        'DownloadExportPipelineService->transitionGroupStatus',
+        { groupId, currentStatus, nextStatus, allowedCurrentStatuses }
       ]);
     }
   }
 
   /**
-   * Transition an export from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition an export-artifact group from one of `allowedCurrentStatuses` to
+   * `nextStatus`.
    *
-   * Fetches the export, asserts the transition is allowed, then writes the new
-   * status plus timestamps via `updateDownloadExportStatus`. The state machine
-   * lives in the service; the repository stays a thin CRUD wrapper. Illegal
-   * transitions (including retries of already-terminal jobs) throw
-   * `ApiConflictError` and bubble up to the pg-boss DLQ.
+   * Fetches the group, asserts the transition is allowed, then writes the new
+   * status plus timestamps via `updateExportArtifactGroupStatus`. Lifecycle
+   * state lives on the GROUP (shared by every user export that dedupes onto it),
+   * never on the per-user export. The state machine lives in the service; the
+   * repository stays a thin CRUD wrapper. Illegal transitions (including retries
+   * of already-terminal jobs) throw `ApiConflictError` and bubble up to the
+   * pg-boss DLQ.
    *
    * `errorMetadata.error` is re-keyed to `error_message` to match the repo's
    * column name while keeping the caller surface consistent with
    * `DownloadPipelineService.transitionDownloadStatus`.
    */
-  async transitionExportStatus(
-    exportId: string,
+  async transitionGroupStatus(
+    groupId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
     errorMetadata?: { error?: string }
   ): Promise<void> {
-    const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
+    const group = await this.downloadVersionExportRepository.getExportArtifactGroupById(groupId);
 
-    this.assertExportStatusTransition(exportId, exportRecord.status, nextStatus, allowedCurrentStatuses);
+    this.assertGroupStatusTransition(groupId, group.status, nextStatus, allowedCurrentStatuses);
 
     const now = new Date().toISOString();
     const timestamps: { started_at?: string; completed_at?: string } = {};
@@ -147,7 +154,7 @@ export class DownloadExportPipelineService extends DBService {
 
     const errorMessage = errorMetadata?.error === undefined ? {} : { error_message: errorMetadata.error };
 
-    await this.downloadExportRepository.updateDownloadExportStatus(exportId, nextStatus, {
+    await this.downloadVersionExportRepository.updateExportArtifactGroupStatus(groupId, nextStatus, {
       ...errorMessage,
       ...timestamps
     });
@@ -218,7 +225,7 @@ export class DownloadExportPipelineService extends DBService {
    * what's left of the feature type's cursor.
    */
   async writeFeatureTypeExport(params: {
-    exportId: string;
+    groupId: string;
     downloadId: string;
     featureTypeName: string;
     properties: CsvPropertyDefinition[];
@@ -249,7 +256,7 @@ export class DownloadExportPipelineService extends DBService {
     // pulling the cursor again.
     pendingRow?: Record<string, unknown>;
   }> {
-    const { exportId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
+    const { groupId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
     let { currentPart } = params;
 
     // Reuse the reader + cursor across roll-overs so we don't re-fetch the
@@ -289,7 +296,7 @@ export class DownloadExportPipelineService extends DBService {
     // PassThrough; archiver reads from it and writes to its own output pipe.
     const openChunkEntry = (): PassThrough => {
       const bundle = currentBundle();
-      const entryName = `biohub-export-${exportId}/${featureTypeName}/chunk${chunkIndex}.csv`;
+      const entryName = `biohub-export-${groupId}/${featureTypeName}/chunk${chunkIndex}.csv`;
       const entry = new PassThrough();
       bundle.archive.append(entry, { name: entryName });
       chunksWritten += 1;
@@ -499,32 +506,33 @@ export class DownloadExportPipelineService extends DBService {
 
   /**
    * Finalize the given part's archiver, record the resulting artifact, and
-   * link it to the export via `download_export_artifact`.
+   * link it to the export-artifact group via `download_version_export_artifact`.
    *
    * The S3 key is deterministic (via `buildPartZipKey`) so a retry overwrites
    * the same object; `insertArtifact` is idempotent on
-   * `(bucket, object_key)`, and `createDownloadExportArtifact` is idempotent on
-   * `(download_export_id, artifact_id)` — a retried part converges to the
-   * same DB + S3 state as a first-time success.
+   * `(bucket, object_key)`, and `createExportArtifactGroupArtifact` is
+   * idempotent on `(download_version_export_artifact_group_id, artifact_id)` — a
+   * retried part converges to the same DB + S3 state as a first-time success.
    *
    * `chunk_id` on the link row doubles as the 1-based part index for the
    * detail endpoint's `parts[]` ordering.
    */
   async writePartZip(params: {
-    exportId: string;
+    groupId: string;
     downloadId: string;
+    downloadVersionId: string;
     partIndex: number;
     archive: archiver.Archiver;
     uploadPromise: Promise<void>;
     hashCount: ReturnType<typeof createHashCountStream>;
   }): Promise<{ artifactId: string; byteCount: number }> {
-    const { exportId, downloadId, partIndex, archive, uploadPromise, hashCount } = params;
+    const { groupId, downloadId, downloadVersionId, partIndex, archive, uploadPromise, hashCount } = params;
 
     await archive.finalize();
     await uploadPromise;
 
     const { sha256Hex, byteCount } = hashCount.getResult();
-    const objectKey = buildPartZipKey(downloadId, exportId, partIndex);
+    const objectKey = buildPartZipKey(downloadId, downloadVersionId, groupId, partIndex);
 
     const { artifact_id } = await this.artifactService.insertArtifact({
       bucket: getObjectStoreBucketName(),
@@ -536,7 +544,7 @@ export class DownloadExportPipelineService extends DBService {
       format: 'zip'
     });
 
-    await this.downloadExportRepository.createDownloadExportArtifact(exportId, artifact_id, partIndex);
+    await this.downloadVersionExportRepository.createExportArtifactGroupArtifact(groupId, artifact_id, partIndex);
 
     return { artifactId: artifact_id, byteCount };
   }
@@ -550,8 +558,7 @@ export class DownloadExportPipelineService extends DBService {
    * not either in isolation.
    */
   private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
-    const codeService = new CodeService(this.connection);
-    const allFeatureTypeCodes = await codeService.getFeatureTypePropertyCodes();
+    const allFeatureTypeCodes = await this.codeService.getFeatureTypePropertyCodes();
 
     const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {
@@ -580,9 +587,14 @@ export class DownloadExportPipelineService extends DBService {
    * pipe that never closes — `uploadPromise` would hang forever. Routing the
    * error into `passThrough.destroy(err)` tears down the entire downstream
    * pipeline (passThrough → hashCount → S3 upload) so `uploadPromise`
-   * rejects, which `writePartZip` / `runExport` can observe.
+   * rejects, which `writePartZip` / `runExportGroup` can observe.
    */
-  private createPartArchiverBundle(exportId: string, downloadId: string, partIndex: number): PartArchiverBundle {
+  private createPartArchiverBundle(
+    groupId: string,
+    downloadId: string,
+    downloadVersionId: string,
+    partIndex: number
+  ): PartArchiverBundle {
     const archive = archiver('zip', { zlib: { level: 5 } });
     const passThrough = new PassThrough();
     const hashCount = createHashCountStream();
@@ -594,32 +606,39 @@ export class DownloadExportPipelineService extends DBService {
     archive.pipe(passThrough);
     passThrough.pipe(hashCount.transform);
 
-    const objectStorageService = new ObjectStorageService();
-    const uploadPromise = objectStorageService.uploadStream(
+    const uploadPromise = this.objectStorageService.uploadStream(
       BucketType.MAIN,
       hashCount.transform,
       'application/zip',
-      buildPartZipKey(downloadId, exportId, partIndex)
+      buildPartZipKey(downloadId, downloadVersionId, groupId, partIndex)
     );
 
     return { archive, uploadPromise, passThrough, hashCount, byteCount: 0n };
   }
 
   /**
-   * Orchestrate the CSV export pipeline end-to-end.
+   * Orchestrate the CSV export pipeline end-to-end for one export-artifact group.
    *
    * Sequence:
    *  1. Transition PENDING → PROCESSING (idempotent — re-entering a running
-   *     export is allowed so pg-boss retries converge).
-   *  2. Resolve the download + per-type schema lookup.
+   *     group is allowed so pg-boss retries converge).
+   *  2. Resolve the version the group is pinned to, then the per-type schema
+   *     lookup.
    *  3. For each feature type in order, stream Parquet rows into the current
-   *     part's CSV chunks. Roll to a new part once the per-export
+   *     part's CSV chunks. Roll to a new part once the group's
    *     `max_part_size_bytes` is crossed.
    *  4. Finalize every open part via `writePartZip`, in index order.
    *  5. Transition PROCESSING → READY.
    *
+   * The version is resolved from the GROUP (`group.download_version_id`), not
+   * from the download's *current* version. The group is pinned to the specific
+   * version it was created against, so a later re-materialization of the
+   * download — which advances `current_download_version_id` — does NOT change
+   * what this group packages. Re-reading the current version would silently zip
+   * a newer version's artifacts; resolving from the group eliminates that drift.
+   *
    * Feature types are processed sequentially, not in parallel, to cap memory:
-   * a download with tens of types and hundreds of thousands of rows would
+   * a version with tens of types and hundreds of thousands of rows would
    * otherwise risk OOM in a single pg-boss worker process. Per-type buffering
    * is the bound.
    *
@@ -627,41 +646,41 @@ export class DownloadExportPipelineService extends DBService {
    * failure and the DLQ handler owns the FAILED transition — duplicating it
    * would mask the root cause and race the retry path.
    */
-  async runExport(exportId: string): Promise<void> {
-    await this.transitionExportStatus(exportId, DownloadStatusEnum.PROCESSING, [
+  async runExportGroup(groupId: string): Promise<void> {
+    await this.transitionGroupStatus(groupId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING,
       DownloadStatusEnum.PROCESSING
     ]);
 
-    const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
-    const download = await this.downloadRepository.getDownloadById(exportRecord.download_id);
+    const group = await this.downloadVersionExportRepository.getExportArtifactGroupById(groupId);
 
-    // A download being exported must have a materialized version — it is created at request
-    // time and owns the parquet artifacts. Discovery reads the version's link table, so a
-    // missing pointer means there is nothing to export.
-    if (download.current_download_version_id === null) {
-      throw new Error(`Export ${exportId}: parent download ${download.download_id} has no materialized version`);
-    }
+    // Resolve the version the group is pinned to (NOT the download's current
+    // version) so a later re-materialization of the download doesn't change what
+    // this group packages. getDownloadVersionById throws ApiNotFoundError if the
+    // version is gone — that absence is the guard.
+    const version = await this.downloadVersionRepository.getDownloadVersionById(group.download_version_id);
+    const downloadId = version.download_id;
+    const downloadVersionId = group.download_version_id;
 
     const schemaLookup = await this.buildSchemaLookup();
-    const featureTypes = await this.listExportFeatureTypes(download.download_id, download.current_download_version_id);
+    const featureTypes = await this.listExportFeatureTypes(downloadId, downloadVersionId);
 
-    // Fail loud if the parent download has no Parquet artifacts — otherwise the
+    // Fail loud if the version has no Parquet artifacts — otherwise the
     // archiver finalizes an empty zip (just the central-directory record) and the
     // user downloads a file their OS refuses to extract. Retry-as-lifecycle: the
-    // DLQ handler transitions the export to FAILED after the pg-boss retry budget
+    // DLQ handler transitions the group to FAILED after the pg-boss retry budget
     // is exhausted, and the error_message is propagated to the card.
     if (featureTypes.length === 0) {
       throw new Error(
-        `Export ${exportId}: parent download ${download.download_id} has no Parquet artifacts to export — refusing to write an empty zip.`
+        `Export group ${groupId}: version ${downloadVersionId} has no Parquet artifacts to export — refusing to write an empty zip.`
       );
     }
 
-    const maxPartSizeBytes = BigInt(exportRecord.max_part_size_bytes);
+    const maxPartSizeBytes = BigInt(group.max_part_size_bytes);
     const archiverByPart = new Map<number, PartArchiverBundle>();
     let currentPart = 1;
 
-    archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
+    archiverByPart.set(currentPart, this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart));
 
     // Binary file references are collected as rows stream by, grouped by the
     // part index the referring row landed in. Each part's binaries must stream
@@ -672,7 +691,6 @@ export class DownloadExportPipelineService extends DBService {
     // turning the per-part lookup into O(refs-in-this-part) instead of
     // O(all-refs-ever).
     const fileRefsByPart = new Map<number, FileFeatureRef[]>();
-    const objectStorageService = new ObjectStorageService();
     let totalChunksWritten = 0;
 
     try {
@@ -693,8 +711,8 @@ export class DownloadExportPipelineService extends DBService {
 
         while (true) {
           const result = await this.writeFeatureTypeExport({
-            exportId,
-            downloadId: download.download_id,
+            groupId,
+            downloadId,
             featureTypeName,
             properties,
             maxPartSizeBytes,
@@ -727,13 +745,14 @@ export class DownloadExportPipelineService extends DBService {
           await this.streamBinariesToPart(
             oldBundle,
             fileRefsByPart.get(oldPartIndex) ?? [],
-            exportId,
+            groupId,
             oldPartIndex,
-            objectStorageService
+            this.objectStorageService
           );
           await this.writePartZip({
-            exportId,
-            downloadId: download.download_id,
+            groupId,
+            downloadId,
+            downloadVersionId,
             partIndex: oldPartIndex,
             archive: oldBundle.archive,
             uploadPromise: oldBundle.uploadPromise,
@@ -743,7 +762,10 @@ export class DownloadExportPipelineService extends DBService {
           fileRefsByPart.delete(oldPartIndex);
 
           currentPart = result.finalPart;
-          archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
+          archiverByPart.set(
+            currentPart,
+            this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart)
+          );
           pendingReader = result.pendingReader;
           pendingCursor = result.pendingCursor;
           pendingChunkIndex = result.pendingChunkIndex;
@@ -756,7 +778,7 @@ export class DownloadExportPipelineService extends DBService {
       // the user's OS will refuse to extract.
       if (totalChunksWritten === 0) {
         throw new Error(
-          `Export ${exportId}: every feature type resolved to zero rows (${featureTypes.join(
+          `Export group ${groupId}: every feature type resolved to zero rows (${featureTypes.join(
             ', '
           )}) — refusing to write an empty zip.`
         );
@@ -771,13 +793,14 @@ export class DownloadExportPipelineService extends DBService {
         await this.streamBinariesToPart(
           bundle,
           fileRefsByPart.get(partIndex) ?? [],
-          exportId,
+          groupId,
           partIndex,
-          objectStorageService
+          this.objectStorageService
         );
         await this.writePartZip({
-          exportId,
-          downloadId: download.download_id,
+          groupId,
+          downloadId,
+          downloadVersionId,
           partIndex,
           archive: bundle.archive,
           uploadPromise: bundle.uploadPromise,
@@ -791,7 +814,7 @@ export class DownloadExportPipelineService extends DBService {
       throw error;
     }
 
-    await this.transitionExportStatus(exportId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+    await this.transitionGroupStatus(groupId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
   }
 
   /**
@@ -829,13 +852,13 @@ export class DownloadExportPipelineService extends DBService {
   private async streamBinariesToPart(
     bundle: PartArchiverBundle,
     fileRefs: FileFeatureRef[],
-    exportId: string,
+    groupId: string,
     partIndex: number,
     objectStorageService: ObjectStorageService
   ): Promise<void> {
     for (const ref of fileRefs) {
       const fileName = ref.filePath.split('/').pop() ?? 'file';
-      const entryName = `biohub-export-${exportId}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
+      const entryName = `biohub-export-${groupId}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
       await this.appendBinaryToArchive(bundle.archive, objectStorageService, ref.filePath, entryName);
     }
   }

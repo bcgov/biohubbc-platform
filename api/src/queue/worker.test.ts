@@ -6,8 +6,8 @@ import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
-import * as processDownloadExportJob from './jobs/process-download-export-job';
 import * as processDownloadJob from './jobs/process-download-job';
+import * as processDownloadVersionExportJob from './jobs/process-download-version-export-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
 import { registerWorkers, workerDependencies } from './worker';
 
@@ -30,7 +30,7 @@ describe('worker', () => {
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
-      expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_EXPORT)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.INDEX_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
@@ -53,12 +53,15 @@ describe('worker', () => {
       expect(workStub.calledWith(JobQueues.PROCESS_DOWNLOAD_FAILED, processDownloadJob.processDownloadFailedHandler)).to
         .be.true;
       expect(
-        workStub.calledWith(JobQueues.PROCESS_DOWNLOAD_EXPORT, processDownloadExportJob.processDownloadExportJobHandler)
+        workStub.calledWith(
+          JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT,
+          processDownloadVersionExportJob.processDownloadVersionExportJobHandler
+        )
       ).to.be.true;
       expect(
         workStub.calledWith(
-          JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED,
-          processDownloadExportJob.processDownloadExportFailedHandler
+          JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED,
+          processDownloadVersionExportJob.processDownloadVersionExportFailedHandler
         )
       ).to.be.true;
       expect(
@@ -105,7 +108,7 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 14 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED
+      // 14 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED
       expect(createQueueStub.callCount).to.equal(14);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
@@ -113,8 +116,8 @@ describe('worker', () => {
       expect(createQueueStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
       expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_FAILED);
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
-      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
-      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED);
+      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
       expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
@@ -170,7 +173,7 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // Index submission features handlers are registered after download + download-export handlers
+      // Index submission features handlers are registered after download + download-version-export handlers
       expect(workStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
       expect(workStub.getCall(8).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesJobHandler);
 
@@ -198,7 +201,7 @@ describe('worker', () => {
       expect(queueConfig.retryBackoff).to.equal(true);
     });
 
-    it('configures dead letter queue + policy:short for process-download-export', async () => {
+    it('configures dead letter queue + policy:short for process-download-version-export', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
@@ -208,14 +211,14 @@ describe('worker', () => {
       await registerWorkers();
 
       // policy: 'short' — without it pg-boss ignores singletonKey, so two
-      // concurrent POST /export calls for the same export would both run.
+      // concurrent export requests for the same group would both run.
       const exportQueueCall = createQueueStub
         .getCalls()
-        .find((call) => call.args[0] === JobQueues.PROCESS_DOWNLOAD_EXPORT);
+        .find((call) => call.args[0] === JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(exportQueueCall).to.not.be.undefined;
 
       const queueConfig = exportQueueCall?.args[1];
-      expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
+      expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
       expect(queueConfig.policy).to.equal('short');
