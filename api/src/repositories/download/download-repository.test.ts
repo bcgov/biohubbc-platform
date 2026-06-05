@@ -89,47 +89,6 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('createDownloadArtifact', () => {
-    it('inserts into download_artifact with downloadId and artifactId', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('download_artifact');
-      expect(sqlText).to.include('artifact_id');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000001');
-    });
-
-    it('uses ON CONFLICT ... WHERE record_end_date IS NULL DO NOTHING for retry idempotency', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('ON CONFLICT');
-      expect(sqlText).to.include('record_end_date IS NULL');
-      expect(sqlText).to.include('DO NOTHING');
-    });
-
-    it('does not throw when rowCount is 0 (conflict — link already exists)', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
   describe('updateDownloadStatus', () => {
     it('updates status with metadata', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));

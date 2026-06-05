@@ -7,7 +7,7 @@
 //   streamFeatureBaseBySearchQueryAndType  →  fetchTypedPropertyRows
 //
 // Also covers: status transitions and the writeFeatureTypeParquet artifact contract
-// (one artifact + one download_artifact row per feature type, idempotent on retry).
+// (one artifact + one download_version_artifact row per feature type, idempotent on retry).
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -105,7 +105,7 @@ function assembleFeatureData(
  * The Parquet writer is replaced with a no-op that never writes to the stream,
  * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
  * The upload is stubbed to resolve without consuming the stream. The real SQL paths
- * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
+ * for ArtifactService.insertArtifact and DownloadVersionRepository.createDownloadVersionArtifact
  * remain unstubbed — those are exactly the idempotency contracts we verify.
  */
 function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
@@ -174,11 +174,6 @@ describe('Download Parquet pipeline (integration)', function () {
    * download at it, returning the version id. The Parquet pipeline links each
    * produced artifact to this version via download_version_artifact, so the
    * writeFeatureTypeParquet tests below need a real version row (FK target).
-   *
-   * NOTE (Phase 7): these specs still assert against the legacy `download_artifact`
-   * link table; migrating those runtime assertions to `download_version_artifact`
-   * is completed in the Phase 7 integration pass. This helper exists so the calls
-   * compile and have a valid version FK in the meantime.
    */
   async function createDownloadVersionFor(downloadId: string): Promise<string> {
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
@@ -868,7 +863,7 @@ describe('Download Parquet pipeline (integration)', function () {
     });
   });
 
-  describe('writeFeatureTypeParquet — artifact + download_artifact rows', () => {
+  describe('writeFeatureTypeParquet — artifact + download_version_artifact rows', () => {
     // ParquetWriter is stubbed — no properties are resolved against typed tables, so
     // an empty property list is safe and minimizes test surface area.
     const emptyProperties: CsvPropertyDefinition[] = [];
@@ -886,7 +881,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expression_id: null
     });
 
-    it('inserts one artifact + one download_artifact row for a single feature type', async () => {
+    it('inserts one artifact + one download_version_artifact row for a single feature type', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
@@ -908,9 +903,9 @@ describe('Download Parquet pipeline (integration)', function () {
         SELECT artifact.artifact_id, artifact.bucket, artifact.object_key, artifact.byte_size,
                artifact.checksum_sha256, artifact.artifact_status, artifact.format, artifact.uploaded_at
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(artifactRows.rowCount).to.equal(1);
 
@@ -923,23 +918,25 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(Number(artifact.byte_size)).to.be.at.least(0);
       expect(artifact.uploaded_at).to.not.be.null;
 
-      // Explicit FK linkage: download_artifact.artifact_id matches artifact.artifact_id
+      // Explicit FK linkage: download_version_artifact.artifact_id matches artifact.artifact_id,
+      // carries the feature type name, and is keyed to the materialized version.
       const linkRows = await connection.sql(SQL`
-        SELECT artifact_id, download_id
-        FROM download_artifact
-        WHERE download_id = ${downloadId}
+        SELECT artifact_id, download_version_id, feature_type_name
+        FROM download_version_artifact
+        WHERE download_version_id = ${downloadVersionId}
           AND record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
       expect(linkRows.rows[0].artifact_id).to.equal(artifact.artifact_id);
-      expect(linkRows.rows[0].download_id).to.equal(downloadId);
+      expect(linkRows.rows[0].download_version_id).to.equal(downloadVersionId);
+      expect(linkRows.rows[0].feature_type_name).to.equal('dataset');
 
       // download status untouched — writeFeatureTypeParquet does not transition status
       const download = await downloadService.findDownloadById(downloadId);
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
     });
 
-    it('is idempotent on retry — second call does not create a duplicate artifact or download_artifact row', async () => {
+    it('is idempotent on retry — second call does not create a duplicate artifact or download_version_artifact row', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
@@ -961,9 +958,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const afterFirst = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(afterFirst.rowCount).to.equal(1);
       const firstArtifactId = afterFirst.rows[0].artifact_id;
@@ -983,9 +980,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const afterSecond = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       // Idempotency: same row count, same artifact_id, unchanged checksum + byte_size
       expect(afterSecond.rowCount).to.equal(1);
@@ -994,7 +991,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(String(afterSecond.rows[0].byte_size)).to.equal(String(firstByteSize));
     });
 
-    it('inserts one artifact + one download_artifact row per feature type when the download has multiple types', async () => {
+    it('inserts one artifact + one download_version_artifact row per feature type when the download has multiple types', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
@@ -1022,11 +1019,11 @@ describe('Download Parquet pipeline (integration)', function () {
       });
 
       const artifactRows = await connection.sql(SQL`
-        SELECT artifact.artifact_id, artifact.object_key, download_artifact.download_id
+        SELECT artifact.artifact_id, artifact.object_key, download_version_artifact.download_version_id
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL
         ORDER BY artifact.object_key;
       `);
       expect(artifactRows.rowCount).to.equal(2);
@@ -1035,9 +1032,9 @@ describe('Download Parquet pipeline (integration)', function () {
         `downloads/${downloadId}/capture/data.parquet`,
         `downloads/${downloadId}/dataset/data.parquet`
       ]);
-      // Both rows link to the same download
+      // Both rows link to the same materialized version
       for (const row of artifactRows.rows) {
-        expect(row.download_id).to.equal(downloadId);
+        expect(row.download_version_id).to.equal(downloadVersionId);
       }
       // The two artifact_ids are distinct
       expect(artifactRows.rows[0].artifact_id).to.not.equal(artifactRows.rows[1].artifact_id);

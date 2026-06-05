@@ -1,6 +1,3 @@
-// NOTE (Phase 7): re-pointed to the download_version_export group API for compilation;
-// runtime assertions validated under make test-db / make test-sys in Phase 7.
-//
 // System integration tests for the CSV download export pipeline — exercises
 // the real binary-streaming path (file-type features, cross-part duplication,
 // missing-binary fallback) against MinIO. Requires MinIO (S3) to be running.
@@ -181,9 +178,9 @@ describe('Download Export pipeline — media (system)', function () {
       .sql(
         SQL`
           SELECT a.object_key
-          FROM download_export_artifact dea
-          INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-          WHERE dea.record_end_date IS NULL
+          FROM download_version_export_artifact dvea
+          INNER JOIN artifact a ON a.artifact_id = dvea.artifact_id
+          WHERE dvea.record_end_date IS NULL
             AND a.object_key LIKE 'downloads/%/exports/%';
         `
       )
@@ -212,7 +209,7 @@ describe('Download Export pipeline — media (system)', function () {
   /**
    * Seed a READY download with one `file`-type submission feature whose
    * `data.file` points at a real object in MinIO, and insert a corresponding
-   * per-feature-type Parquet `download_artifact` row.
+   * per-feature-type Parquet `download_version_artifact` row.
    *
    * The Parquet bytes aren't written — we stub `ParquetReader.openS3` per-test
    * to emit a row referencing the seeded artifact key. This keeps the cases
@@ -288,9 +285,8 @@ describe('Download Export pipeline — media (system)', function () {
       uploaded_at: new Date().toISOString(),
       format: 'parquet'
     });
-    // createDownloadArtifact still exists and compiles; Phase 7 migrates the
-    // link to createDownloadVersionArtifact.
-    await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+    // The export pipeline discovers feature types from the version's artifact links.
+    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'file');
 
     return { downloadId, downloadVersionId, submissionFeatureIds, artifactKey };
   }
@@ -342,7 +338,6 @@ describe('Download Export pipeline — media (system)', function () {
    * Look up the part-zip keys the pipeline wrote for a group, in chunk_id order.
    */
   async function listPartZipKeysForExport(groupId: string): Promise<string[]> {
-    // Phase 7: validate runtime semantics against download_version_export tables
     const rows = await connection.sql(SQL`
       SELECT a.object_key
       FROM download_version_export_artifact dvea
@@ -376,8 +371,6 @@ describe('Download Export pipeline — media (system)', function () {
 
     const zip = await downloadZipFromS3(storageService, partZipKey);
     const entries = zip.getEntries().map((e) => e.entryName);
-
-    // Phase 7: validate runtime semantics against download_version_export tables
     const binaryEntry = `biohub-export-${groupId}/files1/${featureId}_${filename}`;
     const csvEntry = `biohub-export-${groupId}/file/chunk1.csv`;
 
@@ -425,8 +418,6 @@ describe('Download Export pipeline — media (system)', function () {
     expect(keys).to.have.lengthOf(1);
     const zip = await downloadZipFromS3(storageService, keys[0]);
     const entries = zip.getEntries().map((e) => e.entryName);
-
-    // Phase 7: validate runtime semantics against download_version_export tables
     const binaryEntry = `biohub-export-${groupId}/files1/${featureId}_${filename}`;
     const errorEntry = `${binaryEntry}.error.txt`;
 
@@ -475,8 +466,6 @@ describe('Download Export pipeline — media (system)', function () {
 
     const part1Zip = await downloadZipFromS3(storageService, part1Key);
     const part2Zip = await downloadZipFromS3(storageService, part2Key);
-
-    // Phase 7: validate runtime semantics against download_version_export tables
     const part1Binary = `biohub-export-${groupId}/files1/${id1}_${filename}`;
     const part2Binary = `biohub-export-${groupId}/files2/${id2}_${filename}`;
 
@@ -564,7 +553,7 @@ describe('Download Export pipeline — media (system)', function () {
       uploaded_at: new Date().toISOString(),
       format: 'parquet'
     });
-    await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'dataset');
 
     const { groupId } = await seedPendingExport(downloadVersionId);
 
@@ -587,8 +576,6 @@ describe('Download Export pipeline — media (system)', function () {
     } finally {
       clearInterval(sampler);
     }
-
-    // Phase 7: validate runtime semantics against download_version_export tables
     // Verify the export finished successfully.
     const statusRow = await connection.sql(SQL`
       SELECT status FROM download_version_export_artifact_group

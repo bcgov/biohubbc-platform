@@ -153,7 +153,10 @@ describe('Download services (integration)', function () {
 
       // No export is created at request time — any later export is a separate user action.
       const exportRows = await connection.sql(SQL`
-        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
+        SELECT dve.download_version_export_id
+        FROM download_version_export dve
+        INNER JOIN download_version dv ON dv.download_version_id = dve.download_version_id
+        WHERE dv.download_id = ${download_id};
       `);
       expect(exportRows.rowCount).to.equal(0);
     });
@@ -186,7 +189,10 @@ describe('Download services (integration)', function () {
 
       // No up-front export — exports are created later by user action.
       const exportRows = await connection.sql(SQL`
-        SELECT download_export_id FROM download_export WHERE download_id = ${download_id};
+        SELECT dve.download_version_export_id
+        FROM download_version_export dve
+        INNER JOIN download_version dv ON dv.download_version_id = dve.download_version_id
+        WHERE dv.download_id = ${download_id};
       `);
       expect(exportRows.rowCount).to.equal(0);
     });

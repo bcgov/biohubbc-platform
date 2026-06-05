@@ -1,9 +1,6 @@
-// NOTE (Phase 7): re-pointed to the download_version_export group API for compilation;
-// runtime assertions validated under make test-db / make test-sys in Phase 7.
-//
 // Integration test for the CSV download export pipeline — verifies the
 // DownloadVersionExportRepository CRUD, the DownloadExportPipelineService state
-// transitions, and the `writePartZip` contract (artifact + download_export_artifact
+// transitions, and the `writePartZip` contract (artifact + download_version_export_artifact
 // rows, retry idempotency).
 //
 // Run: make test-db
@@ -124,7 +121,7 @@ describe('Download Export pipeline (integration)', function () {
   // ── Helpers ──────────────────────────────────────────────────────────
 
   /**
-   * Seed a READY download with one `download_artifact` row per feature type.
+   * Seed a READY download with one `download_version_artifact` row per feature type.
    *
    * Inserts the per-feature-type Parquet artifacts the export pipeline
    * discovers via `listExportFeatureTypes` — the bytes aren't real (we stub
@@ -181,9 +178,8 @@ describe('Download Export pipeline (integration)', function () {
         uploaded_at: new Date().toISOString(),
         format: 'parquet'
       });
-      // createDownloadArtifact still exists and compiles; Phase 7 migrates the
-      // link to createDownloadVersionArtifact.
-      await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+      // The export pipeline discovers feature types from the version's artifact links.
+      await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, featureTypeName);
       artifactIds.push(artifact_id);
     }
 
@@ -253,8 +249,6 @@ describe('Download Export pipeline (integration)', function () {
       expect(record.mode).to.equal('per_feature_type');
       expect(record.max_part_size_bytes).to.equal('524288000');
       expect(record.download_version_export_artifact_group_id).to.equal(groupId);
-
-      // Phase 7: validate runtime semantics against download_version_export tables
       const group = await exportRepo.getExportArtifactGroupById(groupId);
       expect(group.status).to.equal(DownloadStatusEnum.PENDING);
       expect(group.started_at).to.be.null;
@@ -298,8 +292,6 @@ describe('Download Export pipeline (integration)', function () {
       ]);
 
       await pipelineService.runExportGroup(groupId);
-
-      // Phase 7: validate runtime semantics against download_version_export tables
       const row = await connection.sql(SQL`
         SELECT status, started_at, completed_at
         FROM download_version_export_artifact_group
@@ -367,8 +359,6 @@ describe('Download Export pipeline (integration)', function () {
       expect(artifactRows.rows[0].artifact_status).to.equal('uploaded');
       expect(artifactRows.rows[0].checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifactRows.rows[0].byte_size)).to.be.greaterThan(0);
-
-      // Phase 7: validate runtime semantics against download_version_export tables
       const joinRows = await connection.sql(SQL`
         SELECT download_version_export_artifact_id, download_version_export_artifact_group_id, artifact_id, chunk_id
         FROM download_version_export_artifact
@@ -419,8 +409,6 @@ describe('Download Export pipeline (integration)', function () {
         WHERE object_key = ${expectedKey};
       `);
       expect(artifactRows.rowCount).to.equal(1);
-
-      // Phase 7: validate runtime semantics against download_version_export tables
       const joinRows = await connection.sql(SQL`
         SELECT download_version_export_artifact_id
         FROM download_version_export_artifact
@@ -447,8 +435,6 @@ describe('Download Export pipeline (integration)', function () {
       }
       expect(caught).to.be.instanceOf(Error);
       expect(caught?.message).to.include('zero rows');
-
-      // Phase 7: validate runtime semantics against download_version_export tables
       // Pipeline threw before finalizing any part — no download_version_export_artifact rows landed.
       const joinRows = await connection.sql(SQL`
         SELECT dvea.download_version_export_artifact_id

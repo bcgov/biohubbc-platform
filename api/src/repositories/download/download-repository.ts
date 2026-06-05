@@ -6,7 +6,6 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import {
   CreateDownload,
-  DownloadArtifactInfo,
   DownloadDetailRecord,
   DownloadId,
   DownloadListRecordBase,
@@ -107,55 +106,6 @@ export class DownloadRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
-  }
-
-  /**
-   * Link an artifact to a download via the download_artifact join table.
-   *
-   * Idempotent — the Parquet pipeline writes one download_artifact per feature-type
-   * Parquet file, and a retry of the same feature type must not produce duplicate
-   * links. The `ON CONFLICT … WHERE record_end_date IS NULL DO NOTHING` clause
-   * matches the table's partial unique index so a re-insert on a still-active link
-   * is a silent no-op. A first-time insert returns rowCount=1; a conflict returns
-   * rowCount=0 — both are valid outcomes and neither throws.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} artifactId - The artifact ID.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
-    const sql = SQL`
-      INSERT INTO download_artifact (download_id, artifact_id)
-      VALUES (${downloadId}, ${artifactId})
-      ON CONFLICT (download_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * List all active artifact references for a download, joined to `artifact` for
-   * the S3 `object_key`.
-   *
-   * Used by the export pipeline to discover which Parquet files the parent
-   * download produced (key shape `downloads/{downloadId}/{featureTypeName}/data.parquet`)
-   * without re-running the original search. Bounded by feature-type count for
-   * the download (tens at worst), so no pagination needed.
-   */
-  async listDownloadArtifactsByDownloadId(downloadId: string): Promise<DownloadArtifactInfo[]> {
-    const sql = SQL`
-      SELECT
-        a.artifact_id,
-        a.object_key
-      FROM download_artifact da
-      INNER JOIN artifact a ON a.artifact_id = da.artifact_id
-      WHERE da.download_id = ${downloadId}
-        AND da.record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql, DownloadArtifactInfo);
-    return response.rows;
   }
 
   /**
