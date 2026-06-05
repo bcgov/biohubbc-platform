@@ -108,7 +108,7 @@ describe('DownloadSidebarDownloads', () => {
 
     it('passes pre-joined exports through to each card', async () => {
       mockGetDownloads.mockResolvedValue({
-        downloads: [makeDownload({ download_id: 'd1', exports: [makeExport({ download_export_id: 'exp-1' })] })],
+        downloads: [makeDownload({ download_id: 'd1', exports: [makeExport({ download_version_export_id: 'exp-1' })] })],
         pagination: mockPagination()
       });
 
@@ -185,13 +185,13 @@ describe('DownloadSidebarDownloads', () => {
           makeDownload({
             download_id: 'abc-123',
             download_status: 'ready',
-            exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 1 })]
+            exports: [makeExport({ download_version_export_id: 'exp-1', status: 'ready', part_count: 1 })]
           })
         ],
         pagination: mockPagination()
       });
       mockGetExport.mockResolvedValue({
-        download_export_id: 'exp-1',
+        download_version_export_id: 'exp-1',
         parts: [{ chunk_id: 1, file_size_bytes: '1024', url: 'https://s3.example.com/part1' }]
       });
 
@@ -200,7 +200,7 @@ describe('DownloadSidebarDownloads', () => {
       fireEvent.click(await findByTestId('export-download-button-exp-1'));
 
       await waitFor(() => {
-        expect(mockGetExport).toHaveBeenCalledTimes(1);
+        expect(mockGetExport).toHaveBeenCalledWith('abc-123', 'exp-1');
       });
 
       const iframes = document.querySelectorAll('iframe');
@@ -214,7 +214,7 @@ describe('DownloadSidebarDownloads', () => {
           makeDownload({
             download_id: 'abc-123',
             download_status: 'ready',
-            exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 1 })]
+            exports: [makeExport({ download_version_export_id: 'exp-1', status: 'ready', part_count: 1 })]
           })
         ],
         pagination: mockPagination()
@@ -239,13 +239,13 @@ describe('DownloadSidebarDownloads', () => {
           makeDownload({
             download_id: 'abc-123',
             download_status: 'ready',
-            exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 3 })]
+            exports: [makeExport({ download_version_export_id: 'exp-1', status: 'ready', part_count: 3 })]
           })
         ],
         pagination: mockPagination()
       });
       mockGetExport.mockResolvedValue({
-        download_export_id: 'exp-1',
+        download_version_export_id: 'exp-1',
         parts: [
           { chunk_id: 1, file_size_bytes: '1', url: 'https://s3.example.com/p1' },
           { chunk_id: 2, file_size_bytes: '1', url: 'https://s3.example.com/p2' },
@@ -258,8 +258,9 @@ describe('DownloadSidebarDownloads', () => {
       fireEvent.click(await findByTestId('export-download-all-button-exp-1'));
 
       await waitFor(() => {
-        expect(mockGetExport).toHaveBeenCalledTimes(1);
+        expect(mockGetExport).toHaveBeenCalledWith('abc-123', 'exp-1');
       });
+      expect(mockGetExport).toHaveBeenCalledTimes(1);
 
       const iframes = document.querySelectorAll('iframe');
       expect(iframes.length).toBe(3);
@@ -274,7 +275,7 @@ describe('DownloadSidebarDownloads', () => {
           makeDownload({
             download_id: 'abc-123',
             download_status: 'ready',
-            exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 3 })]
+            exports: [makeExport({ download_version_export_id: 'exp-1', status: 'ready', part_count: 3 })]
           })
         ],
         pagination: mockPagination()
@@ -299,7 +300,7 @@ describe('DownloadSidebarDownloads', () => {
           makeDownload({
             download_id: 'abc-123',
             download_status: 'ready',
-            exports: [makeExport({ download_export_id: 'exp-1', status: 'ready', part_count: 0 })]
+            exports: [makeExport({ download_version_export_id: 'exp-1', status: 'ready', part_count: 0 })]
           })
         ],
         pagination: mockPagination()

@@ -32,11 +32,12 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    *
    * URLs regenerate per request — callers must not cache them.
    *
+   * @param {string} downloadId
    * @param {string} exportId
    * @return {Promise<DownloadExportDetail>}
    */
-  const getExport = async (exportId: string): Promise<DownloadExportDetail> => {
-    const { data } = await axios.get<DownloadExportDetail>(`/api/download-export/${exportId}`);
+  const getExport = async (downloadId: string, exportId: string): Promise<DownloadExportDetail> => {
+    const { data } = await axios.get<DownloadExportDetail>(`/api/download/${downloadId}/export/${exportId}`);
     return data;
   };
 

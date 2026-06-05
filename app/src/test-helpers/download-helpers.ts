@@ -21,7 +21,7 @@ export const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadR
  * Test factory: build a DownloadExport with sensible defaults (single-part ready).
  */
 export const makeExport = (overrides: Partial<DownloadExport> = {}): DownloadExport => ({
-  download_export_id: 'exp-abc-123',
+  download_version_export_id: 'exp-abc-123',
   download_id: 'abc-123',
   format: 'csv',
   mode: 'per_feature_type',

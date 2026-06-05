@@ -97,7 +97,7 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
           <Stack spacing={0.5} sx={{ pt: 0.5 }}>
             {exports.map((ex) => (
               <ExportRow
-                key={ex.download_export_id}
+                key={ex.download_version_export_id}
                 exportRecord={ex}
                 onDownloadPart={onDownloadExportPart}
                 onDownloadAllParts={onDownloadExportAllParts}
@@ -125,7 +125,8 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
  */
 const ExportRow = (props: ExportRowProps) => {
   const { exportRecord, onDownloadPart, onDownloadAllParts, onRebuild } = props;
-  const { download_export_id: exportId, status, started_at, completed_at, error_message, part_count } = exportRecord;
+  const { download_version_export_id: exportId, status, started_at, completed_at, error_message, part_count } =
+    exportRecord;
   const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status];
 
   const [partsOpen, setPartsOpen] = useState(false);
