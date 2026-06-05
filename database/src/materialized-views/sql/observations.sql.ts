@@ -32,27 +32,16 @@ WITH site_linked_observations AS (
     AND sf_site.record_effective_date IS NOT NULL
     AND sf_site.record_effective_date <= NOW()::date
 ),
-observation_datasets AS (
-  SELECT DISTINCT
-    sf_obs.submission_feature_id AS observation_id,
-    sf_dataset.submission_feature_id AS dataset_id,
-    sf_dataset.data->>'name' AS dataset_name
-  FROM biohub.submission_feature sf_obs
-  JOIN biohub.submission_feature_feature sff ON (
-    sff.source_feature_id = sf_obs.submission_feature_id
-    OR sff.target_feature_id = sf_obs.submission_feature_id
-  )
-  JOIN biohub.submission_feature sf_dataset ON (
-    (sff.source_feature_id = sf_obs.submission_feature_id AND sff.target_feature_id = sf_dataset.submission_feature_id)
-    OR
-    (sff.target_feature_id = sf_obs.submission_feature_id AND sff.source_feature_id = sf_dataset.submission_feature_id)
-  )
-  JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
-  WHERE ft_dataset.name = 'dataset'
-    AND sf_obs.record_effective_date IS NOT NULL
-    AND sf_obs.record_effective_date <= NOW()::date
-    AND sf_dataset.record_effective_date IS NOT NULL
-    AND sf_dataset.record_effective_date <= NOW()::date
+submissions AS (
+  SELECT
+    su.submission_upload_id,
+    su.submission_id,
+    s.name AS submission_name
+  FROM biohub.submission_upload su
+  JOIN biohub.submission s ON su.submission_id = s.submission_id
+  WHERE su.record_end_date IS NULL
+    AND su.record_effective_date IS NOT NULL
+    AND su.record_effective_date <= NOW()::date
 ),
 observation_subcounts AS (
   -- Link parent observations to their subcounts via submission_feature_feature
@@ -78,8 +67,8 @@ SELECT
 FROM biohub.submission_feature sf
 LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
 LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
-LEFT JOIN observation_datasets od
-  ON COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id) = od.observation_id
+LEFT JOIN submissions sub
+  ON sub.submission_upload_id = COALESCE(sf_subcount.submission_upload_id, sf.submission_upload_id)
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t

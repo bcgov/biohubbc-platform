@@ -52,17 +52,16 @@ related_animals AS (
       AND sf.record_effective_date <= NOW()::date
 ),
 
-datasets AS (
+submissions AS (
     SELECT
-        sf.submission_feature_id AS dataset_id,
-        sf.data->>'name' AS dataset_name
-    FROM biohub.submission_feature sf
-    JOIN biohub.feature_type ft_dataset
-      ON sf.feature_type_id = ft_dataset.feature_type_id
-    WHERE ft_dataset.name = 'dataset'
-      AND sf.record_end_date IS NULL
-      AND sf.record_effective_date IS NOT NULL
-      AND sf.record_effective_date <= NOW()::date
+        su.submission_upload_id,
+        su.submission_id,
+        s.name AS submission_name
+    FROM biohub.submission_upload su
+    JOIN biohub.submission s ON su.submission_id = s.submission_id
+    WHERE su.record_end_date IS NULL
+      AND su.record_effective_date IS NOT NULL
+      AND su.record_effective_date <= NOW()::date
 ),
 
 related_ecological_units AS (
@@ -118,8 +117,8 @@ LEFT JOIN deployments d
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
 
-LEFT JOIN datasets ds
-  ON ds.dataset_id = ra.dataset_submission_feature_id
+LEFT JOIN submissions s
+  ON s.submission_upload_id = sf.submission_upload_id
 
 LEFT JOIN related_ecological_units reu
   ON reu.deployment_id = d.submission_feature_id

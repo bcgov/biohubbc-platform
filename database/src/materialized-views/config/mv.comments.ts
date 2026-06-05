@@ -9,14 +9,14 @@ export const TELEMETRY_COMMENTS: MaterializedViewCommentMap = {
   YEAR: 'The year that the GPS location was recorded',
   dop: 'The dilution of precision',
   device_key: 'The vendor and device serial',
-  dataset_id: 'The feature id of the dataset that includes these data',
-  dataset_name: 'The dataset name that includes these data',
+  submission_id: 'Linked submission identifier for the feature',
+  submission_name: 'Linked submission name for the feature',
   animal_id: 'The identifier of the animal wearing the telemetry device',
   scientific_name: 'Scientific name from taxon table linked via ITIS TSN',
   common_name: 'Common English name from taxon table linked via ITIS TSN',
   pop_unit: 'Ecological unit value linked to the animal',
-  SECURED: 'The indicator of whether the feature is secured (Y) or not (N)'
-  ,source: 'A hyperlink to the source feature in the Biodiversity Hub portal'
+  SECURED: 'The indicator of whether the feature is secured (Y) or not (N)',
+  source: 'A hyperlink to the source feature in the Biodiversity Hub portal'
 };
 
 export const OBSERVATIONS_COMMENTS: MaterializedViewCommentMap = {
@@ -33,11 +33,11 @@ export const OBSERVATIONS_COMMENTS: MaterializedViewCommentMap = {
   taxon_id: 'Taxonomic identifier extracted from the observation payload',
   scientific_name: 'Scientific name from taxon table linked via ITIS TSN',
   common_name: 'Common name from taxon table linked via ITIS TSN',
-  dataset_id: 'Linked dataset submission_feature_id for the observation',
-  dataset_name: 'Linked dataset name for the observation',
+  submission_id: 'Linked submission identifier for the observation or subcount feature',
+  submission_name: 'Linked submission name for the observation or subcount feature',
   sex: 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id',
   life_stage:
     'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id',
-  SECURED: 'The indicator of whether the feature is secured (Y) or not (N)'
-  ,source: 'A hyperlink to the source feature in the Biodiversity Hub portal'
+  SECURED: 'The indicator of whether the feature is secured (Y) or not (N)',
+  source: 'A hyperlink to the source feature in the Biodiversity Hub portal'
 };

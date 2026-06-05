@@ -14,8 +14,8 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'Latitude', expression: "(sf.data->>'latitude')::numeric" },
   { alias: 'Longitude', expression: "(sf.data->>'longitude')::numeric" },
   { alias: 'dop', expression: "(sf.data->>'dop')::numeric" },
-  { alias: 'dataset_id', expression: 'ds.dataset_id' },
-  { alias: 'dataset_name', expression: 'ds.dataset_name' },
+  { alias: 'submission_id', expression: 's.submission_id' },
+  { alias: 'submission_name', expression: 's.submission_name' },
   {
     alias: 'SECURED',
     expression:
@@ -23,7 +23,8 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
   },
   {
     alias: 'source',
-    expression: "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
+    expression:
+      "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
   }
 ];
 
@@ -41,8 +42,8 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'taxon_id', expression: "(sf.data->>'taxon_id')::int" },
   { alias: 'scientific_name', expression: 't.itis_scientific_name' },
   { alias: 'common_name', expression: 't.common_name' },
-  { alias: 'dataset_id', expression: 'od.dataset_id' },
-  { alias: 'dataset_name', expression: 'od.dataset_name' },
+  { alias: 'submission_id', expression: 'sub.submission_id' },
+  { alias: 'submission_name', expression: 'sub.submission_name' },
   { alias: 'sex', expression: "COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text)" },
   {
     alias: 'life_stage',
@@ -56,6 +57,7 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   },
   {
     alias: 'source',
-    expression: "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
+    expression:
+      "'https://biodiversityhub.gov.bc.ca/submission/' || sf.submission_id || '/feature/' || sf.submission_feature_id"
   }
 ];
