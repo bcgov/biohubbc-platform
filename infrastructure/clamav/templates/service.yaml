@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  labels:
+    {{- include "clamav.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "clamav.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: clamd
+      port: {{ .Values.service.port }}
+      protocol: TCP
+      targetPort: clamd
