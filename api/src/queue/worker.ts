@@ -2,6 +2,11 @@ import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
+  automaticSecurityScreeningFailedHandler,
+  automaticSecurityScreeningJobHandler,
+  IAutomaticSecurityScreeningJobData
+} from './jobs/automatic-security-screening-job';
+import {
   computeScopeAnchorsFailedHandler,
   computeScopeAnchorsJobHandler,
   IComputeScopeAnchorsJobData
@@ -64,6 +69,8 @@ export interface WorkerDependencies {
   computeSubmissionFeatureClosureFailedHandler: typeof computeSubmissionFeatureClosureFailedHandler;
   pollDownloadSchedulesJobHandler: typeof pollDownloadSchedulesJobHandler;
   pollDownloadSchedulesFailedHandler: typeof pollDownloadSchedulesFailedHandler;
+  automaticSecurityScreeningJobHandler: typeof automaticSecurityScreeningJobHandler;
+  automaticSecurityScreeningFailedHandler: typeof automaticSecurityScreeningFailedHandler;
 }
 
 export const workerDependencies: WorkerDependencies = {
@@ -83,7 +90,9 @@ export const workerDependencies: WorkerDependencies = {
   computeSubmissionFeatureClosureJobHandler,
   computeSubmissionFeatureClosureFailedHandler,
   pollDownloadSchedulesJobHandler,
-  pollDownloadSchedulesFailedHandler
+  pollDownloadSchedulesFailedHandler,
+  automaticSecurityScreeningJobHandler,
+  automaticSecurityScreeningFailedHandler
 };
 
 /**
@@ -290,6 +299,32 @@ export const registerWorkers = async (): Promise<void> => {
   // Schedule the recurring tick. The queue must already exist (created + worked above) before it can
   // be scheduled. tz UTC keeps the infra cadence stable across DST regardless of server timezone.
   await boss.schedule(JobQueues.POLL_DOWNLOAD_SCHEDULES, POLL_DOWNLOAD_SCHEDULES_CRON, {}, { tz: 'UTC' });
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singletonKey uniqueness for queued jobs so two concurrent
+  // screening runs for the same upload are not created.
+  await boss.createQueue(JobQueues.AUTOMATIC_SECURITY_SCREENING, {
+    deadLetter: JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register automatic security screening job handler
+  await boss.work<IAutomaticSecurityScreeningJobData>(
+    JobQueues.AUTOMATIC_SECURITY_SCREENING,
+    workerDependencies.automaticSecurityScreeningJobHandler
+  );
+
+  // Register dead letter queue handler for failed automatic security screening jobs
+  await boss.work<IAutomaticSecurityScreeningJobData>(
+    JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED,
+    workerDependencies.automaticSecurityScreeningFailedHandler
+  );
 
   defaultLog.info({
     label: 'registerWorkers',

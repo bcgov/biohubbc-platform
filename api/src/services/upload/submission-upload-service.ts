@@ -318,6 +318,52 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Transition to security_screening when the automatic screening job starts.
+   * - indexed          -> security_screening (first run)
+   * - security_screening -> security_screening (no-op; idempotent resume)
+   * - failed           -> security_screening (restart after exhausted retries)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToSecurityScreening(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'security_screening') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'security_screening', [
+      'indexed',
+      'failed'
+    ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'security_screening' });
+  }
+
+  /**
+   * Transition to security_screened when automatic screening completes successfully.
+   * - security_screening -> security_screened
+   * - security_screened  -> security_screened (no-op; idempotent)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToSecurityScreened(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'security_screened') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'security_screened', [
+      'security_screening'
+    ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'security_screened' });
+  }
+
+  /**
    * Soft-deletes a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the record to soft-delete

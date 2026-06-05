@@ -77,7 +77,18 @@ export const JobQueues = {
    * Dead letter queue for failed poll-download-schedules ticks.
    * Jobs are moved here after all retries are exhausted.
    */
-  POLL_DOWNLOAD_SCHEDULES_FAILED: 'poll-download-schedules-failed'
+  POLL_DOWNLOAD_SCHEDULES_FAILED: 'poll-download-schedules-failed',
+  /**
+   * Automatic security screening queue — evaluates active security rules against a
+   * submission upload's features after closure has been populated and inserts
+   * draft submission_feature_security records.
+   */
+  AUTOMATIC_SECURITY_SCREENING: 'automatic-security-screening',
+  /**
+   * Dead letter queue for failed automatic-security-screening jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  AUTOMATIC_SECURITY_SCREENING_FAILED: 'automatic-security-screening-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

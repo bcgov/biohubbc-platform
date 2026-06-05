@@ -1,7 +1,22 @@
 import PgBoss from 'pg-boss';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { getLogger } from '../../utils/logger';
+import { publishAutomaticSecurityScreeningJob } from '../publisher';
 import { withConnection } from '../with-connection';
+
+export interface ComputeSubmissionFeatureClosureJobDependencies {
+  publishAutomaticSecurityScreeningJob: typeof publishAutomaticSecurityScreeningJob;
+}
+
+/**
+ * Mutable dependency bag for the compute-submission-feature-closure job.
+ *
+ * Tests should stub this bag rather than the publisher module directly, since
+ * named ESM exports are non-configurable.
+ */
+export const computeSubmissionFeatureClosureJobDependencies: ComputeSubmissionFeatureClosureJobDependencies = {
+  publishAutomaticSecurityScreeningJob
+};
 
 const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job');
 
@@ -79,6 +94,14 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
           submissionId,
           submissionUploadId,
           insertedCount: result.insertedCount
+        });
+
+        // Enqueue screening in the same transaction as the closure write so the job
+        // is only visible if the closure rows commit. This guarantees AC1: screening
+        // never starts before closure population is complete.
+        await computeSubmissionFeatureClosureJobDependencies.publishAutomaticSecurityScreeningJob(conn, {
+          submissionId,
+          submissionUploadId
         });
       });
     } catch (error) {

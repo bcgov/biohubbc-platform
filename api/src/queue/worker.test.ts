@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { JobQueues } from './jobs';
+import * as automaticSecurityScreeningJob from './jobs/automatic-security-screening-job';
 import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
@@ -28,7 +29,7 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(16);
+      expect(createQueueStub.callCount).to.equal(18);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
@@ -37,6 +38,7 @@ describe('worker', () => {
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.AUTOMATIC_SECURITY_SCREENING)).to.be.true;
 
       expect(
         workStub.calledWith(
@@ -111,6 +113,18 @@ describe('worker', () => {
 
       // The poll is a recurring tick — scheduled on a fixed UTC interval after its queue exists.
       expect(scheduleStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES, '0 * * * *')).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.AUTOMATIC_SECURITY_SCREENING,
+          automaticSecurityScreeningJob.automaticSecurityScreeningJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED,
+          automaticSecurityScreeningJob.automaticSecurityScreeningFailedHandler
+        )
+      ).to.be.true;
     });
 
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
@@ -124,8 +138,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 16 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED
-      expect(createQueueStub.callCount).to.equal(16);
+      // 18 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED, AUTOMATIC_SECURITY_SCREENING + FAILED
+      expect(createQueueStub.callCount).to.equal(18);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -144,6 +158,9 @@ describe('worker', () => {
       // Poll download schedules DLQ is created before its main queue
       expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
       expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      // Automatic security screening DLQ is created before its main queue
+      expect(createQueueStub.getCall(16).args[0]).to.equal(JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED);
+      expect(createQueueStub.getCall(17).args[0]).to.equal(JobQueues.AUTOMATIC_SECURITY_SCREENING);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -394,6 +411,46 @@ describe('worker', () => {
       const pollWorkCall = workStub.getCalls().find((call) => call.args[0] === JobQueues.POLL_DOWNLOAD_SCHEDULES);
       expect(pollCreateCall?.calledBefore(scheduleStub.firstCall)).to.be.true;
       expect(pollWorkCall?.calledBefore(scheduleStub.firstCall)).to.be.true;
+    });
+
+    it('configures dead letter queue + policy:short for automatic-security-screening', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      const screeningQueueCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.AUTOMATIC_SECURITY_SCREENING);
+      expect(screeningQueueCall).to.not.be.undefined;
+
+      const queueConfig = screeningQueueCall?.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
+    });
+
+    it('registers the automatic security screening job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Screening handlers are registered after poll-download-schedules handlers (calls 16+17 out of 0-based indexing)
+      expect(workStub.getCall(16).args[0]).to.equal(JobQueues.AUTOMATIC_SECURITY_SCREENING);
+      expect(workStub.getCall(16).args[1]).to.equal(automaticSecurityScreeningJob.automaticSecurityScreeningJobHandler);
+
+      expect(workStub.getCall(17).args[0]).to.equal(JobQueues.AUTOMATIC_SECURITY_SCREENING_FAILED);
+      expect(workStub.getCall(17).args[1]).to.equal(
+        automaticSecurityScreeningJob.automaticSecurityScreeningFailedHandler
+      );
     });
   });
 });

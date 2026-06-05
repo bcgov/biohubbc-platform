@@ -9,6 +9,7 @@ import { SubmissionFeatureClosureService } from '../../services/submission-featu
 import {
   IComputeSubmissionFeatureClosureJobData,
   computeSubmissionFeatureClosureFailedHandler,
+  computeSubmissionFeatureClosureJobDependencies,
   computeSubmissionFeatureClosureJobHandler
 } from './compute-submission-feature-closure-job';
 
@@ -29,7 +30,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       data
     } as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>);
 
-  it('should recompute the closure for the upload and log the inserted count', async () => {
+  it('should recompute the closure for the upload, publish screening job, and commit', async () => {
     const mockDBConnection = getMockDBConnection();
     mockDBConnection.open = sinon.stub().resolves();
     mockDBConnection.commit = sinon.stub().resolves();
@@ -42,11 +43,19 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       .stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload')
       .resolves({ insertedCount: 42 });
 
+    const publishStub = sinon
+      .stub(computeSubmissionFeatureClosureJobDependencies, 'publishAutomaticSecurityScreeningJob')
+      .resolves({ status: 'published', jobId: 'screen-job-1' });
+
     await computeSubmissionFeatureClosureJobHandler([
       createMockJob({ submissionId: 1, submissionUploadId: 'upload-uuid-1' })
     ]);
 
     expect(recomputeStub).to.have.been.calledOnceWith('upload-uuid-1');
+    expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, {
+      submissionId: 1,
+      submissionUploadId: 'upload-uuid-1'
+    });
     expect(mockDBConnection.commit).to.have.been.calledOnce;
   });
 
@@ -60,6 +69,9 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon
+      .stub(computeSubmissionFeatureClosureJobDependencies, 'publishAutomaticSecurityScreeningJob')
+      .resolves({ status: 'published', jobId: 'j1' });
 
     const testError = new Error('Closure recompute failed');
     sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload').rejects(testError);
