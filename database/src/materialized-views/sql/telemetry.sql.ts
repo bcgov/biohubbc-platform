@@ -60,8 +60,6 @@ submissions AS (
     FROM biohub.submission_upload su
     JOIN biohub.submission s ON su.submission_id = s.submission_id
     WHERE su.record_end_date IS NULL
-      AND su.record_effective_date IS NOT NULL
-      AND su.record_effective_date <= NOW()::date
 ),
 
 related_ecological_units AS (
