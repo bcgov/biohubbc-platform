@@ -23,6 +23,32 @@ describe('parseTimestamp', () => {
     });
   });
 
+  it('parses short UTC offset forms (+HH / -HH)', () => {
+    expect(parseTimestamp('14:30:00+00')).to.eql({
+      kind: 'time',
+      date_value: null,
+      time_value: '14:30:00+00'
+    });
+
+    expect(parseTimestamp('14:30:00-07')).to.eql({
+      kind: 'time',
+      date_value: null,
+      time_value: '14:30:00-07'
+    });
+
+    expect(parseTimestamp('2024-02-29T14:30:00+00')).to.eql({
+      kind: 'datetime',
+      date_value: '2024-02-29',
+      time_value: '14:30:00+00'
+    });
+
+    expect(parseTimestamp('2024-02-29T14:30:00-07')).to.eql({
+      kind: 'datetime',
+      date_value: '2024-02-29',
+      time_value: '14:30:00-07'
+    });
+  });
+
   it('rejects invalid calendar dates and times', () => {
     expect(parseTimestamp('2024-02-31')).to.equal(null);
     expect(parseTimestamp('2024-13-01')).to.equal(null);
