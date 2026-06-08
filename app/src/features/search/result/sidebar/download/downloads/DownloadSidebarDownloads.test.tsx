@@ -108,7 +108,9 @@ describe('DownloadSidebarDownloads', () => {
 
     it('passes pre-joined exports through to each card', async () => {
       mockGetDownloads.mockResolvedValue({
-        downloads: [makeDownload({ download_id: 'd1', exports: [makeExport({ download_version_export_id: 'exp-1' })] })],
+        downloads: [
+          makeDownload({ download_id: 'd1', exports: [makeExport({ download_version_export_id: 'exp-1' })] })
+        ],
         pagination: mockPagination()
       });
 

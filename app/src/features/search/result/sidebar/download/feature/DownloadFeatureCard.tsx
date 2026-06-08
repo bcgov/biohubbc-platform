@@ -125,8 +125,14 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
  */
 const ExportRow = (props: ExportRowProps) => {
   const { exportRecord, onDownloadPart, onDownloadAllParts, onRebuild } = props;
-  const { download_version_export_id: exportId, status, started_at, completed_at, error_message, part_count } =
-    exportRecord;
+  const {
+    download_version_export_id: exportId,
+    status,
+    started_at,
+    completed_at,
+    error_message,
+    part_count
+  } = exportRecord;
   const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status];
 
   const [partsOpen, setPartsOpen] = useState(false);
