@@ -45,7 +45,7 @@ describe('useSearchApi', () => {
           feature_type_id: 1,
           feature_type_name: 'dataset',
           feature_name: 'Moose Study',
-          feature_description: 'A study of moose habitat',
+          properties: {},
           submission_name: 'Wildlife Project',
           is_secured: false,
           relevancy_score: 0.75,
@@ -55,6 +55,7 @@ describe('useSearchApi', () => {
 
       const mockResponse: SearchFeatureResponse = {
         features: mockResults,
+        properties: [],
         pagination: {
           total: 1,
           per_page: 10,
@@ -87,7 +88,7 @@ describe('useSearchApi', () => {
           feature_type_id: 2,
           feature_type_name: 'observation',
           feature_name: 'Bear Sighting',
-          feature_description: null,
+          properties: {},
           submission_name: 'Species Census',
           is_secured: true,
           relevancy_score: 0.6,
@@ -97,6 +98,7 @@ describe('useSearchApi', () => {
 
       const mockResponse: SearchFeatureResponse = {
         features: mockResults,
+        properties: [],
         pagination: {
           total: 5,
           per_page: 10,
@@ -123,6 +125,7 @@ describe('useSearchApi', () => {
     it('should make paginated POST request without an expression tree', async () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],
+        properties: [],
         pagination: {
           total: 0,
           per_page: 25,
@@ -148,6 +151,7 @@ describe('useSearchApi', () => {
     it('should return empty array when no results', async () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],
+        properties: [],
         pagination: {
           total: 0,
           per_page: 10,

@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -11,6 +12,17 @@ import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
  * Repository for searching submission features by expression-tree criteria.
  */
 export class SearchFeatureRepository extends BaseRepository {
+  private readonly typedPropertyTableNames = [
+    'submission_feature_property_string',
+    'submission_feature_property_number',
+    'submission_feature_property_boolean',
+    'submission_feature_property_timestamp',
+    'submission_feature_property_geometry',
+    'submission_feature_property_code',
+    'submission_feature_property_taxon',
+    'submission_feature_property_feature'
+  ];
+
   /**
    * Searches for submission features matching the provided expression tree.
    *
@@ -70,6 +82,84 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
+   * Gets property metadata for properties that have typed values on the full filtered result set.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Promise<FeatureTypeProperty[]>} Active property metadata with at least one typed value row.
+   */
+  async searchFeaturesByExpressionTreeProperties(
+    anchorFeatureType: string,
+    expressionTree: NormalizedExpressionTreeExpression | undefined,
+    systemUserId?: number | null
+  ): Promise<FeatureTypeProperty[]> {
+    const knex = getKnex();
+    const expressionFeatureIds = expressionTree
+      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+          anchorFeatureType,
+          expressionTree,
+          systemUserId ?? null
+        )
+      : null;
+    const matchingFeaturesQuery = this.buildExpressionTreeSearchQuery(
+      knex,
+      anchorFeatureType,
+      expressionFeatureIds,
+      systemUserId
+    );
+    const typedPropertyRowsQuery = knex.unionAll(
+      this.typedPropertyTableNames.map((tableName) =>
+        knex(`${tableName} as p`)
+          .select('p.feature_type_property_id')
+          .whereIn('p.submission_feature_id', knex('matching_features').select('submission_feature_id'))
+      ),
+      true
+    );
+    const query = knex
+      .with('matching_features', matchingFeaturesQuery)
+      .with('typed_property_rows', typedPropertyRowsQuery)
+      .from('typed_property_rows as tpr')
+      .select(
+        'ftp.feature_type_property_id',
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name as type_name',
+        'ftp.required_value',
+        'fp.calculated_value',
+        'ftp.allow_multiple'
+      )
+      .join('feature_type_property as ftp', 'tpr.feature_type_property_id', 'ftp.feature_type_property_id')
+      .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
+      .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
+      .whereNull('ftp.record_end_date')
+      .whereNull('fp.record_end_date')
+      .whereNull('fpt.record_end_date')
+      .groupBy(
+        'ftp.feature_type_property_id',
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name',
+        'ftp.required_value',
+        'fp.calculated_value',
+        'ftp.allow_multiple',
+        'ftp.sort'
+      )
+      .orderByRaw('ftp.sort ASC NULLS LAST')
+      .orderBy('fp.display_name', 'asc');
+
+    const response = await this.connection.knex(query, FeatureTypeProperty);
+
+    return response.rows;
+  }
+
+  /**
    * Builds the hydrated expression-tree search projection.
    *
    * Hydrates anchor-type feature rows scoped (when provided) by a precomputed expression-tree
@@ -101,7 +191,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'sf.feature_type_id',
         'ft.name as feature_type_name',
         knex.raw(`sf.data->>'name' as feature_name`),
-        knex.raw(`sf.data->>'description' as feature_description`),
+        knex.raw(`COALESCE(sf.data->'properties', '{}'::jsonb) as properties`),
         's.name as submission_name',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
@@ -125,7 +215,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_type_id',
         'feature_type_name',
         'feature_name',
-        'feature_description',
+        'properties',
         'submission_name',
         knex.raw(`${isEffectivelySecured('expression_results.submission_feature_id')} AS is_secured`),
         'relevancy_score',

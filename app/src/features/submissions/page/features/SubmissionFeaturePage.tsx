@@ -76,7 +76,7 @@ export const SubmissionFeaturePage = () => {
           feature_type_id: feature.feature_type_id,
           feature_type_name: feature.feature_type_name,
           feature_name: null,
-          feature_description: null,
+          properties: {},
           submission_name: feature.submission_name,
           is_secured: feature.secured,
           relevancy_score: 0,

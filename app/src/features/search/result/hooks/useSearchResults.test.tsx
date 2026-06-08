@@ -35,6 +35,7 @@ describe('useSearchResults', () => {
   beforeEach(() => {
     mockSearchFeatures.mockResolvedValue({
       features: [],
+      properties: [],
       pagination: {
         total: 0,
         per_page: 25,

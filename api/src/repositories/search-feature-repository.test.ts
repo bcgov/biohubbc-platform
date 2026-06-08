@@ -101,6 +101,7 @@ describe('SearchFeatureRepository', () => {
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
+      expect(sql).to.include("COALESCE(sf.data->'properties', '{}'::jsonb) as properties");
       expect(sql).to.not.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('order by "submission_feature_id" asc');
       expect(sql).to.include('limit 25');
@@ -140,6 +141,25 @@ describe('SearchFeatureRepository', () => {
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('count(*)::integer as count');
       expect(sql).to.include('"sf"."submission_feature_id" in');
+    });
+  });
+
+  describe('searchFeaturesByExpressionTreeProperties', () => {
+    it('should build a typed-property schema query over the filtered feature set', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTreeProperties('dataset', undefined, 42);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include('with "matching_features" as');
+      expect(sql).to.include('"typed_property_rows" as');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include('"fpt"."name" as "type_name"');
+      expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
     });
   });
 });

@@ -59,7 +59,7 @@ describe('DownloadSidebarCart', () => {
         feature_type_id: 1,
         feature_type_name: 'Observation',
         feature_name: 'Test',
-        feature_description: null,
+        properties: {},
         submission_name: 'Submission',
         is_secured: true,
         relevancy_score: 0.9,

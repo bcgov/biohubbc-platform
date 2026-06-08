@@ -36,6 +36,7 @@ const buildPagination = (params: URLSearchParams): SearchResultsPagination => ({
 
 const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureResponse => ({
   features: [],
+  properties: [],
   pagination: {
     total: 0,
     per_page: pagination.limit,
@@ -243,6 +244,7 @@ export const useSearchResults = (
 
   return {
     rows: data?.features ?? [],
+    properties: data?.properties ?? [],
     isLoading,
     searchParams,
     setSearchParams,

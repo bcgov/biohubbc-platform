@@ -24,11 +24,25 @@ describe('SearchFeatureService', () => {
       feature_type_id: 1,
       feature_type_name: 'dataset',
       feature_name: 'Moose Habitat',
-      feature_description: null,
+      properties: {},
       submission_name: 'Submission A',
       is_secured: false,
       relevancy_score: 1,
       create_date: '2026-05-11T00:00:00.000Z'
+    }
+  ];
+  const mockProperties = [
+    {
+      feature_type_property_id: 1,
+      feature_property_id: 31,
+      feature_property_type_id: 1,
+      name: 'name',
+      display_name: 'Name',
+      description: null,
+      type_name: 'string',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: false
     }
   ];
 
@@ -84,14 +98,18 @@ describe('SearchFeatureService', () => {
       const countStub = sinon
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeCount')
         .resolves(123);
+      const propertiesStub = sinon
+        .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeProperties')
+        .resolves(mockProperties);
 
       const result = await service.searchFeaturesByExpressionTreeWithCount('dataset', tree);
 
       expect(validateStub).to.have.been.calledOnceWith(tree);
       expect(searchStub).to.have.been.calledOnce;
       expect(searchStub.firstCall.args).to.deep.equal(['dataset', normalized, undefined, undefined]);
+      expect(propertiesStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
       expect(countStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
-      expect(result).to.deep.equal({ features: mockFeatures, count: 123 });
+      expect(result).to.deep.equal({ features: mockFeatures, properties: mockProperties, count: 123 });
     });
   });
 
