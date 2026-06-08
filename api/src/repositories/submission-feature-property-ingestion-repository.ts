@@ -1139,7 +1139,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             'artifact_key',
             'code',
             'taxon',
-            'feature'
+            'feature',
+            'array'
           )
       ),
       grouped_errors AS (
