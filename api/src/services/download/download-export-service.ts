@@ -273,6 +273,30 @@ export class DownloadExportService extends DBService {
       })
     );
   }
+
+  /**
+   * Authorize a user for an export and, when it is `ready`, assemble its presigned part URLs.
+   *
+   * The detail endpoint's full shape in a single call: authorize against the parent download, load
+   * the export, and populate `parts[]` only for a `ready` export — `pending` / `processing` /
+   * `failed` / `downloaded` return `[]` so clients don't attempt to download from URLs for an
+   * incomplete job. The status gate lives here, not in the route handler, so it is unit-testable
+   * without driving the HTTP layer.
+   */
+  async getAuthorizedExportWithParts(
+    downloadId: string,
+    exportId: string,
+    systemUserId: number | null
+  ): Promise<DownloadVersionExportRecord & { parts: DownloadExportPart[] }> {
+    const exportRecord = await this.getAuthorizedExport(downloadId, exportId, systemUserId);
+
+    const parts =
+      exportRecord.status === DownloadStatusEnum.READY
+        ? await this.listExportPartUrls(exportId, exportRecord.started_at)
+        : [];
+
+    return { ...exportRecord, parts };
+  }
 }
 
 /**

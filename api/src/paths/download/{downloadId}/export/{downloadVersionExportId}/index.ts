@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../../database/db';
-import { DownloadStatusEnum } from '../../../../../models/download-status';
 import { DownloadVersionExportDetailResponseSchema } from '../../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
@@ -69,19 +68,11 @@ export function getDownloadVersionExportDetail(): RequestHandler {
       const exportId = req.params.downloadVersionExportId;
 
       const exportService = new DownloadExportService(connection);
-      const exportRecord = await exportService.getAuthorizedExport(downloadId, exportId, systemUserId);
-
-      const parts =
-        exportRecord.status === DownloadStatusEnum.READY
-          ? await exportService.listExportPartUrls(exportId, exportRecord.started_at)
-          : [];
+      const result = await exportService.getAuthorizedExportWithParts(downloadId, exportId, systemUserId);
 
       await connection.commit();
 
-      return res.status(200).json({
-        ...exportRecord,
-        parts
-      });
+      return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'getDownloadVersionExportDetail', message: 'error', error });
       await connection.rollback();

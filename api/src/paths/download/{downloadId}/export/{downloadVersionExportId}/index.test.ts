@@ -32,26 +32,28 @@ describe('paths/download/{downloadId}/export/{downloadVersionExportId}/index', (
   });
 
   describe('getDownloadVersionExportDetail', () => {
-    it('threads both path params into getAuthorizedExport, and returns populated parts when status is ready', async () => {
-      // Verifies: both path params (downloadId, downloadVersionExportId) are read from req.params and
-      // passed to getAuthorizedExport; a READY export populates `parts` via listExportPartUrls.
+    it('threads both path params and the system user into getAuthorizedExportWithParts and returns its result', async () => {
+      // Verifies: both path params (downloadId, downloadVersionExportId) and the system user are read
+      // from the request and passed to the service; the service result is returned verbatim. The
+      // status→parts gating itself is unit-tested on the service, not here.
 
-      // Step 1: Stub the DB connection, auth-export (ready), and the parts listing
+      // Step 1: Stub the DB connection and the single service call
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const exportRecord = makeExportRecord({
-        status: DownloadStatusEnum.READY,
-        started_at: '2026-01-01T00:00:00.000Z',
-        completed_at: '2026-01-01T00:05:00.000Z'
-      });
-      const authStub = sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').resolves(exportRecord);
 
       const parts: DownloadExportPart[] = [
         { chunk_id: 1, file_size_bytes: '12345', url: 'https://s3.example.com/part-1.zip' },
         { chunk_id: 2, file_size_bytes: '67890', url: 'https://s3.example.com/part-2.zip' }
       ];
-      const listPartsStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls').resolves(parts);
+      const result = {
+        ...makeExportRecord({
+          status: DownloadStatusEnum.READY,
+          started_at: '2026-01-01T00:00:00.000Z',
+          completed_at: '2026-01-01T00:05:00.000Z'
+        }),
+        parts
+      };
+      const detailStub = sinon.stub(DownloadExportService.prototype, 'getAuthorizedExportWithParts').resolves(result);
 
       // Step 2: Send the request with both path params
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -60,47 +62,19 @@ describe('paths/download/{downloadId}/export/{downloadVersionExportId}/index', (
 
       await getDownloadVersionExportDetail()(mockReq, mockRes, mockNext);
 
-      // Step 3: Verify auth got (downloadId, exportId, systemUserId) and parts were listed by export id
-      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, EXPORT_ID, 42);
-      expect(listPartsStub).to.have.been.calledOnceWith(EXPORT_ID, exportRecord.started_at);
-
-      // Step 4: Verify the response carries the populated parts
+      // Step 3: Verify the service got (downloadId, exportId, systemUserId) and its result was returned
+      expect(detailStub).to.have.been.calledOnceWith(DOWNLOAD_ID, EXPORT_ID, 42);
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ ...exportRecord, parts });
+      expect(mockRes.jsonValue).to.eql(result);
     });
 
-    it('returns empty parts and does not list part URLs when status is not ready', async () => {
-      // Verifies: a non-ready export (pending) skips listExportPartUrls and returns parts: [].
+    it('propagates HTTP403 from getAuthorizedExportWithParts', async () => {
+      // Verifies: an auth failure in the service propagates out of the handler.
 
-      // Step 1: Stub the DB connection and a pending auth-export
+      // Step 1: Stub the DB connection and reject from the service
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const exportRecord = makeExportRecord({ status: DownloadStatusEnum.PENDING });
-      sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').resolves(exportRecord);
-      const listPartsStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls');
-
-      // Step 2: Send the request
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID, downloadVersionExportId: EXPORT_ID };
-
-      await getDownloadVersionExportDetail()(mockReq, mockRes, mockNext);
-
-      // Step 3: Verify no part-URL work and an empty parts array
-      expect(listPartsStub).to.not.have.been.called;
-      expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ ...exportRecord, parts: [] });
-    });
-
-    it('propagates HTTP403 from getAuthorizedExport without listing parts', async () => {
-      // Verifies: an auth failure short-circuits — parts are never listed.
-
-      // Step 1: Stub the DB connection and reject from auth-export
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').rejects(new HTTP403('Access denied'));
-      const listPartsStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls');
+      sinon.stub(DownloadExportService.prototype, 'getAuthorizedExportWithParts').rejects(new HTTP403('Access denied'));
 
       // Step 2: Send the request and capture the error
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -115,9 +89,6 @@ describe('paths/download/{downloadId}/export/{downloadVersionExportId}/index', (
         expect(error).to.be.instanceOf(HTTP403);
         expect((error as HTTPError).status).to.equal(403);
       }
-
-      // Step 4: Verify parts were never listed
-      expect(listPartsStub).to.not.have.been.called;
     });
   });
 });

@@ -14,7 +14,7 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionExportArtifactWithFile } from '../../models/download-version-export-artifact';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { DownloadExportService } from './download-export-service';
+import { DownloadExportPart, DownloadExportService } from './download-export-service';
 import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
@@ -533,6 +533,80 @@ describe('DownloadExportService', () => {
       expect(urlStub.firstCall.args[3]).to.match(
         new RegExp(`^attachment; filename="\\d{8}-\\d{6}-biohub-${EXPORT_ID}-part-1\\.zip"$`)
       );
+    });
+  });
+
+  describe('getAuthorizedExportWithParts', () => {
+    it('populates parts via listExportPartUrls when the export is ready', async () => {
+      // Verifies: a READY export composes getAuthorizedExport + listExportPartUrls, threading the
+      // export's started_at into the URL assembly, and returns the record with parts attached.
+
+      // Step 1: Stub the composed methods — auth returns a READY export, parts listing returns one part
+      const exportRecord = {
+        ...createMockDownloadVersionExport({ download_version_export_id: EXPORT_ID }),
+        download_id: DOWNLOAD_ID,
+        status: DownloadStatusEnum.READY,
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        error_message: null
+      };
+      const authStub = sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').resolves(exportRecord);
+      const parts: DownloadExportPart[] = [{ chunk_id: 1, file_size_bytes: '100', url: 'https://example.com/part-1' }];
+      const listStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls').resolves(parts);
+
+      // Step 2: Get the detail shape
+      const service = new DownloadExportService(getMockDBConnection());
+      const result = await service.getAuthorizedExportWithParts(DOWNLOAD_ID, EXPORT_ID, SYSTEM_USER_ID);
+
+      // Step 3: Verify auth threaded the params and parts were listed with the export's started_at
+      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, EXPORT_ID, SYSTEM_USER_ID);
+      expect(listStub).to.have.been.calledOnceWith(EXPORT_ID, exportRecord.started_at);
+      expect(result).to.eql({ ...exportRecord, parts });
+    });
+
+    it('returns empty parts and skips listExportPartUrls when the export is not ready', async () => {
+      // Verifies: a non-ready export (pending) never assembles part URLs — parts is [].
+
+      // Step 1: Stub auth to return a PENDING export
+      const exportRecord = {
+        ...createMockDownloadVersionExport({ download_version_export_id: EXPORT_ID }),
+        download_id: DOWNLOAD_ID,
+        status: DownloadStatusEnum.PENDING,
+        started_at: null,
+        completed_at: null,
+        error_message: null
+      };
+      sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').resolves(exportRecord);
+      const listStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls');
+
+      // Step 2: Get the detail shape
+      const service = new DownloadExportService(getMockDBConnection());
+      const result = await service.getAuthorizedExportWithParts(DOWNLOAD_ID, EXPORT_ID, SYSTEM_USER_ID);
+
+      // Step 3: Verify no URL assembly and an empty parts array
+      expect(listStub).to.not.have.been.called;
+      expect(result).to.eql({ ...exportRecord, parts: [] });
+    });
+
+    it('propagates the auth error and never lists parts when not authorized', async () => {
+      // Verifies: an auth failure short-circuits — part URLs are never assembled.
+
+      // Step 1: Auth rejects with HTTP403
+      sinon.stub(DownloadExportService.prototype, 'getAuthorizedExport').rejects(new HTTP403('Access denied'));
+      const listStub = sinon.stub(DownloadExportService.prototype, 'listExportPartUrls');
+
+      // Step 2: Attempt to get the detail shape
+      const service = new DownloadExportService(getMockDBConnection());
+      try {
+        await service.getAuthorizedExportWithParts(DOWNLOAD_ID, EXPORT_ID, SYSTEM_USER_ID);
+        expect.fail('Expected throw');
+      } catch (err) {
+        // Step 3: Verify the auth error propagated
+        expect(err).to.be.instanceOf(HTTP403);
+      }
+
+      // Step 4: Verify parts were never listed
+      expect(listStub).to.not.have.been.called;
     });
   });
 });
