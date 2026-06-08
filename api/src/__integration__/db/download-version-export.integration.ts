@@ -501,7 +501,7 @@ describe('Download version export state machine (integration)', function () {
   // ── Part-URL resolution through the group ────────────────────────────
 
   describe('part-URL resolution', () => {
-    it('orders parts by chunk_id, filters null byte_size, and signs the GROUP key while naming the file by EXPORT id', async () => {
+    it('orders parts by chunk_id, filters null byte_size, and signs the GROUP key while naming the file by download + version id', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
 
       // Materialize a group + export via the service.
@@ -569,11 +569,11 @@ describe('Download version export state machine (integration)', function () {
       expect(firstCall.args[1]).to.equal(partKeys[1]);
       expect(firstCall.args[1]).to.include(`/exports/${groupId}/`);
 
-      // The Content-Disposition filename embeds the per-user EXPORT id (provenance),
-      // prefixed with the started_at timestamp (2024-01-02 03:04:05 UTC).
+      // The Content-Disposition filename names the download + version, with the
+      // started_at timestamp (2024-01-02 03:04:05 UTC) — not the export or group id.
       const contentDisposition = firstCall.args[3] as string;
-      expect(contentDisposition).to.include(`biohub-${exportId}-part-1.zip`);
-      expect(contentDisposition).to.include('20240102-030405-');
+      expect(contentDisposition).to.include(`${downloadId}_${downloadVersionId}_20240102-030405_part1.zip`);
+      expect(contentDisposition).to.not.include(exportId);
       expect(contentDisposition).to.not.include(groupId);
     });
   });

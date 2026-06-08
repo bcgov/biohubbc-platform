@@ -52,6 +52,28 @@ export function buildPartZipKey(
 }
 
 /**
+ * Pull the ids back out of a part-zip key built by `buildPartZipKey`.
+ *
+ * Inverse of `buildPartZipKey`, kept beside it so the key shape lives in one
+ * place — a segment reorder breaks both at once. The user-facing download name
+ * (`{downloadId}_{downloadVersionId}_{timestamp}_part{N}.zip`) is derived from
+ * the same key that locates the object, so the name always describes the file.
+ *
+ * @throws if `objectKey` is not a `downloads/.../versions/.../exports/...` part key.
+ */
+export function parseExportPartKey(objectKey: string): {
+  downloadId: string;
+  downloadVersionId: string;
+  groupId: string;
+} {
+  const parts = objectKey.split('/');
+  if (parts.length !== 7 || parts[0] !== 'downloads' || parts[2] !== 'versions' || parts[4] !== 'exports') {
+    throw new Error(`parseExportPartKey: unexpected export part key shape: ${objectKey}`);
+  }
+  return { downloadId: parts[1], downloadVersionId: parts[3], groupId: parts[5] };
+}
+
+/**
  * Decide whether the current byte count should roll over to a new part.
  *
  * Single crossing check — the part is "full" once `currentByteCount` has

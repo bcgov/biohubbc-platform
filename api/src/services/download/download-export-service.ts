@@ -11,6 +11,7 @@ import {
 import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
 import { publishProcessDownloadVersionExportJob } from '../../queue/publisher';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { parseExportPartKey } from '../../utils/export-utils';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadService } from './download-service';
@@ -246,20 +247,24 @@ export class DownloadExportService extends DBService {
    * frontend already consumes.
    *
    * The presigned URL carries a `Content-Disposition` override so the browser
-   * saves each zip as `{YYYYMMDD-HHMMSS}-biohub-{exportId}-part-{N}.zip`. The
-   * timestamp is derived from `started_at` (not the S3 key) so zips from
-   * multiple exports under the same download sort chronologically in the
-   * user's Downloads folder — UUID-only filenames sort alphabetically by
-   * random hex, which is meaningless to a human scanning a file list.
+   * saves each zip as `{downloadId}_{downloadVersionId}_{timestamp}_part{N}.zip`.
+   * The download + version ids name the lineage (which download, which snapshot)
+   * and are read from the same object key that locates the file, so the name
+   * always describes its contents. The timestamp (the group's `started_at`) keeps
+   * two distinct export runs of the same download+version — a re-export at a
+   * different part size, or a failed-group recreate — from colliding; file
+   * explorers handle chronological sort via the OS download date, so it is not
+   * needed as a leading sort key.
    */
   async listExportPartUrls(exportId: string, startedAt: string | null): Promise<DownloadExportPart[]> {
     const artifacts = await this.downloadVersionExportRepository.listExportArtifactGroupArtifactsByExportId(exportId);
     const objectStorageService = new ObjectStorageService();
-    const timestampPrefix = formatDownloadTimestampPrefix(startedAt);
+    const timestamp = formatDownloadTimestampPrefix(startedAt);
 
     return Promise.all(
       artifacts.map(async (artifact) => {
-        const downloadFileName = `${timestampPrefix}-biohub-${exportId}-part-${artifact.chunk_id}.zip`;
+        const { downloadId, downloadVersionId } = parseExportPartKey(artifact.object_key);
+        const downloadFileName = `${downloadId}_${downloadVersionId}_${timestamp}_part${artifact.chunk_id}.zip`;
         return {
           chunk_id: artifact.chunk_id,
           file_size_bytes: artifact.byte_size,

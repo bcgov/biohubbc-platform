@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollPart } from './export-utils';
+import { buildPartZipKey, parseExportPartKey, parseFeatureTypeFromParquetKey, shouldRollPart } from './export-utils';
 
 describe('export-utils', () => {
   describe('parseFeatureTypeFromParquetKey', () => {
@@ -63,6 +63,24 @@ describe('export-utils', () => {
 
       expect(leaf).to.equal('biohub-grp-3-part-1.zip');
       expect(leaf).to.not.include('ver-2');
+    });
+  });
+
+  describe('parseExportPartKey', () => {
+    it('round-trips the ids built by buildPartZipKey', () => {
+      const key = buildPartZipKey('dl-1', 'ver-2', 'grp-3', 4);
+
+      expect(parseExportPartKey(key)).to.eql({
+        downloadId: 'dl-1',
+        downloadVersionId: 'ver-2',
+        groupId: 'grp-3'
+      });
+    });
+
+    it('throws on a non-export key shape (e.g. a parquet key)', () => {
+      expect(() => parseExportPartKey('downloads/dl-1/observation/data.parquet')).to.throw(
+        'unexpected export part key shape'
+      );
     });
   });
 

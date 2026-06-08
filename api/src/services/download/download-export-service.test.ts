@@ -434,11 +434,14 @@ describe('DownloadExportService', () => {
   });
 
   describe('listExportPartUrls', () => {
-    it('builds one presigned URL per artifact — filename keyed by the EXPORT id, object key from the artifact row', async () => {
-      // Verifies: the saved filename uses the export id while getSignedUrl receives the group-keyed
-      // object_key from the artifact row, and chunk_id ASC order is preserved.
+    it('builds one presigned URL per artifact — filename keyed by download + version id, object key from the artifact row', async () => {
+      // Verifies: the saved filename is {downloadId}_{versionId}_{timestamp}_part{N}.zip (ids read
+      // from the object key), getSignedUrl receives the group-keyed object_key, and chunk_id ASC order
+      // is preserved.
 
-      // Step 1: Stub the artifact list (group-keyed object keys)
+      // Step 1: Stub the artifact list (full group-keyed object keys)
+      const key1 = `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-1.zip`;
+      const key2 = `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-2.zip`;
       const artifacts: DownloadVersionExportArtifactWithFile[] = [
         {
           download_version_export_artifact_id: 'ffff0000-0000-0000-0000-000000000001',
@@ -446,7 +449,7 @@ describe('DownloadExportService', () => {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           chunk_id: 1,
           byte_size: '100',
-          object_key: `exports/${GROUP_ID}/biohub-part-1.zip`
+          object_key: key1
         },
         {
           download_version_export_artifact_id: 'ffff0000-0000-0000-0000-000000000002',
@@ -454,7 +457,7 @@ describe('DownloadExportService', () => {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
           chunk_id: 2,
           byte_size: '200',
-          object_key: `exports/${GROUP_ID}/biohub-part-2.zip`
+          object_key: key2
         }
       ];
       sinon
@@ -478,15 +481,15 @@ describe('DownloadExportService', () => {
       ]);
 
       // Step 4: Verify getSignedUrl got the GROUP-keyed object_key while the disposition filename
-      // carries the EXPORT id
+      // names the download + version (not the export or group), with the started_at timestamp
       expect(urlStub.firstCall.args).to.deep.equal([
         BucketType.MAIN,
-        `exports/${GROUP_ID}/biohub-part-1.zip`,
+        key1,
         SIGNED_URL_EXPIRY_DOWNLOAD,
-        `attachment; filename="20260422-153843-biohub-${EXPORT_ID}-part-1.zip"`
+        `attachment; filename="${DOWNLOAD_ID}_${VERSION_ID}_20260422-153843_part1.zip"`
       ]);
       expect(urlStub.secondCall.args[3]).to.equal(
-        `attachment; filename="20260422-153843-biohub-${EXPORT_ID}-part-2.zip"`
+        `attachment; filename="${DOWNLOAD_ID}_${VERSION_ID}_20260422-153843_part2.zip"`
       );
     });
 
@@ -509,7 +512,7 @@ describe('DownloadExportService', () => {
     it('falls back to a live timestamp prefix when started_at is null', async () => {
       // Verifies: a null started_at does not crash — the filename uses a now()-derived prefix.
 
-      // Step 1: Stub a single artifact
+      // Step 1: Stub a single artifact (full group-keyed object key)
       const artifacts: DownloadVersionExportArtifactWithFile[] = [
         {
           download_version_export_artifact_id: 'ffff0000-0000-0000-0000-000000000001',
@@ -517,7 +520,7 @@ describe('DownloadExportService', () => {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           chunk_id: 1,
           byte_size: '100',
-          object_key: `exports/${GROUP_ID}/biohub-part-1.zip`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-1.zip`
         }
       ];
       sinon
@@ -531,7 +534,7 @@ describe('DownloadExportService', () => {
 
       // Step 3: Verify the disposition filename shape (live timestamp — assert shape, not exact value)
       expect(urlStub.firstCall.args[3]).to.match(
-        new RegExp(`^attachment; filename="\\d{8}-\\d{6}-biohub-${EXPORT_ID}-part-1\\.zip"$`)
+        new RegExp(`^attachment; filename="${DOWNLOAD_ID}_${VERSION_ID}_\\d{8}-\\d{6}_part1\\.zip"$`)
       );
     });
   });
