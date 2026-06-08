@@ -32,6 +32,8 @@ db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to ru
 clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
 minio: | run-minio ## Starts MinIO object storage for local S3
 
+all: | web queue clamav minio ## Performs all commands necessary to run the full stack (web, queue, clamav, minio) in docker
+
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
 ## ------------------------------------------------------------------------------
