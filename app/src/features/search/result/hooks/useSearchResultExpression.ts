@@ -70,16 +70,14 @@ export const useSearchResultExpression = () => {
    * param is removed and sort/order are cleared so results revert to their
    * default ordering.
    *
-   * Incrementing `expressionApplyRevision` ensures that re-applying the same
-   * expression (which would produce an identical URL) still triggers an
-   * immediate, non-debounced search refresh.
+   * Incrementing `expressionApplyRevision` only when the URL is unchanged ensures
+   * re-applying the same expression still refreshes without double-firing normal
+   * applies, where the URL change itself triggers the search.
    *
    * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression to apply, or `null` to clear filters.
    */
   const handleExpressionApply = useCallback(
     (nextExpressionTree: ExpressionTreeExpression | null) => {
-      setExpressionApplyRevision((current) => current + 1);
-
       const nextParams: Partial<Record<UrlParamKey, string>> = {
         [URL_PARAMS.PAGE]: '1'
       };
@@ -109,6 +107,15 @@ export const useSearchResultExpression = () => {
         // Use super.set directly on the underlying URLSearchParams to store the
         // base64url value as-is (TypedURLSearchParams.set lowercases values).
         URLSearchParams.prototype.set.call(newParams, URL_PARAMS.EXPR, encodeExpressionToUrl(nextExpressionTree));
+      }
+
+      // Most applies change the URL; the search hook observes that URL/expression change
+      // and fires one request. Re-applying the exact same filters produces the same URL,
+      // so React Router may not rerender. Bump this explicit revision only for that
+      // same-URL case so Apply still refreshes without double-requesting normal applies.
+      if (newParams.toString() === searchParams.toString()) {
+        setExpressionApplyRevision((current) => current + 1);
+        return;
       }
 
       setRawSearchParams(newParams);
