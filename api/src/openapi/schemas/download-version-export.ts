@@ -106,7 +106,7 @@ export const DownloadVersionExportDetailResponseSchema: OpenAPIV3.SchemaObject =
         required: ['chunk_id', 'file_size_bytes', 'url'],
         additionalProperties: false,
         properties: {
-          chunk_id: { type: 'integer', nullable: true, description: '1-based part index.' },
+          chunk_id: { type: 'integer', description: '1-based part index.' },
           file_size_bytes: { type: 'string', format: 'int64' },
           url: {
             type: 'string',

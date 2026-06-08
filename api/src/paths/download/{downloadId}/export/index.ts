@@ -9,7 +9,6 @@ import {
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../../services/download/download-export-service';
-import { DownloadService } from '../../../../services/download/download-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/export');
@@ -149,11 +148,8 @@ export function listDownloadVersionExports(): RequestHandler {
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
 
-      // Authorize the parent download before returning any export rows.
-      await new DownloadService(connection).getAuthorizedDownload(downloadId, systemUserId);
-
       const exportService = new DownloadExportService(connection);
-      const exports = await exportService.listDownloadVersionExportsByDownloadId(downloadId);
+      const exports = await exportService.listAuthorizedExportsByDownloadId(downloadId, systemUserId);
 
       await connection.commit();
 

@@ -23,7 +23,7 @@ import { DownloadService } from './download-service';
  * the frontend already consumes.
  */
 export interface DownloadExportPart {
-  chunk_id: number | null;
+  chunk_id: number;
   file_size_bytes: string;
   url: string;
 }
@@ -205,6 +205,23 @@ export class DownloadExportService extends DBService {
    * List exports for a download, newest first, with `part_count` per row.
    */
   async listDownloadVersionExportsByDownloadId(downloadId: string): Promise<DownloadVersionExportListRow[]> {
+    return this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadId(downloadId);
+  }
+
+  /**
+   * List exports for a download after authorizing the caller against the parent download.
+   *
+   * Authorizes against the parent download (the team-membership rule lives in exactly one place —
+   * `DownloadService.getAuthorizedDownload`), then returns the export list. The auth gate lives here,
+   * not in the route handler, so the list endpoint stays a thin one-service call and mirrors the
+   * detail endpoint's `getAuthorizedExportWithParts`.
+   */
+  async listAuthorizedExportsByDownloadId(
+    downloadId: string,
+    systemUserId: number | null
+  ): Promise<DownloadVersionExportListRow[]> {
+    await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
+
     return this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadId(downloadId);
   }
 
