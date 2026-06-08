@@ -164,6 +164,26 @@ describe('expression-evaluation (integration)', function () {
   }
 
   /**
+   * Rebuild the closure for every upload holding an active feature of the submission.
+   *
+   * The security filter classifies a feature via `isEffectivelySecured`, which fails closed when the
+   * feature has no closure rows. `createTestFeature` mints a fresh upload per call and builds no closure,
+   * so its features need their self-loops rebuilt before the authenticated security filter reads them as
+   * active + unsecured rather than hidden-by-default.
+   */
+  async function rebuildClosureForSubmission(submissionId: number): Promise<void> {
+    const uploads = await connection.sql(SQL`
+      SELECT DISTINCT submission_upload_id
+      FROM submission_feature
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `);
+    for (const row of uploads.rows) {
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(row.submission_upload_id);
+    }
+  }
+
+  /**
    * Index a string `name` value on a feature so a predicate can find it as evidence.
    *
    * The evaluator JOINs feature_type_property and reads from submission_feature_property_string; both must
@@ -339,6 +359,10 @@ describe('expression-evaluation (integration)', function () {
       // Decoy of a different feature type — must not appear.
       const decoy = await createTestFeature(connection, submissionId, 'capture', { comment: 'cap' });
 
+      // Build the closure self-loops so the authenticated security filter reads these active features as
+      // unsecured, not hidden-by-default (isEffectivelySecured fails closed on missing closure rows).
+      await rebuildClosureForSubmission(submissionId);
+
       const subquery = buildBroadFeatureTypeSubquery('sample_site', connection.systemUserId());
       const ids = await runSubquery(subquery);
 
@@ -410,6 +434,10 @@ describe('expression-evaluation (integration)', function () {
       const other = await createTestFeature(connection, submissionOther, 'sample_site', { name: 'AND-other' });
       await indexNameProperty(other, 'AND-other');
 
+      // Self-loops so the authenticated security filter reads these as active + unsecured (fail-closed).
+      await rebuildClosureForSubmission(submissionTarget);
+      await rebuildClosureForSubmission(submissionOther);
+
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -437,6 +465,11 @@ describe('expression-evaluation (integration)', function () {
       const submissionDecoy = await createTestSubmission(connection);
       const decoy = await createTestFeature(connection, submissionDecoy, 'sample_site', { name: 'OR-decoy' });
       await indexNameProperty(decoy, 'OR-decoy');
+
+      // Self-loops so the authenticated security filter reads these as active + unsecured (fail-closed).
+      await rebuildClosureForSubmission(submissionA);
+      await rebuildClosureForSubmission(submissionB);
+      await rebuildClosureForSubmission(submissionDecoy);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -758,10 +791,13 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Empty-closure behaviour, two halves. (a) Without computeClosureForUpload, closure ancestor reach is
-     * empty: A(sample_site) ← E(sample_site), evidence=E, anchor=sample_site → A ABSENT (the closure is what
-     * carries ancestor reach). (b) The content walk works WITHOUT a closure: E2(sample_site) ─content→ M(animal),
-     * evidence=E2, anchor=animal → M PRESENT. Distinct uploads keep the halves clean.
+     * Empty-closure behaviour, two halves, evaluated on the authenticated path.
+     * (a) uploadA gets NO closure: A(sample_site) ← E(sample_site), evidence=E, anchor=sample_site → A
+     *     ABSENT. With no ancestry rows the parent A is unreachable from E, and (post fail-closed) E itself
+     *     reads as secured and is stripped — either way A does not appear.
+     * (b) uploadB's closure is rebuilt to self-loops only (no e2→m ancestor edge), so M stays reachable
+     *     SOLELY via the content walk while reading as a visible unsecured feature: E2(sample_site)
+     *     ─content→ M(animal), evidence=E2, anchor=animal → M PRESENT. Distinct uploads keep the halves clean.
      */
     it('9: empty closure — closure ancestor reach absent, content reach still works', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -791,12 +827,16 @@ describe('expression-evaluation (integration)', function () {
       );
       expect(ancestorIds.has(ancestorSite)).to.equal(false);
 
-      // (b) content reach does NOT need the closure — also do NOT rebuild it.
+      // (b) The content WALK still reaches m without any closure ancestry — but the security filter now
+      // fails closed on a feature with no closure rows, so rebuild uploadB's closure to give e2 and m their
+      // self-loops. m is NOT e2's child, so no e2→m ancestor edge is created: the content edge remains the
+      // ONLY thing that reaches m, while the self-loop lets the filter read m as a visible (unsecured) feature.
       const uploadB = await createTestUpload(connection, submissionId);
       const e2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'sample_site' });
       const m = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'animal' });
       await insertContentEdge(e2, m);
       await indexNameProperty(e2, 'no-closure-content', SAMPLE_SITE_NAME_FTP_ID);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadB);
 
       const contentTree: NormalizedExpressionTreeExpression = {
         type: 'expression',

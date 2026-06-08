@@ -579,6 +579,9 @@ describe('Security scope search (integration)', function () {
     it('should compute zero anchors when no matching secured features exist', async () => {
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Unsecured' });
+      // Build the self-loop so the unsecured feature reads as effectively unsecured rather than
+      // hidden-by-default — isEffectivelySecured fails closed when a feature has no closure rows.
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:dataset:*`;
       const policyId = await createPolicy(connection, 'no-anchor-test');
@@ -1306,6 +1309,9 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
       await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
+      // Build the self-loops so both unsecured features read as effectively unsecured rather than
+      // hidden-by-default — isEffectivelySecured fails closed when a feature has no closure rows.
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:telemetry:*`;
       const policyId = await createPolicy(connection, 'no-security-test');

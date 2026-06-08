@@ -22,14 +22,15 @@ import { Knex } from 'knex';
  * `target_submission_feature_id`. This matters because it runs on every search, cart,
  * and download request.
  *
- * Requires the closure to be populated for the feature's upload. This holds on every
- * caller: features only become searchable after indexing rebuilds the closure, and the
- * anchor recompute write path is only ever triggered for already-indexed submissions
- * (applying a security rule or approving a policy never changes a feature's ancestry,
- * so the closure built at index time is still current). Any feature reaching this check
- * therefore already has its closure rows (at minimum the self-loop). Callers that
- * operate on un-indexed or possibly-inactive ids (e.g. raw id arrays) must filter to
- * active features first, since the closure has no row for soft-deleted features.
+ * Fails closed on missing closure rows. The closure is built by an async recompute job
+ * that runs *after* an upload is flipped to `indexed` (and therefore searchable), in a
+ * separate transaction; a recompute that has not yet run, or that failed, does not revert
+ * that status. So an active, searchable, secured feature can transiently — or, on a failed
+ * recompute, indefinitely — have no closure rows. Rather than read "no rows" as "unsecured"
+ * (which would leak the feature), this check treats the absence of any closure ancestry row
+ * as secured: if we cannot prove a feature is unsecured, we hide it. Under normal operation
+ * every active feature carries at least its self-loop `(F, F)`, so the fail-closed branch is
+ * inert on the happy path.
  *
  * Returns an `EXISTS (...)` SQL expression (returns boolean) with zero `?` placeholders.
  *
@@ -37,15 +38,27 @@ import { Knex } from 'knex';
  *   (e.g. 'wf.submission_feature_id', 'expression_results.submission_feature_id')
  */
 export function isEffectivelySecured(featureIdExpr: string): string {
-  return `EXISTS (
-    SELECT 1
-    FROM submission_feature_closure c
-    JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
-    JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
-    WHERE c.source_submission_feature_id = ${featureIdExpr}
-      AND c.is_ancestor = true
-      AND sfs.record_end_date IS NULL
-      AND sf_sec.record_effective_date <= now()
+  return `(
+    EXISTS (
+      SELECT 1
+      FROM submission_feature_closure c
+      JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
+      JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
+      WHERE c.source_submission_feature_id = ${featureIdExpr}
+        AND c.is_ancestor = true
+        AND sfs.record_end_date IS NULL
+        AND sf_sec.record_effective_date <= now()
+    )
+    -- Fail closed: the reflexive self-loop (F, F) is written for every active feature when its upload's
+    -- closure is built, so its absence means the closure is not built (recompute not yet run, or failed).
+    -- We then cannot prove the feature is unsecured — treat it as secured rather than leak it. This is a
+    -- direct primary-key probe ((source, target) is the PK).
+    OR NOT EXISTS (
+      SELECT 1
+      FROM submission_feature_closure c
+      WHERE c.source_submission_feature_id = ${featureIdExpr}
+        AND c.target_submission_feature_id = ${featureIdExpr}
+    )
   )`;
 }
 
