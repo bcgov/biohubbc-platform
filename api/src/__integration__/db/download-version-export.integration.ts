@@ -634,4 +634,61 @@ describe('Download version export state machine (integration)', function () {
       expect(columns.rowCount).to.equal(0);
     });
   });
+
+  // ── Migration cutover (schema) ───────────────────────────────────────
+  // AC #13: the direct download_export → artifact behaviour is REPLACED, not
+  // aliased. Assert the three legacy tables are dropped and the five new
+  // version/export tables exist, plus the active-uniqueness partial index —
+  // the structural guarantee behind the resolver race (AC #9): without an
+  // index matching `ON CONFLICT (...) WHERE record_end_date IS NULL`, that
+  // guard throws instead of collapsing concurrent duplicates.
+  describe('migration cutover (schema)', () => {
+    it('replaces the three legacy direct-export tables with the five version/export tables', async () => {
+      const result = await connection.sql(SQL`
+        SELECT
+          to_regclass('biohub.download_export')                         AS legacy_download_export,
+          to_regclass('biohub.download_artifact')                       AS legacy_download_artifact,
+          to_regclass('biohub.download_export_artifact')                AS legacy_download_export_artifact,
+          to_regclass('biohub.download_version')                        AS download_version,
+          to_regclass('biohub.download_version_artifact')               AS download_version_artifact,
+          to_regclass('biohub.download_version_export')                 AS download_version_export,
+          to_regclass('biohub.download_version_export_artifact_group')  AS download_version_export_artifact_group,
+          to_regclass('biohub.download_version_export_artifact')        AS download_version_export_artifact;
+      `);
+      const row = result.rows[0];
+
+      // Legacy tables are gone (to_regclass returns null for a missing relation).
+      expect(row.legacy_download_export, 'download_export should be dropped').to.be.null;
+      expect(row.legacy_download_artifact, 'download_artifact should be dropped').to.be.null;
+      expect(row.legacy_download_export_artifact, 'download_export_artifact should be dropped').to.be.null;
+
+      // The five new tables exist.
+      expect(row.download_version, 'download_version should exist').to.not.be.null;
+      expect(row.download_version_artifact, 'download_version_artifact should exist').to.not.be.null;
+      expect(row.download_version_export, 'download_version_export should exist').to.not.be.null;
+      expect(row.download_version_export_artifact_group, 'download_version_export_artifact_group should exist').to.not
+        .be.null;
+      expect(row.download_version_export_artifact, 'download_version_export_artifact should exist').to.not.be.null;
+    });
+
+    it('enforces active group uniqueness with a partial unique index over the 5 dedupe columns', async () => {
+      const result = await connection.sql(SQL`
+        SELECT indexdef
+        FROM pg_indexes
+        WHERE schemaname = 'biohub'
+          AND tablename = 'download_version_export_artifact_group'
+          AND indexdef ILIKE '%UNIQUE%'
+          AND indexdef ILIKE '%record_end_date IS NULL%';
+      `);
+
+      expect(result.rowCount, 'a partial unique index (WHERE record_end_date IS NULL) should exist').to.be.greaterThan(
+        0
+      );
+
+      const def = result.rows.map((r) => r.indexdef).join('\n');
+      for (const col of ['download_version_id', 'format', 'mode', 'max_part_size_bytes', 'exporter_version']) {
+        expect(def, `the active-uniqueness index should cover ${col}`).to.include(col);
+      }
+    });
+  });
 });
