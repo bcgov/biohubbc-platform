@@ -51,6 +51,20 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include("WHERE v.property_type_name = 'datetime'");
       expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
     });
+
+    it('accepts short UTC offsets (+HH / -HH) in datetime regex patterns', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.populateDatetimeCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      // Short-offset form: (:\d{2})? makes the minutes optional in both datetime arms
+      expect(sqlText).to.include('(:\\d{2})?');
+      // The old fixed-width form (no optional group) must not appear
+      expect(sqlText).to.not.include('[+-]\\d{2}:\\d{2})?$');
+    });
   });
 
   describe('populateArtifactCandidateStagingBySubmissionUploadId', () => {

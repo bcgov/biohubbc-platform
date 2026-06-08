@@ -557,16 +557,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.*,
         CASE
           WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN c.value_text::date
-          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}:\\d{2})?$'
+          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}(:\\d{2})?)?$'
             THEN substring(c.value_text FROM 1 FOR 10)::date
           ELSE NULL::date
         END AS date_value,
         CASE
           WHEN c.value_text ~ '^\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?$' THEN c.value_text::time
-          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}:\\d{2})?$'
+          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}(:\\d{2})?)?$'
             THEN regexp_replace(
               regexp_replace(c.value_text, '^\\d{4}-\\d{2}-\\d{2}[T\\s]', ''),
-              '(Z|[+-]\\d{2}:\\d{2})$',
+              '(Z|[+-]\\d{2}(:\\d{2})?)$',
               ''
             )::time
           ELSE NULL::time
