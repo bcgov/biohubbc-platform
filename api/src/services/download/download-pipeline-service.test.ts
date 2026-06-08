@@ -37,18 +37,45 @@ describe('DownloadPipelineService', () => {
   describe('transitionDownloadStatus', () => {
     const downloadId = 'aaaa0000-0000-0000-0000-000000000042';
 
-    it('propagates getDownloadById throw when download does not exist (does NOT call updateDownloadStatus)', async () => {
+    // The transition writes the download's CURRENT VERSION (status lives on the
+    // version), so the lifecycle write is stubbed on DownloadVersionRepository and
+    // its first arg is the version id, not the download id.
+    const versionId = 'dddd0000-0000-0000-0000-000000000001';
+
+    it('propagates getDownloadById throw when download does not exist (does NOT write the version)', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(DownloadRepository.prototype, 'getDownloadById').rejects(new Error('Download not found'));
-      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
       try {
         await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
         expect.fail('expected throw');
       } catch (err: any) {
         expect(err.message).to.equal('Download not found');
+      }
+
+      expect(updateStub.called).to.be.false;
+    });
+
+    it('throws ApiConflictError when the download has no current version', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(
+          createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING, current_download_version_id: null })
+        );
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
+
+      try {
+        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+        expect(err.message).to.equal('Download has no materialized version');
       }
 
       expect(updateStub.called).to.be.false;
@@ -61,7 +88,7 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
-      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
       try {
         await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
@@ -74,50 +101,61 @@ describe('DownloadPipelineService', () => {
       expect(updateStub.called).to.be.false;
     });
 
-    it('calls updateDownloadStatus with started_at set for pending→processing', async () => {
+    it('writes the version with started_at set for pending→processing', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
-      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
       await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
 
       expect(updateStub.calledOnce).to.be.true;
-      expect(updateStub.firstCall.args[0]).to.equal(downloadId);
+      expect(updateStub.firstCall.args[0]).to.equal(versionId);
       expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
-      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      const metadata = updateStub.firstCall.args[2] as {
+        started_at?: string;
+        completed_at?: string;
+        materialized_at?: string;
+      };
       expect(metadata.started_at).to.be.a('string');
       expect(new Date(metadata.started_at!).toISOString()).to.equal(metadata.started_at);
       expect(metadata.completed_at).to.be.undefined;
+      expect(metadata.materialized_at).to.be.undefined;
     });
 
-    it('calls updateDownloadStatus with completed_at set for processing→ready', async () => {
+    it('writes the version with completed_at and materialized_at set for processing→ready', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
-      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
       await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
 
-      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      const metadata = updateStub.firstCall.args[2] as {
+        started_at?: string;
+        completed_at?: string;
+        materialized_at?: string;
+      };
       expect(metadata.started_at).to.be.undefined;
       expect(metadata.completed_at).to.be.a('string');
+      // materialized_at is the data watermark, set only on a successful materialization.
+      expect(metadata.materialized_at).to.be.a('string');
     });
 
-    it('passes completed_at and error metadata for processing→failed', async () => {
+    it('passes completed_at and error_message (no materialized_at) for processing→failed', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
-      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
       await service.transitionDownloadStatus(
         downloadId,
@@ -127,12 +165,14 @@ describe('DownloadPipelineService', () => {
       );
 
       const metadata = updateStub.firstCall.args[2] as {
-        error?: string;
+        error_message?: string;
         started_at?: string;
         completed_at?: string;
+        materialized_at?: string;
       };
-      expect(metadata.error).to.equal('job failed after all retries');
+      expect(metadata.error_message).to.equal('job failed after all retries');
       expect(metadata.completed_at).to.be.a('string');
+      expect(metadata.materialized_at).to.be.undefined;
     });
   });
 

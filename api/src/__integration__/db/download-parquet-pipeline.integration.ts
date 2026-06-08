@@ -824,6 +824,8 @@ describe('Download Parquet pipeline (integration)', function () {
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
       const downloadId = await createPolicyDownload(['dataset']);
+      // Status lives on the current version, so the download needs one to be findable.
+      await createDownloadVersionFor(downloadId);
 
       // Verify initial state
       const initial = await downloadService.findDownloadById(downloadId);

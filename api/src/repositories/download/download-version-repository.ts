@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
+import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionRecord } from '../../models/download-version';
 import { BaseRepository } from '../base-repository';
 
@@ -71,6 +72,55 @@ export class DownloadVersionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to set current download version', [
         'DownloadVersionRepository->setCurrentDownloadVersion',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Update a download version's materialization lifecycle (status + timing + error).
+   *
+   * The materialization status lives on the version, not the download — a download
+   * can hold many versions, one materializing while an earlier one stays ready.
+   * COALESCE preserves an already-set field when a later transition passes only the
+   * fields it owns (e.g. the READY transition sets completed_at + materialized_at
+   * without clearing the started_at written at PROCESSING; an error_message set on
+   * FAILED is never cleared by a subsequent update).
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {DownloadStatusEnum} status - The new lifecycle status.
+   * @param {{ started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string }} [metadata]
+   *   Optional timestamps / error to set alongside the status.
+   * @return {Promise<void>}
+   * @throws {ApiExecuteSQLError} when no version matches the given ID (rowCount !== 1).
+   * @memberof DownloadVersionRepository
+   */
+  async updateDownloadVersionStatus(
+    downloadVersionId: string,
+    status: DownloadStatusEnum,
+    metadata?: {
+      started_at?: string;
+      completed_at?: string;
+      materialized_at?: string;
+      error_message?: string;
+    }
+  ): Promise<void> {
+    const sql = SQL`
+      UPDATE download_version
+      SET
+        status = ${status},
+        started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
+        completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at),
+        materialized_at = COALESCE(${metadata?.materialized_at ?? null}::timestamptz, materialized_at),
+        error_message = COALESCE(${metadata?.error_message ?? null}, error_message)
+      WHERE download_version_id = ${downloadVersionId};
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update download version status', [
+        'DownloadVersionRepository->updateDownloadVersionStatus',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

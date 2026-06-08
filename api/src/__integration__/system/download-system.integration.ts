@@ -36,15 +36,18 @@ async function waitForDownloadStatus(
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const [row] = await db('biohub.download').where('download_id', downloadId).select('download_status');
+    // Status lives on the current version; the download just points at it.
+    const [row] = await db('biohub.download as d')
+      .join('biohub.download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
+      .where('d.download_id', downloadId)
+      .select('dv.status as download_status', 'dv.error_message');
 
     if (row?.download_status === targetStatus) {
       return;
     }
 
     if (row?.download_status === 'failed') {
-      const [detail] = await db('biohub.download').where('download_id', downloadId).select('metadata');
-      throw new Error(`Download ${downloadId} failed: ${JSON.stringify(detail?.metadata)}`);
+      throw new Error(`Download ${downloadId} failed: ${row?.error_message}`);
     }
 
     await new Promise((r) => setTimeout(r, 500));
@@ -288,7 +291,6 @@ describe('Download Worker', function () {
 
     const [download] = await db('biohub.download')
       .insert({
-        download_status: 'pending',
         policy_id: policy.policy_id,
         format,
         create_user: SYSTEM_USER_ID,
@@ -421,8 +423,11 @@ describe('Download Worker', function () {
     expect(sampleSiteFeatureId).to.be.a('number');
     expect(fileFeatureId).to.be.a('number');
 
-    // 3. Verify download status transitions completed
-    const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
+    // 3. Verify download status transitions completed (status/timing live on the version)
+    const [finalDownload] = await db('biohub.download as d')
+      .join('biohub.download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
+      .where('d.download_id', downloadId)
+      .select('dv.status as download_status', 'd.format', 'dv.completed_at');
     expect(finalDownload.download_status).to.equal('ready');
     expect(finalDownload.format).to.equal('parquet');
     expect(finalDownload.completed_at).to.not.be.null;
@@ -634,11 +639,15 @@ describe('Download Worker', function () {
     expect(afterRun1).to.have.lengthOf(3);
     const run1Keys = new Set(afterRun1.map((r: any) => r.object_key));
 
-    // Reset the download so the handler can legally transition pending → processing again
-    await db('biohub.download').where('download_id', downloadId).update({
-      download_status: 'pending',
+    // Reset the version (status lives there) so the handler can legally transition pending → processing again
+    const [{ current_download_version_id: resetVersionId }] = await db('biohub.download')
+      .where('download_id', downloadId)
+      .select('current_download_version_id');
+    await db('biohub.download_version').where('download_version_id', resetVersionId).update({
+      status: 'pending',
       started_at: null,
-      completed_at: null
+      completed_at: null,
+      materialized_at: null
     });
 
     // Re-publish and wait

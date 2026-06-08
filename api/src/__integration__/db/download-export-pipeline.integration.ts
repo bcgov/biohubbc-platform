@@ -22,7 +22,6 @@ import { EXPORTER_VERSION } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
@@ -92,7 +91,6 @@ describe('Download Export pipeline (integration)', function () {
   let connection: IDBConnection;
   let exportRepo: DownloadVersionExportRepository;
   let versionRepo: DownloadVersionRepository;
-  let downloadRepo: DownloadRepository;
   let pipelineService: DownloadExportPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
@@ -106,7 +104,6 @@ describe('Download Export pipeline (integration)', function () {
     await connection.open();
     exportRepo = new DownloadVersionExportRepository(connection);
     versionRepo = new DownloadVersionRepository(connection);
-    downloadRepo = new DownloadRepository(connection);
     pipelineService = new DownloadExportPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
@@ -153,17 +150,19 @@ describe('Download Export pipeline (integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Transition pending → ready directly via the repo (no pipeline work to do here).
-    await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
-      started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString()
-    });
-
     // Materialize a download version and point the download at it. The export
     // pipeline discovers feature types from the version's artifact links.
     const version = await versionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
     await versionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
+
+    // Transition the version pending → ready directly via the repo (no pipeline work
+    // to do here). The download's status is sourced from its current version.
+    await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      materialized_at: new Date().toISOString()
+    });
 
     const artifactService = new ArtifactService(connection);
     const artifactIds: string[] = [];

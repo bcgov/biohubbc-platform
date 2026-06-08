@@ -22,6 +22,7 @@ import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
@@ -34,6 +35,7 @@ describe('Download services (integration)', function () {
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
   let downloadRepo: DownloadRepository;
+  let versionRepo: DownloadVersionRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -46,6 +48,7 @@ describe('Download services (integration)', function () {
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
     downloadRepo = new DownloadRepository(connection);
+    versionRepo = new DownloadVersionRepository(connection);
   });
 
   afterEach(async () => {
@@ -55,9 +58,12 @@ describe('Download services (integration)', function () {
   });
 
   /**
-   * Helper: create a download policy + download row in one shot, returning the
-   * download id. Mirrors the route's create-download flow without the team
-   * link or job publish, so each test can decide how to wire those.
+   * Helper: create a download policy + download row + its 1:1 version in one shot,
+   * returning the download id. Mirrors the route's create-download flow (which
+   * materializes a version and sets current_download_version_id) without the team
+   * link or job publish, so each test can decide how to wire those. The version is
+   * required: read paths INNER JOIN it for the download's status, so a versionless
+   * download is invisible.
    */
   async function createPolicyDownload(opts?: {
     name?: string;
@@ -75,6 +81,8 @@ describe('Download services (integration)', function () {
       format: 'parquet',
       requestedBy: connection.systemUserId()
     });
+    const version = await versionRepo.createDownloadVersion(download_id);
+    await versionRepo.setCurrentDownloadVersion(download_id, version.download_version_id);
     return { download_id, policy_id };
   }
 
@@ -99,18 +107,26 @@ describe('Download services (integration)', function () {
   }
 
   describe('createDownload', () => {
-    it('writes a download row with policy_id populated, format set, and status=pending', async () => {
+    it('writes a download row with policy_id populated and format set', async () => {
       const { download_id, policy_id } = await createPolicyDownload();
 
       const row = await connection.sql(SQL`
-        SELECT download_status, format, policy_id, create_user
+        SELECT format, policy_id, create_user
         FROM download WHERE download_id = ${download_id};
       `);
       expect(row.rowCount).to.equal(1);
-      expect(row.rows[0].download_status).to.equal(DownloadStatusEnum.PENDING);
       expect(row.rows[0].format).to.equal('parquet');
       expect(row.rows[0].policy_id).to.equal(policy_id);
       expect(row.rows[0].create_user).to.equal(connection.systemUserId());
+    });
+
+    it('the download reads status=pending from its freshly-materialized version', async () => {
+      const { download_id } = await createPolicyDownload();
+
+      // Status lives on the version (default 'pending') and is sourced back onto the
+      // download via the current-version JOIN in findDownloadById.
+      const detail = await downloadService.findDownloadById(download_id);
+      expect(detail!.download_status).to.equal(DownloadStatusEnum.PENDING);
     });
   });
 

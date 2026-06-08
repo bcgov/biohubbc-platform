@@ -14,7 +14,6 @@ import {
   HasTeams,
   IsAuthorized
 } from '../../models/download';
-import { DownloadStatusEnum } from '../../models/download-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -64,8 +63,8 @@ export class DownloadRepository extends BaseRepository {
     const { policyId, format, requestedBy } = payload;
 
     const sql = SQL`
-      INSERT INTO download (download_status, policy_id, format, requested_by)
-      VALUES ('pending', ${policyId}, ${format}, ${requestedBy})
+      INSERT INTO download (policy_id, format, requested_by)
+      VALUES (${policyId}, ${format}, ${requestedBy})
       RETURNING download_id;
     `;
 
@@ -121,20 +120,26 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
+    // Materialization status/timing live on the current version, not download.
+    // INNER JOIN is safe: a committed download always has a current version (both
+    // are written in the create transaction). `dv.status AS download_status` keeps
+    // the record field name so every reader (export gate, detail/list endpoints,
+    // publisher dedup) stays unchanged.
     const sql = SQL`
       SELECT
         d.download_id,
-        d.download_status,
+        dv.status AS download_status,
         d.format,
         d.metadata,
-        d.started_at,
-        d.completed_at,
+        dv.started_at,
+        dv.completed_at,
         d.downloaded_at,
         d.create_date,
         d.current_download_version_id,
         p.name,
         p.description
       FROM download d
+      INNER JOIN download_version dv ON dv.download_version_id = d.current_download_version_id
       LEFT JOIN policy p ON p.policy_id = d.policy_id
       WHERE d.download_id = ${downloadId};
     `;
@@ -187,19 +192,22 @@ export class DownloadRepository extends BaseRepository {
   ): Promise<{ downloads: DownloadListRecordBase[]; count: number }> {
     const knex = getKnex();
 
+    // Materialization status/timing are sourced from the current version (see
+    // findDownloadById). INNER JOIN is safe — a committed download always has one.
     const query = knex
       .select([
         'd.download_id',
-        'd.download_status',
+        'dv.status as download_status',
         'd.format',
         'd.metadata',
-        'd.started_at',
-        'd.completed_at',
+        'dv.started_at',
+        'dv.completed_at',
         'd.downloaded_at',
         'd.create_date',
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
+      .innerJoin('download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
       .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
@@ -227,45 +235,10 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Update download status by download ID.
+   * Mark a download as downloaded (sets the downloaded_at timestamp).
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadStatusEnum} downloadStatus - The new download status.
-   * @param {object} [metadata] - Optional metadata (error details, timestamps).
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateDownloadStatus(
-    downloadId: string,
-    downloadStatus: DownloadStatusEnum,
-    metadata?: {
-      error?: string;
-      started_at?: string;
-      completed_at?: string;
-    }
-  ): Promise<void> {
-    const sql = SQL`
-      UPDATE download
-      SET
-        download_status = ${downloadStatus},
-        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
-        started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
-        completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at)
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update download status', [
-        'DownloadRepository->updateDownloadStatus',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-  }
-
-  /**
-   * Mark a download as downloaded (sets downloaded_at timestamp and status).
+   * `downloaded_at` is a user-action timestamp on the download; the materialization
+   * status lives on the version, so this no longer touches a status column.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<void>}
@@ -275,7 +248,6 @@ export class DownloadRepository extends BaseRepository {
     const sql = SQL`
       UPDATE download
       SET
-        download_status = 'downloaded',
         downloaded_at = now()
       WHERE download_id = ${downloadId};
     `;

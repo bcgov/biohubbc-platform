@@ -89,35 +89,6 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('updateDownloadStatus', () => {
-    it('updates status with metadata', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.READY, {
-        completed_at: '2025-01-01T00:01:00Z'
-      });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(DownloadStatusEnum.READY);
-      expect(sqlValues).to.include('2025-01-01T00:01:00Z');
-    });
-
-    it('updates status without metadata', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.FAILED);
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(DownloadStatusEnum.FAILED);
-    });
-  });
-
   describe('getDownloadById', () => {
     it('returns the download record when found', async () => {
       const row = { download_id: 'aaaa0000-0000-0000-0000-000000000001', download_status: DownloadStatusEnum.PENDING };
@@ -181,6 +152,20 @@ describe('DownloadRepository', () => {
 
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('current_download_version_id');
+    });
+
+    it('SQL sources status/timing from the current version (INNER JOIN download_version)', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.match(/INNER JOIN\s+download_version/i);
+      expect(sqlText).to.match(/dv\.status\s+AS\s+download_status/i);
+      expect(sqlText).to.include('dv.started_at');
+      expect(sqlText).to.include('dv.completed_at');
     });
 
     it('returns the joined detail row when policy description is non-null', async () => {

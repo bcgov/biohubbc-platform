@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { createMockDownloadVersion } from '../../__mocks__/download';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionRepository } from './download-version-repository';
 
 chai.use(sinonChai);
@@ -142,6 +143,52 @@ describe('DownloadVersionRepository', () => {
       } catch (err: any) {
         expect(err).to.be.instanceOf(ApiExecuteSQLError);
         expect(err.message).to.equal('Failed to set current download version');
+      }
+    });
+  });
+
+  describe('updateDownloadVersionStatus', () => {
+    it('UPDATEs download_version status/timing/error and binds the version id', async () => {
+      // Verifies: the lifecycle write targets download_version (not download), sets
+      // status + all four COALESCE columns, and binds the version id + status.
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      await repo.updateDownloadVersionStatus(VERSION_ID, DownloadStatusEnum.READY, {
+        completed_at: '2026-01-01T00:01:00.000Z',
+        materialized_at: '2026-01-01T00:01:00.000Z'
+      });
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('UPDATE download_version');
+      expect(sqlText).to.match(/status\s*=/);
+      expect(sqlText).to.include('started_at = COALESCE');
+      expect(sqlText).to.include('completed_at = COALESCE');
+      expect(sqlText).to.include('materialized_at = COALESCE');
+      expect(sqlText).to.include('error_message = COALESCE');
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(DownloadStatusEnum.READY);
+      expect(sqlValues).to.include(VERSION_ID);
+    });
+
+    it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
+      // Verifies: an UPDATE that matched no version row is surfaced as an error
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      try {
+        await repo.updateDownloadVersionStatus(VERSION_ID, DownloadStatusEnum.FAILED);
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect(err.message).to.equal('Failed to update download version status');
       }
     });
   });

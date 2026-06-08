@@ -121,15 +121,17 @@ describe('Download version export state machine (integration)', function () {
       requestedBy: systemUserId
     });
 
-    // The download is born `pending`; the export gate requires `ready`.
-    await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
-      started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString()
-    });
-
     // createDownloadRequest already materialized the current version — resolve it.
     const download = await downloadRepo.findDownloadById(downloadId);
     const downloadVersionId = download!.current_download_version_id as string;
+
+    // The version is born `pending`; the export gate requires `ready`. Status lives
+    // on the version and is sourced back onto the download.
+    await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      materialized_at: new Date().toISOString()
+    });
 
     // Link one parquet artifact per feature type to the version (the export
     // pipeline's discovery surface — `download_version_artifact`, NOT the

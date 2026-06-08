@@ -96,13 +96,14 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Transition a download from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition a download's current version from one of `allowedCurrentStatuses` to `nextStatus`.
    *
-   * Fetches the download, asserts the transition is allowed, then writes the new status
-   * plus timestamps via the existing generic `updateDownloadStatus`. The state machine
-   * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
-   * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
-   * to the pg-boss DLQ.
+   * The materialization lifecycle lives on the version (a version IS a materialization),
+   * so the transition writes `download_version`, not `download`. The download's status is
+   * read back from its current version, so callers keep the download-id contract while the
+   * write lands on the version. The state machine lives in the service; the repository stays
+   * a thin CRUD wrapper. Illegal transitions (including retries of already-terminal jobs)
+   * throw `ApiConflictError` and bubble up to the pg-boss DLQ.
    *
    * @param {string} downloadId - The download ID.
    * @param {DownloadStatusEnum} nextStatus - Target status.
@@ -110,7 +111,7 @@ export class DownloadPipelineService extends DBService {
    * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
    * @return {Promise<void>}
    * @throws {ApiNotFoundError} if the download does not exist.
-   * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
+   * @throws {ApiConflictError} if the download has no current version, or the current status is not in `allowedCurrentStatuses`.
    * @memberof DownloadPipelineService
    */
   async transitionDownloadStatus(
@@ -121,18 +122,39 @@ export class DownloadPipelineService extends DBService {
   ): Promise<void> {
     const download = await this.downloadRepository.getDownloadById(downloadId);
 
+    // A committed download always has a current version (created in the same request
+    // transaction). Guard narrows the nullable pointer and surfaces the impossible case.
+    if (download.current_download_version_id === null) {
+      throw new ApiConflictError('Download has no materialized version', [
+        'DownloadPipelineService->transitionDownloadStatus',
+        { downloadId, nextStatus }
+      ]);
+    }
+
     this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
 
     const now = new Date().toISOString();
-    const timestamps: { started_at?: string; completed_at?: string } = {};
+    const metadata: { started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string } =
+      {};
     if (nextStatus === DownloadStatusEnum.PROCESSING) {
-      timestamps.started_at = now;
+      metadata.started_at = now;
     }
     if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
-      timestamps.completed_at = now;
+      metadata.completed_at = now;
+    }
+    // materialized_at is the data watermark — when this version's snapshot was captured.
+    if (nextStatus === DownloadStatusEnum.READY) {
+      metadata.materialized_at = now;
+    }
+    if (errorMetadata?.error !== undefined) {
+      metadata.error_message = errorMetadata.error;
     }
 
-    await this.downloadRepository.updateDownloadStatus(downloadId, nextStatus, { ...errorMetadata, ...timestamps });
+    await this.downloadVersionRepository.updateDownloadVersionStatus(
+      download.current_download_version_id,
+      nextStatus,
+      metadata
+    );
   }
 
   /**
