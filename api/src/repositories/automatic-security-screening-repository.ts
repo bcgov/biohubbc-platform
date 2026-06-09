@@ -35,7 +35,10 @@ export class AutomaticSecurityScreeningRepository extends BaseRepository {
    * The `UNION` of both directions is upload-scoped and deduped.
    *
    * **Idempotency:** `ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING`
-   * means rerunning the job for the same upload is safe (AC10).
+   * means rerunning the job for the same upload is safe (AC10). The conflict target
+   * references the non-partial unique constraint `submission_feature_security_uk1`
+   * (`UNIQUE (submission_feature_id, security_rule_id)`), which coexists with the
+   * partial unique index `_nuk1` used for soft-delete deduplication.
    *
    * **Access safety:** Draft rows have `status = 'draft'` and are excluded from
    * `isEffectivelySecured` / `computeAnchorBatch` so they do NOT restrict feature

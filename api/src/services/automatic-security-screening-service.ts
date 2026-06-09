@@ -53,9 +53,16 @@ export class AutomaticSecurityScreeningService extends DBService {
    *   existing evaluator in `api/src/repositories/expression-evaluation.ts`.
    * - Returns the `submission_feature_id` values of matching features.
    *
+   * **Contract when `policy_id` is null:** A rule with no linked policy cannot be
+   * evaluated against upload features, so the real implementation must return `[]`
+   * for such rules (effectively skipping them). Rules without a policy should never
+   * reach a screenable state in practice, but the evaluator must handle the case
+   * gracefully rather than throwing.
+   *
    * @param {SecurityRuleRecord} _rule The security rule to evaluate.
    * @param {string} _submissionUploadId The upload to evaluate against.
    * @returns {Promise<number[]>} IDs of features that trigger the rule. Stub returns [].
+   *   When `_rule.policy_id` is null the real implementation must also return [].
    * @memberof AutomaticSecurityScreeningService
    */
   // TODO: implement policy evaluator — replace stub with expression-evaluation.ts integration

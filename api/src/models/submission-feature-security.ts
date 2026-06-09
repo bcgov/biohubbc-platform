@@ -4,6 +4,7 @@ export const SubmissionFeatureSecurityRecord = z.object({
   submission_feature_security_id: z.number(),
   submission_feature_id: z.number(),
   security_rule_id: z.number(),
+  status: z.enum(['draft', 'secured']),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),

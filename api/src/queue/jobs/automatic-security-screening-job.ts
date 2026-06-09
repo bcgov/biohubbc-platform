@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { AutomaticSecurityScreeningService } from '../../services/automatic-security-screening-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { withConnection } from '../with-connection';
 
@@ -102,10 +103,10 @@ export const automaticSecurityScreeningJobHandler: PgBoss.WorkHandler<IAutomatic
 /**
  * Dead Letter Queue handler for failed automatic security screening jobs.
  *
- * Screening produces only draft rows (no access restrictions, no data loss if
- * stale) and the job is idempotent, so a future re-enqueue (e.g. re-indexing)
- * will regenerate the records. This handler only logs the failure and does not
- * change the upload's lifecycle status.
+ * Transitions the upload to `failed` so operators can observe the terminal
+ * error state and re-trigger screening (e.g. by re-indexing). Any draft
+ * `submission_feature_security` rows already inserted by earlier attempts are
+ * harmless and will be overwritten on a subsequent idempotent run.
  *
  * @param {PgBoss.Job<IAutomaticSecurityScreeningJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
@@ -117,6 +118,15 @@ export const automaticSecurityScreeningFailedHandler: PgBoss.WorkHandler<IAutoma
     const { submissionId, submissionUploadId } = job.data;
 
     const jobOutput = (job as PgBoss.JobWithMetadata<IAutomaticSecurityScreeningJobData>).output;
+
+    await withConnection(async (connection) => {
+      const submissionUploadService = new SubmissionUploadService(connection);
+      await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
+        'indexed',
+        'security_screening',
+        'failed'
+      ]);
+    });
 
     defaultLog.warn({
       label: 'automaticSecurityScreeningFailedHandler',
