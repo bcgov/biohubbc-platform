@@ -2,7 +2,11 @@ import type { PredicateOperator } from '../models/expression-predicate';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 
 /**
- * Maximum graph depth for recursive expression search projection.
+ * Maximum hop count for the recursive content-edge (`data.content`) walk in expression search.
+ *
+ * The closure precomputes parent-ancestry and property-reference reach, so the only run-time
+ * recursion left is the bounded walk over `submission_feature_feature` content edges. This caps
+ * that walk.
  */
 export const MAX_SEARCH_GRAPH_DEPTH = 6;
 

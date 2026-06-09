@@ -20,7 +20,9 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { computeScopeHash } from '../../utils/scope-hash';
+import { createTestUpload } from '../helpers/test-feature-property-helpers';
 import {
   addTeamMember,
   computeAnchors,
@@ -94,6 +96,87 @@ describe('Security scope search (integration)', function () {
     `);
   }
 
+  /**
+   * Insert ONE submission_feature bound to a SPECIFIC upload, resolving feature_type_id by name.
+   *
+   * Read-path security is now resolved via the precomputed `submission_feature_closure`, which is
+   * UPLOAD-SCOPED and only links a parent and child when both share one submission_upload_id (both
+   * endpoints must be active features of the same upload). `createTestFeature` mints its OWN upload
+   * per call and cannot place a parent + child under one upload, so the closure-driven search-security
+   * fixtures insert features directly here under a shared upload. Mirrors the insertFeatureRow helper in
+   * cart-submission-feature-service.integration.ts / expression-evaluation.integration.ts.
+   *
+   * @returns The new submission_feature_id.
+   */
+  async function insertFeatureRow(params: {
+    submissionId: number;
+    submissionUploadId: string;
+    featureTypeName: string;
+    parentFeatureId?: number;
+  }): Promise<number> {
+    const systemUserId = connection.systemUserId();
+
+    const result = await connection.sql(SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        feature_type_id,
+        parent_submission_feature_id,
+        data,
+        data_byte_size,
+        record_effective_date,
+        create_user
+      )
+      VALUES (
+        ${params.submissionId},
+        ${params.submissionUploadId}::uuid,
+        (SELECT feature_type_id FROM feature_type WHERE name = ${params.featureTypeName} LIMIT 1),
+        ${params.parentFeatureId ?? null},
+        '{}'::jsonb,
+        500,
+        now(),
+        ${systemUserId}
+      )
+      RETURNING submission_feature_id;
+    `);
+
+    return result.rows[0].submission_feature_id;
+  }
+
+  /**
+   * Recompute the upload-scoped closure (self-loops + parent ancestry + property edges) for the given
+   * upload. Read-path search security (isEffectivelySecured / isAccessibleToUser) reads this
+   * closure, so it MUST be rebuilt AFTER seeding + securing and BEFORE the first search — otherwise the
+   * fragment finds nothing and every feature reads as unsecured.
+   */
+  async function rebuildClosure(uploadId: string): Promise<void> {
+    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+  }
+
+  /**
+   * Rebuild the closure for every upload that holds an active feature of the submission.
+   *
+   * The anchor-recompute write path now reads `isEffectivelySecured`, so a feature only reads
+   * as effectively secured when its closure rows exist. `createTestFeature` / `createTestFeaturesInBulk`
+   * mint a fresh upload per call (or per bulk batch), so directly-secured features each need their own
+   * upload's self-loop rebuilt. Cross-feature ancestry is still resolved by the recompute's live
+   * `ancestor_walk` over parent pointers, so per-upload self-loops are sufficient whenever the secured
+   * feature is secured directly. Tests that depend on a feature inheriting security from an ancestor must
+   * instead co-locate the hierarchy under ONE upload (createTestUpload + insertFeatureRow) so the closure
+   * stores the ancestry edge.
+   */
+  async function rebuildClosureForSubmission(submissionId: number): Promise<void> {
+    const uploads = await connection.sql(SQL`
+      SELECT DISTINCT submission_upload_id
+      FROM submission_feature
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `);
+    for (const row of uploads.rows) {
+      await rebuildClosure(row.submission_upload_id);
+    }
+  }
+
   async function countAnchors(securityScopeId: string): Promise<number> {
     const result = await connection.sql(SQL`
       SELECT count(*)::integer as count FROM security_scope_anchor
@@ -105,14 +188,25 @@ describe('Security scope search (integration)', function () {
   /**
    * Create a submission with a single secured feature and a scope chain for it.
    * Covers the common "one feature, one policy, one scope" setup pattern.
+   *
+   * The feature is seeded under a shared upload and the closure is rebuilt so both the read path
+   * (searchInSubmission) and the anchor-recompute write path resolve the feature's "directly secured"
+   * check via its closure self-loop — both now read `isEffectivelySecured`.
    */
   async function setupSecuredScope(
-    featureName: string,
+    _featureName: string,
     policyName: string
   ): Promise<{ submissionId: number; featureId: number; scopeId: string; policyId: string; stmtId: string }> {
     const submissionId = await createTestSubmission(connection);
-    const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
+    const uploadId = await createTestUpload(connection, submissionId);
+    const featureId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'dataset'
+    });
     await secureFeature(connection, featureId);
+
+    await rebuildClosure(uploadId);
 
     const urn = `urn:${submissionId}:*:*`;
     const policyId = await createPolicy(connection, policyName);
@@ -133,10 +227,24 @@ describe('Security scope search (integration)', function () {
     urnOverride?: (submissionId: number, childId: number) => string
   ): Promise<{ submissionId: number; datasetId: number; childId: number; scopeId: string; policyId: string }> {
     const submissionId = await createTestSubmission(connection);
-    const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-    const childId = await createTestFeature(connection, submissionId, childType, { name: 'Child' }, datasetId);
+    // Parent + child must share ONE upload so the closure stores the child -> dataset ancestor edge;
+    // securing the dataset then makes the child read as effectively secured (inherited) on the read path.
+    const uploadId = await createTestUpload(connection, submissionId);
+    const datasetId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'dataset'
+    });
+    const childId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: childType,
+      parentFeatureId: datasetId
+    });
 
     await secureFeature(connection, datasetId);
+
+    await rebuildClosure(uploadId);
 
     const urn = urnOverride ? urnOverride(submissionId, childId) : `urn:${submissionId}:${childType}:*`;
     const policyId = await createPolicy(connection, policyName);
@@ -144,6 +252,57 @@ describe('Security scope search (integration)', function () {
     const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
     return { submissionId, datasetId, childId, scopeId, policyId };
+  }
+
+  /**
+   * Seed one secured `dataset` feature under its own shared upload, closure rebuilt — the common
+   * "one submission, one secured feature, ready for a scope chain or search" fixture.
+   */
+  async function seedSecuredDataset(): Promise<{ submissionId: number; uploadId: string; featureId: number }> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const featureId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'dataset'
+    });
+    await secureFeature(connection, featureId);
+    await rebuildClosure(uploadId);
+    return { submissionId, uploadId, featureId };
+  }
+
+  /**
+   * Seed a 3-level hierarchy (dataset → sample_site → species_observation) under ONE upload with only the
+   * grandparent (dataset) secured, closure rebuilt. Descendants inherit security via the closure ancestry.
+   */
+  async function seedSecuredGrandparentHierarchy(): Promise<{
+    submissionId: number;
+    grandparent: number;
+    parent: number;
+    child: number;
+  }> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const grandparent = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'dataset'
+    });
+    const parent = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'sample_site',
+      parentFeatureId: grandparent
+    });
+    const child = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'species_observation',
+      parentFeatureId: parent
+    });
+    await secureFeature(connection, grandparent);
+    await rebuildClosure(uploadId);
+    return { submissionId, grandparent, parent, child };
   }
 
   /**
@@ -312,6 +471,8 @@ describe('Security scope search (integration)', function () {
       await markFeatureUnapproved(dataset);
     }
 
+    await rebuildClosureForSubmission(submissionId);
+
     const urn = `urn:${submissionId}:*:*`;
     const policyId = await createPolicy(connection, policyName);
     const stmtId = await createPolicyStatement(connection, policyId, urn);
@@ -343,6 +504,8 @@ describe('Security scope search (integration)', function () {
     for (const f of securedFeatures) {
       await secureFeature(connection, featureMap[f]);
     }
+
+    await rebuildClosureForSubmission(submissionId);
 
     const urnStr = urn(ids);
     const policyId = await createPolicy(connection, policyName);
@@ -398,6 +561,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Anchor Target' });
       await secureFeature(connection, featureId);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:dataset:*`;
       const policyId = await createPolicy(connection, 'anchor-test');
@@ -415,6 +579,9 @@ describe('Security scope search (integration)', function () {
     it('should compute zero anchors when no matching secured features exist', async () => {
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Unsecured' });
+      // Build the self-loop so the unsecured feature reads as effectively unsecured rather than
+      // hidden-by-default — isEffectivelySecured fails closed when a feature has no closure rows.
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:dataset:*`;
       const policyId = await createPolicy(connection, 'no-anchor-test');
@@ -501,11 +668,27 @@ describe('Security scope search (integration)', function () {
   // ── Search with security scopes ──────────────────────────────────────
 
   describe('Search with security scopes', () => {
+    // Read-path security is resolved via the precomputed submission_feature_closure
+    // (isEffectivelySecured / isAccessibleToUser), not a live recursive parent walk. The
+    // closure is UPLOAD-SCOPED, so every fixture here seeds its features under a SHARED upload
+    // (createTestUpload + insertFeatureRow) and rebuilds the closure AFTER seeding + securing and BEFORE
+    // the first search — otherwise the fragment finds nothing and every feature reads as unsecured.
     it('should show authorized secured features to authenticated user with matching scope', async () => {
       const submissionId = await createTestSubmission(connection);
-      const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const openFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'Auth Team');
@@ -522,9 +705,20 @@ describe('Security scope search (integration)', function () {
 
     it('should hide secured features from anonymous user', async () => {
       const submissionId = await createTestSubmission(connection);
-      const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const openFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -535,9 +729,20 @@ describe('Security scope search (integration)', function () {
 
     it('should hide secured features from authenticated user without matching scope', async () => {
       const submissionId = await createTestSubmission(connection);
-      const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const openFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       // User exists but has no team/policy/scope
       const userId = await createOtherUser();
@@ -550,33 +755,15 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should hide descendant from anonymous when only the grandparent is secured (deep hierarchy)', async () => {
-      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open)
-      // The ancestor walk in buildSecurityFilter must find dataset's security row
-      // two levels up from species_observation and hide it.
-      const submissionId = await createTestSubmission(connection);
-      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
-      const parent = await createTestFeature(
-        connection,
-        submissionId,
-        'sample_site',
-        { name: 'Open Mid' },
-        grandparent
-      );
-      const child = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Open Leaf' },
-        parent
-      );
-
-      // Only secure the root — descendants inherit security via ancestor walk
-      await secureFeature(connection, grandparent);
+      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open), all under ONE upload
+      // so the closure stores each descendant's ancestry up to the secured grandparent.
+      // isEffectivelySecured resolves grandparent's security two levels up and hides the subtree.
+      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      // All three should be hidden — grandparent is secured, and the ancestor walk
+      // All three should be hidden — grandparent is secured, and the closure ancestry
       // makes its descendants invisible to anonymous users
       expect(featureIds).to.not.include(grandparent);
       expect(featureIds).to.not.include(parent);
@@ -584,27 +771,10 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should grant authenticated user access to deep descendants via scope anchored at grandparent', async () => {
-      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open)
-      // Scope anchored at dataset. Authenticated user should see all three because
-      // the ancestor walk finds the anchor in each feature's ancestor chain.
-      const submissionId = await createTestSubmission(connection);
-      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
-      const parent = await createTestFeature(
-        connection,
-        submissionId,
-        'sample_site',
-        { name: 'Open Mid' },
-        grandparent
-      );
-      const child = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Open Leaf' },
-        parent
-      );
-
-      await secureFeature(connection, grandparent);
+      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open), all under ONE upload.
+      // Scope anchored at dataset. Authenticated user should see all three because isAccessibleToUser
+      // Branch 2 finds the anchor in each feature's closure ancestry.
+      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
 
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'Deep Access Team');
@@ -620,24 +790,7 @@ describe('Security scope search (integration)', function () {
 
     it('should hide deep descendants from authenticated user without matching scope (deep hierarchy)', async () => {
       // Same hierarchy, but user has no scope — should behave like anonymous for secured subtree
-      const submissionId = await createTestSubmission(connection);
-      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
-      const parent = await createTestFeature(
-        connection,
-        submissionId,
-        'sample_site',
-        { name: 'Open Mid' },
-        grandparent
-      );
-      const child = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Open Leaf' },
-        parent
-      );
-
-      await secureFeature(connection, grandparent);
+      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
 
       const userId = await createOtherUser();
 
@@ -651,10 +804,13 @@ describe('Security scope search (integration)', function () {
 
     it('should grant access to all secured features via wildcard scope', async () => {
       const submissionId = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS 1' });
-      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS 2' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
       await secureFeature(connection, feat1);
       await secureFeature(connection, feat2);
+
+      await rebuildClosure(uploadId);
 
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
@@ -711,6 +867,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Shared Scope' });
       await secureFeature(connection, featureId);
+      await rebuildClosureForSubmission(submissionId);
 
       // Two policies with the same URN → shared scope
       const urn = `urn:${submissionId}:*:*`;
@@ -736,8 +893,15 @@ describe('Security scope search (integration)', function () {
 
     it('should block search access after policy deletion makes scope orphaned', async () => {
       const submissionId = await createTestSubmission(connection);
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Soon Hidden' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       const userId = connection.systemUserId();
       const { stmtId, teamId } = await setupFullAccess(
@@ -765,14 +929,9 @@ describe('Security scope search (integration)', function () {
 
   describe('Policy update → scope replacement', () => {
     it('should replace scopes and clean up orphaned anchors when statements are updated', async () => {
-      // Two submissions, each with a secured feature
-      const sub1 = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, sub1, 'dataset', { name: 'Sub1 DS' });
-      await secureFeature(connection, feat1);
-
-      const sub2 = await createTestSubmission(connection);
-      const feat2 = await createTestFeature(connection, sub2, 'dataset', { name: 'Sub2 DS' });
-      await secureFeature(connection, feat2);
+      // Two submissions, each with a secured feature under its own upload (closure rebuilt per upload)
+      const { submissionId: sub1, featureId: feat1 } = await seedSecuredDataset();
+      const { submissionId: sub2, featureId: feat2 } = await seedSecuredDataset();
 
       // Policy initially targets sub1
       const policyId = await createPolicy(connection, 'update-test');
@@ -823,8 +982,15 @@ describe('Security scope search (integration)', function () {
   describe('Team-policy deletion → access removal', () => {
     it('should remove team access and block search when team-policy is deleted', async () => {
       const submissionId = await createTestSubmission(connection);
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team Access' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'team-delete-test');
@@ -857,13 +1023,8 @@ describe('Security scope search (integration)', function () {
     it('should preserve scopes from remaining policies when one team-policy is deleted', async () => {
       // Team has Policy A (sub1 scope) and Policy B (sub2 scope).
       // Deleting team-policy A should leave sub2's scope intact.
-      const sub1 = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, sub1, 'dataset', { name: 'Sub1 Secured' });
-      await secureFeature(connection, feat1);
-
-      const sub2 = await createTestSubmission(connection);
-      const feat2 = await createTestFeature(connection, sub2, 'dataset', { name: 'Sub2 Secured' });
-      await secureFeature(connection, feat2);
+      const { submissionId: sub1, featureId: feat1 } = await seedSecuredDataset();
+      const { submissionId: sub2, featureId: feat2 } = await seedSecuredDataset();
 
       // Policy A covers sub1, Policy B covers sub2
       const policyA = await createPolicy(connection, 'multi-tp-A');
@@ -911,8 +1072,15 @@ describe('Security scope search (integration)', function () {
       // Policy A and Policy B both use same URN → same shared scope.
       // Deleting team-policy A should leave the scope intact via Policy B.
       const submissionId = await createTestSubmission(connection);
-      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Overlap' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const securedFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, securedFeature);
+
+      await rebuildClosure(uploadId);
 
       const urn = `urn:${submissionId}:*:*`;
 
@@ -959,6 +1127,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Already Secured' });
       await secureFeature(connection, feat1);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'new-anchor-test');
@@ -970,6 +1139,7 @@ describe('Security scope search (integration)', function () {
       // Secure a NEW feature in the same submission
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Newly Secured' });
       await secureFeature(connection, feat2);
+      await rebuildClosureForSubmission(submissionId);
 
       // Recompute anchors — new secured feature should become an anchor
       await computeAnchors(scopeRepo, scopeId);
@@ -987,10 +1157,11 @@ describe('Security scope search (integration)', function () {
       // Hierarchy: grandparent → parent → child
       // Secured:   YES            NO        YES
       //
-      // This is the key regression test for the recursive ancestor walk.
-      // A single-level parent check would see child's immediate parent (parent) is
-      // NOT secured and incorrectly make child an anchor. The recursive walk finds
-      // grandparent (secured) two levels up and correctly excludes child.
+      // Key regression test for multi-level ancestry in anchor pruning. A single-level parent
+      // check would see child's immediate parent (parent) is NOT secured and incorrectly make
+      // child an anchor. The recompute's live ancestor_walk reaches grandparent (secured) two
+      // levels up — whose own closure self-loop makes it read as effectively secured — and
+      // correctly prunes child.
       const submissionId = await createTestSubmission(connection);
       const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Grandparent' });
       const parent = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Parent' }, grandparent);
@@ -999,6 +1170,7 @@ describe('Security scope search (integration)', function () {
       // Secure grandparent and child, but NOT parent — gap in the chain
       await secureFeature(connection, grandparent);
       await secureFeature(connection, child);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'gap-hierarchy-test');
@@ -1022,6 +1194,7 @@ describe('Security scope search (integration)', function () {
 
       // Only the leaf is secured
       await secureFeature(connection, child);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'leaf-only-test');
@@ -1044,6 +1217,7 @@ describe('Security scope search (integration)', function () {
 
       // Only the middle level is secured
       await secureFeature(connection, parent);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'mid-only-test');
@@ -1093,12 +1267,31 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should anchor specific child feature via inherited security (feature-scoped URN)', async () => {
-      // Two telemetry children — only the one named in the URN should be anchored
+      // Two telemetry children inherit security from the dataset — only the one named in the URN
+      // is anchored. The hierarchy is seeded under ONE upload so the closure stores each child's
+      // ancestor edge to the secured dataset (inherited security needs closure ancestry, not just
+      // self-loops).
       const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      const telemetry1 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Target' }, dataset);
-      const telemetry2 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Other' }, dataset);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const dataset = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const telemetry1 = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'telemetry',
+        parentFeatureId: dataset
+      });
+      const telemetry2 = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'telemetry',
+        parentFeatureId: dataset
+      });
       await secureFeature(connection, dataset);
+      await rebuildClosure(uploadId);
 
       const urn = `urn:${submissionId}:telemetry:${telemetry1}`;
       const policyId = await createPolicy(connection, 'feature-scoped-inherited-test');
@@ -1116,6 +1309,9 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
       await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
+      // Build the self-loops so both unsecured features read as effectively unsecured rather than
+      // hidden-by-default — isEffectivelySecured fails closed when a feature has no closure rows.
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:telemetry:*`;
       const policyId = await createPolicy(connection, 'no-security-test');
@@ -1139,18 +1335,30 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should anchor deep descendant via multi-level inherited security', async () => {
-      // dataset → sample_site → telemetry (2 levels deep)
+      // dataset → sample_site → telemetry (2 levels deep), all under ONE upload so the closure
+      // stores telemetry's ancestry up to the secured dataset (inherited security needs closure
+      // ancestry).
       const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
-      const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
-      const telemetry = await createTestFeature(
-        connection,
+      const uploadId = await createTestUpload(connection, submissionId);
+      const dataset = await insertFeatureRow({
         submissionId,
-        'telemetry',
-        { name: 'Deep Leaf' },
-        sampleSite
-      );
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const sampleSite = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: dataset
+      });
+      const telemetry = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'telemetry',
+        parentFeatureId: sampleSite
+      });
       await secureFeature(connection, dataset);
+      await rebuildClosure(uploadId);
 
       const urn = `urn:${submissionId}:telemetry:*`;
       const policyId = await createPolicy(connection, 'deep-inherited-test');
@@ -1187,6 +1395,7 @@ describe('Security scope search (integration)', function () {
       await secureFeature(connection, feat1);
       await secureFeature(connection, feat2);
       await secureFeature(connection, feat3);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'selective-anchor-test');
@@ -1216,15 +1425,26 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
+    // Read-path security reads the closure. The closure's active universe is record_end_date IS NULL only
+    // (it does NOT filter on record_effective_date), so the self-loop / ancestry rows exist regardless of
+    // approval; the effective-date predicate lives in isEffectivelySecured (sf_sec.record_effective_date
+    // <= now()). Each fixture seeds under a SHARED upload and rebuilds the closure before searching.
     for (const { label, markFn } of [
       { label: 'NULL', markFn: markFeatureUnapproved },
       { label: 'in the future', markFn: markFeatureFutureDate }
     ] as const) {
       it(`should NOT hide feature from anonymous when security rule exists but record_effective_date is ${label}`, async () => {
         const submissionId = await createTestSubmission(connection);
-        const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: `Secured ${label}` });
+        const uploadId = await createTestUpload(connection, submissionId);
+        const featureId = await insertFeatureRow({
+          submissionId,
+          submissionUploadId: uploadId,
+          featureTypeName: 'dataset'
+        });
         await secureFeature(connection, featureId);
         await markFn(featureId);
+
+        await rebuildClosure(uploadId);
 
         const results = await searchInSubmission(submissionId, ['dataset'], null);
         const featureIds = results.map((r) => r.submission_feature_id);
@@ -1236,11 +1456,18 @@ describe('Security scope search (integration)', function () {
     }
 
     it('should hide feature from anonymous when security rule exists and record_effective_date is approved', async () => {
-      // Baseline: createTestFeature sets record_effective_date = now(), so feature
+      // Baseline: insertFeatureRow sets record_effective_date = now(), so feature
       // with a security rule IS effectively secured. Anonymous should NOT see it.
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Secured' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const featureId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, featureId);
+
+      await rebuildClosure(uploadId);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -1252,10 +1479,18 @@ describe('Security scope search (integration)', function () {
       // Parent has a security rule but NULL record_effective_date. The parent is
       // NOT effectively secured, so its child should remain visible.
       const submissionId = await createTestSubmission(connection);
-      const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Parent' });
-      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const child = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: parent
+      });
       await secureFeature(connection, parent);
       await markFeatureUnapproved(parent);
+
+      await rebuildClosure(uploadId);
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -1266,11 +1501,19 @@ describe('Security scope search (integration)', function () {
 
     it('should hide child from anonymous when parent is secured and approved', async () => {
       // Parent has a security rule AND record_effective_date = now(). The parent IS
-      // effectively secured, so its child inherits security and is hidden.
+      // effectively secured, so its child inherits security via closure ancestry and is hidden.
       const submissionId = await createTestSubmission(connection);
-      const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Parent' });
-      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const child = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: parent
+      });
       await secureFeature(connection, parent);
+
+      await rebuildClosure(uploadId);
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -1283,9 +1526,16 @@ describe('Security scope search (integration)', function () {
       // Authenticated user without scope grants sees the same as anonymous for the
       // "not secured" branch. Unapproved security rule → feature is visible.
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Auth' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const featureId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, featureId);
       await markFeatureUnapproved(featureId);
+
+      await rebuildClosure(uploadId);
 
       const userId = await createOtherUser();
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -1296,9 +1546,16 @@ describe('Security scope search (integration)', function () {
 
     it('should NOT hide feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Auth' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const featureId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, featureId);
       await markFeatureFutureDate(featureId);
+
+      await rebuildClosure(uploadId);
 
       const userId = await createOtherUser();
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -1310,8 +1567,15 @@ describe('Security scope search (integration)', function () {
     it('should hide feature from authenticated user (no scope) when record_effective_date is approved', async () => {
       // Approved security rule + no scope grant → feature is hidden, same as anonymous.
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Auth' });
+      const uploadId = await createTestUpload(connection, submissionId);
+      const featureId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
       await secureFeature(connection, featureId);
+
+      await rebuildClosure(uploadId);
 
       const userId = await createOtherUser();
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -1347,6 +1611,7 @@ describe('Security scope search (integration)', function () {
       await secureFeature(connection, dataset);
 
       await markFeatureFutureDate(dataset);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'future-date-anchor-test');
@@ -1359,14 +1624,7 @@ describe('Security scope search (integration)', function () {
     it('should prune anchor when record_effective_date is set to NULL after initial computation', async () => {
       // Compute anchors for an approved+secured feature, then de-approve it.
       // deleteStaleAnchorBatch should remove the now-stale anchor.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'De-approved Dataset' });
-      await secureFeature(connection, dataset);
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy(connection, 'de-approve-anchor-test');
-      const stmtId = await createPolicyStatement(connection, policyId, urn);
-      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
+      const { featureId: dataset, scopeId } = await setupSecuredScope('De-approved Dataset', 'de-approve-anchor-test');
 
       // Anchor exists for the approved+secured feature
       expect(await countAnchors(scopeId)).to.equal(1);
@@ -1435,6 +1693,9 @@ describe('Security scope search (integration)', function () {
       const dataset = await createTestFeature(connection, sub1, 'dataset', { name: 'Dataset' });
       await secureFeature(connection, dataset);
 
+      await rebuildClosureForSubmission(sub1);
+      await rebuildClosureForSubmission(sub2);
+
       const urn = 'urn:*:telemetry:*';
       const policyId = await createPolicy(connection, 'wildcard-sub-type-test');
       const stmtId = await createPolicyStatement(connection, policyId, urn);
@@ -1469,6 +1730,7 @@ describe('Security scope search (integration)', function () {
 
       await secureFeature(connection, dataset);
       await secureFeature(connection, child);
+      await rebuildClosureForSubmission(submissionId);
 
       // ── Step 1: Policy with urn:{sub}:*:* (broad) ──
       const broadUrn = `urn:${submissionId}:*:*`;
@@ -1767,6 +2029,7 @@ describe('Security scope search (integration)', function () {
       await secureFeature(connection, root);
       await secureFeature(connection, childA);
       await secureFeature(connection, childB);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'child-promotion-test');
@@ -1831,6 +2094,7 @@ describe('Security scope search (integration)', function () {
 
       // Secure all features in bulk
       await secureFeaturesInBulk(featureIds);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'multi-batch-stale-delete-test');
@@ -1896,6 +2160,7 @@ describe('Security scope search (integration)', function () {
 
       // Secure root + all children in bulk
       await secureFeaturesInBulk([root, ...childIds]);
+      await rebuildClosureForSubmission(submissionId);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy(connection, 'multi-batch-test');

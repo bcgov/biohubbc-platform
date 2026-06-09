@@ -21,6 +21,7 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /** Download a zip file from S3 and return it as an AdmZip instance. */
@@ -143,6 +144,16 @@ describe('Ingest → Download → Export (system integration)', function () {
 
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
     await indexTelemetryProperties(featureId, telemetryData);
+
+    // createTestFeature skips the indexing pipeline that builds the closure. The export's security filter
+    // (isEffectivelySecured) fails closed on a feature with no closure rows, so build the closure self-loop
+    // the recompute would write — otherwise the feature reads as secured and is dropped from the export.
+    const uploadRow = await connection.sql(SQL`
+      SELECT submission_upload_id FROM submission_feature WHERE submission_feature_id = ${featureId};
+    `);
+    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(
+      uploadRow.rows[0].submission_upload_id
+    );
 
     // Build a download policy + download via the real services. Broad-path
     // policy on the telemetry feature type — at export time the security
