@@ -1,0 +1,436 @@
+import { createHash } from 'node:crypto';
+import { ApiValidationError } from '../errors/api-error';
+import { ExportConfig, MergeStep, OutputColumn } from '../models/download-export-config';
+import { buildSchemaHeaders, CsvPropertyDefinition } from './csv-utils';
+
+/**
+ * Columns every materialized per-type Parquet/CSV carries ahead of its schema
+ * properties. `submission_feature_id` traces a row to its feature-detail page;
+ * `uuid` is the feature's own identity and `parent_uuid` links it to its parent
+ * — together they are the cross-file star-schema join keys.
+ *
+ * All three are always *present* (only the submission-feature level is fixed
+ * schema), so they are always valid join/output *targets* even though they are
+ * not feature properties — referencing them passes existence validation. But
+ * `parent_uuid` is **nullable**: ingestion does not require a feature to have a
+ * parent, so its value may be absent on any row (root types such as `dataset`
+ * have none). A join on `parent_uuid → uuid` therefore legitimately finds no
+ * match for a parentless root row, which is kept with empty right-side columns
+ * under left-join semantics.
+ */
+const STRUCTURAL_COLUMNS = ['submission_feature_id', 'uuid', 'parent_uuid'] as const;
+
+/**
+ * Build-side row budget for a single dimension. The denormalized join buffers
+ * each dimension table fully in memory; a dimension over this budget fails fast
+ * and steers the client to the raw-Parquet path rather than risking an
+ * out-of-memory join.
+ */
+export const MAX_DIMENSION_ROWS = 200_000;
+
+/**
+ * Cap on the cumulative number of joined rows a single root row may fan out to.
+ * Arbitrary user-defined joins can match many dimension rows per step and
+ * multiply output rows without bound; this cap protects output size and runtime.
+ */
+export const MAX_FANOUT_PER_ROOT_ROW = 100_000;
+
+/**
+ * The exact materialized column set for a feature type — structural columns
+ * followed by the schema-derived headers.
+ *
+ * This MUST stay identical to the header set the per-type CSV writer emits;
+ * AC8 validation and the join engine both check user-referenced columns against
+ * what is actually present in the materialized Parquet, so a divergence here
+ * would let invalid configs through or reject valid ones.
+ *
+ * @param properties - Schema property definitions for the feature type.
+ * @returns Ordered column names: structural columns first, then schema headers.
+ */
+export function materializedColumnsForType(properties: CsvPropertyDefinition[]): string[] {
+  return [...STRUCTURAL_COLUMNS, ...buildSchemaHeaders(properties)];
+}
+
+/**
+ * Produce the canonical form of an export recipe: the single shape that is both
+ * stored and hashed.
+ *
+ * Two logically identical recipes must reuse the same already-built artifacts,
+ * so identity is semantic, not byte-for-byte:
+ * - `feature_types` is a set, so it is sorted (its order has no output meaning).
+ * - `merge_steps` and `output_columns` are left in caller order — merge order is
+ *   the topological join order and output order is the CSV column order; sorting
+ *   either would change the produced file.
+ * - Defaults are materialized before hashing: each `output_column` gets its
+ *   `{feature_type}_{column}` name and each merge step its `merge_type`, so two
+ *   recipes that differ only by an omitted default still hash equal.
+ *
+ * @param config - A parsed export recipe (defaults already applied by Zod).
+ * @returns The canonical recipe.
+ */
+export function canonicalizeExportConfig(config: ExportConfig): ExportConfig {
+  return {
+    version: config.version,
+    export_type: config.export_type,
+    mode: config.mode,
+    ...(config.root_feature_type ? { root_feature_type: config.root_feature_type } : {}),
+    feature_types: [...config.feature_types].toSorted((a, b) => a.localeCompare(b)),
+    merge_steps: config.merge_steps.map((step) => ({ ...step, merge_type: step.merge_type })),
+    ...(config.output_columns
+      ? {
+          output_columns: config.output_columns.map((outputColumn) => ({
+            ...outputColumn,
+            output_column: outputColumn.output_column ?? `${outputColumn.feature_type}_${outputColumn.column}`
+          }))
+        }
+      : {})
+  };
+}
+
+/**
+ * Serialize a value to a stable string where object key order is irrelevant but
+ * array order is preserved.
+ *
+ * Object keys are sorted recursively so two objects that differ only by key
+ * order serialize identically; arrays keep their order because sequence is part
+ * of a recipe's identity (merge order, output column order). This is the input
+ * to the recipe hash.
+ *
+ * @param value - Any JSON-serializable value.
+ * @returns A canonical string representation.
+ */
+export function stableStringify(value: unknown): string {
+  if (value === null) {
+    return 'null';
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value).toSorted(([a], [b]) => a.localeCompare(b));
+    const serializedEntries = entries.map(([key, val]) => JSON.stringify(key) + ':' + stableStringify(val));
+    return '{' + serializedEntries.join(',') + '}';
+  }
+
+  return JSON.stringify(value);
+}
+
+/**
+ * Compute the canonical SHA-256 hash that identifies an export recipe for
+ * artifact reuse.
+ *
+ * The input must already be canonical (see `canonicalizeExportConfig`): the hash
+ * is taken over `stableStringify` of the recipe so logically identical recipes
+ * collide onto the same hash and reuse the same stored artifacts.
+ *
+ * @param normalized - A canonicalized export recipe.
+ * @returns SHA-256 hex string (64 characters).
+ */
+export function computeConfigHash(normalized: ExportConfig): string {
+  return createHash('sha256').update(stableStringify(normalized)).digest('hex');
+}
+
+/**
+ * Order merge steps so each step's left side is already reachable from the root
+ * when it runs.
+ *
+ * A denormalized export starts at the root feature type and folds dimensions in
+ * one step at a time; a step can only run once its `left_feature_type` is part
+ * of the joined result. Steps are emitted in dependency order starting from the
+ * root. Two failure modes throw rather than silently dropping data:
+ * - a cycle (steps mutually depend so none becomes reachable), and
+ * - a step whose left side is never reachable from the root (an orphaned join).
+ *
+ * @param rootFeatureType - The feature type the join is anchored at.
+ * @param steps - The (unordered) merge steps.
+ * @returns The steps in topological, root-first order.
+ * @throws If the merge graph has a cycle or a step unreachable from the root.
+ */
+export function orderMergeSteps(rootFeatureType: string, steps: MergeStep[]): MergeStep[] {
+  const reachable = new Set<string>([rootFeatureType]);
+  const remaining = [...steps];
+  const ordered: MergeStep[] = [];
+
+  let madeProgress = true;
+  while (remaining.length > 0 && madeProgress) {
+    madeProgress = false;
+    for (let index = 0; index < remaining.length; index++) {
+      const step = remaining[index];
+      if (reachable.has(step.left_feature_type)) {
+        ordered.push(step);
+        reachable.add(step.right_feature_type);
+        remaining.splice(index, 1);
+        madeProgress = true;
+        break;
+      }
+    }
+  }
+
+  if (remaining.length > 0) {
+    const orphaned = remaining.map((step) => `${step.left_feature_type} -> ${step.right_feature_type}`).join(', ');
+    throw new Error(
+      `merge_steps form a cycle or reference a left feature type unreachable from root '${rootFeatureType}': ${orphaned}`
+    );
+  }
+
+  return ordered;
+}
+
+/**
+ * Validate an export recipe — both its mode-dependent structural rules and its
+ * references against the download's materialized data (AC8) — throwing
+ * `ApiValidationError` when the recipe is invalid.
+ *
+ * Validation is one pass with two bands, deliberately kept together (mirroring
+ * `ExpressionPredicateSemanticValidator`) so a recipe has a single validation
+ * surface and a single error type:
+ * - Structural rules that need no data: `per_feature_type` cannot carry
+ *   `merge_steps` (there is nothing to join); `denormalized` requires a
+ *   `root_feature_type` that is one of `feature_types`. These previously lived
+ *   in the `ExportConfig` schema's `superRefine` and were folded here so all
+ *   recipe validation reads in one place.
+ * - Data-aware existence checks: once data is materialized to per-type Parquet,
+ *   foreign keys are gone and any cross-type join is user-defined over whatever
+ *   columns each file happens to carry, so validation confirms only that
+ *   referenced types and columns *exist* — never that a join is semantically
+ *   meaningful. Structural columns (`submission_feature_id` / `uuid` /
+ *   `parent_uuid`) are valid join/output targets on every type even though they
+ *   are not feature properties.
+ *
+ * All problems are accumulated (the pass never stops at the first) and surfaced
+ * as one `ApiValidationError` so the client can fix the whole recipe in one
+ * round. (Accumulating rather than failing on the first error is a deliberate
+ * divergence from the fail-fast predicate validator — flag it in review.)
+ *
+ * @param config - The export recipe to validate.
+ * @param availableColumnsByType - Materialized feature types → their column sets.
+ * @throws {ApiValidationError} When the recipe is structurally invalid or
+ *   references types/columns absent from the materialized data.
+ */
+export function validateExportConfig(config: ExportConfig, availableColumnsByType: Map<string, Set<string>>): void {
+  const errors: string[] = [];
+
+  const columnExists = (featureType: string, column: string): boolean => {
+    if ((STRUCTURAL_COLUMNS as readonly string[]).includes(column)) {
+      return true;
+    }
+    return availableColumnsByType.get(featureType)?.has(column) ?? false;
+  };
+
+  // Mode-dependent structural rules (formerly the schema's superRefine).
+  if (config.mode === 'per_feature_type' && config.merge_steps.length > 0) {
+    errors.push('merge_steps are only valid in denormalized mode; per_feature_type exports one CSV per type');
+  }
+
+  if (config.mode === 'denormalized' && !config.root_feature_type) {
+    errors.push('denormalized mode requires a root_feature_type');
+  }
+
+  for (const featureType of config.feature_types) {
+    if (!availableColumnsByType.has(featureType)) {
+      errors.push(`feature type '${featureType}' is not materialized for this download`);
+    }
+  }
+
+  if (config.root_feature_type && !config.feature_types.includes(config.root_feature_type)) {
+    errors.push(`root_feature_type '${config.root_feature_type}' is not one of feature_types`);
+  }
+
+  for (const step of config.merge_steps) {
+    if (!config.feature_types.includes(step.left_feature_type)) {
+      errors.push(`merge step left_feature_type '${step.left_feature_type}' is not in feature_types`);
+    } else if (!columnExists(step.left_feature_type, step.left_column)) {
+      errors.push(`column '${step.left_column}' does not exist on feature type '${step.left_feature_type}'`);
+    }
+
+    if (!config.feature_types.includes(step.right_feature_type)) {
+      errors.push(`merge step right_feature_type '${step.right_feature_type}' is not in feature_types`);
+    } else if (!columnExists(step.right_feature_type, step.right_column)) {
+      errors.push(`column '${step.right_column}' does not exist on feature type '${step.right_feature_type}'`);
+    }
+  }
+
+  for (const outputColumn of config.output_columns ?? []) {
+    if (!config.feature_types.includes(outputColumn.feature_type)) {
+      errors.push(`output column feature type '${outputColumn.feature_type}' is not in feature_types`);
+    } else if (!columnExists(outputColumn.feature_type, outputColumn.column)) {
+      errors.push(`column '${outputColumn.column}' does not exist on feature type '${outputColumn.feature_type}'`);
+    }
+  }
+
+  if (config.root_feature_type) {
+    try {
+      orderMergeSteps(config.root_feature_type, config.merge_steps);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new ApiValidationError('Invalid export configuration', errors);
+  }
+}
+
+/**
+ * Coerce a parquet join-key value to one canonical comparison string.
+ *
+ * parquetjs surfaces a join column as different JS types depending on its
+ * logical type — INT64 as `BigInt`, DATE as `Date`, TIME as a number, etc. Both
+ * the build (dimension) and probe (root) sides must coerce keys the same way so
+ * a valid join doesn't silently miss on a type mismatch. `null`/`undefined`
+ * collapse to the empty string, which won't match any non-empty key — correct
+ * for a left join, where an unmatched root row is kept with empty right columns.
+ *
+ * @param value - A raw join-key value from a parquet row.
+ * @returns The canonical comparison string.
+ */
+export function coerceJoinKey(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Buffer.isBuffer(value)) {
+    return value.toString('hex');
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
+ * Compute the set of columns a dimension feature type must contribute to a
+ * denormalized join.
+ *
+ * A dimension is buffered with only the columns it actually needs: the columns
+ * its own join key is probed on (`right_column`), the columns it contributes to
+ * the output, and — critically for chained merges — the `left_column` of any
+ * *downstream* step that joins off this type. Omitting that downstream join key
+ * would break a multi-step chain because the key would not be present on the
+ * partially-joined row.
+ *
+ * @param featureType - The dimension feature type to project.
+ * @param orderedSteps - The merge steps in topological order.
+ * @param outputColumns - The selected output columns (or undefined for all).
+ * @returns The set of columns to read from the dimension's parquet.
+ */
+export function computeDimensionProjection(
+  featureType: string,
+  orderedSteps: MergeStep[],
+  outputColumns: OutputColumn[] | undefined
+): Set<string> {
+  const projection = new Set<string>();
+
+  for (const step of orderedSteps) {
+    if (step.right_feature_type === featureType) {
+      projection.add(step.right_column);
+    }
+    // Downstream steps that join *off* this type need its column present on the
+    // joined row (chained merges).
+    if (step.left_feature_type === featureType) {
+      projection.add(step.left_column);
+    }
+  }
+
+  for (const outputColumn of outputColumns ?? []) {
+    if (outputColumn.feature_type === featureType) {
+      projection.add(outputColumn.column);
+    }
+  }
+
+  return projection;
+}
+
+/**
+ * Merge a matched dimension row's columns onto the left row, prefixing each
+ * right column with its feature type for uniqueness (AC5).
+ *
+ * Columns from different feature types can share a name; prefixing the right
+ * side with `{feature_type}_{column}` keeps headers unique so one type's column
+ * cannot overwrite another's. The left row is copied, never mutated, so a single
+ * left row can fan out to multiple merged rows independently.
+ *
+ * @param left - The accumulated left-side row.
+ * @param right - The matched dimension row.
+ * @param rightFeatureType - The dimension's feature type (the prefix).
+ * @returns A new row with the right columns prefixed and merged in.
+ */
+export function mergePrefixed(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  rightFeatureType: string
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...left };
+
+  for (const [column, value] of Object.entries(right)) {
+    merged[`${rightFeatureType}_${column}`] = value;
+  }
+
+  return merged;
+}
+
+/**
+ * Project a fully-joined row down to the configured output columns: filter to
+ * the selected columns, rename them to their output names, and order them as the
+ * CSV expects.
+ *
+ * A selected column is read by its prefixed name (`{feature_type}_{column}`) and
+ * written under its `output_column` name. A missing value renders as an empty
+ * string (left-join misses leave right columns absent). When `output_columns` is
+ * omitted, every column on the joined row is emitted, each coerced to a string.
+ *
+ * @param joined - A fully-joined wide row.
+ * @param outputColumns - The selected output columns (or undefined for all).
+ * @returns The output record keyed by output column name.
+ */
+export function buildOutputRecord(
+  joined: Record<string, unknown>,
+  outputColumns: OutputColumn[] | undefined
+): Record<string, string> {
+  const record: Record<string, string> = {};
+
+  if (!outputColumns) {
+    for (const [column, value] of Object.entries(joined)) {
+      record[column] = coerceCell(value);
+    }
+    return record;
+  }
+
+  for (const outputColumn of outputColumns) {
+    const sourceColumn = `${outputColumn.feature_type}_${outputColumn.column}`;
+    const outputName = outputColumn.output_column ?? sourceColumn;
+    record[outputName] = coerceCell(joined[sourceColumn] ?? joined[outputColumn.column]);
+  }
+
+  return record;
+}
+
+/**
+ * Coerce a joined-row cell to its CSV string form. Null/undefined → empty
+ * string; objects are JSON-stringified; everything else uses `String`.
+ *
+ * @param value - The raw cell value.
+ * @returns The string cell.
+ */
+function coerceCell(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
+    return JSON.stringify(value);
+  }
+  return coerceJoinKey(value);
+}
