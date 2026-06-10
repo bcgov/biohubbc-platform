@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExportConfig } from './download-export-config';
 import { DownloadStatusZod } from './download-status';
 import { DownloadVersionExportMode } from './download-version-export';
 
@@ -12,6 +13,10 @@ import { DownloadVersionExportMode } from './download-version-export';
 export const DownloadVersionExportArtifactGroupRecord = z.object({
   download_version_export_artifact_group_id: z.string().uuid(),
   download_version_id: z.string().uuid(),
+  // The recipe, re-parsed back from the JSONB column.
+  config: ExportConfig,
+  // sha256 hex of the canonical config — the active-group dedupe key.
+  config_hash: z.string(),
   format: z.string(),
   mode: DownloadVersionExportMode,
   // BIGINT → string via pg default INT8 parser.

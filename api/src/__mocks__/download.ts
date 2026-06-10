@@ -99,6 +99,14 @@ export const createMockExportArtifactGroup = (
 ): DownloadVersionExportArtifactGroupRecord => ({
   download_version_export_artifact_group_id: 'cccc0000-0000-0000-0000-000000000001',
   download_version_id: 'dddd0000-0000-0000-0000-000000000001',
+  config: {
+    version: 1,
+    export_type: 'csv',
+    mode: 'per_feature_type',
+    feature_types: ['observation'],
+    merge_steps: []
+  },
+  config_hash: 'a'.repeat(64),
   format: 'csv',
   mode: 'per_feature_type',
   max_part_size_bytes: '524288000',

@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { createMockDownloadVersionExport, createMockExportArtifactGroup } from '../../__mocks__/download';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { CreateDownloadVersionExportPayload } from '../../models/download-version-export';
 import {
@@ -19,9 +20,20 @@ const GROUP_ID = 'cccc0000-0000-0000-0000-000000000001';
 const EXPORT_ID = 'eeee0000-0000-0000-0000-000000000001';
 const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
 const ARTIFACT_ID = 'bbbb0000-0000-0000-0000-000000000001';
+const CONFIG_HASH = 'a'.repeat(64);
+
+const groupConfig: ExportConfig = {
+  version: 1,
+  export_type: 'csv',
+  mode: 'per_feature_type',
+  feature_types: ['observation'],
+  merge_steps: []
+};
 
 const groupPayload: CreateExportArtifactGroupPayload = {
   downloadVersionId: VERSION_ID,
+  config: groupConfig,
+  configHash: CONFIG_HASH,
   format: 'csv',
   mode: 'per_feature_type',
   maxPartSizeBytes: '524288000',
@@ -42,8 +54,9 @@ describe('DownloadVersionExportRepository', () => {
   });
 
   describe('findActiveExportArtifactGroup', () => {
-    it('WHERE filters on all 5 dedupe-key columns plus record_end_date IS NULL', async () => {
-      // Verifies: the active-group probe keys on the full partial-unique tuple and excludes ended groups
+    it('WHERE filters on config_hash (not format/mode), binds configHash, and SELECTs config/config_hash', async () => {
+      // Verifies: the dedupe key moved to config_hash — the probe keys on the hash, not the
+      // denormalized format/mode columns, and surfaces the inline config back to the caller
 
       // Step 1: Setup mock DB to return no active group
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
@@ -52,23 +65,73 @@ describe('DownloadVersionExportRepository', () => {
       // Step 2: Create repository with mocked connection
       const repo = new DownloadVersionExportRepository(mockDBConnection);
 
-      // Step 3: Call findActiveExportArtifactGroup
-      await repo.findActiveExportArtifactGroup(VERSION_ID, 'csv', 'per_feature_type', '524288000', 1);
+      // Step 3: Call findActiveExportArtifactGroup with the new (versionId, configHash, …) signature
+      await repo.findActiveExportArtifactGroup(VERSION_ID, CONFIG_HASH, '524288000', 1);
 
-      // Step 4: Verify all 5 key columns plus the active-row filter appear in the WHERE
+      // Step 4a: WHERE keys on config_hash + the other dedupe-key columns and excludes ended groups
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('download_version_id');
-      expect(sqlText).to.include('format');
-      expect(sqlText).to.include('mode');
-      expect(sqlText).to.include('max_part_size_bytes');
-      expect(sqlText).to.include('exporter_version');
-      expect(sqlText).to.include('record_end_date IS NULL');
+      const whereClause = sqlText.slice(sqlText.indexOf('WHERE'));
+      expect(whereClause).to.include('config_hash');
+      expect(whereClause).to.include('download_version_id');
+      expect(whereClause).to.include('max_part_size_bytes');
+      expect(whereClause).to.include('exporter_version');
+      expect(whereClause).to.include('record_end_date IS NULL');
+
+      // Step 4b: WHERE must NOT filter on the denormalized format/mode columns anymore
+      expect(whereClause).to.not.match(/format\s*=/);
+      expect(whereClause).to.not.match(/\bmode\s*=/);
+
+      // Step 4c: SELECT list surfaces the inline config + its hash so the job can re-read the recipe
+      const selectClause = sqlText.slice(sqlText.indexOf('SELECT'), sqlText.indexOf('FROM'));
+      expect(selectClause).to.include('config');
+      expect(selectClause).to.include('config_hash');
+
+      // Step 4d: the passed configHash is the bound dedupe value (not a hardcoded format/mode)
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(CONFIG_HASH);
+    });
+
+    it('maps a matched row through to a record (incl. config/config_hash)', async () => {
+      // Verifies: a found active group is returned as the parsed record, carrying the new config fields
+
+      // Step 1: Setup mock DB to return one active group
+      const group = createMockExportArtifactGroup({ config_hash: CONFIG_HASH });
+      const sqlStub = sinon.stub().resolves(mockQueryResult([group], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionExportRepository(mockDBConnection);
+
+      // Step 3: Call findActiveExportArtifactGroup
+      const result = await repo.findActiveExportArtifactGroup(VERSION_ID, CONFIG_HASH, '524288000', 1);
+
+      // Step 4: Verify the record maps through with its config + config_hash intact
+      expect(result?.config_hash).to.equal(CONFIG_HASH);
+      expect(result?.config).to.deep.equal(group.config);
+    });
+
+    it('returns null when no active group matches', async () => {
+      // Verifies: the empty-result path resolves to null (via response.rows[0] ?? null)
+
+      // Step 1: Setup mock DB to return no rows
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionExportRepository(mockDBConnection);
+
+      // Step 3: Call findActiveExportArtifactGroup
+      const result = await repo.findActiveExportArtifactGroup(VERSION_ID, CONFIG_HASH, '524288000', 1);
+
+      // Step 4: Verify the null-row path returns null
+      expect(result).to.be.null;
     });
   });
 
   describe('createExportArtifactGroup', () => {
-    it('SQL is ON CONFLICT … DO NOTHING on the 5 key columns; does not throw on rowCount 0; binds all 5', async () => {
-      // Verifies: group materialization is an idempotent upsert that no-ops the racing loser (rowCount 0)
+    it('INSERTs config/config_hash/format/mode and ON CONFLICTs on the config_hash key; does not throw on rowCount 0', async () => {
+      // Verifies: the recipe is stored inline as JSONB config + its hash; the dedupe key is config_hash;
+      // and the loser of a race (rowCount 0) is a valid no-op, not an error
 
       // Step 1: Setup mock DB to return zero rows (the conflict / loser path)
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
@@ -81,18 +144,61 @@ describe('DownloadVersionExportRepository', () => {
       const result = await repo.createExportArtifactGroup(groupPayload);
       expect(result).to.be.undefined;
 
-      // Step 4: Verify the partial-unique conflict target and all 5 bound key columns
       const sqlText = sqlStub.firstCall.args[0].text;
+
+      // Step 4a: the INSERT column list includes the inline config, its hash, and the denormalized format/mode
+      const insertColumns = sqlText.slice(sqlText.indexOf('('), sqlText.indexOf(')'));
+      expect(insertColumns).to.include('config');
+      expect(insertColumns).to.include('config_hash');
+      expect(insertColumns).to.include('format');
+      expect(insertColumns).to.include('mode');
+
+      // Step 4b: config is bound as JSONB — the SQL text carries the ::jsonb cast
+      expect(sqlText).to.include('::jsonb');
+
+      // Step 4c: ON CONFLICT targets the new config_hash dedupe key (NOT format/mode)
       expect(sqlText).to.include(
-        'ON CONFLICT (download_version_id, format, mode, max_part_size_bytes, exporter_version) WHERE record_end_date IS NULL DO NOTHING'
+        'ON CONFLICT (download_version_id, config_hash, max_part_size_bytes, exporter_version) WHERE record_end_date IS NULL DO NOTHING'
       );
 
+      // Step 4d: config is bound as the stringified recipe; configHash + version key columns are bound
       const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(JSON.stringify(groupPayload.config));
+      expect(sqlValues).to.include(CONFIG_HASH);
       expect(sqlValues).to.include(VERSION_ID);
-      expect(sqlValues).to.include('csv');
-      expect(sqlValues).to.include('per_feature_type');
       expect(sqlValues).to.include('524288000');
       expect(sqlValues).to.include(1);
+
+      // Step 4e: single-write-path rule — format/mode are bound from the config, never independent payload fields
+      expect(sqlValues).to.include(groupPayload.config.export_type);
+      expect(sqlValues).to.include(groupPayload.config.mode);
+    });
+
+    it('binds format/mode from the config even when payload.format/mode disagree (single write path)', async () => {
+      // Verifies: format/mode are written ONLY from the parsed config — config_hash already encodes them,
+      // so a divergent payload.format/payload.mode must be ignored in favour of config.export_type/config.mode
+
+      // Step 1: Setup mock DB (inserting path)
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionExportRepository(mockDBConnection);
+
+      // Step 3: Call with payload.format/mode that DISAGREE with the config's export_type/mode
+      const divergentPayload: CreateExportArtifactGroupPayload = {
+        ...groupPayload,
+        format: 'WRONG_FORMAT',
+        mode: 'denormalized'
+      };
+      await repo.createExportArtifactGroup(divergentPayload);
+
+      // Step 4: Verify the config-derived values are bound, NOT the divergent payload fields
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(groupConfig.export_type); // 'csv'
+      expect(sqlValues).to.include(groupConfig.mode); // 'per_feature_type'
+      expect(sqlValues).to.not.include('WRONG_FORMAT');
+      expect(sqlValues).to.not.include('denormalized');
     });
   });
 
@@ -385,6 +491,31 @@ describe('DownloadVersionExportRepository', () => {
 
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(EXPORT_ID);
+    });
+  });
+
+  describe('findExportArtifactGroupById', () => {
+    it('SELECTs config/config_hash and binds the group id', async () => {
+      // Verifies: the by-id lookup surfaces the inline config + its hash so callers see the full recipe
+
+      // Step 1: Setup mock DB to return one group
+      const sqlStub = sinon.stub().resolves(mockQueryResult([createMockExportArtifactGroup()], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionExportRepository(mockDBConnection);
+
+      // Step 3: Call findExportArtifactGroupById
+      await repo.findExportArtifactGroupById(GROUP_ID);
+
+      // Step 4: Verify the SELECT now includes config/config_hash and binds the group id
+      const sqlText = sqlStub.firstCall.args[0].text;
+      const selectClause = sqlText.slice(sqlText.indexOf('SELECT'), sqlText.indexOf('FROM'));
+      expect(selectClause).to.include('config');
+      expect(selectClause).to.include('config_hash');
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(GROUP_ID);
     });
   });
 
