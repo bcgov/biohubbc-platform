@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
+import { CreateDownloadVersionExportRequest } from '../../../../models/download-version-export';
 import {
   CreateDownloadVersionExportRequestSchema,
   DownloadVersionExportListResponseSchema,
@@ -84,15 +85,16 @@ GET.apiDoc = {
 
 /**
  * Create a CSV export and publish the processing job inside a single
- * transaction. The service resolves-or-creates the shared artifact group, inserts the per-user
- * export row, and enqueues the packaging job on this same `connection` — so the row insert and the
- * job enqueue succeed or fail together (no ghost jobs, no orphaned exports) and the job fires only
- * for genuinely new work.
+ * transaction. The service validates the recipe against the download's materialized data,
+ * resolves-or-creates the shared artifact group, inserts the per-user export row, and enqueues the
+ * packaging job on this same `connection` — so the row insert and the job enqueue succeed or fail
+ * together (no ghost jobs, no orphaned exports) and the job fires only for genuinely new work.
  *
- * Client bounds on `max_part_size_bytes` are enforced by the OpenAPI body schema
- * (min 5 MiB, max 5 GiB → 400). The JSON body is an integer for client
- * ergonomics; widened to string here before hitting the service, because the
- * model stores `max_part_size_bytes` as `bigint` → `z.string()`.
+ * The body is the full export recipe plus an optional `max_part_size_bytes` packaging knob; the
+ * recipe is passed to the service, which parses, validates, canonicalizes, and hashes it. Structural
+ * body shape is enforced by the OpenAPI schema at the transport boundary. `max_part_size_bytes`
+ * arrives as an integer for client ergonomics and is widened to a string here because the model
+ * stores it as `bigint` → `z.string()`.
  */
 export function createDownloadVersionExport(): RequestHandler {
   return async (req, res) => {
@@ -103,18 +105,21 @@ export function createDownloadVersionExport(): RequestHandler {
 
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
-      const body = req.body as { download_version_id: string; max_part_size_bytes?: number };
+      // The request body is the full export recipe (ExportConfig) plus a required `download_version_id`
+      // and an optional `max_part_size_bytes`. Spread it through verbatim — `download_version_id` and the
+      // config fields ride along — only normalizing `max_part_size_bytes` (wire integer → BIGINT-as-string).
+      const body = req.body as CreateDownloadVersionExportRequest & { max_part_size_bytes?: number };
+      const request: CreateDownloadVersionExportRequest = {
+        ...req.body,
+        max_part_size_bytes: typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
+      };
 
       const exportService = new DownloadExportService(connection);
 
       const exportRecord = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        {
-          download_version_id: body.download_version_id,
-          max_part_size_bytes:
-            typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
-        },
+        request,
         connection
       );
 

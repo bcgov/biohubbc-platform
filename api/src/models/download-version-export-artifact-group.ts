@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { ExportConfig } from './download-export-config';
+import { DownloadVersionExportMode, ExportConfig } from './download-export-config';
 import { DownloadStatusZod } from './download-status';
-import { DownloadVersionExportMode } from './download-version-export';
 
 /**
  * The reusable, materialized set of export artifacts for one download version, keyed by export

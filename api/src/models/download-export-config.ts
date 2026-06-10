@@ -1,5 +1,20 @@
 import { z } from 'zod';
-import { DownloadVersionExportMode } from './download-version-export';
+
+/**
+ * Export shape discriminator.
+ *
+ * `per_feature_type` — one logical CSV per feature type (star shape). The only value
+ * currently written; the `mode` column and CHECK constraint land now so a future
+ * denormalized-mode addition is strictly additive (data, not schema, change).
+ *
+ * Defined here (the leaf recipe module) rather than in `download-version-export.ts`
+ * so the two modules don't form an import cycle: `download-version-export.ts` and
+ * `download-version-export-artifact-group.ts` both need this enum AND `ExportConfig`,
+ * and `ExportConfig` lives here — colocating the enum keeps all imports flowing one
+ * way (recipe → export models).
+ */
+export const DownloadVersionExportMode = z.enum(['per_feature_type', 'denormalized']);
+export type DownloadVersionExportMode = z.infer<typeof DownloadVersionExportMode>;
 
 /**
  * Merge (join) strategy for a denormalized export step.
