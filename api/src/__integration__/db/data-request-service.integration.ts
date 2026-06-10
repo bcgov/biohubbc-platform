@@ -333,7 +333,7 @@ describe('DataRequestService (integration)', function () {
       expect(policyTeamRows.rowCount).to.equal(1);
       const policyTeamId = policyTeamRows.rows[0].team_id as string;
 
-      const expectedMembers = [collaborator];
+      const expectedMembers = [requester, collaborator].sort((a, b) => a - b);
       expect(await teamMemberIds(dataRequestTeamId)).to.deep.equal(expectedMembers);
       expect(await teamMemberIds(policyTeamId)).to.deep.equal(expectedMembers);
     });

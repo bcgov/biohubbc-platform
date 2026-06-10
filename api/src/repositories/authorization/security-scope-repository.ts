@@ -134,9 +134,10 @@ export class SecurityScopeRepository extends BaseRepository {
    * the NOT EXISTS subquery finds nothing, so all anchors are deleted.
    *
    * **Why keyset pagination:** With ~10% of features secured per submission,
-   * a scope can have 50k+ anchors. The monolithic DELETE runs isEffectivelySecured()
-   * (recursive CTE) per anchor row — 50k recursive CTEs + WAL + row locks in one
-   * transaction. Keyset pagination bounds memory and WAL per batch.
+   * a scope can have 50k+ anchors. The monolithic DELETE runs
+   * isEffectivelySecured() (a closure ancestry probe) per anchor row — 50k
+   * probes + WAL + row locks in one transaction. Keyset pagination bounds memory and
+   * WAL per batch.
    *
    * **All-valid-batch fallback:** When no anchors in a batch are stale, no rows
    * are deleted but the batch is not exhausted. A boundary query advances the

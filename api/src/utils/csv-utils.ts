@@ -125,6 +125,8 @@ export function flattenFeatureWithParent(
  * - array → delegate to flattenArray()
  * - artifact_key → files/{submissionFeatureId}_{filename}
  * - object → JSON.stringify(value)
+ * - feature → JSON.stringify(value) for the URN array, toStringOrEmpty(value)
+ *   for a scalar, '' for null/undefined
  * - null/undefined → empty string
  *
  * @param data - The feature's JSONB data.
@@ -172,6 +174,16 @@ export function flattenFeatureBySchema(
         break;
       case 'object':
         result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
+        break;
+      case 'feature':
+        if (value == null) {
+          result[prop.feature_property_name] = '';
+          break;
+        }
+        // A feature property hydrates into a URN array; JSON-stringify it so the
+        // cell carries the full list. A scalar value passes through unquoted —
+        // JSON.stringify would otherwise wrap a lone string in literal quotes.
+        result[prop.feature_property_name] = Array.isArray(value) ? JSON.stringify(value) : toStringOrEmpty(value);
         break;
       default:
         result[prop.feature_property_name] = toStringOrEmpty(value);

@@ -77,7 +77,7 @@ export const AdminRouter = () => {
         path="security"
         element={
           <BaseLayout>
-            <PageTitle title="Security" description="View security categories and reasons" />
+            <PageTitle title="Manage Security" description="Manage security categories and reasons" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}

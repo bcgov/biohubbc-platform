@@ -557,16 +557,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.*,
         CASE
           WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN c.value_text::date
-          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}:\\d{2})?$'
+          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}(:\\d{2})?)?$'
             THEN substring(c.value_text FROM 1 FOR 10)::date
           ELSE NULL::date
         END AS date_value,
         CASE
           WHEN c.value_text ~ '^\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?$' THEN c.value_text::time
-          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}:\\d{2})?$'
+          WHEN c.value_text ~ '^\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}(:\\d{2})?)?$'
             THEN regexp_replace(
               regexp_replace(c.value_text, '^\\d{4}-\\d{2}-\\d{2}[T\\s]', ''),
-              '(Z|[+-]\\d{2}:\\d{2})$',
+              '(Z|[+-]\\d{2}(:\\d{2})?)$',
               ''
             )::time
           ELSE NULL::time
@@ -2294,6 +2294,73 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         error_message,
         count,
         NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Record duplicate `source_id` errors for the upload.
+   *
+   * A duplicate-source-id error is recorded once per `source_id` value that appears in
+   * two or more active rows of `submission_feature` within the same upload. NULL
+   * `source_id` rows are excluded — Postgres NULL semantics make them non-equal, and
+   * the downstream `feature::<source_id>` resolver cannot match NULLs either, so they
+   * cannot produce the resolution ambiguity this check prevents.
+   *
+   * One row per distinct duplicated `source_id` is written so that the colliding
+   * identifier is recoverable from `details->>'source_id'`. `count` is the literal
+   * duplicate-row count (e.g., three colliding rows → `count = 3`).
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIngestionRepository
+   */
+  async recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          submission_upload_id,
+          source_id,
+          COUNT(*)::integer AS count
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_end_date IS NULL
+          -- Load-bearing, not defensive: GROUP BY collapses all NULL source_id rows into a
+          -- single group, so omitting this would make HAVING COUNT(*) > 1 report distinct
+          -- NULL-source_id features as a false duplicate collision.
+          AND source_id IS NOT NULL
+        GROUP BY submission_upload_id, source_id
+        HAVING COUNT(*) > 1
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        NULL::text,
+        NULL::integer,
+        'DUPLICATE_FEATURE_SOURCE_ID',
+        'Multiple active submission_feature rows share the same source_id within this upload',
+        count,
+        jsonb_build_object('source_id', source_id)
       FROM grouped_errors
       ON CONFLICT (
         submission_upload_id,

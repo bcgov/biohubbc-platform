@@ -58,7 +58,16 @@ export const JobQueues = {
    * Dead letter queue for failed compute-scope-anchors jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  COMPUTE_SCOPE_ANCHORS_FAILED: 'compute-scope-anchors-failed'
+  COMPUTE_SCOPE_ANCHORS_FAILED: 'compute-scope-anchors-failed',
+  /**
+   * Compute submission feature closure queue for async reachability recomputation after indexing.
+   */
+  COMPUTE_SUBMISSION_FEATURE_CLOSURE: 'compute-submission-feature-closure',
+  /**
+   * Dead letter queue for failed compute-submission-feature-closure jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED: 'compute-submission-feature-closure-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

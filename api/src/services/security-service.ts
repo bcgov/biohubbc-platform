@@ -1,13 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
-import { SecurityCategoryRecord, SecurityCategoryWithRuleCount } from '../models/security-category';
-import {
-  SecurityRuleAndCategory,
-  SecurityRuleRecord,
-  SecurityRuleWithFeatureCount,
-  SecuritySearchFilters
-} from '../models/security-rule';
 import {
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
@@ -15,7 +8,6 @@ import {
 import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
@@ -139,7 +131,7 @@ export class SecurityService extends DBService {
   /**
    * Apply security rules to all selected artifacts.
    *
-   * @param {SecurityReason[]} securityReasons
+   * @param {number[]} securityReasonIds
    * @param {Artifact[]} selectedArtifacts
    * @return {*}  {(Promise<({ artifact_persecution_id: number } | undefined)[]>)}
    * @memberof SecurityService
@@ -454,90 +446,5 @@ export class SecurityService extends DBService {
     submissionFeatureIds?: number[]
   ): Promise<SubmissionFeatureSecurityRulesSummary> {
     return this.securityRepository.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
-  }
-
-  /**
-   * Gets a list of all active security rules. A security rule is active if it has not
-   * been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    return this.securityRepository.getActiveSecurityRules();
-  }
-
-  /**
-   * Gets a list of all active security rules with associated categories. A security rule is
-   * active if it has not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityService
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    return this.securityRepository.getActiveRulesAndCategories();
-  }
-
-  /**
-   * Gets a list of all active security categories. A security category is active if it has
-   * not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityCategoryRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
-    return this.securityRepository.getActiveSecurityCategories();
-  }
-
-  /**
-   * Gets paginated security categories with a count of associated active rules.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesWithRuleCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityCategoryWithRuleCount[]> {
-    return this.securityRepository.getSecurityCategoriesWithRuleCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security categories matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityCategoriesCount(filters);
-  }
-
-  /**
-   * Gets paginated security rules with a count of associated submission features.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityRuleWithFeatureCount[]> {
-    return this.securityRepository.getSecurityRulesWithFeatureCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security rules matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityRulesCount(filters);
   }
 }

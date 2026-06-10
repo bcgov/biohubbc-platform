@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import { JobQueues } from './jobs';
 import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
+import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
 import * as processDownloadExportJob from './jobs/process-download-export-job';
@@ -25,13 +26,14 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(12);
+      expect(createQueueStub.callCount).to.equal(14);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_EXPORT)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.INDEX_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
 
       expect(
         workStub.calledWith(
@@ -79,6 +81,18 @@ describe('worker', () => {
           computeScopeAnchorsJob.computeScopeAnchorsFailedHandler
         )
       ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE,
+          computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED,
+          computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
+        )
+      ).to.be.true;
     });
 
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
@@ -91,8 +105,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 12 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED
-      expect(createQueueStub.callCount).to.equal(12);
+      // 14 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED
+      expect(createQueueStub.callCount).to.equal(14);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -105,6 +119,9 @@ describe('worker', () => {
       expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
       expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      // Recompute closure DLQ is created before its main queue
+      expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -239,6 +256,50 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('configures dead letter queue + policy:short for compute-submission-feature-closure', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // policy: 'short' — without it pg-boss ignores singletonKey, so two
+      // concurrent recomputes for the same upload would both run.
+      const closureQueueCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(closureQueueCall).to.not.be.undefined;
+
+      const queueConfig = closureQueueCall?.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
+    });
+
+    it('registers the compute submission feature closure job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Recompute closure handlers are registered after compute scope anchors handlers
+      expect(workStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(workStub.getCall(12).args[1]).to.equal(
+        computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureJobHandler
+      );
+
+      expect(workStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(workStub.getCall(13).args[1]).to.equal(
+        computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
+      );
     });
   });
 });

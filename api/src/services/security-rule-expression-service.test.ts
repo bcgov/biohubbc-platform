@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
-import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
+import { SecurityRuleRepository } from '../repositories/security-rule-repository';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { SecurityRuleExpressionService } from './security-rule-expression-service';
 
@@ -34,7 +34,7 @@ describe('SecurityRuleExpressionService', () => {
           security_rule_id: 7,
           expression_id: 'expr-new'
         } as any);
-      const getActiveRulesStub = sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
+      const getActiveRulesStub = sinon.stub(SecurityRuleRepository.prototype, 'getActiveSecurityRules').resolves([
         {
           security_rule_id: 7,
           policy_id: '11111111-1111-1111-1111-111111111111'
@@ -84,7 +84,7 @@ describe('SecurityRuleExpressionService', () => {
       const insertStub = sinon
         .stub(SecurityRuleExpressionRepository.prototype, 'insertSecurityRuleExpression')
         .resolves({} as any);
-      sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
+      sinon.stub(SecurityRuleRepository.prototype, 'getActiveSecurityRules').resolves([
         {
           security_rule_id: 7,
           policy_id: '11111111-1111-1111-1111-111111111111'
@@ -132,7 +132,7 @@ describe('SecurityRuleExpressionService', () => {
         security_rule_id: 7,
         expression_id: 'expr-new'
       } as any);
-      sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
+      sinon.stub(SecurityRuleRepository.prototype, 'getActiveSecurityRules').resolves([
         {
           security_rule_id: 7,
           policy_id: null

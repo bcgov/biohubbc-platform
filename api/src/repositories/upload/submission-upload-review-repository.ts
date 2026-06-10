@@ -247,12 +247,11 @@ export class SubmissionUploadReviewRepository extends BaseRepository {
           requested_by = ${requestedBy}
         FROM
           submission_upload su
-        INNER JOIN
+        CROSS JOIN
           requested_scopes rs
-        ON
-          rs.scope = sur.scope
         WHERE
           sur.submission_upload_id = su.submission_upload_id
+          AND rs.scope = sur.scope
           AND su.submission_id = ${submissionId}
           AND su.submission_upload_id = ${submissionUploadId}
           AND su.record_end_date IS NULL

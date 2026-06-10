@@ -30,7 +30,12 @@ describe('CartSubmissionFeatureRepository', () => {
       expect(result).to.be.undefined;
     });
 
-    it('should use NOT EXISTS with recursive ancestor walk to block secured features', async () => {
+    it('should use NOT EXISTS over the closure ancestry to block secured features', async () => {
+      // Verifies: the unsecured-add query excludes secured features via the closure-based
+      // security fragment (NOT EXISTS over submission_feature_closure), and guards against
+      // soft-deleted ids with an active-record JOIN — no recursive parent walk.
+
+      // Step 1: Stub knex to capture the emitted query
       const knexStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
@@ -40,22 +45,37 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
+      // Step 2: Call the unsecured-add method
       await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
+      // Step 3: Capture the emitted SQL (lowercased for robust token matching)
       expect(knexStub).to.have.been.calledOnce;
-      const sqlText = knexStub.firstCall.args[0].toString();
+      const sqlText = knexStub.firstCall.args[0].toString().toLowerCase();
 
-      expect(sqlText).to.include('NOT EXISTS');
-      expect(sqlText).to.include('RECURSIVE');
-      expect(sqlText).to.include('ancestor_chain');
+      // Step 4: Verify it filters secured features via the closure-based fragment
+      expect(sqlText).to.include('not exists');
+      expect(sqlText).to.include('submission_feature_closure');
+      expect(sqlText).to.include('is_ancestor');
       expect(sqlText).to.include('submission_feature_security');
       expect(sqlText).to.include('record_effective_date');
-      expect(sqlText).to.include('record_end_date');
+
+      // Step 5: Verify the active-guard JOIN excludes soft-deleted ids
+      expect(sqlText).to.include('join submission_feature sf');
+      expect(sqlText).to.include('sf.record_end_date is null');
+
+      // Step 6: Verify it no longer uses the recursive parent walk
+      expect(sqlText).to.not.include('recursive');
+      expect(sqlText).to.not.include('ancestor_chain');
     });
   });
 
   describe('createCartSubmissionFeaturesWithScopeCheck', () => {
-    it('should use scope check SQL with recursive ancestor walk', async () => {
+    it('should use scope check SQL resolved through the closure ancestry', async () => {
+      // Verifies: the scope-checked add query resolves the scope grant through the closure
+      // ancestry (security_scope_anchor → team_security_scope → team_member) and guards
+      // against soft-deleted ids with an active-record JOIN — no recursive parent walk.
+
+      // Step 1: Stub knex to capture the emitted query
       const knexStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
@@ -65,15 +85,27 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
+      // Step 2: Call the scope-checked add method with a system user id
       await repo.createCartSubmissionFeaturesWithScopeCheck('cart-1', [1, 2, 3], 42);
 
+      // Step 3: Capture the emitted SQL (lowercased for robust token matching)
       expect(knexStub).to.have.been.calledOnce;
-      const sqlText = knexStub.firstCall.args[0].toString();
+      const sqlText = knexStub.firstCall.args[0].toString().toLowerCase();
 
+      // Step 4: Verify the scope grant chain resolves through the closure ancestry
+      expect(sqlText).to.include('submission_feature_closure');
+      expect(sqlText).to.include('is_ancestor');
       expect(sqlText).to.include('security_scope_anchor');
       expect(sqlText).to.include('team_security_scope');
       expect(sqlText).to.include('team_member');
-      expect(sqlText).to.include('RECURSIVE');
+
+      // Step 5: Verify the active-guard JOIN excludes soft-deleted ids
+      expect(sqlText).to.include('join submission_feature sf');
+      expect(sqlText).to.include('sf.record_end_date is null');
+
+      // Step 6: Verify it no longer uses the recursive parent walk
+      expect(sqlText).to.not.include('recursive');
+      expect(sqlText).to.not.include('ancestor_chain');
     });
   });
 

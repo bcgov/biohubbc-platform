@@ -614,6 +614,65 @@ describe('DownloadRepository', () => {
       expect(queryTexts.some((t) => t.includes('submission_feature_property_string'))).to.be.true;
       expect(queryTexts.some((t) => t.includes('submission_feature_property_number'))).to.be.true;
       expect(queryTexts.some((t) => t.includes('submission_feature_property_code'))).to.be.false;
+      // When `feature` is absent from the requested property types, the feature-arm SQL must not run.
+      expect(queryTexts.some((t) => t.includes('submission_feature_property_feature'))).to.be.false;
+
+      // When `feature` is present, the feature-arm SQL is included.
+      queryStub.resetHistory();
+      await repo.fetchTypedPropertyRows([1], ['string', 'feature']);
+      const featureQueryTexts = queryStub.getCalls().map((c) => String(c.args[0]));
+      expect(featureQueryTexts.some((t) => t.includes('submission_feature_property_feature'))).to.be.true;
+    });
+
+    it('returns a single-element string array for a feature property with one referenced feature', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({
+        rows: [{ submission_feature_id: 100, name: 'related_feature', value: ['urn:1:obs:42'] }]
+      });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const result = await repo.fetchTypedPropertyRows([100], ['feature']);
+
+      expect(result).to.deep.include({
+        submission_feature_id: 100,
+        name: 'related_feature',
+        value: ['urn:1:obs:42']
+      });
+
+      const sqlText = String(queryStub.getCall(0).args[0]);
+      expect(sqlText).to.include('jsonb_agg');
+      expect(sqlText).to.include('submission_feature_property_feature');
+      expect(sqlText).to.include('ORDER BY sf.submission_feature_id');
+    });
+
+    it('returns an ordered multi-element string array for a feature property with multiple referenced features', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({
+        rows: [{ submission_feature_id: 100, name: 'related_feature', value: ['urn:1:obs:42', 'urn:1:obs:43'] }]
+      });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const result = await repo.fetchTypedPropertyRows([100], ['feature']);
+
+      expect(result[0].value).to.deep.equal(['urn:1:obs:42', 'urn:1:obs:43']);
+    });
+
+    it('includes the sf.record_end_date IS NULL filter', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      await repo.fetchTypedPropertyRows([100], ['feature']);
+
+      const sqlText = String(queryStub.getCall(0).args[0]);
+      expect(sqlText).to.include('sf.record_end_date IS NULL');
+      expect(sqlText).to.include('referenced_submission_feature_id');
     });
 
     it('skips unknown property type names', async () => {

@@ -29,8 +29,10 @@ queue: | build-queue run-queue ## Starts the queue worker (run after backend/web
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 
-clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
+clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
 minio: | run-minio ## Starts MinIO object storage for local S3
+
+all: | web queue clamav minio ## Performs all commands necessary to run the full stack (web, queue, clamav, minio) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -200,11 +202,11 @@ run-db-setup: ## Run the database migrations and seeding
 ## clamav commands
 ## ------------------------------------------------------------------------------
 
-build-clamav: ## Build the clamav image
+build-clamav: ## Pull the clamav image
 	@echo "==============================================="
-	@echo "Make: build-clamav - building clamav image"
+	@echo "Make: build-clamav - pulling clamav image"
 	@echo "==============================================="
-	@docker compose build clamav
+	@docker compose pull clamav
 
 run-clamav: ## Run clamav
 	@echo "==============================================="
