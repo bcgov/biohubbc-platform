@@ -2,9 +2,11 @@ import { ParquetReader } from '@dsnp/parquetjs';
 import archiver from 'archiver';
 import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
+import { ExportConfig, MergeStep, OutputColumn } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
@@ -15,6 +17,15 @@ import {
   escapeCsvField,
   flattenFeatureBySchema
 } from '../../utils/csv-utils';
+import {
+  buildOutputRecord,
+  coerceJoinKey,
+  computeDimensionProjection,
+  DimensionMaps,
+  joinRowTransform,
+  materializedColumnsForType,
+  orderMergeSteps
+} from '../../utils/export-config-utils';
 import {
   buildParquetKey,
   buildPartZipKey,
@@ -250,6 +261,10 @@ export class DownloadExportPipelineService extends DBService {
     // resumed call processes this row first instead of re-reading the cursor —
     // the look-ahead has already advanced past it.
     resumeRow?: Record<string, unknown>;
+    // The materialized column names to keep for this type (a
+    // per_feature_type `output_columns` selection). The structural trace
+    // columns are always kept regardless; absent ⇒ all columns, the default.
+    selectedColumns?: Set<string>;
   }): Promise<{
     finalPart: number;
     chunksWritten: number;
@@ -277,7 +292,15 @@ export class DownloadExportPipelineService extends DBService {
     // its feature-detail page in the platform. `uuid` + `parent_uuid` follow
     // as the cross-file star-schema join keys — telemetry → deployment →
     // animal joins downstream by `parent_uuid → uuid`.
-    const headers = ['submission_feature_id', 'uuid', 'parent_uuid', ...buildSchemaHeaders(properties)];
+    const structuralHeaders = ['submission_feature_id', 'uuid', 'parent_uuid'];
+    const allHeaders = [...structuralHeaders, ...buildSchemaHeaders(properties)];
+    // A column filter (per_feature_type output_columns selection) keeps the
+    // structural trace columns plus the chosen schema columns; an absent filter
+    // emits every column (the default). Raw header names — per-type files have no
+    // cross-type name collisions, so no rename is applied.
+    const headers = params.selectedColumns
+      ? allHeaders.filter((header) => structuralHeaders.includes(header) || params.selectedColumns!.has(header))
+      : allHeaders;
     const headerLine = headers.map(escapeCsvField).join(',') + '\n';
     // Hoisted: most feature types have zero artifact_key properties, so
     // pre-filter once instead of re-scanning every row.
@@ -587,6 +610,387 @@ export class DownloadExportPipelineService extends DBService {
   }
 
   /**
+   * Group `output_columns` into per-feature-type column sets for the
+   * `per_feature_type` column filter.
+   *
+   * Returns `undefined` when no selection was given so the writer falls back to
+   * all columns — the omitted-output_columns default. A type absent from the
+   * returned map likewise gets no filter (all its columns): selecting columns for
+   * one type does not narrow another, since each per-type CSV is independent and a
+   * user who scoped one type's columns still expects the rest in full.
+   */
+  private buildSelectedColumnsByType(outputColumns: OutputColumn[] | undefined): Map<string, Set<string>> | undefined {
+    if (outputColumns === undefined) {
+      return undefined;
+    }
+
+    const selectedColumnsByType = new Map<string, Set<string>>();
+    for (const outputColumn of outputColumns) {
+      const columns = selectedColumnsByType.get(outputColumn.feature_type) ?? new Set<string>();
+      columns.add(outputColumn.column);
+      selectedColumnsByType.set(outputColumn.feature_type, columns);
+    }
+
+    return selectedColumnsByType;
+  }
+
+  /**
+   * Convert a raw per-type Parquet row into a materialized, CSV-ready record:
+   * flatten schema properties to their materialized header names with formatted
+   * values (datetime → YYYY-MM-DD / HH:MM:SS, spatial → WKT, artifact_key →
+   * filePath), then re-attach the structural trace columns the flattener does not
+   * own.
+   *
+   * The denormalized join operates on these materialized names so a config's
+   * column references (validated against `materializedColumnsForType`) resolve
+   * directly against the joined row. Operating on raw Parquet rows instead would
+   * render datetime as integers/Dates and key artifact paths under their raw
+   * property name rather than `filePath`, silently breaking those columns.
+   */
+  private materializeParquetRow(
+    row: Record<string, unknown>,
+    properties: CsvPropertyDefinition[]
+  ): Record<string, string> {
+    const submissionFeatureId = Number(row.submission_feature_id ?? 0);
+    const flattened = flattenFeatureBySchema(row, properties, submissionFeatureId);
+    // `flattenFeatureBySchema` owns only the schema properties; re-attach the
+    // structural trace columns so the join can probe/output on them too.
+    flattened['submission_feature_id'] = row.submission_feature_id == null ? '' : String(submissionFeatureId);
+    flattened['uuid'] = (row.uuid as string | null) ?? '';
+    flattened['parent_uuid'] = (row.parent_uuid as string | null) ?? '';
+    return flattened;
+  }
+
+  /**
+   * Build the in-memory hash maps that form the BUILD side of the denormalized
+   * broadcast join — one map per distinct dimension feature type, keyed by that
+   * dimension's join column.
+   *
+   * Each dimension is read fully into memory once (the broadcast/build side) so
+   * the root can be streamed and probed against it without re-reading. Three
+   * properties of this build matter:
+   *
+   * - **Row-count budget fail-fast.** The Parquet footer carries the row count,
+   *   so a footer-only preflight rejects an over-budget dimension
+   *   (`> DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS`) BEFORE buffering a single row — steering the client
+   *   to the raw-Parquet download path instead of risking an out-of-memory join.
+   * - **Materialize-then-trim memory bound.** Rows are read in full (no reader
+   *   column projection — the flattener needs every raw input to format datetime /
+   *   spatial / artifact_key), materialized, then trimmed in memory to only the
+   *   columns this dimension actually contributes (`computeDimensionProjection`).
+   *   The map therefore holds the minimum each dimension owes the output, not the
+   *   whole wide row.
+   * - **Null keys are never indexed.** A row whose join key coerces to `''`
+   *   (null / absent) is skipped — SQL `NULL ≠ NULL`, so a null-keyed dimension
+   *   row must never match a null-keyed root row.
+   *
+   * Single-column index: a dimension type is indexed by ONE join column — the
+   * `right_column` of the first step that joins to it. A config that joins the
+   * same dimension type on two different columns is rejected here, rather than
+   * silently mis-probing the single index and returning no/wrong matches; a
+   * per-column index would be needed to lift that.
+   */
+  private async buildDimensionMaps(params: {
+    downloadId: string;
+    downloadVersionId: string;
+    orderedSteps: MergeStep[];
+    outputColumns: OutputColumn[];
+    schemaLookup: Map<string, CsvPropertyDefinition[]>;
+  }): Promise<DimensionMaps> {
+    const { downloadId, downloadVersionId, orderedSteps, outputColumns, schemaLookup } = params;
+    const dimMaps: DimensionMaps = new Map();
+
+    const dimensionFeatureTypes = new Set(orderedSteps.map((step) => step.right_feature_type));
+
+    for (const featureType of dimensionFeatureTypes) {
+      const properties = schemaLookup.get(featureType) ?? [];
+      // Index this dimension by the first step that joins to it (one join column
+      // per dimension), so every probe against this type uses one key.
+      const stepsForType = orderedSteps.filter((step) => step.right_feature_type === featureType);
+      const keyStep = stepsForType[0];
+
+      // Guard the single-column-index assumption: the dimension is bucketed by
+      // one `right_column`, so a second step joining the same type on a different
+      // column would probe the wrong index and silently miss. Reject it loudly.
+      const conflictingStep = stepsForType.find((step) => step.right_column !== keyStep.right_column);
+      if (conflictingStep) {
+        throw new Error(
+          `Denormalized export: dimension '${featureType}' is joined on multiple columns ('${keyStep.right_column}' and '${conflictingStep.right_column}'); a dimension may be joined on only one column.`
+        );
+      }
+
+      const reader = await this.openParquetReader(downloadId, downloadVersionId, featureType);
+      try {
+        // Footer-only preflight: reject an over-budget dimension before buffering
+        // any rows so an oversize join fails fast rather than exhausting memory.
+        const rowCount = Number(await reader.getRowCount());
+        if (rowCount > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+          throw new Error(
+            `Denormalized export: dimension '${featureType}' has ${rowCount} rows, exceeding the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} — use the raw-Parquet download path for joins this large.`
+          );
+        }
+
+        const projection = computeDimensionProjection(featureType, orderedSteps, outputColumns);
+        const map = new Map<string, Record<string, unknown>[]>();
+
+        // FULL rows from the reader — flattening needs the raw inputs; the map is
+        // trimmed to `projection` per row instead of projecting at the reader.
+        const cursor = reader.getCursor();
+        let raw = (await cursor.next()) as Record<string, unknown> | null;
+        while (raw !== null) {
+          const materialized = this.materializeParquetRow(raw, properties);
+          const key = coerceJoinKey(materialized[keyStep.right_column]);
+          // Never index a null/empty key — SQL NULL ≠ NULL, so a null-keyed
+          // dimension row must not match a null-keyed root row.
+          if (key !== '') {
+            const projected: Record<string, unknown> = {};
+            for (const column of projection) {
+              if (column in materialized) {
+                projected[column] = materialized[column];
+              }
+            }
+            const bucket = map.get(key) ?? [];
+            bucket.push(projected);
+            map.set(key, bucket);
+          }
+          raw = (await cursor.next()) as Record<string, unknown> | null;
+        }
+
+        dimMaps.set(featureType, map);
+      } finally {
+        await reader.close().catch(() => undefined);
+      }
+    }
+
+    return dimMaps;
+  }
+
+  /**
+   * Resolve the output columns for a denormalized export, materializing the
+   * "all columns" default when the config omits `output_columns`.
+   *
+   * Mirrors the per-type "omitted ⇒ all columns" default — and is what makes the
+   * single-type, no-merge-steps passthrough emit that type's rows. The root type's
+   * columns keep their RAW header names (root columns stay unprefixed on the joined
+   * row); each contributed dimension type's columns omit `output_column` so
+   * `buildOutputRecord` falls back to the `${feature_type}_${column}` name, which
+   * keeps cross-type headers unique.
+   */
+  private resolveDenormalizedOutputColumns(
+    config: ExportConfig,
+    orderedSteps: MergeStep[],
+    schemaLookup: Map<string, CsvPropertyDefinition[]>
+  ): OutputColumn[] {
+    if (config.output_columns) {
+      return config.output_columns;
+    }
+
+    const rootFeatureType = config.root_feature_type!;
+    const rootProperties = schemaLookup.get(rootFeatureType) ?? [];
+
+    const outputColumns: OutputColumn[] = materializedColumnsForType(rootProperties).map((column) => ({
+      feature_type: rootFeatureType,
+      column,
+      output_column: column
+    }));
+
+    // Each dimension contributed by a merge step, deduped in merge order, gets all
+    // its materialized columns with no explicit output name (prefixed for
+    // uniqueness by buildOutputRecord).
+    const seenDimensions = new Set<string>();
+    for (const step of orderedSteps) {
+      const featureType = step.right_feature_type;
+      if (seenDimensions.has(featureType)) {
+        continue;
+      }
+      seenDimensions.add(featureType);
+
+      const properties = schemaLookup.get(featureType) ?? [];
+      for (const column of materializedColumnsForType(properties)) {
+        outputColumns.push({ feature_type: featureType, column });
+      }
+    }
+
+    return outputColumns;
+  }
+
+  /**
+   * Run the denormalized export: a broadcast LEFT join that streams the root
+   * feature type and folds every dimension into each root row, writing the wide
+   * joined rows into size-bounded part-zips.
+   *
+   * Shape and ordering choices captured here because they are load-bearing:
+   *
+   * - **Broadcast left-join, build-side first.** Every dimension is buffered in
+   *   memory (`buildDimensionMaps`) BEFORE any upload opens, so an over-budget
+   *   dimension fails fast without having created an archiver / multipart upload to
+   *   tear down. The root is then streamed and probed against the buffers row by
+   *   row — the root is never fully materialized, only one root row's bounded
+   *   fan-out is live at a time.
+   * - **No binary streaming.** Denormalized output is analytical tabular columns;
+   *   an `artifact_key` here carries the materialized `filePath` STRING, not a
+   *   bundled file. The part-zip spine is reused verbatim minus the binary
+   *   projection and `streamBinariesToPart` calls.
+   * - **Roll BEFORE writing.** With no binaries to project, the part can be rolled
+   *   before the next row is written; because the row that triggers the roll is
+   *   then written into the fresh part, the final part is guaranteed non-empty and
+   *   no look-ahead is needed (unlike the per-type path).
+   *
+   * Retry-as-lifecycle: errors are NOT caught into a FAILED transition here — they
+   * bubble to the pg-boss DLQ, which owns the FAILED transition after the retry
+   * budget is exhausted (same contract as `runExportGroup`).
+   */
+  private async runDenormalizedExport(params: {
+    groupId: string;
+    downloadId: string;
+    downloadVersionId: string;
+    config: ExportConfig;
+    maxPartSizeBytes: bigint;
+    schemaLookup: Map<string, CsvPropertyDefinition[]>;
+  }): Promise<void> {
+    const { groupId, downloadId, downloadVersionId, config, maxPartSizeBytes, schemaLookup } = params;
+
+    // Denormalized always has a root (validated at request time).
+    const rootFeatureType = config.root_feature_type!;
+    const rootProperties = schemaLookup.get(rootFeatureType) ?? [];
+
+    const orderedSteps = orderMergeSteps(rootFeatureType, config.merge_steps);
+    const outputColumns = this.resolveDenormalizedOutputColumns(config, orderedSteps, schemaLookup);
+
+    const headers = outputColumns.map(
+      (outputColumn) => outputColumn.output_column ?? `${outputColumn.feature_type}_${outputColumn.column}`
+    );
+    const headerLine = headers.map(escapeCsvField).join(',') + '\n';
+
+    // Build side first: buffer every dimension so an over-budget one fails before
+    // any upload opens.
+    const dimMaps = await this.buildDimensionMaps({
+      downloadId,
+      downloadVersionId,
+      orderedSteps,
+      outputColumns,
+      schemaLookup
+    });
+
+    const reader = await this.openParquetReader(downloadId, downloadVersionId, rootFeatureType);
+
+    // Fail loud if the root has zero rows — otherwise we finalize an empty zip the
+    // user's OS refuses to extract (mirrors the per-type empty-zip guard). Guard
+    // before any bundle is created so there is nothing to tear down.
+    if (Number(await reader.getRowCount()) === 0) {
+      await reader.close().catch(() => undefined);
+      throw new Error(
+        `Export group ${groupId}: denormalized root '${rootFeatureType}' has zero rows — refusing to write an empty zip.`
+      );
+    }
+
+    const archiverByPart = new Map<number, PartArchiverBundle>();
+    let currentPart = 1;
+    archiverByPart.set(currentPart, this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart));
+
+    const currentBundle = (): PartArchiverBundle => {
+      const bundle = archiverByPart.get(currentPart);
+      if (!bundle) {
+        throw new Error(
+          `DownloadExportPipelineService->runDenormalizedExport: no archiver bundle for part ${currentPart}`
+        );
+      }
+      return bundle;
+    };
+
+    // Same back-pressure rule as the per-type path: a slow S3 leg must not let the
+    // row loop out-run the pipe and grow the working set past our bound.
+    const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
+      if (!entry.write(line)) {
+        await once(entry, 'drain');
+      }
+    };
+
+    // chunkIndex threads across part-zips so the joined CSVs stay monotonic
+    // (`chunk1.csv`, `chunk2.csv`, …) and don't collide on flat-extract.
+    let chunkIndex = 1;
+    let currentEntry: PassThrough | null = null;
+
+    try {
+      const cursor = reader.getCursor();
+      let raw = (await cursor.next()) as Record<string, unknown> | null;
+      while (raw !== null) {
+        const rootRow = this.materializeParquetRow(raw, rootProperties);
+
+        for (const joined of joinRowTransform(rootRow, rootFeatureType, orderedSteps, dimMaps)) {
+          // Roll BEFORE writing: with no binaries to project, rolling here keeps
+          // the final part non-empty (the triggering row lands in the fresh part).
+          if (currentEntry !== null && shouldRollPart(currentBundle().byteCount, maxPartSizeBytes)) {
+            currentEntry.end();
+            const rolledBundle = currentBundle();
+            await this.writePartZip({
+              groupId,
+              downloadId,
+              downloadVersionId,
+              partIndex: currentPart,
+              archive: rolledBundle.archive,
+              uploadPromise: rolledBundle.uploadPromise,
+              hashCount: rolledBundle.hashCount
+            });
+            archiverByPart.delete(currentPart);
+            currentPart += 1;
+            chunkIndex += 1;
+            archiverByPart.set(
+              currentPart,
+              this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart)
+            );
+            currentEntry = null;
+          }
+
+          // Lazy-open the chunk entry on the first joined row of this part; the
+          // header is written on every chunk so any single `chunkN.csv` is usable
+          // on its own.
+          if (currentEntry === null) {
+            currentEntry = new PassThrough();
+            currentBundle().archive.append(currentEntry, {
+              name: `biohub-export-${groupId}/${rootFeatureType}/chunk${chunkIndex}.csv`
+            });
+            await writeLine(currentEntry, headerLine);
+            currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
+          }
+
+          const record = buildOutputRecord(joined, outputColumns);
+          const line = headers.map((header) => escapeCsvField(record[header] ?? '')).join(',') + '\n';
+          await writeLine(currentEntry, line);
+          currentBundle().byteCount += BigInt(Buffer.byteLength(line, 'utf8'));
+        }
+
+        raw = (await cursor.next()) as Record<string, unknown> | null;
+      }
+
+      currentEntry?.end();
+      await reader.close().catch(() => undefined);
+
+      // Finalize every still-open part in ascending index order (mirrors
+      // runExportGroup's trailing finalize, minus the binary streaming).
+      const openPartIndexes = Array.from(archiverByPart.keys()).sort((a, b) => a - b);
+      for (const partIndex of openPartIndexes) {
+        const bundle = archiverByPart.get(partIndex)!;
+        await this.writePartZip({
+          groupId,
+          downloadId,
+          downloadVersionId,
+          partIndex,
+          archive: bundle.archive,
+          uploadPromise: bundle.uploadPromise,
+          hashCount: bundle.hashCount
+        });
+        archiverByPart.delete(partIndex);
+      }
+    } catch (error) {
+      currentEntry?.end();
+      await reader.close().catch(() => undefined);
+      this.abortOpenArchivers(archiverByPart);
+      throw error;
+    }
+  }
+
+  /**
    * Create a fresh archiver bundle for the given part index.
    *
    * Each part has its own archiver + S3 multipart upload so finalizing one
@@ -637,9 +1041,12 @@ export class DownloadExportPipelineService extends DBService {
    *     group is allowed so pg-boss retries converge).
    *  2. Resolve the version the group is pinned to, then the per-type schema
    *     lookup.
-   *  3. For each feature type in order, stream Parquet rows into the current
-   *     part's CSV chunks. Roll to a new part once the group's
-   *     `max_part_size_bytes` is crossed.
+   *  3. Branch on the config's `mode`:
+   *     - `denormalized` → `runDenormalizedExport` (broadcast join into wide
+   *       CSV rows), then transition READY and return.
+   *     - `per_feature_type` (default) → for each configured feature type, stream
+   *       Parquet rows into the current part's CSV chunks, rolling to a new part
+   *       once the group's `max_part_size_bytes` is crossed.
    *  4. Finalize every open part via `writePartZip`, in index order.
    *  5. Transition PROCESSING → READY.
    *
@@ -676,7 +1083,31 @@ export class DownloadExportPipelineService extends DBService {
     const downloadVersionId = group.download_version_id;
 
     const schemaLookup = await this.buildSchemaLookup();
-    const featureTypes = await this.listExportFeatureTypes(downloadId, downloadVersionId);
+    const config = group.config;
+    const maxPartSizeBytes = BigInt(group.max_part_size_bytes);
+
+    // Denormalized mode joins the per-type Parquet into wide CSV rows; it owns its
+    // own part-zip spine (no binary streaming) and finalizes inside the call.
+    if (config.mode === 'denormalized') {
+      await this.runDenormalizedExport({
+        groupId,
+        downloadId,
+        downloadVersionId,
+        config,
+        maxPartSizeBytes,
+        schemaLookup
+      });
+      await this.transitionGroupStatus(groupId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+      return;
+    }
+
+    // per_feature_type: emit one CSV per configured type. Discovery finds every
+    // materialized type; restrict it to the config's selection so a type that was
+    // materialized but not requested is not exported.
+    const selectedColumnsByType = this.buildSelectedColumnsByType(config.output_columns);
+    const featureTypes = (await this.listExportFeatureTypes(downloadId, downloadVersionId)).filter((featureType) =>
+      config.feature_types.includes(featureType)
+    );
 
     // Fail loud if the version has no Parquet artifacts — otherwise the
     // archiver finalizes an empty zip (just the central-directory record) and the
@@ -689,7 +1120,6 @@ export class DownloadExportPipelineService extends DBService {
       );
     }
 
-    const maxPartSizeBytes = BigInt(group.max_part_size_bytes);
     const archiverByPart = new Map<number, PartArchiverBundle>();
     let currentPart = 1;
 
@@ -735,7 +1165,8 @@ export class DownloadExportPipelineService extends DBService {
             resumeReader: pendingReader,
             resumeCursor: pendingCursor,
             resumeChunkIndex: pendingChunkIndex,
-            resumeRow: pendingRow
+            resumeRow: pendingRow,
+            selectedColumns: selectedColumnsByType?.get(featureTypeName)
           });
 
           for (const ref of result.fileRefs) {

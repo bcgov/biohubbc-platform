@@ -5,7 +5,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockExportArtifactGroup } from '../../__mocks__/download';
+import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
+import { MergeStep, OutputColumn } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
@@ -897,6 +899,315 @@ describe('DownloadExportPipelineService', () => {
       expect(result.pendingReader).to.not.be.undefined;
       expect(result.pendingCursor).to.not.be.undefined;
       expect(result.pendingChunkIndex).to.equal(2);
+    });
+
+    it('emits only the selected schema columns (plus structural columns) when selectedColumns is set', async () => {
+      // Verifies: a per_feature_type output_columns selection filters the header (and every data row)
+      // to the structural trace columns + the chosen schema columns, dropping unselected ones.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const captured: CapturedEntry[] = [];
+      const archiverByPart = new Map<number, unknown>();
+      archiverByPart.set(1, makeCapturingBundle(captured));
+
+      // Two-property schema; the selection keeps only `species`.
+      const twoColProps: CsvPropertyDefinition[] = [
+        { feature_property_name: 'species', feature_property_type_name: 'string' },
+        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      ];
+      const reader = makeFakeReader([
+        { submission_feature_id: 1, uuid: 'u-1', parent_uuid: null, species: 'wolf', count: 5 }
+      ]);
+      sinon.stub(service as any, 'openParquetReader').resolves(reader);
+
+      await service.writeFeatureTypeExport({
+        groupId: GROUP_ID,
+        downloadId: DOWNLOAD_ID,
+        featureTypeName: 'observation',
+        properties: twoColProps,
+        maxPartSizeBytes: 1_000_000n,
+        archiverByPart: archiverByPart as any,
+        currentPart: 1,
+        selectedColumns: new Set(['species'])
+      });
+
+      // Header keeps structural columns + species, and drops the unselected `count` column.
+      const content = await captured[0].data;
+      const headerLine = content.split('\n')[0];
+      expect(headerLine).to.equal('submission_feature_id,uuid,parent_uuid,species');
+      expect(headerLine).to.not.include('count');
+      // The data row mirrors the header — no `count` cell emitted.
+      expect(content).to.equal('submission_feature_id,uuid,parent_uuid,species\n1,u-1,,wolf\n');
+    });
+
+    it('emits every schema column when selectedColumns is omitted (regression guard for the default)', async () => {
+      // Verifies: the omitted-selection default keeps all schema columns — guards against the filter
+      // accidentally narrowing when no selection was given.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const captured: CapturedEntry[] = [];
+      const archiverByPart = new Map<number, unknown>();
+      archiverByPart.set(1, makeCapturingBundle(captured));
+
+      const twoColProps: CsvPropertyDefinition[] = [
+        { feature_property_name: 'species', feature_property_type_name: 'string' },
+        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      ];
+      const reader = makeFakeReader([
+        { submission_feature_id: 1, uuid: 'u-1', parent_uuid: null, species: 'wolf', count: 5 }
+      ]);
+      sinon.stub(service as any, 'openParquetReader').resolves(reader);
+
+      await service.writeFeatureTypeExport({
+        groupId: GROUP_ID,
+        downloadId: DOWNLOAD_ID,
+        featureTypeName: 'observation',
+        properties: twoColProps,
+        maxPartSizeBytes: 1_000_000n,
+        archiverByPart: archiverByPart as any,
+        currentPart: 1
+        // selectedColumns omitted → all columns
+      });
+
+      const headerLine = (await captured[0].data).split('\n')[0];
+      expect(headerLine).to.equal('submission_feature_id,uuid,parent_uuid,species,count');
+    });
+  });
+
+  describe('buildDimensionMaps', () => {
+    /**
+     * Fake Parquet reader for the build side: exposes a footer row count
+     * (`getRowCount`) consulted by the over-budget preflight, plus a one-shot
+     * cursor over the supplied rows and a no-op `close`. `cursorOpened` records
+     * whether the cursor was ever drawn so the preflight short-circuit is observable.
+     */
+    function makeFakeDimensionReader(rows: Record<string, unknown>[], rowCount?: number) {
+      const state = { cursorOpened: false };
+      const reader = {
+        getRowCount: async () => rowCount ?? rows.length,
+        getCursor: () => {
+          state.cursorOpened = true;
+          let i = 0;
+          return { next: async () => (i < rows.length ? rows[i++] : null) };
+        },
+        close: async () => undefined
+      } as any;
+      return { reader, state };
+    }
+
+    const schemaLookup = new Map<string, CsvPropertyDefinition[]>([
+      [
+        'animal',
+        [
+          { feature_property_name: 'species', feature_property_type_name: 'string' },
+          { feature_property_name: 'tag', feature_property_type_name: 'string' }
+        ]
+      ]
+    ]);
+
+    // observation.parent_uuid -> animal.uuid; output only animal.species.
+    const orderedSteps: MergeStep[] = [
+      {
+        left_feature_type: 'observation',
+        left_column: 'parent_uuid',
+        right_feature_type: 'animal',
+        right_column: 'uuid',
+        merge_type: 'left'
+      }
+    ];
+    const outputColumns: OutputColumn[] = [{ feature_type: 'animal', column: 'species' }];
+
+    it('buckets dimension rows by their coerced join key and trims each row to the projection', async () => {
+      // Verifies: each dimension row is bucketed under coerceJoinKey(right_column) and stored trimmed
+      // to the projection columns — a non-projected column (`tag`) is dropped from the stored row.
+
+      // Step 1: Two animal rows under distinct uuids; each also carries a non-projected `tag` column
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const { reader } = makeFakeDimensionReader([
+        { submission_feature_id: 1, uuid: 'p1', parent_uuid: null, species: 'wolf', tag: 't1' },
+        { submission_feature_id: 2, uuid: 'p2', parent_uuid: null, species: 'bear', tag: 't2' }
+      ]);
+      sinon.stub(service as any, 'openParquetReader').resolves(reader);
+
+      // Step 2: Build the dimension maps
+      const dimMaps = await (service as any).buildDimensionMaps({
+        downloadId: DOWNLOAD_ID,
+        orderedSteps,
+        outputColumns,
+        schemaLookup
+      });
+
+      // Step 3: The animal type is present, keyed by uuid ('uuid' is the right_column)
+      const animalMap = dimMaps.get('animal');
+      expect(animalMap).to.not.be.undefined;
+      expect([...animalMap.keys()].sort()).to.deep.equal(['p1', 'p2']);
+
+      // Step 4: Each stored row is trimmed to the projection (uuid join key + species output);
+      // the non-projected `tag` column is absent.
+      const p1Bucket = animalMap.get('p1');
+      expect(p1Bucket).to.have.lengthOf(1);
+      expect(p1Bucket[0]).to.deep.equal({ uuid: 'p1', species: 'wolf' });
+      expect(p1Bucket[0]).to.not.have.property('tag');
+    });
+
+    it('skips dimension rows whose join key is null — no empty-string bucket', async () => {
+      // Verifies: a null/absent right_column value coerces to '' and is never indexed (SQL NULL != NULL),
+      // so no '' bucket appears in the map.
+
+      // Step 1: One animal row whose uuid (the join key) is null
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const { reader } = makeFakeDimensionReader([
+        { submission_feature_id: 1, uuid: null, parent_uuid: null, species: 'ghost', tag: 't0' }
+      ]);
+      sinon.stub(service as any, 'openParquetReader').resolves(reader);
+
+      // Step 2: Build the dimension maps
+      const dimMaps = await (service as any).buildDimensionMaps({
+        downloadId: DOWNLOAD_ID,
+        orderedSteps,
+        outputColumns,
+        schemaLookup
+      });
+
+      // Step 3: The animal map exists but holds no '' bucket — the null-keyed row was skipped
+      const animalMap = dimMaps.get('animal');
+      expect(animalMap).to.not.be.undefined;
+      expect(animalMap.has('')).to.be.false;
+      expect(animalMap.size).to.equal(0);
+    });
+
+    it('throws before buffering when a dimension exceeds the row budget, steering to raw Parquet', async () => {
+      // Verifies: the footer-only preflight rejects an over-budget dimension before the cursor is ever
+      // drawn — naming the feature type and steering to the raw-Parquet path.
+
+      // Step 1: A reader whose footer reports one row over the budget (cursor would yield none)
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const { reader, state } = makeFakeDimensionReader([], DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS + 1);
+      sinon.stub(service as any, 'openParquetReader').resolves(reader);
+
+      // Step 2: Build must reject on the preflight
+      let thrown: unknown;
+      try {
+        await (service as any).buildDimensionMaps({
+          downloadId: DOWNLOAD_ID,
+          orderedSteps,
+          outputColumns,
+          schemaLookup
+        });
+        expect.fail('expected throw');
+      } catch (err) {
+        thrown = err;
+      }
+
+      // Step 3: The error names the feature type and the raw-Parquet steer; the cursor was never drawn
+      expect((thrown as Error).message).to.include('animal');
+      expect((thrown as Error).message).to.include('raw-Parquet');
+      expect(state.cursorOpened).to.be.false;
+    });
+
+    it('throws when one dimension type is joined on two different columns (single-column-index guard)', async () => {
+      // Verifies: the dimension is bucketed by a single right_column, so a config that joins the same
+      // type on a second column is rejected loudly rather than silently mis-probing the one index.
+
+      // Step 1: Two steps both target 'animal' but on different right columns (uuid vs alt_id)
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      const conflictingSteps: MergeStep[] = [
+        {
+          left_feature_type: 'observation',
+          left_column: 'parent_uuid',
+          right_feature_type: 'animal',
+          right_column: 'uuid',
+          merge_type: 'left'
+        },
+        {
+          left_feature_type: 'observation',
+          left_column: 'tag_ref',
+          right_feature_type: 'animal',
+          right_column: 'alt_id',
+          merge_type: 'left'
+        }
+      ];
+
+      const openReaderStub = sinon
+        .stub(service as any, 'openParquetReader')
+        .resolves(makeFakeDimensionReader([]).reader);
+
+      // Step 2: Build must reject before opening the reader
+      let thrown: unknown;
+      try {
+        await (service as any).buildDimensionMaps({
+          downloadId: DOWNLOAD_ID,
+          orderedSteps: conflictingSteps,
+          outputColumns,
+          schemaLookup
+        });
+        expect.fail('expected throw');
+      } catch (err) {
+        thrown = err;
+      }
+
+      // Step 3: The error names the type and both conflicting columns; no reader was opened
+      expect((thrown as Error).message).to.include('animal');
+      expect((thrown as Error).message).to.include('uuid');
+      expect((thrown as Error).message).to.include('alt_id');
+      expect(openReaderStub.called).to.be.false;
+    });
+  });
+
+  describe('runExportGroup denormalized dispatch', () => {
+    it('routes a denormalized config to runDenormalizedExport, never the per-type writer, and transitions READY', async () => {
+      // Verifies: when the group's config is denormalized, the orchestrator dispatches to
+      // runDenormalizedExport (not the per_feature_type writeFeatureTypeExport branch) and still
+      // brackets the work with the PROCESSING/READY transitions.
+
+      // Step 1: Stub the group fetch to return a denormalized config + version resolution
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadExportPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById').resolves(
+        createMockExportArtifactGroup({
+          mode: 'denormalized',
+          config: {
+            version: 1,
+            export_type: 'csv',
+            mode: 'denormalized',
+            feature_types: ['observation'],
+            root_feature_type: 'observation',
+            merge_steps: []
+          }
+        })
+      );
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(service as any, 'buildSchemaLookup').resolves(new Map<string, CsvPropertyDefinition[]>());
+
+      // Step 2: Stub the transition + both export seams so no real S3/archiver/join runs
+      const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
+      const denormStub = sinon.stub(service as any, 'runDenormalizedExport').resolves();
+      const writeStub = sinon.stub(DownloadExportPipelineService.prototype, 'writeFeatureTypeExport');
+
+      // Step 3: Run the group
+      await service.runExportGroup(GROUP_ID);
+
+      // Step 4: The denormalized branch ran exactly once; the per-type writer never did.
+      expect(denormStub.calledOnce).to.be.true;
+      expect(writeStub.called).to.be.false;
+
+      // Step 5: PROCESSING then READY bracketed the denormalized work.
+      expect(transitionStub.callCount).to.equal(2);
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
   });
 

@@ -1,13 +1,16 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
+import { DOWNLOAD_EXPORT_FANOUT_MAX_ROWS } from '../constants/download';
 import { ApiValidationError } from '../errors/api-error';
-import { ExportConfig } from '../models/download-export-config';
+import { ExportConfig, MergeStep } from '../models/download-export-config';
 import {
   buildOutputRecord,
   canonicalizeExportConfig,
   coerceJoinKey,
   computeConfigHash,
   computeDimensionProjection,
+  DimensionMaps,
+  joinRowTransform,
   materializedColumnsForType,
   mergePrefixed,
   orderMergeSteps,
@@ -490,6 +493,182 @@ describe('export-config-utils', () => {
       const left = { uuid: 'a' };
       mergePrefixed(left, { device_id: 'd1' }, 'deployment');
       expect(left).to.deep.equal({ uuid: 'a' });
+    });
+  });
+
+  describe('joinRowTransform', () => {
+    /**
+     * Build a single-step `observation.parent_uuid -> animal.uuid` chain as a
+     * typed `MergeStep[]` (all five fields incl. the defaulted `merge_type`).
+     */
+    const animalStep: MergeStep[] = [
+      {
+        left_feature_type: 'observation',
+        left_column: 'parent_uuid',
+        right_feature_type: 'animal',
+        right_column: 'uuid',
+        merge_type: 'left'
+      }
+    ];
+
+    it('merges and prefixes the matched dimension row onto the root row (single match)', () => {
+      // Verifies: a root row whose left key matches one dimension row yields exactly one
+      // merged row carrying the root columns plus the prefixed `animal_*` columns.
+
+      // Step 1: Build the dimension map bucketing the animal row under its uuid key 'p1'
+      const dimMaps: DimensionMaps = new Map([['animal', new Map([['p1', [{ uuid: 'p1', species: 'wolf' }]]])]]);
+
+      // Step 2: Broadcast the root row through the single-step chain
+      const rows = [...joinRowTransform({ uuid: 'r1', parent_uuid: 'p1' }, 'observation', animalStep, dimMaps)];
+
+      // Step 3: Exactly one merged row — root cols intact, right cols prefixed by feature type
+      expect(rows).to.have.lengthOf(1);
+      expect(rows[0]).to.deep.equal({
+        uuid: 'r1',
+        parent_uuid: 'p1',
+        animal_uuid: 'p1',
+        animal_species: 'wolf'
+      });
+    });
+
+    it('keeps the root row unchanged when the dimension has no matching key (left join)', () => {
+      // Verifies: left-join semantics — an unmatched root row survives as-is with no right columns,
+      // never dropped.
+
+      // Step 1: Dimension map has no bucket for the probe key 'p1'
+      const dimMaps: DimensionMaps = new Map([['animal', new Map()]]);
+
+      // Step 2: Broadcast the root row
+      const rows = [...joinRowTransform({ uuid: 'r1', parent_uuid: 'p1' }, 'observation', animalStep, dimMaps)];
+
+      // Step 3: One row, exactly the root, with no animal_* columns added
+      expect(rows).to.have.lengthOf(1);
+      expect(rows[0]).to.deep.equal({ uuid: 'r1', parent_uuid: 'p1' });
+    });
+
+    it('never matches a null left key, even against a null-keyed dimension bucket (SQL NULL != NULL)', () => {
+      // Verifies: the load-bearing correctness case — coerceJoinKey(null) === '' and the transform
+      // short-circuits on the empty probe key, skipping the dimension lookup entirely. A deliberately
+      // present '' bucket proves the probe never reads it.
+
+      // Step 1: Dimension map DELIBERATELY contains a '' bucket that would join if probed
+      const dimMaps: DimensionMaps = new Map([['animal', new Map([['', [{ uuid: null, species: 'ghost' }]]])]]);
+
+      // Step 2: Broadcast a root row whose left key is null
+      const rows = [...joinRowTransform({ uuid: 'r1', parent_uuid: null }, 'observation', animalStep, dimMaps)];
+
+      // Step 3: The empty-key probe is skipped — root kept unchanged, no spurious join to the '' bucket
+      expect(rows).to.have.lengthOf(1);
+      expect(rows[0]).to.deep.equal({ uuid: 'r1', parent_uuid: null });
+    });
+
+    it('fans out one row per matching dimension row', () => {
+      // Verifies: a key matching N dimension rows produces N output rows, each carrying that
+      // match's distinct prefixed values.
+
+      // Step 1: Three animal rows share the join key 'p1'
+      const dimMaps: DimensionMaps = new Map([
+        [
+          'animal',
+          new Map([
+            [
+              'p1',
+              [
+                { uuid: 'p1', species: 'wolf' },
+                { uuid: 'p1', species: 'bear' },
+                { uuid: 'p1', species: 'fox' }
+              ]
+            ]
+          ])
+        ]
+      ]);
+
+      // Step 2: Broadcast the root row
+      const rows = [...joinRowTransform({ uuid: 'r1', parent_uuid: 'p1' }, 'observation', animalStep, dimMaps)];
+
+      // Step 3: Three output rows, one per match, each with its distinct species
+      expect(rows).to.have.lengthOf(3);
+      expect(rows.map((row) => row.animal_species)).to.deep.equal(['wolf', 'bear', 'fox']);
+    });
+
+    it('resolves a chained step left key at the prefixed name and cross-products the matches', () => {
+      // Verifies: after step1 prefixes the animal columns, step2's left side
+      // (animal.tag_id) resolves at the prefixed `animal_tag_id` — proving the
+      // root-vs-prefixed left-key resolution. One animal fans into two tags.
+
+      // Step 1: Order steps observation->animal then animal->tag; tag fans out to 2 rows
+      const chainedSteps: MergeStep[] = [
+        {
+          left_feature_type: 'observation',
+          left_column: 'parent_uuid',
+          right_feature_type: 'animal',
+          right_column: 'uuid',
+          merge_type: 'left'
+        },
+        {
+          left_feature_type: 'animal',
+          left_column: 'tag_id',
+          right_feature_type: 'tag',
+          right_column: 'tag_id',
+          merge_type: 'left'
+        }
+      ];
+      const dimMaps: DimensionMaps = new Map<string, Map<string, Record<string, unknown>[]>>([
+        ['animal', new Map([['p1', [{ uuid: 'p1', tag_id: 't1' }]]])],
+        [
+          'tag',
+          new Map([
+            [
+              't1',
+              [
+                { tag_id: 't1', color: 'red' },
+                { tag_id: 't1', color: 'blue' }
+              ]
+            ]
+          ])
+        ]
+      ]);
+
+      // Step 2: Broadcast through both steps
+      const rows = [...joinRowTransform({ uuid: 'r1', parent_uuid: 'p1' }, 'observation', chainedSteps, dimMaps)];
+
+      // Step 3: 1 animal x 2 tags = 2 rows; each carries the prefixed animal key and distinct tag color
+      expect(rows).to.have.lengthOf(2);
+      expect(rows.map((row) => row.animal_uuid)).to.deep.equal(['p1', 'p1']);
+      expect(rows.map((row) => row.animal_tag_id)).to.deep.equal(['t1', 't1']);
+      expect(rows.map((row) => row.tag_color)).to.deep.equal(['red', 'blue']);
+    });
+
+    it('throws when a single root row fans out past the cap', () => {
+      // Verifies: the cumulative fan-out cap fails fast on a runaway root row instead of
+      // producing an unbounded number of output rows.
+
+      // Step 1: One key matches DOWNLOAD_EXPORT_FANOUT_MAX_ROWS + 1 dimension rows
+      const matches = Array.from({ length: DOWNLOAD_EXPORT_FANOUT_MAX_ROWS + 1 }, (_, i) => ({
+        uuid: 'p1',
+        species: `s${i}`
+      }));
+      const dimMaps: DimensionMaps = new Map([['animal', new Map([['p1', matches]])]]);
+
+      // Step 2: Draining the generator must throw, naming the fan-out cap
+      expect(() => [
+        ...joinRowTransform({ uuid: 'r1', parent_uuid: 'p1' }, 'observation', animalStep, dimMaps)
+      ]).to.throw(/fan-out cap/);
+    });
+
+    it('passes the root row through unchanged when there are no steps (single-type identity)', () => {
+      // Verifies: the zero-step degenerate case (single-type denormalized passthrough) yields the
+      // root row verbatim with no transformation.
+
+      // Step 1: No merge steps and an empty dimension map
+      const rootRow = { uuid: 'r1', parent_uuid: 'p1', species: 'wolf' };
+
+      // Step 2: Broadcast through the empty chain
+      const rows = [...joinRowTransform(rootRow, 'observation', [], new Map())];
+
+      // Step 3: Exactly the root row, unchanged
+      expect(rows).to.have.lengthOf(1);
+      expect(rows[0]).to.deep.equal({ uuid: 'r1', parent_uuid: 'p1', species: 'wolf' });
     });
   });
 

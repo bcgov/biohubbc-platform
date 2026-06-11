@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { DOWNLOAD_EXPORT_FANOUT_MAX_ROWS } from '../constants/download';
 import { ApiValidationError } from '../errors/api-error';
 import { ExportConfig, MergeStep, OutputColumn } from '../models/download-export-config';
 import { buildSchemaHeaders, CsvPropertyDefinition } from './csv-utils';
@@ -20,20 +21,10 @@ import { buildSchemaHeaders, CsvPropertyDefinition } from './csv-utils';
  */
 const STRUCTURAL_COLUMNS = ['submission_feature_id', 'uuid', 'parent_uuid'] as const;
 
-/**
- * Build-side row budget for a single dimension. The denormalized join buffers
- * each dimension table fully in memory; a dimension over this budget fails fast
- * and steers the client to the raw-Parquet path rather than risking an
- * out-of-memory join.
- */
-export const MAX_DIMENSION_ROWS = 200_000;
-
-/**
- * Cap on the cumulative number of joined rows a single root row may fan out to.
- * Arbitrary user-defined joins can match many dimension rows per step and
- * multiply output rows without bound; this cap protects output size and runtime.
- */
-export const MAX_FANOUT_PER_ROOT_ROW = 100_000;
+/** Per-feature-type build-side hash maps for the denormalized join: feature type
+ *  → (canonical join-key string → the dimension rows carrying that key). Buffered
+ *  in memory by `buildDimensionMaps`; probed per root row by `joinRowTransform`. */
+export type DimensionMaps = Map<string, Map<string, Record<string, unknown>[]>>;
 
 /**
  * The exact materialized column set for a feature type — structural columns
@@ -380,6 +371,107 @@ export function mergePrefixed(
   }
 
   return merged;
+}
+
+/**
+ * Broadcast a single root row through the ordered merge chain, yielding every
+ * fully-joined output row it produces (a left join, evaluated step by step).
+ *
+ * The transform keeps a *frontier* — the set of partially-joined rows produced so
+ * far — and folds one dimension into it per step. A step probes each frontier row's
+ * left join key against the dimension's build-side hash map (`dimMaps`) and either
+ * keeps the row unchanged or fans it out to one merged row per match. The frontier
+ * after the last step is the root row's contribution to the output.
+ *
+ * Design choices captured here because they are easy to get subtly wrong:
+ *
+ * - **Left-join semantics.** When a step finds no match for a frontier row, that
+ *   row is *kept* as-is (with the right side's columns simply absent), never
+ *   dropped. Dropping unmatched rows would silently lose data — a root row whose
+ *   dimension is missing must still appear in the export, just with empty right
+ *   columns (rendered as empty cells downstream).
+ *
+ * - **Root-vs-prefixed left key resolution.** `mergePrefixed` rewrites every merged
+ *   dimension column to `{feature_type}_{column}`, so in a chained merge the left
+ *   side of a later step may itself be a previously-merged dimension whose join key
+ *   now lives under the prefixed name. The left key column is therefore the raw
+ *   `left_column` only when the left side is the root (root columns stay unprefixed);
+ *   otherwise it is `{left_feature_type}_{left_column}`. Reading the raw name in a
+ *   chained merge would miss the key and wrongly treat every row as unmatched.
+ *
+ * - **Null/empty key is unmatchable on both sides.** `coerceJoinKey` collapses
+ *   null/undefined/absent to `''`, and `buildDimensionMaps` never indexes `''`
+ *   keys. An empty probe key is thus a guaranteed no-match — which is exactly SQL's
+ *   `NULL ≠ NULL`: a parentless root row (e.g. a root feature type with no
+ *   `parent_uuid`) is kept under left-join semantics rather than spuriously joined
+ *   to another null-keyed dimension row.
+ *
+ * - **Cumulative fan-out cap.** Arbitrary user-defined joins can match many
+ *   dimension rows per step and multiply output without bound. The frontier is
+ *   checked against `DOWNLOAD_EXPORT_FANOUT_MAX_ROWS` as it grows so a single runaway root
+ *   row fails fast instead of exhausting memory or producing an unbounded file.
+ *
+ * - **Generator, not array.** Yielding keeps only this one root row's bounded
+ *   frontier live at a time; the caller consumes and frees it before the next root
+ *   row is processed, so peak memory is bounded by one root row's fan-out, not the
+ *   whole output.
+ *
+ * A dimension type is indexed by a single join column: `buildDimensionMaps` keys
+ * each type's map by one `right_column`, so every step joining to a given right
+ * type must probe on that same column (a config that joins one type on two
+ * different columns is rejected up front rather than mis-probing the single index).
+ *
+ * @param rootRow - One row of the root feature type to broadcast.
+ * @param rootFeatureType - The feature type the join is anchored at (its columns
+ *   stay unprefixed on the joined row).
+ * @param orderedSteps - The merge steps in topological, root-first order.
+ * @param dimMaps - Build-side hash maps for each dimension feature type.
+ * @yields Each fully-joined output row this root row produces.
+ * @throws If the root row's cumulative fan-out exceeds `DOWNLOAD_EXPORT_FANOUT_MAX_ROWS`.
+ */
+export function* joinRowTransform(
+  rootRow: Record<string, unknown>,
+  rootFeatureType: string,
+  orderedSteps: MergeStep[],
+  dimMaps: DimensionMaps
+): Generator<Record<string, unknown>> {
+  let frontier = [rootRow];
+
+  for (const step of orderedSteps) {
+    // Root columns stay raw; a previously-merged dimension's columns were prefixed
+    // `{feature_type}_{column}` by mergePrefixed — so the left key lives at the raw
+    // name only when the left side is the root, otherwise at the prefixed name.
+    const leftKeyColumn =
+      step.left_feature_type === rootFeatureType ? step.left_column : `${step.left_feature_type}_${step.left_column}`;
+
+    const next: Record<string, unknown>[] = [];
+
+    for (const row of frontier) {
+      const probeKey = coerceJoinKey(row[leftKeyColumn]);
+      // An empty key is unmatchable on both sides (SQL NULL ≠ NULL): coerceJoinKey
+      // collapses null/absent to '' and buildDimensionMaps never indexes '' keys,
+      // so the root row is kept (left join) rather than spuriously joined.
+      const matches = probeKey === '' ? [] : dimMaps.get(step.right_feature_type)?.get(probeKey) ?? [];
+
+      if (matches.length === 0) {
+        next.push(row); // left-join keep: unmatched left row survives with no right columns
+      } else {
+        for (const match of matches) {
+          next.push(mergePrefixed(row, match, step.right_feature_type)); // fan-out
+        }
+      }
+
+      if (next.length > DOWNLOAD_EXPORT_FANOUT_MAX_ROWS) {
+        throw new Error(
+          `denormalized join exceeded the per-root-row fan-out cap of ${DOWNLOAD_EXPORT_FANOUT_MAX_ROWS} rows`
+        );
+      }
+    }
+
+    frontier = next;
+  }
+
+  yield* frontier;
 }
 
 /**
