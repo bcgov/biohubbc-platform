@@ -20,7 +20,9 @@ export const formatSubmissionPropertyValue = (value: unknown): string => {
   }
 
   if (typeof value === 'object') {
-    return String(safeJSONStringify(value));
+    const jsonValue = safeJSONStringify(value);
+
+    return typeof jsonValue === 'string' ? jsonValue : '';
   }
 
   return String(value);

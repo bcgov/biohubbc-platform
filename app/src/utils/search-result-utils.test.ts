@@ -21,4 +21,11 @@ describe('formatSubmissionPropertyValue', () => {
       '{"type":"Point","coordinates":[1,2]}'
     );
   });
+
+  it('does not fall back to default object stringification for unstringifiable objects', () => {
+    const circularValue: Record<string, unknown> = { name: 'loop' };
+    circularValue.self = circularValue;
+
+    expect(formatSubmissionPropertyValue(circularValue)).toBe('');
+  });
 });
