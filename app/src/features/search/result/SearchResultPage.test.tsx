@@ -274,6 +274,7 @@ describe('SearchResultPage', () => {
     const { getByRole, rerender } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
 
     await waitFor(() => {
       expect(mockUseSearchResults).toHaveBeenLastCalledWith(
@@ -304,10 +305,11 @@ describe('SearchResultPage', () => {
   });
 
   it('refreshes with a null expression when applying no expression filters', async () => {
-    const { getByRole } = renderPage();
+    const { getByRole, rerender } = renderPage();
     const callCountBeforeApply = mockUseSearchResults.mock.calls.length;
 
     fireEvent.click(getByRole('button', { name: /apply empty expression/i }));
+    rerender(<SearchResultPage />);
 
     await waitFor(() => {
       expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
