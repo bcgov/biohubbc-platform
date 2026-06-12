@@ -1,5 +1,10 @@
 import { AxiosInstance } from 'axios';
-import { CreateExportPayload, DownloadExport, DownloadExportDetail } from 'interfaces/useDownloadExportApi.interface';
+import {
+  CreateExportPayload,
+  DownloadExport,
+  DownloadExportDetail,
+  DownloadFeatureType
+} from 'interfaces/useDownloadExportApi.interface';
 
 /**
  * Returns a set of supported api methods for working with CSV exports of downloads.
@@ -41,5 +46,17 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { createExport, getExport };
+  /**
+   * Lists the download's materialized feature types and their exportable columns,
+   * which drive the export config picker.
+   *
+   * @param {string} downloadId
+   * @return {Promise<DownloadFeatureType[]>}
+   */
+  const getDownloadFeatureTypes = async (downloadId: string): Promise<DownloadFeatureType[]> => {
+    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`);
+    return data;
+  };
+
+  return { createExport, getExport, getDownloadFeatureTypes };
 };

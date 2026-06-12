@@ -13,6 +13,7 @@ const makeProps = (
   download: overrides.download ?? makeDownload(),
   exports: overrides.exports ?? [],
   onCreateExport: vi.fn(),
+  onConfigureExport: vi.fn(),
   onDownloadExportPart: vi.fn(),
   onDownloadExportAllParts: vi.fn(),
   onRebuildExport: vi.fn()
@@ -69,6 +70,23 @@ describe('DownloadFeatureCard', () => {
       fireEvent.click(getByTestId('custom-menu-icon-Export'));
       fireEvent.click(getByTestId('custom-menu-icon-item-CSV—perfeaturetype'));
       expect(props.onCreateExport).toHaveBeenCalledWith();
+    });
+
+    it('fires onConfigureExport(downloadId) when the "CSV — single combined file" item is clicked', () => {
+      // Verifies: the card routes the "CSV — single combined file" menu item to onConfigureExport (the
+      // combined-export dialog path) and not onCreateExport (the one-click path), passing the download_id.
+
+      // Step 1: Render a ready download so the Export menu is present.
+      const props = makeProps({ download: makeDownload({ download_id: 'abc-123', download_status: 'ready' }) });
+      const { getByTestId } = render(<DownloadFeatureCard {...props} />);
+
+      // Step 2: Open the Export menu and click the "CSV — single combined file" item.
+      fireEvent.click(getByTestId('custom-menu-icon-Export'));
+      fireEvent.click(getByTestId('custom-menu-icon-item-CSV—singlecombinedfile'));
+
+      // Step 3: Verify the configure callback fired with the download id, and the one-click create did not.
+      expect(props.onConfigureExport).toHaveBeenCalledWith('abc-123');
+      expect(props.onCreateExport).not.toHaveBeenCalled();
     });
   });
 
