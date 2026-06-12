@@ -52,7 +52,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE download_version IS 'A point-in-time version of a download, and the owner of the materialization lifecycle. A version is the temporal axis — it re-snapshots the same invariant policy later to pick up newly uploaded features; the policy itself is never recorded per version. Materialization status/timing lives here (not on download) because a download can hold many versions, one materializing while an earlier one stays ready.';
     COMMENT ON COLUMN download_version.download_version_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN download_version.download_id IS 'Foreign key to the download table.';
-    COMMENT ON COLUMN download_version.status IS 'Materialization lifecycle status of this version (reuses the download_status enum). The download''s API-facing status is sourced from its current version via download.current_download_version_id.';
+    COMMENT ON COLUMN download_version.status IS 'Materialization lifecycle status of this version (reuses the download_status enum). The download''s API-facing status is sourced from its most recent version.';
     COMMENT ON COLUMN download_version.started_at IS 'Timestamp when this version began materializing.';
     COMMENT ON COLUMN download_version.completed_at IS 'Timestamp when this version finished materializing (success or failure).';
     COMMENT ON COLUMN download_version.materialized_at IS 'Data watermark — when this version''s snapshot was captured (set on success). Distinguishes what data each version contains, so a later version can be compared against it to surface newly ingested features.';
@@ -65,24 +65,11 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN download_version.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- DOWNLOAD.CURRENT_DOWNLOAD_VERSION_ID
-    --------------------------------------------------------------------------------
-
-    ALTER TABLE download ADD COLUMN current_download_version_id UUID;
-
-    ALTER TABLE download ADD CONSTRAINT download_current_download_version_fk
-      FOREIGN KEY (current_download_version_id) REFERENCES download_version(download_version_id);
-
-    CREATE INDEX download_idx4 ON download(current_download_version_id);
-
-    COMMENT ON COLUMN download.current_download_version_id IS 'Points at the download''s currently-materialized version. Nullable because the download row is inserted before its version within the create transaction; set once the version exists.';
-
-    --------------------------------------------------------------------------------
     -- RELOCATE MATERIALIZATION LIFECYCLE: download -> download_version
     --------------------------------------------------------------------------------
     -- The materialization status/timing belongs to the version (a version IS a
     -- materialization). Drop it from download; read paths source the download's
-    -- API status from its current version via current_download_version_id.
+    -- API status from its most recent version.
     -- downloaded_at (a user-action timestamp) and metadata stay on download.
 
     ALTER TABLE download DROP COLUMN download_status;
@@ -316,14 +303,6 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS download_version_export;
     DROP TABLE IF EXISTS download_version_export_artifact_group;
     DROP TABLE IF EXISTS download_version_artifact;
-
-    --------------------------------------------------------------------------------
-    -- DROP DOWNLOAD.CURRENT_DOWNLOAD_VERSION_ID (FK + index drop with the column)
-    --------------------------------------------------------------------------------
-
-    ALTER TABLE download DROP CONSTRAINT IF EXISTS download_current_download_version_fk;
-    DROP INDEX IF EXISTS download_idx4;
-    ALTER TABLE download DROP COLUMN IF EXISTS current_download_version_id;
 
     --------------------------------------------------------------------------------
     -- RESTORE DOWNLOAD MATERIALIZATION LIFECYCLE COLUMNS (relocated to download_version in up())

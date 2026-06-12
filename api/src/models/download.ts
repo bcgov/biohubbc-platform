@@ -5,6 +5,7 @@ import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
+  download_version_id: z.string().uuid(), // resolved most-recent version (a committed download always has one)
   download_status: DownloadStatusZod,
   format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
@@ -24,7 +25,6 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
  * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
  */
 export const DownloadDetailRecord = DownloadRecord.extend({
-  current_download_version_id: z.string().uuid().nullable(),
   name: z.string(),
   description: z.string().nullable()
 });

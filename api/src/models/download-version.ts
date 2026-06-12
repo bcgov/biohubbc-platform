@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DownloadStatusZod } from './download-status';
 
 /**
  * A download_version is the temporal axis of a download. Re-running the same invariant policy at a
@@ -12,3 +13,18 @@ export const DownloadVersionRecord = z.object({
   download_id: z.string().uuid()
 });
 export type DownloadVersionRecord = z.infer<typeof DownloadVersionRecord>;
+
+/**
+ * The version's own materialization-lifecycle status row, read directly by version id — the version
+ * (not the download) owns the lifecycle, so status/timing/error live here.
+ */
+export const DownloadVersionStatusRecord = z.object({
+  download_version_id: z.string().uuid(),
+  download_id: z.string().uuid(),
+  status: DownloadStatusZod,
+  started_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  materialized_at: z.string().nullable(),
+  error_message: z.string().nullable()
+});
+export type DownloadVersionStatusRecord = z.infer<typeof DownloadVersionStatusRecord>;
