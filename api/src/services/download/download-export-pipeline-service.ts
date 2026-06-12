@@ -954,7 +954,7 @@ export class DownloadExportPipelineService extends DBService {
             currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
           }
 
-          const record = buildOutputRecord(joined, outputColumns);
+          const record = buildOutputRecord(joined, outputColumns, rootFeatureType);
           const line = headers.map((header) => escapeCsvField(record[header] ?? '')).join(',') + '\n';
           await writeLine(currentEntry, line);
           currentBundle().byteCount += BigInt(Buffer.byteLength(line, 'utf8'));

@@ -23,7 +23,6 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
-import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /** Download a zip file from S3 and return it as an AdmZip instance. */
@@ -152,16 +151,6 @@ describe('Ingest → Download → Export (system integration)', function () {
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
     await indexTelemetryProperties(featureId, telemetryData);
 
-    // createTestFeature skips the indexing pipeline that builds the closure. The export's security filter
-    // (isEffectivelySecured) fails closed on a feature with no closure rows, so build the closure self-loop
-    // the recompute would write — otherwise the feature reads as secured and is dropped from the export.
-    const uploadRow = await connection.sql(SQL`
-      SELECT submission_upload_id FROM submission_feature WHERE submission_feature_id = ${featureId};
-    `);
-    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(
-      uploadRow.rows[0].submission_upload_id
-    );
-
     // Build a download policy + download via the real services. Broad-path
     // policy on the telemetry feature type — at export time the security
     // filter is applied for the policy creator's authorization scope.
@@ -181,16 +170,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize the download's version. The parquet pipeline links each artifact to
-    // this version, and runExportGroup discovers feature types from it. Reads resolve
-    // the most-recent version — there is no stored pointer to set.
+    // Materialize the download's version and point the download at it. The parquet pipeline links
+    // each artifact to this version, and runExportGroup discovers feature types from it.
     const downloadVersionRepo = new DownloadVersionRepository(connection);
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
+    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
-    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
+    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
@@ -206,16 +195,25 @@ describe('Ingest → Download → Export (system integration)', function () {
         statement
       });
     }
-    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
+    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
       DownloadStatusEnum.PROCESSING
     ]);
 
     // Run the export (CSV) pipeline through the resolve-or-create group contract.
+    // Per-feature-type recipe over the one materialized type (telemetry), all
+    // columns (no output_columns) — the pre-config-driven behaviour this test
+    // asserts on (the full telemetry CSV header).
     const exportService = new DownloadExportService(connection);
     const exportRecord = await exportService.createDownloadVersionExport(
       downloadId,
       systemUserId,
-      { download_version_id: downloadVersionId },
+      {
+        version: 1,
+        export_type: 'csv',
+        mode: 'per_feature_type',
+        feature_types: ['telemetry'],
+        merge_steps: []
+      },
       connection
     );
     // The export record no longer exposes the internal artifact-group FK (it is server-only), so the

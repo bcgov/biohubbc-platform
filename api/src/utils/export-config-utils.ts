@@ -479,18 +479,24 @@ export function* joinRowTransform(
  * the selected columns, rename them to their output names, and order them as the
  * CSV expects.
  *
- * A selected column is read by its prefixed name (`{feature_type}_{column}`) and
- * written under its `output_column` name. A missing value renders as an empty
- * string (left-join misses leave right columns absent). When `output_columns` is
+ * On the joined row the root feature type's columns stay unprefixed while every
+ * dimension column was rewritten `{feature_type}_{column}` by `mergePrefixed`, so
+ * a root column is read at its raw name and a dimension column at its prefixed
+ * name. A dimension column absent from the row is a left-join miss and renders as
+ * an empty string — it must NOT fall back to the raw name, or a dimension column
+ * sharing a name with a root column (e.g. the structural `uuid`) would wrongly
+ * surface the root's value for an unmatched dimension. When `output_columns` is
  * omitted, every column on the joined row is emitted, each coerced to a string.
  *
  * @param joined - A fully-joined wide row.
  * @param outputColumns - The selected output columns (or undefined for all).
+ * @param rootFeatureType - The join's root type, whose columns stay unprefixed.
  * @returns The output record keyed by output column name.
  */
 export function buildOutputRecord(
   joined: Record<string, unknown>,
-  outputColumns: OutputColumn[] | undefined
+  outputColumns: OutputColumn[] | undefined,
+  rootFeatureType: string
 ): Record<string, string> {
   const record: Record<string, string> = {};
 
@@ -502,9 +508,14 @@ export function buildOutputRecord(
   }
 
   for (const outputColumn of outputColumns) {
-    const sourceColumn = `${outputColumn.feature_type}_${outputColumn.column}`;
-    const outputName = outputColumn.output_column ?? sourceColumn;
-    record[outputName] = coerceCell(joined[sourceColumn] ?? joined[outputColumn.column]);
+    const prefixedColumn = `${outputColumn.feature_type}_${outputColumn.column}`;
+    // Root columns stay unprefixed on the joined row; dimension columns were
+    // prefixed by mergePrefixed. Read a dimension column ONLY at its prefixed name
+    // so a left-join miss stays empty instead of falling back to a same-named root
+    // column.
+    const sourceColumn = outputColumn.feature_type === rootFeatureType ? outputColumn.column : prefixedColumn;
+    const outputName = outputColumn.output_column ?? prefixedColumn;
+    record[outputName] = coerceCell(joined[sourceColumn]);
   }
 
   return record;

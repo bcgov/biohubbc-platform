@@ -674,24 +674,51 @@ describe('export-config-utils', () => {
 
   describe('buildOutputRecord', () => {
     it('filters, renames, and orders to the output columns', () => {
+      // Root `animal` keeps its columns unprefixed (`name`); the `deployment`
+      // dimension is read at its prefixed name (`deployment_device_id`).
       const joined = { name: 'wolf', deployment_device_id: 'd1', deployment_model: 'x' };
-      const record = buildOutputRecord(joined, [
-        { feature_type: 'deployment', column: 'device_id', output_column: 'device' },
-        { feature_type: 'animal', column: 'name' }
-      ]);
+      const record = buildOutputRecord(
+        joined,
+        [
+          { feature_type: 'deployment', column: 'device_id', output_column: 'device' },
+          { feature_type: 'animal', column: 'name' }
+        ],
+        'animal'
+      );
 
       expect(record).to.deep.equal({ device: 'd1', animal_name: 'wolf' });
       expect(Object.keys(record)).to.deep.equal(['device', 'animal_name']);
     });
 
     it('renders a missing value as an empty string', () => {
-      const record = buildOutputRecord({ animal_name: 'wolf' }, [{ feature_type: 'deployment', column: 'device_id' }]);
+      const record = buildOutputRecord(
+        { animal_name: 'wolf' },
+        [{ feature_type: 'deployment', column: 'device_id' }],
+        'animal'
+      );
 
       expect(record).to.deep.equal({ deployment_device_id: '' });
     });
 
+    it('keeps an unmatched dimension column empty even when it collides with a root column name', () => {
+      // Root `dataset` carries the structural `uuid` unprefixed; the `capture`
+      // dimension had no match, so `capture_uuid` is absent on the joined row. It
+      // must render empty — never fall back to the root's `uuid` (the bug the
+      // chained-merge integration test surfaced).
+      const record = buildOutputRecord(
+        { uuid: 'ds-1', name: 'Dataset One' },
+        [
+          { feature_type: 'dataset', column: 'name' },
+          { feature_type: 'capture', column: 'uuid' }
+        ],
+        'dataset'
+      );
+
+      expect(record).to.deep.equal({ dataset_name: 'Dataset One', capture_uuid: '' });
+    });
+
     it('emits all columns when output_columns is omitted', () => {
-      const record = buildOutputRecord({ uuid: 'a', deployment_device_id: 'd1', count: 5 }, undefined);
+      const record = buildOutputRecord({ uuid: 'a', deployment_device_id: 'd1', count: 5 }, undefined, 'animal');
 
       expect(record).to.deep.equal({ uuid: 'a', deployment_device_id: 'd1', count: '5' });
     });
