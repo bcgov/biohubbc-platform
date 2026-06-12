@@ -146,7 +146,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"p"."feature_type_property_id" = 123');
     });
 
-    it('should project related predicate evidence to anchor feature ids through bounded graph traversal', () => {
+    it('should project related predicate evidence to anchor feature ids through the content walk and closure probes', () => {
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -163,32 +163,41 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
 
+      // Evidence CTE seeds the recursive content walk (WITH RECURSIVE is restored by the content-edge recursion).
       expect(sql).to.include('submission_feature_property_taxon');
-      expect(sql).to.include('with recursive "evidence"');
-      expect(sql).to.include('"connected_features" as');
-      expect(sql).to.include('as "graph_edges"');
-      expect(sql).to.include('"evidence"."submission_feature_id" as "root_feature_id"');
-      expect(sql).to.include('"evidence"."submission_feature_id" as "connected_feature_id"');
-      expect(sql).to.include('0 as depth');
-      expect(sql).to.include('from "submission_feature_feature"');
-      expect(sql).to.include('inner join "submission_feature" as "source_sf"');
-      expect(sql).to.include('inner join "submission_feature" as "target_sf"');
+      expect(sql).to.include('with recursive "evidence" as');
+
+      // Bounded recursive content walk over submission_feature_feature edges.
+      expect(sql).to.include('"content_edges"');
+      expect(sql).to.include('"content_reach"');
+      expect(sql).to.include('from "submission_feature_feature" as "sff"');
       expect(sql).to.include('"source_sf"."record_end_date" is null');
       expect(sql).to.include('"target_sf"."record_end_date" is null');
-      expect(sql).to.include('"source_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"target_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"target_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"source_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"parent_submission_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
-      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
-      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"dataset_sf"."submission_feature_id" as "to_feature_id"');
-      expect(sql).to.include('"connected_features"."depth" < 6');
-      expect(sql).to.include('NOT edges.to_feature_id = ANY(connected_features.path)');
+      // Depth bound and cycle guard on the recursive term.
+      expect(sql).to.include('"content_reach"."depth" < 6');
+      expect(sql).to.include('= ANY(content_reach.path)');
+
+      // Closure probed from every content-reached node — forward (by source) and reverse (by target).
+      expect(sql).to.include('from "submission_feature_closure" as "c"');
+      expect(sql).to.include('"cr"."feature_id" = "c"."source_submission_feature_id"');
+      expect(sql).to.include('"cr"."feature_id" = "c"."target_submission_feature_id"');
+      expect(sql).to.include('"c"."target_submission_feature_id" as "submission_feature_id"');
+      expect(sql).to.include('"c"."source_submission_feature_id" as "submission_feature_id"');
+
+      // The reachable selects are UNION-combined (dedup), and the anchor type is applied to the resolved targets.
+      expect(sql).to.include(' union ');
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
       expect(sql).to.include('"sf"."record_end_date" is null');
+
+      // The synthetic dataset↔same-submission membership edge has been removed — content edges only.
+      expect(sql).to.not.include('as "dataset_sf"');
+      expect(sql).to.not.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+
+      // The old graph-edge union machinery is gone (parent/child reach now comes from the closure).
+      expect(sql).to.not.include('connected_features');
+      expect(sql).to.not.include('graph_edges');
+      expect(sql).to.not.include('parent_submission_feature_id as');
+      expect(sql).to.not.include('root_feature_id');
     });
 
     it('should union child target sets for OR expressions', () => {
@@ -286,7 +295,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"p_not_equals"."value" = \'red\'');
     });
 
-    it('should project parent dataset evidence to species observation targets through hierarchy edges', () => {
+    it('should project predicate evidence to species_observation targets through the content walk and closure probes', () => {
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -305,12 +314,18 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('from "submission_feature"');
-      expect(sql).to.include('"parent_submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"submission_feature_id" as "from_feature_id"');
-      expect(sql).to.include('"dataset_ft"."name" = \'dataset\'');
-      expect(sql).to.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+      expect(sql).to.include('with recursive "evidence" as');
+      expect(sql).to.include('"content_reach"');
+      expect(sql).to.include('"content_edges"');
+      expect(sql).to.include('from "submission_feature_feature" as "sff"');
+      expect(sql).to.include('from "submission_feature_closure" as "c"');
+      expect(sql).to.include('"cr"."feature_id" = "c"."source_submission_feature_id"');
+      expect(sql).to.include('"cr"."feature_id" = "c"."target_submission_feature_id"');
+      expect(sql).to.include('"content_reach"."depth" < 6');
+      expect(sql).to.include(' union ');
       expect(sql).to.include('"ft"."name" = \'species_observation\'');
+      expect(sql).to.not.include('as "dataset_sf"');
+      expect(sql).to.not.include('connected_features');
     });
   });
 
