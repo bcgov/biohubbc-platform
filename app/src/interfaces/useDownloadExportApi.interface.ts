@@ -1,9 +1,4 @@
-import {
-  EXPORT_CONFIG_VERSION,
-  EXPORT_TYPE,
-  ExportMode,
-  MergeType
-} from 'constants/export-config-constants';
+import { EXPORT_CONFIG_VERSION, EXPORT_TYPE, ExportMode, MergeType } from 'constants/export-config-constants';
 
 /**
  * Status values a `download_export` row can take.
