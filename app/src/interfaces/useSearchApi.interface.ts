@@ -1,6 +1,7 @@
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
+import { JsonValue } from 'types/json';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 /** Generic paginated result */
@@ -37,7 +38,7 @@ export interface SearchFeatureResultWithRelevancy {
   feature_type_id: number;
   feature_type_name: string;
   feature_name: string | null;
-  properties: Record<string, unknown>;
+  properties: Record<string, JsonValue>;
   submission_name: string;
   is_secured: boolean;
   relevancy_score: number;

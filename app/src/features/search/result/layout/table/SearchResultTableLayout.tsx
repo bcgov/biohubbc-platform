@@ -28,9 +28,7 @@ interface SearchResultTableLayoutProps {
  */
 export const SearchResultTableLayout = ({ results, featureTypeProperties, onClick }: SearchResultTableLayoutProps) => {
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
-    const renderEllipsisCell = (value: unknown) => {
-      const displayValue = formatSubmissionPropertyValue(value);
-
+    const renderEllipsisCell = (displayValue: string) => {
       return (
         <Typography variant="body2" noWrap title={displayValue} sx={{ width: '100%' }}>
           {displayValue}
@@ -45,7 +43,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
       flex: 1,
       sortable: false,
       valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
-      renderCell: (params) => renderEllipsisCell(params.value)
+      renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
     }));
 
     return [
@@ -75,7 +73,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
         headerName: 'Submission',
         flex: 1,
         sortable: true,
-        renderCell: (params) => renderEllipsisCell(params.value)
+        renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
       },
       ...propertyColumns
     ];
