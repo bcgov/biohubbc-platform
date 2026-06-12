@@ -75,6 +75,7 @@ export const useSearchResults = (
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
   const [data, setData] = useState<SearchFeatureResponse>();
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSettled, setHasSettled] = useState(false);
   const searchApiRef = useRef(api.search);
   const dialogContextRef = useRef(dialogContext);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -143,6 +144,7 @@ export const useSearchResults = (
 
       if (nextData) {
         setData(nextData);
+        setHasSettled(true);
       }
 
       setIsLoading(false);
@@ -228,6 +230,7 @@ export const useSearchResults = (
       debouncedRefresh.cancel();
       abortControllerRef.current?.abort();
       setData(buildEmptyResponse(pagination));
+      setHasSettled(true);
       setIsLoading(false);
       return;
     }
@@ -267,7 +270,7 @@ export const useSearchResults = (
 
   return {
     rows: data?.features ?? [],
-    isLoading: isLoading || data === undefined,
+    isLoading: isLoading || !hasSettled,
     searchParams,
     setSearchParams,
     pagination: data?.pagination

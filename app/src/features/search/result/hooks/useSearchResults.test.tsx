@@ -18,6 +18,17 @@ const mockSearchFeatures = vi.fn();
 
 describe('useSearchResults', () => {
   const expectAbortOptions = expect.objectContaining({ signal: expect.any(Object) });
+  const defaultSearchFeatureResponse = {
+    features: [],
+    pagination: {
+      total: 0,
+      per_page: 25,
+      current_page: 2,
+      last_page: 1,
+      sort: 'create_date',
+      order: 'asc'
+    }
+  };
   const expressionTree: ExpressionTreeExpression = {
     type: 'expression',
     operator: 'AND',
@@ -33,17 +44,7 @@ describe('useSearchResults', () => {
   };
 
   beforeEach(() => {
-    mockSearchFeatures.mockResolvedValue({
-      features: [],
-      pagination: {
-        total: 0,
-        per_page: 25,
-        current_page: 2,
-        last_page: 1,
-        sort: 'create_date',
-        order: 'asc'
-      }
-    });
+    mockSearchFeatures.mockResolvedValue(defaultSearchFeatureResponse);
 
     (useApi as Mock).mockReturnValue({
       search: {
@@ -215,6 +216,42 @@ describe('useSearchResults', () => {
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps loading until the first successful response when the initial API result is undefined', async () => {
+    vi.useFakeTimers();
+
+    mockSearchFeatures.mockResolvedValueOnce(undefined).mockResolvedValueOnce(defaultSearchFeatureResponse);
+
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey),
+      {
+        initialProps: { refreshKey: 0 }
+      }
+    );
+
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.pagination).toBeUndefined();
+
+    await act(async () => {
+      rerender({ refreshKey: 1 });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.pagination).toEqual(defaultSearchFeatureResponse.pagination);
   });
 
   it('starts one immediate request when the applied expression changes', async () => {
