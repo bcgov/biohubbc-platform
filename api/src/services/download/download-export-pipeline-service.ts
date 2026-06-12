@@ -15,7 +15,12 @@ import {
   escapeCsvField,
   flattenFeatureBySchema
 } from '../../utils/csv-utils';
-import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollPart } from '../../utils/export-utils';
+import {
+  buildParquetKey,
+  buildPartZipKey,
+  parseFeatureTypeFromParquetKey,
+  shouldRollPart
+} from '../../utils/export-utils';
 import { _getS3Client, getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { CodeService } from '../code-service';
@@ -131,7 +136,7 @@ export class DownloadExportPipelineService extends DBService {
    *
    * `errorMetadata.error` is re-keyed to `error_message` to match the repo's
    * column name while keeping the caller surface consistent with
-   * `DownloadPipelineService.transitionDownloadStatus`.
+   * `DownloadPipelineService.transitionDownloadVersionStatus`.
    */
   async transitionGroupStatus(
     groupId: string,
@@ -166,10 +171,11 @@ export class DownloadExportPipelineService extends DBService {
    *
    * Artifacts are discovered from the version's `download_version_artifact`
    * links, so a re-run of the parquet pipeline against the same version is the
-   * unit of discovery. The Parquet object key, however, still embeds the
-   * download id (`downloads/{downloadId}/{featureTypeName}/data.parquet`), so the
-   * key parse is validated against `downloadId`, not the version id — anything
-   * else (including our own part-zip artifacts) is silently skipped via
+   * unit of discovery. The Parquet object key is version-scoped
+   * (`downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`),
+   * so the key parse is validated against BOTH `downloadId` and
+   * `downloadVersionId` — any non-matching artifact (a different version's
+   * Parquet, or our own part-zip artifacts) is silently skipped via
    * `parseFeatureTypeFromParquetKey` returning null. Deduped because version
    * artifacts can accrete across retries.
    */
@@ -180,7 +186,7 @@ export class DownloadExportPipelineService extends DBService {
 
     const featureTypes = new Set<string>();
     for (const artifact of artifacts) {
-      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId);
+      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId, downloadVersionId);
       if (featureType !== null) {
         featureTypes.add(featureType);
       }
@@ -227,6 +233,7 @@ export class DownloadExportPipelineService extends DBService {
   async writeFeatureTypeExport(params: {
     groupId: string;
     downloadId: string;
+    downloadVersionId: string;
     featureTypeName: string;
     properties: CsvPropertyDefinition[];
     maxPartSizeBytes: bigint;
@@ -256,12 +263,14 @@ export class DownloadExportPipelineService extends DBService {
     // pulling the cursor again.
     pendingRow?: Record<string, unknown>;
   }> {
-    const { groupId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
+    const { groupId, downloadId, downloadVersionId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } =
+      params;
     let { currentPart } = params;
 
     // Reuse the reader + cursor across roll-overs so we don't re-fetch the
     // Parquet footer every time a feature type spans multiple parts.
-    const reader = params.resumeReader ?? (await this.openParquetReader(downloadId, featureTypeName));
+    const reader =
+      params.resumeReader ?? (await this.openParquetReader(downloadId, downloadVersionId, featureTypeName));
     const cursor = params.resumeCursor ?? reader.getCursor();
 
     // submission_feature_id leads so consumers can trace a CSV row back to
@@ -497,10 +506,14 @@ export class DownloadExportPipelineService extends DBService {
    * credential config stays in sync with the rest of the codebase — no inline
    * duplication of the region / path-style / env-var config.
    */
-  private async openParquetReader(downloadId: string, featureTypeName: string): Promise<ParquetReader> {
+  private async openParquetReader(
+    downloadId: string,
+    downloadVersionId: string,
+    featureTypeName: string
+  ): Promise<ParquetReader> {
     return ParquetReader.openS3(_getS3Client(), {
       Bucket: getObjectStoreBucketName(),
-      Key: `downloads/${downloadId}/${featureTypeName}/data.parquet`
+      Key: buildParquetKey(downloadId, downloadVersionId, featureTypeName)
     });
   }
 
@@ -713,6 +726,7 @@ export class DownloadExportPipelineService extends DBService {
           const result = await this.writeFeatureTypeExport({
             groupId,
             downloadId,
+            downloadVersionId,
             featureTypeName,
             properties,
             maxPartSizeBytes,

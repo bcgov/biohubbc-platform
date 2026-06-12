@@ -1,6 +1,6 @@
 import { DownloadDetailRecord, DownloadListRecord } from '../models/download';
 import { DownloadStatusEnum } from '../models/download-status';
-import { DownloadVersionRecord } from '../models/download-version';
+import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../models/download-version';
 import { DownloadVersionExportListRow, DownloadVersionExportRow } from '../models/download-version-export';
 import { DownloadVersionExportArtifactGroupRecord } from '../models/download-version-export-artifact-group';
 
@@ -69,6 +69,24 @@ export const createMockDownloadVersionExportListRow = (
 export const createMockDownloadVersion = (overrides?: Partial<DownloadVersionRecord>): DownloadVersionRecord => ({
   download_version_id: 'dddd0000-0000-0000-0000-000000000001',
   download_id: 'aaaa0000-0000-0000-0000-000000000042',
+  ...overrides
+});
+
+/**
+ * Test factory: build a DownloadVersionStatusRecord (the version's materialization-lifecycle row
+ * returned by `getDownloadVersionStatusById`). The version owns the lifecycle, so callers override
+ * `status` (and timing/error fields) to drive transition tests.
+ */
+export const createMockDownloadVersionStatusRecord = (
+  overrides?: Partial<DownloadVersionStatusRecord>
+): DownloadVersionStatusRecord => ({
+  download_version_id: 'dddd0000-0000-0000-0000-000000000001',
+  download_id: 'aaaa0000-0000-0000-0000-000000000042',
+  status: DownloadStatusEnum.PENDING,
+  started_at: null,
+  completed_at: null,
+  materialized_at: null,
+  error_message: null,
   ...overrides
 });
 

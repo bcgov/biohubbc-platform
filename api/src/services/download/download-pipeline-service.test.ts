@@ -4,7 +4,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadRecord } from '../../__mocks__/download';
+import { createMockDownloadVersionStatusRecord } from '../../__mocks__/download';
 import { ApiConflictError } from '../../errors/api-error';
 import { DownloadSource } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -34,84 +34,60 @@ describe('DownloadPipelineService', () => {
     sinon.restore();
   });
 
-  describe('transitionDownloadStatus', () => {
-    const downloadId = 'aaaa0000-0000-0000-0000-000000000042';
-
-    // The transition writes the download's CURRENT VERSION (status lives on the
-    // version), so the lifecycle write is stubbed on DownloadVersionRepository and
-    // its first arg is the version id, not the download id.
+  describe('transitionDownloadVersionStatus', () => {
+    // The transition now reads + writes the version DIRECTLY (status lives on the version), so the
+    // lifecycle read is stubbed on DownloadVersionRepository.getDownloadVersionStatusById and the
+    // write on updateDownloadVersionStatus; the first arg of both is the version id.
     const versionId = 'dddd0000-0000-0000-0000-000000000001';
 
-    it('propagates getDownloadById throw when download does not exist (does NOT write the version)', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').rejects(new Error('Download not found'));
-      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
-
-      try {
-        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
-        expect.fail('expected throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('Download not found');
-      }
-
-      expect(updateStub.called).to.be.false;
-    });
-
-    it('throws ApiConflictError when the download has no current version', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(
-          createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING, current_download_version_id: null })
-        );
-      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
-
-      try {
-        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
-        expect.fail('expected throw');
-      } catch (err: any) {
-        expect(err).to.be.instanceOf(ApiConflictError);
-        expect(err.message).to.equal('Download has no materialized version');
-      }
-
-      expect(updateStub.called).to.be.false;
-    });
-
     it('throws ApiConflictError when current status is not in allowedCurrentStatuses (illegal transition)', async () => {
+      // Verifies: the state-machine assertion runs on the version's own status and rejects an illegal
+      // transition (version is READY, only PROCESSING allowed) before any write.
+
+      // Step 1: Stub the version-status read to return a READY (disallowed) version
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.READY }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
+      // Step 2: Attempt the illegal ready→processing transition
       try {
-        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        await service.transitionDownloadVersionStatus(versionId, DownloadStatusEnum.PROCESSING, [
+          DownloadStatusEnum.PROCESSING
+        ]);
         expect.fail('expected throw');
       } catch (err: any) {
+        // Step 3: Verify the conflict error surfaced
         expect(err).to.be.instanceOf(ApiConflictError);
         expect(err.message).to.equal('Invalid download status transition');
       }
 
+      // Step 4: No write happened — the assertion fired before the update call
       expect(updateStub.called).to.be.false;
     });
 
     it('writes the version with started_at set for pending→processing', async () => {
+      // Verifies: a pending→processing transition stamps started_at only, and the update is keyed by
+      // the version id with the target status.
+
+      // Step 1: Stub the version-status read to return a PENDING version
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PENDING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
-      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+      // Step 2: Perform the transition
+      await service.transitionDownloadVersionStatus(versionId, DownloadStatusEnum.PROCESSING, [
+        DownloadStatusEnum.PENDING
+      ]);
 
+      // Step 3: Verify the params the service decided to pass to the repo
       expect(updateStub.calledOnce).to.be.true;
       expect(updateStub.firstCall.args[0]).to.equal(versionId);
       expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
@@ -127,16 +103,26 @@ describe('DownloadPipelineService', () => {
     });
 
     it('writes the version with completed_at and materialized_at set for processing→ready', async () => {
+      // Verifies: a processing→ready transition stamps completed_at AND materialized_at (the data
+      // watermark), but not started_at.
+
+      // Step 1: Stub the version-status read to return a PROCESSING version
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
-      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+      // Step 2: Perform the transition
+      await service.transitionDownloadVersionStatus(versionId, DownloadStatusEnum.READY, [
+        DownloadStatusEnum.PROCESSING
+      ]);
 
+      // Step 3: Verify the write is keyed by the version and the timestamp set is correct
+      expect(updateStub.firstCall.args[0]).to.equal(versionId);
+      expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
       const metadata = updateStub.firstCall.args[2] as {
         started_at?: string;
         completed_at?: string;
@@ -149,21 +135,29 @@ describe('DownloadPipelineService', () => {
     });
 
     it('passes completed_at and error_message (no materialized_at) for processing→failed', async () => {
+      // Verifies: a processing→failed transition stamps completed_at, re-keys errorMetadata.error →
+      // error_message, and leaves materialized_at unset.
+
+      // Step 1: Stub the version-status read to return a PROCESSING version
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
-      await service.transitionDownloadStatus(
-        downloadId,
+      // Step 2: Perform the failing transition with error metadata
+      await service.transitionDownloadVersionStatus(
+        versionId,
         DownloadStatusEnum.FAILED,
         [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
         { error: 'job failed after all retries' }
       );
 
+      // Step 3: Verify the write is keyed by the version and the failure metadata landed
+      expect(updateStub.firstCall.args[0]).to.equal(versionId);
+      expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.FAILED);
       const metadata = updateStub.firstCall.args[2] as {
         error_message?: string;
         started_at?: string;
@@ -451,7 +445,9 @@ describe('DownloadPipelineService', () => {
       expect(mockWriter.appendRow).to.have.been.calledOnce;
       expect(mockWriter.close).to.have.been.calledOnce;
       expect(uploadStub).to.have.been.calledOnce;
-      expect(uploadStub.firstCall.args[3]).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
+      expect(uploadStub.firstCall.args[3]).to.equal(
+        `downloads/${TEST_DOWNLOAD_ID}/versions/${TEST_DOWNLOAD_VERSION_ID}/observation/data.parquet`
+      );
     });
 
     it('sets GeoParquet metadata on the writer when feature type has spatial properties', async () => {
@@ -517,7 +513,9 @@ describe('DownloadPipelineService', () => {
       const payload = insertArtifactStub.firstCall.args[0];
       expect(payload.artifact_status).to.equal('uploaded');
       expect(payload.format).to.equal('parquet');
-      expect(payload.object_key).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
+      expect(payload.object_key).to.equal(
+        `downloads/${TEST_DOWNLOAD_ID}/versions/${TEST_DOWNLOAD_VERSION_ID}/observation/data.parquet`
+      );
     });
 
     it('aborts the multipart upload and surfaces the original error when row hydration throws mid-stream', async () => {

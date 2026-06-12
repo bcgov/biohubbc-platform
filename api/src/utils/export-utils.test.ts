@@ -1,49 +1,107 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { buildPartZipKey, parseExportPartKey, parseFeatureTypeFromParquetKey, shouldRollPart } from './export-utils';
+import {
+  buildParquetKey,
+  buildPartZipKey,
+  parseExportPartKey,
+  parseFeatureTypeFromParquetKey,
+  shouldRollPart
+} from './export-utils';
 
 describe('export-utils', () => {
+  // Shared ids for the version-scoped Parquet key tests.
+  const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000001';
+  const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000002';
+
+  describe('buildParquetKey', () => {
+    it('builds the version-scoped Parquet key in the documented segment order', () => {
+      // Verifies: the key embeds downloadId, then versions/{versionId}, then the feature type, then data.parquet.
+      const key = buildParquetKey('dl-1', 'ver-2', 'observation');
+
+      expect(key).to.equal('downloads/dl-1/versions/ver-2/observation/data.parquet');
+    });
+
+    it('round-trips through parseFeatureTypeFromParquetKey', () => {
+      // Verifies: parse is the exact inverse of build for the feature type when both ids match.
+      const key = buildParquetKey(DOWNLOAD_ID, DOWNLOAD_VERSION_ID, 'observation');
+
+      expect(parseFeatureTypeFromParquetKey(key, DOWNLOAD_ID, DOWNLOAD_VERSION_ID)).to.equal('observation');
+    });
+  });
+
   describe('parseFeatureTypeFromParquetKey', () => {
-    it('returns the feature type name for a valid Parquet key', () => {
+    it('returns the feature type name for a valid version-scoped Parquet key', () => {
+      // Verifies: a 6-segment versioned key matching both ids resolves to its feature type.
       const result = parseFeatureTypeFromParquetKey(
-        'downloads/aaaa0000-0000-0000-0000-000000000001/observation/data.parquet',
-        'aaaa0000-0000-0000-0000-000000000001'
+        `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
       );
 
       expect(result).to.equal('observation');
     });
 
+    it('returns null for the OLD 4-segment (non-versioned) key shape', () => {
+      // Verifies: the legacy `downloads/{id}/{type}/data.parquet` shape is no longer accepted.
+      const result = parseFeatureTypeFromParquetKey(
+        `downloads/${DOWNLOAD_ID}/observation/data.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
+      );
+
+      expect(result).to.be.null;
+    });
+
     it('returns null when the download_id segment does not match', () => {
+      // Verifies: a key for a different download is rejected even if the version id matches.
       const result = parseFeatureTypeFromParquetKey(
-        'downloads/bbbb0000-0000-0000-0000-000000000999/observation/data.parquet',
-        'aaaa0000-0000-0000-0000-000000000001'
+        `downloads/bbbb0000-0000-0000-0000-000000000999/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
       );
 
       expect(result).to.be.null;
     });
 
-    it('returns null for a part-zip export key (wrong shape)', () => {
+    it('returns null when the download_version_id segment does not match (right download, wrong version)', () => {
+      // Verifies: a key for a different version of the SAME download is rejected — recovery is version-scoped.
       const result = parseFeatureTypeFromParquetKey(
-        'downloads/aaaa0000-0000-0000-0000-000000000001/exports/eid/biohub-eid-part-1.zip',
-        'aaaa0000-0000-0000-0000-000000000001'
+        `downloads/${DOWNLOAD_ID}/versions/dddd0000-0000-0000-0000-000000000999/observation/data.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
       );
 
       expect(result).to.be.null;
     });
 
-    it('returns null for the group-keyed part-zip export key (5 segments, not 4)', () => {
+    it('returns null for a versioned part-zip export key (wrong shape, 7 segments)', () => {
+      // Verifies: the per-part export zip under `.../exports/...` is filtered out.
       const result = parseFeatureTypeFromParquetKey(
-        'downloads/dl-1/versions/ver-2/exports/grp-3/biohub-grp-3-part-1.zip',
-        'dl-1'
+        `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/exports/grp-3/biohub-grp-3-part-1.zip`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
       );
 
       expect(result).to.be.null;
     });
 
     it('returns null when trailing segment is not data.parquet', () => {
+      // Verifies: a 6-segment key whose leaf is not `data.parquet` is rejected.
       const result = parseFeatureTypeFromParquetKey(
-        'downloads/aaaa0000-0000-0000-0000-000000000001/observation/other.parquet',
-        'aaaa0000-0000-0000-0000-000000000001'
+        `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/other.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
+      );
+
+      expect(result).to.be.null;
+    });
+
+    it('returns null on the wrong segment count', () => {
+      // Verifies: a key with too few segments (5, missing the feature-type segment) is rejected.
+      const result = parseFeatureTypeFromParquetKey(
+        `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/data.parquet`,
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID
       );
 
       expect(result).to.be.null;

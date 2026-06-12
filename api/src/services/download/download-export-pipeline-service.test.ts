@@ -213,11 +213,11 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-          object_key: `downloads/${DOWNLOAD_ID}/dataset/data.parquet`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/dataset/data.parquet`
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
-          object_key: `downloads/${DOWNLOAD_ID}/observation/data.parquet`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`
         }
       ]);
 
@@ -234,11 +234,11 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-          object_key: `downloads/${DOWNLOAD_ID}/observation/data.parquet`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
-          object_key: `downloads/${DOWNLOAD_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-1.zip`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/exports/${GROUP_ID}/biohub-${GROUP_ID}-part-1.zip`
         }
       ]);
 
@@ -259,11 +259,11 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-          object_key: `downloads/${DOWNLOAD_ID}/observation/data.parquet`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
-          object_key: `downloads/${otherDownloadId}/dataset/data.parquet`
+          object_key: `downloads/${otherDownloadId}/versions/${DOWNLOAD_VERSION_ID}/dataset/data.parquet`
         }
       ]);
 
@@ -533,6 +533,7 @@ describe('DownloadExportPipelineService', () => {
       const result1 = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1n,
@@ -551,6 +552,7 @@ describe('DownloadExportPipelineService', () => {
       const result2 = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1n,
@@ -573,6 +575,7 @@ describe('DownloadExportPipelineService', () => {
       const result3 = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1n,
@@ -622,6 +625,7 @@ describe('DownloadExportPipelineService', () => {
       const result = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1n,
@@ -664,6 +668,7 @@ describe('DownloadExportPipelineService', () => {
       await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1_000_000n,
@@ -690,6 +695,7 @@ describe('DownloadExportPipelineService', () => {
         await service.writeFeatureTypeExport({
           groupId: GROUP_ID,
           downloadId: DOWNLOAD_ID,
+          downloadVersionId: DOWNLOAD_VERSION_ID,
           featureTypeName: 'observation',
           properties,
           maxPartSizeBytes: 1_000_000n,
@@ -747,6 +753,7 @@ describe('DownloadExportPipelineService', () => {
       const result = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
         maxPartSizeBytes: 1_500_000n,
@@ -805,6 +812,7 @@ describe('DownloadExportPipelineService', () => {
       const result = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
         maxPartSizeBytes: 1_000_000n,
@@ -846,6 +854,7 @@ describe('DownloadExportPipelineService', () => {
       await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties: propsWithArtifact,
         maxPartSizeBytes: 1_000_000n,
@@ -874,6 +883,7 @@ describe('DownloadExportPipelineService', () => {
       const result = await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties,
         maxPartSizeBytes: 1n,

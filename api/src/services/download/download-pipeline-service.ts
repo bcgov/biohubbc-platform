@@ -5,13 +5,14 @@ import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
-import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
+import { DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { buildParquetKey } from '../../utils/export-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
@@ -73,8 +74,8 @@ export class DownloadPipelineService extends DBService {
    *
    * Pure business-rule assertion; no I/O.
    *
-   * @param {string} downloadId - The download ID (for error context).
-   * @param {DownloadRecord['download_status']} currentStatus - The download's current status.
+   * @param {string} downloadVersionId - The download version ID (for error context).
+   * @param {DownloadStatusEnum} currentStatus - The version's current status.
    * @param {DownloadStatusEnum} nextStatus - The status being transitioned to.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
    * @return {void}
@@ -82,56 +83,52 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   private assertDownloadStatusTransition(
-    downloadId: string,
-    currentStatus: DownloadRecord['download_status'],
+    downloadVersionId: string,
+    currentStatus: DownloadStatusEnum,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[]
   ): void {
-    if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
+    if (!allowedCurrentStatuses.includes(currentStatus)) {
       throw new ApiConflictError('Invalid download status transition', [
-        'DownloadPipelineService->transitionDownloadStatus',
-        { downloadId, currentStatus, nextStatus, allowedCurrentStatuses }
+        'DownloadPipelineService->transitionDownloadVersionStatus',
+        { downloadVersionId, currentStatus, nextStatus, allowedCurrentStatuses }
       ]);
     }
   }
 
   /**
-   * Transition a download's current version from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition a download version from one of `allowedCurrentStatuses` to `nextStatus`.
    *
-   * The materialization lifecycle lives on the version (a version IS a materialization),
-   * so the transition writes `download_version`, not `download`. The download's status is
-   * read back from its current version, so callers keep the download-id contract while the
-   * write lands on the version. The state machine lives in the service; the repository stays
-   * a thin CRUD wrapper. Illegal transitions (including retries of already-terminal jobs)
-   * throw `ApiConflictError` and bubble up to the pg-boss DLQ.
+   * The version IS the unit of materialization, and the materialization lifecycle
+   * (status, timing, error) lives on `download_version` — so the transition reads the
+   * version's current status and writes the new status back onto the version directly.
+   * The state machine lives in the service; the repository stays a thin CRUD wrapper.
+   * Illegal transitions (including retries of already-terminal jobs) throw
+   * `ApiConflictError` and bubble up to the pg-boss DLQ.
    *
-   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The download version ID.
    * @param {DownloadStatusEnum} nextStatus - Target status.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
    * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
    * @return {Promise<void>}
-   * @throws {ApiNotFoundError} if the download does not exist.
-   * @throws {ApiConflictError} if the download has no current version, or the current status is not in `allowedCurrentStatuses`.
+   * @throws {ApiNotFoundError} if the download version does not exist.
+   * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
    * @memberof DownloadPipelineService
    */
-  async transitionDownloadStatus(
-    downloadId: string,
+  async transitionDownloadVersionStatus(
+    downloadVersionId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
     errorMetadata?: { error?: string }
   ): Promise<void> {
-    const download = await this.downloadRepository.getDownloadById(downloadId);
+    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
 
-    // A committed download always has a current version (created in the same request
-    // transaction). Guard narrows the nullable pointer and surfaces the impossible case.
-    if (download.current_download_version_id === null) {
-      throw new ApiConflictError('Download has no materialized version', [
-        'DownloadPipelineService->transitionDownloadStatus',
-        { downloadId, nextStatus }
-      ]);
-    }
-
-    this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
+    this.assertDownloadStatusTransition(
+      downloadVersionId,
+      version.status as DownloadStatusEnum,
+      nextStatus,
+      allowedCurrentStatuses
+    );
 
     const now = new Date().toISOString();
     const metadata: { started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string } =
@@ -150,11 +147,7 @@ export class DownloadPipelineService extends DBService {
       metadata.error_message = errorMetadata.error;
     }
 
-    await this.downloadVersionRepository.updateDownloadVersionStatus(
-      download.current_download_version_id,
-      nextStatus,
-      metadata
-    );
+    await this.downloadVersionRepository.updateDownloadVersionStatus(downloadVersionId, nextStatus, metadata);
   }
 
   /**
@@ -190,7 +183,7 @@ export class DownloadPipelineService extends DBService {
    * Stream a single feature type to a Parquet file on S3, recording the artifact
    * with authoritative checksum and byte size.
    *
-   * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+   * The S3 key is deterministic: `downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`.
    * Retries overwrite the same key — S3 is idempotent on overwrites, and the
    * artifact / download_artifact inserts are idempotent on unique keys. A retried
    * feature type converges to the same DB + S3 state as a first-time success.
@@ -238,7 +231,7 @@ export class DownloadPipelineService extends DBService {
       .filter((p) => p.feature_property_type_name === 'spatial')
       .map((p) => p.feature_property_name);
     const schema = buildParquetSchema(properties);
-    const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
+    const s3Key = buildParquetKey(downloadId, downloadVersionId, featureTypeName);
 
     // Resolve every precondition (expression read, semantic validation, subquery
     // build, cursor setup) BEFORE starting the S3 multipart upload. The upload
