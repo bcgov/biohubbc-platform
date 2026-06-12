@@ -1,3 +1,4 @@
+import { SCREENING_START_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
@@ -319,9 +320,10 @@ export class SubmissionUploadService extends DBService {
 
   /**
    * Transition to security_screening when the automatic screening job starts.
-   * - indexed          -> security_screening (first run)
+   * - indexed            -> security_screening (first run)
    * - security_screening -> security_screening (no-op; idempotent resume)
-   * - failed           -> security_screening (restart after exhausted retries)
+   * - failed             -> security_screening (restart after exhausted retries)
+   * - security_screened  -> security_screening (re-screen; idempotent draft insert)
    * - all other statuses -> conflict
    *
    * @param {string} submissionUploadId Submission upload scope.
@@ -334,10 +336,12 @@ export class SubmissionUploadService extends DBService {
       return;
     }
 
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'security_screening', [
-      'indexed',
-      'failed'
-    ]);
+    this.assertSubmissionUploadStatusTransition(
+      submissionUploadId,
+      current.status,
+      'security_screening',
+      SCREENING_START_STATUSES
+    );
     await this.updateSubmissionUpload(submissionUploadId, { status: 'security_screening' });
   }
 

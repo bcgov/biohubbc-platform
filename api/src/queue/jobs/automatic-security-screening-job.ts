@@ -104,9 +104,9 @@ export const automaticSecurityScreeningJobHandler: PgBoss.WorkHandler<IAutomatic
  * Dead Letter Queue handler for failed automatic security screening jobs.
  *
  * Transitions the upload to `failed` so operators can observe the terminal
- * error state and re-trigger screening (e.g. by re-indexing). Any draft
- * `submission_feature_security` rows already inserted by earlier attempts are
- * harmless and will be overwritten on a subsequent idempotent run.
+ * error state and re-trigger screening (e.g. by re-indexing). Failed attempts
+ * leave no partial rows behind — each attempt runs in a single transaction
+ * that rolls back on error.
  *
  * @param {PgBoss.Job<IAutomaticSecurityScreeningJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
@@ -121,9 +121,12 @@ export const automaticSecurityScreeningFailedHandler: PgBoss.WorkHandler<IAutoma
 
     await withConnection(async (connection) => {
       const submissionUploadService = new SubmissionUploadService(connection);
+      // 'security_screened' is allowed-from so a failed *re-screen* of an already-screened
+      // upload surfaces as 'failed' instead of erroring the DLQ handler itself.
       await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
         'indexed',
         'security_screening',
+        'security_screened',
         'failed'
       ]);
     });

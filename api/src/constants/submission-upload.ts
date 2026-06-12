@@ -33,8 +33,17 @@ export const INDEX_START_STATUSES: SubmissionUpload['status'][] = ['ingested', '
 /**
  * Upload statuses from which automatic security screening is allowed to start or resume.
  *
+ * Used by `SubmissionUploadService.transitionSubmissionUploadToSecurityScreening`.
+ *
  * `indexed`            — first run after closure has been populated.
  * `security_screening` — idempotent resume if the job retried mid-flight.
  * `failed`             — explicit restart after exhausted retries.
+ * `security_screened`  — re-screen of an already-screened upload (e.g. after a new
+ *                        security rule is activated); the draft insert is idempotent.
  */
-export const SCREENING_START_STATUSES: SubmissionUpload['status'][] = ['indexed', 'security_screening', 'failed'];
+export const SCREENING_START_STATUSES: SubmissionUpload['status'][] = [
+  'indexed',
+  'security_screening',
+  'failed',
+  'security_screened'
+];

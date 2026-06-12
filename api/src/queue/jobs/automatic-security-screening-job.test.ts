@@ -122,8 +122,14 @@ describe('automaticSecurityScreeningFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('upload-1', 'failed', ['indexed', 'security_screening', 'failed'])).to.be
-      .true;
+    expect(
+      transitionStatusStub.calledWith('upload-1', 'failed', [
+        'indexed',
+        'security_screening',
+        'security_screened',
+        'failed'
+      ])
+    ).to.be.true;
   });
 
   it('marks upload failed and logs default message when output is null', async () => {
@@ -147,7 +153,13 @@ describe('automaticSecurityScreeningFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('upload-2', 'failed', ['indexed', 'security_screening', 'failed'])).to.be
-      .true;
+    expect(
+      transitionStatusStub.calledWith('upload-2', 'failed', [
+        'indexed',
+        'security_screening',
+        'security_screened',
+        'failed'
+      ])
+    ).to.be.true;
   });
 });

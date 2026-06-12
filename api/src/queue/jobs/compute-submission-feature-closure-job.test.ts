@@ -6,6 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
   IComputeSubmissionFeatureClosureJobData,
   computeSubmissionFeatureClosureFailedHandler,
@@ -94,9 +95,23 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
     sinon.restore();
   });
 
-  it('should log failure with error output without opening a connection or calling the service', async () => {
-    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+  const stubConnections = () => {
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
+      const conn = getMockDBConnection();
+      conn.open = sinon.stub().resolves();
+      conn.commit = sinon.stub().resolves();
+      conn.rollback = sinon.stub().resolves();
+      conn.release = sinon.stub();
+      return conn;
+    });
+  };
+
+  it('marks the upload failed and logs failure without recomputing the closure', async () => {
+    stubConnections();
     const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload');
+    const transitionStatusStub = sinon
+      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+      .resolves();
 
     const job = {
       id: 'job-1',
@@ -107,13 +122,16 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
 
     await computeSubmissionFeatureClosureFailedHandler([job]);
 
-    // DLQ handler is log-only — no DB connection and no service call
-    expect(getConnectionStub).not.to.have.been.called;
+    expect(transitionStatusStub.calledWith('upload-uuid-1', 'failed', ['indexed', 'security_screened', 'failed'])).to.be
+      .true;
     expect(recomputeStub).not.to.have.been.called;
   });
 
-  it('should log default message when output is null', async () => {
-    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
+  it('marks the upload failed and logs default message when output is null', async () => {
+    stubConnections();
+    const transitionStatusStub = sinon
+      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+      .resolves();
 
     const job = {
       id: 'job-2',
@@ -124,6 +142,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
 
     await computeSubmissionFeatureClosureFailedHandler([job]);
 
-    expect(getConnectionStub).not.to.have.been.called;
+    expect(transitionStatusStub.calledWith('upload-uuid-2', 'failed', ['indexed', 'security_screened', 'failed'])).to.be
+      .true;
   });
 });

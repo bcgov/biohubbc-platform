@@ -10,6 +10,8 @@ export type SubmissionUploadJobStatus =
   | 'ingested'
   | 'indexing'
   | 'indexed'
+  | 'security_screening'
+  | 'security_screened'
   | 'invalid'
   | 'failed';
 export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | 'invalid' | 'failed';

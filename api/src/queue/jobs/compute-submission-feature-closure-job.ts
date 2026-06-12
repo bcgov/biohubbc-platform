@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { publishAutomaticSecurityScreeningJob } from '../publisher';
 import { withConnection } from '../with-connection';
@@ -122,10 +123,12 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 /**
  * Dead Letter Queue handler for failed compute submission feature closure jobs.
  *
- * The closure is derived data — a stale closure for one upload is recoverable by re-enqueueing the
- * job (the next successful indexing run, or a manual recompute, regenerates it). The upload's own
- * lifecycle status reflects indexing, not closure state, so this handler only logs the failure and
- * does not flip the upload's status.
+ * The closure recompute is now a required leg of the upload lifecycle: it publishes the
+ * automatic security screening job, which carries the upload to the terminal-success
+ * `security_screened` status. A permanently failed closure would otherwise strand the
+ * upload at the intermediate `indexed` status with no operator signal, so this handler
+ * transitions the upload to `failed` (restartable — `failed` is a process-start status).
+ * The closure data itself remains recoverable: re-running the pipeline regenerates it.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
@@ -138,6 +141,20 @@ export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IComputeSubmissionFeatureClosureJobData>).output;
+
+    await withConnection(async (connection) => {
+      const submissionUploadService = new SubmissionUploadService(connection);
+      // The closure job runs after the upload reached 'indexed' (set in the same transaction
+      // that published this job); a failed run leaves it there. 'failed' allows idempotent
+      // re-handling of the DLQ job itself. 'security_screened' covers a closure job queued
+      // before the screening migration backfilled completed uploads to that status — its
+      // closure is genuinely missing, so surfacing 'failed' is still correct.
+      await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
+        'indexed',
+        'security_screened',
+        'failed'
+      ]);
+    });
 
     defaultLog.warn({
       label: 'computeSubmissionFeatureClosureFailedHandler',

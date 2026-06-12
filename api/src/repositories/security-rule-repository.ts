@@ -141,7 +141,10 @@ export class SecurityRuleRepository extends BaseRepository {
         this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sc.record_end_date');
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id').andOnNull('sfs.record_end_date');
+        // Draft rows (automatic screening output pending review) are not applied security
+        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id')
+          .andOnNull('sfs.record_end_date')
+          .andOnVal('sfs.status', '=', 'secured');
       })
       .whereNull('sr.record_end_date')
       .groupBy(

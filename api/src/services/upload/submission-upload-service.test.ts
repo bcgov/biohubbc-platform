@@ -501,6 +501,22 @@ describe('SubmissionUploadService', () => {
       expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'security_screening' });
     });
 
+    it('updates status from security_screened to security_screening (re-screen)', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'security_screened',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToSecurityScreening('artifact-1');
+      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'security_screening' });
+    });
+
     it('is a no-op when already security_screening (idempotent resume)', async () => {
       sinon.stub(service, 'getSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1',

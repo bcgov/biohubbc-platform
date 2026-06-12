@@ -44,6 +44,14 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON COLUMN submission_upload.status IS
       'Submission upload lifecycle status. uploaded=accepted and ready for ingestion; ingesting=feature extraction and validation running; ingested=feature rows and validation persisted; indexing=derived indexes being populated; indexed=derived indexes ready; security_screening=automatic security screening in progress; security_screened=automatic screening complete (terminal success); invalid=deterministic validation errors; failed=operational/runtime failure.';
+
+    -- Backfill: under the previous lifecycle 'indexed' was the terminal-success state. Any upload
+    -- still at 'indexed' completed before automatic screening existed — map it to the new
+    -- terminal-success state so it is not stranded mid-pipeline (nothing will ever enqueue
+    -- screening for it). Screening can also start from 'security_screened' (re-screen is
+    -- idempotent), so an upload whose closure/screening job was already queued at deploy time
+    -- still gets screened.
+    UPDATE submission_upload SET status = 'security_screened' WHERE status = 'indexed';
   `);
 }
 

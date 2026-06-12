@@ -224,8 +224,12 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
-      return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
+    // Dedupe inputs — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair
+    // appears twice in one INSERT ("cannot affect row a second time")
+    const queryValues = [...new Set(submissionFeatureIds)].flatMap((submissionFeatureId) => {
+      return [...new Set(securityRuleIds)].flatMap(
+        (securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`
+      );
     });
 
     const insertSQL = SQL`
@@ -234,9 +238,13 @@ export class SecurityRepository extends BaseRepository {
       VALUES `;
 
     insertSQL.append(queryValues.join(', '));
+    // A conflicting row may be a 'draft' inserted by automatic screening — manual application
+    // must promote it to 'secured' or the rule would silently remain unenforced. Rows already
+    // 'secured' are left untouched (and excluded from RETURNING) to avoid audit churn.
     insertSQL.append(`
       ON CONFLICT (submission_feature_id, security_rule_id)
-      DO NOTHING
+      DO UPDATE SET status = 'secured'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'secured'
       RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
@@ -255,12 +263,16 @@ export class SecurityRepository extends BaseRepository {
     submissionId: number,
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!securityRuleIds.length) {
+    // Dedupe — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair appears
+    // twice in one INSERT ("cannot affect row a second time")
+    const uniqueSecurityRuleIds = [...new Set(securityRuleIds)];
+
+    if (!uniqueSecurityRuleIds.length) {
       return [];
     }
 
-    const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
-    const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
+    const placeholders = uniqueSecurityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
+    const submissionIdPlaceholder = `$${uniqueSecurityRuleIds.length + 1}`;
 
     const sql = `
       INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
@@ -268,11 +280,13 @@ export class SecurityRepository extends BaseRepository {
       FROM submission_feature sf
       CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
       WHERE sf.submission_id = ${submissionIdPlaceholder}
-      ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+      ON CONFLICT (submission_feature_id, security_rule_id)
+      DO UPDATE SET status = 'secured'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'secured'
       RETURNING *;
     `;
 
-    const insertSQL = SQL([sql], ...securityRuleIds, submissionId);
+    const insertSQL = SQL([sql], ...uniqueSecurityRuleIds, submissionId);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
@@ -374,7 +388,9 @@ export class SecurityRepository extends BaseRepository {
       .queryBuilder()
       .select('*')
       .from('submission_feature_security')
-      .whereIn('submission_feature_id', submissionFeatureIds);
+      .whereIn('submission_feature_id', submissionFeatureIds)
+      // Draft rows (automatic screening output pending review) are not applied security
+      .where('status', 'secured');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
@@ -405,6 +421,7 @@ export class SecurityRepository extends BaseRepository {
       .with('grouped_rules', (qb) => {
         qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
           .from('submission_feature_security as sfs')
+          .where('sfs.status', 'secured')
           .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
           .modify((qb) => {
             // Conditionally filter for specific features
