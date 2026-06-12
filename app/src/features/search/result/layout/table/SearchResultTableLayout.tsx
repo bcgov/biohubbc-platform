@@ -103,10 +103,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
         '& .MuiDataGrid-root': {
           border: 'none'
         },
-        '& .secured-column-cell, & .secured-column-header': {
-          pl: '40px !important',
-          justifyContent: 'center'
-        }
+        '& .secured-column-cell, & .secured-column-header': { pl: '30px', justifyContent: 'center' }
       }}
     />
   );

@@ -60,6 +60,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     'uuid',
     'feature_type_id',
     'feature_type_name',
+    'feature_name',
+    'properties',
     'submission_name',
     'is_secured',
     'relevancy_score',

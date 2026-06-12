@@ -160,6 +160,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_feature');
       expect(sql).to.include('"fpt"."name" as "type_name"');
       expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
+      expect(sql).to.not.include('jsonb_object_keys');
     });
   });
 });
