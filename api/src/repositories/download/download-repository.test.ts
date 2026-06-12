@@ -143,7 +143,7 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('p.description');
     });
 
-    it('SQL selects the current_download_version_id pointer', async () => {
+    it('SQL selects the resolved dv.download_version_id', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -151,10 +151,12 @@ describe('DownloadRepository', () => {
       await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
 
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('current_download_version_id');
+      expect(sqlText).to.include('dv.download_version_id');
+      // The dropped stored pointer must be gone — reads resolve the most-recent version instead.
+      expect(sqlText).to.not.include('current_download_version_id');
     });
 
-    it('SQL sources status/timing from the current version (INNER JOIN download_version)', async () => {
+    it('SQL sources status/timing from the most-recent active version (INNER JOIN LATERAL)', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -162,7 +164,9 @@ describe('DownloadRepository', () => {
       await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
 
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.match(/INNER JOIN\s+download_version/i);
+      expect(sqlText).to.match(/INNER JOIN\s+LATERAL/i);
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.match(/ORDER BY\s+create_date\s+DESC/i);
       expect(sqlText).to.match(/dv\.status\s+AS\s+download_status/i);
       expect(sqlText).to.include('dv.started_at');
       expect(sqlText).to.include('dv.completed_at');
@@ -178,7 +182,7 @@ describe('DownloadRepository', () => {
         completed_at: '2026-01-01T00:01:00.000Z',
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
-        current_download_version_id: 'dddd0000-0000-0000-0000-000000000001',
+        download_version_id: 'dddd0000-0000-0000-0000-000000000001',
         name: 'My download',
         description: 'A nice description'
       };
@@ -203,7 +207,7 @@ describe('DownloadRepository', () => {
         completed_at: null,
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
-        current_download_version_id: null,
+        download_version_id: 'dddd0000-0000-0000-0000-000000000002',
         name: 'My download',
         description: null
       };
@@ -256,6 +260,25 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.not.include('feature_count');
       expect(sqlText).to.include('join "team" as "t" on "t"."team_id" = "dt"."team_id"');
       expect(sqlText).to.include('"t"."record_end_date" is null');
+    });
+
+    it('SQL resolves the most-recent active version via INNER JOIN LATERAL', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.match(/inner join lateral/i);
+      expect(sqlText).to.include('"dv"."download_version_id"');
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.match(/order by\s+create_date\s+desc/i);
+      // The dropped stored pointer must be gone.
+      expect(sqlText).to.not.include('current_download_version_id');
     });
 
     it('returns paginated results when pagination is provided', async () => {

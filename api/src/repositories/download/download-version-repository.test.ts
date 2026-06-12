@@ -215,6 +215,67 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
+  describe('getDownloadVersionStatusById', () => {
+    it('SELECTs the lifecycle status columns from download_version, binds the version id, and returns the row', async () => {
+      // Verifies: the wider status read targets download_version, surfaces status/timing/error, returns the raw row
+
+      // Step 1: Setup mock DB to return one status row
+      const statusRow = {
+        download_version_id: VERSION_ID,
+        download_id: DOWNLOAD_ID,
+        status: DownloadStatusEnum.READY,
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        materialized_at: '2026-01-01T00:01:00.000Z',
+        error_message: null
+      };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([statusRow], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      // Step 3: Call the get method
+      const result = await repo.getDownloadVersionStatusById(VERSION_ID);
+
+      // Step 4: Verify the returned row, the SELECTed columns, and the bound version id
+      expect(result).to.equal(statusRow);
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('download_version');
+      expect(sqlText).to.include('download_version_id');
+      expect(sqlText).to.include('download_id');
+      expect(sqlText).to.include('status');
+      expect(sqlText).to.include('started_at');
+      expect(sqlText).to.include('completed_at');
+      expect(sqlText).to.include('materialized_at');
+      expect(sqlText).to.include('error_message');
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(VERSION_ID);
+    });
+
+    it('throws ApiNotFoundError when no version matches', async () => {
+      // Verifies: the get* variant maps an empty result to a 404-mapping ApiNotFoundError
+
+      // Step 1: Setup mock DB to return no rows
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      // Step 3 + 4: Call and assert it rejects with ApiNotFoundError
+      try {
+        await repo.getDownloadVersionStatusById(VERSION_ID);
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect(err.message).to.equal('Download version not found');
+      }
+    });
+  });
+
   describe('listDownloadVersionArtifactsByDownloadVersionId', () => {
     it('JOINs artifact, filters record_end_date IS NULL, and binds versionId', async () => {
       // Verifies: the active-artifact lookup joins artifact for object_key and excludes ended links

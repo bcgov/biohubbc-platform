@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadVersionRecord } from '../../models/download-version';
+import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -222,6 +222,47 @@ export class DownloadVersionRepository extends BaseRepository {
     if (!record) {
       throw new ApiNotFoundError('Download version not found', [
         'DownloadVersionRepository->getDownloadVersionById',
+        `no download_version with id ${downloadVersionId}`
+      ]);
+    }
+
+    return record;
+  }
+
+  /**
+   * Get a download version's full materialization-lifecycle status row by ID, throwing if not found.
+   *
+   * Wider SELECT than `getDownloadVersionById` — surfaces status/timing/error so callers (the worker's
+   * status guards, the export ready-gate, the publisher's duplicate gate) judge a version's lifecycle
+   * directly off the version row that owns it, with no `download`-side indirection. The not-found throw is
+   * the codebase get* convention; all status/ownership/duplicate decisions stay in the calling services.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionStatusRecord>}
+   * @throws {ApiNotFoundError} when no version matches the given ID.
+   * @memberof DownloadVersionRepository
+   */
+  async getDownloadVersionStatusById(downloadVersionId: string): Promise<DownloadVersionStatusRecord> {
+    const sql = SQL`
+      SELECT
+        download_version_id,
+        download_id,
+        status,
+        started_at,
+        completed_at,
+        materialized_at,
+        error_message
+      FROM download_version
+      WHERE download_version_id = ${downloadVersionId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadVersionStatusRecord);
+
+    const record = response.rows[0] ?? null;
+
+    if (!record) {
+      throw new ApiNotFoundError('Download version not found', [
+        'DownloadVersionRepository->getDownloadVersionStatusById',
         `no download_version with id ${downloadVersionId}`
       ]);
     }

@@ -120,14 +120,18 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
-    // Materialization status/timing live on the current version, not download.
-    // INNER JOIN is safe: a committed download always has a current version (both
-    // are written in the create transaction). `dv.status AS download_status` keeps
-    // the record field name so every reader (export gate, detail/list endpoints,
-    // publisher dedup) stays unchanged.
+    // Materialization status/timing live on the version, not download. There is no
+    // stored "current version" pointer; reads resolve the most-recent active version
+    // (ordered create_date DESC) via a LATERAL subquery so a re-run's new version
+    // becomes the one surfaced without flipping a stored pointer. LIMIT 1 keeps it
+    // single-row; a committed download always has ≥1 active version (written in the
+    // create transaction), so the LATERAL join is effectively inner. `dv.status AS
+    // download_status` keeps the record field name so every reader (export gate,
+    // detail/list endpoints, publisher dedup) stays unchanged.
     const sql = SQL`
       SELECT
         d.download_id,
+        dv.download_version_id,
         dv.status AS download_status,
         d.format,
         d.metadata,
@@ -135,11 +139,16 @@ export class DownloadRepository extends BaseRepository {
         dv.completed_at,
         d.downloaded_at,
         d.create_date,
-        d.current_download_version_id,
         p.name,
         p.description
       FROM download d
-      INNER JOIN download_version dv ON dv.download_version_id = d.current_download_version_id
+      INNER JOIN LATERAL (
+        SELECT download_version_id, status, started_at, completed_at
+        FROM download_version
+        WHERE download_id = d.download_id AND record_end_date IS NULL
+        ORDER BY create_date DESC, download_version_id DESC
+        LIMIT 1
+      ) dv ON true
       LEFT JOIN policy p ON p.policy_id = d.policy_id
       WHERE d.download_id = ${downloadId};
     `;
@@ -192,11 +201,13 @@ export class DownloadRepository extends BaseRepository {
   ): Promise<{ downloads: DownloadListRecordBase[]; count: number }> {
     const knex = getKnex();
 
-    // Materialization status/timing are sourced from the current version (see
-    // findDownloadById). INNER JOIN is safe — a committed download always has one.
+    // Materialization status/timing are sourced from the most-recent active version
+    // (see findDownloadById) via a LATERAL subquery — there is no stored pointer.
+    // Effectively inner: a committed download always has ≥1 active version.
     const query = knex
       .select([
         'd.download_id',
+        'dv.download_version_id',
         'dv.status as download_status',
         'd.format',
         'd.metadata',
@@ -207,7 +218,15 @@ export class DownloadRepository extends BaseRepository {
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
-      .innerJoin('download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT download_version_id, status, started_at, completed_at
+          FROM download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
       .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
