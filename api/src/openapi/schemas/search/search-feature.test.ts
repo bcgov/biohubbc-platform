@@ -61,5 +61,9 @@ describe('featureSearchRequestBodySchema', () => {
       'type_name',
       'allow_multiple'
     ]);
+    expect(featureSearchPropertySchema.properties?.allow_multiple).to.deep.include({
+      type: 'boolean',
+      description: 'Whether this property can be returned as an array of values.'
+    });
   });
 });

@@ -67,6 +67,16 @@ describe('SearchResultTableLayout', () => {
       required_value: false,
       calculated_value: false,
       allow_multiple: false
+    },
+    {
+      feature_type_property_id: 3,
+      name: 'tags',
+      display_name: 'Tags',
+      description: null,
+      type_name: 'string',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: true
     }
   ];
 
@@ -131,7 +141,8 @@ describe('SearchResultTableLayout', () => {
       ...createMockSearchFeature(1, 'Dataset', false),
       properties: {
         scientific_name: 'Canis lupus',
-        count: 12
+        count: 12,
+        tags: ['coastal', 'survey']
       }
     };
 
@@ -141,8 +152,10 @@ describe('SearchResultTableLayout', () => {
 
     expect(getByTestId('columns')).toHaveTextContent('Scientific Name');
     expect(getByTestId('columns')).toHaveTextContent('Count');
+    expect(getByTestId('columns')).toHaveTextContent('Tags');
     expect(getByTestId('cell-property:scientific_name')).toHaveTextContent('Canis lupus');
     expect(getByTestId('cell-property:count')).toHaveTextContent('12');
+    expect(getByTestId('cell-property:tags')).toHaveTextContent('coastal, survey');
     expect(getByTestId('cell-property:scientific_name').querySelector('.MuiTypography-root')).toBeInTheDocument();
   });
 });

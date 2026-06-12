@@ -105,7 +105,10 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
     type_name: { type: 'string' },
     required_value: { type: 'boolean' },
     calculated_value: { type: 'boolean' },
-    allow_multiple: { type: 'boolean' }
+    allow_multiple: {
+      type: 'boolean',
+      description: 'Whether this property can be returned as an array of values.'
+    }
   }
 };
 
