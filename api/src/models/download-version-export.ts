@@ -53,13 +53,17 @@ export type DownloadVersionExportRecord = z.infer<typeof DownloadVersionExportRe
 /**
  * HTTP body shape for the create-export endpoint.
  *
- * Only `max_part_size_bytes` is accepted from the client (optional — defaulted at the
- * service layer). `mode` is deliberately NOT exposed; the service hard-codes
- * `per_feature_type` until a second shape ships.
+ * `download_version_id` is REQUIRED — the caller names the materialized version to export. An export
+ * binds to one materialized snapshot, so the caller, not the server, picks which version; a re-export
+ * of an older version stays reproducible rather than silently retargeting the latest. `max_part_size_bytes`
+ * stays optional (defaulted at the service layer). `mode` is deliberately NOT exposed; the service
+ * hard-codes `per_feature_type` until a second shape ships.
  */
 export const CreateDownloadVersionExportRequest = DownloadVersionExportRow.pick({
   max_part_size_bytes: true
-}).partial();
+})
+  .partial()
+  .extend({ download_version_id: z.string().uuid() });
 export type CreateDownloadVersionExportRequest = z.infer<typeof CreateDownloadVersionExportRequest>;
 
 /**

@@ -72,11 +72,16 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['download_id', 'status', 'name'],
+            required: ['download_id', 'download_version_id', 'status', 'name'],
             properties: {
               download_id: {
                 type: 'string',
                 format: 'uuid'
+              },
+              download_version_id: {
+                type: 'string',
+                format: 'uuid',
+                description: 'The most-recent materialized version of this download.'
               },
               status: {
                 type: 'string',
@@ -136,6 +141,7 @@ export function findDownloadById(): RequestHandler {
 
       return res.status(200).json({
         download_id: download.download_id,
+        download_version_id: download.download_version_id,
         status: download.download_status,
         name: download.name,
         description: download.description,

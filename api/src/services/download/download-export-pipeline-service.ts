@@ -644,11 +644,11 @@ export class DownloadExportPipelineService extends DBService {
    *  5. Transition PROCESSING → READY.
    *
    * The version is resolved from the GROUP (`group.download_version_id`), not
-   * from the download's *current* version. The group is pinned to the specific
-   * version it was created against, so a later re-materialization of the
-   * download — which advances `current_download_version_id` — does NOT change
-   * what this group packages. Re-reading the current version would silently zip
-   * a newer version's artifacts; resolving from the group eliminates that drift.
+   * from the download's most-recent version. The group is pinned to the specific
+   * version it was created against, so a later re-run of the download — which
+   * creates a NEW version rather than mutating the parent — does NOT change what
+   * this group packages. Re-reading the latest version would silently zip a newer
+   * version's artifacts; resolving from the group eliminates that drift.
    *
    * Feature types are processed sequentially, not in parallel, to cap memory:
    * a version with tens of types and hundreds of thousands of rows would

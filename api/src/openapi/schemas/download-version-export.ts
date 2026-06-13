@@ -14,6 +14,9 @@ const MAX_PART_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 /**
  * Body schema for `POST /api/download/:downloadId/export`.
  *
+ * `download_version_id` is required and names the materialized download version
+ * to export — it must be a ready version belonging to this download.
+ *
  * `max_part_size_bytes` is optional. When provided, the route layer enforces
  * the 5 MiB–5 GiB bounds via the integer min/max (out-of-range → 400). When
  * omitted, the service applies the 500 MB default.
@@ -21,7 +24,13 @@ const MAX_PART_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
+  required: ['download_version_id'],
   properties: {
+    download_version_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The materialized download version to export. Must be a ready version belonging to this download.'
+    },
     max_part_size_bytes: {
       type: 'integer',
       minimum: MIN_PART_SIZE_BYTES,

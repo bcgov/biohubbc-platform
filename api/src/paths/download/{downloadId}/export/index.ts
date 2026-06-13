@@ -103,7 +103,7 @@ export function createDownloadVersionExport(): RequestHandler {
 
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
-      const body = req.body as { max_part_size_bytes?: number };
+      const body = req.body as { download_version_id: string; max_part_size_bytes?: number };
 
       const exportService = new DownloadExportService(connection);
 
@@ -111,6 +111,7 @@ export function createDownloadVersionExport(): RequestHandler {
         downloadId,
         systemUserId,
         {
+          download_version_id: body.download_version_id,
           max_part_size_bytes:
             typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
         },

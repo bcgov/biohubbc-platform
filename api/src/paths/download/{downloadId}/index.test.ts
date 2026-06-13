@@ -20,7 +20,7 @@ const makeDownloadRecord = (overrides: Partial<DownloadDetailRecord> = {}): Down
   completed_at: '2025-01-01T00:01:00Z',
   downloaded_at: null,
   create_date: '2025-01-01T00:00:00Z',
-  current_download_version_id: 'dddd0000-0000-0000-0000-000000000001',
+  download_version_id: 'dddd0000-0000-0000-0000-000000000001',
   name: 'Test download',
   description: 'Test description',
   ...overrides
@@ -53,6 +53,7 @@ describe('paths/download/{downloadId}/index', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
+        download_version_id: 'dddd0000-0000-0000-0000-000000000001',
         status: 'ready',
         name: 'Test download',
         description: 'Test description',
@@ -60,6 +61,9 @@ describe('paths/download/{downloadId}/index', () => {
         completed_at: '2025-01-01T00:01:00Z',
         downloaded_at: null
       });
+
+      // The handler surfaces the version id resolved from the authorized download record
+      expect(mockRes.jsonValue.download_version_id).to.equal(mockDownload.download_version_id);
     });
 
     it('should return 200 with description: null when policy description is null', async () => {

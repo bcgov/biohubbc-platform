@@ -1,6 +1,6 @@
 import { DEFAULT_MAX_PART_SIZE_BYTES, EXPORTER_VERSION, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { HTTP403, HTTP409 } from '../../errors/http-error';
+import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import {
   CreateDownloadVersionExportRequest,
@@ -11,6 +11,7 @@ import {
 import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
 import { publishProcessDownloadVersionExportJob } from '../../queue/publisher';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { parseExportPartKey } from '../../utils/export-utils';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
@@ -42,6 +43,7 @@ export interface DownloadExportPart {
 export class DownloadExportService extends DBService {
   downloadService: DownloadService;
   downloadVersionExportRepository: DownloadVersionExportRepository;
+  downloadVersionRepository: DownloadVersionRepository;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -60,6 +62,7 @@ export class DownloadExportService extends DBService {
     super(connection);
     this.downloadService = new DownloadService(connection);
     this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
   }
 
   /**
@@ -82,9 +85,13 @@ export class DownloadExportService extends DBService {
    *
    * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and require team
    * membership on the parent download — delegates to `DownloadService.getAuthorizedDownload` so the
-   * team-auth rule lives in exactly one place. Only `ready` downloads with a materialized version
-   * can export; `pending` / `processing` / `failed` parents surface 409 and the client retries
-   * after the parent finishes.
+   * team-auth rule lives in exactly one place. The caller names an explicit `download_version_id` in
+   * the request: the service verifies that version belongs to the authorized download (HTTP404
+   * otherwise, so a caller authorized on one download cannot reach another download's artifacts by
+   * naming its version id) and requires the version itself to be `ready` (HTTP409 otherwise, with the
+   * client retrying after materialization finishes). Readiness is gated on the named version's own
+   * status — which may legitimately be older than the download's most-recent version — not the
+   * parent download's.
    */
   async createDownloadVersionExport(
     downloadId: string,
@@ -96,18 +103,27 @@ export class DownloadExportService extends DBService {
       throw new HTTP403('Access denied');
     }
 
-    // Throws HTTP403 / HTTP404 as appropriate.
-    const download = await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
+    // Authorize the caller against the parent download named in the URL. The team-membership rule
+    // lives in exactly one place (DownloadService.getAuthorizedDownload). Throws HTTP403 / HTTP404.
+    await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
-    if (download.download_status !== DownloadStatusEnum.READY) {
-      throw new HTTP409('Download is not ready — cannot export');
+    // The version is the explicit export target. getDownloadVersionStatusById throws HTTP404 when it
+    // does not exist; we then verify it belongs to the authorized download so a caller authorized on
+    // one download cannot export another download's materialized artifacts by naming its version id.
+    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(request.download_version_id);
+
+    if (version.download_id !== downloadId) {
+      throw new HTTP404('Download version not found');
     }
 
-    if (download.current_download_version_id === null) {
-      throw new HTTP409('Download has no materialized version');
+    // An export is bound to one materialized snapshot — only a ready version can export. The named
+    // version may legitimately be older than the download's most-recent version, so readiness is
+    // gated on the version's own status, not the parent download's.
+    if (version.status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Download version is not ready — cannot export');
     }
 
-    const downloadVersionId = download.current_download_version_id;
+    const downloadVersionId = request.download_version_id;
 
     // Single-shape contract — `as const` is required so the literals satisfy the
     // `z.literal('csv')` / `z.literal('per_feature_type')` payload fields (a bare const widens to
