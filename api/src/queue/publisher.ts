@@ -1,9 +1,8 @@
 import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../constants/submission-upload';
 import { IDBConnection } from '../database/db';
-import { ApiNotFoundError } from '../errors/api-error';
 import { DownloadStatusEnum } from '../models/download-status';
 import { SubmissionUpload } from '../models/submission-upload';
-import { DownloadService } from '../services/download/download-service';
+import { DownloadVersionRepository } from '../repositories/download/download-version-repository';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
@@ -25,13 +24,11 @@ const defaultLog = getLogger('queue/publisher');
 export interface PublisherDependencies {
   getPgBoss: typeof getPgBoss;
   createSubmissionValidationService: (connection: IDBConnection) => SubmissionValidationService;
-  createDownloadService: (connection: IDBConnection) => DownloadService;
 }
 
 export const publisherDependencies: PublisherDependencies = {
   getPgBoss,
-  createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection),
-  createDownloadService: (connection: IDBConnection) => new DownloadService(connection)
+  createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection)
 };
 
 /**
@@ -341,14 +338,18 @@ export const publishMalwareScanJob = async (
 /**
  * Publish a process download job to the queue.
  *
- * Queues async packaging of selected features into a downloadable zip file.
- * Updates the download record with the job_id for tracking.
+ * Queues async packaging of a download version's selected features into Parquet files. The version
+ * is the unit of materialization: the job is keyed `download-version-{id}` so a re-run enqueues
+ * independent work that can't collide with an earlier version's in-flight job.
  *
- * @param {IDBConnection} connection Database connection for download record updates
- * @param {IProcessDownloadJobData} data Job data containing downloadId
+ * Only a `pending` version is enqueued; any other status means the version is already in flight or
+ * finished, so the publish is treated as a duplicate.
+ *
+ * @param {IDBConnection} connection Database connection for the transactional job insert
+ * @param {IProcessDownloadJobData} data Job data containing downloadVersionId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
- * @throws {ApiNotFoundError} When the download row does not exist.
+ * @throws {ApiNotFoundError} When the download version does not exist.
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
  *         callers' surrounding transaction rolls back automatically.
  */
@@ -358,25 +359,21 @@ export const publishProcessDownloadJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const downloadService = publisherDependencies.createDownloadService(connection);
+    // Resolve the version directly; a missing version throws ApiNotFoundError from the repository.
+    const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(
+      data.downloadVersionId
+    );
 
-    // Check if download exists
-    const download = await downloadService.findDownloadById(data.downloadId);
-
-    if (!download) {
-      throw new ApiNotFoundError('Download not found', ['publishProcessDownloadJob', { downloadId: data.downloadId }]);
-    }
-
-    // Check if download is already being processed or completed
-    if (download.download_status !== DownloadStatusEnum.PENDING) {
+    // Only a pending version is enqueueable — any other status is already in flight or terminal.
+    if (version.status !== DownloadStatusEnum.PENDING) {
       defaultLog.warn({
         label: 'publishProcessDownloadJob',
-        message: 'Download is not in pending status',
-        downloadId: data.downloadId,
-        currentStatus: download.download_status
+        message: 'Download version is not in pending status',
+        downloadVersionId: data.downloadVersionId,
+        currentStatus: version.status
       });
 
-      return { status: 'duplicate', message: 'Job already exists for this download' };
+      return { status: 'duplicate', message: 'Job already exists for this download version' };
     }
 
     const boss = publisherDependencies.getPgBoss();
@@ -393,10 +390,10 @@ export const publishProcessDownloadJob = async (
       }
     };
 
-    // Use singletonKey to prevent duplicate concurrent jobs for the same download
+    // Use singletonKey to prevent duplicate concurrent jobs for the same download version
     const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD, data, {
       ...mergedOptions,
-      singletonKey: `download-${data.downloadId}`,
+      singletonKey: `download-version-${data.downloadVersionId}`,
       db
     });
 
@@ -405,7 +402,7 @@ export const publishProcessDownloadJob = async (
         label: 'publishProcessDownloadJob',
         message: 'Process download job published',
         jobId,
-        downloadId: data.downloadId
+        downloadVersionId: data.downloadVersionId
       });
 
       return { status: 'published', jobId };
@@ -414,15 +411,15 @@ export const publishProcessDownloadJob = async (
     defaultLog.warn({
       label: 'publishProcessDownloadJob',
       message: 'Job not published (duplicate or throttled)',
-      downloadId: data.downloadId
+      downloadVersionId: data.downloadVersionId
     });
 
-    return { status: 'duplicate', message: 'Job already exists for this download' };
+    return { status: 'duplicate', message: 'Job already exists for this download version' };
   } catch (error) {
     defaultLog.error({
       label: 'publishProcessDownloadJob',
       message: 'Failed to publish job',
-      downloadId: data.downloadId,
+      downloadVersionId: data.downloadVersionId,
       error
     });
     throw error;

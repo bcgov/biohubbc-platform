@@ -141,12 +141,10 @@ export class DownloadService extends DBService {
     });
 
     // A download materializes exactly one version at request time. The version is the temporal
-    // axis the parquet/export pipeline links artifacts to, and `current_download_version_id`
-    // points at it. The version must exist before the pointer UPDATE references it; both writes
-    // ride the route's transaction so a mid-flow failure rolls back the download and its version
-    // together.
+    // axis the parquet/export pipeline links artifacts to, and the worker job is keyed on it.
+    // The write rides the route's transaction so a mid-flow failure rolls back the download and
+    // its version together.
     const version = await this.downloadVersionRepository.createDownloadVersion(download_id);
-    await this.downloadVersionRepository.setCurrentDownloadVersion(download_id, version.download_version_id);
 
     if (payload.requestedBy !== null) {
       await this.linkDownloadToNewTeam(
@@ -158,7 +156,9 @@ export class DownloadService extends DBService {
     }
     // Anonymous: no team link — UUID is the credential.
 
-    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
+    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, {
+      downloadVersionId: version.download_version_id
+    });
 
     return { download_id };
   }

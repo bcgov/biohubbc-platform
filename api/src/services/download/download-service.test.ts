@@ -224,7 +224,6 @@ describe('DownloadService', () => {
       const createVersionStub = sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
-      const setCurrentStub = sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',
         jobId: 'job-1'
@@ -258,24 +257,23 @@ describe('DownloadService', () => {
       expect(linkStub.firstCall.args[0]).to.equal('download-uuid-1');
       expect(linkStub.firstCall.args[1]).to.equal(42);
 
-      // Step 6: Verify the worker job was queued exactly once with the new download id
+      // Step 6: Verify the worker job was queued exactly once with the new version id
       expect(publishStub).to.have.been.calledOnce;
-      expect(publishStub.firstCall.args[1]).to.eql({ downloadId: 'download-uuid-1' });
+      expect(publishStub.firstCall.args[1]).to.eql({ downloadVersionId: 'ver-1' });
 
       // Step 7: Verify the required call order — the version is materialized between the
       // download insert and the team link, and the publish is last.
       expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
       expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
       expect(createDownloadStub).to.have.been.calledBefore(createVersionStub);
-      expect(createVersionStub).to.have.been.calledBefore(setCurrentStub);
-      expect(setCurrentStub).to.have.been.calledBefore(linkStub);
+      expect(createVersionStub).to.have.been.calledBefore(linkStub);
       expect(linkStub).to.have.been.calledBefore(publishStub);
     });
 
-    it('materializes a download version and points the download at it before publishing', async () => {
-      // Verifies: createDownloadRequest creates the version off the new download_id, flips the
-      // current-version pointer with the returned version id, and orders both writes between the
-      // download insert and the worker publish (version must exist before the pointer UPDATE).
+    it('materializes the version off the new download id and enqueues { downloadVersionId } with no pointer write', async () => {
+      // Verifies: createDownloadRequest creates exactly one version off the new download_id and
+      // enqueues the worker job keyed on that version id. There is no "current version" pointer
+      // write — reads resolve the most-recent version and the worker job carries the version id.
 
       // Step 1: Stub the orchestration dependencies up to the download insert
       sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-uuid-1' });
@@ -284,12 +282,10 @@ describe('DownloadService', () => {
         .stub(DownloadRepository.prototype, 'createDownload')
         .resolves({ download_id: 'download-uuid-1' });
 
-      // Step 2: Stub the version repo — createDownloadVersion returns the new version row, and the
-      // pointer UPDATE resolves.
+      // Step 2: Stub the version repo — createDownloadVersion returns the new version row.
       const createVersionStub = sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
-      const setCurrentStub = sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
 
       // Step 3: Stub the team link + publish (the tail of the flow)
       const mockDBConnection = getMockDBConnection();
@@ -303,19 +299,16 @@ describe('DownloadService', () => {
       // Step 4: Run the create request
       await service.createDownloadRequest(basePayload());
 
-      // Step 5: Both version writes fire exactly once
-      expect(createVersionStub).to.have.been.calledOnce;
-      expect(setCurrentStub).to.have.been.calledOnce;
-
-      // Step 6: The version is created off the download_id returned by createDownload, and the
-      // pointer is set with that download_id + the returned version id.
+      // Step 5: Exactly one version is created, off the download_id returned by createDownload.
       expect(createVersionStub).to.have.been.calledOnceWith('download-uuid-1');
-      expect(setCurrentStub).to.have.been.calledOnceWith('download-uuid-1', 'ver-1');
 
-      // Step 7: Ordering — download insert → version create → set-current → publish
+      // Step 6: The worker job is enqueued with the new version id — no pointer write.
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ downloadVersionId: 'ver-1' });
+
+      // Step 7: Ordering — download insert → version create → publish
       expect(createDownloadStub).to.have.been.calledBefore(createVersionStub);
-      expect(createVersionStub).to.have.been.calledBefore(setCurrentStub);
-      expect(setCurrentStub).to.have.been.calledBefore(publishStub);
+      expect(createVersionStub).to.have.been.calledBefore(publishStub);
     });
 
     it('skips the team link for an anonymous request (requestedBy null)', async () => {
@@ -327,11 +320,10 @@ describe('DownloadService', () => {
       sinon.stub(DownloadPolicyService.prototype, 'createDownloadPolicy').resolves({ policy_id: 'policy-uuid-1' });
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'download-uuid-1' });
 
-      // Step 2: Stub the version writes
+      // Step 2: Stub the version write
       sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: 'download-uuid-1' }));
-      sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',
         jobId: 'job-1'
@@ -351,8 +343,8 @@ describe('DownloadService', () => {
       // Step 6: The result is the download id only
       expect(result).to.eql({ download_id: 'download-uuid-1' });
 
-      // Step 7: The worker job is still queued exactly once
-      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'download-uuid-1' });
+      // Step 7: The worker job is still queued exactly once, keyed on the new version id
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadVersionId: 'ver-1' });
     });
 
     it('skips writeExpressionTree and passes expressionId=null when expression is null', async () => {
@@ -367,7 +359,6 @@ describe('DownloadService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
         .resolves(createMockDownloadVersion({ download_version_id: 'ver-2', download_id: 'download-uuid-2' }));
-      sinon.stub(DownloadVersionRepository.prototype, 'setCurrentDownloadVersion').resolves();
       sinon.stub(service, 'linkDownloadToNewTeam').resolves();
       sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
         status: 'published',

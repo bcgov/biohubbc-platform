@@ -3,6 +3,7 @@ import { PROCESS_START_STATUSES, TERMINAL_DOWNLOAD_STATUSES } from '../../consta
 import { getAPIUserDBConnection } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { getLogger } from '../../utils/logger';
 import { withConnection } from '../with-connection';
@@ -11,11 +12,14 @@ const defaultLog = getLogger('queue/jobs/process-download-job');
 
 /**
  * Process download job data interface.
- * Contains the download ID for async packaging of selected features.
+ *
+ * Carries the download version — the version is the unit of materialization, so a
+ * re-run enqueues independent work against its own version that can't collide with
+ * an earlier version's job. The owning download id is derived from the version row.
  */
 export interface IProcessDownloadJobData {
-  /** The download ID to process */
-  downloadId: string;
+  /** The download version to materialize. */
+  downloadVersionId: string;
 }
 
 /**
@@ -44,43 +48,35 @@ export interface IProcessDownloadJobData {
  */
 export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { downloadId } = job.data;
+    const { downloadVersionId } = job.data;
 
     defaultLog.info({
       label: 'processDownloadJobHandler',
       message: 'Processing download job',
       jobId: job.id,
-      downloadId
+      downloadVersionId
     });
 
     try {
-      // Fetch once, up front, to drive the status guards.
-      const download = await withConnection(async (connection) =>
-        new DownloadRepository(connection).findDownloadById(downloadId)
+      // Fetch the version once, up front, to drive the status guards. The version IS the unit
+      // of materialization; its lifecycle status lives on the version row, not the download.
+      const version = await withConnection(async (connection) =>
+        new DownloadVersionRepository(connection).getDownloadVersionStatusById(downloadVersionId)
       );
 
-      if (!download) {
-        throw new Error(`Download ${downloadId} not found`);
-      }
+      // The owning download id is still needed for the parquet S3 key and the download source.
+      const downloadId = version.download_id;
 
-      // A download being processed must have a materialized version — it is created at request
-      // time. Guarding here narrows the type to string so it can be threaded into the parquet
-      // writes, which link each artifact to this version.
-      if (download.current_download_version_id === null) {
-        throw new Error(`Download ${downloadId} has no materialized version — cannot process`);
-      }
-      const downloadVersionId = download.current_download_version_id;
-
-      const currentStatus = download.download_status;
+      const currentStatus = version.status;
 
       // Already complete — pg-boss re-fired a finished job, or the DLQ ran after
       // a late success. Nothing to do; exit cleanly so we don't fight the state.
       if (TERMINAL_DOWNLOAD_STATUSES.includes(currentStatus)) {
         defaultLog.info({
           label: 'processDownloadJobHandler',
-          message: 'Download already in terminal status — skipping',
+          message: 'Download version already in terminal status — skipping',
           jobId: job.id,
-          downloadId,
+          downloadVersionId,
           downloadStatus: currentStatus
         });
         continue;
@@ -89,15 +85,17 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       // Status is neither a start state nor terminal — something unexpected.
       // Surface it: throw puts the job in the DLQ where someone can triage.
       if (!PROCESS_START_STATUSES.includes(currentStatus)) {
-        throw new Error(`Download ${downloadId} in unexpected status '${currentStatus}' — cannot start processing`);
+        throw new Error(
+          `Download version ${downloadVersionId} in unexpected status '${currentStatus}' — cannot start processing`
+        );
       }
 
       // Transition → processing. Accepts PROCESSING as a source because a
       // mid-job retry after a crash re-enters this block with the row already
       // in processing; the transition is a no-op re-entry.
       await withConnection(async (connection) => {
-        await new DownloadPipelineService(connection).transitionDownloadStatus(
-          downloadId,
+        await new DownloadPipelineService(connection).transitionDownloadVersionStatus(
+          downloadVersionId,
           DownloadStatusEnum.PROCESSING,
           [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING]
         );
@@ -132,23 +130,25 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       }
 
       await withConnection(async (connection) => {
-        await new DownloadPipelineService(connection).transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
-          DownloadStatusEnum.PROCESSING
-        ]);
+        await new DownloadPipelineService(connection).transitionDownloadVersionStatus(
+          downloadVersionId,
+          DownloadStatusEnum.READY,
+          [DownloadStatusEnum.PROCESSING]
+        );
       });
 
       defaultLog.info({
         label: 'processDownloadJobHandler',
         message: 'Download job completed successfully',
         jobId: job.id,
-        downloadId
+        downloadVersionId
       });
     } catch (error) {
       defaultLog.error({
         label: 'processDownloadJobHandler',
         message: 'Download job failed',
         jobId: job.id,
-        downloadId,
+        downloadVersionId,
         error
       });
       throw error; // pg-boss retries per queue config; terminal failure lands in DLQ
@@ -159,27 +159,28 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
 /**
  * Dead Letter Queue handler for failed download jobs.
  *
- * Mirror-image terminal guard: if the download is already in a terminal status
+ * Mirror-image terminal guard: if the download version is already in a terminal status
  * (success happened before retries exhausted, or a previous DLQ firing already
- * marked it failed), exit silently. Missing download is also a no-op — nothing
- * to transition, and throwing would put pg-boss in a DLQ retry loop.
+ * marked it failed), exit silently so we don't re-transition a finished version.
  *
- * Otherwise transitions the download to `failed` with the job output as error
- * metadata.
+ * Otherwise transitions the version to `failed` with the job output as error
+ * metadata. The version is created in the same transaction as its download, so a
+ * lookup miss is an unreachable invariant violation; it propagates as a thrown
+ * error rather than being swallowed.
  *
  * @param {PgBoss.Job<IProcessDownloadJobData>[]} jobs - The failed jobs (post-retry).
  * @return {Promise<void>}
  */
 export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { downloadId } = job.data;
+    const { downloadVersionId } = job.data;
     const jobOutput = (job as PgBoss.JobWithMetadata<IProcessDownloadJobData>).output;
 
     defaultLog.warn({
       label: 'processDownloadFailedHandler',
       message: 'Processing failed download job from dead letter queue',
       jobId: job.id,
-      downloadId,
+      downloadVersionId,
       output: jobOutput
     });
 
@@ -188,33 +189,22 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
     try {
       await connection.open();
 
-      const download = await new DownloadRepository(connection).findDownloadById(downloadId);
+      const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(downloadVersionId);
 
-      if (!download) {
-        defaultLog.warn({
-          label: 'processDownloadFailedHandler',
-          message: 'Download not found — skipping DLQ transition',
-          jobId: job.id,
-          downloadId
-        });
-        await connection.commit();
-        continue;
-      }
-
-      if (TERMINAL_DOWNLOAD_STATUSES.includes(download.download_status)) {
+      if (TERMINAL_DOWNLOAD_STATUSES.includes(version.status)) {
         defaultLog.info({
           label: 'processDownloadFailedHandler',
-          message: 'Download already in terminal status — skipping DLQ transition',
+          message: 'Download version already in terminal status — skipping DLQ transition',
           jobId: job.id,
-          downloadId,
-          downloadStatus: download.download_status
+          downloadVersionId,
+          downloadStatus: version.status
         });
         await connection.commit();
         continue;
       }
 
-      await new DownloadPipelineService(connection).transitionDownloadStatus(
-        downloadId,
+      await new DownloadPipelineService(connection).transitionDownloadVersionStatus(
+        downloadVersionId,
         DownloadStatusEnum.FAILED,
         [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
         { error: typeof jobOutput === 'string' ? jobOutput : 'Job failed after all retries' }
@@ -226,7 +216,7 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
         label: 'processDownloadFailedHandler',
         message: 'Failed download job status updated',
         jobId: job.id,
-        downloadId
+        downloadVersionId
       });
     } catch (error) {
       await connection.rollback();
@@ -234,7 +224,7 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
         label: 'processDownloadFailedHandler',
         message: 'Failed to update failed download job status',
         jobId: job.id,
-        downloadId,
+        downloadVersionId,
         error
       });
       throw error;

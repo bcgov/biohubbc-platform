@@ -21,8 +21,8 @@ export class DownloadVersionRepository extends BaseRepository {
   /**
    * Create a new download version row.
    *
-   * Returns the thin record so the caller can immediately set it as the
-   * download's current version without a follow-up SELECT.
+   * Returns the thin record (with the generated `download_version_id`) so the caller can enqueue
+   * the version's materialization job without a follow-up SELECT.
    *
    * @param {string} downloadId - The parent download ID.
    * @return {Promise<DownloadVersionRecord>}
@@ -47,34 +47,6 @@ export class DownloadVersionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Point a download at its currently-materialized version.
-   *
-   * The download row is inserted before its version within the create
-   * transaction; this flips the pointer once the version exists.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} downloadVersionId - The version to mark current.
-   * @return {Promise<void>}
-   * @memberof DownloadVersionRepository
-   */
-  async setCurrentDownloadVersion(downloadId: string, downloadVersionId: string): Promise<void> {
-    const sql = SQL`
-      UPDATE download
-      SET current_download_version_id = ${downloadVersionId}
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to set current download version', [
-        'DownloadVersionRepository->setCurrentDownloadVersion',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
   }
 
   /**

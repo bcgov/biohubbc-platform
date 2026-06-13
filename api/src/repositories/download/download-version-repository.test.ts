@@ -106,47 +106,6 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
-  describe('setCurrentDownloadVersion', () => {
-    it('UPDATEs download.current_download_version_id', async () => {
-      // Verifies: the pointer flip targets download.current_download_version_id
-
-      // Step 1: Setup mock DB to report one updated row
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new DownloadVersionRepository(mockDBConnection);
-
-      // Step 3: Call setCurrentDownloadVersion
-      await repo.setCurrentDownloadVersion(DOWNLOAD_ID, VERSION_ID);
-
-      // Step 4: Verify the UPDATE target column
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('UPDATE download');
-      expect(sqlText).to.include('current_download_version_id');
-    });
-
-    it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
-      // Verifies: an UPDATE that matched no download row is surfaced as an error
-
-      // Step 1: Setup mock DB to report zero updated rows
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new DownloadVersionRepository(mockDBConnection);
-
-      // Step 3 + 4: Call and assert it rejects with ApiExecuteSQLError
-      try {
-        await repo.setCurrentDownloadVersion(DOWNLOAD_ID, VERSION_ID);
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err).to.be.instanceOf(ApiExecuteSQLError);
-        expect(err.message).to.equal('Failed to set current download version');
-      }
-    });
-  });
-
   describe('updateDownloadVersionStatus', () => {
     it('UPDATEs download_version status/timing/error and binds the version id', async () => {
       // Verifies: the lifecycle write targets download_version (not download), sets
