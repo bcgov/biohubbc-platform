@@ -170,16 +170,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize the download's version and point the download at it. The parquet pipeline links
-    // each artifact to this version, and runExportGroup discovers feature types from it.
+    // Materialize the download's version. The parquet pipeline links each artifact to this version,
+    // and runExportGroup discovers feature types from it; reads resolve the most-recent version, so
+    // there is no stored "current version" pointer to set.
     const downloadVersionRepo = new DownloadVersionRepository(connection);
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
-    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
@@ -195,7 +195,7 @@ describe('Ingest → Download → Export (system integration)', function () {
         statement
       });
     }
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
       DownloadStatusEnum.PROCESSING
     ]);
 
@@ -208,6 +208,7 @@ describe('Ingest → Download → Export (system integration)', function () {
       downloadId,
       systemUserId,
       {
+        download_version_id: downloadVersionId,
         version: 1,
         export_type: 'csv',
         mode: 'per_feature_type',

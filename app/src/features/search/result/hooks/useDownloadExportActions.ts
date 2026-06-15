@@ -3,7 +3,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import { type ExportConfig } from 'interfaces/useDownloadExportApi.interface';
+import { type CreateExportPayload } from 'interfaces/useDownloadExportApi.interface';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { buildExportConfig } from '../sidebar/download/export-config-form';
@@ -53,6 +53,12 @@ export const useDownloadExportActions = () => {
   const downloads = downloadsDataLoader.data?.downloads ?? [];
   const lastPage = downloadsDataLoader.data?.pagination?.last_page ?? 1;
 
+  // The export request names an explicit `download_version_id`. The download list row and the
+  // feature-types picker both resolve the same most-recent version, so sourcing the id off the
+  // in-memory row keeps the columns the user picked and the version actually exported in lockstep.
+  const resolveDownloadVersionId = (downloadId: string): string | undefined =>
+    downloads.find((download) => download.download_id === downloadId)?.download_version_id;
+
   // Re-fetches the current page; the refresh button and the post-create refreshes call it.
   // `downloadsDataLoader.refresh` is an unstable ref, so it's omitted from the deps — `refresh`
   // re-creates only when `page` changes.
@@ -76,8 +82,13 @@ export const useDownloadExportActions = () => {
    */
   const handleCreateExport = async (downloadId: string) => {
     try {
+      const downloadVersionId = resolveDownloadVersionId(downloadId);
+      if (!downloadVersionId) {
+        throw new Error('Download version not found');
+      }
       const featureTypes = await biohubApi.downloadExport.getDownloadFeatureTypes(downloadId);
-      const config: ExportConfig = {
+      const config: CreateExportPayload = {
+        download_version_id: downloadVersionId,
         version: EXPORT_CONFIG_VERSION,
         export_type: EXPORT_TYPE,
         mode: 'per_feature_type',
@@ -124,9 +135,15 @@ export const useDownloadExportActions = () => {
     if (configDownloadId === null) {
       return;
     }
+    const downloadVersionId = resolveDownloadVersionId(configDownloadId);
+    if (!downloadVersionId) {
+      dialogContext.setSnackbar({ open: true, snackbarMessage: 'Download version not found.' });
+      return;
+    }
     setIsSubmittingConfig(true);
     try {
-      await biohubApi.downloadExport.createExport(configDownloadId, buildExportConfig(values));
+      const payload: CreateExportPayload = { ...buildExportConfig(values), download_version_id: downloadVersionId };
+      await biohubApi.downloadExport.createExport(configDownloadId, payload);
       setConfigDownloadId(null);
       await refresh();
     } catch (error) {
