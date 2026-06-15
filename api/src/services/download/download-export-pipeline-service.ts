@@ -21,6 +21,7 @@ import {
   buildOutputRecord,
   coerceJoinKey,
   computeDimensionProjection,
+  dedupeOutputColumnNames,
   DimensionMaps,
   joinRowTransform,
   materializedColumnsForType,
@@ -775,6 +776,12 @@ export class DownloadExportPipelineService extends DBService {
    * row); each contributed dimension type's columns omit `output_column` so
    * `buildOutputRecord` falls back to the `${feature_type}_${column}` name, which
    * keeps cross-type headers unique.
+   *
+   * Both paths are run through `dedupeOutputColumnNames` so the resolved header
+   * names are guaranteed unique: user-supplied `output_columns` can collide (two
+   * columns explicitly named the same), and even the default path can collide in
+   * the contrived case of a root property literally named `${dimType}_${dimColumn}`.
+   * Without this, colliding names silently overwrite one another in the CSV row.
    */
   private resolveDenormalizedOutputColumns(
     config: ExportConfig,
@@ -782,7 +789,7 @@ export class DownloadExportPipelineService extends DBService {
     schemaLookup: Map<string, CsvPropertyDefinition[]>
   ): OutputColumn[] {
     if (config.output_columns) {
-      return config.output_columns;
+      return dedupeOutputColumnNames(config.output_columns);
     }
 
     const rootFeatureType = config.root_feature_type!;
@@ -811,7 +818,7 @@ export class DownloadExportPipelineService extends DBService {
       }
     }
 
-    return outputColumns;
+    return dedupeOutputColumnNames(outputColumns);
   }
 
   /**

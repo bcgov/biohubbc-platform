@@ -222,7 +222,7 @@ export class DownloadExportService extends DBService {
       }
     }
 
-    await this.downloadVersionExportRepository.createExportArtifactGroup({
+    const inserted = await this.downloadVersionExportRepository.createExportArtifactGroup({
       downloadVersionId,
       config: normalizedConfig,
       configHash,
@@ -241,7 +241,11 @@ export class DownloadExportService extends DBService {
 
     // The partial-unique insert serializes at the DB, so this immediate re-select always finds
     // exactly one active row (race-safe) — the `!` is intentional, never null here.
-    return { group: group!, shouldEnqueue: true };
+    //
+    // Enqueue only when THIS call actually inserted the group. If a concurrent identical request
+    // won the `ON CONFLICT` race, `inserted` is false and we re-select onto its group — it already
+    // enqueued the one job, so re-queuing here would run the same build twice over the same S3 keys.
+    return { group: group!, shouldEnqueue: inserted };
   }
 
   /**

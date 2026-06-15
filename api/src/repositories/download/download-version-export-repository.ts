@@ -98,15 +98,20 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * group; the loser gets rowCount 0 (a valid outcome — NO throw) and re-selects
    * the winner's row. `status` is omitted so the DB DEFAULT ('pending') applies.
    *
+   * Returns whether THIS call inserted the group: `true` when the row was created,
+   * `false` when it lost the `ON CONFLICT` race to a concurrent identical request.
+   * The caller relies on this to enqueue the pipeline job exactly once — the loser
+   * attaches to the winner's (already-enqueued) group instead of double-queuing.
+   *
    * `format` and `mode` are denormalized from the hashed config for cheap
    * admin/diagnostic filters; they are written only from the parsed config —
    * never independently — because `config_hash` already encodes them.
    *
    * @param {CreateExportArtifactGroupPayload} payload
-   * @return {Promise<void>}
+   * @return {Promise<boolean>} `true` if this call inserted the group, `false` on conflict.
    * @memberof DownloadVersionExportRepository
    */
-  async createExportArtifactGroup(payload: CreateExportArtifactGroupPayload): Promise<void> {
+  async createExportArtifactGroup(payload: CreateExportArtifactGroupPayload): Promise<boolean> {
     const sql = SQL`
       INSERT INTO download_version_export_artifact_group (download_version_id, format, mode, max_part_size_bytes, exporter_version, config, config_hash)
       VALUES (
@@ -121,7 +126,12 @@ export class DownloadVersionExportRepository extends BaseRepository {
       ON CONFLICT (download_version_id, config_hash, max_part_size_bytes, exporter_version) WHERE record_end_date IS NULL DO NOTHING;
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    // `ON CONFLICT DO NOTHING` reports rowCount 1 when this INSERT created the row
+    // and 0 when a concurrent identical request already did — the loser's signal to
+    // skip enqueuing a duplicate job.
+    return response.rowCount === 1;
   }
 
   /**

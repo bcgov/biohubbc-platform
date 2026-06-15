@@ -129,9 +129,9 @@ describe('DownloadVersionExportRepository', () => {
   });
 
   describe('createExportArtifactGroup', () => {
-    it('INSERTs config/config_hash/format/mode and ON CONFLICTs on the config_hash key; does not throw on rowCount 0', async () => {
+    it('INSERTs config/config_hash/format/mode and ON CONFLICTs on the config_hash key; returns false (no throw) on rowCount 0', async () => {
       // Verifies: the recipe is stored inline as JSONB config + its hash; the dedupe key is config_hash;
-      // and the loser of a race (rowCount 0) is a valid no-op, not an error
+      // and the loser of a race (rowCount 0) is a valid no-op that returns false (did NOT insert), not an error
 
       // Step 1: Setup mock DB to return zero rows (the conflict / loser path)
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
@@ -140,9 +140,9 @@ describe('DownloadVersionExportRepository', () => {
       // Step 2: Create repository with mocked connection
       const repo = new DownloadVersionExportRepository(mockDBConnection);
 
-      // Step 3: Call createExportArtifactGroup — must resolve, not throw, on rowCount 0
+      // Step 3: Call createExportArtifactGroup — must resolve false (lost the race), not throw, on rowCount 0
       const result = await repo.createExportArtifactGroup(groupPayload);
-      expect(result).to.be.undefined;
+      expect(result).to.be.false;
 
       const sqlText = sqlStub.firstCall.args[0].text;
 
@@ -191,7 +191,9 @@ describe('DownloadVersionExportRepository', () => {
         format: 'WRONG_FORMAT',
         mode: 'denormalized'
       };
-      await repo.createExportArtifactGroup(divergentPayload);
+      // rowCount 1 here is the inserting (winner) path → returns true
+      const result = await repo.createExportArtifactGroup(divergentPayload);
+      expect(result).to.be.true;
 
       // Step 4: Verify the config-derived values are bound, NOT the divergent payload fields
       const sqlValues = sqlStub.firstCall.args[0].values;

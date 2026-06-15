@@ -156,7 +156,7 @@ describe('DownloadExportService', () => {
           .resolves(createdGroup);
         const createGroupStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-          .resolves();
+          .resolves(true); // this call inserted the group → enqueue
         const createExportStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());
@@ -191,6 +191,54 @@ describe('DownloadExportService', () => {
         expect(publishStub.firstCall.args[1]).to.deep.equal({
           downloadVersionExportArtifactGroupId: GROUP_ID
         });
+      });
+
+      it('lost the create race (ON CONFLICT no-op) → attaches to the winner group, inserts export, does NOT publish', async () => {
+        // Verifies the double-enqueue guard: when the pre-create probe sees no group but the INSERT
+        // loses the ON CONFLICT race to a concurrent identical request (createExportArtifactGroup
+        // returns false), the resolver re-selects the winner's group and must NOT enqueue a second job
+        // — the winner already queued the one build. The per-user export row is still inserted.
+
+        // Step 1: Auth + real column map
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        stubMaterializedData();
+
+        // Step 2: Pre-create probe sees nothing; re-select finds the winner's group; the INSERT reports
+        // it did NOT create the row (rowCount 0 → false)
+        const winnerGroup = createMockExportArtifactGroup({
+          download_version_export_artifact_group_id: GROUP_ID,
+          status: DownloadStatusEnum.PENDING
+        });
+        sinon
+          .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
+          .onFirstCall()
+          .resolves(null)
+          .onSecondCall()
+          .resolves(winnerGroup);
+        const createGroupStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
+          .resolves(false); // lost the race
+        const createExportStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
+          .resolves(createMockDownloadVersionExport());
+        const publishStub = sinon
+          .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
+          .resolves('mock-job-id' as any);
+
+        // Step 3: Create the export
+        const service = new DownloadExportService(getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
+
+        // Step 4: It attempted the insert and the export row was written, but no duplicate job was queued
+        expect(createGroupStub).to.have.been.calledOnce;
+        expect(createExportStub).to.have.been.calledOnce;
+        expect(createExportStub.firstCall.args[0].download_version_export_artifact_group_id).to.equal(GROUP_ID);
+        expect(publishStub).to.not.have.been.called;
       });
 
       it('identical recipe with an active group → reuses it: no group create, no publish, export still inserted', async () => {
@@ -249,7 +297,7 @@ describe('DownloadExportService', () => {
           .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.PENDING }));
         const createGroupStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-          .resolves();
+          .resolves(true);
         sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());
@@ -303,7 +351,7 @@ describe('DownloadExportService', () => {
         const endGroupStub = sinon.stub(DownloadVersionExportRepository.prototype, 'endExportArtifactGroup').resolves();
         const createGroupStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-          .resolves();
+          .resolves(true); // fresh group created after ending the failed one → enqueue
         sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());

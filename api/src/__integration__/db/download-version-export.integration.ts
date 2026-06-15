@@ -607,12 +607,13 @@ describe('Download version export state machine (integration)', function () {
       expect(await exportRepo.findActiveExportArtifactGroup(downloadVersionId, configHash, MAX_PART, EXPORTER_VERSION))
         .to.be.null;
 
-      // First insert wins.
-      await exportRepo.createExportArtifactGroup(payload);
+      // First insert wins → returns true (this call created the group).
+      expect(await exportRepo.createExportArtifactGroup(payload)).to.be.true;
 
       // Second identical insert collides on the partial-unique key → ON CONFLICT
-      // DO NOTHING. rowCount 0 is valid; it must NOT throw.
-      await exportRepo.createExportArtifactGroup(payload);
+      // DO NOTHING. rowCount 0 is valid; it must NOT throw and must report false
+      // (did NOT insert) so the caller skips enqueuing a duplicate job.
+      expect(await exportRepo.createExportArtifactGroup(payload)).to.be.false;
 
       // Re-select returns exactly the one winner.
       expect(await countActiveGroups(downloadVersionId, configHash)).to.equal(1);

@@ -9,6 +9,7 @@ import {
   coerceJoinKey,
   computeConfigHash,
   computeDimensionProjection,
+  dedupeOutputColumnNames,
   DimensionMaps,
   joinRowTransform,
   materializedColumnsForType,
@@ -57,6 +58,23 @@ describe('export-config-utils', () => {
     it('sorts feature_types', () => {
       const canonical = canonicalizeExportConfig(parse(baseConfig));
       expect(canonical.feature_types).to.deep.equal(['animal', 'deployment']);
+    });
+
+    it('dedupes feature_types (a set has no multiplicity)', () => {
+      const canonical = canonicalizeExportConfig(
+        parse({ ...baseConfig, feature_types: ['animal', 'animal', 'deployment'] })
+      );
+      expect(canonical.feature_types).to.deep.equal(['animal', 'deployment']);
+    });
+
+    it('hashes identically whether or not feature_types carries a duplicate (reuse hit, not a miss)', () => {
+      const single = computeConfigHash(
+        canonicalizeExportConfig(parse({ ...baseConfig, feature_types: ['animal', 'deployment'] }))
+      );
+      const withDuplicate = computeConfigHash(
+        canonicalizeExportConfig(parse({ ...baseConfig, feature_types: ['animal', 'deployment', 'deployment'] }))
+      );
+      expect(single).to.equal(withDuplicate);
     });
 
     it('preserves merge_steps order', () => {
@@ -215,6 +233,86 @@ describe('export-config-utils', () => {
           }
         ])
       ).to.throw();
+    });
+
+    it('throws on a self-edge (root joined onto itself)', () => {
+      expect(() =>
+        orderMergeSteps('animal', [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'animal',
+            right_column: 'parent_uuid',
+            merge_type: 'left'
+          }
+        ])
+      ).to.throw(/cycle/);
+    });
+
+    it('throws on a back-edge that re-joins the root after a chain', () => {
+      // root-reachable cycle: animal -> deployment -> animal. Both left sides are
+      // reachable, so this was previously accepted; the right side re-joining the
+      // already-present root must now be rejected.
+      expect(() =>
+        orderMergeSteps('animal', [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'deployment',
+            right_column: 'a',
+            merge_type: 'left'
+          },
+          {
+            left_feature_type: 'deployment',
+            left_column: 'b',
+            right_feature_type: 'animal',
+            right_column: 'uuid',
+            merge_type: 'left'
+          }
+        ])
+      ).to.throw(/cycle/);
+    });
+
+    it('throws when the same dimension is folded in twice', () => {
+      expect(() =>
+        orderMergeSteps('animal', [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'deployment',
+            right_column: 'a',
+            merge_type: 'left'
+          },
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'deployment',
+            right_column: 'a',
+            merge_type: 'left'
+          }
+        ])
+      ).to.throw(/cycle/);
+    });
+
+    it('still accepts a legitimate multi-step chain (no over-rejection)', () => {
+      const ordered = orderMergeSteps('animal', [
+        {
+          left_feature_type: 'animal',
+          left_column: 'uuid',
+          right_feature_type: 'deployment',
+          right_column: 'a',
+          merge_type: 'left'
+        },
+        {
+          left_feature_type: 'deployment',
+          left_column: 'b',
+          right_feature_type: 'observation',
+          right_column: 'c',
+          merge_type: 'left'
+        }
+      ]);
+
+      expect(ordered.map((step) => step.right_feature_type)).to.deep.equal(['deployment', 'observation']);
     });
   });
 
@@ -424,6 +522,35 @@ describe('export-config-utils', () => {
 
       // 'deployment' is unreachable from root 'animal' — orderMergeSteps throws, surfaced as an error.
       expect(errors.length).to.be.greaterThan(0);
+    });
+
+    it('throws for a root-reachable cycle (back-edge re-joining the root)', () => {
+      // animal -> deployment -> animal: both left sides are reachable, so this is a
+      // genuine cycle (not an orphan). It must surface as an ApiValidationError (400),
+      // not slip through to the pipeline.
+      const errors = invalidErrors({
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'deployment'],
+        merge_steps: [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'deployment',
+            right_column: 'parent_uuid'
+          },
+          {
+            left_feature_type: 'deployment',
+            left_column: 'device_id',
+            right_feature_type: 'animal',
+            right_column: 'name'
+          }
+        ]
+      });
+
+      expect(errors.some((error) => typeof error === 'string' && /cycle/.test(error))).to.be.true;
     });
   });
 
@@ -669,6 +796,73 @@ describe('export-config-utils', () => {
       // Step 3: Exactly the root row, unchanged
       expect(rows).to.have.lengthOf(1);
       expect(rows[0]).to.deep.equal({ uuid: 'r1', parent_uuid: 'p1', species: 'wolf' });
+    });
+  });
+
+  describe('dedupeOutputColumnNames', () => {
+    it('leaves already-unique names untouched (default-named columns keep output_column undefined)', () => {
+      const input = [
+        { feature_type: 'telemetry', column: 'uuid' },
+        { feature_type: 'dataset', column: 'uuid' }
+      ];
+
+      // No collision (default names telemetry_uuid / dataset_uuid are distinct) → returned as-is.
+      expect(dedupeOutputColumnNames(input)).to.deep.equal(input);
+    });
+
+    it('qualifies a cross-type collision of explicit names with the feature type (symmetric)', () => {
+      // Two columns both explicitly named "id" — the corruption case. Both sides are
+      // qualified with their feature type so the header is self-describing and no value is lost.
+      const result = dedupeOutputColumnNames([
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'id' },
+        { feature_type: 'dataset', column: 'uuid', output_column: 'id' }
+      ]);
+
+      // Source feature_type/column untouched; only the header name is qualified.
+      expect(result).to.deep.equal([
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'telemetry_id' },
+        { feature_type: 'dataset', column: 'uuid', output_column: 'dataset_id' }
+      ]);
+    });
+
+    it('falls back to a numeric suffix for a SAME-type collision the feature prefix cannot separate', () => {
+      // Two columns of the same type both named "id" → both qualify to telemetry_id → numeric backstop.
+      const result = dedupeOutputColumnNames([
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'id' },
+        { feature_type: 'telemetry', column: 'timestamp', output_column: 'id' }
+      ]);
+
+      expect(result.map((column) => column.output_column)).to.deep.equal(['telemetry_id', 'telemetry_id_2']);
+    });
+
+    it('does not steal a column that was already unique; the qualified name yields to it', () => {
+      // "id" collides (telemetry/dataset) → telemetry's qualifies to "telemetry_id", but that name
+      // is already taken by a third, non-colliding column — so the qualified one takes the suffix and
+      // the un-collided column keeps its name.
+      const result = dedupeOutputColumnNames([
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'id' },
+        { feature_type: 'dataset', column: 'uuid', output_column: 'id' },
+        { feature_type: 'x', column: 'y', output_column: 'telemetry_id' }
+      ]);
+
+      expect(result.map((column) => column.output_column)).to.deep.equal([
+        'telemetry_id_2', // telemetry's "id" qualified, but "telemetry_id" was taken → suffixed
+        'dataset_id',
+        'telemetry_id' // pre-existing unique name preserved
+      ]);
+    });
+
+    it('qualifies the explicit collider and leaves a colliding default name as the bare name', () => {
+      // An explicit "dataset_uuid" on telemetry collides with dataset.uuid's default "dataset_uuid".
+      const result = dedupeOutputColumnNames([
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'dataset_uuid' },
+        { feature_type: 'dataset', column: 'uuid' } // default resolves to dataset_uuid → collision
+      ]);
+
+      // The explicit collider is feature-qualified; the default column (already feature-qualified)
+      // keeps the bare name with output_column undefined.
+      expect(result[0].output_column).to.equal('telemetry_dataset_uuid');
+      expect(result[1]).to.deep.equal({ feature_type: 'dataset', column: 'uuid' });
     });
   });
 

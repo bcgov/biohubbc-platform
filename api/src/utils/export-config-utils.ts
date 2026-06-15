@@ -48,7 +48,8 @@ export function materializedColumnsForType(properties: CsvPropertyDefinition[]):
  *
  * Two logically identical recipes must reuse the same already-built artifacts,
  * so identity is semantic, not byte-for-byte:
- * - `feature_types` is a set, so it is sorted (its order has no output meaning).
+ * - `feature_types` is a set, so it is deduped and sorted (neither order nor a
+ *   repeated entry has any output meaning, so neither may fragment the hash).
  * - `merge_steps` and `output_columns` are left in caller order — merge order is
  *   the topological join order and output order is the CSV column order; sorting
  *   either would change the produced file.
@@ -65,7 +66,7 @@ export function canonicalizeExportConfig(config: ExportConfig): ExportConfig {
     export_type: config.export_type,
     mode: config.mode,
     ...(config.root_feature_type ? { root_feature_type: config.root_feature_type } : {}),
-    feature_types: [...config.feature_types].toSorted((a, b) => a.localeCompare(b)),
+    feature_types: [...new Set(config.feature_types)].toSorted((a, b) => a.localeCompare(b)),
     merge_steps: config.merge_steps.map((step) => ({ ...step, merge_type: step.merge_type })),
     ...(config.output_columns
       ? {
@@ -129,10 +130,16 @@ export function computeConfigHash(normalized: ExportConfig): string {
  *
  * A denormalized export starts at the root feature type and folds dimensions in
  * one step at a time; a step can only run once its `left_feature_type` is part
- * of the joined result. Steps are emitted in dependency order starting from the
- * root. Two failure modes throw rather than silently dropping data:
- * - a cycle (steps mutually depend so none becomes reachable), and
- * - a step whose left side is never reachable from the root (an orphaned join).
+ * of the joined result. The `left -> right` edges must form a tree rooted at the
+ * root — each dimension is introduced exactly once and never points back into the
+ * already-joined set. Steps are emitted in dependency order starting from the
+ * root. Two failure modes throw rather than silently dropping data or self-joining:
+ * - a cycle — a step whose `right_feature_type` is already in the result (a
+ *   self-edge `A->A`, a back-edge `A->...->A`, or the same dimension folded in
+ *   twice). Letting it through would re-join a type into itself and shadow its
+ *   columns (root columns stay unprefixed, the re-join is prefixed) — wrong output
+ *   instead of a rejection.
+ * - an orphan — a step whose left side is never reachable from the root.
  *
  * @param rootFeatureType - The feature type the join is anchored at.
  * @param steps - The (unordered) merge steps.
@@ -149,20 +156,32 @@ export function orderMergeSteps(rootFeatureType: string, steps: MergeStep[]): Me
     madeProgress = false;
     for (let index = 0; index < remaining.length; index++) {
       const step = remaining[index];
-      if (reachable.has(step.left_feature_type)) {
-        ordered.push(step);
-        reachable.add(step.right_feature_type);
-        remaining.splice(index, 1);
-        madeProgress = true;
-        break;
+      if (!reachable.has(step.left_feature_type)) {
+        continue;
       }
+      // The left side is reachable, so this step can run now — but its right side
+      // must be a NEW type. A right type already in `reachable` (the root via a
+      // self-edge, a back-edge to an already-joined type, or the same dimension
+      // folded in twice) closes a cycle in the left->right graph; reachability only
+      // grows, so this is unconditionally invalid regardless of step order.
+      if (reachable.has(step.right_feature_type)) {
+        throw new Error(
+          `merge_steps form a cycle: step '${step.left_feature_type} -> ${step.right_feature_type}' ` +
+            `re-joins '${step.right_feature_type}', which is already part of the result`
+        );
+      }
+      ordered.push(step);
+      reachable.add(step.right_feature_type);
+      remaining.splice(index, 1);
+      madeProgress = true;
+      break;
     }
   }
 
   if (remaining.length > 0) {
     const orphaned = remaining.map((step) => `${step.left_feature_type} -> ${step.right_feature_type}`).join(', ');
     throw new Error(
-      `merge_steps form a cycle or reference a left feature type unreachable from root '${rootFeatureType}': ${orphaned}`
+      `merge_steps reference a left feature type unreachable from root '${rootFeatureType}': ${orphaned}`
     );
   }
 
@@ -472,6 +491,77 @@ export function* joinRowTransform(
   }
 
   yield* frontier;
+}
+
+/**
+ * Ensure every output column resolves to a unique header name.
+ *
+ * The denormalized CSV row is keyed by output name in `buildOutputRecord`, and the
+ * header line is generated from the same names — so two columns resolving to the
+ * same name silently overwrite one another (the later write wins) while the header
+ * still prints the name twice, yielding a corrupt file with one value duplicated and
+ * the other lost. The default `{feature_type}_{column}` naming already keeps
+ * cross-type columns unique, but a caller may supply explicit `output_column` names
+ * that collide (e.g. two columns both named `id`).
+ *
+ * De-collision follows the spec's own uniqueness convention (Edge Case 2): a colliding
+ * name is qualified with its feature type (`id` on `telemetry` → `telemetry_id`), which
+ * is both unique and self-describing — far clearer than an opaque numeric suffix. A
+ * numeric suffix (`_2`, `_3`, …) is only the backstop for the residual cases a feature
+ * prefix can't separate: two columns of the SAME type colliding, or a qualified name
+ * that matches another column. Non-colliding names are reserved up front so a qualified
+ * name never steals the name of a column that had no collision of its own. A
+ * default-named column is already feature-qualified, so it is never double-prefixed.
+ * `feature_type`/`column` are never touched, so each column still reads its own value.
+ *
+ * @param outputColumns - The resolved output columns (user-supplied or default).
+ * @returns Output columns whose resolved header names are guaranteed unique.
+ */
+export function dedupeOutputColumnNames(outputColumns: OutputColumn[]): OutputColumn[] {
+  const resolveBase = (column: OutputColumn): string =>
+    column.output_column ?? `${column.feature_type}_${column.column}`;
+
+  // Which resolved base names appear more than once?
+  const baseCounts = new Map<string, number>();
+  for (const column of outputColumns) {
+    const base = resolveBase(column);
+    baseCounts.set(base, (baseCounts.get(base) ?? 0) + 1);
+  }
+
+  // Reserve every name that doesn't collide, so a feature-qualified name never steals
+  // the name of a column that was already unique on its own.
+  const used = new Set<string>();
+  for (const [base, count] of baseCounts) {
+    if (count === 1) {
+      used.add(base);
+    }
+  }
+
+  return outputColumns.map((column) => {
+    const base = resolveBase(column);
+
+    if (baseCounts.get(base) === 1) {
+      return column; // unique — leave as-is (a default column keeps output_column undefined)
+    }
+
+    // Collision: qualify with the feature type. A default-named column is already
+    // feature-qualified, so use its base rather than double-prefixing it.
+    const qualified = column.output_column ? `${column.feature_type}_${column.output_column}` : base;
+
+    // Numeric backstop for same-type collisions or a qualified name that's already taken.
+    let unique = qualified;
+    let suffix = 2;
+    while (used.has(unique)) {
+      unique = `${qualified}_${suffix}`;
+      suffix += 1;
+    }
+    used.add(unique);
+
+    // Unchanged base (a default-named collider that won the bare name) keeps output_column
+    // undefined so the header and buildOutputRecord agree on the same fallback; otherwise
+    // pin the de-collided name explicitly.
+    return unique === base ? column : { ...column, output_column: unique };
+  });
 }
 
 /**
