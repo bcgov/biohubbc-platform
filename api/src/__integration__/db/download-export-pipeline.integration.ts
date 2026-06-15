@@ -123,8 +123,8 @@ describe('Download Export pipeline (integration)', function () {
    * Inserts the per-feature-type Parquet artifacts the export pipeline
    * discovers via `listExportFeatureTypes` — the bytes aren't real (we stub
    * `ParquetReader.openS3`), but the key shape has to match
-   * `downloads/{downloadId}/{featureType}/data.parquet` or
-   * `parseFeatureTypeFromParquetKey` drops them.
+   * `downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet`
+   * or `parseFeatureTypeFromParquetKey` drops them.
    */
   async function seedReadyDownloadWithParquetArtifact(
     featureTypeNames: string[]
@@ -150,14 +150,13 @@ describe('Download Export pipeline (integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize a download version and point the download at it. The export
-    // pipeline discovers feature types from the version's artifact links.
+    // Materialize a download version. The export pipeline discovers feature types
+    // from the version's artifact links; reads resolve the most-recent version.
     const version = await versionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
-    await versionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Transition the version pending → ready directly via the repo (no pipeline work
-    // to do here). The download's status is sourced from its current version.
+    // to do here). The download's status is sourced from its most-recent version.
     await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
@@ -167,7 +166,7 @@ describe('Download Export pipeline (integration)', function () {
     const artifactService = new ArtifactService(connection);
     const artifactIds: string[] = [];
     for (const featureTypeName of featureTypeNames) {
-      const objectKey = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
+      const objectKey = `downloads/${downloadId}/versions/${downloadVersionId}/${featureTypeName}/data.parquet`;
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
         object_key: objectKey,

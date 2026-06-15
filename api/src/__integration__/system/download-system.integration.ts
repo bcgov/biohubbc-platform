@@ -36,9 +36,18 @@ async function waitForDownloadStatus(
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    // Status lives on the current version; the download just points at it.
+    // Status lives on the version; there is no stored pointer, so resolve the
+    // most-recent active version (create_date DESC) via a LATERAL.
     const [row] = await db('biohub.download as d')
-      .join('biohub.download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT status, error_message, completed_at, started_at
+          FROM biohub.download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
       .where('d.download_id', downloadId)
       .select('dv.status as download_status', 'dv.error_message');
 
@@ -108,10 +117,6 @@ describe('Download Worker', function () {
             await db('biohub.artifact').whereIn('artifact_id', workerArtifactIds).del();
           }
         }
-        // Break the download ↔ download_version FK cycle before deleting either side.
-        await db('biohub.download')
-          .whereIn('download_id', createdDownloadIds)
-          .update({ current_download_version_id: null });
         await db('biohub.download_version').whereIn('download_id', createdDownloadIds).del();
         await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
         await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
@@ -260,7 +265,7 @@ describe('Download Worker', function () {
   async function createDownloadAndProcess(
     featureTypeNames: string[],
     downloadOverrides?: Record<string, unknown>
-  ): Promise<{ downloadId: number }> {
+  ): Promise<{ downloadId: number; downloadVersionId: string }> {
     // Create the owning policy (status='approved' so the row is treated as live).
     const [policy] = await db('biohub.policy')
       .insert({
@@ -301,25 +306,22 @@ describe('Download Worker', function () {
 
     // The worker requires a materialized version (created at request time in production by
     // createDownloadRequest); this test bypasses the request path, so seed the version directly
-    // and point the download at it — without it the worker throws "no materialized version".
+    // — without it the worker throws "no materialized version". Reads resolve the most-recent
+    // active version, so no stored pointer is set.
     const [version] = await db('biohub.download_version')
       .insert({ download_id: download.download_id, create_user: SYSTEM_USER_ID })
       .returning('download_version_id');
-    await db('biohub.download')
-      .where('download_id', download.download_id)
-      .update({ current_download_version_id: version.download_version_id });
 
     const boss = await initPgBoss();
     await boss.createQueue('process-download');
     const jobId = await boss.send('process-download', {
-      downloadId: download.download_id,
-      teamId: null
+      downloadVersionId: version.download_version_id
     });
     expect(jobId).to.be.a('string');
 
     await waitForDownloadStatus(db, download.download_id, 'ready');
 
-    return { downloadId: download.download_id };
+    return { downloadId: download.download_id, downloadVersionId: version.download_version_id };
   }
 
   /**
@@ -415,7 +417,7 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
@@ -423,9 +425,18 @@ describe('Download Worker', function () {
     expect(sampleSiteFeatureId).to.be.a('number');
     expect(fileFeatureId).to.be.a('number');
 
-    // 3. Verify download status transitions completed (status/timing live on the version)
+    // 3. Verify download status transitions completed (status/timing live on the
+    // most-recent active version; resolved via LATERAL — no stored pointer).
     const [finalDownload] = await db('biohub.download as d')
-      .join('biohub.download_version as dv', 'dv.download_version_id', 'd.current_download_version_id')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT status, error_message, completed_at, started_at
+          FROM biohub.download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
       .where('d.download_id', downloadId)
       .select('dv.status as download_status', 'd.format', 'dv.completed_at');
     expect(finalDownload.download_status).to.equal('ready');
@@ -433,9 +444,9 @@ describe('Download Worker', function () {
     expect(finalDownload.completed_at).to.not.be.null;
 
     // 4. List S3 keys under downloads/{downloadId}/ and assert the exact key set
-    const datasetKey = `downloads/${downloadId}/dataset/data.parquet`;
-    const sampleSiteKey = `downloads/${downloadId}/sample_site/data.parquet`;
-    const fileKey = `downloads/${downloadId}/file/data.parquet`;
+    const datasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const sampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
+    const fileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     // Track all per-type parquet keys for cleanup (belt + suspenders alongside
     // the download_id-JOIN cleanup path in after()).
     createdS3Keys.push(datasetKey, sampleSiteKey, fileKey);
@@ -601,7 +612,7 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
@@ -610,9 +621,9 @@ describe('Download Worker', function () {
     expect(fileFeatureId).to.be.a('number');
 
     // Track per-type S3 keys for cleanup (same set expected after both runs)
-    const run1DatasetKey = `downloads/${downloadId}/dataset/data.parquet`;
-    const run1SampleSiteKey = `downloads/${downloadId}/sample_site/data.parquet`;
-    const run1FileKey = `downloads/${downloadId}/file/data.parquet`;
+    const run1DatasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const run1SampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
+    const run1FileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     createdS3Keys.push(run1DatasetKey, run1SampleSiteKey, run1FileKey);
 
     // Capture state after run 1
@@ -639,10 +650,14 @@ describe('Download Worker', function () {
     expect(afterRun1).to.have.lengthOf(3);
     const run1Keys = new Set(afterRun1.map((r: any) => r.object_key));
 
-    // Reset the version (status lives there) so the handler can legally transition pending → processing again
-    const [{ current_download_version_id: resetVersionId }] = await db('biohub.download')
+    // Re-process the SAME version: reset it to pending (status lives on the version)
+    // so the handler can legally transition pending → processing again, then re-publish
+    // keyed by that version id. Resolving the most-recent version returns the one
+    // created above.
+    const [{ download_version_id: resetVersionId }] = await db('biohub.download_version')
       .where('download_id', downloadId)
-      .select('current_download_version_id');
+      .orderBy('create_date', 'desc')
+      .select('download_version_id');
     await db('biohub.download_version').where('download_version_id', resetVersionId).update({
       status: 'pending',
       started_at: null,
@@ -652,7 +667,7 @@ describe('Download Worker', function () {
 
     // Re-publish and wait
     const boss = await initPgBoss();
-    await boss.send('process-download', { downloadId, teamId: null });
+    await boss.send('process-download', { downloadVersionId: resetVersionId });
     await waitForDownloadStatus(db, downloadId, 'ready');
 
     // Capture state after run 2

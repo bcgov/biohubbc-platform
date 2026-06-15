@@ -257,11 +257,10 @@ describe('Download Export pipeline — media (system)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize a download version and point the download at it. The export
-    // pipeline discovers feature types from the version's artifact links.
+    // Materialize a download version. The export pipeline discovers feature types
+    // from the version's artifact links; reads resolve the most-recent version.
     const version = await versionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
-    await versionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Status lives on the version and is sourced back onto the download.
     await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
@@ -272,9 +271,9 @@ describe('Download Export pipeline — media (system)', function () {
 
     // Per-feature-type Parquet artifact row. The Parquet bytes aren't real —
     // ParquetReader.openS3 is stubbed — but the row shape has to match
-    // downloads/{downloadId}/{featureType}/data.parquet so
-    // parseFeatureTypeFromParquetKey picks it up.
-    const parquetKey = `downloads/${downloadId}/file/data.parquet`;
+    // downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet
+    // so parseFeatureTypeFromParquetKey picks it up.
+    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     const { artifact_id } = await artifactService.insertArtifact({
       bucket: 'test-bucket',
       object_key: parquetKey,
@@ -523,11 +522,10 @@ describe('Download Export pipeline — media (system)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize a download version and point the download at it so the export
-    // group can pin to it.
+    // Materialize a download version so the export group can pin to it. Reads
+    // resolve the most-recent version — there is no stored pointer to set.
     const version = await versionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
-    await versionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Status lives on the version and is sourced back onto the download.
     await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
@@ -537,7 +535,7 @@ describe('Download Export pipeline — media (system)', function () {
     });
 
     // Write the fat Parquet fixture at the canonical per-feature-type key.
-    const parquetKey = `downloads/${downloadId}/dataset/data.parquet`;
+    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
     const uploadedBytes = await writeFatParquetToMinIO(storageService, parquetKey, fixtureTargetBytes);
     s3KeysToCleanup.push(parquetKey);
 

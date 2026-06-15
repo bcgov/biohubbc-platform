@@ -59,17 +59,17 @@ describe('Download services (integration)', function () {
 
   /**
    * Helper: create a download policy + download row + its 1:1 version in one shot,
-   * returning the download id. Mirrors the route's create-download flow (which
-   * materializes a version and sets current_download_version_id) without the team
-   * link or job publish, so each test can decide how to wire those. The version is
-   * required: read paths INNER JOIN it for the download's status, so a versionless
+   * returning the download id and version id. Mirrors the route's create-download
+   * flow (which materializes a version) without the team link or job publish, so
+   * each test can decide how to wire those. The version is required: read paths
+   * resolve the most-recent version for the download's status, so a versionless
    * download is invisible.
    */
   async function createPolicyDownload(opts?: {
     name?: string;
     description?: string | null;
     featureTypes?: string[];
-  }): Promise<{ download_id: string; policy_id: string }> {
+  }): Promise<{ download_id: string; policy_id: string; download_version_id: string }> {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: opts?.description ?? null,
@@ -82,8 +82,7 @@ describe('Download services (integration)', function () {
       requestedBy: connection.systemUserId()
     });
     const version = await versionRepo.createDownloadVersion(download_id);
-    await versionRepo.setCurrentDownloadVersion(download_id, version.download_version_id);
-    return { download_id, policy_id };
+    return { download_id, policy_id, download_version_id: version.download_version_id };
   }
 
   /**
@@ -267,14 +266,14 @@ describe('Download services (integration)', function () {
 
   describe('full status lifecycle', () => {
     it('transitions pending → processing → ready and tracks the expected timestamps', async () => {
-      const { download_id } = await createPolicyDownload();
+      const { download_id, download_version_id: downloadVersionId } = await createPolicyDownload();
 
       const initial = await downloadService.findDownloadById(download_id);
       expect(initial!.download_status).to.equal(DownloadStatusEnum.PENDING);
       expect(initial!.started_at).to.be.null;
       expect(initial!.completed_at).to.be.null;
 
-      await pipelineService.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
         DownloadStatusEnum.PENDING
       ]);
       const processing = await downloadService.findDownloadById(download_id);
@@ -284,7 +283,7 @@ describe('Download services (integration)', function () {
 
       const firstStartedAt = processing!.started_at;
 
-      await pipelineService.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
         DownloadStatusEnum.PROCESSING
       ]);
       const ready = await downloadService.findDownloadById(download_id);
@@ -388,6 +387,64 @@ describe('Download services (integration)', function () {
       const { downloads } = await downloadService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.not.include(download_id);
+    });
+  });
+
+  // ── Most-recent-version resolution ───────────────────────────────────
+  // There is no stored current-version pointer: detail + list reads resolve the
+  // most-recent ACTIVE (record_end_date IS NULL) version via a LATERAL ordered
+  // create_date DESC, download_version_id DESC. These tests prove a re-run's newer
+  // version surfaces without flipping any pointer, and that the active filter
+  // falls back to the prior version when the newest is soft-deleted.
+  describe('most-recent-version resolution', () => {
+    it('detail and list both resolve the most-recent (second) version', async () => {
+      const { download_id } = await createPolicyDownload();
+      const systemUserId = connection.systemUserId();
+      await downloadService.linkDownloadToNewTeam(download_id, systemUserId, 'Resolve team', 'Resolve team');
+
+      const v1 = await downloadRepo.findDownloadById(download_id);
+      const firstVersionId = v1!.download_version_id;
+
+      // Insert a strictly-later second version. download_version_id is a random UUID
+      // and the LATERAL tiebreaks on it DESC after create_date DESC — a same-tick
+      // insert would be flaky, so force create_date one second later.
+      const insert = await connection.sql(SQL`
+        INSERT INTO download_version (download_id, status, create_date)
+        VALUES (${download_id}, ${DownloadStatusEnum.READY}, now() + interval '1 second')
+        RETURNING download_version_id;
+      `);
+      const secondVersionId = insert.rows[0].download_version_id;
+      expect(secondVersionId).to.not.equal(firstVersionId);
+
+      // Detail read resolves the second version, carrying its status.
+      const detail = await downloadRepo.findDownloadById(download_id);
+      expect(detail!.download_version_id).to.equal(secondVersionId);
+      expect(detail!.download_status).to.equal(DownloadStatusEnum.READY);
+
+      // List read resolves the same second version.
+      const { downloads } = await downloadService.getDownloadsByTeamMembership(systemUserId);
+      const listed = downloads.find((d) => d.download_id === download_id);
+      expect(listed, 'download should be visible via team membership').to.not.be.undefined;
+      expect(listed!.download_version_id).to.equal(secondVersionId);
+    });
+
+    it('skips a soft-deleted newer version and falls back to the prior active version', async () => {
+      const { download_id } = await createPolicyDownload();
+
+      const v1 = await downloadRepo.findDownloadById(download_id);
+
+      // A strictly-later but already-ended (record_end_date set) version must be
+      // ignored by the active filter — resolution falls back to the original.
+      const insert = await connection.sql(SQL`
+        INSERT INTO download_version (download_id, create_date, record_end_date)
+        VALUES (${download_id}, now() + interval '1 second', now())
+        RETURNING download_version_id;
+      `);
+      const softDeletedVersionId = insert.rows[0].download_version_id;
+
+      const detail = await downloadRepo.findDownloadById(download_id);
+      expect(detail!.download_version_id).to.equal(v1!.download_version_id);
+      expect(detail!.download_version_id).to.not.equal(softDeletedVersionId);
     });
   });
 });

@@ -170,16 +170,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize the download's version and point the download at it. The parquet pipeline links
-    // each artifact to this version, and runExportGroup discovers feature types from it.
+    // Materialize the download's version. The parquet pipeline links each artifact to
+    // this version, and runExportGroup discovers feature types from it. Reads resolve
+    // the most-recent version — there is no stored pointer to set.
     const downloadVersionRepo = new DownloadVersionRepository(connection);
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
-    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, downloadVersionId);
 
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
@@ -195,13 +195,18 @@ describe('Ingest → Download → Export (system integration)', function () {
         statement
       });
     }
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
       DownloadStatusEnum.PROCESSING
     ]);
 
     // Run the export (CSV) pipeline through the resolve-or-create group contract.
     const exportService = new DownloadExportService(connection);
-    const exportRecord = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+    const exportRecord = await exportService.createDownloadVersionExport(
+      downloadId,
+      systemUserId,
+      { download_version_id: downloadVersionId },
+      connection
+    );
     // The export record no longer exposes the internal artifact-group FK (it is server-only), so the
     // group id is read straight from the row to drive the pipeline and locate its part-zips.
     const exportGroup = await connection.sql(SQL`

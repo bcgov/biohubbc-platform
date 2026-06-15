@@ -121,9 +121,9 @@ describe('Download version export state machine (integration)', function () {
       requestedBy: systemUserId
     });
 
-    // createDownloadRequest already materialized the current version — resolve it.
+    // createDownloadRequest already materialized the version — resolve the most-recent one.
     const download = await downloadRepo.findDownloadById(downloadId);
-    const downloadVersionId = download!.current_download_version_id as string;
+    const downloadVersionId = download!.download_version_id;
 
     // The version is born `pending`; the export gate requires `ready`. Status lives
     // on the version and is sourced back onto the download.
@@ -140,7 +140,7 @@ describe('Download version export state machine (integration)', function () {
     for (const featureTypeName of featureTypeNames) {
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/${featureTypeName}/data.parquet`,
+        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/${featureTypeName}/data.parquet`,
         byte_size: 1024,
         artifact_status: 'uploaded',
         checksum_sha256: 'a'.repeat(64),
@@ -199,7 +199,12 @@ describe('Download version export state machine (integration)', function () {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
       const publishStub = stubPublish();
 
-      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const record = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
 
       // Exactly one active group exists for the shape.
       expect(await countActiveGroups(downloadVersionId)).to.equal(1);
@@ -233,7 +238,12 @@ describe('Download version export state machine (integration)', function () {
 
       // First request materializes the group.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const first = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       expect(firstPublish.calledOnce).to.be.true;
       const groupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
@@ -246,7 +256,12 @@ describe('Download version export state machine (integration)', function () {
 
       // Second identical request reuses the ready group.
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const second = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
 
       // Still exactly one active group.
       expect(await countActiveGroups(downloadVersionId)).to.equal(1);
@@ -276,7 +291,12 @@ describe('Download version export state machine (integration)', function () {
 
       // First request leaves the group `pending` (a run is in flight).
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const first = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       const groupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
 
@@ -287,7 +307,12 @@ describe('Download version export state machine (integration)', function () {
 
       // Second request rides the in-flight group.
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const second = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
 
       expect(await countActiveGroups(downloadVersionId)).to.equal(1);
       expect(await readGroupIdForExport(second.download_version_export_id)).to.equal(groupId);
@@ -345,8 +370,18 @@ describe('Download version export state machine (integration)', function () {
 
       // Two export requests through the service both converge on the winner group.
       const publishStub = stubPublish();
-      const a = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
-      const b = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const a = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
+      const b = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
 
       expect(await readGroupIdForExport(a.download_version_export_id)).to.equal(winnerGroupId);
       expect(await readGroupIdForExport(b.download_version_export_id)).to.equal(winnerGroupId);
@@ -365,7 +400,12 @@ describe('Download version export state machine (integration)', function () {
 
       // First request materializes the group, then we drive it to `failed`.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const first = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       const failedGroupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
 
@@ -376,7 +416,12 @@ describe('Download version export state machine (integration)', function () {
 
       // Second request must end the dead group and build a fresh one.
       const publishStub = stubPublish();
-      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const second = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       const freshGroupId = await readGroupIdForExport(second.download_version_export_id);
 
       // Fresh group is a different row.
@@ -428,7 +473,12 @@ describe('Download version export state machine (integration)', function () {
 
       // The service probes at EXPORTER_VERSION=1 → misses the v0 group.
       const publishStub = stubPublish();
-      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const record = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       const newGroupId = await readGroupIdForExport(record.download_version_export_id);
 
       // A fresh group was built at the current exporter_version — the stale one was NOT reused.
@@ -445,7 +495,7 @@ describe('Download version export state machine (integration)', function () {
   // ── Version creation + parquet link ──────────────────────────────────
 
   describe('version creation and parquet link', () => {
-    it('createDownloadRequest materializes a version and points the download at it', async () => {
+    it('createDownloadRequest materializes a version that detail reads resolve as most-recent', async () => {
       const systemUserId = connection.systemUserId();
       const publishStub = sinon
         .stub(DownloadService.dependencies, 'publishProcessDownloadJob')
@@ -469,15 +519,15 @@ describe('Download version export state machine (integration)', function () {
       expect(versionRows.rowCount).to.equal(1);
       const downloadVersionId = versionRows.rows[0].download_version_id;
 
-      // The download points at that version.
+      // Detail reads resolve that version as the most-recent active one.
       const download = await downloadRepo.findDownloadById(downloadId);
-      expect(download!.current_download_version_id).to.equal(downloadVersionId);
+      expect(download!.download_version_id).to.equal(downloadVersionId);
 
       // Parquet pipeline link path: createDownloadVersionArtifact writes a
       // download_version_artifact row keyed to the version.
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/dataset/data.parquet`,
+        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`,
         byte_size: 2048,
         artifact_status: 'uploaded',
         checksum_sha256: 'b'.repeat(64),
@@ -506,7 +556,12 @@ describe('Download version export state machine (integration)', function () {
 
       // Materialize a group + export via the service.
       const publishStub = stubPublish();
-      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const record = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       publishStub.restore();
       const exportId = record.download_version_export_id;
       const groupId = await readGroupIdForExport(exportId);
@@ -586,12 +641,22 @@ describe('Download version export state machine (integration)', function () {
 
       // Two requests attach to one group.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const first = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       firstPublish.restore();
       const groupId = await readGroupIdForExport(first.download_version_export_id);
 
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, {}, connection);
+      const second = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        { download_version_id: downloadVersionId },
+        connection
+      );
       secondPublish.restore();
       // Both attached to the same group (reuse, not a new group).
       expect(await readGroupIdForExport(second.download_version_export_id)).to.equal(groupId);

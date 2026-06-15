@@ -170,14 +170,14 @@ describe('Download Parquet pipeline (integration)', function () {
   }
 
   /**
-   * Helper: materialize a download_version for the given download and point the
-   * download at it, returning the version id. The Parquet pipeline links each
-   * produced artifact to this version via download_version_artifact, so the
-   * writeFeatureTypeParquet tests below need a real version row (FK target).
+   * Helper: materialize a download_version for the given download, returning the
+   * version id. The Parquet pipeline links each produced artifact to this version
+   * via download_version_artifact, so the writeFeatureTypeParquet tests below need
+   * a real version row (FK target). Reads resolve the most-recent active version —
+   * there is no stored current-version pointer to set.
    */
   async function createDownloadVersionFor(downloadId: string): Promise<string> {
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
-    await downloadVersionRepo.setCurrentDownloadVersion(downloadId, version.download_version_id);
     return version.download_version_id;
   }
 
@@ -824,8 +824,9 @@ describe('Download Parquet pipeline (integration)', function () {
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
       const downloadId = await createPolicyDownload(['dataset']);
-      // Status lives on the current version, so the download needs one to be findable.
-      await createDownloadVersionFor(downloadId);
+      // Status lives on the version, so the download needs one to be findable, and
+      // the transition keys off the version id.
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
 
       // Verify initial state
       const initial = await downloadService.findDownloadById(downloadId);
@@ -834,7 +835,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(initial!.completed_at).to.be.null;
 
       // pending → processing: started_at populated, completed_at still null
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
         DownloadStatusEnum.PENDING
       ]);
       const processing = await downloadService.findDownloadById(downloadId);
@@ -845,7 +846,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const firstStartedAt = processing!.started_at;
 
       // processing → ready: completed_at populated, started_at unchanged
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
         DownloadStatusEnum.PROCESSING
       ]);
       const ready = await downloadService.findDownloadById(downloadId);
@@ -853,9 +854,9 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(ready!.started_at).to.equal(firstStartedAt);
       expect(ready!.completed_at).to.not.be.null;
 
-      // Illegal transition: retrying processing → ready on a READY download throws ApiConflictError
+      // Illegal transition: retrying processing → ready on a READY version throws ApiConflictError
       try {
-        await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+        await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
           DownloadStatusEnum.PROCESSING
         ]);
         expect.fail('Expected ApiConflictError for illegal transition from READY');
@@ -914,7 +915,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const artifact = artifactRows.rows[0];
       expect(artifact.format).to.equal('parquet');
       expect(artifact.artifact_status).to.equal('uploaded');
-      expect(artifact.object_key).to.equal(`downloads/${downloadId}/dataset/data.parquet`);
+      expect(artifact.object_key).to.equal(
+        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
+      );
       expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
       expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifact.byte_size)).to.be.at.least(0);
@@ -1031,8 +1034,8 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(artifactRows.rowCount).to.equal(2);
       const objectKeys = artifactRows.rows.map((r: any) => r.object_key);
       expect(objectKeys).to.deep.equal([
-        `downloads/${downloadId}/capture/data.parquet`,
-        `downloads/${downloadId}/dataset/data.parquet`
+        `downloads/${downloadId}/versions/${downloadVersionId}/capture/data.parquet`,
+        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
       ]);
       // Both rows link to the same materialized version
       for (const row of artifactRows.rows) {
