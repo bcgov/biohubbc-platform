@@ -7,11 +7,12 @@ import {
   createMockDownloadRecord,
   createMockDownloadVersionExport,
   createMockDownloadVersionExportListRow,
+  createMockDownloadVersionStatusRecord,
   createMockExportArtifactGroup
 } from '../../__mocks__/download';
 import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { ApiValidationError } from '../../errors/api-error';
-import { HTTP403, HTTP409 } from '../../errors/http-error';
+import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { CreateDownloadVersionExportRequest } from '../../models/download-version-export';
@@ -34,14 +35,31 @@ const FAILED_GROUP_ID = 'cccc0000-0000-0000-0000-0000000000ff';
 const SYSTEM_USER_ID = 42;
 
 /**
- * A READY download with a materialized version — the precondition for export creation.
+ * A READY download whose most-recent version resolves to VERSION_ID — the precondition the picker
+ * reads (`download.download_version_id`). Export creation gates on the explicit request version, not
+ * this field, so create tests additionally stub `getDownloadVersionStatusById` via `stubReadyVersion`.
  */
 const readyDownload = () =>
   createMockDownloadRecord({
     download_id: DOWNLOAD_ID,
     download_status: DownloadStatusEnum.READY,
-    current_download_version_id: VERSION_ID
+    download_version_id: VERSION_ID
   });
+
+/**
+ * Stub `DownloadVersionRepository.getDownloadVersionStatusById` to resolve a READY version owned by
+ * the parent download — the happy-path precondition export creation threads through after the auth
+ * gate. Returns the stub so a test can override its resolution (e.g. a not-ready or wrong-owner
+ * version) to exercise the version gates.
+ */
+const stubReadyVersion = () =>
+  sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+    createMockDownloadVersionStatusRecord({
+      download_version_id: VERSION_ID,
+      download_id: DOWNLOAD_ID,
+      status: DownloadStatusEnum.READY
+    })
+  );
 
 /**
  * Build a `FeatureTypeWithProperties` code entry. The service maps `properties[].{name,type_name}`
@@ -66,19 +84,21 @@ const featureTypeCode = (
 });
 
 /**
- * A per-type Parquet artifact key the materialized-types parser recognizes:
- * `downloads/{downloadId}/{featureType}/data.parquet`.
+ * A per-type Parquet artifact key the materialized-types parser recognizes — version-scoped:
+ * `downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet`.
  */
 const parquetArtifact = (featureType: string): DownloadArtifactInfo => ({
   artifact_id: `bbbb0000-0000-0000-0000-00000000000${featureType.length}`,
-  object_key: `downloads/${DOWNLOAD_ID}/${featureType}/data.parquet`
+  object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/${featureType}/data.parquet`
 });
 
 /**
  * A minimal valid `per_feature_type` recipe over the `observation` type — the happy-path inbound
- * body. Spread `{ ...validPerTypeRequest(), ...overrides }` to perturb a single field.
+ * body, carrying the explicit `download_version_id` the create contract requires. Spread
+ * `{ ...validPerTypeRequest(), ...overrides }` to perturb a single field.
  */
 const validPerTypeRequest = (): CreateDownloadVersionExportRequest => ({
+  download_version_id: VERSION_ID,
   version: 1,
   export_type: 'csv',
   mode: 'per_feature_type',
@@ -98,6 +118,9 @@ describe('DownloadExportService', () => {
      * `observation` carries a `count` (number) column; `sample` carries `site` (string).
      */
     const stubMaterializedData = () => {
+      // The create flow first gates on the explicit version (getDownloadVersionStatusById), then
+      // builds the materialized column map from the version's artifacts + the schema codes.
+      stubReadyVersion();
       sinon
         .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
         .resolves([parquetArtifact('observation'), parquetArtifact('sample')]);
@@ -328,6 +351,7 @@ describe('DownloadExportService', () => {
 
         // Step 3: Create the export from a valid denormalized recipe
         const denormalizedRequest: CreateDownloadVersionExportRequest = {
+          download_version_id: VERSION_ID,
           version: 1,
           export_type: 'csv',
           mode: 'denormalized',
@@ -533,20 +557,21 @@ describe('DownloadExportService', () => {
         expect(authStub).to.not.have.been.called;
       });
 
-      [
-        DownloadStatusEnum.PENDING,
-        DownloadStatusEnum.PROCESSING,
-        DownloadStatusEnum.FAILED,
-        DownloadStatusEnum.DOWNLOADED
-      ].forEach((status) => {
-        it(`throws HTTP409 when download_status is ${status}, doing no resolver or publish work`, async () => {
-          // Verifies: only READY downloads can export — every non-ready parent surfaces 409 before any
-          // group resolution or publish.
+      [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING, DownloadStatusEnum.FAILED].forEach((status) => {
+        it(`throws HTTP409 when the named version status is ${status}, doing no resolver or publish work`, async () => {
+          // Verifies: an export binds to a materialized snapshot — only a READY VERSION can export. The
+          // named version's own status is the gate (not the parent download's), so a non-ready version
+          // surfaces 409 before any group resolution or publish.
 
-          // Step 1: Auth resolves a non-READY download
-          sinon
-            .stub(DownloadService.prototype, 'getAuthorizedDownload')
-            .resolves(createMockDownloadRecord({ download_status: status, current_download_version_id: VERSION_ID }));
+          // Step 1: Auth resolves; the named version exists and is owned by the download, but is not ready
+          sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+          sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+            createMockDownloadVersionStatusRecord({
+              download_version_id: VERSION_ID,
+              download_id: DOWNLOAD_ID,
+              status
+            })
+          );
           const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
           const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
 
@@ -571,14 +596,17 @@ describe('DownloadExportService', () => {
         });
       });
 
-      it('throws HTTP409 when the download has no materialized version, doing no resolver or publish work', async () => {
-        // Verifies: a READY download with a null current_download_version_id cannot export.
+      it('throws HTTP404 when the named version belongs to a different download, doing no resolver or publish work', async () => {
+        // Verifies: the version-ownership check is a real auth boundary — a caller authorized on one
+        // download cannot export another download's materialized artifacts by naming its version id.
 
-        // Step 1: Auth resolves a READY download with no materialized version
-        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(
-          createMockDownloadRecord({
-            download_status: DownloadStatusEnum.READY,
-            current_download_version_id: null
+        // Step 1: Auth resolves the parent download, but the named version is owned by a DIFFERENT download
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+          createMockDownloadVersionStatusRecord({
+            download_version_id: VERSION_ID,
+            download_id: 'aaaa0000-0000-0000-0000-0000000000ff',
+            status: DownloadStatusEnum.READY
           })
         );
         const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
@@ -595,8 +623,8 @@ describe('DownloadExportService', () => {
           );
           expect.fail('Expected throw');
         } catch (err) {
-          // Step 3: Verify HTTP409
-          expect(err).to.be.instanceOf(HTTP409);
+          // Step 3: Verify HTTP404
+          expect(err).to.be.instanceOf(HTTP404);
         }
 
         // Step 4: Verify no resolver / publish work happened

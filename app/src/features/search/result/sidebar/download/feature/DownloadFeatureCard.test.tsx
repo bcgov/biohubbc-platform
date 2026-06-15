@@ -64,12 +64,12 @@ describe('DownloadFeatureCard', () => {
   });
 
   describe('Export menu item', () => {
-    it('fires onCreateExport with no args when the "CSV — per feature type" item is clicked', () => {
+    it('fires onCreateExport(downloadId) when the "CSV — per feature type" item is clicked', () => {
       const props = makeProps({ download: makeDownload({ download_id: 'abc-123', download_status: 'ready' }) });
       const { getByTestId } = render(<DownloadFeatureCard {...props} />);
       fireEvent.click(getByTestId('custom-menu-icon-Export'));
       fireEvent.click(getByTestId('custom-menu-icon-item-CSV—perfeaturetype'));
-      expect(props.onCreateExport).toHaveBeenCalledWith();
+      expect(props.onCreateExport).toHaveBeenCalledWith('abc-123');
     });
 
     it('fires onConfigureExport(downloadId) when the "CSV — single combined file" item is clicked', () => {

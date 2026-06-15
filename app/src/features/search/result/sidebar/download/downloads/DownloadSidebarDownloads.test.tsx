@@ -185,6 +185,7 @@ describe('DownloadSidebarDownloads', () => {
       // empty merge_steps).
       await waitFor(() => {
         expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
+          download_version_id: 'ver-abc-123',
           version: 1,
           export_type: 'csv',
           mode: 'per_feature_type',
@@ -281,6 +282,7 @@ describe('DownloadSidebarDownloads', () => {
       // Step 5: createExport is called with the form-derived denormalized recipe (all types + the root).
       await waitFor(() => {
         expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
+          download_version_id: 'ver-abc-123',
           version: 1,
           export_type: 'csv',
           mode: 'denormalized',
