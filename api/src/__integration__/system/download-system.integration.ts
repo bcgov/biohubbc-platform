@@ -101,38 +101,16 @@ describe('Download Worker', function () {
   after(async () => {
     // Cleanup in reverse dependency order
     try {
-      // 1. Delete artifacts created by the worker (tracked by FK on download_version_artifact
-      //    via the download's version, not in createdArtifactIds). Must run BEFORE the download
-      //    delete so we can still resolve the version → download chain.
-      if (createdDownloadIds.length > 0) {
-        const versionIds = await db('biohub.download_version')
-          .whereIn('download_id', createdDownloadIds)
-          .pluck('download_version_id');
-        if (versionIds.length > 0) {
-          const workerArtifactIds = await db('biohub.download_version_artifact')
-            .whereIn('download_version_id', versionIds)
-            .pluck('artifact_id');
-          await db('biohub.download_version_artifact').whereIn('download_version_id', versionIds).del();
-          if (workerArtifactIds.length > 0) {
-            await db('biohub.artifact').whereIn('artifact_id', workerArtifactIds).del();
-          }
-        }
-        await db('biohub.download_version').whereIn('download_id', createdDownloadIds).del();
-        await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
-        await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
-      }
+      // 1. Worker-produced download artifacts (reachable only via the version chain) then the
+      //    downloads themselves — must run before any other delete so the chain still resolves.
+      await deleteDownloadsAndArtifacts();
 
-      // 1b. Delete policy_statement_expression (no statements should have any here, but be defensive),
-      //     then policy_statement, then the owning policies — children first to satisfy FK.
-      if (createdPolicyStatementIds.length > 0) {
-        await db('biohub.policy_statement_expression').whereIn('policy_statement_id', createdPolicyStatementIds).del();
-        await db('biohub.policy_statement').whereIn('policy_statement_id', createdPolicyStatementIds).del();
-      }
-      if (createdPolicyIds.length > 0) {
-        await db('biohub.policy').whereIn('policy_id', createdPolicyIds).del();
-      }
+      // 1b. Policy statement expressions, then statements, then the owning policies — children first.
+      await deleteByIds('biohub.policy_statement_expression', 'policy_statement_id', createdPolicyStatementIds);
+      await deleteByIds('biohub.policy_statement', 'policy_statement_id', createdPolicyStatementIds);
+      await deleteByIds('biohub.policy', 'policy_id', createdPolicyIds);
 
-      // 2. Delete submission features (closure rows FK to submission_feature on both ends — drop them first)
+      // 2. Submission features — closure rows FK to submission_feature on both ends, so drop them first.
       if (createdSubmissionFeatureIds.length > 0) {
         await db('biohub.submission_feature_closure')
           .whereIn('source_submission_feature_id', createdSubmissionFeatureIds)
@@ -141,39 +119,25 @@ describe('Download Worker', function () {
         await db('biohub.submission_feature').whereIn('submission_feature_id', createdSubmissionFeatureIds).del();
       }
 
-      // 2b. Delete submission upload bridge rows and uploads
-      if (createdSubmissionUploadIds.length > 0) {
-        await db('biohub.submission_upload_status').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
-        await db('biohub.submission_upload').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
-      }
+      // 2b. Submission upload bridge rows, then uploads.
+      await deleteByIds('biohub.submission_upload_status', 'submission_upload_id', createdSubmissionUploadIds);
+      await deleteByIds('biohub.submission_upload', 'submission_upload_id', createdSubmissionUploadIds);
+      await deleteByIds('biohub.upload', 'upload_id', createdUploadIds);
 
-      if (createdUploadIds.length > 0) {
-        await db('biohub.upload').whereIn('upload_id', createdUploadIds).del();
-      }
+      // 2c. Artifact records tracked directly by this suite.
+      await deleteByIds('biohub.artifact', 'artifact_id', createdArtifactIds);
 
-      // 2c. Delete artifact records
-      if (createdArtifactIds.length > 0) {
-        await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
-      }
+      // 3. Submissions.
+      await deleteByIds('biohub.submission', 'submission_id', createdSubmissionIds);
 
-      // 3. Delete submissions
-      if (createdSubmissionIds.length > 0) {
-        await db('biohub.submission').whereIn('submission_id', createdSubmissionIds).del();
-      }
-
+      // Ticket status rows, then tickets.
       if (createdTicketIds.length > 0) {
         await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
-      // 4. Delete S3 objects
-      for (const key of createdS3Keys) {
-        try {
-          await storageService.deleteFile(BucketType.MAIN, key);
-        } catch {
-          /* may not exist */
-        }
-      }
+      // 4. S3 objects.
+      await deleteCreatedS3Objects();
     } catch (error_) {
       console.warn('Cleanup failed:', error_);
     }
@@ -181,6 +145,56 @@ describe('Download Worker', function () {
     await stopPgBoss();
     await db.destroy();
   });
+
+  /**
+   * Delete rows from a biohub table whose `column` value is in `ids`, skipping the query entirely
+   * when there is nothing to delete. Centralizes the "guard then bulk-delete by id list" teardown
+   * step so the after() hook stays a flat, readable sequence of FK-ordered deletes.
+   */
+  async function deleteByIds(table: string, column: string, ids: Array<number | string>): Promise<void> {
+    if (ids.length > 0) {
+      await db(table).whereIn(column, ids).del();
+    }
+  }
+
+  /**
+   * Delete the downloads this suite created together with the artifacts the worker produced for them.
+   * Worker artifacts are reachable only through the download → download_version →
+   * download_version_artifact chain (they are not tracked in createdArtifactIds), so this must run
+   * before the download rows are removed or the chain can no longer be resolved.
+   */
+  async function deleteDownloadsAndArtifacts(): Promise<void> {
+    if (createdDownloadIds.length === 0) {
+      return;
+    }
+    const versionIds = await db('biohub.download_version')
+      .whereIn('download_id', createdDownloadIds)
+      .pluck('download_version_id');
+    if (versionIds.length > 0) {
+      const workerArtifactIds = await db('biohub.download_version_artifact')
+        .whereIn('download_version_id', versionIds)
+        .pluck('artifact_id');
+      await db('biohub.download_version_artifact').whereIn('download_version_id', versionIds).del();
+      await deleteByIds('biohub.artifact', 'artifact_id', workerArtifactIds);
+    }
+    await db('biohub.download_version').whereIn('download_id', createdDownloadIds).del();
+    await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
+    await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
+  }
+
+  /**
+   * Best-effort delete of every S3 object this suite created. A key that no longer exists is not an
+   * error — the worker may already have removed it — so per-key failures are swallowed.
+   */
+  async function deleteCreatedS3Objects(): Promise<void> {
+    for (const key of createdS3Keys) {
+      try {
+        await storageService.deleteFile(BucketType.MAIN, key);
+      } catch {
+        /* may not exist */
+      }
+    }
+  }
 
   /**
    * Insert a test submission and return its ID. Tracked for cleanup.
