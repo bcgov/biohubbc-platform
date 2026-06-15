@@ -25,6 +25,7 @@ describe('useDownloadApi', () => {
         downloads: [
           {
             download_id: 'abc-123',
+            download_version_id: 'ver-abc-123',
             download_status: 'ready',
             create_date: '2026-03-01T00:00:00Z',
             feature_count: 42,
@@ -99,6 +100,7 @@ describe('useDownloadApi', () => {
       const downloadId = '550e8400-e29b-41d4-a716-446655440099';
       const mockResponse: DownloadDetail = {
         download_id: downloadId,
+        download_version_id: 'ver-abc-123',
         status: 'ready',
         name: 'Moose download',
         description: 'Moose observations in the Skeena',

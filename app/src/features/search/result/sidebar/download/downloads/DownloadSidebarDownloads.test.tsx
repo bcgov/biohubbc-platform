@@ -154,7 +154,7 @@ describe('DownloadSidebarDownloads', () => {
       fireEvent.click(await findByTestId('custom-menu-icon-item-CSV—perfeaturetype'));
 
       await waitFor(() => {
-        expect(mockCreateExport).toHaveBeenCalledWith('abc-123');
+        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', { download_version_id: 'ver-abc-123' });
       });
       // Initial load + refresh after create = 2
       await waitFor(() => {

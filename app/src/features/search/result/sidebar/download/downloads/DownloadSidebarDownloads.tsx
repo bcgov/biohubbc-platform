@@ -74,10 +74,11 @@ export const DownloadSidebarDownloads = () => {
    * Failures open the standard export error dialog.
    *
    * @param {string} downloadId - Download request id to export.
+   * @param {string} downloadVersionId - Active version of the download the export is built from.
    */
-  const handleCreateExport = async (downloadId: string) => {
+  const handleCreateExport = async (downloadId: string, downloadVersionId: string) => {
     try {
-      await biohubApi.downloadExport.createExport(downloadId);
+      await biohubApi.downloadExport.createExport(downloadId, { download_version_id: downloadVersionId });
       await downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
     } catch {
       dialogContext.setErrorDialog({
@@ -185,7 +186,7 @@ export const DownloadSidebarDownloads = () => {
               <DownloadFeatureCard
                 download={download}
                 exports={download.exports}
-                onCreateExport={handleCreateExport}
+                onCreateExport={() => handleCreateExport(download.download_id, download.download_version_id)}
                 onDownloadExportPart={(exportId, chunkId) =>
                   handleDownloadExportPart(download.download_id, exportId, chunkId)
                 }

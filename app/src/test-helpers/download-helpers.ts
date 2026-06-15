@@ -7,6 +7,7 @@ import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
  */
 export const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
   download_id: 'abc-123',
+  download_version_id: 'ver-abc-123',
   download_status: 'ready',
   create_date: '2026-03-01T00:00:00Z',
   feature_count: 42,

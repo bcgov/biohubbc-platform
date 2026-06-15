@@ -13,6 +13,7 @@ export type DownloadStatus = 'pending' | 'processing' | 'ready' | 'downloaded' |
  */
 export interface DownloadRecord {
   download_id: string;
+  download_version_id: string;
   download_status: DownloadStatus;
   create_date: string;
   feature_count: number;
@@ -36,6 +37,7 @@ export interface DownloadRecord {
  */
 export interface DownloadDetail {
   download_id: string;
+  download_version_id: string;
   status: DownloadStatus;
   name: string;
   description: string | null;

@@ -15,7 +15,7 @@ describe('useDownloadExportApi', () => {
   });
 
   describe('createExport', () => {
-    it('POSTs to /api/download/{id}/export with empty body when payload omitted', async () => {
+    it('POSTs to /api/download/{id}/export with the download_version_id body', async () => {
       const mockResponse: DownloadExport = {
         download_version_export_id: 'exp-1',
         download_id: 'abc-123',
@@ -31,11 +31,11 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).createExport('abc-123');
+      const result = await useDownloadExportApi(axios).createExport('abc-123', { download_version_id: 'ver-abc-123' });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].url).toBe('/api/download/abc-123/export');
-      expect(mock.history.post[0].data).toBe(JSON.stringify({}));
+      expect(mock.history.post[0].data).toBe(JSON.stringify({ download_version_id: 'ver-abc-123' }));
     });
 
     it('forwards the max_part_size_bytes payload', async () => {
@@ -54,9 +54,14 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      await useDownloadExportApi(axios).createExport('abc-123', { max_part_size_bytes: 1048576 });
+      await useDownloadExportApi(axios).createExport('abc-123', {
+        download_version_id: 'ver-abc-123',
+        max_part_size_bytes: 1048576
+      });
 
-      expect(mock.history.post[0].data).toBe(JSON.stringify({ max_part_size_bytes: 1048576 }));
+      expect(mock.history.post[0].data).toBe(
+        JSON.stringify({ download_version_id: 'ver-abc-123', max_part_size_bytes: 1048576 })
+      );
     });
 
     it('returns a typed DownloadExport', async () => {
@@ -75,7 +80,7 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).createExport('abc-123');
+      const result = await useDownloadExportApi(axios).createExport('abc-123', { download_version_id: 'ver-abc-123' });
 
       expect(result.download_version_export_id).toBe('exp-1');
       expect(result.format).toBe('csv');
@@ -84,7 +89,9 @@ describe('useDownloadExportApi', () => {
     it('propagates HTTP 409 errors', async () => {
       mock.onPost('/api/download/abc-123/export').reply(409);
 
-      await expect(useDownloadExportApi(axios).createExport('abc-123')).rejects.toThrow();
+      await expect(
+        useDownloadExportApi(axios).createExport('abc-123', { download_version_id: 'ver-abc-123' })
+      ).rejects.toThrow();
     });
   });
 
