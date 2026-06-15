@@ -18,6 +18,17 @@ const mockSearchFeatures = vi.fn();
 
 describe('useSearchResults', () => {
   const expectAbortOptions = expect.objectContaining({ signal: expect.any(Object) });
+  const defaultSearchFeatureResponse = {
+    features: [],
+    pagination: {
+      total: 0,
+      per_page: 25,
+      current_page: 2,
+      last_page: 1,
+      sort: 'create_date',
+      order: 'asc'
+    }
+  };
   const expressionTree: ExpressionTreeExpression = {
     type: 'expression',
     operator: 'AND',
@@ -33,17 +44,7 @@ describe('useSearchResults', () => {
   };
 
   beforeEach(() => {
-    mockSearchFeatures.mockResolvedValue({
-      features: [],
-      pagination: {
-        total: 0,
-        per_page: 25,
-        current_page: 2,
-        last_page: 1,
-        sort: 'create_date',
-        order: 'asc'
-      }
-    });
+    mockSearchFeatures.mockResolvedValue(defaultSearchFeatureResponse);
 
     (useApi as Mock).mockReturnValue({
       search: {
@@ -170,6 +171,190 @@ describe('useSearchResults', () => {
         limit: 25,
         sort: undefined,
         order: undefined
+      },
+      expectAbortOptions
+    );
+  });
+
+  it('sets loading immediately while a debounced URL-param search is pending', async () => {
+    vi.useFakeTimers();
+
+    let currentSearchParams = new URLSearchParams('page=2&limit=25');
+    const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
+      currentSearchParams = nextSearchParams;
+    });
+
+    (useSearchQueryParams as Mock).mockImplementation(() => ({
+      searchParams: currentSearchParams,
+      setSearchParams
+    }));
+
+    const { result, rerender } = renderHook(() => useSearchResults('species_observation', true, null));
+
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    mockSearchFeatures.mockClear();
+
+    act(() => {
+      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '3' });
+    });
+    rerender();
+
+    expect(result.current.isLoading).toBe(true);
+    expect(mockSearchFeatures).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps loading until the first successful response when the initial API result is undefined', async () => {
+    vi.useFakeTimers();
+
+    mockSearchFeatures.mockResolvedValueOnce(undefined).mockResolvedValueOnce(defaultSearchFeatureResponse);
+
+    const { result, rerender } = renderHook(
+      ({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey),
+      {
+        initialProps: { refreshKey: 0 }
+      }
+    );
+
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.pagination).toBeUndefined();
+
+    await act(async () => {
+      rerender({ refreshKey: 1 });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.pagination).toEqual(defaultSearchFeatureResponse.pagination);
+  });
+
+  it('starts one immediate request when the applied expression changes', async () => {
+    vi.useFakeTimers();
+
+    const nextExpressionTree: ExpressionTreeExpression = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 11,
+          feature_type_property_id: null,
+          operator: 'ILike',
+          value: 'trout'
+        }
+      ]
+    };
+
+    const { rerender } = renderHook(
+      ({ appliedExpression }) => useSearchResults('species_observation', true, appliedExpression),
+      {
+        initialProps: { appliedExpression: null as ExpressionTreeExpression | null }
+      }
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    mockSearchFeatures.mockClear();
+
+    await act(async () => {
+      rerender({ appliedExpression: nextExpressionTree });
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      nextExpressionTree,
+      {
+        page: 2,
+        limit: 25,
+        sort: 'create_date',
+        order: 'asc'
+      },
+      expectAbortOptions
+    );
+  });
+
+  it('keeps loading true when switching feature types while a request is in flight', async () => {
+    vi.useFakeTimers();
+
+    mockSearchFeatures.mockImplementation(
+      (_featureType, _expressionTree, _pagination, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('canceled');
+            error.name = 'CanceledError';
+            reject(error);
+          });
+        })
+    );
+
+    const { result, rerender } = renderHook(({ featureTypeName }) => useSearchResults(featureTypeName, true, null), {
+      initialProps: { featureTypeName: 'species_observation' }
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      rerender({ featureTypeName: 'telemetry' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'telemetry',
+      null,
+      {
+        page: 2,
+        limit: 25,
+        sort: 'create_date',
+        order: 'asc'
       },
       expectAbortOptions
     );

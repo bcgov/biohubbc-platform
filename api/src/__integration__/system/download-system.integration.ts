@@ -132,8 +132,12 @@ describe('Download Worker', function () {
         await db('biohub.policy').whereIn('policy_id', createdPolicyIds).del();
       }
 
-      // 2. Delete submission features
+      // 2. Delete submission features (closure rows FK to submission_feature on both ends — drop them first)
       if (createdSubmissionFeatureIds.length > 0) {
+        await db('biohub.submission_feature_closure')
+          .whereIn('source_submission_feature_id', createdSubmissionFeatureIds)
+          .orWhereIn('target_submission_feature_id', createdSubmissionFeatureIds)
+          .del();
         await db('biohub.submission_feature').whereIn('submission_feature_id', createdSubmissionFeatureIds).del();
       }
 
@@ -248,6 +252,20 @@ describe('Download Worker', function () {
       .returning('submission_feature_id');
 
     createdSubmissionFeatureIds.push(row.submission_feature_id);
+
+    // The read-path security filter (isEffectivelySecured) fails closed on a feature with no closure
+    // rows. createTestFeature skips the indexing pipeline that builds the closure, so write the reflexive
+    // self-loop the recompute would produce (each feature is alone in its upload, so the self-loop IS its
+    // full closure) — without it the feature reads as secured and is dropped from the download/export.
+    await db('biohub.submission_feature_closure')
+      .insert({
+        source_submission_feature_id: row.submission_feature_id,
+        target_submission_feature_id: row.submission_feature_id,
+        is_ancestor: true
+      })
+      .onConflict(['source_submission_feature_id', 'target_submission_feature_id'])
+      .ignore();
+
     return row.submission_feature_id;
   }
 

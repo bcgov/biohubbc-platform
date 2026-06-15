@@ -94,12 +94,18 @@ const isValidTimeOnly = (value: string): boolean => {
  * @return {{ time: string; offset: string | null } | null} Time without offset plus offset, or null for invalid offset.
  */
 const splitTimeAndOffset = (value: string): { time: string; offset: string | null } | null => {
-  const offsetMatch = /(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  const offsetMatch = /(Z|[+-]\d{2}(:\d{2})?)$/.exec(value);
   const offset = offsetMatch?.[0] ?? null;
   const time = offset ? value.slice(0, -offset.length) : value;
 
-  if (offset && !dayjs(`2000-01-01T00:00:00${offset}`).isValid()) {
-    return null;
+  if (offset) {
+    // dayjs requires full offset form (+HH:MM) to recognise it as a valid timezone offset.
+    // Normalise short offsets (+HH / -HH) to full form for the validity check only; the
+    // returned `offset` still carries the original string so callers can round-trip it.
+    const normalizedOffset = /^[+-]\d{2}$/.test(offset) ? `${offset}:00` : offset;
+    if (!dayjs(`2000-01-01T00:00:00${normalizedOffset}`).isValid()) {
+      return null;
+    }
   }
 
   return { time, offset };
