@@ -175,7 +175,7 @@ describe('Download version export state machine (integration)', function () {
     for (const featureTypeName of featureTypeNames) {
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/${featureTypeName}/data.parquet`,
+        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/${featureTypeName}/data.parquet`,
         byte_size: 1024,
         artifact_status: 'uploaded',
         checksum_sha256: 'a'.repeat(64),
@@ -765,7 +765,7 @@ describe('Download version export state machine (integration)', function () {
       // download_version_artifact row keyed to the version.
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/dataset/data.parquet`,
+        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`,
         byte_size: 2048,
         artifact_status: 'uploaded',
         checksum_sha256: 'b'.repeat(64),

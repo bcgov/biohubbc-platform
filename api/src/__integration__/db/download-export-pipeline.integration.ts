@@ -80,9 +80,10 @@ function stubParquetReaderWithRows(rows: Record<string, unknown>[]): sinon.Sinon
  *
  * A denormalized two-type join opens the root type's Parquet and each dimension
  * type's Parquet from the SAME `openS3` seam — so a blanket stub would feed the
- * dimension the root's rows. The real `openParquetReader` builds the S3 key as
- * `downloads/{downloadId}/{featureType}/data.parquet`, so the feature type is the
- * third path segment of `params.Key`; dispatch on it to return the right rows.
+ * dimension the root's rows. The real `openParquetReader` builds the version-scoped
+ * S3 key as `downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet`,
+ * so the feature type is the FIFTH path segment (index 4) of `params.Key`; dispatch
+ * on it to return the right rows.
  *
  * An unknown feature type returns an empty reader (zero rows) rather than
  * throwing, so a config that references a materialized-but-unseeded type simply
@@ -97,7 +98,7 @@ function stubParquetReadersByType(
   declaredRowCountsByType: Record<string, number> = {}
 ): sinon.SinonStub {
   return sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async (_client: unknown, params: { Key: string }) => {
-    const featureType = params.Key.split('/')[2];
+    const featureType = params.Key.split('/')[4];
     return fakeParquetReader(rowsByType[featureType] ?? [], declaredRowCountsByType[featureType]);
   });
 }
