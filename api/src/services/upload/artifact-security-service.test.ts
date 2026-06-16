@@ -766,12 +766,14 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves(mockSubmissionUpload);
-      sinon
+      const transitionStub = sinon
         .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
         .rejects(new ApiConflictError('Invalid submission upload status transition'));
 
       // Should resolve without throwing.
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
+
+      expect(transitionStub).to.have.been.calledOnce;
     });
 
     it('propagates non-not-found errors from the upload_archive lookup', async () => {
