@@ -1,8 +1,8 @@
+import { SECURITY_CONFIG } from '../config/mv.security';
 import { OBSERVATIONS_BASE_QUERY } from '../sql/observations.sql';
 import { TELEMETRY_BASE_QUERY } from '../sql/telemetry.sql';
 import { MaterializedViewDefinition } from '../types';
-import { buildSecurityFilter } from './build-security';
-import { SECURITY_CONFIG } from '../config/mv.security';
+import { buildEffectivelySecuredExpression, buildSecurityFilter } from './build-security';
 
 export function buildMaterializedViewSQL(definition: MaterializedViewDefinition): string {
   const { schema, name, columns, securityMode } = definition;
@@ -15,11 +15,10 @@ export function buildMaterializedViewSQL(definition: MaterializedViewDefinition)
       } else if (securityMode === 'all') {
         return {
           ...col,
-          expression:
-            "CASE WHEN EXISTS (SELECT 1 FROM biohub.submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) THEN 'Y' ELSE 'N' END"
+          expression: `CASE WHEN ${buildEffectivelySecuredExpression('sf.submission_feature_id')} THEN 'Y' ELSE 'N' END`
         };
       } else if (securityMode === 'secured') {
-        // TODO: Implement secured logic
+        // All rows in a secured view should be marked as secured
         return { ...col, expression: "'Y'" };
       }
     }
