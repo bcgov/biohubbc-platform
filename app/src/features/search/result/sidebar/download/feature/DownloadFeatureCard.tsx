@@ -20,8 +20,8 @@ interface DownloadFeatureCardProps {
    * `[]` when the user has no exports for this download.
    */
   exports: DownloadExport[];
-  /** Fired when the user picks a menu item. Sidebar owns the API call + refresh. */
-  onCreateExport: (downloadId: string) => void;
+  /** Fired when the user picks a menu item. Sidebar owns the API call + refresh, injecting the download/version ids off the row. */
+  onCreateExport: () => void;
   /** Fired when the user clicks a per-part download. Sidebar fetches the presigned URL and triggers the iframe download. */
   onDownloadExportPart: (exportId: string, chunkId: number) => void;
   /** Fired when the user clicks "Download all" on a multi-part ready export. */
@@ -70,7 +70,7 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
     {
       menuLabel: 'CSV — per feature type',
       menuIcon: <Icon path={mdiDownloadOutline} size={0.8} />,
-      menuOnClick: () => onCreateExport(download.download_id)
+      menuOnClick: () => onCreateExport()
     }
   ];
 
@@ -97,7 +97,7 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
           <Stack spacing={0.5} sx={{ pt: 0.5 }}>
             {exports.map((ex) => (
               <ExportRow
-                key={ex.download_export_id}
+                key={ex.download_version_export_id}
                 exportRecord={ex}
                 onDownloadPart={onDownloadExportPart}
                 onDownloadAllParts={onDownloadExportAllParts}
@@ -125,7 +125,14 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
  */
 const ExportRow = (props: ExportRowProps) => {
   const { exportRecord, onDownloadPart, onDownloadAllParts, onRebuild } = props;
-  const { download_export_id: exportId, status, started_at, completed_at, error_message, part_count } = exportRecord;
+  const {
+    download_version_export_id: exportId,
+    status,
+    started_at,
+    completed_at,
+    error_message,
+    part_count
+  } = exportRecord;
   const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status];
 
   const [partsOpen, setPartsOpen] = useState(false);

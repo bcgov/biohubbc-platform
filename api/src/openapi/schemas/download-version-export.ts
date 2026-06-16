@@ -14,14 +14,23 @@ const MAX_PART_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 /**
  * Body schema for `POST /api/download/:downloadId/export`.
  *
+ * `download_version_id` is required and names the materialized download version
+ * to export — it must be a ready version belonging to this download.
+ *
  * `max_part_size_bytes` is optional. When provided, the route layer enforces
  * the 5 MiB–5 GiB bounds via the integer min/max (out-of-range → 400). When
  * omitted, the service applies the 500 MB default.
  */
-export const CreateDownloadExportRequestSchema: OpenAPIV3.SchemaObject = {
+export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
+  required: ['download_version_id'],
   properties: {
+    download_version_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The materialized download version to export. Must be a ready version belonging to this download.'
+    },
     max_part_size_bytes: {
       type: 'integer',
       minimum: MIN_PART_SIZE_BYTES,
@@ -33,13 +42,13 @@ export const CreateDownloadExportRequestSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Response schema for a single download export record (used by POST and by
- * list items). Detail endpoint extends this with `parts[]`.
+ * Response schema for a single download version export record (used by POST and
+ * by list items). Detail endpoint extends this with `parts[]`.
  */
-export const DownloadExportResponseSchema: OpenAPIV3.SchemaObject = {
+export const DownloadVersionExportResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
-    'download_export_id',
+    'download_version_export_id',
     'download_id',
     'format',
     'status',
@@ -51,7 +60,7 @@ export const DownloadExportResponseSchema: OpenAPIV3.SchemaObject = {
   ],
   additionalProperties: false,
   properties: {
-    download_export_id: { type: 'string', format: 'uuid' },
+    download_version_export_id: { type: 'string', format: 'uuid' },
     download_id: { type: 'string', format: 'uuid' },
     format: { type: 'string', description: "Requested export format. Always 'csv' in this release." },
     status: {
@@ -75,14 +84,14 @@ export const DownloadExportResponseSchema: OpenAPIV3.SchemaObject = {
  * with `part_count` so the card can decide single-vs-multi-part UI without a
  * detail-endpoint round-trip.
  */
-export const DownloadExportListResponseSchema: OpenAPIV3.SchemaObject = {
+export const DownloadVersionExportListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'array',
   items: {
     type: 'object',
-    required: [...(DownloadExportResponseSchema.required ?? []), 'part_count'],
+    required: [...(DownloadVersionExportResponseSchema.required ?? []), 'part_count'],
     additionalProperties: false,
     properties: {
-      ...DownloadExportResponseSchema.properties,
+      ...DownloadVersionExportResponseSchema.properties,
       part_count: { type: 'integer', minimum: 0 }
     }
   }
@@ -93,12 +102,12 @@ export const DownloadExportListResponseSchema: OpenAPIV3.SchemaObject = {
  * `status === 'ready'`; all other statuses return an empty array so clients
  * don't accidentally attempt to download from stale URLs.
  */
-export const DownloadExportDetailResponseSchema: OpenAPIV3.SchemaObject = {
+export const DownloadVersionExportDetailResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: [...(DownloadExportResponseSchema.required ?? []), 'parts'],
+  required: [...(DownloadVersionExportResponseSchema.required ?? []), 'parts'],
   additionalProperties: false,
   properties: {
-    ...DownloadExportResponseSchema.properties,
+    ...DownloadVersionExportResponseSchema.properties,
     parts: {
       type: 'array',
       items: {
@@ -106,7 +115,7 @@ export const DownloadExportDetailResponseSchema: OpenAPIV3.SchemaObject = {
         required: ['chunk_id', 'file_size_bytes', 'url'],
         additionalProperties: false,
         properties: {
-          chunk_id: { type: 'integer', nullable: true, description: '1-based part index.' },
+          chunk_id: { type: 'integer', description: '1-based part index.' },
           file_size_bytes: { type: 'string', format: 'int64' },
           url: {
             type: 'string',

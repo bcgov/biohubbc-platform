@@ -19,11 +19,11 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    * is not a team member, 401 if unauthenticated.
    *
    * @param {string} downloadId
-   * @param {CreateExportPayload} [payload]
+   * @param {CreateExportPayload} payload
    * @return {Promise<DownloadExport>}
    */
-  const createExport = async (downloadId: string, payload?: CreateExportPayload): Promise<DownloadExport> => {
-    const { data } = await axios.post<DownloadExport>(`/api/download/${downloadId}/export`, payload ?? {});
+  const createExport = async (downloadId: string, payload: CreateExportPayload): Promise<DownloadExport> => {
+    const { data } = await axios.post<DownloadExport>(`/api/download/${downloadId}/export`, payload);
     return data;
   };
 
@@ -32,11 +32,12 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    *
    * URLs regenerate per request — callers must not cache them.
    *
+   * @param {string} downloadId
    * @param {string} exportId
    * @return {Promise<DownloadExportDetail>}
    */
-  const getExport = async (exportId: string): Promise<DownloadExportDetail> => {
-    const { data } = await axios.get<DownloadExportDetail>(`/api/download-export/${exportId}`);
+  const getExport = async (downloadId: string, exportId: string): Promise<DownloadExportDetail> => {
+    const { data } = await axios.get<DownloadExportDetail>(`/api/download/${downloadId}/export/${exportId}`);
     return data;
   };
 

@@ -5,12 +5,14 @@ import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
-import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
+import { DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { buildParquetKey } from '../../utils/export-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
@@ -20,6 +22,23 @@ import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
+
+/**
+ * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
+ *
+ * `downloadId` keys the deterministic S3 object key; `downloadVersionId` is the
+ * temporal axis the produced artifact is linked to in `download_version_artifact`,
+ * so the export pipeline can rediscover the version's Parquet files without
+ * re-running the original search.
+ */
+export interface WriteFeatureTypeParquetPayload {
+  downloadId: string;
+  downloadVersionId: string;
+  source: DownloadSource;
+  properties: CsvPropertyDefinition[];
+  featureTypeName: string;
+  statement: ActivePolicyStatementWithExpression;
+}
 
 /**
  * Background processing pipeline for downloads.
@@ -36,6 +55,7 @@ import { ArtifactService } from '../upload/artifact-service';
  */
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   expressionTreeService: ExpressionTreeService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
@@ -43,6 +63,7 @@ export class DownloadPipelineService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
@@ -53,8 +74,8 @@ export class DownloadPipelineService extends DBService {
    *
    * Pure business-rule assertion; no I/O.
    *
-   * @param {string} downloadId - The download ID (for error context).
-   * @param {DownloadRecord['download_status']} currentStatus - The download's current status.
+   * @param {string} downloadVersionId - The download version ID (for error context).
+   * @param {DownloadStatusEnum} currentStatus - The version's current status.
    * @param {DownloadStatusEnum} nextStatus - The status being transitioned to.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
    * @return {void}
@@ -62,57 +83,71 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   private assertDownloadStatusTransition(
-    downloadId: string,
-    currentStatus: DownloadRecord['download_status'],
+    downloadVersionId: string,
+    currentStatus: DownloadStatusEnum,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[]
   ): void {
-    if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
+    if (!allowedCurrentStatuses.includes(currentStatus)) {
       throw new ApiConflictError('Invalid download status transition', [
-        'DownloadPipelineService->transitionDownloadStatus',
-        { downloadId, currentStatus, nextStatus, allowedCurrentStatuses }
+        'DownloadPipelineService->transitionDownloadVersionStatus',
+        { downloadVersionId, currentStatus, nextStatus, allowedCurrentStatuses }
       ]);
     }
   }
 
   /**
-   * Transition a download from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition a download version from one of `allowedCurrentStatuses` to `nextStatus`.
    *
-   * Fetches the download, asserts the transition is allowed, then writes the new status
-   * plus timestamps via the existing generic `updateDownloadStatus`. The state machine
-   * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
-   * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
-   * to the pg-boss DLQ.
+   * The version IS the unit of materialization, and the materialization lifecycle
+   * (status, timing, error) lives on `download_version` — so the transition reads the
+   * version's current status and writes the new status back onto the version directly.
+   * The state machine lives in the service; the repository stays a thin CRUD wrapper.
+   * Illegal transitions (including retries of already-terminal jobs) throw
+   * `ApiConflictError` and bubble up to the pg-boss DLQ.
    *
-   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The download version ID.
    * @param {DownloadStatusEnum} nextStatus - Target status.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
    * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
    * @return {Promise<void>}
-   * @throws {ApiNotFoundError} if the download does not exist.
+   * @throws {ApiNotFoundError} if the download version does not exist.
    * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
    * @memberof DownloadPipelineService
    */
-  async transitionDownloadStatus(
-    downloadId: string,
+  async transitionDownloadVersionStatus(
+    downloadVersionId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
     errorMetadata?: { error?: string }
   ): Promise<void> {
-    const download = await this.downloadRepository.getDownloadById(downloadId);
+    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
 
-    this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
+    this.assertDownloadStatusTransition(
+      downloadVersionId,
+      version.status as DownloadStatusEnum,
+      nextStatus,
+      allowedCurrentStatuses
+    );
 
     const now = new Date().toISOString();
-    const timestamps: { started_at?: string; completed_at?: string } = {};
+    const metadata: { started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string } =
+      {};
     if (nextStatus === DownloadStatusEnum.PROCESSING) {
-      timestamps.started_at = now;
+      metadata.started_at = now;
     }
     if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
-      timestamps.completed_at = now;
+      metadata.completed_at = now;
+    }
+    // materialized_at is the data watermark — when this version's snapshot was captured.
+    if (nextStatus === DownloadStatusEnum.READY) {
+      metadata.materialized_at = now;
+    }
+    if (errorMetadata?.error !== undefined) {
+      metadata.error_message = errorMetadata.error;
     }
 
-    await this.downloadRepository.updateDownloadStatus(downloadId, nextStatus, { ...errorMetadata, ...timestamps });
+    await this.downloadVersionRepository.updateDownloadVersionStatus(downloadVersionId, nextStatus, metadata);
   }
 
   /**
@@ -148,7 +183,7 @@ export class DownloadPipelineService extends DBService {
    * Stream a single feature type to a Parquet file on S3, recording the artifact
    * with authoritative checksum and byte size.
    *
-   * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+   * The S3 key is deterministic: `downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`.
    * Retries overwrite the same key — S3 is idempotent on overwrites, and the
    * artifact / download_artifact inserts are idempotent on unique keys. A retried
    * feature type converges to the same DB + S3 state as a first-time success.
@@ -159,9 +194,12 @@ export class DownloadPipelineService extends DBService {
    * would require re-downloading the S3 object.
    *
    * Writes the artifact row (`format='parquet'`, `artifact_status='uploaded'`, real
-   * checksum + byte_size + uploaded_at) and the download_artifact link inside the
-   * caller's transaction — the worker wraps each feature type in its own
-   * `withConnection`, so a mid-job retry replays the whole per-type transaction.
+   * checksum + byte_size + uploaded_at) and the download_version_artifact link inside
+   * the caller's transaction — the worker wraps each feature type in its own
+   * `withConnection`, so a mid-job retry replays the whole per-type transaction. The
+   * artifact is linked to `downloadVersionId` (the download's materialized version),
+   * not the download directly, so the export pipeline can rediscover the version's
+   * Parquet files.
    *
    * Code and taxon properties arrive pre-resolved from the cursor JOIN. Parquet
    * files are standalone — GIS consumers have no database access.
@@ -176,8 +214,9 @@ export class DownloadPipelineService extends DBService {
    * requesting user's authorization scope — not the audit `create_user` or the
    * worker's own connection grants.
    *
-   * @param {object} payload
+   * @param {WriteFeatureTypeParquetPayload} payload
    * @param {string} payload.downloadId - The download ID.
+   * @param {string} payload.downloadVersionId - The download's materialized version; the produced artifact is linked to it.
    * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
@@ -185,20 +224,14 @@ export class DownloadPipelineService extends DBService {
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
-  async writeFeatureTypeParquet(payload: {
-    downloadId: string;
-    source: DownloadSource;
-    properties: CsvPropertyDefinition[];
-    featureTypeName: string;
-    statement: ActivePolicyStatementWithExpression;
-  }): Promise<void> {
-    const { downloadId, source, properties, featureTypeName, statement } = payload;
+  async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<void> {
+    const { downloadId, downloadVersionId, source, properties, featureTypeName, statement } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
       .map((p) => p.feature_property_name);
     const schema = buildParquetSchema(properties);
-    const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
+    const s3Key = buildParquetKey(downloadId, downloadVersionId, featureTypeName);
 
     // Resolve every precondition (expression read, semantic validation, subquery
     // build, cursor setup) BEFORE starting the S3 multipart upload. The upload
@@ -326,7 +359,7 @@ export class DownloadPipelineService extends DBService {
       format: 'parquet'
     });
 
-    await this.downloadRepository.createDownloadArtifact(downloadId, artifact_id);
+    await this.downloadVersionRepository.createDownloadVersionArtifact(downloadVersionId, artifact_id, featureTypeName);
   }
 
   /**

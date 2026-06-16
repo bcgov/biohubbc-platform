@@ -36,15 +36,27 @@ async function waitForDownloadStatus(
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const [row] = await db('biohub.download').where('download_id', downloadId).select('download_status');
+    // Status lives on the version; there is no stored pointer, so resolve the
+    // most-recent active version (create_date DESC) via a LATERAL.
+    const [row] = await db('biohub.download as d')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT status, error_message, completed_at, started_at
+          FROM biohub.download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
+      .where('d.download_id', downloadId)
+      .select('dv.status as download_status', 'dv.error_message');
 
     if (row?.download_status === targetStatus) {
       return;
     }
 
     if (row?.download_status === 'failed') {
-      const [detail] = await db('biohub.download').where('download_id', downloadId).select('metadata');
-      throw new Error(`Download ${downloadId} failed: ${JSON.stringify(detail?.metadata)}`);
+      throw new Error(`Download ${downloadId} failed: ${row?.error_message}`);
     }
 
     await new Promise((r) => setTimeout(r, 500));
@@ -89,32 +101,16 @@ describe('Download Worker', function () {
   after(async () => {
     // Cleanup in reverse dependency order
     try {
-      // 1. Delete artifacts created by the worker (tracked by FK on download_artifact,
-      //    not in createdArtifactIds). Must run BEFORE the download delete so we can
-      //    still JOIN on download_id.
-      if (createdDownloadIds.length > 0) {
-        const workerArtifactIds = await db('biohub.download_artifact')
-          .whereIn('download_id', createdDownloadIds)
-          .pluck('artifact_id');
-        if (workerArtifactIds.length > 0) {
-          await db('biohub.download_artifact').whereIn('download_id', createdDownloadIds).del();
-          await db('biohub.artifact').whereIn('artifact_id', workerArtifactIds).del();
-        }
-        await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
-        await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
-      }
+      // 1. Worker-produced download artifacts (reachable only via the version chain) then the
+      //    downloads themselves — must run before any other delete so the chain still resolves.
+      await deleteDownloadsAndArtifacts();
 
-      // 1b. Delete policy_statement_expression (no statements should have any here, but be defensive),
-      //     then policy_statement, then the owning policies — children first to satisfy FK.
-      if (createdPolicyStatementIds.length > 0) {
-        await db('biohub.policy_statement_expression').whereIn('policy_statement_id', createdPolicyStatementIds).del();
-        await db('biohub.policy_statement').whereIn('policy_statement_id', createdPolicyStatementIds).del();
-      }
-      if (createdPolicyIds.length > 0) {
-        await db('biohub.policy').whereIn('policy_id', createdPolicyIds).del();
-      }
+      // 1b. Policy statement expressions, then statements, then the owning policies — children first.
+      await deleteByIds('biohub.policy_statement_expression', 'policy_statement_id', createdPolicyStatementIds);
+      await deleteByIds('biohub.policy_statement', 'policy_statement_id', createdPolicyStatementIds);
+      await deleteByIds('biohub.policy', 'policy_id', createdPolicyIds);
 
-      // 2. Delete submission features (closure rows FK to submission_feature on both ends — drop them first)
+      // 2. Submission features — closure rows FK to submission_feature on both ends, so drop them first.
       if (createdSubmissionFeatureIds.length > 0) {
         await db('biohub.submission_feature_closure')
           .whereIn('source_submission_feature_id', createdSubmissionFeatureIds)
@@ -123,39 +119,25 @@ describe('Download Worker', function () {
         await db('biohub.submission_feature').whereIn('submission_feature_id', createdSubmissionFeatureIds).del();
       }
 
-      // 2b. Delete submission upload bridge rows and uploads
-      if (createdSubmissionUploadIds.length > 0) {
-        await db('biohub.submission_upload_status').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
-        await db('biohub.submission_upload').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
-      }
+      // 2b. Submission upload bridge rows, then uploads.
+      await deleteByIds('biohub.submission_upload_status', 'submission_upload_id', createdSubmissionUploadIds);
+      await deleteByIds('biohub.submission_upload', 'submission_upload_id', createdSubmissionUploadIds);
+      await deleteByIds('biohub.upload', 'upload_id', createdUploadIds);
 
-      if (createdUploadIds.length > 0) {
-        await db('biohub.upload').whereIn('upload_id', createdUploadIds).del();
-      }
+      // 2c. Artifact records tracked directly by this suite.
+      await deleteByIds('biohub.artifact', 'artifact_id', createdArtifactIds);
 
-      // 2c. Delete artifact records
-      if (createdArtifactIds.length > 0) {
-        await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
-      }
+      // 3. Submissions.
+      await deleteByIds('biohub.submission', 'submission_id', createdSubmissionIds);
 
-      // 3. Delete submissions
-      if (createdSubmissionIds.length > 0) {
-        await db('biohub.submission').whereIn('submission_id', createdSubmissionIds).del();
-      }
-
+      // Ticket status rows, then tickets.
       if (createdTicketIds.length > 0) {
         await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
-      // 4. Delete S3 objects
-      for (const key of createdS3Keys) {
-        try {
-          await storageService.deleteFile(BucketType.MAIN, key);
-        } catch {
-          /* may not exist */
-        }
-      }
+      // 4. S3 objects.
+      await deleteCreatedS3Objects();
     } catch (error_) {
       console.warn('Cleanup failed:', error_);
     }
@@ -163,6 +145,56 @@ describe('Download Worker', function () {
     await stopPgBoss();
     await db.destroy();
   });
+
+  /**
+   * Delete rows from a biohub table whose `column` value is in `ids`, skipping the query entirely
+   * when there is nothing to delete. Centralizes the "guard then bulk-delete by id list" teardown
+   * step so the after() hook stays a flat, readable sequence of FK-ordered deletes.
+   */
+  async function deleteByIds(table: string, column: string, ids: Array<number | string>): Promise<void> {
+    if (ids.length > 0) {
+      await db(table).whereIn(column, ids).del();
+    }
+  }
+
+  /**
+   * Delete the downloads this suite created together with the artifacts the worker produced for them.
+   * Worker artifacts are reachable only through the download → download_version →
+   * download_version_artifact chain (they are not tracked in createdArtifactIds), so this must run
+   * before the download rows are removed or the chain can no longer be resolved.
+   */
+  async function deleteDownloadsAndArtifacts(): Promise<void> {
+    if (createdDownloadIds.length === 0) {
+      return;
+    }
+    const versionIds = await db('biohub.download_version')
+      .whereIn('download_id', createdDownloadIds)
+      .pluck('download_version_id');
+    if (versionIds.length > 0) {
+      const workerArtifactIds = await db('biohub.download_version_artifact')
+        .whereIn('download_version_id', versionIds)
+        .pluck('artifact_id');
+      await db('biohub.download_version_artifact').whereIn('download_version_id', versionIds).del();
+      await deleteByIds('biohub.artifact', 'artifact_id', workerArtifactIds);
+    }
+    await db('biohub.download_version').whereIn('download_id', createdDownloadIds).del();
+    await db('biohub.download_team').whereIn('download_id', createdDownloadIds).del();
+    await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
+  }
+
+  /**
+   * Best-effort delete of every S3 object this suite created. A key that no longer exists is not an
+   * error — the worker may already have removed it — so per-key failures are swallowed.
+   */
+  async function deleteCreatedS3Objects(): Promise<void> {
+    for (const key of createdS3Keys) {
+      try {
+        await storageService.deleteFile(BucketType.MAIN, key);
+      } catch {
+        /* may not exist */
+      }
+    }
+  }
 
   /**
    * Insert a test submission and return its ID. Tracked for cleanup.
@@ -259,13 +291,13 @@ describe('Download Worker', function () {
    * of the named type — same selection model as the route handler.
    *
    * The worker is the single owner of artifact writes — for parquet it creates one
-   * `artifact` + `download_artifact` pair per feature type at write-time with the real
-   * checksum + byte size. No request-time stub artifacts are created here.
+   * `artifact` + `download_version_artifact` pair per feature type at write-time with the
+   * real checksum + byte size. No request-time stub artifacts are created here.
    */
   async function createDownloadAndProcess(
     featureTypeNames: string[],
     downloadOverrides?: Record<string, unknown>
-  ): Promise<{ downloadId: number }> {
+  ): Promise<{ downloadId: number; downloadVersionId: string }> {
     // Create the owning policy (status='approved' so the row is treated as live).
     const [policy] = await db('biohub.policy')
       .insert({
@@ -296,7 +328,6 @@ describe('Download Worker', function () {
 
     const [download] = await db('biohub.download')
       .insert({
-        download_status: 'pending',
         policy_id: policy.policy_id,
         format,
         create_user: SYSTEM_USER_ID,
@@ -305,17 +336,24 @@ describe('Download Worker', function () {
       .returning('download_id');
     createdDownloadIds.push(download.download_id);
 
+    // The worker requires a materialized version (created at request time in production by
+    // createDownloadRequest); this test bypasses the request path, so seed the version directly
+    // — without it the worker throws "no materialized version". Reads resolve the most-recent
+    // active version, so no stored pointer is set.
+    const [version] = await db('biohub.download_version')
+      .insert({ download_id: download.download_id, create_user: SYSTEM_USER_ID })
+      .returning('download_version_id');
+
     const boss = await initPgBoss();
     await boss.createQueue('process-download');
     const jobId = await boss.send('process-download', {
-      downloadId: download.download_id,
-      teamId: null
+      downloadVersionId: version.download_version_id
     });
     expect(jobId).to.be.a('string');
 
     await waitForDownloadStatus(db, download.download_id, 'ready');
 
-    return { downloadId: download.download_id };
+    return { downloadId: download.download_id, downloadVersionId: version.download_version_id };
   }
 
   /**
@@ -411,7 +449,7 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
@@ -419,16 +457,28 @@ describe('Download Worker', function () {
     expect(sampleSiteFeatureId).to.be.a('number');
     expect(fileFeatureId).to.be.a('number');
 
-    // 3. Verify download status transitions completed
-    const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
+    // 3. Verify download status transitions completed (status/timing live on the
+    // most-recent active version; resolved via LATERAL — no stored pointer).
+    const [finalDownload] = await db('biohub.download as d')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT status, error_message, completed_at, started_at
+          FROM biohub.download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
+      .where('d.download_id', downloadId)
+      .select('dv.status as download_status', 'd.format', 'dv.completed_at');
     expect(finalDownload.download_status).to.equal('ready');
     expect(finalDownload.format).to.equal('parquet');
     expect(finalDownload.completed_at).to.not.be.null;
 
     // 4. List S3 keys under downloads/{downloadId}/ and assert the exact key set
-    const datasetKey = `downloads/${downloadId}/dataset/data.parquet`;
-    const sampleSiteKey = `downloads/${downloadId}/sample_site/data.parquet`;
-    const fileKey = `downloads/${downloadId}/file/data.parquet`;
+    const datasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const sampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
+    const fileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     // Track all per-type parquet keys for cleanup (belt + suspenders alongside
     // the download_id-JOIN cleanup path in after()).
     createdS3Keys.push(datasetKey, sampleSiteKey, fileKey);
@@ -437,11 +487,20 @@ describe('Download Worker', function () {
     const s3Keys = new Set((s3List.Contents ?? []).map((o) => o.Key!));
     expect(s3Keys).to.deep.equal(new Set([datasetKey, sampleSiteKey, fileKey]));
 
-    // 5. Row counts: exactly 3 artifact + 3 download_artifact rows for this download
+    // 5. Row counts: exactly 3 artifact + 3 download_version_artifact rows for this download's version
     const artifactRows = await db('biohub.artifact')
-      .join('biohub.download_artifact', 'biohub.download_artifact.artifact_id', 'biohub.artifact.artifact_id')
-      .where('download_artifact.download_id', downloadId)
-      .whereNull('download_artifact.record_end_date')
+      .join(
+        'biohub.download_version_artifact',
+        'biohub.download_version_artifact.artifact_id',
+        'biohub.artifact.artifact_id'
+      )
+      .join(
+        'biohub.download_version',
+        'biohub.download_version.download_version_id',
+        'biohub.download_version_artifact.download_version_id'
+      )
+      .where('download_version.download_id', downloadId)
+      .whereNull('download_version_artifact.record_end_date')
       .select(
         'biohub.artifact.artifact_id',
         'biohub.artifact.object_key',
@@ -453,10 +512,15 @@ describe('Download Worker', function () {
       .orderBy('biohub.artifact.object_key');
     expect(artifactRows).to.have.lengthOf(3);
 
-    const downloadArtifactRows = await db('biohub.download_artifact')
-      .where('download_id', downloadId)
-      .whereNull('record_end_date')
-      .select('*');
+    const downloadArtifactRows = await db('biohub.download_version_artifact')
+      .join(
+        'biohub.download_version',
+        'biohub.download_version.download_version_id',
+        'biohub.download_version_artifact.download_version_id'
+      )
+      .where('download_version.download_id', downloadId)
+      .whereNull('download_version_artifact.record_end_date')
+      .select('download_version_artifact.*');
     expect(downloadArtifactRows).to.have.lengthOf(3);
 
     const artifactByKey = new Map<string, (typeof artifactRows)[number]>(
@@ -580,7 +644,7 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
@@ -589,16 +653,25 @@ describe('Download Worker', function () {
     expect(fileFeatureId).to.be.a('number');
 
     // Track per-type S3 keys for cleanup (same set expected after both runs)
-    const run1DatasetKey = `downloads/${downloadId}/dataset/data.parquet`;
-    const run1SampleSiteKey = `downloads/${downloadId}/sample_site/data.parquet`;
-    const run1FileKey = `downloads/${downloadId}/file/data.parquet`;
+    const run1DatasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const run1SampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
+    const run1FileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     createdS3Keys.push(run1DatasetKey, run1SampleSiteKey, run1FileKey);
 
     // Capture state after run 1
     const afterRun1 = await db('biohub.artifact')
-      .join('biohub.download_artifact', 'biohub.download_artifact.artifact_id', 'biohub.artifact.artifact_id')
-      .where('download_artifact.download_id', downloadId)
-      .whereNull('download_artifact.record_end_date')
+      .join(
+        'biohub.download_version_artifact',
+        'biohub.download_version_artifact.artifact_id',
+        'biohub.artifact.artifact_id'
+      )
+      .join(
+        'biohub.download_version',
+        'biohub.download_version.download_version_id',
+        'biohub.download_version_artifact.download_version_id'
+      )
+      .where('download_version.download_id', downloadId)
+      .whereNull('download_version_artifact.record_end_date')
       .select(
         'biohub.artifact.artifact_id',
         'biohub.artifact.object_key',
@@ -609,23 +682,40 @@ describe('Download Worker', function () {
     expect(afterRun1).to.have.lengthOf(3);
     const run1Keys = new Set(afterRun1.map((r: any) => r.object_key));
 
-    // Reset the download so the handler can legally transition pending → processing again
-    await db('biohub.download').where('download_id', downloadId).update({
-      download_status: 'pending',
+    // Re-process the SAME version: reset it to pending (status lives on the version)
+    // so the handler can legally transition pending → processing again, then re-publish
+    // keyed by that version id. Resolving the most-recent version returns the one
+    // created above.
+    const [{ download_version_id: resetVersionId }] = await db('biohub.download_version')
+      .where('download_id', downloadId)
+      .orderBy('create_date', 'desc')
+      .select('download_version_id');
+    await db('biohub.download_version').where('download_version_id', resetVersionId).update({
+      status: 'pending',
       started_at: null,
-      completed_at: null
+      completed_at: null,
+      materialized_at: null
     });
 
     // Re-publish and wait
     const boss = await initPgBoss();
-    await boss.send('process-download', { downloadId, teamId: null });
+    await boss.send('process-download', { downloadVersionId: resetVersionId });
     await waitForDownloadStatus(db, downloadId, 'ready');
 
     // Capture state after run 2
     const afterRun2 = await db('biohub.artifact')
-      .join('biohub.download_artifact', 'biohub.download_artifact.artifact_id', 'biohub.artifact.artifact_id')
-      .where('download_artifact.download_id', downloadId)
-      .whereNull('download_artifact.record_end_date')
+      .join(
+        'biohub.download_version_artifact',
+        'biohub.download_version_artifact.artifact_id',
+        'biohub.artifact.artifact_id'
+      )
+      .join(
+        'biohub.download_version',
+        'biohub.download_version.download_version_id',
+        'biohub.download_version_artifact.download_version_id'
+      )
+      .where('download_version.download_id', downloadId)
+      .whereNull('download_version_artifact.record_end_date')
       .select(
         'biohub.artifact.artifact_id',
         'biohub.artifact.object_key',

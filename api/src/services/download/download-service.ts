@@ -1,11 +1,12 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload, DownloadDetailRecord, DownloadId, DownloadListRecord } from '../../models/download';
-import { DownloadExportListRow } from '../../models/download-export';
+import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
@@ -43,13 +44,8 @@ export interface CreateDownloadRequestResult {
  */
 export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
-  /**
-   * Held directly (not via `DownloadExportService`) to avoid a circular
-   * construction chain — `DownloadExportService` already composes `DownloadService`
-   * for its auth helper, and layering a `DownloadExportService` dependency here
-   * would loop at construction time.
-   */
-  downloadExportRepository: DownloadExportRepository;
+  downloadVersionExportRepository: DownloadVersionExportRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   teamService: TeamService;
   expressionTreeService: ExpressionTreeService;
   downloadPolicyService: DownloadPolicyService;
@@ -70,7 +66,8 @@ export class DownloadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
+    this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.teamService = new TeamService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.downloadPolicyService = new DownloadPolicyService(connection);
@@ -143,6 +140,12 @@ export class DownloadService extends DBService {
       requestedBy: payload.requestedBy
     });
 
+    // A download materializes exactly one version at request time. The version is the temporal
+    // axis the parquet/export pipeline links artifacts to, and the worker job is keyed on it.
+    // The write rides the route's transaction so a mid-flow failure rolls back the download and
+    // its version together.
+    const version = await this.downloadVersionRepository.createDownloadVersion(download_id);
+
     if (payload.requestedBy !== null) {
       await this.linkDownloadToNewTeam(
         download_id,
@@ -153,7 +156,9 @@ export class DownloadService extends DBService {
     }
     // Anonymous: no team link — UUID is the credential.
 
-    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
+    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, {
+      downloadVersionId: version.download_version_id
+    });
 
     return { download_id };
   }
@@ -201,7 +206,7 @@ export class DownloadService extends DBService {
     }
 
     const downloadIds = baseDownloads.map((d) => d.download_id);
-    const exportRows = await this.downloadExportRepository.listDownloadExportsByDownloadIds(downloadIds);
+    const exportRows = await this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadIds(downloadIds);
 
     const exportsByDownloadId = groupExportsByDownloadId(exportRows);
 
@@ -356,8 +361,10 @@ export class DownloadService extends DBService {
  * `download_id` then `create_date DESC`, so the first occurrence of each id
  * seeds that id's bucket and subsequent rows append in the repo's order.
  */
-export const groupExportsByDownloadId = (rows: DownloadExportListRow[]): Map<string, DownloadExportListRow[]> => {
-  const grouped = new Map<string, DownloadExportListRow[]>();
+export const groupExportsByDownloadId = (
+  rows: DownloadVersionExportListRow[]
+): Map<string, DownloadVersionExportListRow[]> => {
+  const grouped = new Map<string, DownloadVersionExportListRow[]>();
   for (const row of rows) {
     const list = grouped.get(row.download_id);
     if (list) {

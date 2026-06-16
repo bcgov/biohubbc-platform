@@ -89,76 +89,6 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('createDownloadArtifact', () => {
-    it('inserts into download_artifact with downloadId and artifactId', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('download_artifact');
-      expect(sqlText).to.include('artifact_id');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000001');
-    });
-
-    it('uses ON CONFLICT ... WHERE record_end_date IS NULL DO NOTHING for retry idempotency', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('ON CONFLICT');
-      expect(sqlText).to.include('record_end_date IS NULL');
-      expect(sqlText).to.include('DO NOTHING');
-    });
-
-    it('does not throw when rowCount is 0 (conflict — link already exists)', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('updateDownloadStatus', () => {
-    it('updates status with metadata', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.READY, {
-        completed_at: '2025-01-01T00:01:00Z'
-      });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(DownloadStatusEnum.READY);
-      expect(sqlValues).to.include('2025-01-01T00:01:00Z');
-    });
-
-    it('updates status without metadata', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.FAILED);
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(DownloadStatusEnum.FAILED);
-    });
-  });
-
   describe('getDownloadById', () => {
     it('returns the download record when found', async () => {
       const row = { download_id: 'aaaa0000-0000-0000-0000-000000000001', download_status: DownloadStatusEnum.PENDING };
@@ -213,6 +143,35 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('p.description');
     });
 
+    it('SQL selects the resolved dv.download_version_id', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('dv.download_version_id');
+      // The dropped stored pointer must be gone — reads resolve the most-recent version instead.
+      expect(sqlText).to.not.include('current_download_version_id');
+    });
+
+    it('SQL sources status/timing from the most-recent active version (INNER JOIN LATERAL)', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.match(/INNER JOIN\s+LATERAL/i);
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.match(/ORDER BY\s+create_date\s+DESC/i);
+      expect(sqlText).to.match(/dv\.status\s+AS\s+download_status/i);
+      expect(sqlText).to.include('dv.started_at');
+      expect(sqlText).to.include('dv.completed_at');
+    });
+
     it('returns the joined detail row when policy description is non-null', async () => {
       const mockRow = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
@@ -223,6 +182,7 @@ describe('DownloadRepository', () => {
         completed_at: '2026-01-01T00:01:00.000Z',
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
+        download_version_id: 'dddd0000-0000-0000-0000-000000000001',
         name: 'My download',
         description: 'A nice description'
       };
@@ -247,6 +207,7 @@ describe('DownloadRepository', () => {
         completed_at: null,
         downloaded_at: null,
         create_date: '2026-01-01T00:00:00.000Z',
+        download_version_id: 'dddd0000-0000-0000-0000-000000000002',
         name: 'My download',
         description: null
       };
@@ -299,6 +260,25 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.not.include('feature_count');
       expect(sqlText).to.include('join "team" as "t" on "t"."team_id" = "dt"."team_id"');
       expect(sqlText).to.include('"t"."record_end_date" is null');
+    });
+
+    it('SQL resolves the most-recent active version via INNER JOIN LATERAL', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.match(/inner join lateral/i);
+      expect(sqlText).to.include('"dv"."download_version_id"');
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.match(/order by\s+create_date\s+desc/i);
+      // The dropped stored pointer must be gone.
+      expect(sqlText).to.not.include('current_download_version_id');
     });
 
     it('returns paginated results when pagination is provided', async () => {

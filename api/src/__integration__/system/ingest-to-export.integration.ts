@@ -11,10 +11,12 @@
 
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -52,9 +54,14 @@ describe('Ingest → Download → Export (system integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
+    // This spec drives the export pipeline directly via `runExportGroup`; stub the job publish so
+    // the request path doesn't enqueue a real pg-boss job (which the worker would then process
+    // concurrently with the manual run) and doesn't require an initialized pg-boss in the test process.
+    sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob').resolves();
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -174,9 +181,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
+    // Materialize the download's version. The parquet pipeline links each artifact to
+    // this version, and runExportGroup discovers feature types from it. Reads resolve
+    // the most-recent version — there is no stored pointer to set.
+    const downloadVersionRepo = new DownloadVersionRepository(connection);
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    const downloadVersionId = version.download_version_id;
+
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
@@ -185,36 +199,52 @@ describe('Ingest → Download → Export (system integration)', function () {
       const featureTypeName = statement.urn_feature_type;
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: schemaLookup.get(featureTypeName) ?? [],
         featureTypeName,
         statement
       });
     }
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
       DownloadStatusEnum.PROCESSING
     ]);
 
-    // Run the export (CSV) pipeline.
+    // Run the export (CSV) pipeline through the resolve-or-create group contract.
     const exportService = new DownloadExportService(connection);
-    const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {});
+    const exportRecord = await exportService.createDownloadVersionExport(
+      downloadId,
+      systemUserId,
+      { download_version_id: downloadVersionId },
+      connection
+    );
+    // The export record no longer exposes the internal artifact-group FK (it is server-only), so the
+    // group id is read straight from the row to drive the pipeline and locate its part-zips.
+    const exportGroup = await connection.sql(SQL`
+      SELECT download_version_export_artifact_group_id
+      FROM download_version_export
+      WHERE download_version_export_id = ${exportRecord.download_version_export_id};
+    `);
+    const groupId = exportGroup.rows[0].download_version_export_artifact_group_id;
     const exportPipelineService = new DownloadExportPipelineService(connection);
-    await exportPipelineService.runExport(exportRecord.download_export_id);
+    await exportPipelineService.runExportGroup(groupId);
 
-    // Locate the part-zip on S3 and extract chunk1.csv.
+    // Locate the part-zip on S3 and extract chunk1.csv. Part artifacts are linked to the shared
+    // artifact GROUP (keyed by the group id), not the per-user export row.
     const artifacts = await connection.sql(SQL`
       SELECT a.bucket, a.object_key
-      FROM download_export_artifact dea
-      INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-      WHERE dea.download_export_id = ${exportRecord.download_export_id}
-        AND dea.record_end_date IS NULL
-      ORDER BY dea.chunk_id ASC;
+      FROM download_version_export_artifact dvea
+      INNER JOIN artifact a ON a.artifact_id = dvea.artifact_id
+      WHERE dvea.download_version_export_artifact_group_id = ${groupId}
+        AND dvea.record_end_date IS NULL
+      ORDER BY dvea.chunk_id ASC;
     `);
     expect(artifacts.rowCount).to.equal(1, 'expected exactly one part-zip artifact');
 
     const storageService = new ObjectStorageService();
     const zip = await downloadZipFromS3(storageService, artifacts.rows[0].object_key);
-    const chunkEntryName = `biohub-export-${exportRecord.download_export_id}/telemetry/chunk1.csv`;
+    // The physical zip is shared across exports, so its internal entry names are keyed by the group id.
+    const chunkEntryName = `biohub-export-${groupId}/telemetry/chunk1.csv`;
     const csv = zipEntryText(zip, chunkEntryName);
     expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 

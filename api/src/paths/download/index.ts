@@ -43,11 +43,16 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'download_status', 'create_date', 'exports'],
+                  required: ['download_id', 'download_version_id', 'download_status', 'create_date', 'exports'],
                   properties: {
                     download_id: {
                       type: 'string',
                       format: 'uuid'
+                    },
+                    download_version_id: {
+                      type: 'string',
+                      format: 'uuid',
+                      description: 'The most-recent materialized version of this download.'
                     },
                     download_status: {
                       type: 'string',
@@ -71,7 +76,7 @@ GET.apiDoc = {
                       items: {
                         type: 'object',
                         required: [
-                          'download_export_id',
+                          'download_version_export_id',
                           'download_id',
                           'format',
                           'status',
@@ -83,7 +88,7 @@ GET.apiDoc = {
                           'part_count'
                         ],
                         properties: {
-                          download_export_id: { type: 'string', format: 'uuid' },
+                          download_version_export_id: { type: 'string', format: 'uuid' },
                           download_id: { type: 'string', format: 'uuid' },
                           format: { type: 'string' },
                           status: {

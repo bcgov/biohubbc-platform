@@ -1,9 +1,8 @@
 import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../constants/submission-upload';
 import { IDBConnection } from '../database/db';
-import { ApiNotFoundError } from '../errors/api-error';
 import { DownloadStatusEnum } from '../models/download-status';
 import { SubmissionUpload } from '../models/submission-upload';
-import { DownloadService } from '../services/download/download-service';
+import { DownloadVersionRepository } from '../repositories/download/download-version-repository';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
@@ -11,7 +10,6 @@ import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submission-feature-closure-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
-import { IProcessDownloadExportJobData } from './jobs/process-download-export-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
 import { getPgBoss } from './pg-boss-service';
 
@@ -26,13 +24,11 @@ const defaultLog = getLogger('queue/publisher');
 export interface PublisherDependencies {
   getPgBoss: typeof getPgBoss;
   createSubmissionValidationService: (connection: IDBConnection) => SubmissionValidationService;
-  createDownloadService: (connection: IDBConnection) => DownloadService;
 }
 
 export const publisherDependencies: PublisherDependencies = {
   getPgBoss,
-  createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection),
-  createDownloadService: (connection: IDBConnection) => new DownloadService(connection)
+  createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection)
 };
 
 /**
@@ -101,14 +97,24 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
 };
 
 /**
- * Options for process download export jobs.
+ * Job data for the version-export packaging worker.
  *
- * Shorter budget than `PROCESS_DOWNLOAD` because exports read already-finalized
- * Parquet artifacts (the expensive feature-gathering work is done) — the
- * bounded work is read-one-row-group / write-one-CSV-chunk / upload-one-zip
- * per feature type, sequentially.
+ * Keyed on the shared artifact group rather than a per-user export: N user requests for the same
+ * export shape resolve onto one group, and the worker packages that group exactly once.
  */
-const PROCESS_DOWNLOAD_EXPORT_OPTIONS: IPublishOptions = {
+export interface IProcessDownloadVersionExportJobData {
+  /** The download_version_export_artifact_group ID to package. */
+  downloadVersionExportArtifactGroupId: string;
+}
+
+/**
+ * Options for process download version export jobs.
+ *
+ * Shorter budget than `PROCESS_DOWNLOAD` because exports read already-finalized Parquet artifacts
+ * (the expensive feature-gathering work is done) — the bounded work is read-one-row-group /
+ * write-one-CSV-chunk / upload-one-zip per feature type, sequentially.
+ */
+const PROCESS_DOWNLOAD_VERSION_EXPORT_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
@@ -332,14 +338,18 @@ export const publishMalwareScanJob = async (
 /**
  * Publish a process download job to the queue.
  *
- * Queues async packaging of selected features into a downloadable zip file.
- * Updates the download record with the job_id for tracking.
+ * Queues async packaging of a download version's selected features into Parquet files. The version
+ * is the unit of materialization: the job is keyed `download-version-{id}` so a re-run enqueues
+ * independent work that can't collide with an earlier version's in-flight job.
  *
- * @param {IDBConnection} connection Database connection for download record updates
- * @param {IProcessDownloadJobData} data Job data containing downloadId
+ * Only a `pending` version is enqueued; any other status means the version is already in flight or
+ * finished, so the publish is treated as a duplicate.
+ *
+ * @param {IDBConnection} connection Database connection for the transactional job insert
+ * @param {IProcessDownloadJobData} data Job data containing downloadVersionId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
- * @throws {ApiNotFoundError} When the download row does not exist.
+ * @throws {ApiNotFoundError} When the download version does not exist.
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
  *         callers' surrounding transaction rolls back automatically.
  */
@@ -349,25 +359,21 @@ export const publishProcessDownloadJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const downloadService = publisherDependencies.createDownloadService(connection);
+    // Resolve the version directly; a missing version throws ApiNotFoundError from the repository.
+    const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(
+      data.downloadVersionId
+    );
 
-    // Check if download exists
-    const download = await downloadService.findDownloadById(data.downloadId);
-
-    if (!download) {
-      throw new ApiNotFoundError('Download not found', ['publishProcessDownloadJob', { downloadId: data.downloadId }]);
-    }
-
-    // Check if download is already being processed or completed
-    if (download.download_status !== DownloadStatusEnum.PENDING) {
+    // Only a pending version is enqueueable — any other status is already in flight or terminal.
+    if (version.status !== DownloadStatusEnum.PENDING) {
       defaultLog.warn({
         label: 'publishProcessDownloadJob',
-        message: 'Download is not in pending status',
-        downloadId: data.downloadId,
-        currentStatus: download.download_status
+        message: 'Download version is not in pending status',
+        downloadVersionId: data.downloadVersionId,
+        currentStatus: version.status
       });
 
-      return { status: 'duplicate', message: 'Job already exists for this download' };
+      return { status: 'duplicate', message: 'Job already exists for this download version' };
     }
 
     const boss = publisherDependencies.getPgBoss();
@@ -384,10 +390,10 @@ export const publishProcessDownloadJob = async (
       }
     };
 
-    // Use singletonKey to prevent duplicate concurrent jobs for the same download
+    // Use singletonKey to prevent duplicate concurrent jobs for the same download version
     const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD, data, {
       ...mergedOptions,
-      singletonKey: `download-${data.downloadId}`,
+      singletonKey: `download-version-${data.downloadVersionId}`,
       db
     });
 
@@ -396,7 +402,7 @@ export const publishProcessDownloadJob = async (
         label: 'publishProcessDownloadJob',
         message: 'Process download job published',
         jobId,
-        downloadId: data.downloadId
+        downloadVersionId: data.downloadVersionId
       });
 
       return { status: 'published', jobId };
@@ -405,15 +411,15 @@ export const publishProcessDownloadJob = async (
     defaultLog.warn({
       label: 'publishProcessDownloadJob',
       message: 'Job not published (duplicate or throttled)',
-      downloadId: data.downloadId
+      downloadVersionId: data.downloadVersionId
     });
 
-    return { status: 'duplicate', message: 'Job already exists for this download' };
+    return { status: 'duplicate', message: 'Job already exists for this download version' };
   } catch (error) {
     defaultLog.error({
       label: 'publishProcessDownloadJob',
       message: 'Failed to publish job',
-      downloadId: data.downloadId,
+      downloadVersionId: data.downloadVersionId,
       error
     });
     throw error;
@@ -421,31 +427,32 @@ export const publishProcessDownloadJob = async (
 };
 
 /**
- * Publish a process download export job to the queue.
+ * Publish a process download version export job to the queue.
  *
- * Queues async CSV export packaging for an already-created `download_export`
- * row. The caller (route handler) creates the row inside an open transaction
- * and passes the same connection here; pg-boss's `db` option makes the job
- * insert participate in that transaction, so the row and the job either both
- * commit or both roll back — no ghost jobs and no orphaned exports.
+ * Queues async CSV export packaging for a shared artifact group. The job is keyed on the group
+ * (`singletonKey: export-group-{id}`), so N user exports that attach to the same group trigger
+ * exactly one packaging run — the dedupe winner enqueues, every later attach reuses the in-flight
+ * or finished group without re-queueing.
  *
- * `singletonKey: export-{downloadExportId}` paired with `policy: 'short'` on
- * the queue (see worker.ts) prevents two concurrent jobs for the same export.
+ * The caller (the request-time service) creates the export row and resolves the group inside an
+ * open transaction and passes the same connection here; pg-boss's `db` option makes the job insert
+ * participate in that transaction, so the row and the job either both commit or both roll back — no
+ * ghost jobs and no orphaned exports.
  *
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
  *         callers' surrounding transaction rolls back automatically.
  */
-export const publishProcessDownloadExportJob = async (
+export const publishProcessDownloadVersionExportJob = async (
   connection: IDBConnection,
-  data: IProcessDownloadExportJobData,
+  data: IProcessDownloadVersionExportJobData,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
     const boss = publisherDependencies.getPgBoss();
-    const mergedOptions = { ...PROCESS_DOWNLOAD_EXPORT_OPTIONS, ...options };
+    const mergedOptions = { ...PROCESS_DOWNLOAD_VERSION_EXPORT_OPTIONS, ...options };
 
-    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
 
     // Insert the job in the same transaction as the business data via the
     // `db` option. Prevents ghost jobs (job exists but data rolled back) and
@@ -457,35 +464,35 @@ export const publishProcessDownloadExportJob = async (
       }
     };
 
-    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD_EXPORT, data, {
+    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT, data, {
       ...mergedOptions,
-      singletonKey: `export-${data.downloadExportId}`,
+      singletonKey: `export-group-${data.downloadVersionExportArtifactGroupId}`,
       db
     });
 
     if (jobId) {
       defaultLog.info({
-        label: 'publishProcessDownloadExportJob',
-        message: 'Process download export job published',
+        label: 'publishProcessDownloadVersionExportJob',
+        message: 'Process download version export job published',
         jobId,
-        downloadExportId: data.downloadExportId
+        downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId
       });
 
       return { status: 'published', jobId };
     }
 
     defaultLog.warn({
-      label: 'publishProcessDownloadExportJob',
+      label: 'publishProcessDownloadVersionExportJob',
       message: 'Job not published (duplicate or throttled)',
-      downloadExportId: data.downloadExportId
+      downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId
     });
 
-    return { status: 'duplicate', message: 'Job already exists for this download export' };
+    return { status: 'duplicate', message: 'Job already exists for this export artifact group' };
   } catch (error) {
     defaultLog.error({
-      label: 'publishProcessDownloadExportJob',
+      label: 'publishProcessDownloadVersionExportJob',
       message: 'Failed to publish job',
-      downloadExportId: data.downloadExportId,
+      downloadVersionExportArtifactGroupId: data.downloadVersionExportArtifactGroupId,
       error
     });
     throw error;

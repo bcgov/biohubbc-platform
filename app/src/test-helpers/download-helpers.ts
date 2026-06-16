@@ -7,6 +7,7 @@ import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
  */
 export const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
   download_id: 'abc-123',
+  download_version_id: 'ver-abc-123',
   download_status: 'ready',
   create_date: '2026-03-01T00:00:00Z',
   feature_count: 42,
@@ -21,7 +22,7 @@ export const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadR
  * Test factory: build a DownloadExport with sensible defaults (single-part ready).
  */
 export const makeExport = (overrides: Partial<DownloadExport> = {}): DownloadExport => ({
-  download_export_id: 'exp-abc-123',
+  download_version_export_id: 'exp-abc-123',
   download_id: 'abc-123',
   format: 'csv',
   mode: 'per_feature_type',

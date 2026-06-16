@@ -7,7 +7,7 @@
 //   streamFeatureBaseBySearchQueryAndType  →  fetchTypedPropertyRows
 //
 // Also covers: status transitions and the writeFeatureTypeParquet artifact contract
-// (one artifact + one download_artifact row per feature type, idempotent on retry).
+// (one artifact + one download_version_artifact row per feature type, idempotent on retry).
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -27,6 +27,7 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
@@ -106,7 +107,7 @@ function assembleFeatureData(
  * The Parquet writer is replaced with a no-op that never writes to the stream,
  * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
  * The upload is stubbed to resolve without consuming the stream. The real SQL paths
- * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
+ * for ArtifactService.insertArtifact and DownloadVersionRepository.createDownloadVersionArtifact
  * remain unstubbed — those are exactly the idempotency contracts we verify.
  */
 function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
@@ -121,6 +122,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   let connection: IDBConnection;
   let downloadRepo: DownloadRepository;
+  let downloadVersionRepo: DownloadVersionRepository;
   let pipelineService: DownloadPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
@@ -134,6 +136,7 @@ describe('Download Parquet pipeline (integration)', function () {
     connection = getAPIUserDBConnection();
     await connection.open();
     downloadRepo = new DownloadRepository(connection);
+    downloadVersionRepo = new DownloadVersionRepository(connection);
     pipelineService = new DownloadPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
@@ -166,6 +169,18 @@ describe('Download Parquet pipeline (integration)', function () {
       requestedBy: connection.systemUserId()
     });
     return download_id;
+  }
+
+  /**
+   * Helper: materialize a download_version for the given download, returning the
+   * version id. The Parquet pipeline links each produced artifact to this version
+   * via download_version_artifact, so the writeFeatureTypeParquet tests below need
+   * a real version row (FK target). Reads resolve the most-recent active version —
+   * there is no stored current-version pointer to set.
+   */
+  async function createDownloadVersionFor(downloadId: string): Promise<string> {
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    return version.download_version_id;
   }
 
   /**
@@ -858,6 +873,9 @@ describe('Download Parquet pipeline (integration)', function () {
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
       const downloadId = await createPolicyDownload(['dataset']);
+      // Status lives on the version, so the download needs one to be findable, and
+      // the transition keys off the version id.
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
 
       // Verify initial state
       const initial = await downloadService.findDownloadById(downloadId);
@@ -866,7 +884,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(initial!.completed_at).to.be.null;
 
       // pending → processing: started_at populated, completed_at still null
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
         DownloadStatusEnum.PENDING
       ]);
       const processing = await downloadService.findDownloadById(downloadId);
@@ -877,7 +895,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const firstStartedAt = processing!.started_at;
 
       // processing → ready: completed_at populated, started_at unchanged
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
         DownloadStatusEnum.PROCESSING
       ]);
       const ready = await downloadService.findDownloadById(downloadId);
@@ -885,9 +903,9 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(ready!.started_at).to.equal(firstStartedAt);
       expect(ready!.completed_at).to.not.be.null;
 
-      // Illegal transition: retrying processing → ready on a READY download throws ApiConflictError
+      // Illegal transition: retrying processing → ready on a READY version throws ApiConflictError
       try {
-        await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+        await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
           DownloadStatusEnum.PROCESSING
         ]);
         expect.fail('Expected ApiConflictError for illegal transition from READY');
@@ -897,7 +915,7 @@ describe('Download Parquet pipeline (integration)', function () {
     });
   });
 
-  describe('writeFeatureTypeParquet — artifact + download_artifact rows', () => {
+  describe('writeFeatureTypeParquet — artifact + download_version_artifact rows', () => {
     // ParquetWriter is stubbed — no properties are resolved against typed tables, so
     // an empty property list is safe and minimizes test surface area.
     const emptyProperties: CsvPropertyDefinition[] = [];
@@ -915,16 +933,18 @@ describe('Download Parquet pipeline (integration)', function () {
       expression_id: null
     });
 
-    it('inserts one artifact + one download_artifact row for a single feature type', async () => {
+    it('inserts one artifact + one download_version_artifact row for a single feature type', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
       const downloadId = await createPolicyDownload(['dataset']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -935,48 +955,54 @@ describe('Download Parquet pipeline (integration)', function () {
         SELECT artifact.artifact_id, artifact.bucket, artifact.object_key, artifact.byte_size,
                artifact.checksum_sha256, artifact.artifact_status, artifact.format, artifact.uploaded_at
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(artifactRows.rowCount).to.equal(1);
 
       const artifact = artifactRows.rows[0];
       expect(artifact.format).to.equal('parquet');
       expect(artifact.artifact_status).to.equal('uploaded');
-      expect(artifact.object_key).to.equal(`downloads/${downloadId}/dataset/data.parquet`);
+      expect(artifact.object_key).to.equal(
+        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
+      );
       expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
       expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifact.byte_size)).to.be.at.least(0);
       expect(artifact.uploaded_at).to.not.be.null;
 
-      // Explicit FK linkage: download_artifact.artifact_id matches artifact.artifact_id
+      // Explicit FK linkage: download_version_artifact.artifact_id matches artifact.artifact_id,
+      // carries the feature type name, and is keyed to the materialized version.
       const linkRows = await connection.sql(SQL`
-        SELECT artifact_id, download_id
-        FROM download_artifact
-        WHERE download_id = ${downloadId}
+        SELECT artifact_id, download_version_id, feature_type_name
+        FROM download_version_artifact
+        WHERE download_version_id = ${downloadVersionId}
           AND record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
       expect(linkRows.rows[0].artifact_id).to.equal(artifact.artifact_id);
-      expect(linkRows.rows[0].download_id).to.equal(downloadId);
+      expect(linkRows.rows[0].download_version_id).to.equal(downloadVersionId);
+      expect(linkRows.rows[0].feature_type_name).to.equal('dataset');
 
       // download status untouched — writeFeatureTypeParquet does not transition status
       const download = await downloadService.findDownloadById(downloadId);
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
     });
 
-    it('is idempotent on retry — second call does not create a duplicate artifact or download_artifact row', async () => {
+    it('is idempotent on retry — second call does not create a duplicate artifact or download_version_artifact row', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
       const downloadId = await createPolicyDownload(['dataset']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       // Call 1
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -986,9 +1012,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const afterFirst = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(afterFirst.rowCount).to.equal(1);
       const firstArtifactId = afterFirst.rows[0].artifact_id;
@@ -998,6 +1024,7 @@ describe('Download Parquet pipeline (integration)', function () {
       // Call 2 — same download, same feature type
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -1007,9 +1034,9 @@ describe('Download Parquet pipeline (integration)', function () {
       const afterSecond = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       // Idempotency: same row count, same artifact_id, unchanged checksum + byte_size
       expect(afterSecond.rowCount).to.equal(1);
@@ -1018,17 +1045,19 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(String(afterSecond.rows[0].byte_size)).to.equal(String(firstByteSize));
     });
 
-    it('inserts one artifact + one download_artifact row per feature type when the download has multiple types', async () => {
+    it('inserts one artifact + one download_version_artifact row per feature type when the download has multiple types', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
       await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
       const downloadId = await createPolicyDownload(['dataset', 'capture']);
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'dataset',
@@ -1036,6 +1065,7 @@ describe('Download Parquet pipeline (integration)', function () {
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'capture',
@@ -1043,22 +1073,22 @@ describe('Download Parquet pipeline (integration)', function () {
       });
 
       const artifactRows = await connection.sql(SQL`
-        SELECT artifact.artifact_id, artifact.object_key, download_artifact.download_id
+        SELECT artifact.artifact_id, artifact.object_key, download_version_artifact.download_version_id
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL
         ORDER BY artifact.object_key;
       `);
       expect(artifactRows.rowCount).to.equal(2);
       const objectKeys = artifactRows.rows.map((r: any) => r.object_key);
       expect(objectKeys).to.deep.equal([
-        `downloads/${downloadId}/capture/data.parquet`,
-        `downloads/${downloadId}/dataset/data.parquet`
+        `downloads/${downloadId}/versions/${downloadVersionId}/capture/data.parquet`,
+        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
       ]);
-      // Both rows link to the same download
+      // Both rows link to the same materialized version
       for (const row of artifactRows.rows) {
-        expect(row.download_id).to.equal(downloadId);
+        expect(row.download_version_id).to.equal(downloadVersionId);
       }
       // The two artifact_ids are distinct
       expect(artifactRows.rows[0].artifact_id).to.not.equal(artifactRows.rows[1].artifact_id);

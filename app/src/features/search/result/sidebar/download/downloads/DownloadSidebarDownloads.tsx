@@ -74,10 +74,11 @@ export const DownloadSidebarDownloads = () => {
    * Failures open the standard export error dialog.
    *
    * @param {string} downloadId - Download request id to export.
+   * @param {string} downloadVersionId - Active version of the download the export is built from.
    */
-  const handleCreateExport = async (downloadId: string) => {
+  const handleCreateExport = async (downloadId: string, downloadVersionId: string) => {
     try {
-      await biohubApi.downloadExport.createExport(downloadId);
+      await biohubApi.downloadExport.createExport(downloadId, { download_version_id: downloadVersionId });
       await downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
     } catch {
       dialogContext.setErrorDialog({
@@ -94,12 +95,13 @@ export const DownloadSidebarDownloads = () => {
    * Downloads a single export part by resolving a fresh presigned URL first.
    * A missing part uses the same "Download Error" dialog as API failures.
    *
+   * @param {string} downloadId - Download id that owns the export.
    * @param {string} exportId - Export id containing the requested part.
    * @param {number} chunkId - One-based part id to download.
    */
-  const handleDownloadExportPart = async (exportId: string, chunkId: number) => {
+  const handleDownloadExportPart = async (downloadId: string, exportId: string, chunkId: number) => {
     try {
-      const detail = await biohubApi.downloadExport.getExport(exportId);
+      const detail = await biohubApi.downloadExport.getExport(downloadId, exportId);
       const part = detail.parts.find((p) => p.chunk_id === chunkId);
       if (!part) {
         throw new Error('Part not found');
@@ -121,11 +123,12 @@ export const DownloadSidebarDownloads = () => {
    * Fetches export detail once, then iframe-injects each part URL in backend
    * order. No iframe downloads start if detail fetch fails.
    *
+   * @param {string} downloadId - Download id that owns the export.
    * @param {string} exportId - Export id whose parts should all be downloaded.
    */
-  const handleDownloadExportAllParts = async (exportId: string) => {
+  const handleDownloadExportAllParts = async (downloadId: string, exportId: string) => {
     try {
-      const detail = await biohubApi.downloadExport.getExport(exportId);
+      const detail = await biohubApi.downloadExport.getExport(downloadId, exportId);
       for (const part of detail.parts) {
         triggerIframeDownload(part.url);
       }
@@ -183,9 +186,11 @@ export const DownloadSidebarDownloads = () => {
               <DownloadFeatureCard
                 download={download}
                 exports={download.exports}
-                onCreateExport={handleCreateExport}
-                onDownloadExportPart={handleDownloadExportPart}
-                onDownloadExportAllParts={handleDownloadExportAllParts}
+                onCreateExport={() => handleCreateExport(download.download_id, download.download_version_id)}
+                onDownloadExportPart={(exportId, chunkId) =>
+                  handleDownloadExportPart(download.download_id, exportId, chunkId)
+                }
+                onDownloadExportAllParts={(exportId) => handleDownloadExportAllParts(download.download_id, exportId)}
                 onRebuildExport={handleRebuildExport}
               />
             </ListItem>
