@@ -239,12 +239,12 @@ export class SecurityRepository extends BaseRepository {
 
     insertSQL.append(queryValues.join(', '));
     // A conflicting row may be a 'draft' inserted by automatic screening — manual application
-    // must promote it to 'secured' or the rule would silently remain unenforced. Rows already
-    // 'secured' are left untouched (and excluded from RETURNING) to avoid audit churn.
+    // must promote it to 'screened' or the rule would silently remain unenforced. Rows already
+    // 'screened' are left untouched (and excluded from RETURNING) to avoid audit churn.
     insertSQL.append(`
       ON CONFLICT (submission_feature_id, security_rule_id)
-      DO UPDATE SET status = 'secured'
-      WHERE submission_feature_security.status IS DISTINCT FROM 'secured'
+      DO UPDATE SET status = 'screened'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'screened'
       RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
@@ -281,8 +281,8 @@ export class SecurityRepository extends BaseRepository {
       CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
       WHERE sf.submission_id = ${submissionIdPlaceholder}
       ON CONFLICT (submission_feature_id, security_rule_id)
-      DO UPDATE SET status = 'secured'
-      WHERE submission_feature_security.status IS DISTINCT FROM 'secured'
+      DO UPDATE SET status = 'screened'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'screened'
       RETURNING *;
     `;
 
@@ -390,7 +390,7 @@ export class SecurityRepository extends BaseRepository {
       .from('submission_feature_security')
       .whereIn('submission_feature_id', submissionFeatureIds)
       // Draft rows (automatic screening output pending review) are not applied security
-      .where('status', 'secured');
+      .where('status', 'screened');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
@@ -421,7 +421,7 @@ export class SecurityRepository extends BaseRepository {
       .with('grouped_rules', (qb) => {
         qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
           .from('submission_feature_security as sfs')
-          .where('sfs.status', 'secured')
+          .where('sfs.status', 'screened')
           .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
           .modify((qb) => {
             // Conditionally filter for specific features

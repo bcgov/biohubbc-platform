@@ -159,7 +159,7 @@ export class SubmissionFeatureRepository extends BaseRepository {
           FROM submission_feature_security sfs
           WHERE sfs.submission_feature_id = sf.submission_feature_id
             AND sfs.record_end_date IS NULL
-            AND sfs.status = 'secured'
+            AND sfs.status = 'screened'
         ) AS secured
       FROM
         submission_feature sf

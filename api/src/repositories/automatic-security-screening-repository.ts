@@ -5,7 +5,7 @@ import { BaseRepository } from './base-repository';
  *
  * Responsible for writing draft `submission_feature_security` rows produced by
  * the automatic screening job. Manual rule application (admin PATCH) continues
- * to live in `SecurityRepository` and inserts `secured` rows directly.
+ * to live in `SecurityRepository` and inserts `screened` rows directly.
  *
  * @export
  * @class AutomaticSecurityScreeningRepository
@@ -42,7 +42,7 @@ export class AutomaticSecurityScreeningRepository extends BaseRepository {
    *
    * **Access safety:** Draft rows have `status = 'draft'` and are excluded from
    * `isEffectivelySecured` / `computeAnchorBatch` so they do NOT restrict feature
-   * access until an admin promotes them to `status = 'secured'`.
+   * access until an admin promotes them to `status = 'screened'`.
    *
    * @param {number[]} triggerFeatureIds `submission_feature_id` values returned by the
    *   rule's policy evaluator for the given upload.
