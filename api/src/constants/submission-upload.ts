@@ -1,15 +1,12 @@
 import { SubmissionUpload } from '../models/submission-upload';
 
 /**
- * Upload statuses that represent a completed lifecycle with no further automatic pipeline steps.
+ * Upload statuses that represent a completed ingestion lifecycle.
  *
  * Used by queue guards (for example in `process-submission-features-job`) to
  * short-circuit work once the upload has reached a final non-retryable state.
  * `failed` is intentionally excluded so users can restart jobs that failed for
  * transient external reasons.
- *
- * Note: `indexed` is NOT terminal — after indexing the automatic security screening
- * job runs; `security_screened` is the new terminal-success state.
  */
 export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['security_screened', 'invalid'];
 

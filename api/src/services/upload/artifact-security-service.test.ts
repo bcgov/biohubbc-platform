@@ -762,7 +762,7 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon
         .stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId')
-        .resolves({ ...mockSubmissionUpload, status: 'indexed' });
+        .resolves({ ...mockSubmissionUpload, status: 'security_screened' });
       const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus');
 
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
