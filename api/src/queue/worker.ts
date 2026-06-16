@@ -18,6 +18,11 @@ import {
 } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
+  IPollDownloadSchedulesJobData,
+  pollDownloadSchedulesFailedHandler,
+  pollDownloadSchedulesJobHandler
+} from './jobs/poll-download-schedules-job';
+import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,
   processDownloadJobHandler
@@ -57,6 +62,8 @@ export interface WorkerDependencies {
   computeScopeAnchorsFailedHandler: typeof computeScopeAnchorsFailedHandler;
   computeSubmissionFeatureClosureJobHandler: typeof computeSubmissionFeatureClosureJobHandler;
   computeSubmissionFeatureClosureFailedHandler: typeof computeSubmissionFeatureClosureFailedHandler;
+  pollDownloadSchedulesJobHandler: typeof pollDownloadSchedulesJobHandler;
+  pollDownloadSchedulesFailedHandler: typeof pollDownloadSchedulesFailedHandler;
 }
 
 export const workerDependencies: WorkerDependencies = {
@@ -74,7 +81,9 @@ export const workerDependencies: WorkerDependencies = {
   computeScopeAnchorsJobHandler,
   computeScopeAnchorsFailedHandler,
   computeSubmissionFeatureClosureJobHandler,
-  computeSubmissionFeatureClosureFailedHandler
+  computeSubmissionFeatureClosureFailedHandler,
+  pollDownloadSchedulesJobHandler,
+  pollDownloadSchedulesFailedHandler
 };
 
 /**
@@ -248,6 +257,39 @@ export const registerWorkers = async (): Promise<void> => {
     JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED,
     workerDependencies.computeSubmissionFeatureClosureFailedHandler
   );
+
+  // Hourly UTC infrastructure tick. The per-download cadence is the schedule row's own
+  // cron_expression; this fixed interval is just how often the worker scans for due schedules.
+  const POLL_DOWNLOAD_SCHEDULES_CRON = '0 * * * *';
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration. No policy:'short' — the tick
+  // carries no singletonKey, so the default 'standard' policy is correct; the next interval re-scans
+  // anything a missed tick left due.
+  await boss.createQueue(JobQueues.POLL_DOWNLOAD_SCHEDULES, {
+    deadLetter: JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+
+  // Register poll download schedules job handler
+  await boss.work<IPollDownloadSchedulesJobData>(
+    JobQueues.POLL_DOWNLOAD_SCHEDULES,
+    workerDependencies.pollDownloadSchedulesJobHandler
+  );
+
+  // Register dead letter queue handler for failed poll download schedules ticks
+  await boss.work<IPollDownloadSchedulesJobData>(
+    JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED,
+    workerDependencies.pollDownloadSchedulesFailedHandler
+  );
+
+  // Schedule the recurring tick. The queue must already exist (created + worked above) before it can
+  // be scheduled. tz UTC keeps the infra cadence stable across DST regardless of server timezone.
+  await boss.schedule(JobQueues.POLL_DOWNLOAD_SCHEDULES, POLL_DOWNLOAD_SCHEDULES_CRON, {}, { tz: 'UTC' });
 
   defaultLog.info({
     label: 'registerWorkers',
