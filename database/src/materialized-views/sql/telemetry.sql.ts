@@ -1,10 +1,17 @@
 export const TELEMETRY_BASE_QUERY = `
-WITH deployments AS (
+WITH candidate_features AS (
+    SELECT DISTINCT source_submission_feature_id AS submission_feature_id
+    FROM biohub.submission_feature_closure
+),
+
+deployments AS (
     SELECT
         dep.submission_feature_id,
         dep.data->>'device_key' AS device_key,
         dep.data->>'animal_identifier' AS animal_id
     FROM biohub.submission_feature dep
+    JOIN candidate_features cf
+      ON cf.submission_feature_id = dep.submission_feature_id
     JOIN biohub.feature_type ft_dep
       ON dep.feature_type_id = ft_dep.feature_type_id
     WHERE ft_dep.name = 'telemetry_deployment'
@@ -14,6 +21,15 @@ WITH deployments AS (
 ),
 
 related_features AS (
+    SELECT
+        c.source_submission_feature_id AS deployment_id,
+        c.target_submission_feature_id AS related_feature_id
+    FROM biohub.submission_feature_closure c
+    JOIN deployments d
+      ON c.source_submission_feature_id = d.submission_feature_id
+
+    UNION
+
     SELECT
         sff.source_feature_id AS deployment_id,
         sff.target_feature_id AS related_feature_id
@@ -106,6 +122,8 @@ related_ecological_units AS (
 SELECT
     {columns}
 FROM biohub.submission_feature sf
+JOIN candidate_features cf
+  ON cf.submission_feature_id = sf.submission_feature_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 

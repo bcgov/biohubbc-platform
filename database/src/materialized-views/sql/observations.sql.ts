@@ -1,34 +1,18 @@
 export const OBSERVATIONS_BASE_QUERY = `
-WITH site_linked_observations AS (
-  SELECT DISTINCT sf.submission_feature_id
-  FROM biohub.submission_feature sf
-  WHERE sf.parent_submission_feature_id IS NOT NULL
-    AND sf.record_effective_date IS NOT NULL
-    AND sf.record_effective_date <= NOW()::date
-    AND sf.parent_submission_feature_id IN (
-      SELECT submission_feature_id
-      FROM biohub.submission_feature sf_parent
-      JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
-      WHERE ft_parent.name = 'sample_site' AND sf_parent.record_end_date IS NULL
-        AND sf_parent.record_effective_date IS NOT NULL
-        AND sf_parent.record_effective_date <= NOW()::date
-    )
-
-  UNION
-  SELECT DISTINCT sf.submission_feature_id
-  FROM biohub.submission_feature sf
-  JOIN biohub.submission_feature_feature sff ON (
-    sff.source_feature_id = sf.submission_feature_id OR sff.target_feature_id = sf.submission_feature_id
-  )
-  JOIN biohub.submission_feature sf_site ON (
-    (sff.source_feature_id = sf_site.submission_feature_id AND sff.target_feature_id = sf.submission_feature_id)
-    OR
-    (sff.target_feature_id = sf_site.submission_feature_id AND sff.source_feature_id = sf.submission_feature_id)
-  )
-  JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
-  WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
-    AND sf.record_effective_date IS NOT NULL
-    AND sf.record_effective_date <= NOW()::date
+WITH candidate_features AS (
+  SELECT DISTINCT source_submission_feature_id AS submission_feature_id
+  FROM biohub.submission_feature_closure
+),
+site_linked_observations AS (
+  -- Observations whose closure reaches a sample_site via parent/property paths
+  SELECT DISTINCT c.source_submission_feature_id AS submission_feature_id
+  FROM biohub.submission_feature_closure c
+  JOIN biohub.submission_feature sf_site
+    ON sf_site.submission_feature_id = c.target_submission_feature_id
+  JOIN biohub.feature_type ft_site
+    ON sf_site.feature_type_id = ft_site.feature_type_id
+  WHERE ft_site.name = 'sample_site'
+    AND sf_site.record_end_date IS NULL
     AND sf_site.record_effective_date IS NOT NULL
     AND sf_site.record_effective_date <= NOW()::date
 ),
@@ -63,6 +47,8 @@ observation_subcounts AS (
 SELECT
     {columns}
 FROM biohub.submission_feature sf
+JOIN candidate_features cf
+  ON cf.submission_feature_id = sf.submission_feature_id
 LEFT JOIN observation_subcounts parent_obs ON sf.submission_feature_id = parent_obs.parent_observation_id
 LEFT JOIN biohub.submission_feature sf_subcount ON parent_obs.subcount_id = sf_subcount.submission_feature_id
 LEFT JOIN submissions sub
