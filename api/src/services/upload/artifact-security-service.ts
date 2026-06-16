@@ -1,6 +1,6 @@
 import { HeadObjectCommandOutput } from '@aws-sdk/client-s3';
 import { IDBConnection } from '../../database/db';
-import { ApiNotFoundError } from '../../errors/api-error';
+import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
 import { ClamAvScanValidationError } from '../../errors/clamav-errors';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
@@ -157,6 +157,51 @@ export class ArtifactSecurityService extends DBService {
     const submissionUpload = await this.submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
 
     await ArtifactSecurityService.dependencies.publishProcessSubmissionFeaturesJob(this.connection, submissionUpload);
+  }
+
+  /**
+   * Transition the `submission_upload` owning an artifact security record to `failed`.
+   *
+   * Resolves the upload via the artifact's `upload_archive` bridge. Used by the malware scan dead letter handler
+   * so a scan that fails after all retries does not leave the `submission_upload` stuck at `uploaded`.
+   *
+   * Tolerant by design so it cannot throw the failure handler into a retry loop: no-op when the artifact has no
+   * `upload_archive`, and swallows the {@link ApiConflictError} raised when the upload is already terminal.
+   *
+   * @param {string} artifactSecurityId - Artifact security record identifier.
+   * @returns {Promise<void>}
+   */
+  async failSubmissionUploadByArtifactSecurityId(artifactSecurityId: string): Promise<void> {
+    const securityRecord = await this.getArtifactSecurity(artifactSecurityId);
+
+    let uploadArchive: UploadArchive | null = null;
+    try {
+      uploadArchive = await this.uploadArchiveService.getUploadArchiveByArtifactId(securityRecord.artifact_id);
+    } catch (error) {
+      if (!(error instanceof ApiNotFoundError)) {
+        throw error;
+      }
+    }
+
+    if (!uploadArchive) {
+      // Non-archive artifact (e.g. a standalone attachment) — no submission_upload lifecycle to fail.
+      return;
+    }
+
+    const submissionUpload = await this.submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
+
+    try {
+      await this.submissionUploadService.transitionSubmissionUploadStatus(
+        submissionUpload.submission_upload_id,
+        'failed',
+        ['uploaded', 'ingesting', 'ingested', 'indexing', 'failed']
+      );
+    } catch (error) {
+      // Already terminal/invalid — nothing to fail. Swallow so the dead letter handler still commits.
+      if (!(error instanceof ApiConflictError)) {
+        throw error;
+      }
+    }
   }
 
   /**
