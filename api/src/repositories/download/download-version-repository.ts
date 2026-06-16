@@ -170,7 +170,8 @@ export class DownloadVersionRepository extends BaseRepository {
         download_version_id,
         download_id
       FROM download_version
-      WHERE download_version_id = ${downloadVersionId};
+      WHERE download_version_id = ${downloadVersionId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, DownloadVersionRecord);
@@ -225,7 +226,8 @@ export class DownloadVersionRepository extends BaseRepository {
         materialized_at,
         error_message
       FROM download_version
-      WHERE download_version_id = ${downloadVersionId};
+      WHERE download_version_id = ${downloadVersionId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, DownloadVersionStatusRecord);
