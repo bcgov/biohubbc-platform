@@ -355,13 +355,6 @@ export class DownloadExportService extends DBService {
   }
 
   /**
-   * Get an export by ID, throwing if not found.
-   */
-  async getDownloadVersionExportById(exportId: string): Promise<DownloadVersionExportRecord> {
-    return this.downloadVersionExportRepository.getDownloadVersionExportById(exportId);
-  }
-
-  /**
    * Authorize a user for an export under a specific parent download.
    *
    * Authorizes against the parent download (the team-membership rule lives in exactly one place —
@@ -430,9 +423,9 @@ export class DownloadExportService extends DBService {
    *
    * The detail endpoint's full shape in a single call: authorize against the parent download, load
    * the export, and populate `parts[]` only for a `ready` export — `pending` / `processing` /
-   * `failed` / `downloaded` return `[]` so clients don't attempt to download from URLs for an
-   * incomplete job. The status gate lives here, not in the route handler, so it is unit-testable
-   * without driving the HTTP layer.
+   * `failed` return `[]` so clients don't attempt to download from URLs for an incomplete job. The
+   * status gate lives here, not in the route handler, so it is unit-testable without driving the
+   * HTTP layer.
    */
   async getAuthorizedExportWithParts(
     downloadId: string,
@@ -456,7 +449,7 @@ export class DownloadExportService extends DBService {
  *
  * Pure — no I/O. Lifecycle status/timing/error live on the group, never the per-user export, and
  * `download_id` is the parent already resolved by the caller — so the create path needs no
- * JOIN-on-RETURNING to build the same shape `findDownloadVersionExportById` returns.
+ * JOIN-on-RETURNING to build the same shape `getDownloadVersionExportById` returns.
  *
  * Fields are picked explicitly rather than spread from `exportRow`: the thin row carries the
  * internal `download_version_id` and artifact-group FKs, which are not part of the client contract —

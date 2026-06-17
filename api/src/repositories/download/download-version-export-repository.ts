@@ -337,20 +337,19 @@ export class DownloadVersionExportRepository extends BaseRepository {
   }
 
   /**
-   * Get a full export record by ID.
+   * Get a full export record by ID, throwing if not found.
    *
    * JOINs export → version (for `download_id`) and export → group (for the
    * group-owned lifecycle fields status/started_at/completed_at/error_message).
    * The group is always set by the service before insert, so an INNER JOIN is
    * correct — there is no export without a group.
    *
-   * `find*` returns null on missing (companion to `getDownloadVersionExportById`).
-   *
    * @param {string} downloadVersionExportId - The export ID.
-   * @return {Promise<DownloadVersionExportRecord | null>}
+   * @return {Promise<DownloadVersionExportRecord>}
+   * @throws {ApiNotFoundError} when no export matches the given ID.
    * @memberof DownloadVersionExportRepository
    */
-  async findDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord | null> {
+  async getDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
@@ -371,28 +370,14 @@ export class DownloadVersionExportRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, DownloadVersionExportRecord);
 
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Get a full export record by ID, throwing if not found.
-   *
-   * @param {string} downloadVersionExportId - The export ID.
-   * @return {Promise<DownloadVersionExportRecord>}
-   * @throws {ApiNotFoundError} when no export matches the given ID.
-   * @memberof DownloadVersionExportRepository
-   */
-  async getDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
-    const record = await this.findDownloadVersionExportById(downloadVersionExportId);
-
-    if (!record) {
+    if (response.rowCount === 0) {
       throw new ApiNotFoundError('Download version export not found', [
         'DownloadVersionExportRepository->getDownloadVersionExportById',
         `no download_version_export with id ${downloadVersionExportId}`
       ]);
     }
 
-    return record;
+    return response.rows[0];
   }
 
   /**

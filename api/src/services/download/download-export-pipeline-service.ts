@@ -11,12 +11,7 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
-import {
-  buildSchemaHeaders,
-  CsvPropertyDefinition,
-  escapeCsvField,
-  flattenFeatureBySchema
-} from '../../utils/csv-utils';
+import { CsvPropertyDefinition, escapeCsvField, flattenFeatureBySchema } from '../../utils/csv-utils';
 import {
   buildOutputRecord,
   coerceJoinKey,
@@ -25,7 +20,8 @@ import {
   DimensionMaps,
   joinRowTransform,
   materializedColumnsForType,
-  orderMergeSteps
+  orderMergeSteps,
+  STRUCTURAL_COLUMNS
 } from '../../utils/export-config-utils';
 import {
   buildParquetKey,
@@ -289,18 +285,19 @@ export class DownloadExportPipelineService extends DBService {
       params.resumeReader ?? (await this.openParquetReader(downloadId, downloadVersionId, featureTypeName));
     const cursor = params.resumeCursor ?? reader.getCursor();
 
-    // submission_feature_id leads so consumers can trace a CSV row back to
-    // its feature-detail page in the platform. `uuid` + `parent_uuid` follow
-    // as the cross-file star-schema join keys — telemetry → deployment →
-    // animal joins downstream by `parent_uuid → uuid`.
-    const structuralHeaders = ['submission_feature_id', 'uuid', 'parent_uuid'];
-    const allHeaders = [...structuralHeaders, ...buildSchemaHeaders(properties)];
+    // The exact materialized column set for this type (structural trace columns —
+    // submission_feature_id, uuid, parent_uuid — followed by the schema headers).
+    // Derived from the shared `materializedColumnsForType` so this writer's header
+    // set stays identical to what AC8 validation and the join engine check against.
+    const allHeaders = materializedColumnsForType(properties);
     // A column filter (per_feature_type output_columns selection) keeps the
     // structural trace columns plus the chosen schema columns; an absent filter
     // emits every column (the default). Raw header names — per-type files have no
     // cross-type name collisions, so no rename is applied.
     const headers = params.selectedColumns
-      ? allHeaders.filter((header) => structuralHeaders.includes(header) || params.selectedColumns!.has(header))
+      ? allHeaders.filter(
+          (header) => (STRUCTURAL_COLUMNS as readonly string[]).includes(header) || params.selectedColumns!.has(header)
+        )
       : allHeaders;
     const headerLine = headers.map(escapeCsvField).join(',') + '\n';
     // Hoisted: most feature types have zero artifact_key properties, so
@@ -737,8 +734,19 @@ export class DownloadExportPipelineService extends DBService {
         // FULL rows from the reader — flattening needs the raw inputs; the map is
         // trimmed to `projection` per row instead of projecting at the reader.
         const cursor = reader.getCursor();
+        let rowsBuffered = 0;
         let raw = (await cursor.next()) as Record<string, unknown> | null;
         while (raw !== null) {
+          // Runtime backstop for the footer preflight above: a corrupt or
+          // under-reporting footer could pass the row-count check yet stream more
+          // rows than the budget, OOMing the worker. Count actual rows read and
+          // abort before the in-memory map can outgrow the join budget.
+          rowsBuffered += 1;
+          if (rowsBuffered > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+            throw new Error(
+              `Denormalized export: dimension '${featureType}' streamed past the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} rows (Parquet footer under-reported its row count) — use the raw-Parquet download path for joins this large.`
+            );
+          }
           const materialized = this.materializeParquetRow(raw, properties);
           const key = coerceJoinKey(materialized[keyStep.right_column]);
           // Never index a null/empty key — SQL NULL ≠ NULL, so a null-keyed

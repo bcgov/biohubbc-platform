@@ -145,12 +145,13 @@ export const DownloadVersionExportResponseSchema: OpenAPIV3.SchemaObject = {
     format: { type: 'string', description: "Requested export format. Always 'csv' in this release." },
     status: {
       type: 'string',
-      enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+      enum: ['pending', 'processing', 'ready', 'failed']
     },
     mode: {
       type: 'string',
       enum: ['per_feature_type', 'denormalized'],
-      description: "Export shape. Always 'per_feature_type' in this release."
+      description:
+        "Export shape: 'per_feature_type' (one CSV per feature type) or 'denormalized' (a single joined CSV)."
     },
     max_part_size_bytes: { type: 'string', format: 'int64' },
     started_at: { type: 'string', nullable: true },

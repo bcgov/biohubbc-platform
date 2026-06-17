@@ -19,7 +19,7 @@ import { buildSchemaHeaders, CsvPropertyDefinition } from './csv-utils';
  * match for a parentless root row, which is kept with empty right-side columns
  * under left-join semantics.
  */
-const STRUCTURAL_COLUMNS = ['submission_feature_id', 'uuid', 'parent_uuid'] as const;
+export const STRUCTURAL_COLUMNS = ['submission_feature_id', 'uuid', 'parent_uuid'] as const;
 
 /** Per-feature-type build-side hash maps for the denormalized join: feature type
  *  → (canonical join-key string → the dimension rows carrying that key). Buffered
