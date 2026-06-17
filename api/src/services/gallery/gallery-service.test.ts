@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadExportListRow, createMockDownloadRecord } from '../../__mocks__/download';
+import { createMockDownloadRecord, createMockDownloadVersionExportListRow } from '../../__mocks__/download';
 import { createMockGalleryRecord } from '../../__mocks__/gallery';
 import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
 import { GalleryService } from './gallery-service';
 
@@ -193,7 +193,10 @@ describe('GalleryService', () => {
         .stub(GalleryRepository.prototype, 'getGalleryById')
         .rejects(new ApiNotFoundError('Gallery not found'));
       const membersStub = sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads');
-      const exportsStub = sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds');
+      const exportsStub = sinon.stub(
+        DownloadVersionExportRepository.prototype,
+        'listDownloadVersionExportsByDownloadIds'
+      );
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -219,7 +222,10 @@ describe('GalleryService', () => {
       // Step 1: Stub the gallery guard to pass and the membership query to return none
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       const membersStub = sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads').resolves([]);
-      const exportsStub = sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds');
+      const exportsStub = sinon.stub(
+        DownloadVersionExportRepository.prototype,
+        'listDownloadVersionExportsByDownloadIds'
+      );
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -241,12 +247,20 @@ describe('GalleryService', () => {
       // Step 1: Stub two members, one with exports and one without
       const memberA = createMockDownloadRecord({ download_id: 'a' });
       const memberB = createMockDownloadRecord({ download_id: 'b' });
-      const exportA1 = createMockDownloadExportListRow({ download_export_id: 'ex-a1', download_id: 'a' });
-      const exportA2 = createMockDownloadExportListRow({ download_export_id: 'ex-a2', download_id: 'a' });
+      const exportA1 = createMockDownloadVersionExportListRow({
+        download_version_export_id: 'ex-a1',
+        download_id: 'a'
+      });
+      const exportA2 = createMockDownloadVersionExportListRow({
+        download_version_export_id: 'ex-a2',
+        download_id: 'a'
+      });
 
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads').resolves([memberA, memberB]);
-      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([exportA1, exportA2]);
+      sinon
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
+        .resolves([exportA1, exportA2]);
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -274,7 +288,7 @@ describe('GalleryService', () => {
         .stub(GalleryRepository.prototype, 'getGalleryDownloads')
         .resolves(ids.map((id) => createMockDownloadRecord({ download_id: id })));
       const exportsStub = sinon
-        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
         .resolves([]);
 
       // Step 2: Create the service
@@ -300,7 +314,7 @@ describe('GalleryService', () => {
           createMockDownloadRecord({ download_id: 'first' }),
           createMockDownloadRecord({ download_id: 'second' })
         ]);
-      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+      sinon.stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds').resolves([]);
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();

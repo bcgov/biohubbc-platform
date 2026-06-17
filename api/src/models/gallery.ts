@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DownloadDetailRecord } from './download';
-import { DownloadExportListRow } from './download-export';
+import { DownloadVersionExportListRow } from './download-version-export';
 
 /**
  * A curated collection of downloads, surfaced as a public-facing gallery.
@@ -47,7 +47,7 @@ export type CreateGallery = z.infer<typeof CreateGallery>;
  * stays a uuid string here (inherited from `DownloadDetailRecord`).
  */
 export const GalleryDownloadListRecord = DownloadDetailRecord.extend({
-  exports: z.array(DownloadExportListRow)
+  exports: z.array(DownloadVersionExportListRow)
 });
 export type GalleryDownloadListRecord = z.infer<typeof GalleryDownloadListRecord>;
 

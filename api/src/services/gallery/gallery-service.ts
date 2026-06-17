@@ -7,8 +7,8 @@ import {
   GalleryRecord,
   UpdateGalleryRequestBody
 } from '../../models/gallery';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
 import { DBService } from '../db-service';
 import { groupExportsByDownloadId } from '../download/download-service';
@@ -16,7 +16,7 @@ import { groupExportsByDownloadId } from '../download/download-service';
 /**
  * Service for managing galleries and their download memberships.
  *
- * Orchestrates the gallery, download, and download-export repositories: it owns
+ * Orchestrates the gallery, download, and download-version-export repositories: it owns
  * the name-uniqueness and foreign-key business rules around gallery membership,
  * and assembles each gallery member's `exports[]` at read time.
  *
@@ -28,18 +28,18 @@ export class GalleryService extends DBService {
   galleryRepository: GalleryRepository;
   downloadRepository: DownloadRepository;
   /**
-   * Held directly (not via `DownloadExportService`) because the only thing this
-   * service needs is the batch `listDownloadExportsByDownloadIds`, which lives on
+   * Held directly (not via `DownloadVersionExportService`) because the only thing this
+   * service needs is the batch `listDownloadVersionExportsByDownloadIds`, which lives on
    * the repository — there is no export-service method that exposes it, so the
    * repository is the lowest-coupling reach to assemble `exports[]`.
    */
-  downloadExportRepository: DownloadExportRepository;
+  downloadExportRepository: DownloadVersionExportRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.galleryRepository = new GalleryRepository(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
+    this.downloadExportRepository = new DownloadVersionExportRepository(connection);
   }
 
   /**
@@ -187,7 +187,7 @@ export class GalleryService extends DBService {
       return [];
     }
 
-    const exportRows = await this.downloadExportRepository.listDownloadExportsByDownloadIds(
+    const exportRows = await this.downloadExportRepository.listDownloadVersionExportsByDownloadIds(
       members.map((member) => member.download_id)
     );
 
