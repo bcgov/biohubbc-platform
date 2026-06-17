@@ -772,7 +772,7 @@ describe('Download Export pipeline (integration)', function () {
 
       // One root row fanned out to exactly two output rows — one per matched animal.
       expect(rows.length).to.equal(2);
-      expect(rows.map((row) => row[2]).sort()).to.eql(['ANIMAL-1', 'ANIMAL-2']);
+      expect(rows.map((row) => row[2]).sort((a, b) => a.localeCompare(b))).to.eql(['ANIMAL-1', 'ANIMAL-2']);
       // Both rows carry the SAME root columns (the root row broadcast across matches).
       for (const row of rows) {
         expect([row[0], row[1]]).to.eql(['ds-uuid-1', 'Dataset One']);
@@ -822,8 +822,11 @@ describe('Download Export pipeline (integration)', function () {
       expect(rows.length).to.equal(2);
       const nameIndex = header.indexOf('name');
       const uuidIndex = header.indexOf('uuid');
-      expect(rows.map((row) => row[uuidIndex]).sort()).to.eql(['ds-uuid-1', 'ds-uuid-2']);
-      expect(rows.map((row) => row[nameIndex]).sort()).to.eql(['Dataset One', 'Dataset Two']);
+      expect(rows.map((row) => row[uuidIndex]).sort((a, b) => a.localeCompare(b))).to.eql(['ds-uuid-1', 'ds-uuid-2']);
+      expect(rows.map((row) => row[nameIndex]).sort((a, b) => a.localeCompare(b))).to.eql([
+        'Dataset One',
+        'Dataset Two'
+      ]);
     });
 
     it('fails fast on an over-budget dimension before buffering or uploading (Edge 4 getRowCount preflight)', async () => {

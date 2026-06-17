@@ -74,6 +74,17 @@ export interface PartArchiverBundle {
 }
 
 /**
+ * Write a line to a PassThrough and respect back-pressure — without the `drain`
+ * wait, a slow S3 leg lets the row loop out-run the pipe and the working set
+ * silently grows past our bound.
+ */
+const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
+  if (!entry.write(line)) {
+    await once(entry, 'drain');
+  }
+};
+
+/**
  * Background processing pipeline for CSV exports.
  *
  * Called exclusively by the pg-boss group job handler. Packages a download
@@ -331,15 +342,6 @@ export class DownloadExportPipelineService extends DBService {
       bundle.archive.append(entry, { name: entryName });
       chunksWritten += 1;
       return entry;
-    };
-
-    // Write to a PassThrough and respect back-pressure — without the `drain`
-    // wait, a slow S3 leg lets the row loop out-run the pipe and the working
-    // set silently grows past our bound.
-    const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
-      if (!entry.write(line)) {
-        await once(entry, 'drain');
-      }
     };
 
     // Open lazily on first row so a zero-row feature type (or a cursor that
@@ -911,14 +913,6 @@ export class DownloadExportPipelineService extends DBService {
         );
       }
       return bundle;
-    };
-
-    // Same back-pressure rule as the per-type path: a slow S3 leg must not let the
-    // row loop out-run the pipe and grow the working set past our bound.
-    const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
-      if (!entry.write(line)) {
-        await once(entry, 'drain');
-      }
     };
 
     // chunkIndex threads across part-zips so the joined CSVs stay monotonic
