@@ -253,6 +253,14 @@ export class GalleryRepository extends BaseRepository {
    * `record_end_date IS NULL`, so a soft-deleted download never leaks into a
    * public curated list even if its gallery_download link is still active.
    *
+   * Materialization status/timing (`download_status`, `started_at`, `completed_at`)
+   * and `download_version_id` live on `download_version`, not `download`. There is
+   * no stored "current version" pointer, so they are resolved from the most-recent
+   * active version via a `LATERAL` subquery (ordered `create_date DESC`, `LIMIT 1`) —
+   * effectively inner, since a committed download always has ≥1 active version. This
+   * mirrors `DownloadRepository.findDownloadById` so a gallery member carries the
+   * same `DownloadDetailRecord` shape as a directly-fetched download.
+   *
    * Returns flat rows — each download's `exports[]` is attached later at the
    * service layer so this method stays single-SQL CRUD.
    *
@@ -262,10 +270,27 @@ export class GalleryRepository extends BaseRepository {
    */
   async getGalleryDownloads(galleryId: number): Promise<DownloadDetailRecord[]> {
     const sql = SQL`
-      SELECT d.download_id, d.download_status, d.format, d.metadata, d.started_at,
-             d.completed_at, d.downloaded_at, d.create_date, p.name, p.description
+      SELECT
+        d.download_id,
+        dv.download_version_id,
+        dv.status AS download_status,
+        d.format,
+        d.metadata,
+        dv.started_at,
+        dv.completed_at,
+        d.downloaded_at,
+        d.create_date,
+        p.name,
+        p.description
       FROM gallery_download gd
       INNER JOIN download d ON d.download_id = gd.download_id
+      INNER JOIN LATERAL (
+        SELECT download_version_id, status, started_at, completed_at
+        FROM download_version
+        WHERE download_id = d.download_id AND record_end_date IS NULL
+        ORDER BY create_date DESC, download_version_id DESC
+        LIMIT 1
+      ) dv ON true
       LEFT JOIN policy p ON p.policy_id = d.policy_id
       WHERE gd.gallery_id = ${galleryId}
         AND gd.record_end_date IS NULL
