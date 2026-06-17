@@ -195,6 +195,35 @@ describe('UploadArchiveService', () => {
     });
   });
 
+  describe('findUploadArchiveByArtifactId', () => {
+    it('should return the upload archive record for a given artifact ID', async () => {
+      const fakeUploadArchive: UploadArchive = {
+        upload_archive_id: 'archive-1',
+        upload_id: 'upload-1',
+        artifact_id: 'artifact-1',
+        archive_status: ProcessStatusStatusEnum.PENDING
+      };
+
+      const stub = sinon
+        .stub(UploadArchiveRepository.prototype, 'findUploadArchiveByArtifactId')
+        .resolves(fakeUploadArchive);
+
+      const result = await service.findUploadArchiveByArtifactId('artifact-1');
+
+      expect(stub).to.have.been.calledWith('artifact-1');
+      expect(result).to.eql(fakeUploadArchive);
+    });
+
+    it('should return null when no record exists', async () => {
+      const stub = sinon.stub(UploadArchiveRepository.prototype, 'findUploadArchiveByArtifactId').resolves(null);
+
+      const result = await service.findUploadArchiveByArtifactId('artifact-1');
+
+      expect(stub).to.have.been.calledWith('artifact-1');
+      expect(result).to.be.null;
+    });
+  });
+
   describe('deleteUploadArchive', () => {
     it('should delete an upload archive record by ID', async () => {
       const stub = sinon.stub(UploadArchiveRepository.prototype, 'deleteUploadArchive').resolves();

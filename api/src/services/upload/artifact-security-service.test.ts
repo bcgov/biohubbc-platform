@@ -4,7 +4,6 @@ import sinonChai from 'sinon-chai';
 import { Readable } from 'stream';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
@@ -369,7 +368,7 @@ describe('ArtifactSecurityService', () => {
         .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
         .resolves({ key: 'test.tar' });
       sinon.stub(ArtifactService.prototype, 'updateArtifact').resolves({ artifact_id: 'artifact-1' });
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(UploadArchiveService.prototype, 'updateUploadArchive').resolves({ upload_archive_id: 'archive-1' });
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
         submission_upload_id: 'su-1',
@@ -414,9 +413,7 @@ describe('ArtifactSecurityService', () => {
         scanStream: sinon.stub().resolves({ isInfected: false })
       } as any);
 
-      sinon
-        .stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId')
-        .rejects(new ApiNotFoundError('Upload archive not found'));
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(null);
       const promoteStub = sinon
         .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
         .resolves({ key: 'test.tar' });
@@ -534,7 +531,7 @@ describe('ArtifactSecurityService', () => {
         scanStream: sinon.stub().resolves({ isInfected: false })
       } as any);
 
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
         submission_upload_id: 'su-1',
         submission_id: 123,
@@ -731,7 +728,7 @@ describe('ArtifactSecurityService', () => {
 
     it('transitions the owning submission upload to failed', async () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves(mockSubmissionUpload);
       const transitionStub = sinon
         .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
@@ -750,9 +747,7 @@ describe('ArtifactSecurityService', () => {
 
     it('is a no-op when the artifact has no upload_archive', async () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
-      sinon
-        .stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId')
-        .rejects(new ApiNotFoundError('Upload archive not found'));
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(null);
       const getSubmissionUploadStub = sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId');
       const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus');
 
@@ -762,24 +757,23 @@ describe('ArtifactSecurityService', () => {
       expect(transitionStub).to.not.have.been.called;
     });
 
-    it('swallows ApiConflictError when the upload cannot transition to failed', async () => {
+    it('is a no-op when the upload has already reached a terminal status', async () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
-      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves(mockSubmissionUpload);
-      const transitionStub = sinon
-        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
-        .rejects(new ApiConflictError('Invalid submission upload status transition'));
+      sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
+      sinon
+        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId')
+        .resolves({ ...mockSubmissionUpload, status: 'indexed' });
+      const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus');
 
-      // Should resolve without throwing.
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
 
-      expect(transitionStub).to.have.been.calledOnce;
+      expect(transitionStub).to.not.have.been.called;
     });
 
-    it('propagates non-not-found errors from the upload_archive lookup', async () => {
+    it('propagates errors from the upload_archive lookup', async () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
       sinon
-        .stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId')
+        .stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId')
         .rejects(new Error('DB connection lost'));
 
       try {
