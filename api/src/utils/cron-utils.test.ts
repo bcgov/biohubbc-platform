@@ -47,11 +47,13 @@ describe('cron-utils', () => {
     });
 
     it('throws on an invalid cron expression', () => {
-      expect(() => computeNextRunDate('not a cron', 'UTC', new Date('2026-01-15T00:00:00Z'))).to.throw();
+      expect(() => computeNextRunDate('not a cron', 'UTC', new Date('2026-01-15T00:00:00Z'))).to.throw(/Invalid/);
     });
 
     it('throws on an unknown timezone', () => {
-      expect(() => computeNextRunDate('0 2 * * *', 'Not/AZone', new Date('2026-01-15T00:00:00Z'))).to.throw();
+      expect(() => computeNextRunDate('0 2 * * *', 'Not/AZone', new Date('2026-01-15T00:00:00Z'))).to.throw(
+        /unhandled timestamp/
+      );
     });
   });
 });
