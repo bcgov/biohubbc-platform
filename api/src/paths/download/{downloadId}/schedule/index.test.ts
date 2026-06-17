@@ -34,9 +34,9 @@ describe('paths/download/{downloadId}/schedule/index', () => {
 
   describe('upsertDownloadSchedule (POST)', () => {
     it('maps the body and path to upsertSchedule and returns 200 with the record', async () => {
-      // Verifies: the POST threads (downloadId, { cron_expression, timezone }) into the service
-      // upsert and returns the resulting record with a 200 (upsert, not 201). Authorization is a
-      // route-level SystemRole gate, not a service argument.
+      // Verifies: the POST threads (downloadId, { cron_expression }) into the service upsert and
+      // returns the resulting record with a 200 (upsert, not 201). Authorization is a route-level
+      // SystemRole gate, not a service argument.
 
       // Step 1: Stub the DB connection and the service upsert method
       const dbConnectionObj = getMockDBConnection();
@@ -49,14 +49,13 @@ describe('paths/download/{downloadId}/schedule/index', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = { cron_expression: '0 2 * * *', timezone: 'America/Vancouver' };
+      mockReq.body = { cron_expression: '0 2 * * *' };
 
       await upsertDownloadSchedule()(mockReq, mockRes, mockNext);
 
       // Step 3: Verify the service got the path id and the body straight through
       expect(upsertStub).to.have.been.calledOnceWith(DOWNLOAD_ID, {
-        cron_expression: '0 2 * * *',
-        timezone: 'America/Vancouver'
+        cron_expression: '0 2 * * *'
       });
 
       // Step 4: Verify the response (200 + the record)

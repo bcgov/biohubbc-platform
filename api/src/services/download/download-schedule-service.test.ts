@@ -14,7 +14,9 @@ chai.use(sinonChai);
 
 const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000001';
 const VALID_CRON = '0 2 * * *';
-const VALID_TZ = 'UTC';
+// The zone the service fixes server-side (mirrors SCHEDULE_TIMEZONE in the service) — callers no
+// longer supply it, so the persisted payload must always carry this value.
+const SCHEDULE_TZ = 'America/Vancouver';
 
 /**
  * Build a DownloadScheduleRecord with sensible defaults; callers override fields that matter for
@@ -24,7 +26,7 @@ const createMockSchedule = (overrides: Partial<DownloadScheduleRecord> = {}): Do
   download_schedule_id: 1,
   download_id: DOWNLOAD_ID,
   cron_expression: VALID_CRON,
-  timezone: VALID_TZ,
+  timezone: SCHEDULE_TZ,
   next_run_date: '2026-06-16T02:00:00.000Z',
   last_run_date: null,
   ...overrides
@@ -32,7 +34,6 @@ const createMockSchedule = (overrides: Partial<DownloadScheduleRecord> = {}): Do
 
 const validRequest = (overrides: Record<string, string> = {}) => ({
   cron_expression: VALID_CRON,
-  timezone: VALID_TZ,
   ...overrides
 });
 
@@ -64,7 +65,7 @@ describe('DownloadScheduleService', () => {
       expect(updateStub).to.not.have.been.called;
     });
 
-    it('throws HTTP400 for an invalid cron/timezone before any repository write', async () => {
+    it('throws HTTP400 for an invalid cron expression before any repository write', async () => {
       // Verifies: invalid user input maps to a 400 at the system boundary, BEFORE any schedule read
       // or write happens (the parent download exists).
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves({} as never);
@@ -87,7 +88,7 @@ describe('DownloadScheduleService', () => {
 
     it('creates a new schedule with a snake_case payload when no active schedule exists', async () => {
       // Verifies: no active row → create; the persisted payload is snake_case, threads the request
-      // values, carries a computed next_run_date, and no update fires.
+      // cron + the server-fixed timezone, carries a computed next_run_date, and no update fires.
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves({} as never);
       sinon.stub(DownloadScheduleRepository.prototype, 'findActiveScheduleByDownloadId').resolves(null);
       const created = createMockSchedule();
@@ -102,7 +103,7 @@ describe('DownloadScheduleService', () => {
       const payload = createStub.firstCall.args[0];
       expect(payload.download_id).to.equal(DOWNLOAD_ID);
       expect(payload.cron_expression).to.equal(VALID_CRON);
-      expect(payload.timezone).to.equal(VALID_TZ);
+      expect(payload.timezone).to.equal(SCHEDULE_TZ);
       expect(payload.next_run_date).to.be.a('string').and.not.empty;
       expect(result).to.eql(created);
     });
@@ -126,7 +127,7 @@ describe('DownloadScheduleService', () => {
       expect(updateStub.firstCall.args[0]).to.equal(7);
       const payload = updateStub.firstCall.args[1];
       expect(payload.cron_expression).to.equal(VALID_CRON);
-      expect(payload.timezone).to.equal(VALID_TZ);
+      expect(payload.timezone).to.equal(SCHEDULE_TZ);
       expect(payload.next_run_date).to.be.a('string').and.not.empty;
       expect(result).to.eql(updated);
     });

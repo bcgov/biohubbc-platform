@@ -3,22 +3,18 @@ import { OpenAPIV3 } from 'openapi-types';
 /**
  * Body schema for `POST /api/download/:downloadId/schedule`.
  *
- * Both fields are required. `next_run_date` is intentionally absent — the service computes it from
- * the cron expression and timezone before the write, so a caller never supplies (or can falsify) the
- * next occurrence.
+ * Only the cron expression is supplied. `next_run_date` is intentionally absent — the service computes
+ * it from the cron expression and the server-fixed timezone before the write, so a caller never
+ * supplies (or can falsify) the next occurrence or the zone it's interpreted in.
  */
 export const CreateDownloadScheduleRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['cron_expression', 'timezone'],
+  required: ['cron_expression'],
   properties: {
     cron_expression: {
       type: 'string',
       description: '5-field cron expression for the recurrence, e.g. "0 2 * * *" (daily at 02:00).'
-    },
-    timezone: {
-      type: 'string',
-      description: 'IANA timezone the cron expression is interpreted in, e.g. "America/Vancouver".'
     }
   }
 };

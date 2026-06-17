@@ -122,7 +122,7 @@ DELETE.apiDoc = {
  *
  * POST upserts because at most one active schedule exists per download — the service updates the
  * existing active row or creates one. Authorization (System Administrator role) is enforced at the
- * route; cron/timezone validation lives in the service.
+ * route; cron validation lives in the service.
  *
  * @return {RequestHandler}
  */

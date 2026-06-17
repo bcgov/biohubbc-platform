@@ -405,21 +405,20 @@ describe('DownloadScheduleService (integration)', function () {
       const { download_id } = await createPolicyDownload();
 
       const created = await scheduleService.upsertSchedule(download_id, {
-        cron_expression: CRON,
-        timezone: TIMEZONE
+        cron_expression: CRON
       });
       expect(await countActiveSchedules(download_id)).to.equal(1);
 
       const updated = await scheduleService.upsertSchedule(download_id, {
-        cron_expression: '15 6 * * 3',
-        timezone: 'UTC'
+        cron_expression: '15 6 * * 3'
       });
 
       // Routed to UPDATE: still one active row, same id, new cron — no unique-index error.
       expect(await countActiveSchedules(download_id)).to.equal(1);
       expect(updated.download_schedule_id).to.equal(created.download_schedule_id);
       expect(updated.cron_expression).to.equal('15 6 * * 3');
-      expect(updated.timezone).to.equal('UTC');
+      // The service fixes the zone server-side, so the persisted row always carries SCHEDULE_TIMEZONE.
+      expect(updated.timezone).to.equal(TIMEZONE);
     });
   });
 

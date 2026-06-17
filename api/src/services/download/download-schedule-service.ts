@@ -13,12 +13,20 @@ import { DownloadService } from './download-service';
 const POLL_BATCH_LIMIT = 100; // bounded claim per tick
 
 /**
- * The recurrence fields a caller supplies when creating or updating a schedule. `next_run_date` is
- * not part of the request — the service computes it from the cron expression and timezone.
+ * The single zone every schedule's cron fields are interpreted in. Caller-configurable per-schedule
+ * timezone is speculative flexibility the product doesn't need yet, so it's fixed server-side. The
+ * `timezone` column persists this value, so promoting it back to a caller-supplied field is a pure
+ * additive change (no migration) if a second zone ever becomes real.
+ */
+const SCHEDULE_TIMEZONE = 'America/Vancouver';
+
+/**
+ * The recurrence fields a caller supplies when creating or updating a schedule. `next_run_date` and
+ * `timezone` are not part of the request — the service computes the next run from the cron expression
+ * and the fixed {@link SCHEDULE_TIMEZONE}.
  */
 export interface CreateDownloadScheduleRequest {
   cron_expression: string;
-  timezone: string;
 }
 
 /**
@@ -50,16 +58,16 @@ export class DownloadScheduleService extends DBService {
    *
    * Confirms the parent download exists first (HTTP404 otherwise), so no schedule state is read or
    * written — and no FK violation surfaces — for a download that isn't there. An invalid cron
-   * expression or timezone maps to an HTTP400 at this system boundary BEFORE any repository write —
-   * user input is validated once, up front. Authorization (System Administrator role) is enforced at
-   * the route, not here.
+   * expression maps to an HTTP400 at this system boundary BEFORE any repository write — user input is
+   * validated once, up front. Authorization (System Administrator role) is enforced at the route, not
+   * here.
    *
    * At most one active schedule exists per download (a partial unique index makes a second active
    * row impossible), so this upserts: it updates the existing active row if one is found, otherwise
    * creates one. The repository receives the snake_case persisted payloads.
    *
    * @param {string} downloadId - The parent download ID.
-   * @param {CreateDownloadScheduleRequest} request - The recurrence (cron expression + timezone).
+   * @param {CreateDownloadScheduleRequest} request - The recurrence (cron expression).
    * @return {Promise<DownloadScheduleRecord>} The created or updated schedule.
    * @memberof DownloadScheduleService
    */
@@ -71,9 +79,9 @@ export class DownloadScheduleService extends DBService {
 
     let nextRunDate: string;
     try {
-      nextRunDate = computeNextRunDate(request.cron_expression, request.timezone, new Date());
+      nextRunDate = computeNextRunDate(request.cron_expression, SCHEDULE_TIMEZONE, new Date());
     } catch {
-      throw new HTTP400('Invalid cron expression or timezone');
+      throw new HTTP400('Invalid cron expression');
     }
 
     const existing = await this.downloadScheduleRepository.findActiveScheduleByDownloadId(downloadId);
@@ -81,7 +89,7 @@ export class DownloadScheduleService extends DBService {
     if (existing) {
       return this.downloadScheduleRepository.updateDownloadSchedule(existing.download_schedule_id, {
         cron_expression: request.cron_expression,
-        timezone: request.timezone,
+        timezone: SCHEDULE_TIMEZONE,
         next_run_date: nextRunDate
       });
     }
@@ -89,7 +97,7 @@ export class DownloadScheduleService extends DBService {
     return this.downloadScheduleRepository.createDownloadSchedule({
       download_id: downloadId,
       cron_expression: request.cron_expression,
-      timezone: request.timezone,
+      timezone: SCHEDULE_TIMEZONE,
       next_run_date: nextRunDate
     });
   }
