@@ -350,6 +350,13 @@ const appTheme = createTheme({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
           },
+          // Inputs default to single-line truncation (nowrap + ellipsis, above); reset the
+          // multiline textarea back to native wrapping so typed text flows onto the next line.
+          '& .MuiInputBase-inputMultiline': {
+            whiteSpace: 'pre-wrap', // wrap long lines AND preserve user-entered newlines
+            overflow: 'auto', // allow vertical scroll for fixed-`rows` textareas
+            textOverflow: 'clip' // ellipsis is meaningless once text wraps
+          },
           '& .MuiInputBase-input::placeholder': {
             color: theme.palette.text.secondary,
             opacity: 0.7,

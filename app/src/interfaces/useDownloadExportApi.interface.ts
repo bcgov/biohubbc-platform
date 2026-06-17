@@ -9,7 +9,7 @@ export type DownloadExportStatus = 'pending' | 'processing' | 'ready' | 'failed'
  * A single export row, as embedded in `DownloadRecord.exports` and returned by `POST /api/download/:id/export`.
  */
 export interface DownloadExport {
-  download_export_id: string;
+  download_version_export_id: string;
   download_id: string;
   format: 'csv';
   mode: 'per_feature_type' | 'denormalized';
@@ -46,9 +46,14 @@ export interface DownloadExportDetail extends DownloadExport {
 }
 
 /**
- * Optional payload for `POST /api/download/:id/export`.
+ * Payload for `POST /api/download/:id/export`.
  */
 export interface CreateExportPayload {
+  /**
+   * The active download version the export is built from. Required — a committed download always
+   * has at least one active version, and the backend rejects a body without it.
+   */
+  download_version_id: string;
   /**
    * Max size per part-zip in bytes. Backend enforces 5 MiB–5 GiB.
    * Omit to use the server-side default (500 MB).

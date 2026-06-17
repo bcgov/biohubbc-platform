@@ -2,27 +2,25 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
 import {
-  CreateDownloadExportRequestSchema,
-  DownloadExportListResponseSchema,
-  DownloadExportResponseSchema
-} from '../../../../openapi/schemas/download-export';
+  CreateDownloadVersionExportRequestSchema,
+  DownloadVersionExportListResponseSchema,
+  DownloadVersionExportResponseSchema
+} from '../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { publishProcessDownloadExportJob } from '../../../../queue/publisher';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../../services/download/download-export-service';
-import { DownloadService } from '../../../../services/download/download-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/export');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  createDownloadExport()
+  createDownloadVersionExport()
 ];
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  listDownloadExports()
+  listDownloadVersionExports()
 ];
 
 POST.apiDoc = {
@@ -41,7 +39,7 @@ POST.apiDoc = {
   requestBody: {
     content: {
       'application/json': {
-        schema: CreateDownloadExportRequestSchema
+        schema: CreateDownloadVersionExportRequestSchema
       }
     }
   },
@@ -50,7 +48,7 @@ POST.apiDoc = {
       description: 'Export created and queued for processing',
       content: {
         'application/json': {
-          schema: DownloadExportResponseSchema
+          schema: DownloadVersionExportResponseSchema
         }
       }
     },
@@ -76,7 +74,7 @@ GET.apiDoc = {
       description: 'Array of export records, newest first',
       content: {
         'application/json': {
-          schema: DownloadExportListResponseSchema
+          schema: DownloadVersionExportListResponseSchema
         }
       }
     },
@@ -86,18 +84,17 @@ GET.apiDoc = {
 
 /**
  * Create a CSV export and publish the processing job inside a single
- * transaction. The `db` option on `publishProcessDownloadExportJob` ties the
- * job insert to the same transaction as the `download_export` row, so the
- * insert and the job enqueue succeed or fail together — no ghost jobs (job
- * present but row rolled back) and no orphaned exports (row committed but job
- * never sent).
+ * transaction. The service resolves-or-creates the shared artifact group, inserts the per-user
+ * export row, and enqueues the packaging job on this same `connection` — so the row insert and the
+ * job enqueue succeed or fail together (no ghost jobs, no orphaned exports) and the job fires only
+ * for genuinely new work.
  *
  * Client bounds on `max_part_size_bytes` are enforced by the OpenAPI body schema
  * (min 5 MiB, max 5 GiB → 400). The JSON body is an integer for client
  * ergonomics; widened to string here before hitting the service, because the
  * model stores `max_part_size_bytes` as `bigint` → `z.string()`.
  */
-export function createDownloadExport(): RequestHandler {
+export function createDownloadVersionExport(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -106,23 +103,26 @@ export function createDownloadExport(): RequestHandler {
 
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
-      const body = req.body as { max_part_size_bytes?: number };
+      const body = req.body as { download_version_id: string; max_part_size_bytes?: number };
 
       const exportService = new DownloadExportService(connection);
 
-      const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {
-        max_part_size_bytes: typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
-      });
-
-      await publishProcessDownloadExportJob(connection, {
-        downloadExportId: exportRecord.download_export_id
-      });
+      const exportRecord = await exportService.createDownloadVersionExport(
+        downloadId,
+        systemUserId,
+        {
+          download_version_id: body.download_version_id,
+          max_part_size_bytes:
+            typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
+        },
+        connection
+      );
 
       await connection.commit();
 
       return res.status(200).json(exportRecord);
     } catch (error) {
-      defaultLog.error({ label: 'createDownloadExport', message: 'error', error });
+      defaultLog.error({ label: 'createDownloadVersionExport', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
@@ -139,7 +139,7 @@ export function createDownloadExport(): RequestHandler {
  * first. `part_count` is pre-joined at the repo layer so the card can decide
  * single-vs-multi-part UI without a per-row detail fetch.
  */
-export function listDownloadExports(): RequestHandler {
+export function listDownloadVersionExports(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -149,17 +149,14 @@ export function listDownloadExports(): RequestHandler {
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
 
-      // Authorize the parent download before returning any export rows.
-      await new DownloadService(connection).getAuthorizedDownload(downloadId, systemUserId);
-
       const exportService = new DownloadExportService(connection);
-      const exports = await exportService.listExportsByDownloadId(downloadId);
+      const exports = await exportService.listAuthorizedExportsByDownloadId(downloadId, systemUserId);
 
       await connection.commit();
 
       return res.status(200).json(exports);
     } catch (error) {
-      defaultLog.error({ label: 'listDownloadExports', message: 'error', error });
+      defaultLog.error({ label: 'listDownloadVersionExports', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

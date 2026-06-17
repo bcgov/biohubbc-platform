@@ -18,20 +18,20 @@ import {
 } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
-  IProcessDownloadExportJobData,
-  processDownloadExportFailedHandler,
-  processDownloadExportJobHandler
-} from './jobs/process-download-export-job';
-import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,
   processDownloadJobHandler
 } from './jobs/process-download-job';
 import {
+  processDownloadVersionExportFailedHandler,
+  processDownloadVersionExportJobHandler
+} from './jobs/process-download-version-export-job';
+import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
 import { getPgBoss } from './pg-boss-service';
+import { IProcessDownloadVersionExportJobData } from './publisher';
 
 const defaultLog = getLogger('queue/worker');
 
@@ -49,8 +49,8 @@ export interface WorkerDependencies {
   malwareScanFailedHandler: typeof malwareScanFailedHandler;
   processDownloadJobHandler: typeof processDownloadJobHandler;
   processDownloadFailedHandler: typeof processDownloadFailedHandler;
-  processDownloadExportJobHandler: typeof processDownloadExportJobHandler;
-  processDownloadExportFailedHandler: typeof processDownloadExportFailedHandler;
+  processDownloadVersionExportJobHandler: typeof processDownloadVersionExportJobHandler;
+  processDownloadVersionExportFailedHandler: typeof processDownloadVersionExportFailedHandler;
   indexSubmissionFeaturesJobHandler: typeof indexSubmissionFeaturesJobHandler;
   indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
   computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
@@ -67,8 +67,8 @@ export const workerDependencies: WorkerDependencies = {
   malwareScanFailedHandler,
   processDownloadJobHandler,
   processDownloadFailedHandler,
-  processDownloadExportJobHandler,
-  processDownloadExportFailedHandler,
+  processDownloadVersionExportJobHandler,
+  processDownloadVersionExportFailedHandler,
   indexSubmissionFeaturesJobHandler,
   indexSubmissionFeaturesFailedHandler,
   computeScopeAnchorsJobHandler,
@@ -150,30 +150,30 @@ export const registerWorkers = async (): Promise<void> => {
   );
 
   // Create dead letter queue first (must exist before main queue references it)
-  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED);
 
   // Create main queue with dead letter queue and retry configuration.
   // policy: 'short' — enforces singletonKey uniqueness for queued (created) jobs.
   // Without this, the default 'standard' policy ignores singletonKey entirely,
-  // and two concurrent POST /export calls for the same export would both run.
-  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_EXPORT, {
-    deadLetter: JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED,
+  // and two concurrent export requests for the same group would both run.
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT, {
+    deadLetter: JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED,
     retryLimit: 3,
     retryDelay: 60,
     retryBackoff: true,
     policy: 'short'
   });
 
-  // Register process download export job handler
-  await boss.work<IProcessDownloadExportJobData>(
-    JobQueues.PROCESS_DOWNLOAD_EXPORT,
-    workerDependencies.processDownloadExportJobHandler
+  // Register dead letter queue handler for failed download version export jobs
+  await boss.work<IProcessDownloadVersionExportJobData>(
+    JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED,
+    workerDependencies.processDownloadVersionExportFailedHandler
   );
 
-  // Register dead letter queue handler for failed download export jobs
-  await boss.work<IProcessDownloadExportJobData>(
-    JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED,
-    workerDependencies.processDownloadExportFailedHandler
+  // Register process download version export job handler
+  await boss.work<IProcessDownloadVersionExportJobData>(
+    JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT,
+    workerDependencies.processDownloadVersionExportJobHandler
   );
 
   // Create dead letter queue first (must exist before main queue references it)

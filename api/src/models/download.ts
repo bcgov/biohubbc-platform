@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
+import { DownloadVersionExportListRow } from './download-version-export';
 import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
+  download_version_id: z.string().uuid(), // resolved most-recent version (a committed download always has one)
   download_status: DownloadStatusZod,
   format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
@@ -38,14 +39,14 @@ export type DownloadListRecordBase = z.infer<typeof DownloadListRecordBase>;
 
 /**
  * Service-layer (and public API) list-row shape. `exports[]` is attached by
- * `DownloadService.getDownloadsByTeamMembership` via a parallel batch-fetch from
- * `DownloadExportService` and grouped by download_id in JS. Mirrors the assembly
- * pattern used by `TicketService.getTicket` (`ticket-service.ts`) — composed at
- * the service layer rather than via SQL aggregation so repositories stay
- * single-SQL CRUD.
+ * `DownloadService.getDownloadsByTeamMembership` via a batch-fetch from
+ * `DownloadVersionExportRepository` and grouped by download_id in JS. Mirrors the
+ * assembly pattern used by `TicketService.getTicket` (`ticket-service.ts`) —
+ * composed at the service layer rather than via SQL aggregation so repositories
+ * stay single-SQL CRUD.
  */
 export const DownloadListRecord = DownloadListRecordBase.extend({
-  exports: z.array(DownloadExportListRow)
+  exports: z.array(DownloadVersionExportListRow)
 });
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
