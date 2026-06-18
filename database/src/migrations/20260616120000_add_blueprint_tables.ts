@@ -45,16 +45,18 @@ export async function up(knex: Knex): Promise<void> {
       update_user           integer,
       revision_count        integer        DEFAULT 0 NOT NULL,
       CONSTRAINT blueprint_pk PRIMARY KEY (blueprint_id),
-      CONSTRAINT blueprint_parent_blueprint_fk FOREIGN KEY (parent_blueprint_id) REFERENCES blueprint(blueprint_id)
+      CONSTRAINT blueprint_parent_blueprint_fk FOREIGN KEY (parent_blueprint_id) REFERENCES blueprint(blueprint_id),
+      -- A draft Blueprint (no record_effective_date) may not be marked as the default.
+      CONSTRAINT blueprint_default_requires_effective_date CHECK (record_effective_date IS NOT NULL OR is_default = false)
     );
 
     CREATE INDEX blueprint_parent_blueprint_id_idx ON blueprint(parent_blueprint_id);
 
     -- Only one active row per version_number.
-    CREATE UNIQUE INDEX blueprint_nuk1 ON blueprint(version_number, (record_end_date is NULL)) WHERE record_end_date is null;
+    CREATE UNIQUE INDEX blueprint_nuk1 ON blueprint(version_number) WHERE record_end_date is null;
 
     -- At most one active default Blueprint.
-    CREATE UNIQUE INDEX blueprint_nuk2 ON blueprint(is_default, (record_end_date is NULL)) WHERE is_default = true AND record_end_date is null;
+    CREATE UNIQUE INDEX blueprint_nuk2 ON blueprint(is_default) WHERE is_default = true AND record_end_date is null;
 
     COMMENT ON TABLE blueprint IS 'A versioned, named schema configuration describing which feature types are included and how their properties are assigned. Available for indexing when record_effective_date is set and record_end_date is null; a draft otherwise.';
     COMMENT ON COLUMN blueprint.blueprint_id IS 'System generated surrogate primary key identifier.';
@@ -101,7 +103,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX blueprint_feature_type_feature_type_id_idx ON blueprint_feature_type(feature_type_id);
 
     -- Each feature type may be included at most once per active Blueprint row.
-    CREATE UNIQUE INDEX blueprint_feature_type_nuk1 ON blueprint_feature_type(blueprint_id, feature_type_id, (record_end_date is NULL)) WHERE record_end_date is null;
+    CREATE UNIQUE INDEX blueprint_feature_type_nuk1 ON blueprint_feature_type(blueprint_id, feature_type_id) WHERE record_end_date is null;
 
     COMMENT ON TABLE blueprint_feature_type IS 'The feature types included in a Blueprint.';
     COMMENT ON COLUMN blueprint_feature_type.blueprint_feature_type_id IS 'System generated surrogate primary key identifier.';
@@ -127,9 +129,8 @@ export async function up(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
     CREATE TABLE blueprint_feature_type_property (
       blueprint_feature_type_property_id integer        GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      blueprint_id                       integer        NOT NULL,
-      feature_type_id                    integer        NOT NULL,
-      feature_property_id                integer        NOT NULL,
+      blueprint_feature_type_id          integer        NOT NULL,
+      feature_type_property_id           integer        NOT NULL,
       required_value                     boolean        DEFAULT false NOT NULL,
       allow_multiple                     boolean        DEFAULT false NOT NULL,
       sort                               integer,
@@ -140,25 +141,22 @@ export async function up(knex: Knex): Promise<void> {
       update_user                        integer,
       revision_count                     integer        DEFAULT 0 NOT NULL,
       CONSTRAINT blueprint_feature_type_property_pk PRIMARY KEY (blueprint_feature_type_property_id),
-      CONSTRAINT blueprint_feature_type_property_blueprint_fk FOREIGN KEY (blueprint_id) REFERENCES blueprint(blueprint_id),
-      CONSTRAINT blueprint_feature_type_property_feature_type_fk FOREIGN KEY (feature_type_id) REFERENCES feature_type(feature_type_id),
-      CONSTRAINT blueprint_feature_type_property_feature_property_fk FOREIGN KEY (feature_property_id) REFERENCES feature_property(feature_property_id)
+      CONSTRAINT blueprint_feature_type_property_blueprint_feature_type_fk FOREIGN KEY (blueprint_feature_type_id) REFERENCES blueprint_feature_type(blueprint_feature_type_id),
+      CONSTRAINT blueprint_feature_type_property_feature_type_property_fk FOREIGN KEY (feature_type_property_id) REFERENCES feature_type_property(feature_type_property_id)
     );
 
-    CREATE INDEX blueprint_feature_type_property_blueprint_id_idx ON blueprint_feature_type_property(blueprint_id);
-    CREATE INDEX blueprint_feature_type_property_feature_type_id_idx ON blueprint_feature_type_property(feature_type_id);
-    CREATE INDEX blueprint_feature_type_property_feature_property_id_idx ON blueprint_feature_type_property(feature_property_id);
+    CREATE INDEX blueprint_feature_type_property_blueprint_feature_type_id_idx ON blueprint_feature_type_property(blueprint_feature_type_id);
+    CREATE INDEX blueprint_feature_type_property_feature_type_property_id_idx ON blueprint_feature_type_property(feature_type_property_id);
 
-    -- Each property may be assigned at most once per (Blueprint, feature type) among active rows.
-    CREATE UNIQUE INDEX blueprint_feature_type_property_nuk1 ON blueprint_feature_type_property(blueprint_id, feature_type_id, feature_property_id, (record_end_date is NULL)) WHERE record_end_date is null;
+    -- Each feature_type_property may be assigned at most once per Blueprint feature type among active rows.
+    CREATE UNIQUE INDEX blueprint_feature_type_property_nuk1 ON blueprint_feature_type_property(blueprint_feature_type_id, feature_type_property_id) WHERE record_end_date is null;
 
     COMMENT ON TABLE blueprint_feature_type_property IS 'The properties assigned to each feature type within a Blueprint, including whether each is required and whether it allows multiple values.';
     COMMENT ON COLUMN blueprint_feature_type_property.blueprint_feature_type_property_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN blueprint_feature_type_property.blueprint_id IS 'Foreign key to the blueprint table.';
-    COMMENT ON COLUMN blueprint_feature_type_property.feature_type_id IS 'Foreign key to the feature_type table.';
-    COMMENT ON COLUMN blueprint_feature_type_property.feature_property_id IS 'Foreign key to the feature_property table.';
-    COMMENT ON COLUMN blueprint_feature_type_property.required_value IS 'Indicates the property is required for the feature type within this Blueprint and can be assumed non-null.';
-    COMMENT ON COLUMN blueprint_feature_type_property.allow_multiple IS 'Indicates the property may carry multiple values (a JSON array) for the feature type within this Blueprint.';
+    COMMENT ON COLUMN blueprint_feature_type_property.blueprint_feature_type_id IS 'Foreign key to the blueprint_feature_type table; identifies the feature type included in the Blueprint that this property is assigned to.';
+    COMMENT ON COLUMN blueprint_feature_type_property.feature_type_property_id IS 'Foreign key to the feature_type_property table; the global feature-type/property pool entry being assigned within this Blueprint.';
+    COMMENT ON COLUMN blueprint_feature_type_property.required_value IS 'Per-Blueprint override indicating the property is required for the feature type within this Blueprint and can be assumed non-null.';
+    COMMENT ON COLUMN blueprint_feature_type_property.allow_multiple IS 'Per-Blueprint override indicating the property may carry multiple values (a JSON array) for the feature type within this Blueprint.';
     COMMENT ON COLUMN blueprint_feature_type_property.sort IS 'Optional ordering of properties within the feature type.';
     COMMENT ON COLUMN blueprint_feature_type_property.record_end_date IS 'The date the assignment was retired (soft delete); null when the record is active.';
     COMMENT ON COLUMN blueprint_feature_type_property.create_date IS 'The datetime the record was created.';
