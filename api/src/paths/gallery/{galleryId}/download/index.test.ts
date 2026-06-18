@@ -8,7 +8,7 @@ import { createMockDownloadRecord, createMockDownloadVersionExportListRow } from
 import * as db from '../../../../database/db';
 import { ApiNotFoundError } from '../../../../errors/api-error';
 import { HTTP400, HTTPError } from '../../../../errors/http-error';
-import { GalleryDownloadListRecord } from '../../../../models/gallery';
+import { DownloadListRecord } from '../../../../models/download';
 import { GalleryService } from '../../../../services/gallery/gallery-service';
 
 chai.use(sinonChai);
@@ -24,7 +24,7 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
 
-      const members: GalleryDownloadListRecord[] = [
+      const members: DownloadListRecord[] = [
         { ...createMockDownloadRecord(), exports: [createMockDownloadVersionExportListRow({ part_count: 2 })] }
       ];
       const getGalleryDownloadsStub = sinon.stub(GalleryService.prototype, 'getGalleryDownloads').resolves(members);

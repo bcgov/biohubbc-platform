@@ -1,6 +1,4 @@
 import { z } from 'zod';
-import { DownloadDetailRecord } from './download';
-import { DownloadVersionExportListRow } from './download-version-export';
 
 /**
  * A curated collection of downloads, surfaced as a public-facing gallery.
@@ -32,24 +30,6 @@ export const CreateGallery = z.object({
   description: z.string().nullable()
 });
 export type CreateGallery = z.infer<typeof CreateGallery>;
-
-/**
- * Display-ready gallery member: a `DownloadDetailRecord` (base download plus the
- * owning policy's `name`/`description`) with the download's `exports[]` attached.
- *
- * `exports[]` is composed at the service layer via a batch fetch and grouped by
- * download_id in JS — mirroring how `DownloadListRecord` is assembled — so the
- * repository stays single-SQL CRUD rather than reaching for SQL aggregation.
- *
- * Public-safe by inheritance: `DownloadDetailRecord` carries the curated
- * projection that omits `requested_by`, `policy_id`, and `create_user`, so no
- * security identity or audit field leaks through the gallery. `download_id`
- * stays a uuid string here (inherited from `DownloadDetailRecord`).
- */
-export const GalleryDownloadListRecord = DownloadDetailRecord.extend({
-  exports: z.array(DownloadVersionExportListRow)
-});
-export type GalleryDownloadListRecord = z.infer<typeof GalleryDownloadListRecord>;
 
 /**
  * HTTP request body for creating a gallery.

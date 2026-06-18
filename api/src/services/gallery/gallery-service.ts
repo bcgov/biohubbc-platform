@@ -1,12 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
-import {
-  CreateGallery,
-  CreateGalleryRequestBody,
-  GalleryDownloadListRecord,
-  GalleryRecord,
-  UpdateGalleryRequestBody
-} from '../../models/gallery';
+import { DownloadListRecord } from '../../models/download';
+import { CreateGallery, CreateGalleryRequestBody, GalleryRecord, UpdateGalleryRequestBody } from '../../models/gallery';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
@@ -191,11 +186,11 @@ export class GalleryService extends DBService {
    * service's grouping), so the repository stays single-SQL CRUD.
    *
    * @param {number} galleryId - The gallery ID.
-   * @return {Promise<GalleryDownloadListRecord[]>}
+   * @return {Promise<DownloadListRecord[]>}
    * @throws {ApiNotFoundError} when no active gallery matches the given ID.
    * @memberof GalleryService
    */
-  async getGalleryDownloads(galleryId: number): Promise<GalleryDownloadListRecord[]> {
+  async getGalleryDownloads(galleryId: number): Promise<DownloadListRecord[]> {
     await this.galleryRepository.getGalleryById(galleryId);
 
     const members = await this.galleryRepository.getGalleryDownloads(galleryId);

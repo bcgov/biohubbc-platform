@@ -298,6 +298,8 @@ describe('paths/download/index', () => {
           completed_at: '2026-01-01',
           downloaded_at: null,
           create_date: '2026-01-01',
+          name: 'Test download',
+          description: null,
           exports: []
         }
       ];
@@ -334,6 +336,8 @@ describe('paths/download/index', () => {
           completed_at: '2026-01-01',
           downloaded_at: null,
           create_date: '2026-01-01',
+          name: 'Test download',
+          description: null,
           exports: [
             {
               download_export_id: 'eeee0000-0000-0000-0000-000000000001',
