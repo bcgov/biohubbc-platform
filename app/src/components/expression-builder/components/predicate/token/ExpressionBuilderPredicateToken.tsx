@@ -2,50 +2,22 @@ import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { IconButton, Stack, TextField } from '@mui/material';
-import {
-  BuilderPredicateNode,
-  ExpressionBuilderProperty
-} from 'components/expression-builder/ExpressionBuilder.interface';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { InlineSelect } from 'components/select/InlineSelect';
 import { EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS } from 'constants/expression';
 import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { useState } from 'react';
 import { getExpressionBuilderPropertyKeyFromProperty, hasPredicateValue } from 'utils/expression';
 import { ExpressionBuilderPropertySearch } from '../../property/search/ExpressionBuilderPropertySearch';
+import {
+  ExpressionBuilderPredicateDatetimeValueFieldParams,
+  ExpressionBuilderPredicateTextValueInputParams,
+  ExpressionBuilderPredicateTokenProps
+} from './ExpressionBuilderPredicateToken.interface';
 import { getTextInputValue, isDatetimeValue, updateDatetimeValue } from './ExpressionBuilderPredicateToken.utils';
+import { ExpressionBuilderPredicateTokenSkeleton } from './ExpressionBuilderPredicateTokenSkeleton';
 import { ExpressionBuilderPredicateValueClearAdornment } from './ExpressionBuilderPredicateValueClearAdornment';
 import { useExpressionBuilderPredicateProperty } from './useExpressionBuilderPredicateProperty';
-
-interface ExpressionBuilderPredicateTokenProps {
-  /** Predicate node to render and edit. */
-  node: BuilderPredicateNode;
-  /** Property metadata available to this predicate. */
-  properties: ExpressionBuilderProperty[];
-  /** Selected property metadata cache, independent of current option results. */
-  selectedProperties: ExpressionBuilderProperty[];
-  /** Requests a refresh of the parent-owned property options. */
-  onPropertySearchInputChange: (keyword: string) => unknown;
-  /** Updates this predicate's selected property. */
-  onPropertyChange: (
-    predicateId: string,
-    propertyKey: string | null,
-    property?: ExpressionBuilderProperty | null
-  ) => unknown;
-  /** Updates this predicate's operator. */
-  onOperatorChange: (predicateId: string, operator: ExpressionPredicateOperator | null) => unknown;
-  /** Updates this predicate's value draft. */
-  onValueChange: (predicateId: string, value: unknown) => unknown;
-  /** Starts dragging this predicate. */
-  onDragStart: (predicateId: string) => unknown;
-  /** Clears parent drop state while hovering this predicate. */
-  onDragOverPredicate: () => unknown;
-  /** Drops the active predicate onto this predicate. */
-  onDropOnPredicate: (targetPredicateId: string) => unknown;
-  /** Currently dragged predicate UI id, if any. */
-  draggedPredicateId: string | null;
-  /** Removes this predicate by UI id. */
-  onRemove: (predicateId: string) => unknown;
-}
 
 /**
  * Renders one editable predicate token within an expression group or root clause list.
@@ -76,7 +48,9 @@ export const ExpressionBuilderPredicateToken = ({
   const [isDropTarget, setIsDropTarget] = useState(false);
   const { property, propertyOptions } = useExpressionBuilderPredicateProperty({ node, properties, selectedProperties });
   const predicate = node.predicate;
-  const missingProperty = node.feature_property_id === null;
+  const hasSelectedPropertyId = typeof node.feature_property_id === 'number';
+  const missingProperty = !hasSelectedPropertyId;
+  const isSelectedPropertyLabelLoading = hasSelectedPropertyId && !property;
   const missingOperator = !!property && !predicate?.operator;
   const missingValue =
     !!property &&
@@ -86,8 +60,15 @@ export const ExpressionBuilderPredicateToken = ({
     !hasPredicateValue(predicate.value);
   const canDropOnPredicate = !!draggedPredicateId && draggedPredicateId !== node.ui_id;
 
-  // Predicate drop highlighting is local to the token. The parent builder owns
-  // the actual tree mutation when a drop is completed.
+  /**
+   * Handles drag-over events for predicate-to-predicate moves.
+   *
+   * Use this on the token root so the row can show local drop highlighting while
+   * the parent expression builder still owns the actual tree mutation.
+   *
+   * @param {React.DragEvent} event - Browser drag event from the token root.
+   * @returns {void}
+   */
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -100,6 +81,15 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(true);
   };
 
+  /**
+   * Clears local predicate drop highlighting when the dragged item leaves the row.
+   *
+   * Use this on the token root. It ignores movement between child elements of
+   * the same token so the drop highlight does not flicker.
+   *
+   * @param {React.DragEvent} event - Browser drag event from the token root.
+   * @returns {void}
+   */
   const handleDragLeave = (event: React.DragEvent) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
       return;
@@ -108,6 +98,15 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(false);
   };
 
+  /**
+   * Completes a predicate drop onto this token.
+   *
+   * Use this on the token root to clear local highlighting and notify the parent
+   * expression builder which predicate should receive the dragged predicate.
+   *
+   * @param {React.DragEvent} event - Browser drop event from the token root.
+   * @returns {void}
+   */
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -120,15 +119,16 @@ export const ExpressionBuilderPredicateToken = ({
     onDropOnPredicate(node.ui_id);
   };
 
-  const renderTextValueInput = ({
-    value,
-    error,
-    inputMode
-  }: {
-    value: string | number;
-    error?: boolean;
-    inputMode?: 'decimal';
-  }) => (
+  /**
+   * Renders the text-backed predicate value input.
+   *
+   * Use this for incomplete predicates, Exists predicates, strings, numbers, and
+   * fallback draft values that should remain visible as editable text.
+   *
+   * @param {ExpressionBuilderPredicateTextValueInputParams} params - Text value, validation state, and optional input mode.
+   * @returns {JSX.Element} Text field for the predicate value.
+   */
+  const renderTextValueInput = ({ value, error, inputMode }: ExpressionBuilderPredicateTextValueInputParams) => (
     <TextField
       size="small"
       variant="outlined"
@@ -168,6 +168,14 @@ export const ExpressionBuilderPredicateToken = ({
     />
   );
 
+  /**
+   * Renders the boolean predicate value selector.
+   *
+   * Use this when the selected property's predicate type is boolean so the draft
+   * stores actual boolean values instead of user-entered strings.
+   *
+   * @returns {JSX.Element} Boolean value select control.
+   */
   const renderBooleanValueInput = () => {
     const booleanValue = typeof predicate?.value === 'boolean' ? String(predicate.value) : '';
 
@@ -195,6 +203,15 @@ export const ExpressionBuilderPredicateToken = ({
     );
   };
 
+  /**
+   * Renders a single datetime draft input.
+   *
+   * Use this for the date and time fields inside datetime predicates. The field
+   * parameter controls which part of the datetime draft is updated.
+   *
+   * @param {ExpressionBuilderPredicateDatetimeValueFieldParams} params - Datetime field configuration and layout sizing.
+   * @returns {JSX.Element} Native date or time text field.
+   */
   const renderDatetimeValueField = ({
     field,
     type,
@@ -203,15 +220,7 @@ export const ExpressionBuilderPredicateToken = ({
     ariaLabel,
     flex,
     minWidth
-  }: {
-    field: 'date_value' | 'time_value';
-    type: 'date' | 'time';
-    value: string | undefined;
-    error: boolean;
-    ariaLabel: string;
-    flex: string;
-    minWidth: number;
-  }) => (
+  }: ExpressionBuilderPredicateDatetimeValueFieldParams) => (
     <TextField
       size="small"
       variant="outlined"
@@ -261,6 +270,15 @@ export const ExpressionBuilderPredicateToken = ({
     />
   );
 
+  /**
+   * Renders the datetime predicate value controls.
+   *
+   * Use this when the selected property's predicate type is datetime. The
+   * selected operator determines whether the row shows date, time, or both
+   * fields.
+   *
+   * @returns {JSX.Element} Date/time field group for the predicate value.
+   */
   const renderDatetimeValueInput = () => {
     const datetimeValue = isDatetimeValue(predicate?.value) ? predicate.value : {};
     const showDate =
@@ -303,6 +321,15 @@ export const ExpressionBuilderPredicateToken = ({
     );
   };
 
+  /**
+   * Renders the appropriate value editor for the current predicate row.
+   *
+   * Use this from the token layout after property and operator controls. It
+   * dispatches to type-specific render helpers while keeping incomplete and
+   * Exists predicates visually stable with an enabled text input.
+   *
+   * @returns {JSX.Element} Value editor for the current predicate state.
+   */
   const renderValueInput = () => {
     // Keep the value field enabled even when the predicate is incomplete or the
     // operator is Exists. Exists still serializes without value, but enabled
@@ -327,135 +354,139 @@ export const ExpressionBuilderPredicateToken = ({
   };
 
   return (
-    <Stack
-      data-testid="expression-filter-token"
-      data-drop-active={isDropTarget ? 'true' : 'false'}
-      direction="row"
-      gap={1}
-      alignItems="center"
-      flexWrap="nowrap"
-      draggable
-      onDragStart={() => onDragStart(node.ui_id)}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      sx={{
-        bgcolor: 'action.hover',
-        boxShadow: isDropTarget
-          ? (theme) => `0 0 0 2px ${theme.palette.primary.main}`
-          : '0 1px 2px rgba(0, 0, 0, 0.04)',
-        borderRadius: 1,
-        flex: '1 1 520px',
-        minWidth: 0,
-        px: 1,
-        py: 1,
-        transition: 'none'
-      }}>
-      <DragIndicatorIcon
-        fontSize="small"
-        aria-label="Drag filter"
+    <LoadingGuard
+      isLoading={isSelectedPropertyLabelLoading}
+      isLoadingFallback={<ExpressionBuilderPredicateTokenSkeleton onRemove={() => onRemove(node.ui_id)} />}>
+      <Stack
+        data-testid="expression-filter-token"
+        data-drop-active={isDropTarget ? 'true' : 'false'}
+        direction="row"
+        gap={1}
+        alignItems="center"
+        flexWrap="nowrap"
+        draggable
+        onDragStart={() => onDragStart(node.ui_id)}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         sx={{
-          color: 'text.secondary',
-          cursor: 'grab',
-          flexShrink: 0,
-          '&:active': {
-            cursor: 'grabbing'
-          }
-        }}
-      />
-
-      <ExpressionBuilderPropertySearch
-        properties={propertyOptions}
-        ariaLabel="Property"
-        value={property ?? null}
-        placeholder={property?.label ?? 'Property'}
-        showSearchIcon={false}
-        error={missingProperty}
-        sx={{
-          flex: '1.25 1 220px',
+          bgcolor: 'action.hover',
+          boxShadow: isDropTarget
+            ? (theme) => `0 0 0 2px ${theme.palette.primary.main}`
+            : '0 1px 2px rgba(0, 0, 0, 0.04)',
+          borderRadius: 1,
+          flex: '1 1 520px',
           minWidth: 0,
-          '&&& .MuiAutocomplete-endAdornment': {
-            alignItems: 'center',
-            display: 'flex',
-            gap: '4px',
-            justifyContent: 'flex-end',
-            paddingRight: '0 !important',
-            right: '4px !important',
-            width: 28
-          },
-          '&&& .MuiAutocomplete-clearIndicator': {
-            display: 'none !important'
-          },
-          '&&& .MuiAutocomplete-popupIndicator': {
-            alignItems: 'center',
-            display: 'inline-flex !important',
-            height: 24,
-            justifyContent: 'center',
-            padding: '4px',
-            width: 24,
-            '& .MuiSvgIcon-root': {
-              fontSize: '1rem'
+          px: 1,
+          py: 1,
+          transition: 'none'
+        }}>
+        <DragIndicatorIcon
+          fontSize="small"
+          aria-label="Drag filter"
+          sx={{
+            color: 'text.secondary',
+            cursor: 'grab',
+            flexShrink: 0,
+            '&:active': {
+              cursor: 'grabbing'
             }
-          },
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            fontSize: '0.875rem',
-            height: 36,
-            minHeight: 36,
-            padding: '0 36px 0 6px !important',
-            transition: 'box-shadow 120ms ease'
-          },
-          '&& .MuiInputBase-input': {
-            height: 24,
-            lineHeight: '24px',
-            minWidth: '0 !important',
-            overflow: 'hidden',
-            padding: '8px !important',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+          }}
+        />
+
+        <ExpressionBuilderPropertySearch
+          properties={propertyOptions}
+          ariaLabel="Property"
+          value={property ?? null}
+          placeholder={property?.label ?? 'Property'}
+          showSearchIcon={false}
+          error={missingProperty}
+          sx={{
+            flex: '1.25 1 220px',
+            minWidth: 0,
+            '&&& .MuiAutocomplete-endAdornment': {
+              alignItems: 'center',
+              display: 'flex',
+              gap: '4px',
+              justifyContent: 'flex-end',
+              paddingRight: '0 !important',
+              right: '4px !important',
+              width: 28
+            },
+            '&&& .MuiAutocomplete-clearIndicator': {
+              display: 'none !important'
+            },
+            '&&& .MuiAutocomplete-popupIndicator': {
+              alignItems: 'center',
+              display: 'inline-flex !important',
+              height: 24,
+              justifyContent: 'center',
+              padding: '4px',
+              width: 24,
+              '& .MuiSvgIcon-root': {
+                fontSize: '1rem'
+              }
+            },
+            '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
+              fontSize: '0.875rem',
+              height: 36,
+              minHeight: 36,
+              padding: '0 36px 0 6px !important',
+              transition: 'box-shadow 120ms ease'
+            },
+            '&& .MuiInputBase-input': {
+              height: 24,
+              lineHeight: '24px',
+              minWidth: '0 !important',
+              overflow: 'hidden',
+              padding: '8px !important',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }
+          }}
+          onSearchInputChange={onPropertySearchInputChange}
+          onSelectProperty={(property) =>
+            onPropertyChange(node.ui_id, getExpressionBuilderPropertyKeyFromProperty(property), property)
           }
-        }}
-        onSearchInputChange={onPropertySearchInputChange}
-        onSelectProperty={(property) =>
-          onPropertyChange(node.ui_id, getExpressionBuilderPropertyKeyFromProperty(property), property)
-        }
-      />
+        />
 
-      <InlineSelect
-        ariaLabel="Operator"
-        disableClearable
-        sx={{
-          flex: '1 1 180px',
-          minWidth: 0,
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            transition: 'box-shadow 120ms ease'
-          }
-        }}
-        error={missingOperator}
-        value={predicate?.operator ?? 'Equals'}
-        placeholder="Equals"
-        options={(property?.operators ?? (['Equals'] as ExpressionPredicateOperator[])).map((operator) => ({
-          value: operator,
-          label: EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS[operator] ?? operator
-        }))}
-        onChange={(value) => onOperatorChange(node.ui_id, value === '' ? null : value)}
-      />
+        <InlineSelect
+          ariaLabel="Operator"
+          disableClearable
+          sx={{
+            flex: '1 1 180px',
+            minWidth: 0,
+            '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
+              transition: 'box-shadow 120ms ease'
+            }
+          }}
+          error={missingOperator}
+          value={predicate?.operator ?? 'Equals'}
+          placeholder="Equals"
+          options={(property?.operators ?? (['Equals'] as ExpressionPredicateOperator[])).map((operator) => ({
+            value: operator,
+            label: EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS[operator] ?? operator
+          }))}
+          onChange={(value) => onOperatorChange(node.ui_id, value === '' ? null : value)}
+        />
 
-      {renderValueInput()}
+        {renderValueInput()}
 
-      <IconButton
-        aria-label="Remove filter"
-        size="small"
-        onClick={() => onRemove(node.ui_id)}
-        color="inherit"
-        sx={{ flexShrink: 0 }}>
-        <Icon path={mdiTrashCanOutline} size={0.6} />
-      </IconButton>
-    </Stack>
+        <IconButton
+          aria-label="Remove filter"
+          size="small"
+          onClick={() => onRemove(node.ui_id)}
+          color="inherit"
+          sx={{ flexShrink: 0 }}>
+          <Icon path={mdiTrashCanOutline} size={0.6} />
+        </IconButton>
+      </Stack>
+    </LoadingGuard>
   );
 };

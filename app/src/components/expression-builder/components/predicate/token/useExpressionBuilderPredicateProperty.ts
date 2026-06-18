@@ -1,18 +1,7 @@
-import {
-  BuilderPredicateNode,
-  ExpressionBuilderProperty
-} from 'components/expression-builder/ExpressionBuilder.interface';
+import { ExpressionBuilderProperty } from 'components/expression-builder/ExpressionBuilder.interface';
 import { useEffect, useState } from 'react';
 import { getExpressionBuilderPropertyKeyFromProperty } from 'utils/expression';
-
-interface UseExpressionBuilderPredicatePropertyParams {
-  /** Predicate node whose selected property metadata should be resolved. */
-  node: BuilderPredicateNode;
-  /** Current property-picker options from the shared remote loader. */
-  properties: ExpressionBuilderProperty[];
-  /** Stable selected-property cache owned by the expression builder. */
-  selectedProperties: ExpressionBuilderProperty[];
-}
+import { UseExpressionBuilderPredicatePropertyParams } from './ExpressionBuilderPredicateToken.interface';
 
 /**
  * Resolves and caches selected property metadata for a predicate row.
