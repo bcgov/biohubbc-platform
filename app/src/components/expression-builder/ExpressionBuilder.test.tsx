@@ -868,6 +868,7 @@ describe('ExpressionBuilder', () => {
       await waitFor(() =>
         expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'habitat' }, { page: 1, limit: 25 })
       );
+      await waitFor(() => expect(propertyInputs[0]).toHaveValue('Description'));
       listbox = await openCombobox(propertyInputs[1]);
       fireEvent.click(within(listbox).getByRole('option', { name: 'Habitat name' }));
 
