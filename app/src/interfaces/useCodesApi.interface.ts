@@ -18,6 +18,7 @@ export type FeatureTypeProperty = {
   type_name: string;
   required_value: boolean;
   calculated_value: boolean;
+  allow_multiple: boolean;
 };
 
 /**

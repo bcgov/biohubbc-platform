@@ -50,9 +50,8 @@ export const SearchResultPage = () => {
       })),
     [codesDataLoader.data?.feature_type_with_properties]
   );
-
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, isLoading, searchParams, setSearchParams, pagination } = useSearchResults(
+  const { rows, properties, isLoading, searchParams, setSearchParams, pagination } = useSearchResults(
     routeConfig?.featureTypeName,
     Boolean(routeConfig),
     expressionTree,
@@ -109,6 +108,7 @@ export const SearchResultPage = () => {
 
           <SearchResultPanel
             rows={rows}
+            featureTypeProperties={properties}
             isLoading={isLoading}
             pagination={pagination}
             sortOptions={sortOptions}

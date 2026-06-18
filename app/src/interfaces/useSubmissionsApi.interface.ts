@@ -1,4 +1,5 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
+import { JsonValue } from 'types/json';
 import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
 export type SubmissionRecord = {
@@ -44,16 +45,9 @@ export interface ISubmissionFeature {
   create_user: string;
 }
 
-type SubmissionPropertyValue =
-  | string
-  | number
-  | boolean
-  | SubmissionPropertyValue[]
-  | { [key: string]: SubmissionPropertyValue };
-
 export interface IPostSubmissionFeature {
   feature_type: string;
-  properties: Record<string, SubmissionPropertyValue>;
+  properties: Record<string, JsonValue>;
   children: IPostSubmissionFeature[];
 }
 
