@@ -115,6 +115,45 @@ describe('UploadArchiveRepository', () => {
     });
   });
 
+  describe('findUploadArchiveByArtifactId', () => {
+    it('returns null when no record is found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new UploadArchiveRepository(mockDBConnection);
+
+      const result = await repo.findUploadArchiveByArtifactId('artifact-id-1');
+      expect(result).to.be.null;
+    });
+
+    it('returns the record when one is found', async () => {
+      const mockRecord: UploadArchive = {
+        upload_archive_id: 'upload-archive-id-1',
+        upload_id: 'upload-id-1',
+        artifact_id: 'artifact-id-1',
+        archive_status: ProcessStatusStatusEnum.PENDING
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRecord] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new UploadArchiveRepository(mockDBConnection);
+
+      const result = await repo.findUploadArchiveByArtifactId('artifact-id-1');
+      expect(result).to.eql(mockRecord);
+    });
+
+    it('throws an error when more than one record is found', async () => {
+      const mockQueryResponse = { rowCount: 2, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new UploadArchiveRepository(mockDBConnection);
+
+      try {
+        await repo.findUploadArchiveByArtifactId('artifact-id-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Unexpected row count');
+      }
+    });
+  });
+
   describe('insertUploadArchive', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
