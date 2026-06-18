@@ -8,8 +8,9 @@ import { Knex } from 'knex';
  * 1. Creates one initial Blueprint: version 1, `is_default = true`, `record_effective_date = now()`,
  *    `record_end_date` null, `parent_blueprint_id` null — i.e. immediately available for indexing.
  * 2. Adds one `blueprint_feature_type` row for each active `feature_type` (carrying its `sort`).
- * 3. Adds one `blueprint_feature_type_property` row for each active `feature_type_property`, copying
- *    `feature_type_id`, `feature_property_id`, `required_value`, `allow_multiple`, and `sort`.
+ * 3. Adds one `blueprint_feature_type_property` row for each active `feature_type_property`, linking
+ *    the seeded `blueprint_feature_type` row (via its `feature_type_id`) to the `feature_type_property`
+ *    pool entry and copying its `required_value`, `allow_multiple`, and `sort`.
  *
  * `create_user` is intentionally omitted on the inserts; the table audit trigger populates it from
  * the session context (falling back to the DATABASE system user), matching other seed migrations.
@@ -46,27 +47,30 @@ export async function up(knex: Knex): Promise<void> {
       FROM new_blueprint nb
       CROSS JOIN feature_type ft
       WHERE ft.record_end_date IS NULL
-      RETURNING 1
+      RETURNING blueprint_feature_type_id, feature_type_id
     )
+    -- Attach each active feature_type_property to the seeded blueprint_feature_type row for its
+    -- feature type. The join naturally excludes any active property whose feature type was ended
+    -- (and therefore has no blueprint_feature_type row to reference).
     INSERT INTO blueprint_feature_type_property (
-      blueprint_id, feature_type_id, feature_property_id, required_value, allow_multiple, sort
+      blueprint_feature_type_id, feature_type_property_id, required_value, allow_multiple, sort
     )
     SELECT
-      nb.blueprint_id,
-      ftp.feature_type_id,
-      ftp.feature_property_id,
+      sft.blueprint_feature_type_id,
+      ftp.feature_type_property_id,
       COALESCE(ftp.required_value, false),
       COALESCE(ftp.allow_multiple, false),
       ftp.sort
-    FROM new_blueprint nb
-    CROSS JOIN feature_type_property ftp
+    FROM feature_type_property ftp
+    JOIN seed_feature_types sft ON sft.feature_type_id = ftp.feature_type_id
     WHERE ftp.record_end_date IS NULL;
   `);
 }
 
 /**
  * Removes the seeded initial Blueprint and its assignments. Children are deleted first because they
- * carry foreign keys to `blueprint`.
+ * carry foreign keys up the chain: `blueprint_feature_type_property` references
+ * `blueprint_feature_type`, which references `blueprint`.
  *
  * @export
  * @param {Knex} knex
@@ -77,7 +81,12 @@ export async function down(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     DELETE FROM blueprint_feature_type_property
-    WHERE blueprint_id IN (SELECT blueprint_id FROM blueprint WHERE version_number = 1 AND is_default = true);
+    WHERE blueprint_feature_type_id IN (
+      SELECT bft.blueprint_feature_type_id
+      FROM blueprint_feature_type bft
+      JOIN blueprint b ON b.blueprint_id = bft.blueprint_id
+      WHERE b.version_number = 1 AND b.is_default = true
+    );
 
     DELETE FROM blueprint_feature_type
     WHERE blueprint_id IN (SELECT blueprint_id FROM blueprint WHERE version_number = 1 AND is_default = true);
