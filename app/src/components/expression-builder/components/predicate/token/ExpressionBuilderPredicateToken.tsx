@@ -1,10 +1,9 @@
-import { mdiClose, mdiTrashCanOutline } from '@mdi/js';
+import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { IconButton, InputAdornment, Stack, TextField } from '@mui/material';
+import { IconButton, Stack, TextField } from '@mui/material';
 import {
   BuilderPredicateNode,
-  ExpressionBuilderDatetimeValue,
   ExpressionBuilderProperty
 } from 'components/expression-builder/ExpressionBuilder.interface';
 import { InlineSelect } from 'components/select/InlineSelect';
@@ -13,6 +12,9 @@ import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { useState } from 'react';
 import { getExpressionBuilderPropertyKeyFromProperty, hasPredicateValue } from 'utils/expression';
 import { ExpressionBuilderPropertySearch } from '../../property/search/ExpressionBuilderPropertySearch';
+import { getTextInputValue, isDatetimeValue, updateDatetimeValue } from './ExpressionBuilderPredicateToken.utils';
+import { ExpressionBuilderPredicateValueClearAdornment } from './ExpressionBuilderPredicateValueClearAdornment';
+import { useExpressionBuilderPredicateProperty } from './useExpressionBuilderPredicateProperty';
 
 interface ExpressionBuilderPredicateTokenProps {
   /** Predicate node to render and edit. */
@@ -46,82 +48,6 @@ interface ExpressionBuilderPredicateTokenProps {
 }
 
 /**
- * Checks whether an editable predicate value has the datetime draft shape.
- *
- * Datetime values are edited with separate date and time controls, while the
- * serialized expression payload remains a scalar string.
- *
- * @param {unknown} value - Candidate predicate value from builder state.
- * @returns {value is ExpressionBuilderDatetimeValue} True when the value can be used as a datetime draft.
- */
-const isDatetimeValue = (value: unknown): value is ExpressionBuilderDatetimeValue =>
-  typeof value === 'object' &&
-  value !== null &&
-  ('date_value' in value || 'time_value' in value) &&
-  (!('date_value' in value) || typeof value.date_value === 'string' || value.date_value === undefined) &&
-  (!('time_value' in value) || typeof value.time_value === 'string' || value.time_value === undefined);
-
-/**
- * Returns the next editable datetime draft after a date or time field change.
- *
- * Empty field values are removed from the draft so validation and serialization
- * can treat an empty datetime object the same as no value.
- *
- * @param {unknown} value - Current predicate value from builder state.
- * @param {keyof ExpressionBuilderDatetimeValue} field - Datetime field to update.
- * @param {string} nextValue - Next control value for the field.
- * @returns {ExpressionBuilderDatetimeValue} Updated datetime draft value.
- */
-const updateDatetimeValue = (
-  value: unknown,
-  field: keyof ExpressionBuilderDatetimeValue,
-  nextValue: string
-): ExpressionBuilderDatetimeValue => {
-  const currentValue = isDatetimeValue(value) ? value : {};
-  const nextDatetimeValue = { ...currentValue };
-
-  if (nextValue) {
-    nextDatetimeValue[field] = nextValue;
-  } else {
-    delete nextDatetimeValue[field];
-  }
-
-  return nextDatetimeValue;
-};
-
-const getTextInputValue = (value: unknown): string | number => {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  return '';
-};
-
-const renderClearValueAdornment = (isVisible: boolean, onClear: () => unknown) =>
-  isVisible ? (
-    <InputAdornment position="end">
-      <IconButton
-        aria-label="Clear value"
-        size="small"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-          onClear();
-        }}
-        sx={{ height: 24, width: 24 }}>
-        <Icon path={mdiClose} size={0.6} />
-      </IconButton>
-    </InputAdornment>
-  ) : undefined;
-
-/**
  * Renders one editable predicate token within an expression group or root clause list.
  *
  * Use this only as a child of `ExpressionBuilder` or `ExpressionBuilderGroup`.
@@ -148,15 +74,7 @@ export const ExpressionBuilderPredicateToken = ({
   onRemove
 }: ExpressionBuilderPredicateTokenProps) => {
   const [isDropTarget, setIsDropTarget] = useState(false);
-
-  // Predicate nodes store property ids; render-time metadata comes from the
-  // builder's property cache so labels, operators, and value controls can match
-  // the selected property type.
-  const property = selectedProperties.find(
-    (property) =>
-      property.feature_property_id === node.feature_property_id &&
-      property.feature_type_property_id === node.feature_type_property_id
-  );
+  const { property, propertyOptions } = useExpressionBuilderPredicateProperty({ node, properties, selectedProperties });
   const predicate = node.predicate;
   const missingProperty = node.feature_property_id === null;
   const missingOperator = !!property && !predicate?.operator;
@@ -217,7 +135,9 @@ export const ExpressionBuilderPredicateToken = ({
           placeholder="Value"
           onChange={(event) => onValueChange(node.ui_id, event.target.value)}
           InputProps={{
-            endAdornment: renderClearValueAdornment(hasPredicateValue(value), () => onValueChange(node.ui_id, ''))
+            endAdornment: hasPredicateValue(value) ? (
+              <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
+            ) : undefined
           }}
           inputProps={{ 'aria-label': 'Value' }}
           sx={{
@@ -305,9 +225,11 @@ export const ExpressionBuilderPredicateToken = ({
                 onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'date_value', event.target.value))
               }
               InputProps={{
-                endAdornment: renderClearValueAdornment(hasPredicateValue(datetimeValue.date_value), () =>
-                  onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'date_value', ''))
-                )
+                endAdornment: hasPredicateValue(datetimeValue.date_value) ? (
+                  <ExpressionBuilderPredicateValueClearAdornment
+                    onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'date_value', ''))}
+                  />
+                ) : undefined
               }}
               inputProps={{ 'aria-label': 'Date' }}
               sx={{
@@ -354,9 +276,11 @@ export const ExpressionBuilderPredicateToken = ({
                 onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'time_value', event.target.value))
               }
               InputProps={{
-                endAdornment: renderClearValueAdornment(hasPredicateValue(datetimeValue.time_value), () =>
-                  onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'time_value', ''))
-                )
+                endAdornment: hasPredicateValue(datetimeValue.time_value) ? (
+                  <ExpressionBuilderPredicateValueClearAdornment
+                    onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'time_value', ''))}
+                  />
+                ) : undefined
               }}
               inputProps={{ 'aria-label': 'Time' }}
               sx={{
@@ -408,7 +332,9 @@ export const ExpressionBuilderPredicateToken = ({
         error={missingValue}
         onChange={(event) => onValueChange(node.ui_id, event.target.value)}
         InputProps={{
-          endAdornment: renderClearValueAdornment(hasPredicateValue(value), () => onValueChange(node.ui_id, ''))
+          endAdornment: hasPredicateValue(value) ? (
+            <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
+          ) : undefined
         }}
         inputProps={{
           'aria-label': 'Value',
@@ -476,7 +402,7 @@ export const ExpressionBuilderPredicateToken = ({
       />
 
       <ExpressionBuilderPropertySearch
-        properties={properties}
+        properties={propertyOptions}
         ariaLabel="Property"
         value={property ?? null}
         placeholder={property?.label ?? 'Property'}

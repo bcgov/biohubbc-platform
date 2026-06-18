@@ -96,6 +96,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
   const usedPropertyKeys = useMemo(() => getUsedExpressionBuilderPropertyKeys(rootNode), [rootNode]);
   const {
     propertyOptions,
+    selectedProperties,
     knownProperties,
     suggestedProperties,
     suggestedSpecies,
@@ -472,7 +473,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
             key={clause.ui_id}
             node={clause}
             properties={propertyOptions}
-            selectedProperties={knownProperties}
+            selectedProperties={selectedProperties}
             onRemoveClause={handleRemoveClause}
             onPropertySearchInputChange={refreshPropertyOptions}
             onGroupOperatorChange={handleGroupOperatorChange}
@@ -498,7 +499,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
           key={clause.ui_id}
           node={clause}
           properties={propertyOptions}
-          selectedProperties={knownProperties}
+          selectedProperties={selectedProperties}
           onPropertySearchInputChange={refreshPropertyOptions}
           onPropertyChange={handlePropertyChange}
           onOperatorChange={handleOperatorChange}
@@ -513,8 +514,8 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
     },
     [
       activeDropGroupId,
-      knownProperties,
       propertyOptions,
+      selectedProperties,
       draggedGroupId,
       draggedPredicateId,
       handleDropOnGroup,
