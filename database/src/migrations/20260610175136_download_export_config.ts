@@ -13,9 +13,34 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
+    -- Add nullable first: the table shipped in SIMSBIOHUB-1028, so deployed
+    -- environments may already hold export groups. A bare NOT NULL add would fail
+    -- on any such row. Backfill, then set NOT NULL below.
     ALTER TABLE download_version_export_artifact_group
-      ADD COLUMN config JSONB NOT NULL,
-      ADD COLUMN config_hash VARCHAR(64) NOT NULL;
+      ADD COLUMN config JSONB,
+      ADD COLUMN config_hash VARCHAR(64);
+
+    -- Backfill legacy groups with a synthetic per_feature_type recipe. The pre-1030
+    -- pipeline only produced per_feature_type exports and never stored feature_types,
+    -- so the real recipe can't be reconstructed — these groups will never dedupe-match
+    -- a real (feature_type-bearing) request and are effectively retired. config_hash is
+    -- derived from the old (format, mode) key so the new unique index stays unique
+    -- exactly where the old one did.
+    UPDATE download_version_export_artifact_group
+    SET
+      config = jsonb_build_object(
+        'version', 1,
+        'export_type', format,
+        'mode', mode,
+        'feature_types', '[]'::jsonb,
+        'merge_steps', '[]'::jsonb
+      ),
+      config_hash = encode(sha256(convert_to('legacy:' || format || '|' || mode, 'UTF8')), 'hex')
+    WHERE config IS NULL;
+
+    ALTER TABLE download_version_export_artifact_group
+      ALTER COLUMN config SET NOT NULL,
+      ALTER COLUMN config_hash SET NOT NULL;
 
     DROP INDEX download_version_export_artifact_group_nuk1;
 
