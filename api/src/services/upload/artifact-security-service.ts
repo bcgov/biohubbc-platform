@@ -1,6 +1,6 @@
 import { HeadObjectCommandOutput } from '@aws-sdk/client-s3';
+import { TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
-import { ApiNotFoundError } from '../../errors/api-error';
 import { ClamAvScanValidationError } from '../../errors/clamav-errors';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
@@ -160,6 +160,42 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
+   * Transition the `submission_upload` owning an artifact security record to `failed`.
+   *
+   * Resolves the upload via the artifact's `upload_archive` bridge. Used by the malware scan dead letter handler
+   * so a scan that fails after all retries does not leave the `submission_upload` stuck at `uploaded`.
+   *
+   * Tolerant by design so it cannot throw the failure handler into a retry loop: no-op when the artifact has no
+   * `upload_archive`, and no-op when the upload has already reached a terminal status.
+   *
+   * @param {string} artifactSecurityId - Artifact security record identifier.
+   * @returns {Promise<void>}
+   */
+  async failSubmissionUploadByArtifactSecurityId(artifactSecurityId: string): Promise<void> {
+    const securityRecord = await this.getArtifactSecurity(artifactSecurityId);
+
+    const uploadArchive = await this.uploadArchiveService.findUploadArchiveByArtifactId(securityRecord.artifact_id);
+
+    if (!uploadArchive) {
+      // Non-archive artifact (e.g. a standalone attachment) — no submission_upload lifecycle to fail.
+      return;
+    }
+
+    const submissionUpload = await this.submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
+
+    if (TERMINAL_UPLOAD_STATUSES.includes(submissionUpload.status)) {
+      // Already terminal — nothing to fail.
+      return;
+    }
+
+    await this.submissionUploadService.transitionSubmissionUploadStatus(
+      submissionUpload.submission_upload_id,
+      'failed',
+      ['uploaded', 'ingesting', 'ingested', 'indexing', 'failed']
+    );
+  }
+
+  /**
    * Execute end-to-end malware scanning for one artifact security record.
    *
    * This method validates artifact readiness, inserts a scan record, runs ClamAV, persists results,
@@ -228,14 +264,7 @@ export class ArtifactSecurityService extends DBService {
         // still reads `security = PENDING`, so `executeScan` re-runs the full flow and
         // converges. Without this ordering, a queue outage at this step leaves a clean
         // artifact with no downstream submission-processing job.
-        let uploadArchive: UploadArchive | null = null;
-        try {
-          uploadArchive = await this.uploadArchiveService.getUploadArchiveByArtifactId(artifact.artifact_id);
-        } catch (error) {
-          if (!(error instanceof ApiNotFoundError)) {
-            throw error;
-          }
-        }
+        const uploadArchive = await this.uploadArchiveService.findUploadArchiveByArtifactId(artifact.artifact_id);
 
         if (uploadArchive) {
           await this.publishNextPipelineStep(uploadArchive);
