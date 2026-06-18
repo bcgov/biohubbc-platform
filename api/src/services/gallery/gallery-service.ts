@@ -29,7 +29,7 @@ export class GalleryService extends DBService {
   downloadRepository: DownloadRepository;
   /**
    * Held directly (not via `DownloadVersionExportService`) because the only thing this
-   * service needs is the batch `listDownloadVersionExportsByDownloadIds`, which lives on
+   * service needs is the batch `listExportsByDownloadVersionIds`, which lives on
    * the repository — there is no export-service method that exposes it, so the
    * repository is the lowest-coupling reach to assemble `exports[]`.
    */
@@ -95,14 +95,27 @@ export class GalleryService extends DBService {
   /**
    * Update an active gallery's name and description.
    *
+   * A rename onto another active gallery's name is rejected with a clean 409 via the
+   * same active-name pre-check that create uses, mirroring its semantics — including
+   * the documented acceptance that a concurrent racing rename is ultimately guarded
+   * by the `gallery_nuk1` index. The `gallery_id` comparison lets a gallery keep its
+   * own name (e.g. a description-only edit) without tripping the check on itself.
+   *
    * @param {number} galleryId - The gallery ID.
    * @param {UpdateGalleryRequestBody} payload - The new name and description; an
    * absent `description` is resolved to an explicit `null` before the write.
    * @return {Promise<GalleryRecord>} The updated gallery record.
+   * @throws {HTTP409} when another active gallery already uses the given name.
    * @throws {ApiNotFoundError} when no active gallery matches the given ID.
    * @memberof GalleryService
    */
   async updateGallery(galleryId: number, payload: UpdateGalleryRequestBody): Promise<GalleryRecord> {
+    const existing = await this.galleryRepository.findActiveGalleryByName(payload.name);
+
+    if (existing && existing.gallery_id !== galleryId) {
+      throw new HTTP409('A gallery with this name already exists');
+    }
+
     const gallery: CreateGallery = { name: payload.name, description: payload.description ?? null };
 
     return this.galleryRepository.updateGallery(galleryId, gallery);
@@ -169,9 +182,13 @@ export class GalleryService extends DBService {
    * the same response. The empty-member short-circuit also skips the export
    * batch fetch when there is nothing to attach.
    *
-   * Members come back as flat rows from the repository; their `exports[]` are
-   * batch-fetched in one query and grouped by `download_id` in JS (reusing the
-   * download service's grouping), so the repository stays single-SQL CRUD.
+   * Members come back as flat rows from the repository, each already carrying the
+   * download's latest active `download_version_id`. Their `exports[]` are
+   * batch-fetched in one query keyed by those exact version ids, so `exports[]`
+   * reflects the displayed version: a download whose latest version is still
+   * export-less (a fresh re-run) shows an empty `exports[]` rather than an older
+   * version's files. Grouped by `download_id` in JS (reusing the download
+   * service's grouping), so the repository stays single-SQL CRUD.
    *
    * @param {number} galleryId - The gallery ID.
    * @return {Promise<GalleryDownloadListRecord[]>}
@@ -187,8 +204,8 @@ export class GalleryService extends DBService {
       return [];
     }
 
-    const exportRows = await this.downloadExportRepository.listDownloadVersionExportsByDownloadIds(
-      members.map((member) => member.download_id)
+    const exportRows = await this.downloadExportRepository.listExportsByDownloadVersionIds(
+      members.map((member) => member.download_version_id)
     );
 
     const exportsByDownloadId = groupExportsByDownloadId(exportRows);

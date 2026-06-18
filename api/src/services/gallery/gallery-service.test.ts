@@ -89,6 +89,79 @@ describe('GalleryService', () => {
     });
   });
 
+  describe('updateGallery', () => {
+    it('throws HTTP409 and does not write when the name belongs to a different active gallery', async () => {
+      // Verifies (S2c): the rename pre-check rejects a name already used by ANOTHER
+      // active gallery with a clean 409, closing the gap where a colliding rename
+      // previously hit the unique index and surfaced a raw 500.
+
+      // Step 1: Stub the name lookup to report a DIFFERENT gallery owning the name
+      const findStub = sinon
+        .stub(GalleryRepository.prototype, 'findActiveGalleryByName')
+        .resolves(createMockGalleryRecord({ gallery_id: 99, name: 'Home' }));
+      const updateStub = sinon.stub(GalleryRepository.prototype, 'updateGallery');
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryService(mockDBConnection);
+
+      // Step 3: Attempt to rename gallery 7 onto gallery 99's name
+      try {
+        await service.updateGallery(7, { name: 'Home', description: 'desc' });
+        expect.fail('expected HTTP409');
+      } catch (error) {
+        // Step 4: The conflict is reported and the write never happens
+        expect(error).to.be.instanceOf(HTTP409);
+        expect(findStub).to.have.been.calledOnceWith('Home');
+        expect(updateStub).to.not.have.been.called;
+      }
+    });
+
+    it('allows the update when the matching gallery is the one being updated (self-name)', async () => {
+      // Verifies (S2d): keeping a gallery's own name (e.g. a description-only edit)
+      // must NOT trip the pre-check against itself.
+
+      // Step 1: Stub the name lookup to return the SAME gallery being updated
+      sinon
+        .stub(GalleryRepository.prototype, 'findActiveGalleryByName')
+        .resolves(createMockGalleryRecord({ gallery_id: 7, name: 'Home' }));
+      const updated = createMockGalleryRecord({ gallery_id: 7, name: 'Home', description: 'new desc' });
+      const updateStub = sinon.stub(GalleryRepository.prototype, 'updateGallery').resolves(updated);
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryService(mockDBConnection);
+
+      // Step 3: Update gallery 7 keeping its own name
+      const result = await service.updateGallery(7, { name: 'Home', description: 'new desc' });
+
+      // Step 4: The update proceeds with the resolved payload and returns the row
+      expect(updateStub).to.have.been.calledOnceWith(7, { name: 'Home', description: 'new desc' });
+      expect(result).to.eql(updated);
+    });
+
+    it('updates with the resolved payload when the name is free', async () => {
+      // Verifies (S2e): a free name forwards the exact CreateGallery payload (absent
+      // description resolved to null) and returns the updated row.
+
+      // Step 1: Stub the name lookup as free and the update to return a row
+      sinon.stub(GalleryRepository.prototype, 'findActiveGalleryByName').resolves(null);
+      const updated = createMockGalleryRecord({ gallery_id: 7, name: 'Renamed', description: null });
+      const updateStub = sinon.stub(GalleryRepository.prototype, 'updateGallery').resolves(updated);
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryService(mockDBConnection);
+
+      // Step 3: Rename gallery 7 to a free name with no description field
+      const result = await service.updateGallery(7, { name: 'Renamed' });
+
+      // Step 4: The repository receives the resolved payload and the row is returned
+      expect(updateStub).to.have.been.calledOnceWith(7, { name: 'Renamed', description: null });
+      expect(result).to.eql(updated);
+    });
+  });
+
   describe('addDownloadToGallery', () => {
     it('adds the download when both the gallery and download exist', async () => {
       // Verifies (S3): both guards pass, and the repo insert receives the
@@ -193,10 +266,7 @@ describe('GalleryService', () => {
         .stub(GalleryRepository.prototype, 'getGalleryById')
         .rejects(new ApiNotFoundError('Gallery not found'));
       const membersStub = sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads');
-      const exportsStub = sinon.stub(
-        DownloadVersionExportRepository.prototype,
-        'listDownloadVersionExportsByDownloadIds'
-      );
+      const exportsStub = sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds');
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -222,10 +292,7 @@ describe('GalleryService', () => {
       // Step 1: Stub the gallery guard to pass and the membership query to return none
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       const membersStub = sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads').resolves([]);
-      const exportsStub = sinon.stub(
-        DownloadVersionExportRepository.prototype,
-        'listDownloadVersionExportsByDownloadIds'
-      );
+      const exportsStub = sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds');
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -259,7 +326,7 @@ describe('GalleryService', () => {
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       sinon.stub(GalleryRepository.prototype, 'getGalleryDownloads').resolves([memberA, memberB]);
       sinon
-        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
+        .stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds')
         .resolves([exportA1, exportA2]);
 
       // Step 2: Create the service
@@ -277,18 +344,23 @@ describe('GalleryService', () => {
       expect(result[1].exports).to.eql([]);
     });
 
-    it('passes the full set of member download ids to the export batch fetch', async () => {
-      // Verifies (S9): every member id is forwarded to the batch export fetch so no
+    it('passes each member’s latest download version id to the export fetch', async () => {
+      // Verifies (S9): every member's already-resolved latest download_version_id is
+      // forwarded to the batch fetch — so exports[] reflects the displayed version and no
       // member is silently dropped from the exports lookup.
 
-      // Step 1: Stub three members
-      const ids = ['one', 'two', 'three'];
+      // Step 1: Stub three members with distinct download version ids
+      const versionIds = ['version-1', 'version-2', 'version-3'];
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       sinon
         .stub(GalleryRepository.prototype, 'getGalleryDownloads')
-        .resolves(ids.map((id) => createMockDownloadRecord({ download_id: id })));
+        .resolves(
+          versionIds.map((id, index) =>
+            createMockDownloadRecord({ download_id: `download-${index + 1}`, download_version_id: id })
+          )
+        );
       const exportsStub = sinon
-        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds')
+        .stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds')
         .resolves([]);
 
       // Step 2: Create the service
@@ -298,8 +370,8 @@ describe('GalleryService', () => {
       // Step 3: Read the gallery's contents
       await service.getGalleryDownloads(1);
 
-      // Step 4: The batch fetch receives the full id set in member order
-      expect(exportsStub).to.have.been.calledOnceWith(ids);
+      // Step 4: The batch fetch receives the full download-version-id set in member order
+      expect(exportsStub).to.have.been.calledOnceWith(versionIds);
     });
 
     it('preserves the member order returned by the repository', async () => {
@@ -314,7 +386,7 @@ describe('GalleryService', () => {
           createMockDownloadRecord({ download_id: 'first' }),
           createMockDownloadRecord({ download_id: 'second' })
         ]);
-      sinon.stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadIds').resolves([]);
+      sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds').resolves([]);
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();

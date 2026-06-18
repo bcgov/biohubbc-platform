@@ -489,6 +489,70 @@ export class DownloadVersionExportRepository extends BaseRepository {
   }
 
   /**
+   * Batch export fetch for a set of download versions — returns the live exports
+   * belonging to exactly the given versions, each with its live part count.
+   *
+   * Callers pass the *displayed* (latest) `download_version_id` for each download,
+   * so `exports[]` reflects that exact version: a version with no live exports
+   * contributes no rows (its download's `exports[]` is `[]`) rather than falling
+   * back to an older version's exports.
+   *
+   * `AND g.record_end_date IS NULL` excludes soft-ended artifact groups (a retired
+   * failed build), so only live exports surface.
+   *
+   * Returns `dv.download_id` and orders by it, so callers reuse
+   * `groupExportsByDownloadId` unchanged. The empty-array short-circuit avoids a
+   * `= ANY('{}')` no-op round-trip.
+   *
+   * @param {string[]} downloadVersionIds - The download version IDs.
+   * @return {Promise<DownloadVersionExportListRow[]>}
+   * @memberof DownloadVersionExportRepository
+   */
+  async listExportsByDownloadVersionIds(downloadVersionIds: string[]): Promise<DownloadVersionExportListRow[]> {
+    if (downloadVersionIds.length === 0) {
+      return [];
+    }
+
+    const sql = SQL`
+      SELECT
+        de.download_version_export_id,
+        de.format,
+        de.mode,
+        de.max_part_size_bytes,
+        dv.download_id,
+        g.status,
+        g.started_at,
+        g.completed_at,
+        g.error_message,
+        COALESCE(COUNT(dvea.download_version_export_artifact_id), 0)::integer AS part_count
+      FROM download_version_export de
+      INNER JOIN download_version dv ON dv.download_version_id = de.download_version_id
+      INNER JOIN download_version_export_artifact_group g
+        ON g.download_version_export_artifact_group_id = de.download_version_export_artifact_group_id
+       AND g.record_end_date IS NULL
+      LEFT JOIN download_version_export_artifact dvea
+        ON dvea.download_version_export_artifact_group_id = g.download_version_export_artifact_group_id
+       AND dvea.record_end_date IS NULL
+      WHERE de.download_version_id = ANY(${downloadVersionIds})
+      GROUP BY
+        de.download_version_export_id,
+        de.format,
+        de.mode,
+        de.max_part_size_bytes,
+        dv.download_id,
+        g.status,
+        g.started_at,
+        g.completed_at,
+        g.error_message,
+        de.create_date
+      ORDER BY dv.download_id ASC, de.create_date DESC;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadVersionExportListRow);
+    return response.rows;
+  }
+
+  /**
    * List an export's part-zip artifacts with their file metadata.
    *
    * Reaches the parts through export → group → artifact join rows, then JOINs
