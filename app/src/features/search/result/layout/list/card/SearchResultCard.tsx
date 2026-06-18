@@ -1,16 +1,6 @@
 import { mdiCheck, mdiLock, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
-import {
-  Card,
-  CardActionArea,
-  CardActions,
-  CardContent,
-  CardHeader,
-  Chip,
-  IconButton,
-  Stack,
-  Typography
-} from '@mui/material';
+import { Card, CardActionArea, CardActions, CardHeader, Chip, IconButton, Stack, Typography } from '@mui/material';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 
 interface SearchResultCardProps {
@@ -82,21 +72,6 @@ export const SearchResultCard = ({
             }
           }}
         />
-        <CardContent sx={{ pt: 0 }}>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              maxWidth: 800,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-            {result.feature_description}
-          </Typography>
-        </CardContent>
       </CardActionArea>
       <CardActions sx={{ px: 2, py: 1.5, gap: 0.5, display: 'flex', justifyContent: 'flex-end' }}>
         {isInCart ? (

@@ -6,6 +6,7 @@ import { CustomPagination } from 'components/pagination/CustomPagination';
 import { PageSection } from 'components/section/PageSection';
 import { ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { SearchResultOptions } from './option/SearchResultOptions';
@@ -14,6 +15,8 @@ import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchRes
 interface SearchResultPanelProps {
   /** Search result rows returned by the feature search endpoint. */
   rows: SearchFeatureResultWithRelevancy[];
+  /** Feature type property metadata used to build table columns. */
+  featureTypeProperties: FeatureTypeProperty[];
   /** Whether the result request is currently loading. */
   isLoading: boolean;
   /** Pagination metadata returned by the result request. Undefined while the first request is pending. */
@@ -56,6 +59,7 @@ interface SearchResultPanelProps {
  */
 export const SearchResultPanel = ({
   rows,
+  featureTypeProperties,
   isLoading,
   pagination,
   sortOptions,
@@ -125,7 +129,13 @@ export const SearchResultPanel = ({
         <Divider />
 
         <Box sx={{ flex: 1, overflow: 'auto' }}>
-          <SearchResultOptions rows={rows} isLoading={isLoading} view={view} onClick={onResultClick} />
+          <SearchResultOptions
+            rows={rows}
+            featureTypeProperties={featureTypeProperties}
+            isLoading={isLoading}
+            view={view}
+            onClick={onResultClick}
+          />
         </Box>
 
         <Divider />

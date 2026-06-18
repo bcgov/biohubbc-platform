@@ -101,9 +101,35 @@ describe('SearchFeatureRepository', () => {
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include("COALESCE(typed_properties.properties, '{}'::jsonb) as properties");
+      expect(sql).to.not.include('sf.data');
       expect(sql).to.not.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('order by "submission_feature_id" asc');
       expect(sql).to.include('limit 25');
+    });
+
+    it('should hydrate expression-search fields from typed property tables instead of submission_feature.data', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('dataset', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.not.include('sf.data');
+      expect(sql).to.include('AS typed_properties ON true');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('submission_feature_property_boolean');
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include('submission_feature_property_geometry');
+      expect(sql).to.include('submission_feature_property_code');
+      expect(sql).to.include('submission_feature_property_taxon');
+      expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include('contributor_codeset_code');
+      expect(sql).to.include('public.ST_AsGeoJSON');
+      expect(sql).to.include('referenced_sf.urn');
     });
   });
 
@@ -140,6 +166,28 @@ describe('SearchFeatureRepository', () => {
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('count(*)::integer as count');
       expect(sql).to.include('"sf"."submission_feature_id" in');
+      expect(sql).to.not.include('typed_properties');
+    });
+  });
+
+  describe('searchFeaturesByExpressionTreeProperties', () => {
+    it('should build a typed-property schema query over the filtered feature set', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTreeProperties('dataset', undefined, 42);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include('with "matching_features" as');
+      expect(sql).to.include('"typed_property_rows" as');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include('"fpt"."name" as "type_name"');
+      expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
+      expect(sql).to.not.include('jsonb_object_keys');
+      expect(sql).to.not.include('typed_properties');
     });
   });
 });
