@@ -189,6 +189,55 @@ function buildArchiverBundle(): {
   return { archive, uploadPromise, hashCount };
 }
 
+/**
+ * A minimal valid `per_feature_type` recipe over one feature type, referencing
+ * only the always-present `uuid` structural column. Used as the default config
+ * for `seedPendingExport` when a test doesn't supply its own recipe.
+ */
+function defaultPerTypeConfig(featureType = 'dataset'): ExportConfig {
+  return ExportConfig.parse({
+    version: 1,
+    export_type: 'csv',
+    mode: 'per_feature_type',
+    feature_types: [featureType],
+    merge_steps: [],
+    output_columns: [{ feature_type: featureType, column: 'uuid' }]
+  });
+}
+
+// Root `dataset` joined to dimension `animal` on dataset.uuid = animal.parent_uuid
+// (a real star-schema link — an animal's parent_uuid points at its dataset's
+// uuid). Output selects the root's `name` and the dimension's `animal_identifier`;
+// the dimension column is prefixed `animal_animal_identifier` for header uniqueness.
+function datasetAnimalConfig(): ExportConfig {
+  return ExportConfig.parse({
+    version: 1,
+    export_type: 'csv',
+    mode: 'denormalized',
+    root_feature_type: 'dataset',
+    feature_types: ['dataset', 'animal'],
+    merge_steps: [
+      {
+        left_feature_type: 'dataset',
+        left_column: 'uuid',
+        right_feature_type: 'animal',
+        right_column: 'parent_uuid',
+        merge_type: 'left'
+      }
+    ],
+    output_columns: [
+      { feature_type: 'dataset', column: 'uuid' },
+      { feature_type: 'dataset', column: 'name' },
+      { feature_type: 'animal', column: 'animal_identifier' }
+    ]
+  });
+}
+
+/** The single part-zip key the denormalized pipeline writes for one small export. */
+function part1Key(downloadId: string, downloadVersionId: string, groupId: string): string {
+  return buildPartZipKey(downloadId, downloadVersionId, groupId, 1);
+}
+
 describe('Download Export pipeline (integration)', function () {
   // OOM skeleton + multi-part runs need headroom; happy-path tests complete well under this.
   this.timeout(60000);
@@ -287,22 +336,6 @@ describe('Download Export pipeline (integration)', function () {
     }
 
     return { downloadId, downloadVersionId, artifactIds };
-  }
-
-  /**
-   * A minimal valid `per_feature_type` recipe over one feature type, referencing
-   * only the always-present `uuid` structural column. Used as the default config
-   * for `seedPendingExport` when a test doesn't supply its own recipe.
-   */
-  function defaultPerTypeConfig(featureType = 'dataset'): ExportConfig {
-    return ExportConfig.parse({
-      version: 1,
-      export_type: 'csv',
-      mode: 'per_feature_type',
-      feature_types: [featureType],
-      merge_steps: [],
-      output_columns: [{ feature_type: featureType, column: 'uuid' }]
-    });
   }
 
   /**
@@ -590,39 +623,6 @@ describe('Download Export pipeline (integration)', function () {
   // so the join inputs are fully controlled; the group row is written directly,
   // so no `validateExportConfig` pass is needed here.
   describe('runExportGroup denormalized join', () => {
-    // Root `dataset` joined to dimension `animal` on dataset.uuid = animal.parent_uuid
-    // (a real star-schema link — an animal's parent_uuid points at its dataset's
-    // uuid). Output selects the root's `name` and the dimension's `animal_identifier`;
-    // the dimension column is prefixed `animal_animal_identifier` for header uniqueness.
-    function datasetAnimalConfig(): ExportConfig {
-      return ExportConfig.parse({
-        version: 1,
-        export_type: 'csv',
-        mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset', 'animal'],
-        merge_steps: [
-          {
-            left_feature_type: 'dataset',
-            left_column: 'uuid',
-            right_feature_type: 'animal',
-            right_column: 'parent_uuid',
-            merge_type: 'left'
-          }
-        ],
-        output_columns: [
-          { feature_type: 'dataset', column: 'uuid' },
-          { feature_type: 'dataset', column: 'name' },
-          { feature_type: 'animal', column: 'animal_identifier' }
-        ]
-      });
-    }
-
-    /** The single part-zip key the denormalized pipeline writes for one small export. */
-    function part1Key(downloadId: string, downloadVersionId: string, groupId: string): string {
-      return buildPartZipKey(downloadId, downloadVersionId, groupId, 1);
-    }
-
     it('single match: one CSV, prefixed dimension column in the header, one joined row per matched root row', async () => {
       const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
       const { groupId } = await seedPendingExport(downloadVersionId, datasetAnimalConfig());

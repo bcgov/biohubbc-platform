@@ -218,7 +218,7 @@ describe('export-config-utils', () => {
             merge_type: 'left'
           }
         ])
-      ).to.throw();
+      ).to.throw(/unreachable from root/);
     });
 
     it('throws when a step is unreachable from the root', () => {
@@ -232,7 +232,7 @@ describe('export-config-utils', () => {
             merge_type: 'left'
           }
         ])
-      ).to.throw();
+      ).to.throw(/unreachable from root/);
     });
 
     it('throws on a self-edge (root joined onto itself)', () => {

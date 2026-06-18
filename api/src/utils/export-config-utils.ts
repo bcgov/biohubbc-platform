@@ -188,6 +188,96 @@ export function orderMergeSteps(rootFeatureType: string, steps: MergeStep[]): Me
   return ordered;
 }
 
+/** A column is a valid join/output target if it is a structural column (present on
+ *  every type) or a materialized schema column of the given feature type. */
+function makeColumnExists(
+  availableColumnsByType: Map<string, Set<string>>
+): (featureType: string, column: string) => boolean {
+  return (featureType, column) => {
+    if ((STRUCTURAL_COLUMNS as readonly string[]).includes(column)) {
+      return true;
+    }
+    return availableColumnsByType.get(featureType)?.has(column) ?? false;
+  };
+}
+
+/** Mode-dependent structural rules that need no materialized data. */
+function validateModeRules(config: ExportConfig): string[] {
+  const errors: string[] = [];
+  if (config.mode === 'per_feature_type' && config.merge_steps.length > 0) {
+    errors.push('merge_steps are only valid in denormalized mode; per_feature_type exports one CSV per type');
+  }
+  if (config.mode === 'denormalized' && !config.root_feature_type) {
+    errors.push('denormalized mode requires a root_feature_type');
+  }
+  return errors;
+}
+
+/** Every referenced feature type must be materialized for this download. */
+function validateFeatureTypesMaterialized(
+  config: ExportConfig,
+  availableColumnsByType: Map<string, Set<string>>
+): string[] {
+  const errors: string[] = [];
+  for (const featureType of config.feature_types) {
+    if (!availableColumnsByType.has(featureType)) {
+      errors.push(`feature type '${featureType}' is not materialized for this download`);
+    }
+  }
+  return errors;
+}
+
+/** Each merge step's sides must be selected feature types whose join columns exist. */
+function validateMergeStepReferences(
+  config: ExportConfig,
+  columnExists: (featureType: string, column: string) => boolean
+): string[] {
+  const errors: string[] = [];
+  for (const step of config.merge_steps) {
+    if (!config.feature_types.includes(step.left_feature_type)) {
+      errors.push(`merge step left_feature_type '${step.left_feature_type}' is not in feature_types`);
+    } else if (!columnExists(step.left_feature_type, step.left_column)) {
+      errors.push(`column '${step.left_column}' does not exist on feature type '${step.left_feature_type}'`);
+    }
+
+    if (!config.feature_types.includes(step.right_feature_type)) {
+      errors.push(`merge step right_feature_type '${step.right_feature_type}' is not in feature_types`);
+    } else if (!columnExists(step.right_feature_type, step.right_column)) {
+      errors.push(`column '${step.right_column}' does not exist on feature type '${step.right_feature_type}'`);
+    }
+  }
+  return errors;
+}
+
+/** Each selected output column must be a selected feature type's existing column. */
+function validateOutputColumnReferences(
+  config: ExportConfig,
+  columnExists: (featureType: string, column: string) => boolean
+): string[] {
+  const errors: string[] = [];
+  for (const outputColumn of config.output_columns ?? []) {
+    if (!config.feature_types.includes(outputColumn.feature_type)) {
+      errors.push(`output column feature type '${outputColumn.feature_type}' is not in feature_types`);
+    } else if (!columnExists(outputColumn.feature_type, outputColumn.column)) {
+      errors.push(`column '${outputColumn.column}' does not exist on feature type '${outputColumn.feature_type}'`);
+    }
+  }
+  return errors;
+}
+
+/** The merge graph must form a tree rooted at root_feature_type (cycle/orphan free). */
+function validateMergeOrdering(config: ExportConfig): string[] {
+  if (!config.root_feature_type) {
+    return [];
+  }
+  try {
+    orderMergeSteps(config.root_feature_type, config.merge_steps);
+    return [];
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error)];
+  }
+}
+
 /**
  * Validate an export recipe — both its mode-dependent structural rules and its
  * references against the download's materialized data (AC8) — throwing
@@ -220,63 +310,21 @@ export function orderMergeSteps(rootFeatureType: string, steps: MergeStep[]): Me
  *   references types/columns absent from the materialized data.
  */
 export function validateExportConfig(config: ExportConfig, availableColumnsByType: Map<string, Set<string>>): void {
-  const errors: string[] = [];
+  const columnExists = makeColumnExists(availableColumnsByType);
 
-  const columnExists = (featureType: string, column: string): boolean => {
-    if ((STRUCTURAL_COLUMNS as readonly string[]).includes(column)) {
-      return true;
-    }
-    return availableColumnsByType.get(featureType)?.has(column) ?? false;
-  };
-
-  // Mode-dependent structural rules (formerly the schema's superRefine).
-  if (config.mode === 'per_feature_type' && config.merge_steps.length > 0) {
-    errors.push('merge_steps are only valid in denormalized mode; per_feature_type exports one CSV per type');
-  }
-
-  if (config.mode === 'denormalized' && !config.root_feature_type) {
-    errors.push('denormalized mode requires a root_feature_type');
-  }
-
-  for (const featureType of config.feature_types) {
-    if (!availableColumnsByType.has(featureType)) {
-      errors.push(`feature type '${featureType}' is not materialized for this download`);
-    }
-  }
-
-  if (config.root_feature_type && !config.feature_types.includes(config.root_feature_type)) {
-    errors.push(`root_feature_type '${config.root_feature_type}' is not one of feature_types`);
-  }
-
-  for (const step of config.merge_steps) {
-    if (!config.feature_types.includes(step.left_feature_type)) {
-      errors.push(`merge step left_feature_type '${step.left_feature_type}' is not in feature_types`);
-    } else if (!columnExists(step.left_feature_type, step.left_column)) {
-      errors.push(`column '${step.left_column}' does not exist on feature type '${step.left_feature_type}'`);
-    }
-
-    if (!config.feature_types.includes(step.right_feature_type)) {
-      errors.push(`merge step right_feature_type '${step.right_feature_type}' is not in feature_types`);
-    } else if (!columnExists(step.right_feature_type, step.right_column)) {
-      errors.push(`column '${step.right_column}' does not exist on feature type '${step.right_feature_type}'`);
-    }
-  }
-
-  for (const outputColumn of config.output_columns ?? []) {
-    if (!config.feature_types.includes(outputColumn.feature_type)) {
-      errors.push(`output column feature type '${outputColumn.feature_type}' is not in feature_types`);
-    } else if (!columnExists(outputColumn.feature_type, outputColumn.column)) {
-      errors.push(`column '${outputColumn.column}' does not exist on feature type '${outputColumn.feature_type}'`);
-    }
-  }
-
-  if (config.root_feature_type) {
-    try {
-      orderMergeSteps(config.root_feature_type, config.merge_steps);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-  }
+  // Accumulated in the original single-pass order so the surfaced error list is
+  // unchanged: mode rules, materialized-type existence, root membership, then
+  // merge-step and output-column references, then merge ordering.
+  const errors = [
+    ...validateModeRules(config),
+    ...validateFeatureTypesMaterialized(config, availableColumnsByType),
+    ...(config.root_feature_type && !config.feature_types.includes(config.root_feature_type)
+      ? [`root_feature_type '${config.root_feature_type}' is not one of feature_types`]
+      : []),
+    ...validateMergeStepReferences(config, columnExists),
+    ...validateOutputColumnReferences(config, columnExists),
+    ...validateMergeOrdering(config)
+  ];
 
   if (errors.length > 0) {
     throw new ApiValidationError('Invalid export configuration', errors);
@@ -313,12 +361,14 @@ export function coerceJoinKey(value: unknown): string {
     return value;
   }
   if (Buffer.isBuffer(value)) {
-    return value.toString('hex');
+    return (value as Buffer).toString('hex');
   }
   if (typeof value === 'object') {
     return JSON.stringify(value);
   }
-  return String(value);
+  // Object was handled above; the only remaining runtime type is a boolean, whose
+  // own toString is well-defined (the cast keeps that explicit for the analyzer).
+  return String(value as boolean);
 }
 
 /**
@@ -393,6 +443,58 @@ export function mergePrefixed(
 }
 
 /**
+ * Advance the join frontier by one merge step: probe each frontier row's left
+ * join key against the dimension's build-side map, keeping unmatched rows (left
+ * join) and fanning matched rows out one per match. Throws once a single root
+ * row's cumulative fan-out exceeds the cap.
+ *
+ * @param frontier - The partially-joined rows produced so far.
+ * @param step - The merge step to fold in.
+ * @param rootFeatureType - The join's root type, whose columns stay unprefixed.
+ * @param dimMaps - Build-side hash maps for each dimension feature type.
+ * @returns The frontier after folding in this step.
+ * @throws If the row's cumulative fan-out exceeds `DOWNLOAD_EXPORT_FANOUT_MAX_ROWS`.
+ */
+function advanceFrontier(
+  frontier: Record<string, unknown>[],
+  step: MergeStep,
+  rootFeatureType: string,
+  dimMaps: DimensionMaps
+): Record<string, unknown>[] {
+  // Root columns stay raw; a previously-merged dimension's columns were prefixed
+  // `{feature_type}_{column}` by mergePrefixed — so the left key lives at the raw
+  // name only when the left side is the root, otherwise at the prefixed name.
+  const leftKeyColumn =
+    step.left_feature_type === rootFeatureType ? step.left_column : `${step.left_feature_type}_${step.left_column}`;
+
+  const next: Record<string, unknown>[] = [];
+
+  for (const row of frontier) {
+    const probeKey = coerceJoinKey(row[leftKeyColumn]);
+    // An empty key is unmatchable on both sides (SQL NULL ≠ NULL): coerceJoinKey
+    // collapses null/absent to '' and buildDimensionMaps never indexes '' keys,
+    // so the root row is kept (left join) rather than spuriously joined.
+    const matches = probeKey === '' ? [] : dimMaps.get(step.right_feature_type)?.get(probeKey) ?? [];
+
+    if (matches.length === 0) {
+      next.push(row); // left-join keep: unmatched left row survives with no right columns
+    } else {
+      for (const match of matches) {
+        next.push(mergePrefixed(row, match, step.right_feature_type)); // fan-out
+      }
+    }
+
+    if (next.length > DOWNLOAD_EXPORT_FANOUT_MAX_ROWS) {
+      throw new Error(
+        `denormalized join exceeded the per-root-row fan-out cap of ${DOWNLOAD_EXPORT_FANOUT_MAX_ROWS} rows`
+      );
+    }
+  }
+
+  return next;
+}
+
+/**
  * Broadcast a single root row through the ordered merge chain, yielding every
  * fully-joined output row it produces (a left join, evaluated step by step).
  *
@@ -457,37 +559,7 @@ export function* joinRowTransform(
   let frontier = [rootRow];
 
   for (const step of orderedSteps) {
-    // Root columns stay raw; a previously-merged dimension's columns were prefixed
-    // `{feature_type}_{column}` by mergePrefixed — so the left key lives at the raw
-    // name only when the left side is the root, otherwise at the prefixed name.
-    const leftKeyColumn =
-      step.left_feature_type === rootFeatureType ? step.left_column : `${step.left_feature_type}_${step.left_column}`;
-
-    const next: Record<string, unknown>[] = [];
-
-    for (const row of frontier) {
-      const probeKey = coerceJoinKey(row[leftKeyColumn]);
-      // An empty key is unmatchable on both sides (SQL NULL ≠ NULL): coerceJoinKey
-      // collapses null/absent to '' and buildDimensionMaps never indexes '' keys,
-      // so the root row is kept (left join) rather than spuriously joined.
-      const matches = probeKey === '' ? [] : dimMaps.get(step.right_feature_type)?.get(probeKey) ?? [];
-
-      if (matches.length === 0) {
-        next.push(row); // left-join keep: unmatched left row survives with no right columns
-      } else {
-        for (const match of matches) {
-          next.push(mergePrefixed(row, match, step.right_feature_type)); // fan-out
-        }
-      }
-
-      if (next.length > DOWNLOAD_EXPORT_FANOUT_MAX_ROWS) {
-        throw new Error(
-          `denormalized join exceeded the per-root-row fan-out cap of ${DOWNLOAD_EXPORT_FANOUT_MAX_ROWS} rows`
-        );
-      }
-    }
-
-    frontier = next;
+    frontier = advanceFrontier(frontier, step, rootFeatureType, dimMaps);
   }
 
   yield* frontier;

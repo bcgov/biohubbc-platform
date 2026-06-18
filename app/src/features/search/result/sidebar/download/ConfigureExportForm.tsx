@@ -35,7 +35,7 @@ export interface IExportConfigFormValues {
   /** The feature type the merge chain joins outward from (`''` until chosen). */
   root_feature_type: string;
   /** Ordered join steps building the single combined table. */
-  merge_steps: MergeStep[];
+  merge_steps: IMergeStepFormValue[];
   /** Columns to emit; empty means "all columns" for every selected feature type. */
   output_columns: OutputColumn[];
 }
@@ -63,6 +63,24 @@ const EMPTY_MERGE_STEP: MergeStep = {
   right_column: '',
   merge_type: 'left'
 };
+
+/**
+ * A merge step plus a stable UI-only `_key` so React keeps each row's identity across a
+ * mid-list removal (an array index would shift and reattach field state to the wrong row).
+ * The key never leaves the form — `buildExportConfig` strips it before the recipe is sent.
+ */
+export interface IMergeStepFormValue extends MergeStep {
+  _key: string;
+}
+
+let mergeStepKeySeq = 0;
+
+/** A new merge-step row carrying a fresh stable `_key`. */
+const newMergeStep = (overrides: Partial<MergeStep> = {}): IMergeStepFormValue => ({
+  ...EMPTY_MERGE_STEP,
+  ...overrides,
+  _key: `merge-step-${(mergeStepKeySeq += 1)}`
+});
 
 /**
  * Form body for the combined ("single flattened") CSV export. Presentational only — it reads/writes
@@ -229,7 +247,7 @@ export const ConfigureExportForm = (props: IConfigureExportFormProps) => {
 
               return (
                 <Box
-                  key={index}
+                  key={mergeStep._key}
                   data-testid={`merge-step-${index}`}
                   sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
@@ -316,21 +334,18 @@ export const ConfigureExportForm = (props: IConfigureExportFormProps) => {
                   // Default "Start with" to the most-recently-added type so deeper chains build
                   // naturally (dataset → telemetry → animal); fall back to the root for the first step.
                   const lastAddedType = values.merge_steps[values.merge_steps.length - 1]?.right_feature_type;
-                  arrayHelpers.push({
-                    ...EMPTY_MERGE_STEP,
-                    left_feature_type: lastAddedType || values.root_feature_type
-                  });
+                  arrayHelpers.push(newMergeStep({ left_feature_type: lastAddedType || values.root_feature_type }));
                 }}
                 data-testid="add-merge-step"
                 disabled={!canAddMergeStep}
                 sx={{ alignSelf: 'flex-start' }}>
                 Add another feature type
               </Button>
-              {!canAddMergeStep ? (
+              {canAddMergeStep ? null : (
                 <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                   Choose a root feature type and at least two feature types to combine them.
                 </Typography>
-              ) : null}
+              )}
             </Box>
           </Stack>
         )}

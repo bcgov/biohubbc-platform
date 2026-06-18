@@ -697,83 +697,122 @@ export class DownloadExportPipelineService extends DBService {
     outputColumns: OutputColumn[];
     schemaLookup: Map<string, CsvPropertyDefinition[]>;
   }): Promise<DimensionMaps> {
-    const { downloadId, downloadVersionId, orderedSteps, outputColumns, schemaLookup } = params;
     const dimMaps: DimensionMaps = new Map();
 
-    const dimensionFeatureTypes = new Set(orderedSteps.map((step) => step.right_feature_type));
+    const dimensionFeatureTypes = new Set(params.orderedSteps.map((step) => step.right_feature_type));
 
     for (const featureType of dimensionFeatureTypes) {
-      const properties = schemaLookup.get(featureType) ?? [];
-      // Index this dimension by the first step that joins to it (one join column
-      // per dimension), so every probe against this type uses one key.
-      const stepsForType = orderedSteps.filter((step) => step.right_feature_type === featureType);
-      const keyStep = stepsForType[0];
-
-      // Guard the single-column-index assumption: the dimension is bucketed by
-      // one `right_column`, so a second step joining the same type on a different
-      // column would probe the wrong index and silently miss. Reject it loudly.
-      const conflictingStep = stepsForType.find((step) => step.right_column !== keyStep.right_column);
-      if (conflictingStep) {
-        throw new Error(
-          `Denormalized export: dimension '${featureType}' is joined on multiple columns ('${keyStep.right_column}' and '${conflictingStep.right_column}'); a dimension may be joined on only one column.`
-        );
-      }
-
-      const reader = await this.openParquetReader(downloadId, downloadVersionId, featureType);
-      try {
-        // Footer-only preflight: reject an over-budget dimension before buffering
-        // any rows so an oversize join fails fast rather than exhausting memory.
-        const rowCount = Number(await reader.getRowCount());
-        if (rowCount > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
-          throw new Error(
-            `Denormalized export: dimension '${featureType}' has ${rowCount} rows, exceeding the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} — use the raw-Parquet download path for joins this large.`
-          );
-        }
-
-        const projection = computeDimensionProjection(featureType, orderedSteps, outputColumns);
-        const map = new Map<string, Record<string, unknown>[]>();
-
-        // FULL rows from the reader — flattening needs the raw inputs; the map is
-        // trimmed to `projection` per row instead of projecting at the reader.
-        const cursor = reader.getCursor();
-        let rowsBuffered = 0;
-        let raw = (await cursor.next()) as Record<string, unknown> | null;
-        while (raw !== null) {
-          // Runtime backstop for the footer preflight above: a corrupt or
-          // under-reporting footer could pass the row-count check yet stream more
-          // rows than the budget, OOMing the worker. Count actual rows read and
-          // abort before the in-memory map can outgrow the join budget.
-          rowsBuffered += 1;
-          if (rowsBuffered > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
-            throw new Error(
-              `Denormalized export: dimension '${featureType}' streamed past the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} rows (Parquet footer under-reported its row count) — use the raw-Parquet download path for joins this large.`
-            );
-          }
-          const materialized = this.materializeParquetRow(raw, properties);
-          const key = coerceJoinKey(materialized[keyStep.right_column]);
-          // Never index a null/empty key — SQL NULL ≠ NULL, so a null-keyed
-          // dimension row must not match a null-keyed root row.
-          if (key !== '') {
-            const projected: Record<string, unknown> = {};
-            for (const column of projection) {
-              if (column in materialized) {
-                projected[column] = materialized[column];
-              }
-            }
-            const bucket = map.get(key) ?? [];
-            bucket.push(projected);
-            map.set(key, bucket);
-          }
-          raw = (await cursor.next()) as Record<string, unknown> | null;
-        }
-
-        dimMaps.set(featureType, map);
-      } finally {
-        await reader.close().catch(() => undefined);
-      }
+      dimMaps.set(featureType, await this.buildDimensionMap(featureType, params));
     }
 
     return dimMaps;
+  }
+
+  /**
+   * Build the BUILD-side hash map for ONE dimension feature type: resolve its
+   * single join column (rejecting a config that joins the type on two different
+   * columns, which would mis-probe the one index), preflight the Parquet footer
+   * row count against the in-memory join budget, then buffer its rows.
+   */
+  private async buildDimensionMap(
+    featureType: string,
+    params: {
+      downloadId: string;
+      downloadVersionId: string;
+      orderedSteps: MergeStep[];
+      outputColumns: OutputColumn[];
+      schemaLookup: Map<string, CsvPropertyDefinition[]>;
+    }
+  ): Promise<Map<string, Record<string, unknown>[]>> {
+    const { downloadId, downloadVersionId, orderedSteps, outputColumns, schemaLookup } = params;
+
+    // Index this dimension by the first step that joins to it (one join column
+    // per dimension), so every probe against this type uses one key.
+    const stepsForType = orderedSteps.filter((step) => step.right_feature_type === featureType);
+    const keyStep = stepsForType[0];
+
+    // Guard the single-column-index assumption: the dimension is bucketed by
+    // one `right_column`, so a second step joining the same type on a different
+    // column would probe the wrong index and silently miss. Reject it loudly.
+    const conflictingStep = stepsForType.find((step) => step.right_column !== keyStep.right_column);
+    if (conflictingStep) {
+      throw new Error(
+        `Denormalized export: dimension '${featureType}' is joined on multiple columns ('${keyStep.right_column}' and '${conflictingStep.right_column}'); a dimension may be joined on only one column.`
+      );
+    }
+
+    const reader = await this.openParquetReader(downloadId, downloadVersionId, featureType);
+    try {
+      // Footer-only preflight: reject an over-budget dimension before buffering
+      // any rows so an oversize join fails fast rather than exhausting memory.
+      const rowCount = Number(await reader.getRowCount());
+      if (rowCount > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+        throw new Error(
+          `Denormalized export: dimension '${featureType}' has ${rowCount} rows, exceeding the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} — use the raw-Parquet download path for joins this large.`
+        );
+      }
+
+      const projection = computeDimensionProjection(featureType, orderedSteps, outputColumns);
+      const properties = schemaLookup.get(featureType) ?? [];
+
+      return await this.bufferDimensionRows(reader, { featureType, keyStep, projection, properties });
+    } finally {
+      await reader.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Stream a dimension's Parquet rows into its build-side hash map — keyed by the
+   * coerced join key and trimmed to the projected columns. A runtime row-count
+   * backstop aborts if a corrupt/under-reporting footer streams past the in-memory
+   * budget; null/empty keys are never indexed (SQL NULL ≠ NULL).
+   */
+  private async bufferDimensionRows(
+    reader: ParquetReader,
+    options: {
+      featureType: string;
+      keyStep: MergeStep;
+      projection: Set<string>;
+      properties: CsvPropertyDefinition[];
+    }
+  ): Promise<Map<string, Record<string, unknown>[]>> {
+    const { featureType, keyStep, projection, properties } = options;
+    const map = new Map<string, Record<string, unknown>[]>();
+
+    // FULL rows from the reader — flattening needs the raw inputs; the map is
+    // trimmed to `projection` per row instead of projecting at the reader.
+    const cursor = reader.getCursor();
+    let rowsBuffered = 0;
+    let raw = (await cursor.next()) as Record<string, unknown> | null;
+    while (raw !== null) {
+      // Runtime backstop for the footer preflight: a corrupt or under-reporting
+      // footer could pass the row-count check yet stream more rows than the
+      // budget, OOMing the worker. Abort before the map can outgrow the budget.
+      rowsBuffered += 1;
+      if (rowsBuffered > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+        throw new Error(
+          `Denormalized export: dimension '${featureType}' streamed past the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} rows (Parquet footer under-reported its row count) — use the raw-Parquet download path for joins this large.`
+        );
+      }
+      const materialized = this.materializeParquetRow(raw, properties);
+      const key = coerceJoinKey(materialized[keyStep.right_column]);
+      // Never index a null/empty key — SQL NULL ≠ NULL, so a null-keyed
+      // dimension row must not match a null-keyed root row.
+      if (key !== '') {
+        const projected: Record<string, unknown> = {};
+        for (const column of projection) {
+          if (column in materialized) {
+            projected[column] = materialized[column];
+          }
+        }
+        const bucket = map.get(key) ?? [];
+        bucket.push(projected);
+        map.set(key, bucket);
+      }
+      raw = (await cursor.next()) as Record<string, unknown> | null;
+    }
+
+    return map;
   }
 
   /**

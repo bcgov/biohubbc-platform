@@ -20,7 +20,17 @@ export const buildExportConfig = (values: IExportConfigFormValues): ExportConfig
     export_type: EXPORT_TYPE,
     mode: values.mode,
     feature_types: values.feature_types,
-    merge_steps: isDenormalized ? values.merge_steps : []
+    // Strip the UI-only `_key` (see IMergeStepFormValue) so the recipe shape — and
+    // thus its dedupe hash — matches the backend's exactly.
+    merge_steps: isDenormalized
+      ? values.merge_steps.map((step) => ({
+          left_feature_type: step.left_feature_type,
+          left_column: step.left_column,
+          right_feature_type: step.right_feature_type,
+          right_column: step.right_column,
+          merge_type: step.merge_type
+        }))
+      : []
   };
 
   if (isDenormalized && values.root_feature_type) {

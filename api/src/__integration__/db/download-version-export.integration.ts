@@ -45,6 +45,39 @@ import { BucketType, ObjectStorageService } from '../../services/object-storage/
 import { ArtifactService } from '../../services/upload/artifact-service';
 import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
 
+/**
+ * Build a minimal-but-valid `per_feature_type` export recipe over the given
+ * feature types. References only the always-present structural columns
+ * (`submission_feature_id` / `uuid` / `parent_uuid`), so the recipe passes
+ * `validateExportConfig` regardless of each type's schema — the only data-aware
+ * requirement is that the types are materialized for the download, which the
+ * seed helper guarantees.
+ */
+function validPerTypeConfig(downloadVersionId: string, featureTypes: string[]): CreateDownloadVersionExportRequest {
+  return {
+    download_version_id: downloadVersionId,
+    version: 1,
+    export_type: 'csv',
+    mode: 'per_feature_type',
+    feature_types: featureTypes,
+    merge_steps: [],
+    output_columns: featureTypes.map((feature_type) => ({ feature_type, column: 'uuid' }))
+  };
+}
+
+/**
+ * The `config_hash` the service computes for a given request body — canonicalize
+ * the recipe (stripping the packaging knob) then hash. Lets the dedupe-key
+ * assertions read the active group exactly as the resolver keys it.
+ */
+function hashForConfig(request: CreateDownloadVersionExportRequest): string {
+  // Drop the packaging knob (max_part_size_bytes) before hashing, mirroring the
+  // service's dedupe key.
+  const rawConfig = { ...request };
+  delete rawConfig.max_part_size_bytes;
+  return computeConfigHash(canonicalizeExportConfig(ExportConfig.parse(rawConfig)));
+}
+
 describe('Download version export state machine (integration)', function () {
   this.timeout(30000);
 
@@ -59,37 +92,6 @@ describe('Download version export state machine (integration)', function () {
   const FORMAT = 'csv';
   const MODE = 'per_feature_type';
   const MAX_PART = '524288000';
-
-  /**
-   * Build a minimal-but-valid `per_feature_type` export recipe over the given
-   * feature types. References only the always-present structural columns
-   * (`submission_feature_id` / `uuid` / `parent_uuid`), so the recipe passes
-   * `validateExportConfig` regardless of each type's schema — the only data-aware
-   * requirement is that the types are materialized for the download, which the
-   * seed helper guarantees.
-   */
-  function validPerTypeConfig(downloadVersionId: string, featureTypes: string[]): CreateDownloadVersionExportRequest {
-    return {
-      download_version_id: downloadVersionId,
-      version: 1,
-      export_type: 'csv',
-      mode: 'per_feature_type',
-      feature_types: featureTypes,
-      merge_steps: [],
-      output_columns: featureTypes.map((feature_type) => ({ feature_type, column: 'uuid' }))
-    };
-  }
-
-  /**
-   * The `config_hash` the service computes for a given request body — canonicalize
-   * the recipe (stripping the packaging knob) then hash. Lets the dedupe-key
-   * assertions read the active group exactly as the resolver keys it.
-   */
-  function hashForConfig(request: CreateDownloadVersionExportRequest): string {
-    const { max_part_size_bytes, ...rawConfig } = request;
-    void max_part_size_bytes;
-    return computeConfigHash(canonicalizeExportConfig(ExportConfig.parse(rawConfig)));
-  }
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -388,47 +390,47 @@ describe('Download version export state machine (integration)', function () {
 
   // ── Invalid config rejects clean (no group, no export, no job) ───────
 
+  /**
+   * Read-back probe: prove the failed request left NOTHING behind — no active
+   * group, no export row attached to this version. Run from raw SQL so it is
+   * independent of the resolver path.
+   */
+  async function assertNothingPersisted(downloadVersionId: string): Promise<void> {
+    const groups = await connection.sql(SQL`
+      SELECT download_version_export_artifact_group_id
+      FROM download_version_export_artifact_group
+      WHERE download_version_id = ${downloadVersionId};
+    `);
+    expect(groups.rowCount, 'no artifact group should be created for an invalid config').to.equal(0);
+
+    const exports = await connection.sql(SQL`
+      SELECT download_version_export_id
+      FROM download_version_export
+      WHERE download_version_id = ${downloadVersionId};
+    `);
+    expect(exports.rowCount, 'no download_version_export row should be created for an invalid config').to.equal(0);
+  }
+
+  /**
+   * Drive the create through the service and assert it rejected with
+   * `ApiValidationError` (HTTP400). Returns nothing — the caller then proves no
+   * group/export/job leaked. try/catch (not chai-as-promised, which this repo
+   * does not register) mirrors the existing `illegal transition` test's style.
+   */
+  async function expectValidationRejection(
+    downloadId: string,
+    systemUserId: number,
+    config: CreateDownloadVersionExportRequest
+  ): Promise<void> {
+    try {
+      await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
+      expect.fail('Expected ApiValidationError for an invalid export config');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+    }
+  }
+
   describe('invalid config validation (AC8)', () => {
-    /**
-     * Read-back probe: prove the failed request left NOTHING behind — no active
-     * group, no export row attached to this version. Run from raw SQL so it is
-     * independent of the resolver path.
-     */
-    async function assertNothingPersisted(downloadVersionId: string): Promise<void> {
-      const groups = await connection.sql(SQL`
-        SELECT download_version_export_artifact_group_id
-        FROM download_version_export_artifact_group
-        WHERE download_version_id = ${downloadVersionId};
-      `);
-      expect(groups.rowCount, 'no artifact group should be created for an invalid config').to.equal(0);
-
-      const exports = await connection.sql(SQL`
-        SELECT download_version_export_id
-        FROM download_version_export
-        WHERE download_version_id = ${downloadVersionId};
-      `);
-      expect(exports.rowCount, 'no download_version_export row should be created for an invalid config').to.equal(0);
-    }
-
-    /**
-     * Drive the create through the service and assert it rejected with
-     * `ApiValidationError` (HTTP400). Returns nothing — the caller then proves no
-     * group/export/job leaked. try/catch (not chai-as-promised, which this repo
-     * does not register) mirrors the existing `illegal transition` test's style.
-     */
-    async function expectValidationRejection(
-      downloadId: string,
-      systemUserId: number,
-      config: CreateDownloadVersionExportRequest
-    ): Promise<void> {
-      try {
-        await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
-        expect.fail('Expected ApiValidationError for an invalid export config');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiValidationError);
-      }
-    }
-
     it('rejects a config referencing a non-materialized feature type with ApiValidationError', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['dataset']);
       const publishStub = stubPublish();
