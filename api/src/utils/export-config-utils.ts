@@ -265,17 +265,32 @@ function validateOutputColumnReferences(
   return errors;
 }
 
-/** The merge graph must form a tree rooted at root_feature_type (cycle/orphan free). */
+/** The merge graph must form a tree rooted at root_feature_type that reaches every
+ *  selected feature type (cycle-, orphan-, and island-free). A type selected but never
+ *  joined contributes nothing to the single denormalized output, so its output columns
+ *  would come back silently empty — reject it instead. */
 function validateMergeOrdering(config: ExportConfig): string[] {
   if (!config.root_feature_type) {
     return [];
   }
+  let ordered: MergeStep[];
   try {
-    orderMergeSteps(config.root_feature_type, config.merge_steps);
-    return [];
+    ordered = orderMergeSteps(config.root_feature_type, config.merge_steps);
   } catch (error) {
+    // A cycle/orphan already describes the structural break; reachability would be noise.
     return [error instanceof Error ? error.message : String(error)];
   }
+
+  // Every left side is the root or a prior right (orderMergeSteps guarantees no orphan),
+  // so root + all right sides is the full set of types the join reaches.
+  const reachable = new Set<string>([config.root_feature_type, ...ordered.map((step) => step.right_feature_type)]);
+  return config.feature_types
+    .filter((featureType) => !reachable.has(featureType))
+    .map(
+      (featureType) =>
+        `feature type '${featureType}' is not reachable from root_feature_type ` +
+        `'${config.root_feature_type}' through merge_steps`
+    );
 }
 
 /**

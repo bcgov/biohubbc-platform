@@ -552,6 +552,136 @@ describe('export-config-utils', () => {
 
       expect(errors.some((error) => typeof error === 'string' && /cycle/.test(error))).to.be.true;
     });
+
+    it('throws for a selected feature type the merge graph never reaches (island)', () => {
+      // 'deployment' is materialized and selected but no merge step joins it, so it
+      // never enters the single denormalized output — an island, not an orphan step.
+      const errors = invalidErrors({
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'deployment']
+      });
+
+      expect(errors).to.have.lengthOf(1);
+      expect(String(errors[0])).to.contain('deployment');
+      expect(String(errors[0])).to.contain('not reachable');
+    });
+
+    it('does not add a reachability error when ordering already failed (cycle/orphan wins)', () => {
+      // deployment -> animal leaves deployment an unreachable left side, so orderMergeSteps
+      // throws and reachability is never evaluated — the orphan message must stand alone,
+      // not be doubled up with an island error for the same type.
+      const errors = invalidErrors({
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'deployment'],
+        merge_steps: [
+          {
+            left_feature_type: 'deployment',
+            left_column: 'uuid',
+            right_feature_type: 'animal',
+            right_column: 'parent_uuid'
+          }
+        ]
+      });
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors.some((error) => String(error).includes('not reachable'))).to.be.false;
+    });
+  });
+
+  describe('validateExportConfig — multi-type merge reachability', () => {
+    // A three-type materialized fixture so chains and multiple islands can be exercised
+    // without tripping the separate "not materialized" check.
+    const columns = new Map<string, Set<string>>([
+      ['animal', new Set(['submission_feature_id', 'uuid', 'parent_uuid', 'name'])],
+      ['deployment', new Set(['submission_feature_id', 'uuid', 'parent_uuid', 'device_id'])],
+      ['observation', new Set(['submission_feature_id', 'uuid', 'parent_uuid', 'count'])]
+    ]);
+
+    const invalidErrors = (raw: unknown): (string | object)[] => {
+      let thrown: unknown;
+      try {
+        validateExportConfig(parse(raw), columns);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown, 'expected validateExportConfig to throw').to.be.instanceOf(ApiValidationError);
+      return (thrown as ApiValidationError).errors;
+    };
+
+    it('does not flag a type reached transitively through a non-root left side', () => {
+      // observation joins off deployment, not the root, yet is still reachable — the
+      // reachable set must accumulate every step's right side, not just the root's.
+      expect(() =>
+        validateExportConfig(
+          parse({
+            version: 1,
+            export_type: 'csv',
+            mode: 'denormalized',
+            root_feature_type: 'animal',
+            feature_types: ['animal', 'deployment', 'observation'],
+            merge_steps: [
+              {
+                left_feature_type: 'animal',
+                left_column: 'uuid',
+                right_feature_type: 'deployment',
+                right_column: 'parent_uuid'
+              },
+              {
+                left_feature_type: 'deployment',
+                left_column: 'uuid',
+                right_feature_type: 'observation',
+                right_column: 'parent_uuid'
+              }
+            ]
+          }),
+          columns
+        )
+      ).to.not.throw();
+    });
+
+    it('flags only the island when a valid chain leaves one type unjoined', () => {
+      const errors = invalidErrors({
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'deployment', 'observation'],
+        merge_steps: [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'deployment',
+            right_column: 'parent_uuid'
+          }
+        ]
+      });
+
+      expect(errors).to.have.lengthOf(1);
+      expect(String(errors[0])).to.contain('observation');
+      expect(String(errors[0])).to.contain('not reachable');
+    });
+
+    it('accumulates a reachability error for every unjoined type', () => {
+      const errors = invalidErrors({
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'deployment', 'observation'],
+        merge_steps: []
+      });
+
+      expect(errors).to.have.lengthOf(2);
+      expect(errors.every((error) => String(error).includes('not reachable'))).to.be.true;
+      expect(errors.map(String).join(' ')).to.contain('deployment');
+      expect(errors.map(String).join(' ')).to.contain('observation');
+    });
   });
 
   describe('coerceJoinKey', () => {
