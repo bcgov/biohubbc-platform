@@ -76,7 +76,7 @@ export function searchFeatures(): RequestHandler {
 
       const expressionTree = expressionTreeParseResult?.data;
 
-      const { features, count } = await service.searchFeaturesByExpressionTreeWithCount(
+      const { features, properties, count } = await service.searchFeaturesByExpressionTreeWithCount(
         featureType,
         expressionTree,
         pagination,
@@ -87,7 +87,11 @@ export function searchFeatures(): RequestHandler {
 
       res.setHeader('Cache-Control', 'public, max-age=90');
 
-      return res.status(200).json({ features: features, pagination: makePaginationResponse(count, pagination) });
+      return res.status(200).json({
+        features,
+        properties,
+        pagination: makePaginationResponse(count, pagination)
+      });
     } catch (error) {
       defaultLog.error({ label: 'searchFeatures', message: 'error', error });
       await connection.rollback();

@@ -5,6 +5,7 @@ import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { APIError } from 'hooks/api/useAxios';
 import { useCartContext, useDialogContext } from 'hooks/useContext';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useCallback, useMemo } from 'react';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
@@ -13,6 +14,8 @@ import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLay
 interface SearchResultOptionsProps {
   /** Search result rows rendered by the active table or list layout. */
   rows: SearchFeatureResultWithRelevancy[];
+  /** Feature type property metadata used by the table layout. */
+  featureTypeProperties: FeatureTypeProperty[];
   /** Whether the result request is currently loading. */
   isLoading: boolean;
   /** Active result layout selected in the toolbar. */
@@ -30,7 +33,13 @@ interface SearchResultOptionsProps {
  * @param {SearchResultOptionsProps} props - Rows, loading state, selected view, and result-click callback.
  * @returns {JSX.Element} Loading, empty, table, or card result content.
  */
-export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchResultOptionsProps) => {
+export const SearchResultOptions = ({
+  rows,
+  featureTypeProperties,
+  isLoading,
+  view,
+  onClick
+}: SearchResultOptionsProps) => {
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
 
@@ -90,13 +99,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onClick }: SearchRe
         switch={view}
         components={{
           [SEARCH_RESULT_VIEW.TABLE]: (
-            <SearchResultTableLayout
-              results={rows}
-              cartFeatureIds={cartFeatureIds}
-              onClick={onClick}
-              onAddToCart={handleAddToCart}
-              onRemoveFromCart={handleRemoveFromCart}
-            />
+            <SearchResultTableLayout results={rows} featureTypeProperties={featureTypeProperties} onClick={onClick} />
           ),
           [SEARCH_RESULT_VIEW.LIST]: (
             <SearchResultCardLayout
