@@ -1,9 +1,16 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { featureSearchRequestBodySchema, featureSearchResultSchema } from './search-feature';
+import { OpenAPIV3 } from 'openapi-types';
+import {
+  featureSearchPropertySchema,
+  featureSearchRequestBodySchema,
+  featureSearchResponseSchema,
+  featureSearchResultSchema
+} from './search-feature';
 
 describe('featureSearchRequestBodySchema', () => {
-  const schema = featureSearchRequestBodySchema.content['application/json'].schema;
+  const schema = featureSearchRequestBodySchema.content['application/json'].schema as OpenAPIV3.SchemaObject;
+  const schemaProperties = schema.properties as Record<string, OpenAPIV3.SchemaObject>;
 
   it('accepts a pagination-only feature search body', () => {
     expect(schema).to.include({
@@ -11,25 +18,52 @@ describe('featureSearchRequestBodySchema', () => {
       additionalProperties: false
     });
     expect(schema).to.not.have.property('required');
-    expect(schema.properties).to.have.property('pagination');
+    expect(schemaProperties).to.have.property('pagination');
   });
 
   it('accepts an expression tree feature search body', () => {
-    expect(schema.properties).to.have.property('expression');
-    expect(schema.properties.expression.properties).to.include.keys(['type', 'operator', 'clauses']);
-    expect(schema.properties).to.not.include.keys(['type', 'operator', 'clauses']);
-    const predicateSchema = schema.properties.expression.properties.clauses.items.oneOf[0];
+    const expressionSchema = schemaProperties.expression;
+    const expressionProperties = expressionSchema.properties as Record<string, OpenAPIV3.SchemaObject>;
+    const clausesSchema = expressionProperties.clauses as OpenAPIV3.ArraySchemaObject;
+    const predicateSchema = (clausesSchema.items as OpenAPIV3.SchemaObject).oneOf?.[0] as OpenAPIV3.SchemaObject;
+    const predicateProperties = predicateSchema.properties as Record<string, OpenAPIV3.SchemaObject>;
+
+    expect(schemaProperties).to.have.property('expression');
+    expect(expressionProperties).to.include.keys(['type', 'operator', 'clauses']);
+    expect(schemaProperties).to.not.include.keys(['type', 'operator', 'clauses']);
     expect(predicateSchema.required).to.include.members(['feature_property_id', 'feature_type_property_id']);
-    expect(predicateSchema.properties.feature_type_property_id).to.include({ nullable: true });
+    expect(predicateProperties.feature_type_property_id).to.include({ nullable: true });
   });
 
   it('rejects the old filters wrapper body', () => {
     expect(schema).to.have.property('additionalProperties', false);
-    expect(schema.properties).to.not.have.property('filters');
+    expect(schemaProperties).to.not.have.property('filters');
   });
 
   it('documents every returned feature result field', () => {
-    expect(featureSearchResultSchema.required).to.include('create_date');
+    expect(featureSearchResultSchema.required).to.include.members(['create_date', 'properties']);
     expect(featureSearchResultSchema.properties).to.have.property('create_date');
+    expect(featureSearchResultSchema.properties).to.have.property('properties');
+  });
+
+  it('documents response-level property metadata used for table columns', () => {
+    const responseProperties = featureSearchResponseSchema.properties as Record<string, OpenAPIV3.SchemaObject>;
+
+    expect(featureSearchResponseSchema.required).to.include.members(['features', 'properties', 'pagination']);
+    expect(responseProperties.properties).to.deep.include({
+      type: 'array',
+      items: featureSearchPropertySchema
+    });
+    expect(featureSearchPropertySchema.required).to.include.members([
+      'feature_type_property_id',
+      'name',
+      'display_name',
+      'type_name',
+      'allow_multiple'
+    ]);
+    expect(featureSearchPropertySchema.properties?.allow_multiple).to.deep.include({
+      type: 'boolean',
+      description: 'Whether this property can be returned as an array of values.'
+    });
   });
 });

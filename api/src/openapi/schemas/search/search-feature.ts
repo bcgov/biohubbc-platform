@@ -60,6 +60,7 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     'uuid',
     'feature_type_id',
     'feature_type_name',
+    'properties',
     'submission_name',
     'is_secured',
     'relevancy_score',
@@ -71,12 +72,41 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
     uuid: { type: 'string', format: 'uuid' },
     feature_type_id: { type: 'integer' },
     feature_type_name: { type: 'string' },
-    feature_name: { type: 'string', nullable: true },
-    feature_description: { type: 'string', nullable: true },
+    properties: { type: 'object', additionalProperties: true },
     submission_name: { type: 'string' },
     is_secured: { type: 'boolean' },
     relevancy_score: { type: 'number' },
     create_date: { type: 'string', format: 'date-time' }
+  }
+};
+
+export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
+  title: 'featureSearchProperty',
+  type: 'object',
+  required: [
+    'feature_type_property_id',
+    'name',
+    'display_name',
+    'description',
+    'type_name',
+    'required_value',
+    'calculated_value',
+    'allow_multiple'
+  ],
+  properties: {
+    feature_type_property_id: { type: 'integer' },
+    feature_property_id: { type: 'integer' },
+    feature_property_type_id: { type: 'integer' },
+    name: { type: 'string' },
+    display_name: { type: 'string' },
+    description: { type: 'string', nullable: true },
+    type_name: { type: 'string' },
+    required_value: { type: 'boolean' },
+    calculated_value: { type: 'boolean' },
+    allow_multiple: {
+      type: 'boolean',
+      description: 'Whether this property can be returned as an array of values.'
+    }
   }
 };
 
@@ -105,11 +135,15 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
  */
 export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['features', 'pagination'],
+  required: ['features', 'properties', 'pagination'],
   properties: {
     features: {
       type: 'array',
       items: featureSearchResultSchema
+    },
+    properties: {
+      type: 'array',
+      items: featureSearchPropertySchema
     },
     pagination: paginationResponseSchema
   }
