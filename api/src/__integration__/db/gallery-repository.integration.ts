@@ -115,7 +115,8 @@ describe('GalleryRepository (integration)', function () {
         await repo.createGallery({ name, description: null });
         expect.fail('Expected duplicate-name insert to throw');
       } catch (error) {
-        // Partial unique index violation surfaces as a SQL error.
+        // Partial unique index violation surfaces as a SQL error. The clean 409 is
+        // applied above this layer by the service pre-check (see gallery-service).
         expect(error).to.be.an('error');
       }
     });
@@ -274,6 +275,16 @@ describe('GalleryRepository (integration)', function () {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
+    });
+
+    it('allows a no-op rename to the gallery’s own current name', async () => {
+      // A self-rename must not trip the unique index against the row's own value.
+      const created = await repo.createGallery({ name: uniqueName('Self'), description: 'before' });
+
+      const updated = await repo.updateGallery(created.gallery_id, { name: created.name, description: 'after' });
+      expect(updated.gallery_id).to.equal(created.gallery_id);
+      expect(updated.name).to.equal(created.name);
+      expect(updated.description).to.equal('after');
     });
   });
 
