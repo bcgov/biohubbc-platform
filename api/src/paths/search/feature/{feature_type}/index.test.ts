@@ -49,8 +49,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440001',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Moose Study 2024',
-        feature_description: 'A study of moose habitat in Northern BC',
+        properties: {},
         submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
         relevancy_score: 0.75,
@@ -68,7 +67,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -78,6 +77,7 @@ describe('searchFeatures', () => {
     expect(searchStub.firstCall.args[1]).to.eql(expressionTree);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 10,
@@ -110,7 +110,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -138,8 +138,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440002',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Moose Population Survey',
-        feature_description: 'Population survey data for moose',
+        properties: {},
         submission_name: 'Species Census 2024',
         is_secured: true,
         relevancy_score: 0.6,
@@ -157,7 +156,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -165,6 +164,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 10,
@@ -195,8 +195,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440003',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Dataset 1',
-        feature_description: 'Description 1',
+        properties: {},
         submission_name: 'Submission 1',
         is_secured: false,
         relevancy_score: 0.8,
@@ -209,14 +208,14 @@ describe('searchFeatures', () => {
       pagination: {
         page: '2',
         limit: '5',
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
       }
     };
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: 25 });
+      .resolves({ features: mockResults, properties: [], count: 25 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -224,12 +223,13 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 25,
         per_page: 5,
         current_page: 2,
         last_page: 5,
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
       }
     });
@@ -257,7 +257,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -265,6 +265,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: [],
+      properties: [],
       pagination: {
         total: 0,
         per_page: 10,
@@ -362,8 +363,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440005',
         feature_type_id: 3,
         feature_type_name: 'telemetry',
-        feature_name: 'Telemetry 1',
-        feature_description: null,
+        properties: {},
         submission_name: 'Telemetry Submission',
         is_secured: false,
         relevancy_score: 1,
@@ -373,7 +373,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: 37 });
+      .resolves({ features: mockResults, properties: [], count: 37 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -410,8 +410,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440004',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Dataset Without Pagination',
-        feature_description: 'Description',
+        properties: {},
         submission_name: 'Submission',
         is_secured: false,
         relevancy_score: 0.9,
@@ -425,7 +424,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -433,6 +432,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 25,
@@ -463,7 +463,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -493,7 +493,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0 });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);

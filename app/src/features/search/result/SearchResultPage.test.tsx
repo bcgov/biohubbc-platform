@@ -130,6 +130,7 @@ describe('SearchResultPage', () => {
     mockUseParams.mockReturnValue({ featureType: 'dataset' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -147,6 +148,7 @@ describe('SearchResultPage', () => {
   it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -240,6 +242,7 @@ describe('SearchResultPage', () => {
   it('disables Create Download while pagination is still loading (undefined → not zero)', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
+      properties: [],
       isLoading: true,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -338,6 +341,7 @@ describe('SearchResultPage', () => {
   it('P1: hides the secured-results banner when no rows are secured', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -355,6 +359,7 @@ describe('SearchResultPage', () => {
         { uuid: 'result-1', submission_feature_id: 1, is_secured: false },
         { uuid: 'result-2', submission_feature_id: 2, is_secured: true }
       ],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -375,6 +380,7 @@ describe('SearchResultPage', () => {
     mockUseParams.mockReturnValue({ featureType: 'DATASET' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -401,6 +407,7 @@ describe('SearchResultPage', () => {
     mockCreateDataRequest.mockRejectedValue({ message: 'Server exploded' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
