@@ -49,7 +49,6 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440001',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Moose Study 2024',
         properties: {},
         submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
@@ -139,7 +138,6 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440002',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Moose Population Survey',
         properties: {},
         submission_name: 'Species Census 2024',
         is_secured: true,
@@ -197,7 +195,6 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440003',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Dataset 1',
         properties: {},
         submission_name: 'Submission 1',
         is_secured: false,
@@ -211,7 +208,7 @@ describe('searchFeatures', () => {
       pagination: {
         page: '2',
         limit: '5',
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
       }
     };
@@ -232,7 +229,7 @@ describe('searchFeatures', () => {
         per_page: 5,
         current_page: 2,
         last_page: 5,
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
       }
     });
@@ -366,7 +363,6 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440005',
         feature_type_id: 3,
         feature_type_name: 'telemetry',
-        feature_name: 'Telemetry 1',
         properties: {},
         submission_name: 'Telemetry Submission',
         is_secured: false,
@@ -414,7 +410,6 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440004',
         feature_type_id: 1,
         feature_type_name: 'dataset',
-        feature_name: 'Dataset Without Pagination',
         properties: {},
         submission_name: 'Submission',
         is_secured: false,

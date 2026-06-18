@@ -4,15 +4,15 @@ import { safeJSONStringify } from './Utils';
 /**
  * Formats a submission feature property value for compact table display.
  *
- * Falsy values are displayed as an empty string, arrays are flattened into a comma-separated list, and object values
+ * Absent values are displayed as an empty string, arrays are flattened into a comma-separated list, and object values
  * use the shared safe JSON stringifier so structured values remain inspectable in grid cells.
  *
  * @param {JsonValue | undefined} value - Raw submission feature property value from the search result row.
  * @returns {string} Display-ready property value.
  */
 export const formatSubmissionPropertyValue = (value: JsonValue | undefined): string => {
-  // Treat absent, empty, and falsey property values as no display value in the compact grid.
-  if (!value) {
+  // Treat only absent property values as no display value in the compact grid.
+  if (value === null || value === undefined) {
     return '';
   }
 
@@ -34,4 +34,6 @@ export const formatSubmissionPropertyValue = (value: JsonValue | undefined): str
       return typeof jsonValue === 'string' ? jsonValue : '';
     }
   }
+
+  return '';
 };

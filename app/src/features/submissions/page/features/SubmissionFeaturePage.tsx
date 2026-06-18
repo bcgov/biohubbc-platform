@@ -75,7 +75,6 @@ export const SubmissionFeaturePage = () => {
           uuid: feature.uuid,
           feature_type_id: feature.feature_type_id,
           feature_type_name: feature.feature_type_name,
-          feature_name: null,
           properties: {},
           submission_name: feature.submission_name,
           is_secured: feature.secured,

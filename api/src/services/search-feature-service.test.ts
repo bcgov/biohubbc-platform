@@ -23,7 +23,6 @@ describe('SearchFeatureService', () => {
       uuid: '11111111-1111-1111-1111-111111111111',
       feature_type_id: 1,
       feature_type_name: 'dataset',
-      feature_name: 'Moose Habitat',
       properties: {},
       submission_name: 'Submission A',
       is_secured: false,

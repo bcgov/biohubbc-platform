@@ -41,7 +41,7 @@ describe('featureSearchRequestBodySchema', () => {
   });
 
   it('documents every returned feature result field', () => {
-    expect(featureSearchResultSchema.required).to.include.members(['create_date', 'feature_name', 'properties']);
+    expect(featureSearchResultSchema.required).to.include.members(['create_date', 'properties']);
     expect(featureSearchResultSchema.properties).to.have.property('create_date');
     expect(featureSearchResultSchema.properties).to.have.property('properties');
   });

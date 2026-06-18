@@ -75,7 +75,12 @@ export class SearchFeatureRepository extends BaseRepository {
         )
       : null;
 
-    const query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
+    const query = this.buildExpressionTreeMatchingFeaturesQuery(
+      knex,
+      anchorFeatureType,
+      expressionFeatureIds,
+      systemUserId
+    );
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
@@ -102,7 +107,7 @@ export class SearchFeatureRepository extends BaseRepository {
           systemUserId ?? null
         )
       : null;
-    const matchingFeaturesQuery = this.buildExpressionTreeSearchQuery(
+    const matchingFeaturesQuery = this.buildExpressionTreeMatchingFeaturesQuery(
       knex,
       anchorFeatureType,
       expressionFeatureIds,
@@ -160,10 +165,52 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
+   * Builds the filtered set of matching submission_feature ids without result hydration.
+   *
+   * Used by count and property-metadata queries so they do not pay the cost of building
+   * row-level properties JSON that they never read.
+   *
+   * @param {Knex} knex - Knex instance
+   * @param {string} anchorFeatureType - Route anchor/result feature type
+   * @param {Knex.QueryBuilder | null} expressionFeatureIds - Optional expression-tree matches
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Knex.QueryBuilder} Query returning submission_feature_id rows
+   */
+  private buildExpressionTreeMatchingFeaturesQuery(
+    knex: Knex,
+    anchorFeatureType: string,
+    expressionFeatureIds: Knex.QueryBuilder | null,
+    systemUserId?: number | null
+  ): Knex.QueryBuilder {
+    const query = knex('submission_feature as sf')
+      .select('sf.submission_feature_id')
+      .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('ft.name', anchorFeatureType)
+      .whereNull('sf.record_end_date')
+      .whereNull('ft.record_end_date');
+
+    if (expressionFeatureIds) {
+      query.whereIn('sf.submission_feature_id', expressionFeatureIds);
+    }
+
+    if (systemUserId !== undefined) {
+      const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
+
+      if (securityFilter) {
+        query.whereRaw(securityFilter);
+      }
+    }
+
+    return query;
+  }
+
+  /**
    * Builds the hydrated expression-tree search projection.
    *
    * Hydrates anchor-type feature rows scoped (when provided) by a precomputed expression-tree
    * subquery from `expression-evaluation.buildExpressionTreeFeatureIdsSubquery`.
+   * Feature properties are hydrated from typed property tables rather than
+   * `submission_feature.data`, which remains ingestion source JSON only.
    * Adds the `is_secured` projection and applies the security WHERE filter.
    *
    * Pagination is applied separately by `applyExpressionSearchPagination` so the count wrapper
@@ -183,21 +230,20 @@ export class SearchFeatureRepository extends BaseRepository {
     systemUserId?: number | null
   ): Knex.QueryBuilder {
     const expressionResults = knex('submission_feature as sf')
-      .distinct()
       .select(
         'sf.submission_feature_id',
         'sf.submission_id',
         knex.raw('sf.uuid::text as uuid'),
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`sf.data->>'name' as feature_name`),
-        knex.raw(`COALESCE(sf.data->'properties', '{}'::jsonb) as properties`),
+        knex.raw(`COALESCE(typed_properties.properties, '{}'::jsonb) as properties`),
         's.name as submission_name',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .joinRaw(this.buildTypedPropertiesLateralJoinSql())
       .where('ft.name', anchorFeatureType)
       .whereNull('sf.record_end_date')
       .whereNull('ft.record_end_date');
@@ -214,7 +260,6 @@ export class SearchFeatureRepository extends BaseRepository {
         'uuid',
         'feature_type_id',
         'feature_type_name',
-        'feature_name',
         'properties',
         'submission_name',
         knex.raw(`${isEffectivelySecured('expression_results.submission_feature_id')} AS is_secured`),
@@ -231,6 +276,190 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     return finalQuery;
+  }
+
+  /**
+   * Builds a lateral join that hydrates the public `properties` JSON object from canonical
+   * typed property tables. Multiple rows for the same property, or properties configured
+   * as allow_multiple, are surfaced as JSON arrays.
+   *
+   * @return {string} LEFT JOIN LATERAL SQL fragment
+   */
+  private buildTypedPropertiesLateralJoinSql(): string {
+    return `
+      LEFT JOIN LATERAL (
+        SELECT jsonb_object_agg(grouped_properties.name, grouped_properties.value ORDER BY grouped_properties.sort, grouped_properties.name) AS properties
+        FROM (
+          SELECT
+            property_values.name,
+            MIN(property_values.sort) AS sort,
+            CASE
+              WHEN BOOL_OR(property_values.allow_multiple) OR COUNT(*) > 1
+                THEN jsonb_agg(property_values.value ORDER BY property_values.ordinal)
+              ELSE (array_agg(property_values.value ORDER BY property_values.ordinal))[1]
+            END AS value
+          FROM (
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_string_id AS ordinal,
+              to_jsonb(p.value) AS value
+            FROM submission_feature_property_string p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_number_id AS ordinal,
+              to_jsonb(p.value) AS value
+            FROM submission_feature_property_number p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_boolean_id AS ordinal,
+              to_jsonb(p.value) AS value
+            FROM submission_feature_property_boolean p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_timestamp_id AS ordinal,
+              to_jsonb(
+                CASE
+                  WHEN p.date_value IS NOT NULL AND p.time_value IS NOT NULL
+                    THEN to_char(p.date_value, 'YYYY-MM-DD') || 'T' || to_char(p.time_value, 'HH24:MI:SS')
+                  WHEN p.date_value IS NOT NULL
+                    THEN to_char(p.date_value, 'YYYY-MM-DD')
+                  ELSE to_char(p.time_value, 'HH24:MI:SS')
+                END
+              ) AS value
+            FROM submission_feature_property_timestamp p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_code_id AS ordinal,
+              to_jsonb(ccc.label) AS value
+            FROM submission_feature_property_code p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            JOIN contributor_codeset_code ccc
+              ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_taxon_id AS ordinal,
+              to_jsonb(t.itis_scientific_name) AS value
+            FROM submission_feature_property_taxon p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            JOIN taxon t
+              ON t.taxon_id = p.taxon_id
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_geometry_id AS ordinal,
+              public.ST_AsGeoJSON(p.value)::jsonb AS value
+            FROM submission_feature_property_geometry p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              ftp.sort,
+              ftp.allow_multiple,
+              p.submission_feature_property_feature_id AS ordinal,
+              to_jsonb(referenced_sf.urn) AS value
+            FROM submission_feature_property_feature p
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
+            JOIN submission_feature referenced_sf
+              ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
+             AND referenced_sf.record_end_date IS NULL
+            WHERE p.submission_feature_id = sf.submission_feature_id
+          ) AS property_values
+          GROUP BY property_values.name
+        ) AS grouped_properties
+      ) AS typed_properties ON true
+    `;
   }
 
   /**

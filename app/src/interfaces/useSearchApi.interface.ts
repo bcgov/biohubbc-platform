@@ -37,7 +37,6 @@ export interface SearchFeatureResultWithRelevancy {
   uuid: string;
   feature_type_id: number;
   feature_type_name: string;
-  feature_name: string | null;
   properties: Record<string, JsonValue>;
   submission_name: string;
   is_secured: boolean;

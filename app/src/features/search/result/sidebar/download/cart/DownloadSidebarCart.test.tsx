@@ -58,7 +58,6 @@ describe('DownloadSidebarCart', () => {
         uuid: 'uuid-1',
         feature_type_id: 1,
         feature_type_name: 'Observation',
-        feature_name: 'Test',
         properties: {},
         submission_name: 'Submission',
         is_secured: true,
