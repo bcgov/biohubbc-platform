@@ -12,24 +12,104 @@ const MIN_PART_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_PART_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 
 /**
- * Body schema for `POST /api/download/:downloadId/export`.
+ * Body schema for `POST /api/download/:downloadId/export` — the full export recipe plus the
+ * optional `max_part_size_bytes` packaging knob.
  *
- * `download_version_id` is required and names the materialized download version
- * to export — it must be a ready version belonging to this download.
+ * This schema enforces only the COARSE request shape (types present, fields well-formed, literals
+ * pinned). The authoritative SEMANTIC validation — that the named feature types and columns
+ * actually exist in the download's materialized version, that merge-step references resolve, and the
+ * mode-structural rules (`per_feature_type` carries no `merge_steps`; `denormalized` requires a
+ * `root_feature_type` drawn from `feature_types`) — lives in `validateExportConfig` in the service,
+ * which throws a single error type. The recipe properties mirror `ExportConfig` (and its nested
+ * `MergeStep` / `OutputColumn`) with snake_case wire names.
  *
- * `max_part_size_bytes` is optional. When provided, the route layer enforces
- * the 5 MiB–5 GiB bounds via the integer min/max (out-of-range → 400). When
- * omitted, the service applies the 500 MB default.
+ * `download_version_id` is required and names the materialized download version to export — it must
+ * be a ready version belonging to this download.
+ *
+ * `max_part_size_bytes` is optional. When provided, the route layer enforces the 5 MiB–5 GiB bounds
+ * via the integer min/max (out-of-range → 400). When omitted, the service applies the 500 MB
+ * default.
  */
 export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['download_version_id'],
+  required: ['download_version_id', 'version', 'export_type', 'mode', 'feature_types'],
   properties: {
     download_version_id: {
       type: 'string',
       format: 'uuid',
       description: 'The materialized download version to export. Must be a ready version belonging to this download.'
+    },
+    version: {
+      type: 'integer',
+      enum: [1],
+      description: 'Recipe schema version. Pinned to 1 — the only version this release accepts.'
+    },
+    export_type: {
+      type: 'string',
+      enum: ['csv'],
+      description: "Output format of the export. Always 'csv' in this release."
+    },
+    mode: {
+      type: 'string',
+      enum: ['per_feature_type', 'denormalized'],
+      description:
+        "Export shape. 'per_feature_type' writes one CSV per feature type; 'denormalized' joins feature types into a single CSV via merge_steps."
+    },
+    root_feature_type: {
+      type: 'string',
+      description:
+        'Root feature type the denormalized merge chain starts from. Denormalized mode only; must be one of feature_types.'
+    },
+    feature_types: {
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 1,
+      description: 'The feature types in scope for this export. Order carries no meaning — sorted at canonicalization.'
+    },
+    merge_steps: {
+      type: 'array',
+      default: [],
+      description:
+        'Ordered join steps for denormalized mode. Each step joins rows accumulated for left_feature_type to right_feature_type on left_column = right_column. Empty for per_feature_type mode.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['left_feature_type', 'left_column', 'right_feature_type', 'right_column'],
+        properties: {
+          left_feature_type: {
+            type: 'string',
+            description: 'Feature type whose accumulated rows are the left side of the join.'
+          },
+          left_column: { type: 'string', description: 'Column on the left feature type to join on.' },
+          right_feature_type: { type: 'string', description: 'Feature type joined in on the right side.' },
+          right_column: { type: 'string', description: 'Column on the right feature type to join on.' },
+          merge_type: {
+            type: 'string',
+            enum: ['left'],
+            description:
+              "Join strategy. Defaults to 'left' (keeps every left row even with no right match); the only strategy this release."
+          }
+        }
+      }
+    },
+    output_columns: {
+      type: 'array',
+      description:
+        'Ordered columns for the denormalized CSV, each drawn from any feature type in scope. The array order is the CSV column order. Omit to let the service select all columns.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['feature_type', 'column'],
+        properties: {
+          feature_type: { type: 'string', description: 'Feature type the column is drawn from.' },
+          column: { type: 'string', description: 'Column name on that feature type to include.' },
+          output_column: {
+            type: 'string',
+            description: 'Header name for this column in the CSV. Defaults to {feature_type}_{column} when omitted.'
+          }
+        }
+      }
     },
     max_part_size_bytes: {
       type: 'integer',
@@ -65,12 +145,13 @@ export const DownloadVersionExportResponseSchema: OpenAPIV3.SchemaObject = {
     format: { type: 'string', description: "Requested export format. Always 'csv' in this release." },
     status: {
       type: 'string',
-      enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+      enum: ['pending', 'processing', 'ready', 'failed']
     },
     mode: {
       type: 'string',
       enum: ['per_feature_type', 'denormalized'],
-      description: "Export shape. Always 'per_feature_type' in this release."
+      description:
+        "Export shape: 'per_feature_type' (one CSV per feature type) or 'denormalized' (a single joined CSV)."
     },
     max_part_size_bytes: { type: 'string', format: 'int64' },
     started_at: { type: 'string', nullable: true },
@@ -123,6 +204,32 @@ export const DownloadVersionExportDetailResponseSchema: OpenAPIV3.SchemaObject =
             description: 'Signed S3 URL for the part-zip. Regenerated per request — do not cache.'
           }
         }
+      }
+    }
+  }
+};
+
+/**
+ * Response schema for `GET /api/download/:downloadId/feature-types`.
+ *
+ * Mirrors `DownloadExportFeatureType` (the model) and backs the export-recipe picker: each item is a
+ * feature type the download's current materialized version can export, paired with the exact column
+ * set the per-type CSV writer emits — the structural columns followed by the schema-derived headers.
+ * Offering anything beyond this set would let a recipe reference a column the CSV never carries.
+ */
+export const DownloadFeatureTypesResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['feature_type', 'columns'],
+    properties: {
+      feature_type: { type: 'string', description: 'A feature type the current materialized version can export.' },
+      columns: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'The exact columns the CSV pipeline emits for this feature type — structural columns plus schema-derived headers.'
       }
     }
   }

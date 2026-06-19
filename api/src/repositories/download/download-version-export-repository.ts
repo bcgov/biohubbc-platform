@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import {
   CreateDownloadVersionExportPayload,
@@ -14,13 +15,17 @@ import { BaseRepository } from '../base-repository';
 /**
  * Service-layer payload for materializing (or finding) the active artifact group.
  *
- * The five fields are the active-group dedupe key — exactly one active group
- * exists per (version, format, mode, max_part_size_bytes, exporter_version).
+ * The dedupe key is (version, config_hash, max_part_size_bytes, exporter_version) —
+ * exactly one active group exists per shape, and `configHash` stands in for the full
+ * recipe. `config` is persisted alongside the hash so the job can re-read the recipe;
+ * `format`/`mode` are denormalized from the config for cheap admin/diagnostic filters.
  * `status` is deliberately absent: the DB DEFAULT ('pending') owns the initial
  * lifecycle state.
  */
 export interface CreateExportArtifactGroupPayload {
   downloadVersionId: string;
+  config: ExportConfig;
+  configHash: string;
   format: string;
   mode: string;
   maxPartSizeBytes: string;
@@ -44,17 +49,17 @@ export class DownloadVersionExportRepository extends BaseRepository {
   /**
    * Probe for the active artifact group matching an export shape.
    *
-   * Single-row read on the partial-unique key (version, format, mode,
-   * max_part_size_bytes, exporter_version). Returns null when no active group
-   * exists yet — the caller then materializes one.
+   * Single-row read on the partial-unique key (version, config_hash,
+   * max_part_size_bytes, exporter_version). `config_hash` stands in for the full
+   * recipe — identical recipes hash equal and dedupe onto the same group. Returns
+   * null when no active group exists yet — the caller then materializes one.
    *
    * @return {Promise<DownloadVersionExportArtifactGroupRecord | null>}
    * @memberof DownloadVersionExportRepository
    */
   async findActiveExportArtifactGroup(
     downloadVersionId: string,
-    format: string,
-    mode: string,
+    configHash: string,
     maxPartSizeBytes: string,
     exporterVersion: number
   ): Promise<DownloadVersionExportArtifactGroupRecord | null> {
@@ -62,6 +67,8 @@ export class DownloadVersionExportRepository extends BaseRepository {
       SELECT
         download_version_export_artifact_group_id,
         download_version_id,
+        config,
+        config_hash,
         format,
         mode,
         max_part_size_bytes,
@@ -72,8 +79,7 @@ export class DownloadVersionExportRepository extends BaseRepository {
         error_message
       FROM download_version_export_artifact_group
       WHERE download_version_id = ${downloadVersionId}
-        AND format = ${format}
-        AND mode = ${mode}
+        AND config_hash = ${configHash}
         AND max_part_size_bytes = ${maxPartSizeBytes}
         AND exporter_version = ${exporterVersion}
         AND record_end_date IS NULL;
@@ -92,18 +98,40 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * group; the loser gets rowCount 0 (a valid outcome — NO throw) and re-selects
    * the winner's row. `status` is omitted so the DB DEFAULT ('pending') applies.
    *
+   * Returns whether THIS call inserted the group: `true` when the row was created,
+   * `false` when it lost the `ON CONFLICT` race to a concurrent identical request.
+   * The caller relies on this to enqueue the pipeline job exactly once — the loser
+   * attaches to the winner's (already-enqueued) group instead of double-queuing.
+   *
+   * `format` and `mode` are denormalized from the hashed config for cheap
+   * admin/diagnostic filters; they are written only from the parsed config —
+   * never independently — because `config_hash` already encodes them.
+   *
    * @param {CreateExportArtifactGroupPayload} payload
-   * @return {Promise<void>}
+   * @return {Promise<boolean>} `true` if this call inserted the group, `false` on conflict.
    * @memberof DownloadVersionExportRepository
    */
-  async createExportArtifactGroup(payload: CreateExportArtifactGroupPayload): Promise<void> {
+  async createExportArtifactGroup(payload: CreateExportArtifactGroupPayload): Promise<boolean> {
     const sql = SQL`
-      INSERT INTO download_version_export_artifact_group (download_version_id, format, mode, max_part_size_bytes, exporter_version)
-      VALUES (${payload.downloadVersionId}, ${payload.format}, ${payload.mode}, ${payload.maxPartSizeBytes}, ${payload.exporterVersion})
-      ON CONFLICT (download_version_id, format, mode, max_part_size_bytes, exporter_version) WHERE record_end_date IS NULL DO NOTHING;
+      INSERT INTO download_version_export_artifact_group (download_version_id, format, mode, max_part_size_bytes, exporter_version, config, config_hash)
+      VALUES (
+        ${payload.downloadVersionId},
+        ${payload.config.export_type},
+        ${payload.config.mode},
+        ${payload.maxPartSizeBytes},
+        ${payload.exporterVersion},
+        ${JSON.stringify(payload.config)}::jsonb,
+        ${payload.configHash}
+      )
+      ON CONFLICT (download_version_id, config_hash, max_part_size_bytes, exporter_version) WHERE record_end_date IS NULL DO NOTHING;
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    // `ON CONFLICT DO NOTHING` reports rowCount 1 when this INSERT created the row
+    // and 0 when a concurrent identical request already did — the loser's signal to
+    // skip enqueuing a duplicate job.
+    return response.rowCount === 1;
   }
 
   /**
@@ -194,6 +222,8 @@ export class DownloadVersionExportRepository extends BaseRepository {
       SELECT
         download_version_export_artifact_group_id,
         download_version_id,
+        config,
+        config_hash,
         format,
         mode,
         max_part_size_bytes,
@@ -307,20 +337,19 @@ export class DownloadVersionExportRepository extends BaseRepository {
   }
 
   /**
-   * Get a full export record by ID.
+   * Get a full export record by ID, throwing if not found.
    *
    * JOINs export → version (for `download_id`) and export → group (for the
    * group-owned lifecycle fields status/started_at/completed_at/error_message).
    * The group is always set by the service before insert, so an INNER JOIN is
    * correct — there is no export without a group.
    *
-   * `find*` returns null on missing (companion to `getDownloadVersionExportById`).
-   *
    * @param {string} downloadVersionExportId - The export ID.
-   * @return {Promise<DownloadVersionExportRecord | null>}
+   * @return {Promise<DownloadVersionExportRecord>}
+   * @throws {ApiNotFoundError} when no export matches the given ID.
    * @memberof DownloadVersionExportRepository
    */
-  async findDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord | null> {
+  async getDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
@@ -341,28 +370,14 @@ export class DownloadVersionExportRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, DownloadVersionExportRecord);
 
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Get a full export record by ID, throwing if not found.
-   *
-   * @param {string} downloadVersionExportId - The export ID.
-   * @return {Promise<DownloadVersionExportRecord>}
-   * @throws {ApiNotFoundError} when no export matches the given ID.
-   * @memberof DownloadVersionExportRepository
-   */
-  async getDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
-    const record = await this.findDownloadVersionExportById(downloadVersionExportId);
-
-    if (!record) {
+    if (response.rowCount === 0) {
       throw new ApiNotFoundError('Download version export not found', [
         'DownloadVersionExportRepository->getDownloadVersionExportById',
         `no download_version_export with id ${downloadVersionExportId}`
       ]);
     }
 
-    return record;
+    return response.rows[0];
   }
 
   /**
