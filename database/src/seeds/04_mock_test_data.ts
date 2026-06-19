@@ -193,12 +193,20 @@ export const insertSubmissionUploadRecord = async (
 ): Promise<string> => {
   const ticket_id = await ensureTicketForSubmissionUpload(knex, { submission_id, upload_id });
 
+  // Pin the upload to the active default Blueprint (seeded by the initial-blueprint migration).
+  const blueprintRow = await knex('blueprint')
+    .where({ is_default: true })
+    .whereNull('record_end_date')
+    .select('blueprint_id')
+    .first();
+
   const [{ submission_upload_id }] = await knex('submission_upload')
     .insert({
       submission_id,
       upload_id,
       create_user: 1,
-      ticket_id
+      ticket_id,
+      blueprint_id: blueprintRow.blueprint_id
     })
     .returning('submission_upload_id');
 

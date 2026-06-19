@@ -1,5 +1,6 @@
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { HTTP400 } from '../../errors/http-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -7,12 +8,14 @@ import {
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
+import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 
 export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
+  blueprintRepository: BlueprintRepository;
 
   /**
    * Creates an instance of SubmissionUploadService.
@@ -23,6 +26,58 @@ export class SubmissionUploadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
+    this.blueprintRepository = new BlueprintRepository(connection);
+  }
+
+  /**
+   * Resolve the Blueprint a new upload should be pinned to.
+   *
+   * Resolution order:
+   * 1. If a `blueprint_id` was supplied, validate it is currently available (`record_end_date IS
+   *    NULL`) and use it. An unavailable id is a client error (HTTP 400).
+   * 2. Otherwise inherit the most recent prior upload's Blueprint for the same submission, so
+   *    re-submissions stay stable when the system default Blueprint changes.
+   * 3. Otherwise (no prior upload) fall back to the active default Blueprint.
+   *
+   * @param {number} submissionId - The submission the upload belongs to.
+   * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The resolved `blueprint_id` to store on the upload.
+   * @throws {HTTP400} If a requested Blueprint id is not available.
+   * @throws {ApiGeneralError} If no Blueprint can be resolved (no prior upload and no default).
+   * @memberof SubmissionUploadService
+   */
+  async resolveBlueprintIdForUpload(submissionId: number, requestedBlueprintId?: number | null): Promise<number> {
+    if (requestedBlueprintId != null) {
+      const blueprintId = await this.blueprintRepository.findActiveBlueprintById(requestedBlueprintId);
+
+      if (blueprintId === null) {
+        throw new HTTP400('Requested Blueprint is not available', [
+          'SubmissionUploadService->resolveBlueprintIdForUpload',
+          `blueprint_id ${requestedBlueprintId} does not exist or is no longer available for new uploads`
+        ]);
+      }
+
+      return blueprintId;
+    }
+
+    const priorBlueprintId = await this.submissionUploadRepository.findMostRecentBlueprintIdBySubmissionId(
+      submissionId
+    );
+
+    if (priorBlueprintId !== null) {
+      return priorBlueprintId;
+    }
+
+    const defaultBlueprintId = await this.blueprintRepository.findDefaultBlueprintId();
+
+    if (defaultBlueprintId === null) {
+      throw new ApiGeneralError('No default Blueprint is configured', [
+        'SubmissionUploadService->resolveBlueprintIdForUpload',
+        `submission_id ${submissionId} has no prior upload and no active default Blueprint exists`
+      ]);
+    }
+
+    return defaultBlueprintId;
   }
 
   /**

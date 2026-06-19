@@ -334,16 +334,18 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.populateResolvedPropertyStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.populateResolvedPropertyStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 7);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
 
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_resolved_property');
 
-      // Selected Blueprint is the active default Blueprint available for indexing.
-      expect(sqlText).to.include('is_default = true');
-      expect(sqlText).to.include('record_effective_date IS NOT NULL');
+      // Selected Blueprint is the one pinned to the upload, passed in by the caller — not re-selected
+      // here. The default Blueprint is no longer chosen inside the SQL.
+      expect(sqlText).to.include('::integer AS blueprint_id');
+      expect(sqlText).to.not.include('is_default');
+      expect(sqlStub.firstCall.args[0].values).to.include(7);
 
       // Feature-type inclusion and property assignment come from the Blueprint tables.
       expect(sqlText).to.include('blueprint_feature_type bft');
@@ -379,16 +381,28 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.recordMissingRequiredPropertyErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.recordMissingRequiredPropertyErrorsBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000',
+        7
+      );
 
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('is_default = true');
+
+      // Selected Blueprint is pinned to the upload and passed in — not re-selected from the default.
+      expect(sqlText).to.include('::integer AS blueprint_id');
+      expect(sqlText).to.not.include('is_default');
+      expect(sqlStub.firstCall.args[0].values).to.include(7);
+
       expect(sqlText).to.include('blueprint_feature_type_property bftp');
       expect(sqlText).to.include('bftp.required_value = TRUE');
 
       // The Blueprint assignment is joined through its new foreign keys.
       expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
       expect(sqlText).to.include('ftp.feature_type_property_id = bftp.feature_type_property_id');
+
+      // The pool-entry bridge is constrained to the Blueprint feature type, so a property assigned
+      // under a different feature type cannot satisfy a requiredness check.
+      expect(sqlText).to.include('ftp.feature_type_id = bft.feature_type_id');
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
       expect(sqlText).to.not.include('bftp.blueprint_id');
@@ -404,7 +418,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.recordMissingRequiredPropertyErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.recordMissingRequiredPropertyErrorsBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000',
+        7
+      );
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;

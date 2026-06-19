@@ -249,6 +249,7 @@ describe('SubmissionUploadRepository', () => {
         upload_id: 'a-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         status: 'uploaded',
+        blueprint_id: 7,
         comment: 'Upload-specific note'
       };
 
@@ -264,18 +265,55 @@ describe('SubmissionUploadRepository', () => {
     it('returns the inserted record ID if successful', async () => {
       const mockRow = { submission_upload_id: 'id-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
       const payload: CreateSubmissionUpload = {
         submission_id: 123,
         upload_id: 'a-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'uploaded'
+        status: 'uploaded',
+        blueprint_id: 7
       };
       const result = await repo.insertSubmissionUpload(payload);
 
       expect(result).to.eql(mockRow);
+
+      // The pinned Blueprint is persisted with the upload.
+      expect(sqlStub.firstCall.args[0].text).to.contain('blueprint_id');
+      expect(sqlStub.firstCall.args[0].values).to.include(7);
+    });
+  });
+
+  describe('findMostRecentBlueprintIdBySubmissionId', () => {
+    it('returns the most recent prior blueprint_id ordered by create_date', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ blueprint_id: 9 }] } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.findMostRecentBlueprintIdBySubmissionId(123);
+
+      expect(result).to.equal(9);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.contain('FROM');
+      expect(sqlText).to.contain('submission_upload');
+      expect(sqlText).to.contain('create_date DESC');
+      expect(sqlText).to.contain('LIMIT 1');
+      // Soft-deleted prior uploads still pin a valid Blueprint, so record_end_date is not filtered.
+      expect(sqlText).to.not.contain('record_end_date');
+      expect(sqlStub.firstCall.args[0].values).to.include(123);
+    });
+
+    it('returns null when the submission has no prior upload', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.findMostRecentBlueprintIdBySubmissionId(123);
+
+      expect(result).to.equal(null);
     });
   });
 
