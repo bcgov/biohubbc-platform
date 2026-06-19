@@ -32,7 +32,10 @@ import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { EXPORTER_VERSION } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ApiValidationError } from '../../errors/api-error';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { CreateDownloadVersionExportRequest } from '../../models/download-version-export';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
@@ -40,6 +43,40 @@ import { DownloadExportService } from '../../services/download/download-export-s
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
+
+/**
+ * Build a minimal-but-valid `per_feature_type` export recipe over the given
+ * feature types. References only the always-present structural columns
+ * (`submission_feature_id` / `uuid` / `parent_uuid`), so the recipe passes
+ * `validateExportConfig` regardless of each type's schema — the only data-aware
+ * requirement is that the types are materialized for the download, which the
+ * seed helper guarantees.
+ */
+function validPerTypeConfig(downloadVersionId: string, featureTypes: string[]): CreateDownloadVersionExportRequest {
+  return {
+    download_version_id: downloadVersionId,
+    version: 1,
+    export_type: 'csv',
+    mode: 'per_feature_type',
+    feature_types: featureTypes,
+    merge_steps: [],
+    output_columns: featureTypes.map((feature_type) => ({ feature_type, column: 'uuid' }))
+  };
+}
+
+/**
+ * The `config_hash` the service computes for a given request body — canonicalize
+ * the recipe (stripping the packaging knob) then hash. Lets the dedupe-key
+ * assertions read the active group exactly as the resolver keys it.
+ */
+function hashForConfig(request: CreateDownloadVersionExportRequest): string {
+  // Drop the packaging knob (max_part_size_bytes) before hashing, mirroring the
+  // service's dedupe key.
+  const rawConfig = { ...request };
+  delete rawConfig.max_part_size_bytes;
+  return computeConfigHash(canonicalizeExportConfig(ExportConfig.parse(rawConfig)));
+}
 
 describe('Download version export state machine (integration)', function () {
   this.timeout(30000);
@@ -121,7 +158,7 @@ describe('Download version export state machine (integration)', function () {
       requestedBy: systemUserId
     });
 
-    // createDownloadRequest already materialized the version — resolve the most-recent one.
+    // createDownloadRequest already materialized the current version — resolve it.
     const download = await downloadRepo.findDownloadById(downloadId);
     const downloadVersionId = download!.download_version_id;
 
@@ -174,19 +211,35 @@ describe('Download version export state machine (integration)', function () {
   }
 
   /**
-   * Count the active groups (record_end_date IS NULL) matching the full dedupe
-   * key for a version — proves the active-uniqueness invariant from raw SQL,
-   * independent of the resolver.
+   * Count the active groups (record_end_date IS NULL) matching the dedupe key for
+   * a version + `config_hash` — proves the active-uniqueness invariant from raw
+   * SQL, independent of the resolver. The dedupe key is now keyed on
+   * `config_hash` (NOT `format`/`mode`), so a denormalized config and a per-type
+   * config against the same version are distinct keys and counted separately.
    */
-  async function countActiveGroups(downloadVersionId: string): Promise<number> {
+  async function countActiveGroups(downloadVersionId: string, configHash: string): Promise<number> {
     const result = await connection.sql(SQL`
       SELECT COUNT(*)::integer AS n
       FROM download_version_export_artifact_group
       WHERE download_version_id = ${downloadVersionId}
-        AND format = ${FORMAT}
-        AND mode = ${MODE}
+        AND config_hash = ${configHash}
         AND max_part_size_bytes = ${MAX_PART}
         AND exporter_version = ${EXPORTER_VERSION}
+        AND record_end_date IS NULL;
+    `);
+    return result.rows[0].n;
+  }
+
+  /**
+   * Count ALL active groups (record_end_date IS NULL) for a version regardless of
+   * config_hash — used to prove that two DIFFERENT configs each get their own
+   * active group, and that an identical config does NOT spawn a second one.
+   */
+  async function countAllActiveGroups(downloadVersionId: string): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT COUNT(*)::integer AS n
+      FROM download_version_export_artifact_group
+      WHERE download_version_id = ${downloadVersionId}
         AND record_end_date IS NULL;
     `);
     return result.rows[0].n;
@@ -199,15 +252,11 @@ describe('Download version export state machine (integration)', function () {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
       const publishStub = stubPublish();
 
-      const record = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
 
       // Exactly one active group exists for the shape.
-      expect(await countActiveGroups(downloadVersionId)).to.equal(1);
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(config))).to.equal(1);
 
       const groupId = await readGroupIdForExport(record.download_version_export_id);
 
@@ -224,9 +273,232 @@ describe('Download version export state machine (integration)', function () {
       expect(group.status).to.equal(DownloadStatusEnum.PENDING);
       expect(record.status).to.equal(DownloadStatusEnum.PENDING);
 
+      // The group persisted the recipe (config JSONB + config_hash) and the
+      // denormalized format/mode columns; the config round-trips back through the
+      // Zod model (proving the JSONB stored a valid ExportConfig, not a partial).
+      expect(group.format).to.equal('csv');
+      expect(group.mode).to.equal('per_feature_type');
+      expect(group.config_hash).to.equal(hashForConfig(config));
+      expect(group.config.mode).to.equal('per_feature_type');
+      expect(group.config.feature_types).to.eql(['dataset']);
+
+      // Raw read-back of the JSONB column confirms it was written (not null) and
+      // matches the canonical hash the service keyed the group on.
+      const rawGroup = await connection.sql(SQL`
+        SELECT config, config_hash, format, mode
+        FROM download_version_export_artifact_group
+        WHERE download_version_export_artifact_group_id = ${groupId};
+      `);
+      expect(rawGroup.rows[0].config).to.not.be.null;
+      expect(rawGroup.rows[0].config_hash).to.equal(hashForConfig(config));
+      expect(rawGroup.rows[0].format).to.equal('csv');
+      expect(rawGroup.rows[0].mode).to.equal('per_feature_type');
+
       // One job published, carrying the group id.
       expect(publishStub.calledOnce).to.be.true;
       expect(publishStub.firstCall.args[1]).to.deep.equal({ downloadVersionExportArtifactGroupId: groupId });
+    });
+  });
+
+  // ── Distinct config → distinct active group ──────────────────────────
+
+  describe('distinct config materializes a distinct group', () => {
+    it('two configs with different config_hash get two separate active groups on the same version', async () => {
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
+        'dataset',
+        'animal'
+      ]);
+
+      // Config A exports one type; config B exports both — different recipes, so
+      // different canonical hashes.
+      const configA = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const configB = validPerTypeConfig(downloadVersionId, ['dataset', 'animal']);
+      expect(hashForConfig(configA)).to.not.equal(hashForConfig(configB));
+
+      const firstPublish = stubPublish();
+      const a = await exportService.createDownloadVersionExport(downloadId, systemUserId, configA, connection);
+      firstPublish.restore();
+
+      const secondPublish = stubPublish();
+      const b = await exportService.createDownloadVersionExport(downloadId, systemUserId, configB, connection);
+
+      const groupA = await readGroupIdForExport(a.download_version_export_id);
+      const groupB = await readGroupIdForExport(b.download_version_export_id);
+
+      // Distinct configs → distinct groups, each its own active row, two total.
+      expect(groupA).to.not.equal(groupB);
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(configA))).to.equal(1);
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(configB))).to.equal(1);
+      expect(await countAllActiveGroups(downloadVersionId)).to.equal(2);
+
+      // Config B is genuinely new work → its own enqueue.
+      expect(secondPublish.calledOnce).to.be.true;
+      expect(secondPublish.firstCall.args[1]).to.deep.equal({ downloadVersionExportArtifactGroupId: groupB });
+    });
+  });
+
+  // ── Denormalized config materializes a denormalized group ────────────
+
+  describe('denormalized config', () => {
+    it('materializes a group with mode=denormalized and attaches the export', async () => {
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
+        'dataset',
+        'animal'
+      ]);
+
+      // A valid denormalized recipe rooted at `dataset`, joining `animal` on the
+      // always-present structural keys (parent_uuid → uuid). No schema columns
+      // referenced, so it passes validation regardless of each type's properties.
+      const config: CreateDownloadVersionExportRequest = {
+        download_version_id: downloadVersionId,
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'dataset',
+        feature_types: ['dataset', 'animal'],
+        merge_steps: [
+          {
+            left_feature_type: 'dataset',
+            left_column: 'uuid',
+            right_feature_type: 'animal',
+            right_column: 'parent_uuid',
+            merge_type: 'left'
+          }
+        ],
+        output_columns: [
+          { feature_type: 'dataset', column: 'uuid' },
+          { feature_type: 'animal', column: 'parent_uuid' }
+        ]
+      };
+
+      const publishStub = stubPublish();
+      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
+      const groupId = await readGroupIdForExport(record.download_version_export_id);
+
+      const group = await exportRepo.getExportArtifactGroupById(groupId);
+      expect(group.mode).to.equal('denormalized');
+      expect(group.config.mode).to.equal('denormalized');
+      expect(group.config.root_feature_type).to.equal('dataset');
+      expect(group.config_hash).to.equal(hashForConfig(config));
+      expect(record.mode).to.equal('denormalized');
+
+      // Exactly one active group for the denormalized config, and new work enqueued.
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(config))).to.equal(1);
+      expect(publishStub.calledOnce).to.be.true;
+    });
+  });
+
+  // ── Invalid config rejects clean (no group, no export, no job) ───────
+
+  /**
+   * Read-back probe: prove the failed request left NOTHING behind — no active
+   * group, no export row attached to this version. Run from raw SQL so it is
+   * independent of the resolver path.
+   */
+  async function assertNothingPersisted(downloadVersionId: string): Promise<void> {
+    const groups = await connection.sql(SQL`
+      SELECT download_version_export_artifact_group_id
+      FROM download_version_export_artifact_group
+      WHERE download_version_id = ${downloadVersionId};
+    `);
+    expect(groups.rowCount, 'no artifact group should be created for an invalid config').to.equal(0);
+
+    const exports = await connection.sql(SQL`
+      SELECT download_version_export_id
+      FROM download_version_export
+      WHERE download_version_id = ${downloadVersionId};
+    `);
+    expect(exports.rowCount, 'no download_version_export row should be created for an invalid config').to.equal(0);
+  }
+
+  /**
+   * Drive the create through the service and assert it rejected with
+   * `ApiValidationError` (HTTP400). Returns nothing — the caller then proves no
+   * group/export/job leaked. try/catch (not chai-as-promised, which this repo
+   * does not register) mirrors the existing `illegal transition` test's style.
+   */
+  async function expectValidationRejection(
+    downloadId: string,
+    systemUserId: number,
+    config: CreateDownloadVersionExportRequest
+  ): Promise<void> {
+    try {
+      await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
+      expect.fail('Expected ApiValidationError for an invalid export config');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+    }
+  }
+
+  describe('invalid config validation (AC8)', () => {
+    it('rejects a config referencing a non-materialized feature type with ApiValidationError', async () => {
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['dataset']);
+      const publishStub = stubPublish();
+
+      // 'observation' was never materialized for this download.
+      const config = validPerTypeConfig(downloadVersionId, ['observation']);
+
+      await expectValidationRejection(downloadId, systemUserId, config);
+
+      await assertNothingPersisted(downloadVersionId);
+      expect(publishStub.notCalled, 'no job should be published for an invalid config').to.be.true;
+    });
+
+    it('rejects a config referencing a non-existent column with ApiValidationError', async () => {
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['dataset']);
+      const publishStub = stubPublish();
+
+      // 'dataset' is materialized but 'no_such_column' is neither structural nor a schema property.
+      const config: CreateDownloadVersionExportRequest = {
+        download_version_id: downloadVersionId,
+        version: 1,
+        export_type: 'csv',
+        mode: 'per_feature_type',
+        feature_types: ['dataset'],
+        merge_steps: [],
+        output_columns: [{ feature_type: 'dataset', column: 'no_such_column' }]
+      };
+
+      await expectValidationRejection(downloadId, systemUserId, config);
+
+      await assertNothingPersisted(downloadVersionId);
+      expect(publishStub.notCalled, 'no job should be published for an invalid config').to.be.true;
+    });
+
+    it('rejects a config whose merge steps are unreachable from the root with ApiValidationError', async () => {
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
+        'dataset',
+        'animal'
+      ]);
+      const publishStub = stubPublish();
+
+      // Root is `dataset`, but the only merge step joins FROM `animal` — which is
+      // never made reachable from the root (no step has `dataset` on its left). The
+      // step is orphaned, so orderMergeSteps throws the cycle/unreachable error
+      // inside validateExportConfig (same throw a true cycle produces). All types
+      // and structural columns referenced exist, so this is the only error.
+      const config: CreateDownloadVersionExportRequest = {
+        download_version_id: downloadVersionId,
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'dataset',
+        feature_types: ['dataset', 'animal'],
+        merge_steps: [
+          {
+            left_feature_type: 'animal',
+            left_column: 'uuid',
+            right_feature_type: 'dataset',
+            right_column: 'parent_uuid',
+            merge_type: 'left'
+          }
+        ]
+      };
+
+      await expectValidationRejection(downloadId, systemUserId, config);
+
+      await assertNothingPersisted(downloadVersionId);
+      expect(publishStub.notCalled, 'no job should be published for an invalid config').to.be.true;
     });
   });
 
@@ -235,15 +507,12 @@ describe('Download version export state machine (integration)', function () {
   describe('reuse of a ready group', () => {
     it('attaches a second export to the same ready group and does not re-enqueue', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const configHash = hashForConfig(config);
 
       // First request materializes the group.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       expect(firstPublish.calledOnce).to.be.true;
       const groupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
@@ -254,17 +523,13 @@ describe('Download version export state machine (integration)', function () {
         completed_at: new Date().toISOString()
       });
 
-      // Second identical request reuses the ready group.
+      // Second identical request resolves to the same config_hash → reuses the ready group.
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
 
-      // Still exactly one active group.
-      expect(await countActiveGroups(downloadVersionId)).to.equal(1);
+      // Still exactly one active group for the config_hash, and none other on the version.
+      expect(await countActiveGroups(downloadVersionId, configHash)).to.equal(1);
+      expect(await countAllActiveGroups(downloadVersionId)).to.equal(1);
 
       // The second export attached to the SAME group.
       expect(await readGroupIdForExport(second.download_version_export_id)).to.equal(groupId);
@@ -288,15 +553,11 @@ describe('Download version export state machine (integration)', function () {
   describe('reuse of an in-flight group', () => {
     it('attaches to a pending group without re-enqueuing, and resolves no parts yet', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
 
       // First request leaves the group `pending` (a run is in flight).
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       const groupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
 
@@ -307,14 +568,9 @@ describe('Download version export state machine (integration)', function () {
 
       // Second request rides the in-flight group.
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
 
-      expect(await countActiveGroups(downloadVersionId)).to.equal(1);
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(config))).to.equal(1);
       expect(await readGroupIdForExport(second.download_version_export_id)).to.equal(groupId);
       expect(secondPublish.notCalled).to.be.true;
 
@@ -336,32 +592,36 @@ describe('Download version export state machine (integration)', function () {
       // concurrency + the one-job singleton collapse are proven in the system test.
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
 
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const normalized = canonicalizeExportConfig(ExportConfig.parse(config));
+      const configHash = computeConfigHash(normalized);
       const payload = {
         downloadVersionId,
-        format: FORMAT,
-        mode: MODE,
+        config: normalized,
+        configHash,
+        format: normalized.export_type,
+        mode: normalized.mode,
         maxPartSizeBytes: MAX_PART,
         exporterVersion: EXPORTER_VERSION
       };
 
       // No active group yet.
-      expect(
-        await exportRepo.findActiveExportArtifactGroup(downloadVersionId, FORMAT, MODE, MAX_PART, EXPORTER_VERSION)
-      ).to.be.null;
+      expect(await exportRepo.findActiveExportArtifactGroup(downloadVersionId, configHash, MAX_PART, EXPORTER_VERSION))
+        .to.be.null;
 
-      // First insert wins.
-      await exportRepo.createExportArtifactGroup(payload);
+      // First insert wins → returns true (this call created the group).
+      expect(await exportRepo.createExportArtifactGroup(payload)).to.be.true;
 
       // Second identical insert collides on the partial-unique key → ON CONFLICT
-      // DO NOTHING. rowCount 0 is valid; it must NOT throw.
-      await exportRepo.createExportArtifactGroup(payload);
+      // DO NOTHING. rowCount 0 is valid; it must NOT throw and must report false
+      // (did NOT insert) so the caller skips enqueuing a duplicate job.
+      expect(await exportRepo.createExportArtifactGroup(payload)).to.be.false;
 
       // Re-select returns exactly the one winner.
-      expect(await countActiveGroups(downloadVersionId)).to.equal(1);
+      expect(await countActiveGroups(downloadVersionId, configHash)).to.equal(1);
       const winner = await exportRepo.findActiveExportArtifactGroup(
         downloadVersionId,
-        FORMAT,
-        MODE,
+        configHash,
         MAX_PART,
         EXPORTER_VERSION
       );
@@ -370,18 +630,8 @@ describe('Download version export state machine (integration)', function () {
 
       // Two export requests through the service both converge on the winner group.
       const publishStub = stubPublish();
-      const a = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
-      const b = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const a = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
+      const b = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
 
       expect(await readGroupIdForExport(a.download_version_export_id)).to.equal(winnerGroupId);
       expect(await readGroupIdForExport(b.download_version_export_id)).to.equal(winnerGroupId);
@@ -397,15 +647,11 @@ describe('Download version export state machine (integration)', function () {
   describe('recovery from a failed group', () => {
     it('ends the failed group (preserving its error_message), creates a fresh group, and enqueues', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
 
       // First request materializes the group, then we drive it to `failed`.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       const failedGroupId = await readGroupIdForExport(first.download_version_export_id);
       firstPublish.restore();
 
@@ -416,12 +662,7 @@ describe('Download version export state machine (integration)', function () {
 
       // Second request must end the dead group and build a fresh one.
       const publishStub = stubPublish();
-      const second = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       const freshGroupId = await readGroupIdForExport(second.download_version_export_id);
 
       // Fresh group is a different row.
@@ -442,7 +683,7 @@ describe('Download version export state machine (integration)', function () {
       expect(freshGroup.error_message).to.be.null;
 
       // Active-uniqueness never violated — exactly one active group for the key.
-      expect(await countActiveGroups(downloadVersionId)).to.equal(1);
+      expect(await countActiveGroups(downloadVersionId, hashForConfig(config))).to.equal(1);
 
       // Genuinely new work → one job.
       expect(publishStub.calledOnce).to.be.true;
@@ -455,30 +696,30 @@ describe('Download version export state machine (integration)', function () {
   describe('exporter_version invalidation', () => {
     it('ignores a ready group at a stale exporter_version and builds a fresh group at the current version', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const normalized = canonicalizeExportConfig(ExportConfig.parse(config));
+      const configHash = computeConfigHash(normalized);
 
       // Seed a `ready` group at exporter_version 0 (one less than the current
-      // EXPORTER_VERSION=1). The repo helper always stamps EXPORTER_VERSION, so
-      // the stale-version row must be inserted via raw SQL.
+      // EXPORTER_VERSION=1) carrying the SAME config_hash the service will compute —
+      // so the only difference is the exporter_version. The repo helper always
+      // stamps EXPORTER_VERSION, so the stale-version row must be inserted via raw
+      // SQL. config/config_hash are NOT NULL, so they are supplied here too.
       const staleVersion = EXPORTER_VERSION - 1;
       const staleInsert = await connection.sql(SQL`
         INSERT INTO download_version_export_artifact_group
-          (download_version_id, format, mode, max_part_size_bytes, exporter_version, status, started_at, completed_at)
+          (download_version_id, format, mode, max_part_size_bytes, exporter_version, status, started_at, completed_at, config, config_hash)
         VALUES (
           ${downloadVersionId}, ${FORMAT}, ${MODE}, ${MAX_PART}, ${staleVersion}, ${DownloadStatusEnum.READY},
-          now(), now()
+          now(), now(), ${JSON.stringify(normalized)}::jsonb, ${configHash}
         )
         RETURNING download_version_export_artifact_group_id;
       `);
       const staleGroupId = staleInsert.rows[0].download_version_export_artifact_group_id;
 
-      // The service probes at EXPORTER_VERSION=1 → misses the v0 group.
+      // The service probes at EXPORTER_VERSION=1 → misses the v0 group despite the matching config_hash.
       const publishStub = stubPublish();
-      const record = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       const newGroupId = await readGroupIdForExport(record.download_version_export_id);
 
       // A fresh group was built at the current exporter_version — the stale one was NOT reused.
@@ -495,7 +736,7 @@ describe('Download version export state machine (integration)', function () {
   // ── Version creation + parquet link ──────────────────────────────────
 
   describe('version creation and parquet link', () => {
-    it('createDownloadRequest materializes a version that detail reads resolve as most-recent', async () => {
+    it('createDownloadRequest materializes a version and points the download at it', async () => {
       const systemUserId = connection.systemUserId();
       const publishStub = sinon
         .stub(DownloadService.dependencies, 'publishProcessDownloadJob')
@@ -519,7 +760,7 @@ describe('Download version export state machine (integration)', function () {
       expect(versionRows.rowCount).to.equal(1);
       const downloadVersionId = versionRows.rows[0].download_version_id;
 
-      // Detail reads resolve that version as the most-recent active one.
+      // The download points at that version.
       const download = await downloadRepo.findDownloadById(downloadId);
       expect(download!.download_version_id).to.equal(downloadVersionId);
 
@@ -559,7 +800,7 @@ describe('Download version export state machine (integration)', function () {
       const record = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: downloadVersionId },
+        validPerTypeConfig(downloadVersionId, ['dataset']),
         connection
       );
       publishStub.restore();
@@ -638,25 +879,16 @@ describe('Download version export state machine (integration)', function () {
   describe('list status derivation', () => {
     it('lists both exports of a ready group as ready with a JOINed part_count and no per-export status write', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
+      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
 
       // Two requests attach to one group.
       const firstPublish = stubPublish();
-      const first = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const first = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       firstPublish.restore();
       const groupId = await readGroupIdForExport(first.download_version_export_id);
 
       const secondPublish = stubPublish();
-      const second = await exportService.createDownloadVersionExport(
-        downloadId,
-        systemUserId,
-        { download_version_id: downloadVersionId },
-        connection
-      );
+      const second = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
       secondPublish.restore();
       // Both attached to the same group (reuse, not a new group).
       expect(await readGroupIdForExport(second.download_version_export_id)).to.equal(groupId);
@@ -736,7 +968,12 @@ describe('Download version export state machine (integration)', function () {
       expect(row.download_version_export_artifact, 'download_version_export_artifact should exist').to.not.be.null;
     });
 
-    it('enforces active group uniqueness with a partial unique index over the 5 dedupe columns', async () => {
+    it('keys the active-group partial unique index on config_hash, with format/mode dropped from it', async () => {
+      // The nuk1 swap (this ticket) re-keyed the active-uniqueness index from
+      // (download_version_id, format, mode, max_part_size_bytes, exporter_version)
+      // to (download_version_id, config_hash, max_part_size_bytes, exporter_version):
+      // config_hash now stands in for the full recipe, so two recipes that differ
+      // only in format/mode-derived shape collide iff their hashes collide.
       const result = await connection.sql(SQL`
         SELECT indexdef
         FROM pg_indexes
@@ -751,9 +988,17 @@ describe('Download version export state machine (integration)', function () {
       );
 
       const def = result.rows.map((r) => r.indexdef).join('\n');
-      for (const col of ['download_version_id', 'format', 'mode', 'max_part_size_bytes', 'exporter_version']) {
+
+      // The new dedupe key columns are all present.
+      for (const col of ['download_version_id', 'config_hash', 'max_part_size_bytes', 'exporter_version']) {
         expect(def, `the active-uniqueness index should cover ${col}`).to.include(col);
       }
+
+      // The active-uniqueness index def references columns inside the index list
+      // only — so format/mode appearing here would mean they are still part of the
+      // dedupe key. They must be ABSENT now (folded into config_hash).
+      expect(def, 'format must not be part of the active-uniqueness index').to.not.match(/\bformat\b/);
+      expect(def, 'mode must not be part of the active-uniqueness index').to.not.match(/\bmode\b/);
     });
   });
 });

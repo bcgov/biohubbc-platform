@@ -60,7 +60,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
       description: 'Species',
       type_name: 'string',
       required_value: false,
-      calculated_value: false
+      calculated_value: false,
+      allow_multiple: false
     },
     {
       feature_type_property_id: 2,
@@ -69,7 +70,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
       description: 'Count',
       type_name: 'number',
       required_value: false,
-      calculated_value: false
+      calculated_value: false,
+      allow_multiple: false
     },
     {
       feature_type_property_id: 3,
@@ -78,7 +80,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
       description: 'Observed date',
       type_name: 'datetime',
       required_value: false,
-      calculated_value: false
+      calculated_value: false,
+      allow_multiple: false
     },
     {
       feature_type_property_id: 4,
@@ -87,7 +90,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
       description: 'Is verified',
       type_name: 'boolean',
       required_value: false,
-      calculated_value: false
+      calculated_value: false,
+      allow_multiple: false
     },
     {
       feature_type_property_id: 5,
@@ -96,7 +100,8 @@ const createMockFeatureType = (): FeatureTypeWithProperties => ({
       description: 'Location',
       type_name: 'spatial',
       required_value: false,
-      calculated_value: false
+      calculated_value: false,
+      allow_multiple: false
     }
   ]
 });

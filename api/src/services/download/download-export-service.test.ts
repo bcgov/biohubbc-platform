@@ -11,12 +11,16 @@ import {
   createMockExportArtifactGroup
 } from '../../__mocks__/download';
 import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
-import { ApiNotFoundError } from '../../errors/api-error';
+import { ApiValidationError } from '../../errors/api-error';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { CreateDownloadVersionExportRequest } from '../../models/download-version-export';
 import { DownloadVersionExportArtifactWithFile } from '../../models/download-version-export-artifact';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { CodeService } from '../code-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadExportPart, DownloadExportService } from './download-export-service';
 import { DownloadService } from './download-service';
@@ -31,19 +35,22 @@ const FAILED_GROUP_ID = 'cccc0000-0000-0000-0000-0000000000ff';
 const SYSTEM_USER_ID = 42;
 
 /**
- * The authorized parent download. `getAuthorizedDownload`'s return value is no longer consumed by
- * the export path (the version owns readiness), so the only field that matters here is the id.
+ * A READY download whose most-recent version resolves to VERSION_ID — the precondition the picker
+ * reads (`download.download_version_id`). Export creation gates on the explicit request version, not
+ * this field, so create tests additionally stub `getDownloadVersionStatusById` via `stubReadyVersion`.
  */
 const readyDownload = () =>
   createMockDownloadRecord({
     download_id: DOWNLOAD_ID,
-    download_status: DownloadStatusEnum.READY
+    download_status: DownloadStatusEnum.READY,
+    download_version_id: VERSION_ID
   });
 
 /**
  * Stub `DownloadVersionRepository.getDownloadVersionStatusById` to resolve a READY version owned by
- * the parent download — the happy-path precondition every resolver-matrix / payload test threads
- * through after the auth gate.
+ * the parent download — the happy-path precondition export creation threads through after the auth
+ * gate. Returns the stub so a test can override its resolution (e.g. a not-ready or wrong-owner
+ * version) to exercise the version gates.
  */
 const stubReadyVersion = () =>
   sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
@@ -55,11 +62,47 @@ const stubReadyVersion = () =>
   );
 
 /**
- * The request payload every create call now carries — the explicit version target.
+ * Build a `FeatureTypeWithProperties` code entry. The service maps `properties[].{name,type_name}`
+ * through `materializedColumnsForType`, so the only fields that matter for column derivation are the
+ * type name and each property's `name`/`type_name`; the rest carry harmless defaults.
  */
-const exportRequest = (overrides: Record<string, unknown> = {}) => ({
+const featureTypeCode = (
+  name: string,
+  properties: { name: string; type_name: string }[]
+): FeatureTypeWithProperties => ({
+  feature_type: { feature_type_id: 1, name, display_name: name, description: null },
+  properties: properties.map((property, index) => ({
+    feature_type_property_id: index + 1,
+    name: property.name,
+    display_name: property.name,
+    description: null,
+    type_name: property.type_name,
+    required_value: false,
+    calculated_value: false,
+    allow_multiple: false
+  }))
+});
+
+/**
+ * A per-type Parquet artifact key the materialized-types parser recognizes — version-scoped:
+ * `downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet`.
+ */
+const parquetArtifact = (featureType: string): DownloadArtifactInfo => ({
+  artifact_id: `bbbb0000-0000-0000-0000-00000000000${featureType.length}`,
+  object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/${featureType}/data.parquet`
+});
+
+/**
+ * A minimal valid `per_feature_type` recipe over the `observation` type — the happy-path inbound
+ * body, carrying the explicit `download_version_id` the create contract requires. Spread
+ * `{ ...validPerTypeRequest(), ...overrides }` to perturb a single field.
+ */
+const validPerTypeRequest = (): CreateDownloadVersionExportRequest => ({
   download_version_id: VERSION_ID,
-  ...overrides
+  version: 1,
+  export_type: 'csv',
+  mode: 'per_feature_type',
+  feature_types: ['observation']
 });
 
 describe('DownloadExportService', () => {
@@ -68,21 +111,44 @@ describe('DownloadExportService', () => {
   });
 
   describe('createDownloadVersionExport', () => {
-    describe('resolver matrix', () => {
-      it('none → creates a new group and publishes once with the group id', async () => {
-        // Verifies: no active group → create + re-select + publish; the publish payload carries the
-        // newly-created GROUP id (not the export id).
+    /**
+     * Stub the two NEW config-validation collaborators so the REAL pure utils
+     * (`buildAvailableColumnsByType` → `materializedColumnsForType`, `validateExportConfig`,
+     * `canonicalizeExportConfig`, `computeConfigHash`) run against a genuine materialized column map.
+     * `observation` carries a `count` (number) column; `sample` carries `site` (string).
+     */
+    const stubMaterializedData = () => {
+      // The create flow first gates on the explicit version (getDownloadVersionStatusById), then
+      // builds the materialized column map from the version's artifacts + the schema codes.
+      stubReadyVersion();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .resolves([parquetArtifact('observation'), parquetArtifact('sample')]);
+      sinon
+        .stub(CodeService.prototype, 'getFeatureTypePropertyCodes')
+        .resolves([
+          featureTypeCode('observation', [{ name: 'count', type_name: 'number' }]),
+          featureTypeCode('sample', [{ name: 'site', type_name: 'string' }])
+        ]);
+    };
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+    describe('valid recipe → group lifecycle', () => {
+      it('per_feature_type recipe with no active group → creates group (hashed) + inserts export + publishes once', async () => {
+        // Verifies: a valid per_feature_type recipe over a materialized type with no active group runs
+        // the REAL validate/canonicalize/hash, creates the group keyed on a non-empty configHash with
+        // mode/format derived from the recipe, inserts a csv/per_feature_type export, and enqueues once
+        // (shouldEnqueue true on a freshly-created group).
+
+        // Step 1: Auth resolves a READY download, and the real column map is built from stubbed data
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
-        // Step 2: findActive returns null first (none exists), then the created group on re-select
+        // Step 2: No active group → resolver creates, then re-selects the created group
         const createdGroup = createMockExportArtifactGroup({
           download_version_export_artifact_group_id: GROUP_ID,
           status: DownloadStatusEnum.PENDING
         });
-        const findActiveStub = sinon
+        sinon
           .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
           .onFirstCall()
           .resolves(null)
@@ -90,7 +156,68 @@ describe('DownloadExportService', () => {
           .resolves(createdGroup);
         const createGroupStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-          .resolves();
+          .resolves(true); // this call inserted the group → enqueue
+        const createExportStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
+          .resolves(createMockDownloadVersionExport());
+        const publishStub = sinon
+          .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
+          .resolves('mock-job-id' as any);
+
+        // Step 3: Create the export from the valid recipe
+        const service = new DownloadExportService(getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
+
+        // Step 4: Verify the group create payload — derived format/mode + a real, non-empty hash + config
+        expect(createGroupStub).to.have.been.calledOnce;
+        const groupPayload = createGroupStub.firstCall.args[0];
+        expect(groupPayload.mode).to.equal('per_feature_type');
+        expect(groupPayload.format).to.equal('csv');
+        expect(groupPayload.configHash).to.be.a('string').with.length.greaterThan(0);
+        expect(groupPayload.config.mode).to.equal('per_feature_type');
+        expect(groupPayload.config.feature_types).to.deep.equal(['observation']);
+
+        // Step 5: Verify the export-row insert derived csv/per_feature_type from the recipe
+        expect(createExportStub).to.have.been.calledOnce;
+        expect(createExportStub.firstCall.args[0]).to.include({ format: 'csv', mode: 'per_feature_type' });
+
+        // Step 6: Verify exactly one publish for the freshly-created group
+        expect(publishStub).to.have.been.calledOnce;
+        expect(publishStub.firstCall.args[1]).to.deep.equal({
+          downloadVersionExportArtifactGroupId: GROUP_ID
+        });
+      });
+
+      it('lost the create race (ON CONFLICT no-op) → attaches to the winner group, inserts export, does NOT publish', async () => {
+        // Verifies the double-enqueue guard: when the pre-create probe sees no group but the INSERT
+        // loses the ON CONFLICT race to a concurrent identical request (createExportArtifactGroup
+        // returns false), the resolver re-selects the winner's group and must NOT enqueue a second job
+        // — the winner already queued the one build. The per-user export row is still inserted.
+
+        // Step 1: Auth + real column map
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        stubMaterializedData();
+
+        // Step 2: Pre-create probe sees nothing; re-select finds the winner's group; the INSERT reports
+        // it did NOT create the row (rowCount 0 → false)
+        const winnerGroup = createMockExportArtifactGroup({
+          download_version_export_artifact_group_id: GROUP_ID,
+          status: DownloadStatusEnum.PENDING
+        });
+        sinon
+          .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
+          .onFirstCall()
+          .resolves(null)
+          .onSecondCall()
+          .resolves(winnerGroup);
+        const createGroupStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
+          .resolves(false); // lost the race
         const createExportStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());
@@ -100,27 +227,30 @@ describe('DownloadExportService', () => {
 
         // Step 3: Create the export
         const service = new DownloadExportService(getMockDBConnection());
-        await service.createDownloadVersionExport(DOWNLOAD_ID, SYSTEM_USER_ID, exportRequest(), getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
 
-        // Step 4: Verify a group was created, an export row inserted, and publish fired once with the group id
-        expect(findActiveStub).to.have.been.calledTwice;
+        // Step 4: It attempted the insert and the export row was written, but no duplicate job was queued
         expect(createGroupStub).to.have.been.calledOnce;
         expect(createExportStub).to.have.been.calledOnce;
-        expect(publishStub).to.have.been.calledOnce;
-        expect(publishStub.firstCall.args[1]).to.deep.equal({
-          downloadVersionExportArtifactGroupId: GROUP_ID
-        });
+        expect(createExportStub.firstCall.args[0].download_version_export_artifact_group_id).to.equal(GROUP_ID);
+        expect(publishStub).to.not.have.been.called;
       });
 
-      it('ready → attaches to the existing group, does not create a group and does not publish', async () => {
-        // Verifies: a `ready` active group is reused — no createExportArtifactGroup, no publish — but
-        // the per-user export row is still inserted.
+      it('identical recipe with an active group → reuses it: no group create, no publish, export still inserted', async () => {
+        // Verifies: the configHash-keyed dedup — a second logically-identical recipe finds an active
+        // group, so the resolver returns shouldEnqueue:false; no new group is created and nothing is
+        // re-queued, but the per-user export row is still inserted (per-user provenance).
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+        // Step 1: Auth + real column map
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
-        // Step 2: findActive returns a ready group
+        // Step 2: findActive returns an already-ready group on the first probe (no re-select needed)
         sinon
           .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
           .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.READY }));
@@ -134,62 +264,73 @@ describe('DownloadExportService', () => {
           .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
           .resolves('mock-job-id' as any);
 
-        // Step 3: Create the export
+        // Step 3: Create the export from the same valid recipe
         const service = new DownloadExportService(getMockDBConnection());
-        await service.createDownloadVersionExport(DOWNLOAD_ID, SYSTEM_USER_ID, exportRequest(), getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
 
-        // Step 4: Verify no group create, no publish, but the export row was inserted
+        // Step 4: Verify the reuse decision — no create, no enqueue, but the export row is inserted
         expect(createGroupStub).to.not.have.been.called;
         expect(publishStub).to.not.have.been.called;
         expect(createExportStub).to.have.been.calledOnce;
       });
 
-      [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING].forEach((status) => {
-        it(`${status} → attaches to the in-flight group, does not create a group and does not publish`, async () => {
-          // Verifies: an in-flight group (pending/processing) is reused — second identical request
-          // rides the existing job rather than re-queuing.
+      it('the configHash the resolver keys on is deterministic for the same recipe', async () => {
+        // Verifies: the real hash is stable — two probes against findActive (the pre-create probe and
+        // the post-create re-select) receive the IDENTICAL configHash, the property the DB dedupe key
+        // relies on. The hash is computed by the real computeConfigHash, never stubbed.
 
-          // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
-          sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-          stubReadyVersion();
+        // Step 1: Auth + real column map
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        stubMaterializedData();
 
-          // Step 2: findActive returns an in-flight group
-          sinon
-            .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
-            .resolves(createMockExportArtifactGroup({ status }));
-          const createGroupStub = sinon
-            .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-            .resolves();
-          const createExportStub = sinon
-            .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
-            .resolves(createMockDownloadVersionExport());
-          const publishStub = sinon
-            .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
-            .resolves('mock-job-id' as any);
+        // Step 2: No active group → both probes run; capture the configHash each was called with
+        const findActiveStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
+          .onFirstCall()
+          .resolves(null)
+          .onSecondCall()
+          .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.PENDING }));
+        const createGroupStub = sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
+          .resolves(true);
+        sinon
+          .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
+          .resolves(createMockDownloadVersionExport());
+        sinon
+          .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
+          .resolves('mock-job-id' as any);
 
-          // Step 3: Create the export
-          const service = new DownloadExportService(getMockDBConnection());
-          await service.createDownloadVersionExport(
-            DOWNLOAD_ID,
-            SYSTEM_USER_ID,
-            exportRequest(),
-            getMockDBConnection()
-          );
+        // Step 3: Create the export
+        const service = new DownloadExportService(getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
 
-          // Step 4: Verify reuse — no create, no publish, export row inserted
-          expect(createGroupStub).to.not.have.been.called;
-          expect(publishStub).to.not.have.been.called;
-          expect(createExportStub).to.have.been.calledOnce;
-        });
+        // Step 4: Verify both findActive probes and the create used the SAME real hash (configHash is
+        // findActive arg index 1; createExportArtifactGroup payload field configHash)
+        const probeHash = findActiveStub.firstCall.args[1];
+        const reselectHash = findActiveStub.secondCall.args[1];
+        const createHash = createGroupStub.firstCall.args[0].configHash;
+        expect(probeHash).to.be.a('string').with.length.greaterThan(0);
+        expect(reselectHash).to.equal(probeHash);
+        expect(createHash).to.equal(probeHash);
       });
 
-      it('failed → ends the dead group before creating a fresh one, then publishes once', async () => {
-        // Verifies: a `failed` active group is ended (endExportArtifactGroup with its id) BEFORE a new
-        // group is created, then publish fires once for the genuinely-new work.
+      it('failed active group → ends it before creating a fresh one, then publishes once', async () => {
+        // Verifies: a `failed` active group is ended (by its id) BEFORE a new group is created, then
+        // publish fires once for the genuinely-new work.
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+        // Step 1: Auth + real column map
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
         // Step 2: findActive returns a failed group first, then the fresh group on re-select
         const failedGroup = createMockExportArtifactGroup({
@@ -210,7 +351,7 @@ describe('DownloadExportService', () => {
         const endGroupStub = sinon.stub(DownloadVersionExportRepository.prototype, 'endExportArtifactGroup').resolves();
         const createGroupStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup')
-          .resolves();
+          .resolves(true); // fresh group created after ending the failed one → enqueue
         sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());
@@ -220,67 +361,84 @@ describe('DownloadExportService', () => {
 
         // Step 3: Create the export
         const service = new DownloadExportService(getMockDBConnection());
-        await service.createDownloadVersionExport(DOWNLOAD_ID, SYSTEM_USER_ID, exportRequest(), getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
 
-        // Step 4: Verify the failed group was ended (by its id) BEFORE the new group create
+        // Step 4: Verify the dead group was ended (by its id) BEFORE the create, then one publish
         expect(endGroupStub).to.have.been.calledOnceWith(FAILED_GROUP_ID);
         expect(endGroupStub).to.have.been.calledBefore(createGroupStub);
-
-        // Step 5: Verify exactly one publish for the fresh group
         expect(publishStub).to.have.been.calledOnce;
         expect(publishStub.firstCall.args[1]).to.deep.equal({
           downloadVersionExportArtifactGroupId: GROUP_ID
         });
       });
+    });
 
-      it('feeds the re-selected group id (not the pre-create probe) into the export-row insert', async () => {
-        // Verifies: the race-safe re-select path — the SECOND findActive result (the group the insert
-        // converged on) supplies the artifact-group id passed to createDownloadVersionExport, not the
-        // first (null) probe.
+    describe('mode derivation', () => {
+      it('denormalized recipe → inserts the export with mode denormalized', async () => {
+        // Verifies: the insert `mode` is whatever the validated recipe resolved to — a valid
+        // denormalized recipe (root in feature_types + a valid merge step over materialized columns)
+        // persists with mode 'denormalized', not the per_feature_type default.
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+        // Step 1: Auth + real column map (observation.uuid + sample.parent_uuid are structural, always
+        // valid join targets; both types are materialized)
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
-        // Step 2: findActive returns null first, then the re-selected group
-        const reselectedGroup = createMockExportArtifactGroup({
-          download_version_export_artifact_group_id: GROUP_ID,
-          status: DownloadStatusEnum.PENDING
-        });
+        // Step 2: findActive returns a ready group (no create / publish noise — mode is the focus)
         sinon
           .stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup')
-          .onFirstCall()
-          .resolves(null)
-          .onSecondCall()
-          .resolves(reselectedGroup);
-        sinon.stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup').resolves();
+          .resolves(createMockExportArtifactGroup({ status: DownloadStatusEnum.READY }));
         const createExportStub = sinon
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
-          .resolves(createMockDownloadVersionExport());
-        sinon
-          .stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob')
-          .resolves('mock-job-id' as any);
+          .resolves(createMockDownloadVersionExport({ mode: 'denormalized' }));
 
-        // Step 3: Create the export
+        // Step 3: Create the export from a valid denormalized recipe
+        const denormalizedRequest: CreateDownloadVersionExportRequest = {
+          download_version_id: VERSION_ID,
+          version: 1,
+          export_type: 'csv',
+          mode: 'denormalized',
+          root_feature_type: 'observation',
+          feature_types: ['observation', 'sample'],
+          merge_steps: [
+            {
+              left_feature_type: 'observation',
+              left_column: 'uuid',
+              right_feature_type: 'sample',
+              right_column: 'parent_uuid',
+              merge_type: 'left'
+            }
+          ]
+        };
         const service = new DownloadExportService(getMockDBConnection());
-        await service.createDownloadVersionExport(DOWNLOAD_ID, SYSTEM_USER_ID, exportRequest(), getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          denormalizedRequest,
+          getMockDBConnection()
+        );
 
-        // Step 4: Verify the insert used the re-selected group id
-        expect(createExportStub.firstCall.args[0].download_version_export_artifact_group_id).to.equal(GROUP_ID);
+        // Step 4: Verify the insert carried the recipe's mode
+        expect(createExportStub.firstCall.args[0].mode).to.equal('denormalized');
       });
     });
 
-    describe('export-row payload', () => {
-      it('builds the insert payload with version id, hard-coded csv/per_feature_type, default part size, and group id', async () => {
-        // Verifies: the service hard-codes format='csv' and mode='per_feature_type', resolves the
-        // version id from the download, defaults max_part_size_bytes when the request omits it, and
-        // threads the resolved group id.
+    describe('insert payload', () => {
+      it('defaults max_part_size_bytes and threads version id + resolved group id into the insert', async () => {
+        // Verifies: the service resolves the version id from the download, defaults
+        // max_part_size_bytes when the request omits it, hard-codes format='csv', and threads the
+        // resolved group id into the insert payload.
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+        // Step 1: Auth + real column map
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
-        // Step 2: findActive returns a ready group (no create / no publish noise)
+        // Step 2: findActive returns a ready group
         sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup').resolves(
           createMockExportArtifactGroup({
             download_version_export_artifact_group_id: GROUP_ID,
@@ -293,7 +451,12 @@ describe('DownloadExportService', () => {
 
         // Step 3: Create the export with NO max_part_size_bytes in the request
         const service = new DownloadExportService(getMockDBConnection());
-        await service.createDownloadVersionExport(DOWNLOAD_ID, SYSTEM_USER_ID, exportRequest(), getMockDBConnection());
+        await service.createDownloadVersionExport(
+          DOWNLOAD_ID,
+          SYSTEM_USER_ID,
+          validPerTypeRequest(),
+          getMockDBConnection()
+        );
 
         // Step 4: Verify the full insert payload
         expect(createExportStub.firstCall.args[0]).to.deep.equal({
@@ -305,13 +468,14 @@ describe('DownloadExportService', () => {
         });
       });
 
-      it('passes a request-supplied max_part_size_bytes through to the insert payload', async () => {
-        // Verifies: when the request supplies max_part_size_bytes, it overrides the default in the
-        // insert payload (and the group-resolution key).
+      it('peels a request-supplied max_part_size_bytes off the recipe and threads it to the insert', async () => {
+        // Verifies: max_part_size_bytes is packaging, not recipe — it is stripped before
+        // canonicalize/hash but still reaches the insert payload (and the group-resolution key)
+        // unchanged when the request supplies it.
 
-        // Step 1: Auth resolves the parent download; the named version is READY and belongs to it
+        // Step 1: Auth + real column map
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        stubReadyVersion();
+        stubMaterializedData();
 
         // Step 2: findActive returns a ready group
         sinon
@@ -321,12 +485,12 @@ describe('DownloadExportService', () => {
           .stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport')
           .resolves(createMockDownloadVersionExport());
 
-        // Step 3: Create the export WITH an explicit max_part_size_bytes
+        // Step 3: Create the export WITH an explicit max_part_size_bytes on the recipe body
         const service = new DownloadExportService(getMockDBConnection());
         await service.createDownloadVersionExport(
           DOWNLOAD_ID,
           SYSTEM_USER_ID,
-          exportRequest({ max_part_size_bytes: '10485760' }),
+          { ...validPerTypeRequest(), max_part_size_bytes: '10485760' },
           getMockDBConnection()
         );
 
@@ -335,162 +499,119 @@ describe('DownloadExportService', () => {
       });
     });
 
-    describe('gates', () => {
-      it('throws HTTP403 when systemUserId is null and does not call getAuthorizedDownload or the version lookup', async () => {
-        // Verifies: exports are authenticated-only — a null user short-circuits before any auth /
-        // version / group / publish work.
+    describe('invalid recipe → rejects before any side effect', () => {
+      it('rejects ApiValidationError when a feature type is not materialized — persists nothing', async () => {
+        // Verifies: validation runs (REAL validateExportConfig) against the materialized column map
+        // BEFORE any group/job work; a recipe over a non-materialized type rejects with
+        // ApiValidationError and never creates a group or publishes.
 
-        // Step 1: Stub auth and the version lookup so we can assert neither is reached
+        // Step 1: Auth + real column map (only observation/sample materialized)
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        stubMaterializedData();
+        const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
+        const createGroupStub = sinon.stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup');
+        const createExportStub = sinon.stub(DownloadVersionExportRepository.prototype, 'createDownloadVersionExport');
+        const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
+
+        // Step 2: Attempt to create the export with a recipe referencing an absent type
+        const service = new DownloadExportService(getMockDBConnection());
+        try {
+          await service.createDownloadVersionExport(
+            DOWNLOAD_ID,
+            SYSTEM_USER_ID,
+            { ...validPerTypeRequest(), feature_types: ['not_materialized'] },
+            getMockDBConnection()
+          );
+          expect.fail('Expected throw');
+        } catch (err) {
+          // Step 3: Verify the validation error type
+          expect(err).to.be.instanceOf(ApiValidationError);
+        }
+
+        // Step 4: Verify nothing was persisted or enqueued — validation gates before all side effects
+        expect(findActiveStub).to.not.have.been.called;
+        expect(createGroupStub).to.not.have.been.called;
+        expect(createExportStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      });
+
+      it('rejects ApiValidationError when a merge step references a column absent from the type — persists nothing', async () => {
+        // Verifies: the data-aware column existence check — a denormalized recipe whose merge step
+        // joins on a column that does not exist on a materialized type rejects with ApiValidationError
+        // before any side effect.
+
+        // Step 1: Auth + real column map
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        stubMaterializedData();
+        const createGroupStub = sinon.stub(DownloadVersionExportRepository.prototype, 'createExportArtifactGroup');
+        const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
+
+        // Step 2: Attempt to create with a merge step keyed on a non-existent column ('nonexistent' is
+        // not a property of sample and is not a structural column)
+        const service = new DownloadExportService(getMockDBConnection());
+        try {
+          await service.createDownloadVersionExport(
+            DOWNLOAD_ID,
+            SYSTEM_USER_ID,
+            {
+              version: 1,
+              export_type: 'csv',
+              mode: 'denormalized',
+              root_feature_type: 'observation',
+              feature_types: ['observation', 'sample'],
+              merge_steps: [
+                {
+                  left_feature_type: 'observation',
+                  left_column: 'uuid',
+                  right_feature_type: 'sample',
+                  right_column: 'nonexistent',
+                  merge_type: 'left'
+                }
+              ]
+            },
+            getMockDBConnection()
+          );
+          expect.fail('Expected throw');
+        } catch (err) {
+          // Step 3: Verify the validation error type
+          expect(err).to.be.instanceOf(ApiValidationError);
+        }
+
+        // Step 4: Verify nothing was persisted or enqueued
+        expect(createGroupStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      });
+    });
+
+    describe('gates', () => {
+      it('throws HTTP403 when systemUserId is null and does not call getAuthorizedDownload', async () => {
+        // Verifies: exports are authenticated-only — a null user short-circuits before any auth /
+        // group / publish work.
+
+        // Step 1: Stub auth so we can assert it is never reached
         const authStub = sinon.stub(DownloadService.prototype, 'getAuthorizedDownload');
-        const versionStub = sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById');
 
         // Step 2: Call with a null systemUserId
         const service = new DownloadExportService(getMockDBConnection());
         try {
-          await service.createDownloadVersionExport(DOWNLOAD_ID, null, exportRequest(), getMockDBConnection());
+          await service.createDownloadVersionExport(DOWNLOAD_ID, null, validPerTypeRequest(), getMockDBConnection());
           expect.fail('Expected throw');
         } catch (err) {
           // Step 3: Verify HTTP403
           expect(err).to.be.instanceOf(HTTP403);
         }
 
-        // Step 4: Verify neither auth nor the version lookup was invoked (the null-user gate is first)
+        // Step 4: Verify auth was never invoked
         expect(authStub).to.not.have.been.called;
-        expect(versionStub).to.not.have.been.called;
-      });
-
-      it('short-circuits an auth failure before the version lookup', async () => {
-        // Verifies: a team-auth failure (HTTP403) propagates and the version is never loaded — the
-        // auth gate runs strictly before the version lookup.
-
-        // Step 1: Auth rejects with HTTP403; stub the version lookup so we can assert it is unreached
-        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-        const versionStub = sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById');
-
-        // Step 2: Attempt to create the export
-        const service = new DownloadExportService(getMockDBConnection());
-        try {
-          await service.createDownloadVersionExport(
-            DOWNLOAD_ID,
-            SYSTEM_USER_ID,
-            exportRequest(),
-            getMockDBConnection()
-          );
-          expect.fail('Expected throw');
-        } catch (err) {
-          // Step 3: Verify the auth error propagates
-          expect(err).to.be.instanceOf(HTTP403);
-        }
-
-        // Step 4: Verify the version lookup was never reached
-        expect(versionStub).to.not.have.been.called;
-      });
-
-      it('propagates ApiNotFoundError from the version lookup without swallowing it', async () => {
-        // Verifies: a missing version surfaces the repository's ApiNotFoundError unchanged — the
-        // service does not catch it or remap it to a generic error.
-
-        // Step 1: Auth resolves; the version lookup rejects as not-found
-        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        sinon
-          .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
-          .rejects(new ApiNotFoundError('Download version not found'));
-        const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
-        const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
-
-        // Step 2: Attempt to create the export
-        const service = new DownloadExportService(getMockDBConnection());
-        try {
-          await service.createDownloadVersionExport(
-            DOWNLOAD_ID,
-            SYSTEM_USER_ID,
-            exportRequest(),
-            getMockDBConnection()
-          );
-          expect.fail('Expected throw');
-        } catch (err) {
-          // Step 3: Verify the not-found error propagates unchanged
-          expect(err).to.be.instanceOf(ApiNotFoundError);
-        }
-
-        // Step 4: Verify no resolver / publish work happened
-        expect(findActiveStub).to.not.have.been.called;
-        expect(publishStub).to.not.have.been.called;
-      });
-
-      it('throws HTTP404 when the version belongs to a different download, doing no resolver or publish work', async () => {
-        // Verifies: a caller authorized on one download cannot reach another download's artifacts by
-        // naming its version id — ownership is enforced against the URL download.
-
-        // Step 1: Auth resolves; the named version is READY but owned by a DIFFERENT download
-        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
-          createMockDownloadVersionStatusRecord({
-            download_version_id: VERSION_ID,
-            download_id: 'bbbb0000-0000-0000-0000-00000000ffff',
-            status: DownloadStatusEnum.READY
-          })
-        );
-        const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
-        const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
-
-        // Step 2: Attempt to create the export
-        const service = new DownloadExportService(getMockDBConnection());
-        try {
-          await service.createDownloadVersionExport(
-            DOWNLOAD_ID,
-            SYSTEM_USER_ID,
-            exportRequest(),
-            getMockDBConnection()
-          );
-          expect.fail('Expected throw');
-        } catch (err) {
-          // Step 3: Verify HTTP404
-          expect(err).to.be.instanceOf(HTTP404);
-        }
-
-        // Step 4: Verify no resolver / publish work happened
-        expect(findActiveStub).to.not.have.been.called;
-        expect(publishStub).to.not.have.been.called;
-      });
-
-      it('throws HTTP404 (ownership) before HTTP409 (status) when the foreign version is also not ready', async () => {
-        // Verifies: ownership is checked strictly before status — a version owned by another download
-        // AND not ready surfaces 404 (not 409), so status is never leaked across the ownership boundary.
-
-        // Step 1: Auth resolves; the named version is PENDING and owned by a DIFFERENT download
-        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
-          createMockDownloadVersionStatusRecord({
-            download_version_id: VERSION_ID,
-            download_id: 'bbbb0000-0000-0000-0000-00000000ffff',
-            status: DownloadStatusEnum.PENDING
-          })
-        );
-
-        // Step 2: Attempt to create the export
-        const service = new DownloadExportService(getMockDBConnection());
-        try {
-          await service.createDownloadVersionExport(
-            DOWNLOAD_ID,
-            SYSTEM_USER_ID,
-            exportRequest(),
-            getMockDBConnection()
-          );
-          expect.fail('Expected throw');
-        } catch (err) {
-          // Step 3: Verify HTTP404 wins (ownership before status)
-          expect(err).to.be.instanceOf(HTTP404);
-        }
       });
 
       [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING, DownloadStatusEnum.FAILED].forEach((status) => {
-        it(`throws HTTP409 when the version status is ${status}, doing no resolver or publish work`, async () => {
-          // Verifies: only a READY version can export — readiness is gated on the named version's own
-          // status (not the parent download's), and every non-ready version surfaces 409 before any
-          // group resolution or publish.
+        it(`throws HTTP409 when the named version status is ${status}, doing no resolver or publish work`, async () => {
+          // Verifies: an export binds to a materialized snapshot — only a READY VERSION can export. The
+          // named version's own status is the gate (not the parent download's), so a non-ready version
+          // surfaces 409 before any group resolution or publish.
 
-          // Step 1: Auth resolves the parent download; the named version belongs to it but is not READY
+          // Step 1: Auth resolves; the named version exists and is owned by the download, but is not ready
           sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
           sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
             createMockDownloadVersionStatusRecord({
@@ -508,7 +629,7 @@ describe('DownloadExportService', () => {
             await service.createDownloadVersionExport(
               DOWNLOAD_ID,
               SYSTEM_USER_ID,
-              exportRequest(),
+              validPerTypeRequest(),
               getMockDBConnection()
             );
             expect.fail('Expected throw');
@@ -522,6 +643,103 @@ describe('DownloadExportService', () => {
           expect(publishStub).to.not.have.been.called;
         });
       });
+
+      it('throws HTTP404 when the named version belongs to a different download, doing no resolver or publish work', async () => {
+        // Verifies: the version-ownership check is a real auth boundary — a caller authorized on one
+        // download cannot export another download's materialized artifacts by naming its version id.
+
+        // Step 1: Auth resolves the parent download, but the named version is owned by a DIFFERENT download
+        sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+          createMockDownloadVersionStatusRecord({
+            download_version_id: VERSION_ID,
+            download_id: 'aaaa0000-0000-0000-0000-0000000000ff',
+            status: DownloadStatusEnum.READY
+          })
+        );
+        const findActiveStub = sinon.stub(DownloadVersionExportRepository.prototype, 'findActiveExportArtifactGroup');
+        const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
+
+        // Step 2: Attempt to create the export
+        const service = new DownloadExportService(getMockDBConnection());
+        try {
+          await service.createDownloadVersionExport(
+            DOWNLOAD_ID,
+            SYSTEM_USER_ID,
+            validPerTypeRequest(),
+            getMockDBConnection()
+          );
+          expect.fail('Expected throw');
+        } catch (err) {
+          // Step 3: Verify HTTP404
+          expect(err).to.be.instanceOf(HTTP404);
+        }
+
+        // Step 4: Verify no resolver / publish work happened
+        expect(findActiveStub).to.not.have.been.called;
+        expect(publishStub).to.not.have.been.called;
+      });
+    });
+  });
+
+  describe('getDownloadVersionExportFeatureTypes', () => {
+    it('returns one entry per materialized type with the full structural + property-derived column set', async () => {
+      // Verifies: the picker read returns exactly the materialized types, each with the EXACT column
+      // set the CSV pipeline emits — structural columns (submission_feature_id/uuid/parent_uuid) then
+      // schema-derived headers — and drops codes for types that did not materialize a Parquet file.
+
+      // Step 1: Auth resolves a READY download
+      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+
+      // Step 2: Only `observation` materialized a Parquet artifact; codes also carry an
+      // unmaterialized `artifact` type that must be filtered out
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .resolves([parquetArtifact('observation')]);
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+        featureTypeCode('observation', [
+          { name: 'count', type_name: 'number' },
+          { name: 'comment', type_name: 'string' }
+        ]),
+        featureTypeCode('artifact', [{ name: 'filePath', type_name: 'string' }])
+      ]);
+
+      // Step 3: Read the exportable feature types
+      const service = new DownloadExportService(getMockDBConnection());
+      const result = await service.getDownloadVersionExportFeatureTypes(DOWNLOAD_ID, SYSTEM_USER_ID);
+
+      // Step 4: Verify only the materialized type is offered, with the full column set in order
+      expect(result).to.deep.equal([
+        {
+          feature_type: 'observation',
+          columns: ['submission_feature_id', 'uuid', 'parent_uuid', 'count', 'comment']
+        }
+      ]);
+    });
+
+    it('delegates authorization to getAuthorizedDownload and propagates its HTTP403', async () => {
+      // Verifies: the picker read authorizes against the parent download FIRST — an auth failure
+      // (HTTP403) propagates and the materialized-types read never runs.
+
+      // Step 1: Auth rejects with HTTP403
+      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
+      const listArtifactsStub = sinon.stub(
+        DownloadVersionRepository.prototype,
+        'listDownloadVersionArtifactsByDownloadVersionId'
+      );
+
+      // Step 2: Attempt the read
+      const service = new DownloadExportService(getMockDBConnection());
+      try {
+        await service.getDownloadVersionExportFeatureTypes(DOWNLOAD_ID, SYSTEM_USER_ID);
+        expect.fail('Expected throw');
+      } catch (err) {
+        // Step 3: Verify the auth error propagates
+        expect(err).to.be.instanceOf(HTTP403);
+      }
+
+      // Step 4: Verify the materialized-types read never ran
+      expect(listArtifactsStub).to.not.have.been.called;
     });
   });
 

@@ -1,9 +1,11 @@
 import { DEFAULT_MAX_PART_SIZE_BYTES, EXPORTER_VERSION, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import {
   CreateDownloadVersionExportRequest,
+  DownloadExportFeatureType,
   DownloadVersionExportListRow,
   DownloadVersionExportRecord,
   DownloadVersionExportRow
@@ -12,7 +14,14 @@ import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-
 import { publishProcessDownloadVersionExportJob } from '../../queue/publisher';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
-import { parseExportPartKey } from '../../utils/export-utils';
+import {
+  canonicalizeExportConfig,
+  computeConfigHash,
+  materializedColumnsForType,
+  validateExportConfig
+} from '../../utils/export-config-utils';
+import { parseExportPartKey, parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
+import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadService } from './download-service';
@@ -43,6 +52,7 @@ export interface DownloadExportPart {
 export class DownloadExportService extends DBService {
   downloadService: DownloadService;
   downloadVersionExportRepository: DownloadVersionExportRepository;
+  codeService: CodeService;
   downloadVersionRepository: DownloadVersionRepository;
 
   /**
@@ -62,26 +72,33 @@ export class DownloadExportService extends DBService {
     super(connection);
     this.downloadService = new DownloadService(connection);
     this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
+    this.codeService = new CodeService(connection);
     this.downloadVersionRepository = new DownloadVersionRepository(connection);
   }
 
   /**
-   * Create a CSV export for a ready download.
+   * Create a CSV export for a ready download from a caller-supplied export recipe.
    *
-   * Many user export requests for the same shape resolve onto a single physical artifact set keyed
-   * by (version, format, mode, max_part_size_bytes, exporter_version): a second identical request
-   * attaches to an already-`ready` group with no pipeline re-run. Each request still gets its own
-   * `download_version_export` row (per-user provenance), but lifecycle state lives on the shared
-   * group.
+   * The recipe (an `ExportConfig`) is validated against the download's materialized data BEFORE any
+   * artifact group or job is created: `validateExportConfig` throws `ApiValidationError` (HTTP400)
+   * on any structural or existence problem, so an invalid recipe never materializes a group or
+   * enqueues a job — the request fails clean with nothing persisted.
+   *
+   * Many user requests for the same recipe resolve onto a single physical artifact set keyed by the
+   * canonical `config_hash` (with version, max_part_size_bytes, exporter_version): a second
+   * logically-identical request attaches to an already-`ready` group with no pipeline re-run. Each
+   * request still gets its own `download_version_export` row (per-user provenance), but lifecycle
+   * state lives on the shared group.
    *
    * The publish rides the route's connection so the export-row create and the job enqueue commit
    * atomically — and it fires only when the resolver materialized genuinely new work
    * (`shouldEnqueue`); attaching to an in-flight or finished group never re-queues.
    *
-   * `max_part_size_bytes` lives per-export so a single download can be re-exported at different part
-   * sizes without re-running the Parquet pipeline. `format` is hard-coded to `'csv'` and `mode` to
-   * `'per_feature_type'` here because this ticket ships the single-shape contract; a future
-   * denormalized-mode addition opens `mode` at the request layer.
+   * `max_part_size_bytes` is packaging, not recipe: it controls how the bytes split into parts and
+   * is peeled off before canonicalizing/hashing, so two requests that differ only in part size still
+   * reuse the same artifact group rather than fragmenting it. `format` is the recipe's `'csv'`
+   * literal; `mode` is whatever the validated recipe resolved to (`per_feature_type` or
+   * `denormalized`).
    *
    * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and require team
    * membership on the parent download — delegates to `DownloadService.getAuthorizedDownload` so the
@@ -123,27 +140,33 @@ export class DownloadExportService extends DBService {
       throw new HTTP409('Download version is not ready — cannot export');
     }
 
-    const downloadVersionId = request.download_version_id;
+    // Strip the packaging knob AND the version id off before validating/hashing — neither is part of
+    // the content recipe. `max_part_size_bytes` is packaging; `download_version_id` is a separate
+    // dimension of the artifact-group key. What's left (`rawConfig`) is the pure export recipe.
+    const { download_version_id: downloadVersionId, max_part_size_bytes, ...rawConfig } = request;
+    const config = ExportConfig.parse(rawConfig);
+    const maxPartSizeBytes = max_part_size_bytes ?? DEFAULT_MAX_PART_SIZE_BYTES;
 
-    // Single-shape contract — `as const` is required so the literals satisfy the
-    // `z.literal('csv')` / `z.literal('per_feature_type')` payload fields (a bare const widens to
-    // `string`).
-    const format = 'csv' as const;
-    const mode = 'per_feature_type' as const;
-    const maxPartSizeBytes = request.max_part_size_bytes ?? DEFAULT_MAX_PART_SIZE_BYTES;
+    // Throws ApiValidationError (HTTP400) on any structural or existence problem — runs before any
+    // group/job is created so an invalid recipe never persists.
+    const availableColumnsByType = await this.buildAvailableColumnsByType(downloadId, downloadVersionId);
+    validateExportConfig(config, availableColumnsByType);
+
+    const normalized = canonicalizeExportConfig(config);
+    const configHash = computeConfigHash(normalized);
 
     const { group, shouldEnqueue } = await this.resolveOrCreateActiveExportArtifactGroup(
       downloadVersionId,
-      format,
-      mode,
+      normalized,
+      configHash,
       maxPartSizeBytes,
       EXPORTER_VERSION
     );
 
     const exportRow = await this.downloadVersionExportRepository.createDownloadVersionExport({
       download_version_id: downloadVersionId,
-      format,
-      mode,
+      format: 'csv',
+      mode: normalized.mode,
       max_part_size_bytes: maxPartSizeBytes,
       download_version_export_artifact_group_id: group.download_version_export_artifact_group_id
     });
@@ -158,8 +181,11 @@ export class DownloadExportService extends DBService {
   }
 
   /**
-   * Resolve the active artifact group for an export shape, materializing one when none is usable.
+   * Resolve the active artifact group for an export recipe, materializing one when none is usable.
    *
+   * Groups are keyed on the canonical `configHash` (with version, max_part_size_bytes,
+   * exporter_version) so logically-identical recipes against one version collapse onto a single
+   * artifact group and reuse its already-built (or in-flight) parts:
    * - `ready` / `pending` / `processing` → reuse the existing group (no new job): the work is done
    *   or in flight, so a second identical request rides it.
    * - `failed` → end the dead group (its `error_message` is preserved as failure history) and
@@ -168,19 +194,19 @@ export class DownloadExportService extends DBService {
    * - none → create.
    *
    * The create uses `ON CONFLICT DO NOTHING` + re-select so two racing identical requests converge
-   * on one group; `shouldEnqueue` is true only for genuinely new work.
+   * on one group; `shouldEnqueue` is true only when THIS call created the group — a reused group's
+   * artifacts already exist or are being built, so re-queuing would be wasted work.
    */
   private async resolveOrCreateActiveExportArtifactGroup(
     downloadVersionId: string,
-    format: string,
-    mode: string,
+    normalizedConfig: ExportConfig,
+    configHash: string,
     maxPartSizeBytes: string,
     exporterVersion: number
   ): Promise<{ group: DownloadVersionExportArtifactGroupRecord; shouldEnqueue: boolean }> {
     const existing = await this.downloadVersionExportRepository.findActiveExportArtifactGroup(
       downloadVersionId,
-      format,
-      mode,
+      configHash,
       maxPartSizeBytes,
       exporterVersion
     );
@@ -196,25 +222,76 @@ export class DownloadExportService extends DBService {
       }
     }
 
-    await this.downloadVersionExportRepository.createExportArtifactGroup({
+    const inserted = await this.downloadVersionExportRepository.createExportArtifactGroup({
       downloadVersionId,
-      format,
-      mode,
+      config: normalizedConfig,
+      configHash,
+      format: normalizedConfig.export_type,
+      mode: normalizedConfig.mode,
       maxPartSizeBytes,
       exporterVersion
     });
 
     const group = await this.downloadVersionExportRepository.findActiveExportArtifactGroup(
       downloadVersionId,
-      format,
-      mode,
+      configHash,
       maxPartSizeBytes,
       exporterVersion
     );
 
     // The partial-unique insert serializes at the DB, so this immediate re-select always finds
     // exactly one active row (race-safe) — the `!` is intentional, never null here.
-    return { group: group!, shouldEnqueue: true };
+    //
+    // Enqueue only when THIS call actually inserted the group. If a concurrent identical request
+    // won the `ON CONFLICT` race, `inserted` is false and we re-select onto its group — it already
+    // enqueued the one job, so re-queuing here would run the same build twice over the same S3 keys.
+    return { group: group!, shouldEnqueue: inserted };
+  }
+
+  /**
+   * Build the exportable column set for every feature type materialized for this download's version.
+   *
+   * The column set per type MUST mirror exactly what the export pipeline materializes — structural
+   * columns (`submission_feature_id` / `uuid` / `parent_uuid`) followed by the schema-derived
+   * headers, via `materializedColumnsForType`. Backs both AC8 recipe validation and the picker read,
+   * so a divergence here would either reject valid recipes or offer columns the CSV can't produce.
+   *
+   * Only types that actually produced a Parquet file for this version are included; the schema
+   * codes are filtered down to that materialized set so the picker never offers a type with no data.
+   */
+  private async buildAvailableColumnsByType(downloadId: string, versionId: string): Promise<Map<string, Set<string>>> {
+    const materialized = await this.listMaterializedFeatureTypes(downloadId, versionId);
+    const codes = await this.codeService.getFeatureTypePropertyCodes();
+
+    const availableColumnsByType = new Map<string, Set<string>>();
+    for (const code of codes) {
+      if (!materialized.has(code.feature_type.name)) {
+        continue;
+      }
+      const properties = code.properties.map((p) => ({
+        feature_property_name: p.name,
+        feature_property_type_name: p.type_name
+      }));
+      availableColumnsByType.set(code.feature_type.name, new Set(materializedColumnsForType(properties)));
+    }
+
+    return availableColumnsByType;
+  }
+
+  /**
+   * Resolve the set of feature types that actually materialized a Parquet file for this version.
+   *
+   * Reads the version's artifacts and maps each Parquet object key back to its feature type; keys
+   * that are not per-type Parquet sources (e.g. export part-zips) parse to null and drop out.
+   */
+  private async listMaterializedFeatureTypes(downloadId: string, versionId: string): Promise<Set<string>> {
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(versionId);
+
+    return new Set(
+      artifacts
+        .map((artifact) => parseFeatureTypeFromParquetKey(artifact.object_key, downloadId, versionId))
+        .filter((featureType): featureType is string => featureType !== null)
+    );
   }
 
   /**
@@ -242,10 +319,39 @@ export class DownloadExportService extends DBService {
   }
 
   /**
-   * Get an export by ID, throwing if not found.
+   * List the feature types (and their exportable columns) a download's most-recent version can export.
+   *
+   * Backs the export-recipe picker: the client builds a recipe by choosing among exactly these
+   * types and columns. The column set per type mirrors precisely what the export pipeline
+   * materializes (structural columns + schema headers via `materializedColumnsForType`), so the
+   * picker can never offer a column the CSV won't produce — the same guarantee AC8 validation
+   * enforces on the inbound recipe.
+   *
+   * The version is the download's most-recent (`download.download_version_id`, resolved by the read
+   * query) — the same version the client sends back as `download_version_id` on the export request,
+   * so the columns shown and the version exported are guaranteed to be the same materialized snapshot.
+   *
+   * Authorizes against the parent download (the team-membership rule lives in exactly one place —
+   * `DownloadService.getAuthorizedDownload`); only `ready` downloads with a materialized version
+   * have exportable data, so a `pending` / `processing` / `failed` parent surfaces 409.
    */
-  async getDownloadVersionExportById(exportId: string): Promise<DownloadVersionExportRecord> {
-    return this.downloadVersionExportRepository.getDownloadVersionExportById(exportId);
+  async getDownloadVersionExportFeatureTypes(
+    downloadId: string,
+    systemUserId: number | null
+  ): Promise<DownloadExportFeatureType[]> {
+    // Throws HTTP403 / HTTP404 as appropriate.
+    const download = await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
+
+    if (download.download_status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Download is not ready — cannot export');
+    }
+
+    const availableColumnsByType = await this.buildAvailableColumnsByType(downloadId, download.download_version_id);
+
+    return [...availableColumnsByType].map(([feature_type, columns]) => ({
+      feature_type,
+      columns: [...columns]
+    }));
   }
 
   /**
@@ -317,9 +423,9 @@ export class DownloadExportService extends DBService {
    *
    * The detail endpoint's full shape in a single call: authorize against the parent download, load
    * the export, and populate `parts[]` only for a `ready` export — `pending` / `processing` /
-   * `failed` / `downloaded` return `[]` so clients don't attempt to download from URLs for an
-   * incomplete job. The status gate lives here, not in the route handler, so it is unit-testable
-   * without driving the HTTP layer.
+   * `failed` return `[]` so clients don't attempt to download from URLs for an incomplete job. The
+   * status gate lives here, not in the route handler, so it is unit-testable without driving the
+   * HTTP layer.
    */
   async getAuthorizedExportWithParts(
     downloadId: string,
@@ -343,7 +449,7 @@ export class DownloadExportService extends DBService {
  *
  * Pure — no I/O. Lifecycle status/timing/error live on the group, never the per-user export, and
  * `download_id` is the parent already resolved by the caller — so the create path needs no
- * JOIN-on-RETURNING to build the same shape `findDownloadVersionExportById` returns.
+ * JOIN-on-RETURNING to build the same shape `getDownloadVersionExportById` returns.
  *
  * Fields are picked explicitly rather than spread from `exportRow`: the thin row carries the
  * internal `download_version_id` and artifact-group FKs, which are not part of the client contract —

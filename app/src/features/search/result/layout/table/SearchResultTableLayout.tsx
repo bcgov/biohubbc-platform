@@ -1,53 +1,62 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Box, Button, Stack } from '@mui/material';
-import { GridCellParams } from '@mui/x-data-grid';
+import { Box, Typography } from '@mui/material';
+import { GridCellParams, GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
+import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 
 interface SearchResultTableLayoutProps {
   /** Result rows rendered in the data grid. */
   results: SearchFeatureResultWithRelevancy[];
-  /** Submission feature ids currently present in the cart. */
-  cartFeatureIds: Set<number>;
+  /** Feature type properties rendered as one column each. */
+  featureTypeProperties: FeatureTypeProperty[];
   /** Opens the selected result's feature detail page. */
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
-  /** Adds the selected result to the cart. */
-  onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
-  /** Removes the selected feature id from the cart. */
-  onRemoveFromCart?: (featureId: number) => void;
 }
 
 /**
  * Renders search results in the table view.
  *
- * Table-view layout for result rows. Derives grid columns from current rows and
- * cart state, then forwards row/action clicks to `SearchResultOptions`.
+ * Table-view layout for result rows. Builds grid columns from the result schema
+ * and forwards row clicks to `SearchResultOptions`.
  *
- * @param {SearchResultTableLayoutProps} props - Results, cart ids, and optional row action callbacks.
+ * @param {SearchResultTableLayoutProps} props - Results, feature type properties, and optional row click callback.
  * @returns {JSX.Element} Search result data grid.
  */
-export const SearchResultTableLayout = ({
-  results,
-  cartFeatureIds,
-  onClick,
-  onAddToCart,
-  onRemoveFromCart
-}: SearchResultTableLayoutProps) => {
-  const columns = useMemo(() => {
-    if (results.length === 0) {
-      return [];
-    }
+export const SearchResultTableLayout = ({ results, featureTypeProperties, onClick }: SearchResultTableLayoutProps) => {
+  const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
+    const renderEllipsisCell = (displayValue: string) => {
+      return (
+        <Typography variant="body2" noWrap title={displayValue} sx={{ width: '100%' }}>
+          {displayValue}
+        </Typography>
+      );
+    };
+
+    const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
+      field: `property:${property.name}`,
+      headerName: property.display_name,
+      minWidth: 160,
+      flex: 1,
+      sortable: false,
+      valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
+      renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
+    }));
 
     return [
       {
         field: 'is_secured',
         headerName: '',
-        width: 50,
+        width: 30,
+        minWidth: 30,
         sortable: false,
         filterable: false,
         disableColumnMenu: true,
+        cellClassName: 'secured-column-cell',
+        headerClassName: 'secured-column-header',
         renderCell: (params: GridCellParams) => {
           if (!params.value) {
             return null;
@@ -60,77 +69,15 @@ export const SearchResultTableLayout = ({
         }
       },
       {
-        field: 'feature_type_name',
-        headerName: 'Feature Type',
-        width: 150,
-        sortable: true
-      },
-      {
         field: 'submission_name',
         headerName: 'Submission',
-        width: 150,
-        sortable: true
+        flex: 1,
+        sortable: true,
+        renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
       },
-      {
-        field: 'feature_description',
-        headerName: 'Description',
-        width: 250,
-        sortable: true
-      },
-      {
-        field: 'relevancy_score',
-        headerName: 'Relevance',
-        width: 120,
-        sortable: true
-      },
-      {
-        field: 'actions',
-        headerName: 'Actions',
-        width: 220,
-        sortable: false,
-        renderCell: (params: GridCellParams) => {
-          const result = params.row as SearchFeatureResultWithRelevancy;
-          const isInCart = cartFeatureIds.has(result.submission_feature_id);
-
-          return (
-            <Stack direction="row" gap={1} height="100%" alignItems="center">
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClick?.(result);
-                }}>
-                View
-              </Button>
-              {isInCart ? (
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemoveFromCart?.(result.submission_feature_id);
-                  }}>
-                  Remove
-                </Button>
-              ) : (
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAddToCart?.(result);
-                  }}>
-                  Add
-                </Button>
-              )}
-            </Stack>
-          );
-        }
-      }
+      ...propertyColumns
     ];
-  }, [results, cartFeatureIds, onClick, onAddToCart, onRemoveFromCart]);
+  }, [featureTypeProperties]);
 
   return (
     <CustomDataGrid
@@ -147,14 +94,14 @@ export const SearchResultTableLayout = ({
       hideFooter
       sortingOrder={['asc', 'desc']}
       initialState={{
-        sorting: { sortModel: [{ field: 'relevancy_score', sort: 'desc' }] },
         pagination: { paginationModel: { pageSize: 10 } }
       }}
       sx={{
         minWidth: '100%',
         '& .MuiDataGrid-root': {
           border: 'none'
-        }
+        },
+        '& .secured-column-cell, & .secured-column-header': { pl: '30px', justifyContent: 'center' }
       }}
     />
   );

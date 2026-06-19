@@ -261,13 +261,14 @@ describe('DownloadService', () => {
       expect(publishStub).to.have.been.calledOnce;
       expect(publishStub.firstCall.args[1]).to.eql({ downloadVersionId: 'ver-1' });
 
-      // Step 7: Verify the required call order — the version is materialized between the
-      // download insert and the team link, and the publish is last.
+      // Step 7: Verify the required call order — the team link happens after the download insert,
+      // then the version is materialized and the publish fires last (version + publish ride
+      // rerunDownload, after the team link).
       expect(writeExpressionTreeStub).to.have.been.calledBefore(createDownloadPolicyStub);
       expect(createDownloadPolicyStub).to.have.been.calledBefore(createDownloadStub);
-      expect(createDownloadStub).to.have.been.calledBefore(createVersionStub);
-      expect(createVersionStub).to.have.been.calledBefore(linkStub);
-      expect(linkStub).to.have.been.calledBefore(publishStub);
+      expect(createDownloadStub).to.have.been.calledBefore(linkStub);
+      expect(linkStub).to.have.been.calledBefore(createVersionStub);
+      expect(createVersionStub).to.have.been.calledBefore(publishStub);
     });
 
     it('materializes the version off the new download id and enqueues { downloadVersionId } with no pointer write', async () => {
@@ -410,6 +411,79 @@ describe('DownloadService', () => {
         expect(linkStub).to.not.have.been.called;
         expect(publishStub).to.not.have.been.called;
       }
+    });
+  });
+
+  describe('rerunDownload', () => {
+    const DOWNLOAD_ID = 'download-uuid-1';
+
+    it('creates a version off the download id and publishes the worker job keyed on the new version id', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const createVersionStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: DOWNLOAD_ID }));
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      await service.rerunDownload(DOWNLOAD_ID);
+
+      expect(createVersionStub).to.have.been.calledOnceWith(DOWNLOAD_ID);
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadVersionId: 'ver-1' });
+    });
+
+    it('creates the version before publishing the worker job', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const createVersionStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .resolves(createMockDownloadVersion({ download_version_id: 'ver-1', download_id: DOWNLOAD_ID }));
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      await service.rerunDownload(DOWNLOAD_ID);
+
+      expect(createVersionStub).to.have.been.calledBefore(publishStub);
+    });
+
+    it('does not publish when version creation fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'createDownloadVersion')
+        .rejects(new Error('version creation failed'));
+      const publishStub = sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob');
+
+      try {
+        await service.rerunDownload(DOWNLOAD_ID);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('version creation failed');
+        expect(publishStub).to.not.have.been.called;
+      }
+    });
+
+    it('returns the created version unmodified', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const mockVersion = createMockDownloadVersion({ download_version_id: 'ver-1', download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'createDownloadVersion').resolves(mockVersion);
+      sinon.stub(DownloadService.dependencies, 'publishProcessDownloadJob').resolves({
+        status: 'published',
+        jobId: 'job-1'
+      });
+
+      const result = await service.rerunDownload(DOWNLOAD_ID);
+
+      expect(result).to.eql(mockVersion);
     });
   });
 

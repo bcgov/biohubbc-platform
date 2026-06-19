@@ -181,9 +181,9 @@ describe('Ingest → Download → Export (system integration)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    // Materialize the download's version. The parquet pipeline links each artifact to
-    // this version, and runExportGroup discovers feature types from it. Reads resolve
-    // the most-recent version — there is no stored pointer to set.
+    // Materialize the download's version. The parquet pipeline links each artifact to this version,
+    // and runExportGroup discovers feature types from it; reads resolve the most-recent version, so
+    // there is no stored "current version" pointer to set.
     const downloadVersionRepo = new DownloadVersionRepository(connection);
     const version = await downloadVersionRepo.createDownloadVersion(downloadId);
     const downloadVersionId = version.download_version_id;
@@ -211,11 +211,21 @@ describe('Ingest → Download → Export (system integration)', function () {
     ]);
 
     // Run the export (CSV) pipeline through the resolve-or-create group contract.
+    // Per-feature-type recipe over the one materialized type (telemetry), all
+    // columns (no output_columns) — the pre-config-driven behaviour this test
+    // asserts on (the full telemetry CSV header).
     const exportService = new DownloadExportService(connection);
     const exportRecord = await exportService.createDownloadVersionExport(
       downloadId,
       systemUserId,
-      { download_version_id: downloadVersionId },
+      {
+        download_version_id: downloadVersionId,
+        version: 1,
+        export_type: 'csv',
+        mode: 'per_feature_type',
+        feature_types: ['telemetry'],
+        merge_steps: []
+      },
       connection
     );
     // The export record no longer exposes the internal artifact-group FK (it is server-only), so the

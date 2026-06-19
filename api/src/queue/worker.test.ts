@@ -6,6 +6,7 @@ import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
+import * as pollDownloadSchedulesJob from './jobs/poll-download-schedules-job';
 import * as processDownloadJob from './jobs/process-download-job';
 import * as processDownloadVersionExportJob from './jobs/process-download-version-export-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
@@ -20,13 +21,14 @@ describe('worker', () => {
     it('creates queues and registers handlers', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(14);
+      expect(createQueueStub.callCount).to.equal(16);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
@@ -34,6 +36,7 @@ describe('worker', () => {
       expect(createQueueStub.calledWith(JobQueues.INDEX_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES)).to.be.true;
 
       expect(
         workStub.calledWith(
@@ -96,20 +99,33 @@ describe('worker', () => {
           computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
         )
       ).to.be.true;
+      expect(
+        workStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES, pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler)
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED,
+          pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler
+        )
+      ).to.be.true;
+
+      // The poll is a recurring tick — scheduled on a fixed UTC interval after its queue exists.
+      expect(scheduleStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES, '0 * * * *')).to.be.true;
     });
 
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 14 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED
-      expect(createQueueStub.callCount).to.equal(14);
+      // 16 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED
+      expect(createQueueStub.callCount).to.equal(16);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -125,6 +141,9 @@ describe('worker', () => {
       // Recompute closure DLQ is created before its main queue
       expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
       expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      // Poll download schedules DLQ is created before its main queue
+      expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -132,7 +151,8 @@ describe('worker', () => {
     it('configures dead letter queue for process-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -153,7 +173,8 @@ describe('worker', () => {
     it('registers dead letter queue handler for failed jobs', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -167,7 +188,8 @@ describe('worker', () => {
     it('registers the index submission features job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -184,7 +206,8 @@ describe('worker', () => {
     it('configures dead letter queue for index-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -204,7 +227,8 @@ describe('worker', () => {
     it('configures dead letter queue + policy:short for process-download-version-export', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -227,7 +251,8 @@ describe('worker', () => {
     it('registers the compute scope anchors job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -244,7 +269,8 @@ describe('worker', () => {
     it('configures dead letter queue for compute-scope-anchors', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -264,7 +290,8 @@ describe('worker', () => {
     it('configures dead letter queue + policy:short for compute-submission-feature-closure', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -287,7 +314,8 @@ describe('worker', () => {
     it('registers the compute submission feature closure job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
@@ -303,6 +331,69 @@ describe('worker', () => {
       expect(workStub.getCall(13).args[1]).to.equal(
         computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
       );
+    });
+
+    it('registers the poll download schedules job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Poll download schedules handlers are registered after recompute closure handlers
+      expect(workStub.getCall(14).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(workStub.getCall(14).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler);
+
+      expect(workStub.getCall(15).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(workStub.getCall(15).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler);
+    });
+
+    it('configures dead letter queue for poll-download-schedules', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      const pollQueueCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(pollQueueCall).to.not.be.undefined;
+
+      const queueConfig = pollQueueCall?.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('schedules the poll on a recurring UTC cron after creating and working its queue', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      expect(scheduleStub.callCount).to.equal(1);
+      expect(scheduleStub.firstCall.args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(scheduleStub.firstCall.args[1]).to.equal('0 * * * *');
+      expect(scheduleStub.firstCall.args[3]).to.deep.equal({ tz: 'UTC' });
+
+      // schedule requires the queue to already exist and be worked
+      const pollCreateCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      const pollWorkCall = workStub.getCalls().find((call) => call.args[0] === JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(pollCreateCall?.calledBefore(scheduleStub.firstCall)).to.be.true;
+      expect(pollWorkCall?.calledBefore(scheduleStub.firstCall)).to.be.true;
     });
   });
 });

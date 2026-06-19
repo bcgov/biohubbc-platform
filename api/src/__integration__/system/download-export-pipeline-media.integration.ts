@@ -19,6 +19,7 @@ import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { EXPORTER_VERSION } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
@@ -27,6 +28,7 @@ import { DownloadPolicyService } from '../../services/download/download-policy-s
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -297,25 +299,42 @@ describe('Download Export pipeline — media (system)', function () {
    *
    * Returns both ids: lifecycle state + the pipeline entrypoint key off `groupId`,
    * while the export id is kept for any per-user-export reads.
+   *
+   * The recipe is a `per_feature_type` export over `featureType` with NO
+   * `output_columns` — i.e. all of that type's columns, the pre-config-driven
+   * behaviour these media tests rely on (the binary `artifact_key` column must be
+   * exported for the pipeline to stream the referenced file into the part-zip).
+   * The group row is written directly (bypassing service validation) with the
+   * config canonicalized + hashed via the production helpers, mirroring the DB
+   * pipeline test's seed.
    */
   async function seedPendingExport(
     downloadVersionId: string,
+    featureType = 'file',
     maxPartSizeBytes = '524288000'
   ): Promise<{ exportId: string; groupId: string }> {
-    const format = 'csv' as const;
-    const mode = 'per_feature_type' as const;
+    const config = ExportConfig.parse({
+      version: 1,
+      export_type: 'csv',
+      mode: 'per_feature_type',
+      feature_types: [featureType],
+      merge_steps: []
+    });
+    const normalized = canonicalizeExportConfig(config);
+    const configHash = computeConfigHash(normalized);
 
     await exportRepo.createExportArtifactGroup({
       downloadVersionId,
-      format,
-      mode,
+      config: normalized,
+      configHash,
+      format: normalized.export_type,
+      mode: normalized.mode,
       maxPartSizeBytes,
       exporterVersion: EXPORTER_VERSION
     });
     const group = await exportRepo.findActiveExportArtifactGroup(
       downloadVersionId,
-      format,
-      mode,
+      configHash,
       maxPartSizeBytes,
       EXPORTER_VERSION
     );
@@ -324,8 +343,8 @@ describe('Download Export pipeline — media (system)', function () {
 
     const record = await exportRepo.createDownloadVersionExport({
       download_version_id: downloadVersionId,
-      format,
-      mode,
+      format: normalized.export_type,
+      mode: normalized.mode,
       max_part_size_bytes: maxPartSizeBytes,
       download_version_export_artifact_group_id: groupId
     });
@@ -449,7 +468,7 @@ describe('Download Export pipeline — media (system)', function () {
     expect(submissionFeatureIds).to.have.lengthOf(2);
     const [id1, id2] = submissionFeatureIds;
 
-    const { groupId } = await seedPendingExport(downloadVersionId, '1');
+    const { groupId } = await seedPendingExport(downloadVersionId, 'file', '1');
 
     stubParquetReaderWithRows([
       { submission_feature_id: id1, file: artifactKey },
@@ -554,7 +573,7 @@ describe('Download Export pipeline — media (system)', function () {
     });
     await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'dataset');
 
-    const { groupId } = await seedPendingExport(downloadVersionId);
+    const { groupId } = await seedPendingExport(downloadVersionId, 'dataset');
 
     // Baseline: sample heap after writing the fixture but before the export
     // runs. Using `heapUsed` directly — we're watching for large deltas, not

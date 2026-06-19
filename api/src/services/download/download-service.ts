@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload, DownloadDetailRecord, DownloadId, DownloadListRecord } from '../../models/download';
+import { DownloadVersionRecord } from '../../models/download-version';
 import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -140,12 +141,6 @@ export class DownloadService extends DBService {
       requestedBy: payload.requestedBy
     });
 
-    // A download materializes exactly one version at request time. The version is the temporal
-    // axis the parquet/export pipeline links artifacts to, and the worker job is keyed on it.
-    // The write rides the route's transaction so a mid-flow failure rolls back the download and
-    // its version together.
-    const version = await this.downloadVersionRepository.createDownloadVersion(download_id);
-
     if (payload.requestedBy !== null) {
       await this.linkDownloadToNewTeam(
         download_id,
@@ -156,11 +151,32 @@ export class DownloadService extends DBService {
     }
     // Anonymous: no team link — UUID is the credential.
 
+    // A download materializes exactly one version at request time. rerunDownload creates that
+    // first version and enqueues the worker job keyed on it — the version is the temporal axis the
+    // parquet/export pipeline links artifacts to. The write + enqueue ride the route's transaction
+    // so a mid-flow failure rolls back the download and its version together.
+    await this.rerunDownload(download_id);
+
+    return { download_id };
+  }
+
+  /**
+   * Create and enqueue a new version of an existing download.
+   *
+   * Both the manual create path and the scheduler call this; materialization logic is never
+   * re-implemented — a rerun is just a new version plus the same enqueue. The write + enqueue ride
+   * the caller's transaction, so the worker only sees the job after commit.
+   *
+   * @param {string} downloadId - The download ID to materialize a new version for.
+   * @return {Promise<DownloadVersionRecord>} The newly created version.
+   * @memberof DownloadService
+   */
+  async rerunDownload(downloadId: string): Promise<DownloadVersionRecord> {
+    const version = await this.downloadVersionRepository.createDownloadVersion(downloadId);
     await DownloadService.dependencies.publishProcessDownloadJob(this.connection, {
       downloadVersionId: version.download_version_id
     });
-
-    return { download_id };
+    return version;
   }
 
   /**
