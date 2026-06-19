@@ -1,125 +1,23 @@
-import { mdiClose, mdiTrashCanOutline } from '@mdi/js';
+import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { IconButton, InputAdornment, Stack, TextField } from '@mui/material';
-import {
-  BuilderPredicateNode,
-  ExpressionBuilderDatetimeValue,
-  ExpressionBuilderProperty
-} from 'components/expression-builder/ExpressionBuilder.interface';
+import { IconButton, Stack, TextField } from '@mui/material';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { InlineSelect } from 'components/select/InlineSelect';
 import { EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS } from 'constants/expression';
 import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { useState } from 'react';
 import { getExpressionBuilderPropertyKeyFromProperty, hasPredicateValue } from 'utils/expression';
 import { ExpressionBuilderPropertySearch } from '../../property/search/ExpressionBuilderPropertySearch';
-
-interface ExpressionBuilderPredicateTokenProps {
-  /** Predicate node to render and edit. */
-  node: BuilderPredicateNode;
-  /** Property metadata available to this predicate. */
-  properties: ExpressionBuilderProperty[];
-  /** Selected property metadata cache, independent of current option results. */
-  selectedProperties: ExpressionBuilderProperty[];
-  /** Requests a refresh of the parent-owned property options. */
-  onPropertySearchInputChange: (keyword: string) => unknown;
-  /** Updates this predicate's selected property. */
-  onPropertyChange: (
-    predicateId: string,
-    propertyKey: string | null,
-    property?: ExpressionBuilderProperty | null
-  ) => unknown;
-  /** Updates this predicate's operator. */
-  onOperatorChange: (predicateId: string, operator: ExpressionPredicateOperator | null) => unknown;
-  /** Updates this predicate's value draft. */
-  onValueChange: (predicateId: string, value: unknown) => unknown;
-  /** Starts dragging this predicate. */
-  onDragStart: (predicateId: string) => unknown;
-  /** Clears parent drop state while hovering this predicate. */
-  onDragOverPredicate: () => unknown;
-  /** Drops the active predicate onto this predicate. */
-  onDropOnPredicate: (targetPredicateId: string) => unknown;
-  /** Currently dragged predicate UI id, if any. */
-  draggedPredicateId: string | null;
-  /** Removes this predicate by UI id. */
-  onRemove: (predicateId: string) => unknown;
-}
-
-/**
- * Checks whether an editable predicate value has the datetime draft shape.
- *
- * Datetime values are edited with separate date and time controls, while the
- * serialized expression payload remains a scalar string.
- *
- * @param {unknown} value - Candidate predicate value from builder state.
- * @returns {value is ExpressionBuilderDatetimeValue} True when the value can be used as a datetime draft.
- */
-const isDatetimeValue = (value: unknown): value is ExpressionBuilderDatetimeValue =>
-  typeof value === 'object' &&
-  value !== null &&
-  ('date_value' in value || 'time_value' in value) &&
-  (!('date_value' in value) || typeof value.date_value === 'string' || value.date_value === undefined) &&
-  (!('time_value' in value) || typeof value.time_value === 'string' || value.time_value === undefined);
-
-/**
- * Returns the next editable datetime draft after a date or time field change.
- *
- * Empty field values are removed from the draft so validation and serialization
- * can treat an empty datetime object the same as no value.
- *
- * @param {unknown} value - Current predicate value from builder state.
- * @param {keyof ExpressionBuilderDatetimeValue} field - Datetime field to update.
- * @param {string} nextValue - Next control value for the field.
- * @returns {ExpressionBuilderDatetimeValue} Updated datetime draft value.
- */
-const updateDatetimeValue = (
-  value: unknown,
-  field: keyof ExpressionBuilderDatetimeValue,
-  nextValue: string
-): ExpressionBuilderDatetimeValue => {
-  const currentValue = isDatetimeValue(value) ? value : {};
-  const nextDatetimeValue = { ...currentValue };
-
-  if (nextValue) {
-    nextDatetimeValue[field] = nextValue;
-  } else {
-    delete nextDatetimeValue[field];
-  }
-
-  return nextDatetimeValue;
-};
-
-const getTextInputValue = (value: unknown): string | number => {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  return '';
-};
-
-const renderClearValueAdornment = (isVisible: boolean, onClear: () => unknown) =>
-  isVisible ? (
-    <InputAdornment position="end">
-      <IconButton
-        aria-label="Clear value"
-        size="small"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-          onClear();
-        }}
-        sx={{ height: 24, width: 24 }}>
-        <Icon path={mdiClose} size={0.6} />
-      </IconButton>
-    </InputAdornment>
-  ) : undefined;
+import {
+  ExpressionBuilderPredicateDatetimeValueFieldParams,
+  ExpressionBuilderPredicateTextValueInputParams,
+  ExpressionBuilderPredicateTokenProps
+} from './ExpressionBuilderPredicateToken.interface';
+import { getTextInputValue, isDatetimeValue, updateDatetimeValue } from './ExpressionBuilderPredicateToken.utils';
+import { ExpressionBuilderPredicateTokenSkeleton } from './ExpressionBuilderPredicateTokenSkeleton';
+import { ExpressionBuilderPredicateValueClearAdornment } from './ExpressionBuilderPredicateValueClearAdornment';
+import { useExpressionBuilderPredicateProperty } from './useExpressionBuilderPredicateProperty';
 
 /**
  * Renders one editable predicate token within an expression group or root clause list.
@@ -148,17 +46,11 @@ export const ExpressionBuilderPredicateToken = ({
   onRemove
 }: ExpressionBuilderPredicateTokenProps) => {
   const [isDropTarget, setIsDropTarget] = useState(false);
-
-  // Predicate nodes store property ids; render-time metadata comes from the
-  // builder's property cache so labels, operators, and value controls can match
-  // the selected property type.
-  const property = selectedProperties.find(
-    (property) =>
-      property.feature_property_id === node.feature_property_id &&
-      property.feature_type_property_id === node.feature_type_property_id
-  );
+  const { property, propertyOptions } = useExpressionBuilderPredicateProperty({ node, properties, selectedProperties });
   const predicate = node.predicate;
-  const missingProperty = node.feature_property_id === null;
+  const hasSelectedPropertyId = typeof node.feature_property_id === 'number';
+  const missingProperty = !hasSelectedPropertyId;
+  const isSelectedPropertyLabelLoading = hasSelectedPropertyId && !property;
   const missingOperator = !!property && !predicate?.operator;
   const missingValue =
     !!property &&
@@ -168,8 +60,15 @@ export const ExpressionBuilderPredicateToken = ({
     !hasPredicateValue(predicate.value);
   const canDropOnPredicate = !!draggedPredicateId && draggedPredicateId !== node.ui_id;
 
-  // Predicate drop highlighting is local to the token. The parent builder owns
-  // the actual tree mutation when a drop is completed.
+  /**
+   * Handles drag-over events for predicate-to-predicate moves.
+   *
+   * Use this on the token root so the row can show local drop highlighting while
+   * the parent expression builder still owns the actual tree mutation.
+   *
+   * @param {React.DragEvent} event - Browser drag event from the token root.
+   * @returns {void}
+   */
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -182,6 +81,15 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(true);
   };
 
+  /**
+   * Clears local predicate drop highlighting when the dragged item leaves the row.
+   *
+   * Use this on the token root. It ignores movement between child elements of
+   * the same token so the drop highlight does not flicker.
+   *
+   * @param {React.DragEvent} event - Browser drag event from the token root.
+   * @returns {void}
+   */
   const handleDragLeave = (event: React.DragEvent) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
       return;
@@ -190,6 +98,15 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(false);
   };
 
+  /**
+   * Completes a predicate drop onto this token.
+   *
+   * Use this on the token root to clear local highlighting and notify the parent
+   * expression builder which predicate should receive the dragged predicate.
+   *
+   * @param {React.DragEvent} event - Browser drop event from the token root.
+   * @returns {void}
+   */
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -202,27 +119,314 @@ export const ExpressionBuilderPredicateToken = ({
     onDropOnPredicate(node.ui_id);
   };
 
+  /**
+   * Renders the text-backed predicate value input.
+   *
+   * Use this for incomplete predicates, Exists predicates, strings, numbers, and
+   * fallback draft values that should remain visible as editable text.
+   *
+   * @param {ExpressionBuilderPredicateTextValueInputParams} params - Text value, validation state, and optional input mode.
+   * @returns {JSX.Element} Text field for the predicate value.
+   */
+  const renderTextValueInput = ({ value, error, inputMode }: ExpressionBuilderPredicateTextValueInputParams) => (
+    <TextField
+      size="small"
+      variant="outlined"
+      type="text"
+      value={value ?? ''}
+      placeholder="Value"
+      error={error}
+      onChange={(event) => onValueChange(node.ui_id, event.target.value)}
+      InputProps={{
+        endAdornment: hasPredicateValue(value) ? (
+          <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
+        ) : undefined
+      }}
+      inputProps={{
+        'aria-label': 'Value',
+        inputMode
+      }}
+      sx={{
+        flex: '1 1 180px',
+        minWidth: 0,
+        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
+          fontSize: '0.875rem',
+          height: 36,
+          minHeight: 36,
+          padding: '0 4px 0 6px !important',
+          transition: 'box-shadow 120ms ease'
+        },
+        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
+          height: 24,
+          lineHeight: '24px',
+          padding: '8px !important'
+        }
+      }}
+    />
+  );
+
+  /**
+   * Renders the boolean predicate value selector.
+   *
+   * Use this when the selected property's predicate type is boolean so the draft
+   * stores actual boolean values instead of user-entered strings.
+   *
+   * @returns {JSX.Element} Boolean value select control.
+   */
+  const renderBooleanValueInput = () => {
+    const booleanValue = typeof predicate?.value === 'boolean' ? String(predicate.value) : '';
+
+    return (
+      <InlineSelect
+        ariaLabel="Value"
+        placeholder="Value"
+        sx={{
+          flex: '1 1 180px',
+          minWidth: 0,
+          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
+            transition: 'box-shadow 120ms ease'
+          }
+        }}
+        options={[
+          { value: 'true', label: 'true' },
+          { value: 'false', label: 'false' }
+        ]}
+        value={booleanValue}
+        onChange={(value) => onValueChange(node.ui_id, value === '' ? undefined : value === 'true')}
+      />
+    );
+  };
+
+  /**
+   * Renders a single datetime draft input.
+   *
+   * Use this for the date and time fields inside datetime predicates. The field
+   * parameter controls which part of the datetime draft is updated.
+   *
+   * @param {ExpressionBuilderPredicateDatetimeValueFieldParams} params - Datetime field configuration and layout sizing.
+   * @returns {JSX.Element} Native date or time text field.
+   */
+  const renderDatetimeValueField = ({
+    field,
+    type,
+    value,
+    error,
+    ariaLabel,
+    flex,
+    minWidth
+  }: ExpressionBuilderPredicateDatetimeValueFieldParams) => (
+    <TextField
+      size="small"
+      variant="outlined"
+      type={type}
+      value={value ?? ''}
+      error={error}
+      onChange={(event) => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, event.target.value))}
+      InputProps={{
+        endAdornment: hasPredicateValue(value) ? (
+          <ExpressionBuilderPredicateValueClearAdornment
+            onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, ''))}
+          />
+        ) : undefined
+      }}
+      inputProps={{ 'aria-label': ariaLabel }}
+      sx={{
+        flex,
+        minWidth,
+        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
+          fontSize: '0.875rem',
+          height: 36,
+          minHeight: 36,
+          padding: '0 56px 0 6px !important',
+          transition: 'box-shadow 120ms ease'
+        },
+        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
+          height: 24,
+          lineHeight: '24px',
+          padding: '8px !important'
+        },
+        '&& input[type="date"], && input[type="time"]': {
+          paddingRight: '0 !important'
+        },
+        '&& input[type="date"]::-webkit-calendar-picker-indicator, && input[type="time"]::-webkit-calendar-picker-indicator':
+          {
+            cursor: 'pointer',
+            margin: 0,
+            padding: 0,
+            position: 'absolute',
+            right: 28,
+            width: 24
+          }
+      }}
+    />
+  );
+
+  /**
+   * Renders the datetime predicate value controls.
+   *
+   * Use this when the selected property's predicate type is datetime. The
+   * selected operator determines whether the row shows date, time, or both
+   * fields.
+   *
+   * @returns {JSX.Element} Date/time field group for the predicate value.
+   */
+  const renderDatetimeValueInput = () => {
+    const datetimeValue = isDatetimeValue(predicate?.value) ? predicate.value : {};
+    const showDate =
+      predicate?.operator === 'OnDate' || predicate?.operator === 'Before' || predicate?.operator === 'After';
+    const showTime =
+      predicate?.operator === 'OnTime' || predicate?.operator === 'Before' || predicate?.operator === 'After';
+    const datetimeMissingValue =
+      !hasPredicateValue(datetimeValue.date_value) && !hasPredicateValue(datetimeValue.time_value);
+    const datetimeInputCount = Number(showDate) + Number(showTime);
+
+    return (
+      <Stack
+        direction="row"
+        gap={1}
+        sx={{
+          flex: datetimeInputCount > 1 ? '2 1 360px' : '1 1 180px',
+          minWidth: datetimeInputCount > 1 ? 320 : 160
+        }}>
+        {showDate &&
+          renderDatetimeValueField({
+            field: 'date_value',
+            type: 'date',
+            value: datetimeValue.date_value,
+            error: datetimeMissingValue,
+            ariaLabel: 'Date',
+            flex: '1 0 156px',
+            minWidth: 156
+          })}
+        {showTime &&
+          renderDatetimeValueField({
+            field: 'time_value',
+            type: 'time',
+            value: datetimeValue.time_value,
+            error: datetimeMissingValue,
+            ariaLabel: 'Time',
+            flex: '1 0 132px',
+            minWidth: 132
+          })}
+      </Stack>
+    );
+  };
+
+  /**
+   * Renders the appropriate value editor for the current predicate row.
+   *
+   * Use this from the token layout after property and operator controls. It
+   * dispatches to type-specific render helpers while keeping incomplete and
+   * Exists predicates visually stable with an enabled text input.
+   *
+   * @returns {JSX.Element} Value editor for the current predicate state.
+   */
   const renderValueInput = () => {
     // Keep the value field enabled even when the predicate is incomplete or the
     // operator is Exists. Exists still serializes without value, but enabled
     // fields keep the row visually stable and avoid focus traps.
     if (!property || !predicate?.operator || predicate.operator === 'Exists') {
-      const value = getTextInputValue(predicate?.value);
+      return renderTextValueInput({ value: getTextInputValue(predicate?.value) });
+    }
 
-      return (
-        <TextField
-          size="small"
-          variant="outlined"
-          value={value ?? ''}
-          placeholder="Value"
-          onChange={(event) => onValueChange(node.ui_id, event.target.value)}
-          InputProps={{
-            endAdornment: renderClearValueAdornment(hasPredicateValue(value), () => onValueChange(node.ui_id, ''))
-          }}
-          inputProps={{ 'aria-label': 'Value' }}
+    if (property.predicate_type === 'boolean') {
+      return renderBooleanValueInput();
+    }
+
+    if (property.predicate_type === 'datetime') {
+      return renderDatetimeValueInput();
+    }
+
+    return renderTextValueInput({
+      value: getTextInputValue(predicate.value),
+      error: missingValue,
+      inputMode: property.predicate_type === 'number' ? 'decimal' : undefined
+    });
+  };
+
+  return (
+    <LoadingGuard
+      isLoading={isSelectedPropertyLabelLoading}
+      isLoadingFallback={<ExpressionBuilderPredicateTokenSkeleton onRemove={() => onRemove(node.ui_id)} />}>
+      <Stack
+        data-testid="expression-filter-token"
+        data-drop-active={isDropTarget ? 'true' : 'false'}
+        direction="row"
+        gap={1}
+        alignItems="center"
+        flexWrap="nowrap"
+        draggable
+        onDragStart={() => onDragStart(node.ui_id)}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        sx={{
+          bgcolor: 'action.hover',
+          boxShadow: isDropTarget
+            ? (theme) => `0 0 0 2px ${theme.palette.primary.main}`
+            : '0 1px 2px rgba(0, 0, 0, 0.04)',
+          borderRadius: 1,
+          flex: '1 1 520px',
+          minWidth: 0,
+          px: 1,
+          py: 1,
+          transition: 'none'
+        }}>
+        <DragIndicatorIcon
+          fontSize="small"
+          aria-label="Drag filter"
           sx={{
-            flex: '1 1 180px',
+            color: 'text.secondary',
+            cursor: 'grab',
+            flexShrink: 0,
+            '&:active': {
+              cursor: 'grabbing'
+            }
+          }}
+        />
+
+        <ExpressionBuilderPropertySearch
+          properties={propertyOptions}
+          ariaLabel="Property"
+          value={property ?? null}
+          placeholder={property?.label ?? 'Property'}
+          showSearchIcon={false}
+          error={missingProperty}
+          sx={{
+            flex: '1.25 1 220px',
             minWidth: 0,
+            '&&& .MuiAutocomplete-endAdornment': {
+              alignItems: 'center',
+              display: 'flex',
+              gap: '4px',
+              justifyContent: 'flex-end',
+              paddingRight: '0 !important',
+              right: '4px !important',
+              width: 28
+            },
+            '&&& .MuiAutocomplete-clearIndicator': {
+              display: 'none !important'
+            },
+            '&&& .MuiAutocomplete-popupIndicator': {
+              alignItems: 'center',
+              display: 'inline-flex !important',
+              height: 24,
+              justifyContent: 'center',
+              padding: '4px',
+              width: 24,
+              '& .MuiSvgIcon-root': {
+                fontSize: '1rem'
+              }
+            },
             '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
               bgcolor: 'background.paper',
               borderRadius: 1,
@@ -230,29 +434,28 @@ export const ExpressionBuilderPredicateToken = ({
               fontSize: '0.875rem',
               height: 36,
               minHeight: 36,
-              padding: '0 4px 0 6px !important',
+              padding: '0 36px 0 6px !important',
               transition: 'box-shadow 120ms ease'
             },
-            '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
+            '&& .MuiInputBase-input': {
               height: 24,
               lineHeight: '24px',
-              padding: '8px !important'
+              minWidth: '0 !important',
+              overflow: 'hidden',
+              padding: '8px !important',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }
           }}
+          onSearchInputChange={onPropertySearchInputChange}
+          onSelectProperty={(property) =>
+            onPropertyChange(node.ui_id, getExpressionBuilderPropertyKeyFromProperty(property), property)
+          }
         />
-      );
-    }
 
-    if (property.predicate_type === 'boolean') {
-      // Boolean predicates use a select so users choose an actual boolean value
-      // instead of typing strings that would need coercion.
-      const hasBooleanValue = typeof predicate.value === 'boolean';
-      const booleanValue = hasBooleanValue ? String(predicate.value) : '';
-
-      return (
         <InlineSelect
-          ariaLabel="Value"
-          placeholder="Value"
+          ariaLabel="Operator"
+          disableClearable
           sx={{
             flex: '1 1 180px',
             minWidth: 0,
@@ -263,310 +466,27 @@ export const ExpressionBuilderPredicateToken = ({
               transition: 'box-shadow 120ms ease'
             }
           }}
-          options={[
-            { value: 'true', label: 'true' },
-            { value: 'false', label: 'false' }
-          ]}
-          value={booleanValue}
-          onChange={(value) => onValueChange(node.ui_id, value === '' ? undefined : value === 'true')}
+          error={missingOperator}
+          value={predicate?.operator ?? 'Equals'}
+          placeholder="Equals"
+          options={(property?.operators ?? (['Equals'] as ExpressionPredicateOperator[])).map((operator) => ({
+            value: operator,
+            label: EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS[operator] ?? operator
+          }))}
+          onChange={(value) => onOperatorChange(node.ui_id, value === '' ? null : value)}
         />
-      );
-    }
 
-    if (property.predicate_type === 'datetime') {
-      // The public API accepts datetime predicates as scalar strings. The token
-      // keeps date/time inputs separate for editing, then serialization converts
-      // the draft back to the API string form.
-      const datetimeValue = isDatetimeValue(predicate.value) ? predicate.value : {};
-      const showDate =
-        predicate.operator === 'OnDate' || predicate.operator === 'Before' || predicate.operator === 'After';
-      const showTime =
-        predicate.operator === 'OnTime' || predicate.operator === 'Before' || predicate.operator === 'After';
-      const datetimeMissingValue =
-        !hasPredicateValue(datetimeValue.date_value) && !hasPredicateValue(datetimeValue.time_value);
-      const datetimeInputCount = Number(showDate) + Number(showTime);
+        {renderValueInput()}
 
-      return (
-        <Stack
-          direction="row"
-          gap={1}
-          sx={{
-            flex: datetimeInputCount > 1 ? '2 1 360px' : '1 1 180px',
-            minWidth: datetimeInputCount > 1 ? 320 : 160
-          }}>
-          {showDate && (
-            <TextField
-              size="small"
-              variant="outlined"
-              type="date"
-              value={datetimeValue.date_value ?? ''}
-              error={datetimeMissingValue}
-              onChange={(event) =>
-                onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'date_value', event.target.value))
-              }
-              InputProps={{
-                endAdornment: renderClearValueAdornment(hasPredicateValue(datetimeValue.date_value), () =>
-                  onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'date_value', ''))
-                )
-              }}
-              inputProps={{ 'aria-label': 'Date' }}
-              sx={{
-                flex: '1 0 156px',
-                minWidth: 156,
-                '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-                  bgcolor: 'background.paper',
-                  borderRadius: 1,
-                  boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-                  fontSize: '0.875rem',
-                  height: 36,
-                  minHeight: 36,
-                  padding: '0 56px 0 6px !important',
-                  transition: 'box-shadow 120ms ease'
-                },
-                '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
-                  height: 24,
-                  lineHeight: '24px',
-                  padding: '8px !important'
-                },
-                '&& input[type="date"], && input[type="time"]': {
-                  paddingRight: '0 !important'
-                },
-                '&& input[type="date"]::-webkit-calendar-picker-indicator, && input[type="time"]::-webkit-calendar-picker-indicator':
-                  {
-                    cursor: 'pointer',
-                    margin: 0,
-                    padding: 0,
-                    position: 'absolute',
-                    right: 28,
-                    width: 24
-                  }
-              }}
-            />
-          )}
-          {showTime && (
-            <TextField
-              size="small"
-              variant="outlined"
-              type="time"
-              value={datetimeValue.time_value ?? ''}
-              error={datetimeMissingValue}
-              onChange={(event) =>
-                onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'time_value', event.target.value))
-              }
-              InputProps={{
-                endAdornment: renderClearValueAdornment(hasPredicateValue(datetimeValue.time_value), () =>
-                  onValueChange(node.ui_id, updateDatetimeValue(predicate.value, 'time_value', ''))
-                )
-              }}
-              inputProps={{ 'aria-label': 'Time' }}
-              sx={{
-                flex: '1 0 132px',
-                minWidth: 132,
-                '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-                  bgcolor: 'background.paper',
-                  borderRadius: 1,
-                  boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-                  fontSize: '0.875rem',
-                  height: 36,
-                  minHeight: 36,
-                  padding: '0 56px 0 6px !important',
-                  transition: 'box-shadow 120ms ease'
-                },
-                '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
-                  height: 24,
-                  lineHeight: '24px',
-                  padding: '8px !important'
-                },
-                '&& input[type="date"], && input[type="time"]': {
-                  paddingRight: '0 !important'
-                },
-                '&& input[type="date"]::-webkit-calendar-picker-indicator, && input[type="time"]::-webkit-calendar-picker-indicator':
-                  {
-                    cursor: 'pointer',
-                    margin: 0,
-                    padding: 0,
-                    position: 'absolute',
-                    right: 28,
-                    width: 24
-                  }
-              }}
-            />
-          )}
-        </Stack>
-      );
-    }
-
-    const value = getTextInputValue(predicate.value);
-
-    return (
-      <TextField
-        size="small"
-        variant="outlined"
-        type="text"
-        value={value ?? ''}
-        placeholder="Value"
-        error={missingValue}
-        onChange={(event) => onValueChange(node.ui_id, event.target.value)}
-        InputProps={{
-          endAdornment: renderClearValueAdornment(hasPredicateValue(value), () => onValueChange(node.ui_id, ''))
-        }}
-        inputProps={{
-          'aria-label': 'Value',
-          inputMode: property.predicate_type === 'number' ? 'decimal' : undefined
-        }}
-        sx={{
-          flex: '1 1 180px',
-          minWidth: 0,
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            fontSize: '0.875rem',
-            height: 36,
-            minHeight: 36,
-            padding: '0 4px 0 6px !important',
-            transition: 'box-shadow 120ms ease'
-          },
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
-            height: 24,
-            lineHeight: '24px',
-            padding: '8px !important'
-          }
-        }}
-      />
-    );
-  };
-
-  return (
-    <Stack
-      data-testid="expression-filter-token"
-      data-drop-active={isDropTarget ? 'true' : 'false'}
-      direction="row"
-      gap={1}
-      alignItems="center"
-      flexWrap="nowrap"
-      draggable
-      onDragStart={() => onDragStart(node.ui_id)}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      sx={{
-        bgcolor: 'action.hover',
-        boxShadow: isDropTarget
-          ? (theme) => `0 0 0 2px ${theme.palette.primary.main}`
-          : '0 1px 2px rgba(0, 0, 0, 0.04)',
-        borderRadius: 1,
-        flex: '1 1 520px',
-        minWidth: 0,
-        px: 1,
-        py: 1,
-        transition: 'none'
-      }}>
-      <DragIndicatorIcon
-        fontSize="small"
-        aria-label="Drag filter"
-        sx={{
-          color: 'text.secondary',
-          cursor: 'grab',
-          flexShrink: 0,
-          '&:active': {
-            cursor: 'grabbing'
-          }
-        }}
-      />
-
-      <ExpressionBuilderPropertySearch
-        properties={properties}
-        ariaLabel="Property"
-        value={property ?? null}
-        placeholder={property?.label ?? 'Property'}
-        showSearchIcon={false}
-        error={missingProperty}
-        sx={{
-          flex: '1.25 1 220px',
-          minWidth: 0,
-          '&&& .MuiAutocomplete-endAdornment': {
-            alignItems: 'center',
-            display: 'flex',
-            gap: '4px',
-            justifyContent: 'flex-end',
-            paddingRight: '0 !important',
-            right: '4px !important',
-            width: 28
-          },
-          '&&& .MuiAutocomplete-clearIndicator': {
-            display: 'none !important'
-          },
-          '&&& .MuiAutocomplete-popupIndicator': {
-            alignItems: 'center',
-            display: 'inline-flex !important',
-            height: 24,
-            justifyContent: 'center',
-            padding: '4px',
-            width: 24,
-            '& .MuiSvgIcon-root': {
-              fontSize: '1rem'
-            }
-          },
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            fontSize: '0.875rem',
-            height: 36,
-            minHeight: 36,
-            padding: '0 36px 0 6px !important',
-            transition: 'box-shadow 120ms ease'
-          },
-          '&& .MuiInputBase-input': {
-            height: 24,
-            lineHeight: '24px',
-            minWidth: '0 !important',
-            overflow: 'hidden',
-            padding: '8px !important',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }
-        }}
-        onSearchInputChange={onPropertySearchInputChange}
-        onSelectProperty={(property) =>
-          onPropertyChange(node.ui_id, getExpressionBuilderPropertyKeyFromProperty(property), property)
-        }
-      />
-
-      <InlineSelect
-        ariaLabel="Operator"
-        disableClearable
-        sx={{
-          flex: '1 1 180px',
-          minWidth: 0,
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            transition: 'box-shadow 120ms ease'
-          }
-        }}
-        error={missingOperator}
-        value={predicate?.operator ?? 'Equals'}
-        placeholder="Equals"
-        options={(property?.operators ?? (['Equals'] as ExpressionPredicateOperator[])).map((operator) => ({
-          value: operator,
-          label: EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS[operator] ?? operator
-        }))}
-        onChange={(value) => onOperatorChange(node.ui_id, value === '' ? null : value)}
-      />
-
-      {renderValueInput()}
-
-      <IconButton
-        aria-label="Remove filter"
-        size="small"
-        onClick={() => onRemove(node.ui_id)}
-        color="inherit"
-        sx={{ flexShrink: 0 }}>
-        <Icon path={mdiTrashCanOutline} size={0.6} />
-      </IconButton>
-    </Stack>
+        <IconButton
+          aria-label="Remove filter"
+          size="small"
+          onClick={() => onRemove(node.ui_id)}
+          color="inherit"
+          sx={{ flexShrink: 0 }}>
+          <Icon path={mdiTrashCanOutline} size={0.6} />
+        </IconButton>
+      </Stack>
+    </LoadingGuard>
   );
 };
