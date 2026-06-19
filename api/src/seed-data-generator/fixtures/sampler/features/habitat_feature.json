@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cbb9ec4c-1874-47fa-942c-7be0f1db15d9",
+    "type": "habitat_feature",
+    "properties": {
+      "name": "Sampler Habitat Feature 1",
+      "count": 3,
+      "timestamp": "2020-07-15 12:00:00+00",
+      "geometry": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -122.1875939,
+                58.6467094
+              ]
+            },
+            "properties": {}
+          }
+        ]
+      }
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

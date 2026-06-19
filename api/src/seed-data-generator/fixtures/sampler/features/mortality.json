@@ -1,0 +1,29 @@
+[
+  {
+    "id": "ad6dc187-8734-41f3-8c95-8c2dda898df2",
+    "type": "mortality",
+    "properties": {
+      "cause_of_death": "Predation",
+      "comment": "Sampler mortality.",
+      "timestamp": "2020-09-01 08:30:00+00",
+      "geometry": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -122.1875939,
+                58.6467094
+              ]
+            },
+            "properties": {}
+          }
+        ]
+      }
+    },
+    "content": [],
+    "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6"
+  }
+]
