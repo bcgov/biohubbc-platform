@@ -66,5 +66,6 @@ WHERE ft.name = 'species_observation'
   AND sf.record_effective_date IS NOT NULL
   AND sf.record_effective_date <= NOW()::date
   {siteFilter}
+  {taxonExclusionFilter}
   {securityFilter}
 `;

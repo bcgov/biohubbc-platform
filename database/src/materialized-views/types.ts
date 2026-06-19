@@ -33,3 +33,12 @@ export interface MaterializedViewSecurityConfig {
   defaultExcludeAllSecured: boolean;
   securedWhitelist: string[];
 }
+
+export interface TaxonExclusionBranchConfig {
+  rootScientificName: string;
+  exceptDescendantScientificNames?: string[];
+}
+
+export interface MaterializedViewTaxonExclusionConfig {
+  excludedBranches: TaxonExclusionBranchConfig[];
+}

@@ -147,5 +147,6 @@ WHERE ft.name = 'telemetry'
   AND sf.record_effective_date IS NOT NULL
   AND sf.record_effective_date <= NOW()::date
   AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months')
+  {taxonExclusionFilter}
   {securityFilter}
 `;

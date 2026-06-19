@@ -1,8 +1,10 @@
 import { SECURITY_CONFIG } from '../config/mv.security';
+import { TAXON_EXCLUSION_CONFIG } from '../config/mv.taxon-exclusions';
 import { OBSERVATIONS_BASE_QUERY } from '../sql/observations.sql';
 import { TELEMETRY_BASE_QUERY } from '../sql/telemetry.sql';
 import { MaterializedViewDefinition } from '../types';
 import { buildEffectivelySecuredExpression, buildSecurityFilter } from './build-security';
+import { buildTaxonExclusionFilter } from './build-taxon-exclusion';
 
 export function buildMaterializedViewSQL(definition: MaterializedViewDefinition): string {
   const { schema, name, columns, securityMode } = definition;
@@ -40,6 +42,7 @@ export function buildMaterializedViewSQL(definition: MaterializedViewDefinition)
 
   // Apply security filter
   const securityFilter = buildSecurityFilter(securityMode, SECURITY_CONFIG);
+  const taxonExclusionFilter = buildTaxonExclusionFilter(TAXON_EXCLUSION_CONFIG, 't.taxon_id');
 
   // Apply site filter for observations vs incidental
   let siteFilter = '';
@@ -53,6 +56,7 @@ export function buildMaterializedViewSQL(definition: MaterializedViewDefinition)
   const sql = baseQuery
     .replace('{columns}', columnSQL)
     .replace('{securityFilter}', securityFilter)
+    .replace('{taxonExclusionFilter}', taxonExclusionFilter)
     .replace('{siteFilter}', siteFilter);
 
   return `CREATE MATERIALIZED VIEW ${schema}.${name} AS\n${sql};`;
