@@ -47,7 +47,7 @@ export function isEffectivelySecured(featureIdExpr: string): string {
       WHERE c.source_submission_feature_id = ${featureIdExpr}
         AND c.is_ancestor = true
         AND sfs.record_end_date IS NULL
-        AND sfs.status = 'screened'
+        AND sfs.status = 'active'
         AND sf_sec.record_effective_date <= now()
     )
     -- Fail closed: the reflexive self-loop (F, F) is written for every active feature when its upload's

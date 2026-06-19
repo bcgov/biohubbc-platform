@@ -144,7 +144,7 @@ export class SecurityRuleRepository extends BaseRepository {
         // Draft rows (automatic screening output pending review) are not applied security
         this.on('sfs.security_rule_id', '=', 'sr.security_rule_id')
           .andOnNull('sfs.record_end_date')
-          .andOnVal('sfs.status', '=', 'screened');
+          .andOnVal('sfs.status', '=', 'active');
       })
       .whereNull('sr.record_end_date')
       .groupBy(

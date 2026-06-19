@@ -1,12 +1,11 @@
 import PgBoss from 'pg-boss';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
-import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import { publishAutomaticSecurityScreeningJob } from '../publisher';
+import { publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 export interface ComputeSubmissionFeatureClosureJobDependencies {
-  publishAutomaticSecurityScreeningJob: typeof publishAutomaticSecurityScreeningJob;
+  publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
 }
 
 /**
@@ -16,7 +15,7 @@ export interface ComputeSubmissionFeatureClosureJobDependencies {
  * named ESM exports are non-configurable.
  */
 export const computeSubmissionFeatureClosureJobDependencies: ComputeSubmissionFeatureClosureJobDependencies = {
-  publishAutomaticSecurityScreeningJob
+  publishSubmissionUploadSecurityJob
 };
 
 const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job');
@@ -100,7 +99,7 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
         // Enqueue screening in the same transaction as the closure write so the job
         // is only visible if the closure rows commit. This guarantees AC1: screening
         // never starts before closure population is complete.
-        await computeSubmissionFeatureClosureJobDependencies.publishAutomaticSecurityScreeningJob(conn, {
+        await computeSubmissionFeatureClosureJobDependencies.publishSubmissionUploadSecurityJob(conn, {
           submissionId,
           submissionUploadId
         });
@@ -123,12 +122,11 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 /**
  * Dead Letter Queue handler for failed compute submission feature closure jobs.
  *
- * The closure recompute is now a required leg of the upload lifecycle: it publishes the
- * automatic security screening job, which carries the upload to the terminal-success
- * `security_screened` status. A permanently failed closure would otherwise strand the
- * upload at the intermediate `indexed` status with no operator signal, so this handler
- * transitions the upload to `failed` (restartable — `failed` is a process-start status).
- * The closure data itself remains recoverable: re-running the pipeline regenerates it.
+ * Closure is a derived index recomputed wholesale per upload; `indexed` remains the
+ * terminal-success status and automatic security screening is an independent background
+ * workflow, so a permanently failed closure does not change the upload's status. The
+ * closure data itself remains recoverable: re-running the pipeline regenerates it. This
+ * handler therefore only logs the exhausted-retry event for operator visibility.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
@@ -141,20 +139,6 @@ export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IComputeSubmissionFeatureClosureJobData>).output;
-
-    await withConnection(async (connection) => {
-      const submissionUploadService = new SubmissionUploadService(connection);
-      // The closure job runs after the upload reached 'indexed' (set in the same transaction
-      // that published this job); a failed run leaves it there. 'failed' allows idempotent
-      // re-handling of the DLQ job itself. 'security_screened' covers a closure job queued
-      // before the screening migration backfilled completed uploads to that status — its
-      // closure is genuinely missing, so surfacing 'failed' is still correct.
-      await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
-        'indexed',
-        'security_screened',
-        'failed'
-      ]);
-    });
 
     defaultLog.warn({
       label: 'computeSubmissionFeatureClosureFailedHandler',

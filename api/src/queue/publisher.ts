@@ -6,12 +6,12 @@ import { DownloadVersionRepository } from '../repositories/download/download-ver
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
-import { IAutomaticSecurityScreeningJobData } from './jobs/automatic-security-screening-job';
 import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submission-feature-closure-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
+import { ISubmissionUploadSecurityJobData } from './jobs/submission-upload-security-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -736,7 +736,7 @@ export const publishComputeSubmissionFeatureClosureJob = async (
  * Generous expiry (2 hours) covers uploads with many active rules. Backoff
  * avoids hammering the DB if a transient error occurs.
  */
-const AUTOMATIC_SECURITY_SCREENING_OPTIONS: IPublishOptions = {
+const SUBMISSION_UPLOAD_SECURITY_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
@@ -744,7 +744,7 @@ const AUTOMATIC_SECURITY_SCREENING_OPTIONS: IPublishOptions = {
 };
 
 /**
- * Publish an automatic security screening job to the queue.
+ * Publish a submission upload security (automatic screening) job to the queue.
  *
  * Queues screening for a submission upload after its `submission_feature_closure`
  * has been populated. Uses the caller's DB connection via pg-boss's `db` option so
@@ -755,26 +755,26 @@ const AUTOMATIC_SECURITY_SCREENING_OPTIONS: IPublishOptions = {
  * queue prevents two concurrent screening jobs for the same upload.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IAutomaticSecurityScreeningJobData} data Job data containing submissionId and submissionUploadId
+ * @param {ISubmissionUploadSecurityJobData} data Job data containing submissionId and submissionUploadId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
  *         callers' surrounding transaction rolls back automatically.
  */
-export const publishAutomaticSecurityScreeningJob = async (
+export const publishSubmissionUploadSecurityJob = async (
   connection: IDBConnection,
-  data: IAutomaticSecurityScreeningJobData,
+  data: ISubmissionUploadSecurityJobData,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
     const boss = publisherDependencies.getPgBoss();
-    const mergedOptions = { ...AUTOMATIC_SECURITY_SCREENING_OPTIONS, ...options };
+    const mergedOptions = { ...SUBMISSION_UPLOAD_SECURITY_OPTIONS, ...options };
 
-    await boss.createQueue(JobQueues.AUTOMATIC_SECURITY_SCREENING);
+    await boss.createQueue(JobQueues.SUBMISSION_UPLOAD_SECURITY);
 
     // Use singletonKey to prevent duplicate concurrent screening jobs for the same upload.
     // Pass caller's connection via db option so job insert is part of the same transaction.
-    const jobId = await boss.send(JobQueues.AUTOMATIC_SECURITY_SCREENING, data, {
+    const jobId = await boss.send(JobQueues.SUBMISSION_UPLOAD_SECURITY, data, {
       ...mergedOptions,
       singletonKey: `screening-${data.submissionUploadId}`,
       db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
@@ -782,8 +782,8 @@ export const publishAutomaticSecurityScreeningJob = async (
 
     if (jobId) {
       defaultLog.info({
-        label: 'publishAutomaticSecurityScreeningJob',
-        message: 'Automatic security screening job published',
+        label: 'publishSubmissionUploadSecurityJob',
+        message: 'Submission upload security job published',
         jobId,
         submissionId: data.submissionId,
         submissionUploadId: data.submissionUploadId
@@ -793,7 +793,7 @@ export const publishAutomaticSecurityScreeningJob = async (
     }
 
     defaultLog.warn({
-      label: 'publishAutomaticSecurityScreeningJob',
+      label: 'publishSubmissionUploadSecurityJob',
       message: 'Job not published (duplicate or throttled)',
       submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId
@@ -802,7 +802,7 @@ export const publishAutomaticSecurityScreeningJob = async (
     return { status: 'duplicate', message: 'Job already exists for this submission upload' };
   } catch (error) {
     defaultLog.error({
-      label: 'publishAutomaticSecurityScreeningJob',
+      label: 'publishSubmissionUploadSecurityJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,

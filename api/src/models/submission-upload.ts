@@ -10,8 +10,6 @@ export const SubmissionUploadJobStatus = z.enum([
   'ingested',
   'indexing',
   'indexed',
-  'security_screening',
-  'security_screened',
   // Terminal failure states
   'invalid',
   'failed'

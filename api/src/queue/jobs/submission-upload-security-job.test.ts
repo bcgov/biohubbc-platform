@@ -5,32 +5,31 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import * as db from '../../database/db';
-import { AutomaticSecurityScreeningService } from '../../services/automatic-security-screening-service';
-import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
+import { SubmissionUploadSecurityService } from '../../services/submission-upload-security-service';
 import {
-  IAutomaticSecurityScreeningJobData,
-  automaticSecurityScreeningFailedHandler,
-  automaticSecurityScreeningJobHandler
-} from './automatic-security-screening-job';
+  ISubmissionUploadSecurityJobData,
+  submissionUploadSecurityFailedHandler,
+  submissionUploadSecurityJobHandler
+} from './submission-upload-security-job';
 
 chai.use(sinonChai);
 
 const createMockJob = (
-  data: IAutomaticSecurityScreeningJobData,
+  data: ISubmissionUploadSecurityJobData,
   id = 'job-1'
-): PgBoss.Job<IAutomaticSecurityScreeningJobData> =>
+): PgBoss.Job<ISubmissionUploadSecurityJobData> =>
   ({
     id,
-    name: 'automatic-security-screening',
+    name: 'submission-upload-security',
     data
-  } as PgBoss.Job<IAutomaticSecurityScreeningJobData>);
+  } as PgBoss.Job<ISubmissionUploadSecurityJobData>);
 
-describe('automaticSecurityScreeningJobHandler', () => {
+describe('submissionUploadSecurityJobHandler', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  it('acquires the advisory lock and calls screenSubmissionUpload', async () => {
+  it('acquires the advisory lock and calls screenSubmissionUpload with the job id', async () => {
     const mockConn = getMockDBConnection();
     mockConn.open = sinon.stub().resolves();
     mockConn.commit = sinon.stub().resolves();
@@ -39,11 +38,11 @@ describe('automaticSecurityScreeningJobHandler', () => {
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockConn);
 
-    const screenStub = sinon.stub(AutomaticSecurityScreeningService.prototype, 'screenSubmissionUpload').resolves();
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload').resolves();
 
-    await automaticSecurityScreeningJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
+    await submissionUploadSecurityJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
 
-    expect(screenStub).to.have.been.calledOnceWith('upload-1', 1);
+    expect(screenStub).to.have.been.calledOnceWith('upload-1', 1, 'job-1');
     expect(mockConn.commit).to.have.been.calledOnce;
   });
 
@@ -56,9 +55,9 @@ describe('automaticSecurityScreeningJobHandler', () => {
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockConn);
 
-    const screenStub = sinon.stub(AutomaticSecurityScreeningService.prototype, 'screenSubmissionUpload');
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload');
 
-    await automaticSecurityScreeningJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
+    await submissionUploadSecurityJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
 
     expect(screenStub).to.not.have.been.called;
   });
@@ -74,10 +73,10 @@ describe('automaticSecurityScreeningJobHandler', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockConn);
 
     const testError = new Error('Screening failed');
-    sinon.stub(AutomaticSecurityScreeningService.prototype, 'screenSubmissionUpload').rejects(testError);
+    sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload').rejects(testError);
 
     try {
-      await automaticSecurityScreeningJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
+      await submissionUploadSecurityJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
       expect.fail('Should have thrown');
     } catch (error) {
       expect((error as Error).message).to.equal('Screening failed');
@@ -85,7 +84,7 @@ describe('automaticSecurityScreeningJobHandler', () => {
   });
 });
 
-describe('automaticSecurityScreeningFailedHandler', () => {
+describe('submissionUploadSecurityFailedHandler', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -101,65 +100,51 @@ describe('automaticSecurityScreeningFailedHandler', () => {
     });
   };
 
-  it('marks upload failed and logs failure without throwing', async () => {
+  it('records a failed scan event without throwing or touching submission_upload.status', async () => {
     stubConnections();
-    const transitionStatusStub = sinon
-      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+    const recordFailureStub = sinon
+      .stub(SubmissionUploadSecurityService.prototype, 'recordScreeningFailure')
       .resolves();
 
     const job = {
       id: 'job-1',
-      name: 'automatic-security-screening-failed',
+      name: 'submission-upload-security-failed',
       data: { submissionId: 1, submissionUploadId: 'upload-1' },
       output: { message: 'Screening failed after retries' }
-    } as unknown as PgBoss.Job<IAutomaticSecurityScreeningJobData>;
+    } as unknown as PgBoss.Job<ISubmissionUploadSecurityJobData>;
 
     let thrownError: unknown;
     try {
-      await automaticSecurityScreeningFailedHandler([job]);
+      await submissionUploadSecurityFailedHandler([job]);
     } catch (error) {
       thrownError = error;
     }
 
     expect(thrownError).to.be.undefined;
-    expect(
-      transitionStatusStub.calledWith('upload-1', 'failed', [
-        'indexed',
-        'security_screening',
-        'security_screened',
-        'failed'
-      ])
-    ).to.be.true;
+    expect(recordFailureStub).to.have.been.calledOnceWith('upload-1', 'job-1');
   });
 
-  it('marks upload failed and logs default message when output is null', async () => {
+  it('records a failed scan event and logs the default message when output is null', async () => {
     stubConnections();
-    const transitionStatusStub = sinon
-      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+    const recordFailureStub = sinon
+      .stub(SubmissionUploadSecurityService.prototype, 'recordScreeningFailure')
       .resolves();
 
     const job = {
       id: 'job-2',
-      name: 'automatic-security-screening-failed',
+      name: 'submission-upload-security-failed',
       data: { submissionId: 2, submissionUploadId: 'upload-2' },
       output: null
-    } as unknown as PgBoss.Job<IAutomaticSecurityScreeningJobData>;
+    } as unknown as PgBoss.Job<ISubmissionUploadSecurityJobData>;
 
     let thrownError: unknown;
     try {
-      await automaticSecurityScreeningFailedHandler([job]);
+      await submissionUploadSecurityFailedHandler([job]);
     } catch (error) {
       thrownError = error;
     }
 
     expect(thrownError).to.be.undefined;
-    expect(
-      transitionStatusStub.calledWith('upload-2', 'failed', [
-        'indexed',
-        'security_screening',
-        'security_screened',
-        'failed'
-      ])
-    ).to.be.true;
+    expect(recordFailureStub).to.have.been.calledOnceWith('upload-2', 'job-2');
   });
 });

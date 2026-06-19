@@ -8,7 +8,7 @@ import { SubmissionUpload } from '../models/submission-upload';
  * `failed` is intentionally excluded so users can restart jobs that failed for
  * transient external reasons.
  */
-export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['security_screened', 'invalid'];
+export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed', 'invalid'];
 
 /**
  * Upload statuses from which processing is allowed to start or resume.
@@ -26,21 +26,3 @@ export const PROCESS_START_STATUSES: SubmissionUpload['status'][] = ['uploaded',
  * and idempotent resume (`indexing`) while rejecting terminal states.
  */
 export const INDEX_START_STATUSES: SubmissionUpload['status'][] = ['ingested', 'indexing'];
-
-/**
- * Upload statuses from which automatic security screening is allowed to start or resume.
- *
- * Used by `SubmissionUploadService.transitionSubmissionUploadToSecurityScreening`.
- *
- * `indexed`            — first run after closure has been populated.
- * `security_screening` — idempotent resume if the job retried mid-flight.
- * `failed`             — explicit restart after exhausted retries.
- * `security_screened`  — re-screen of an already-screened upload (e.g. after a new
- *                        security rule is activated); the draft insert is idempotent.
- */
-export const SCREENING_START_STATUSES: SubmissionUpload['status'][] = [
-  'indexed',
-  'security_screening',
-  'failed',
-  'security_screened'
-];

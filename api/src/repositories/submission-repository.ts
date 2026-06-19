@@ -888,7 +888,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -990,7 +990,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -1067,7 +1067,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -1119,7 +1119,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       WHERE
         submission_id = ${submissionId}
       GROUP BY
@@ -1180,7 +1180,7 @@ export class SubmissionRepository extends BaseRepository {
       })
       .innerJoin('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .leftJoin('submission_feature_security as sfs', function () {
-        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'screened');
+        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
       })
       .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
       .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
@@ -1342,7 +1342,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
@@ -1476,7 +1476,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'screened'
+        submission_feature_security.status = 'active'
       INNER JOIN
         feature_type
       ON
@@ -1821,7 +1821,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         sf.submission_feature_id = sfs.submission_feature_id
       AND
-        sfs.status = 'screened'
+        sfs.status = 'active'
       WHERE
         parent_submission_feature_id IS null
       AND
@@ -1852,7 +1852,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         sf.submission_feature_id = sfs.submission_feature_id
       AND
-        sfs.status = 'screened'
+        sfs.status = 'active'
       WHERE
         sf.submission_id = ${submissionId}
       AND sfs.submission_feature_security_id IS NULL
@@ -1908,7 +1908,7 @@ export class SubmissionRepository extends BaseRepository {
           SELECT 1
           FROM submission_feature_security sfs
           WHERE sfs.submission_feature_id = submission_feature.submission_feature_id
-            AND sfs.status = 'screened'
+            AND sfs.status = 'active'
         ) AS secured
       `)
       )

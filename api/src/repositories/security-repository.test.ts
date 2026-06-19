@@ -436,6 +436,39 @@ describe('SecurityRepository', () => {
     });
   });
 
+  describe('insertDraftSecurityForTriggers', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns 0 and does not query when there are no trigger feature ids', async () => {
+      const queryStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.insertDraftSecurityForTriggers([], 1, 'upload-uuid-1', 99);
+
+      expect(response).to.equal(0);
+      expect(queryStub).to.not.have.been.called;
+    });
+
+    it('inserts draft rows linked to the scan event and returns the inserted count', async () => {
+      const queryStub = sinon
+        .stub()
+        .resolves({ rowCount: 2, rows: [{ submission_feature_id: 10 }, { submission_feature_id: 20 }] });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.insertDraftSecurityForTriggers([10], 1, 'upload-uuid-1', 99);
+
+      expect(response).to.equal(2);
+      // The scan-event id is passed as the 4th bind parameter and written into submission_upload_security_id.
+      expect(queryStub).to.have.been.calledOnce;
+      const [, params] = queryStub.firstCall.args;
+      expect(params).to.deep.equal([[10], 1, 'upload-uuid-1', 99]);
+    });
+  });
+
   describe('removeSecurityFromSubmission', () => {
     it('should succeed at removing specific security rules from a submission', async () => {
       const mockQueryResponse = {
