@@ -328,7 +328,77 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('populateResolvedPropertyStagingBySubmissionUploadId', () => {
+    it('resolves assignment and validation flags through the selected Blueprint', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.populateResolvedPropertyStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+
+      expect(sqlText).to.include('INSERT INTO submission_upload_staging_resolved_property');
+
+      // Selected Blueprint is the active default Blueprint available for indexing.
+      expect(sqlText).to.include('is_default = true');
+      expect(sqlText).to.include('record_effective_date IS NOT NULL');
+
+      // Feature-type inclusion and property assignment come from the Blueprint tables.
+      expect(sqlText).to.include('blueprint_feature_type bft');
+      expect(sqlText).to.include('blueprint_feature_type_property bftp');
+
+      // The Blueprint assignment is joined through its new foreign keys: blueprint_feature_type_id
+      // (to the included feature type) and feature_type_property_id (to the pool entry).
+      expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
+      expect(sqlText).to.include('bftp.feature_type_property_id = ftp.feature_type_property_id');
+
+      // The columns removed from blueprint_feature_type_property must not be referenced.
+      expect(sqlText).to.not.include('bftp.blueprint_id');
+      expect(sqlText).to.not.include('bftp.feature_type_id');
+      expect(sqlText).to.not.include('bftp.feature_property_id');
+
+      // Requiredness and multiplicity are sourced from the Blueprint assignment.
+      expect(sqlText).to.include('COALESCE(bftp.allow_multiple, false)');
+      expect(sqlText).to.include('COALESCE(bftp.required_value, false)');
+
+      // Primitive property type still read from feature_property_type.
+      expect(sqlText).to.include('feature_property_type fpt');
+      expect(sqlText).to.include('fpt.name AS property_type_name');
+
+      // feature_type_property is not the source of requiredness or multiplicity.
+      expect(sqlText).to.not.include('COALESCE(ftp.allow_multiple');
+      expect(sqlText).to.not.include('COALESCE(ftp.required_value');
+    });
+  });
+
   describe('recordMissingRequiredPropertyErrorsBySubmissionUploadId', () => {
+    it('sources requiredness from the selected Blueprint', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordMissingRequiredPropertyErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('is_default = true');
+      expect(sqlText).to.include('blueprint_feature_type_property bftp');
+      expect(sqlText).to.include('bftp.required_value = TRUE');
+
+      // The Blueprint assignment is joined through its new foreign keys.
+      expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
+      expect(sqlText).to.include('ftp.feature_type_property_id = bftp.feature_type_property_id');
+
+      // The columns removed from blueprint_feature_type_property must not be referenced.
+      expect(sqlText).to.not.include('bftp.blueprint_id');
+      expect(sqlText).to.not.include('bftp.feature_type_id');
+      expect(sqlText).to.not.include('bftp.feature_property_id');
+
+      // Requiredness no longer derived from feature_type_property.
+      expect(sqlText).to.not.include('COALESCE(ftp.required_value, false) = TRUE');
+    });
+
     it('uses an indexable raw-property anti-lookup for present required properties', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
