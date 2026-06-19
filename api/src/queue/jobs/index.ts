@@ -67,7 +67,17 @@ export const JobQueues = {
    * Dead letter queue for failed compute-submission-feature-closure jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED: 'compute-submission-feature-closure-failed'
+  COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED: 'compute-submission-feature-closure-failed',
+  /**
+   * Recurring scheduler tick that drives due download-schedule reruns. This is the infrastructure
+   * cadence (a fixed interval); each schedule's own cron_expression is the per-download cadence.
+   */
+  POLL_DOWNLOAD_SCHEDULES: 'poll-download-schedules',
+  /**
+   * Dead letter queue for failed poll-download-schedules ticks.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  POLL_DOWNLOAD_SCHEDULES_FAILED: 'poll-download-schedules-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];
