@@ -182,7 +182,7 @@ describe('SecurityRepository', () => {
 
       const response = await securityRepository.deleteSecurityRuleFromArtifact(1, 1);
 
-      expect(response).to.eql(undefined);
+      expect(response).to.be.undefined;
     });
   });
 
@@ -344,7 +344,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.applySecurityRulesToSubmissionFeatures([1, 2, 3], [1, 2]);
-      expect(response.length).to.equal(6);
+      expect(response).to.have.lengthOf(6);
     });
   });
 
@@ -432,7 +432,7 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.applySecurityToSubmission(1, [1, 2]);
-      expect(response.length).to.equal(6);
+      expect(response).to.have.lengthOf(6);
     });
   });
 
@@ -505,7 +505,7 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeSecurityFromSubmission(1, [1]);
-      expect(response.length).to.equal(2);
+      expect(response).to.have.lengthOf(2);
     });
 
     it('should succeed at removing all security rules from a submission when no rule IDs are provided', async () => {
@@ -567,7 +567,7 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeSecurityFromSubmission(1);
-      expect(response.length).to.equal(4);
+      expect(response).to.have.lengthOf(4);
     });
   });
 
@@ -621,7 +621,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeAllSecurityRulesFromSubmissionFeatures([1, 2]);
-      expect(response.length).to.equal(3);
+      expect(response).to.have.lengthOf(3);
     });
   });
 
@@ -675,7 +675,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.getSecurityRulesForSubmissionFeatures([1, 2]);
-      expect(response.length).to.equal(3);
+      expect(response).to.have.lengthOf(3);
     });
   });
 });

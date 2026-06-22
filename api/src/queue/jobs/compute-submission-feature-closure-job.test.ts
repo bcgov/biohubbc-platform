@@ -111,7 +111,9 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
     expect(recomputeStub).not.to.have.been.called;
   });
 
-  it('logs the default message when output is null', async () => {
+  it('logs the default message when output is null without recomputing the closure', async () => {
+    const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload');
+
     const job = {
       id: 'job-2',
       name: 'compute-submission-feature-closure-failed',
@@ -120,5 +122,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
     } as unknown as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>;
 
     await computeSubmissionFeatureClosureFailedHandler([job]);
+
+    expect(recomputeStub).not.to.have.been.called;
   });
 });
