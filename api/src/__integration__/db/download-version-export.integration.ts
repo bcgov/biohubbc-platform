@@ -966,7 +966,7 @@ describe('Download version export state machine (integration)', function () {
       const v1Export = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: v1 },
+        validPerTypeConfig(v1, ['dataset']),
         connection
       );
 
@@ -981,7 +981,7 @@ describe('Download version export state machine (integration)', function () {
       await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: v1 },
+        validPerTypeConfig(v1, ['dataset']),
         connection
       );
       const v2 = await addReadyVersion(downloadId);
@@ -997,7 +997,7 @@ describe('Download version export state machine (integration)', function () {
       const v1Export = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: v1 },
+        validPerTypeConfig(v1, ['dataset']),
         connection
       );
 
@@ -1005,7 +1005,7 @@ describe('Download version export state machine (integration)', function () {
       const v2Export = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: v2 },
+        validPerTypeConfig(v2, ['dataset']),
         connection
       );
 
@@ -1032,7 +1032,7 @@ describe('Download version export state machine (integration)', function () {
       const v2Export = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        { download_version_id: v2 },
+        validPerTypeConfig(v2, ['dataset']),
         connection
       );
       await exportRepo.endExportArtifactGroup(await readGroupIdForExport(v2Export.download_version_export_id));
