@@ -190,6 +190,25 @@ describe('SecurityRuleRepository', () => {
       expect(count).to.equal(4);
     });
 
+    it("filters on status = 'active' so draft screening rows do not block deletion", async () => {
+      let capturedSql = '';
+      let capturedBindings: readonly unknown[] = [];
+      const mockDBConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const compiled = query.toSQL().toNative();
+          capturedSql = compiled.sql;
+          capturedBindings = compiled.bindings;
+          return { rowCount: 1, rows: [{ count: 0 }] } as any as Promise<QueryResult<any>>;
+        }
+      });
+
+      const repo = new SecurityRuleRepository(mockDBConnection);
+      await repo.getActiveAppliedFeatureCount(1);
+
+      expect(capturedSql).to.contain('status');
+      expect(capturedBindings).to.include('active');
+    });
+
     it('returns 0 when no active applications exist', async () => {
       const mockDBConnection = getMockDBConnection({
         knex: async () => ({ rowCount: 1, rows: [{ count: 0 }] } as any as Promise<QueryResult<any>>)

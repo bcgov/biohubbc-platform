@@ -35,6 +35,11 @@ import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
+import {
+  ISubmissionUploadSecurityJobData,
+  submissionUploadSecurityFailedHandler,
+  submissionUploadSecurityJobHandler
+} from './jobs/submission-upload-security-job';
 import { getPgBoss } from './pg-boss-service';
 import { IProcessDownloadVersionExportJobData } from './publisher';
 
@@ -64,6 +69,8 @@ export interface WorkerDependencies {
   computeSubmissionFeatureClosureFailedHandler: typeof computeSubmissionFeatureClosureFailedHandler;
   pollDownloadSchedulesJobHandler: typeof pollDownloadSchedulesJobHandler;
   pollDownloadSchedulesFailedHandler: typeof pollDownloadSchedulesFailedHandler;
+  submissionUploadSecurityJobHandler: typeof submissionUploadSecurityJobHandler;
+  submissionUploadSecurityFailedHandler: typeof submissionUploadSecurityFailedHandler;
 }
 
 export const workerDependencies: WorkerDependencies = {
@@ -83,7 +90,9 @@ export const workerDependencies: WorkerDependencies = {
   computeSubmissionFeatureClosureJobHandler,
   computeSubmissionFeatureClosureFailedHandler,
   pollDownloadSchedulesJobHandler,
-  pollDownloadSchedulesFailedHandler
+  pollDownloadSchedulesFailedHandler,
+  submissionUploadSecurityJobHandler,
+  submissionUploadSecurityFailedHandler
 };
 
 /**
@@ -290,6 +299,32 @@ export const registerWorkers = async (): Promise<void> => {
   // Schedule the recurring tick. The queue must already exist (created + worked above) before it can
   // be scheduled. tz UTC keeps the infra cadence stable across DST regardless of server timezone.
   await boss.schedule(JobQueues.POLL_DOWNLOAD_SCHEDULES, POLL_DOWNLOAD_SCHEDULES_CRON, {}, { tz: 'UTC' });
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singletonKey uniqueness for queued jobs so two concurrent
+  // screening runs for the same upload are not created.
+  await boss.createQueue(JobQueues.SUBMISSION_UPLOAD_SECURITY, {
+    deadLetter: JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register submission upload security (automatic screening) job handler
+  await boss.work<ISubmissionUploadSecurityJobData>(
+    JobQueues.SUBMISSION_UPLOAD_SECURITY,
+    workerDependencies.submissionUploadSecurityJobHandler
+  );
+
+  // Register dead letter queue handler for failed submission upload security jobs
+  await boss.work<ISubmissionUploadSecurityJobData>(
+    JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED,
+    workerDependencies.submissionUploadSecurityFailedHandler
+  );
 
   defaultLog.info({
     label: 'registerWorkers',

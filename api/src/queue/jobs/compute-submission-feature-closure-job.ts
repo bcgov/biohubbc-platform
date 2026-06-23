@@ -1,7 +1,22 @@
 import PgBoss from 'pg-boss';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { getLogger } from '../../utils/logger';
+import { publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
+
+export interface ComputeSubmissionFeatureClosureJobDependencies {
+  publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
+}
+
+/**
+ * Mutable dependency bag for the compute-submission-feature-closure job.
+ *
+ * Tests should stub this bag rather than the publisher module directly, since
+ * named ESM exports are non-configurable.
+ */
+export const computeSubmissionFeatureClosureJobDependencies: ComputeSubmissionFeatureClosureJobDependencies = {
+  publishSubmissionUploadSecurityJob
+};
 
 const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job');
 
@@ -80,6 +95,14 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
           submissionUploadId,
           insertedCount: result.insertedCount
         });
+
+        // Enqueue screening in the same transaction as the closure write so the job
+        // is only visible if the closure rows commit. This guarantees AC1: screening
+        // never starts before closure population is complete.
+        await computeSubmissionFeatureClosureJobDependencies.publishSubmissionUploadSecurityJob(conn, {
+          submissionId,
+          submissionUploadId
+        });
       });
     } catch (error) {
       defaultLog.error({
@@ -99,10 +122,11 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 /**
  * Dead Letter Queue handler for failed compute submission feature closure jobs.
  *
- * The closure is derived data — a stale closure for one upload is recoverable by re-enqueueing the
- * job (the next successful indexing run, or a manual recompute, regenerates it). The upload's own
- * lifecycle status reflects indexing, not closure state, so this handler only logs the failure and
- * does not flip the upload's status.
+ * Closure is a derived index recomputed wholesale per upload; `indexed` remains the
+ * terminal-success status and automatic security screening is an independent background
+ * workflow, so a permanently failed closure does not change the upload's status. The
+ * closure data itself remains recoverable: re-running the pipeline regenerates it. This
+ * handler therefore only logs the exhausted-retry event for operator visibility.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}

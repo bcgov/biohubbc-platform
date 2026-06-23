@@ -11,6 +11,7 @@ import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submissi
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
+import { ISubmissionUploadSecurityJobData } from './jobs/submission-upload-security-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -720,6 +721,88 @@ export const publishComputeSubmissionFeatureClosureJob = async (
   } catch (error) {
     defaultLog.error({
       label: 'publishComputeSubmissionFeatureClosureJob',
+      message: 'Failed to publish job',
+      submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Options for automatic security screening jobs.
+ *
+ * Generous expiry (2 hours) covers uploads with many active rules. Backoff
+ * avoids hammering the DB if a transient error occurs.
+ */
+const SUBMISSION_UPLOAD_SECURITY_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 * 2 // 2 hours
+};
+
+/**
+ * Publish a submission upload security (automatic screening) job to the queue.
+ *
+ * Queues screening for a submission upload after its `submission_feature_closure`
+ * has been populated. Uses the caller's DB connection via pg-boss's `db` option so
+ * the job insert participates in the same transaction as the closure write — if the
+ * caller rolls back, the job is never visible.
+ *
+ * `singletonKey: screening-${submissionUploadId}` paired with `policy: 'short'` on the
+ * queue prevents two concurrent screening jobs for the same upload.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {ISubmissionUploadSecurityJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishSubmissionUploadSecurityJob = async (
+  connection: IDBConnection,
+  data: ISubmissionUploadSecurityJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    const mergedOptions = { ...SUBMISSION_UPLOAD_SECURITY_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.SUBMISSION_UPLOAD_SECURITY);
+
+    // Use singletonKey to prevent duplicate concurrent screening jobs for the same upload.
+    // Pass caller's connection via db option so job insert is part of the same transaction.
+    const jobId = await boss.send(JobQueues.SUBMISSION_UPLOAD_SECURITY, data, {
+      ...mergedOptions,
+      singletonKey: `screening-${data.submissionUploadId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishSubmissionUploadSecurityJob',
+        message: 'Submission upload security job published',
+        jobId,
+        submissionId: data.submissionId,
+        submissionUploadId: data.submissionUploadId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishSubmissionUploadSecurityJob',
+      message: 'Job not published (duplicate or throttled)',
+      submissionId: data.submissionId,
+      submissionUploadId: data.submissionUploadId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this submission upload' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishSubmissionUploadSecurityJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
