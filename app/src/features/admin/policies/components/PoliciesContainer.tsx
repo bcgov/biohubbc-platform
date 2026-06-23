@@ -18,15 +18,10 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IServerPaginationProps } from 'types/pagination';
-import { transformPolicyJsonToApi } from '../utils/policyTransform';
-import {
-  AddPolicyForm,
-  AddPolicyFormInitialValues,
-  AddPolicyFormYupSchema,
-  IAddPolicyFormValues
-} from './AddPolicyForm';
 import { EditPolicyDialog } from './EditPolicyDialog';
+import { IPolicyFormValues, PolicyForm, PolicyFormInitialValues, PolicyFormYupSchema } from './PolicyForm';
 
 /**
  * Props for the PoliciesContainer component.
@@ -57,6 +52,7 @@ export interface IPoliciesContainerProps extends IServerPaginationProps {
  */
 export const PoliciesContainer = (props: IPoliciesContainerProps) => {
   const biohubApi = useApi();
+  const navigate = useNavigate();
   const { policies, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel } = props;
 
   const dialogContext = useDialogContext();
@@ -163,20 +159,18 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
    * Transforms the form values to API format and creates the policy.
    * Shows success snackbar or error dialog based on result.
    *
-   * @param {IAddPolicyFormValues} values - Form values from the add policy dialog
+   * @param {IPolicyFormValues} values - Form values from the add policy dialog
    * @returns {Promise<void>}
    */
-  const handleAddPolicySave = async (values: IAddPolicyFormValues) => {
+  const handleAddPolicySave = async (values: IPolicyFormValues) => {
     setIsLoading(true);
 
     try {
-      const statements = transformPolicyJsonToApi(values.policy_json);
-
       await biohubApi.policies.createPolicy({
         name: values.name,
         description: values.description || undefined,
         status: values.status,
-        statements
+        statements: []
       });
 
       setOpenAddPolicyDialog(false);
@@ -198,10 +192,10 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
    * Transforms the form values to API format and updates the policy.
    * Shows success snackbar or error dialog based on result.
    *
-   * @param {IAddPolicyFormValues} values - Form values from the edit policy dialog
+   * @param {IPolicyFormValues} values - Form values from the edit policy dialog
    * @returns {Promise<void>}
    */
-  const handleEditPolicySave = async (values: IAddPolicyFormValues) => {
+  const handleEditPolicySave = async (values: IPolicyFormValues) => {
     if (!editingPolicy) {
       return;
     }
@@ -209,13 +203,16 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
     setIsLoading(true);
 
     try {
-      const statements = transformPolicyJsonToApi(values.policy_json, editingPolicy.statements);
-
       await biohubApi.policies.updatePolicy(editingPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
         status: values.status,
-        statements
+        statements: editingPolicy.statements.map((statement) => ({
+          effect: statement.effect,
+          submission_feature_urn: statement.submission_feature_urn,
+          ...(statement.policy_expression_id ? { policy_expression_id: statement.policy_expression_id } : {}),
+          ...(statement.expression ? { expression: statement.expression } : {})
+        }))
       });
 
       setOpenEditPolicyDialog(false);
@@ -275,22 +272,28 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
-        <CustomMenuIconButton
-          buttonTitle="Actions"
-          buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-          menuItems={[
-            {
-              menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
-              menuLabel: 'Edit policy',
-              menuOnClick: () => handleEditPolicyClick(params.row)
-            },
-            {
-              menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-              menuLabel: 'Delete policy',
-              menuOnClick: () => handleDeletePolicyClick(params.row)
-            }
-          ]}
-        />
+        <Box
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}>
+          <CustomMenuIconButton
+            buttonTitle="Actions"
+            buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+            menuItems={[
+              {
+                menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
+                menuLabel: 'Edit policy',
+                menuOnClick: () => handleEditPolicyClick(params.row)
+              },
+              {
+                menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+                menuLabel: 'Delete policy',
+                menuOnClick: () => handleDeletePolicyClick(params.row)
+              }
+            ]}
+          />
+        </Box>
       )
     }
   ];
@@ -340,6 +343,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
             setPaginationModel={setPaginationModel}
             sortModel={sortModel}
             setSortModel={setSortModel}
+            onRowClick={(row) => navigate(`/admin/policy/${row.policy_id}`)}
           />
         </PageSection>
       </Container>
@@ -349,10 +353,11 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
         dialogTitle={'Add Policy'}
         open={openAddPolicyDialog}
         dialogSaveButtonLabel={'Create'}
+        maxWidth="md"
         component={{
-          element: <AddPolicyForm />,
-          initialValues: AddPolicyFormInitialValues,
-          validationSchema: AddPolicyFormYupSchema
+          element: <PolicyForm />,
+          initialValues: PolicyFormInitialValues,
+          validationSchema: PolicyFormYupSchema
         }}
         onCancel={() => setOpenAddPolicyDialog(false)}
         onSave={handleAddPolicySave}

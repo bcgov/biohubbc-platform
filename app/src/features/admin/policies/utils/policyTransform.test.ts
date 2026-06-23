@@ -1,5 +1,7 @@
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   defaultPolicyDocument,
+  transformPolicyFormToApiStatements,
   transformApiToPolicyJson,
   transformPolicyJsonToApi,
   validatePolicyJson
@@ -88,6 +90,41 @@ describe('policyTransform', () => {
       );
 
       expect(result).toEqual([{ effect: 'allow', submission_feature_urn: 'urn:*:observation:*' }]);
+    });
+  });
+
+  describe('transformPolicyFormToApiStatements', () => {
+    it('transforms single-statement expression form values', () => {
+      const expression = {
+        type: 'expression' as const,
+        operator: 'AND' as const,
+        clauses: [
+          {
+            type: 'predicate' as const,
+            feature_property_id: 1,
+            feature_type_property_id: null,
+            operator: 'Equals' as const,
+            value: 'north'
+          }
+        ]
+      };
+
+      expect(
+        transformPolicyFormToApiStatements({
+          name: 'Expression Policy',
+          description: '',
+          status: PolicyStatus.REQUESTED,
+          statement_effect: 'allow',
+          submission_feature_urn: 'urn:*:*:*',
+          expression
+        })
+      ).toEqual([
+        {
+          effect: 'allow',
+          submission_feature_urn: 'urn:*:*:*',
+          expression
+        }
+      ]);
     });
   });
 

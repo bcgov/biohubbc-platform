@@ -4,9 +4,10 @@ import {
   ICreateTeamPoliciesResponse,
   ICreateTeamPolicyRequest,
   ITeamPoliciesResponse,
+  ITeamPolicySearchParams,
   ITeamPolicy
 } from 'interfaces/useTeamPoliciesApi.interface';
-import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with team-policy associations.
@@ -23,7 +24,7 @@ export const useTeamPoliciesApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITeamPoliciesResponse>}
    */
   const getTeamPolicies = async (
-    searchParams?: ApiSearchParams,
+    searchParams?: ITeamPolicySearchParams,
     pagination?: ApiPaginationRequestOptions
   ): Promise<ITeamPoliciesResponse> => {
     const params = { ...searchParams, ...pagination };

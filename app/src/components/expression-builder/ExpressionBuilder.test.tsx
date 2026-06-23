@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import { SearchPropertyResponse } from 'interfaces/useSearchApi.interface';
 import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
-import { ExpressionBuilder } from './ExpressionBuilder';
+import { SearchExpressionBuilder as ExpressionBuilder } from './SearchExpressionBuilder';
 
 const searchPropertiesMock = vi.hoisted(() => vi.fn());
 const searchSpeciesMock = vi.hoisted(() => vi.fn());

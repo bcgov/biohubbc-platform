@@ -1,4 +1,4 @@
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { ApiPaginationResponseParams, ApiSearchParams } from 'types/pagination';
 
 /**
  * Team-policy association with team and policy names for display.
@@ -18,6 +18,13 @@ export interface ITeamPolicyDetails {
 export interface ITeamPoliciesResponse {
   team_policies: ITeamPolicyDetails[];
   pagination: ApiPaginationResponseParams;
+}
+
+/**
+ * Search and filter params for GET /api/administrative/team-policies.
+ */
+export interface ITeamPolicySearchParams extends ApiSearchParams {
+  policyIds?: string[];
 }
 
 /**

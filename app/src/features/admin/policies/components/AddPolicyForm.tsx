@@ -1,13 +1,11 @@
 import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
-import { PolicyAutocompleteContextProvider } from 'contexts/policyAutocompleteContext';
 import { useFormikContext } from 'formik';
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { useCallback } from 'react';
 import yup from 'utils/YupSchema';
-import { defaultPolicyDocument, validatePolicyJson } from '../utils/policyTransform';
-import { PolicyJsonEditor } from './PolicyJsonEditor';
+import { PolicyExpression } from './PolicyExpression';
 
 /**
  * Form values for creating or editing a policy.
@@ -20,8 +18,14 @@ export interface IAddPolicyFormValues {
   description: string;
   /** Lifecycle status for the policy */
   status: PolicyStatus;
-  /** JSON string containing the policy document (IPolicyDocument structure) */
-  policy_json: string;
+  /** Statement effect for the single editable policy statement */
+  statement_effect: 'allow' | 'deny';
+  /** Resource URN for the single editable policy statement */
+  submission_feature_urn: string;
+  /** Expression tree committed by the expression builder */
+  expression: ExpressionTreeExpression | null;
+  /** Current expression-builder validation error, if any */
+  expression_error?: string;
 }
 
 /**
@@ -31,58 +35,46 @@ export const AddPolicyFormInitialValues: IAddPolicyFormValues = {
   name: '',
   description: '',
   status: PolicyStatus.REQUESTED,
-  policy_json: JSON.stringify(defaultPolicyDocument, null, 2)
+  statement_effect: 'allow',
+  submission_feature_urn: 'urn:*:*:*',
+  expression: null,
+  expression_error: undefined
 };
 
 /**
  * Yup validation schema for the policy form.
- * Validates name is required and policy_json is valid JSON with correct structure.
+ * Validates policy metadata and the single statement target.
  */
 export const AddPolicyFormYupSchema = yup.object().shape({
   name: yup.string().required('Policy name is required'),
   description: yup.string(),
   status: yup.mixed<PolicyStatus>().required('Status is required'),
-  policy_json: yup
+  statement_effect: yup.mixed<'allow' | 'deny'>().oneOf(['allow', 'deny']).required('Statement effect is required'),
+  submission_feature_urn: yup
     .string()
-    .required('Policy document is required')
-    .test('valid-policy', function (value) {
-      const result = validatePolicyJson(value || '');
-      if (!result.valid) {
-        return this.createError({ message: result.error });
-      }
-      return true;
-    })
+    .required('Resource URN is required')
+    .matches(
+      /^urn:(\*|\d+):(\*|[a-zA-Z0-9_]+):(\*|[^:]+)$/,
+      'Invalid Resource URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
+    ),
+  expression: yup.mixed<ExpressionTreeExpression>().nullable(),
+  expression_error: yup
+    .string()
+    .optional()
+    .test('valid-expression-builder-draft', 'Policy expression is invalid', (value) => !value)
 });
 
 /**
  * Form component for creating or editing a policy.
  *
  * Must be used within a Formik context (wrapped by EditDialog or similar).
- * Includes fields for name, description, and a JSON policy document editor.
- * The PolicyJsonEditor is wrapped in PolicyAutocompleteContextProvider for autocomplete support.
+ * Includes fields for metadata, the single policy statement, and an expression builder.
  *
  * @returns {React.ReactElement} The policy form
  */
 export const AddPolicyForm = () => {
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, setFieldError } =
+  const { values, handleChange, handleSubmit, errors, touched, setFieldValue } =
     useFormikContext<IAddPolicyFormValues>();
-
-  /**
-   * Handle Monaco validation state changes.
-   * Sets a Formik field error when Monaco has validation errors,
-   * which prevents form submission via Formik's isValid check.
-   */
-  const handleValidationChange = useCallback(
-    (hasErrors: boolean) => {
-      if (hasErrors) {
-        setFieldError('policy_json', 'Policy document has validation errors');
-      } else if (errors.policy_json === 'Policy document has validation errors') {
-        // Clear only our Monaco-set error, not Yup validation errors
-        setFieldError('policy_json', undefined);
-      }
-    },
-    [setFieldError, errors.policy_json]
-  );
 
   return (
     <form onSubmit={handleSubmit}>
@@ -110,23 +102,54 @@ export const AddPolicyForm = () => {
           fullWidth
         />
 
+        <TextField
+          name="status"
+          label="Status"
+          value={values.status}
+          onChange={handleChange}
+          error={touched.status && Boolean(errors.status)}
+          helperText={touched.status && errors.status}
+          select
+          required
+          fullWidth>
+          {Object.values(PolicyStatus).map((status) => (
+            <MenuItem key={status} value={status}>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          name="statement_effect"
+          label="Effect"
+          value={values.statement_effect}
+          onChange={handleChange}
+          error={touched.statement_effect && Boolean(errors.statement_effect)}
+          helperText={touched.statement_effect && errors.statement_effect}
+          select
+          required
+          fullWidth>
+          <MenuItem value="allow">Allow</MenuItem>
+          <MenuItem value="deny">Deny</MenuItem>
+        </TextField>
+
+        <TextField
+          name="submission_feature_urn"
+          label="Resource"
+          value={values.submission_feature_urn}
+          onChange={handleChange}
+          error={touched.submission_feature_urn && Boolean(errors.submission_feature_urn)}
+          helperText={touched.submission_feature_urn && errors.submission_feature_urn}
+          required
+          fullWidth
+        />
+
         <Box>
-          <Typography component="legend" mb={1}>
-            Definition
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Add statements using JSON. Use the format:{' '}
-            <code>urn:&lt;submissionId&gt;:&lt;featureType&gt;:&lt;featureId&gt;</code> for resources. Use{' '}
-            <code>*</code> as a wildcard.
-          </Typography>
-          <PolicyAutocompleteContextProvider>
-            <PolicyJsonEditor
-              value={values.policy_json}
-              onChange={(val) => setFieldValue('policy_json', val)}
-              error={touched.policy_json ? (errors.policy_json as string) : undefined}
-              onValidationChange={handleValidationChange}
-            />
-          </PolicyAutocompleteContextProvider>
+          <PolicyExpression
+            value={values.expression ?? undefined}
+            onChange={(expression) => setFieldValue('expression', expression, false)}
+            onValidationChange={(error) => setFieldValue('expression_error', error ?? undefined, false)}
+          />
         </Box>
       </Box>
     </form>

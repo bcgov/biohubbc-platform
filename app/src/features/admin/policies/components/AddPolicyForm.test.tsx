@@ -1,33 +1,53 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { Formik } from 'formik';
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { cleanup, render } from 'test-helpers/test-utils';
 import { AddPolicyForm, AddPolicyFormInitialValues, IAddPolicyFormValues } from './AddPolicyForm';
 
-// Mock Monaco Editor - it doesn't work well in jsdom and causes hangs
-vi.mock('@monaco-editor/react', () => ({
-  default: ({ value, onChange }: { value?: string; onChange?: (value?: string) => void }) => (
-    <textarea data-testid="monaco-editor" value={value || ''} onChange={(e) => onChange?.(e.target.value)} />
-  ),
-  loader: {
-    init: vi.fn().mockResolvedValue({
-      languages: {
-        json: {
-          jsonDefaults: {
-            setDiagnosticsOptions: vi.fn()
-          }
-        }
+const mockExpression = vi.hoisted(
+  (): ExpressionTreeExpression => ({
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        type: 'predicate',
+        feature_property_id: 1,
+        feature_type_property_id: null,
+        operator: 'Equals',
+        value: 'north'
       }
-    })
-  }
+    ]
+  })
+);
+
+vi.mock('./PolicyExpression', () => ({
+  PolicyExpression: ({
+    value,
+    onChange
+  }: {
+    value?: ExpressionTreeExpression;
+    onChange?: (value: ExpressionTreeExpression | null) => void;
+  }) => (
+    <div data-testid="policy-expression" data-has-expression={value ? 'true' : 'false'}>
+      <button type="button" onClick={() => onChange?.(mockExpression)}>
+        Change Expression
+      </button>
+    </div>
+  )
 }));
 
-const renderContainer = (initialValues: IAddPolicyFormValues = AddPolicyFormInitialValues) => {
-  return render(
-    <Formik initialValues={initialValues} onSubmit={vi.fn()}>
+const renderContainer = (initialValues: IAddPolicyFormValues = AddPolicyFormInitialValues, onSubmit = vi.fn()) => {
+  const result = render(
+    <Formik initialValues={initialValues} onSubmit={onSubmit}>
       <AddPolicyForm />
     </Formik>
   );
+
+  return {
+    ...result,
+    onSubmit
+  };
 };
 
 describe('AddPolicyForm', () => {
@@ -51,25 +71,32 @@ describe('AddPolicyForm', () => {
     });
   });
 
-  it('renders the Definition section', async () => {
-    const { getByText } = renderContainer();
+  it('renders the statement and expression fields', async () => {
+    const { getByLabelText, getByTestId } = renderContainer();
 
     await waitFor(() => {
-      expect(getByText('Definition')).toBeVisible();
+      expect(getByLabelText(/Status/i)).toBeVisible();
+      expect(getByLabelText(/Effect/i)).toBeVisible();
+      expect(getByLabelText(/Resource/i)).toBeVisible();
+      expect(getByTestId('policy-expression')).toBeVisible();
     });
   });
 
   it('renders with pre-populated values', async () => {
-    const { getByDisplayValue } = renderContainer({
+    const { getByDisplayValue, getByTestId } = renderContainer({
       name: 'Test Policy',
       description: 'Test description',
       status: PolicyStatus.REVIEWED,
-      policy_json: JSON.stringify({ Version: '2024-01-01', Statement: [] }, null, 2)
+      statement_effect: 'deny',
+      submission_feature_urn: 'urn:1:telemetry:*',
+      expression: mockExpression
     });
 
     await waitFor(() => {
       expect(getByDisplayValue('Test Policy')).toBeVisible();
       expect(getByDisplayValue('Test description')).toBeVisible();
+      expect(getByDisplayValue('urn:1:telemetry:*')).toBeVisible();
+      expect(getByTestId('policy-expression')).toHaveAttribute('data-has-expression', 'true');
     });
   });
 
@@ -80,6 +107,25 @@ describe('AddPolicyForm', () => {
 
     await waitFor(() => {
       expect(getByDisplayValue('New Policy')).toBeVisible();
+    });
+  });
+
+  it('commits the applied expression into form values', async () => {
+    const { container, getByText, onSubmit } = renderContainer({
+      ...AddPolicyFormInitialValues,
+      name: 'Expression Policy'
+    });
+
+    fireEvent.click(getByText('Change Expression'));
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expression: mockExpression
+        }),
+        expect.anything()
+      );
     });
   });
 });

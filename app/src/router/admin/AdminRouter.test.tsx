@@ -10,6 +10,10 @@ vi.mock('features/admin/policies/ManagePoliciesPage', () => ({
   ManagePoliciesPage: () => <div data-testid="manage-policies-page">Manage Policies Page</div>
 }));
 
+vi.mock('features/admin/policies/PolicyDetailPage', () => ({
+  PolicyDetailPage: () => <div data-testid="policy-detail-page">Policy Detail Page</div>
+}));
+
 vi.mock('features/admin/users/ManageUsersPage', () => ({
   default: () => <div data-testid="manage-users-page">Manage Users Page</div>
 }));
@@ -31,10 +35,10 @@ vi.mock('./ticket/TicketsRouter', () => ({
 }));
 
 describe('AdminRouter ticket route guard', () => {
-  const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>) =>
+  const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>, initialEntry = '/admin/tickets') =>
     render(
       <AuthStateContext.Provider value={authState}>
-        <MemoryRouter initialEntries={['/admin/tickets']}>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
             <Route path="/admin/*" element={<AdminRouter />} />
             <Route path="/forbidden" element={<div data-testid="forbidden-page">Forbidden</div>} />
@@ -69,6 +73,23 @@ describe('AdminRouter ticket route guard', () => {
     await waitFor(() => {
       expect(queryByTestId('tickets-router')).toBeNull();
       expect(getByTestId('forbidden-page')).toBeVisible();
+    });
+  });
+
+  it('renders policy detail route for data admin', async () => {
+    const authState = getMockAuthState({
+      base: SystemUserAuthState,
+      overrides: {
+        biohubUserWrapper: {
+          roleNames: [SYSTEM_ROLE.DATA_ADMINISTRATOR]
+        }
+      }
+    });
+
+    const { getByTestId } = renderAdminRouter(authState, '/admin/policy/policy-1');
+
+    await waitFor(() => {
+      expect(getByTestId('policy-detail-page')).toBeVisible();
     });
   });
 });

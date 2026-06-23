@@ -43,7 +43,8 @@ export const ExpressionBuilderPredicateToken = ({
   onDragOverPredicate,
   onDropOnPredicate,
   draggedPredicateId,
-  onRemove
+  onRemove,
+  readOnly = false
 }: ExpressionBuilderPredicateTokenProps) => {
   const [isDropTarget, setIsDropTarget] = useState(false);
   const { property, propertyOptions } = useExpressionBuilderPredicateProperty({ node, properties, selectedProperties });
@@ -58,7 +59,7 @@ export const ExpressionBuilderPredicateToken = ({
     predicate.operator !== 'Exists' &&
     predicate.type !== 'datetime' &&
     !hasPredicateValue(predicate.value);
-  const canDropOnPredicate = !!draggedPredicateId && draggedPredicateId !== node.ui_id;
+  const canDropOnPredicate = !readOnly && !!draggedPredicateId && draggedPredicateId !== node.ui_id;
 
   /**
    * Handles drag-over events for predicate-to-predicate moves.
@@ -136,11 +137,13 @@ export const ExpressionBuilderPredicateToken = ({
       value={value ?? ''}
       placeholder="Value"
       error={error}
+      disabled={readOnly}
       onChange={(event) => onValueChange(node.ui_id, event.target.value)}
       InputProps={{
-        endAdornment: hasPredicateValue(value) ? (
-          <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
-        ) : undefined
+        endAdornment:
+          !readOnly && hasPredicateValue(value) ? (
+            <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
+          ) : undefined
       }}
       inputProps={{
         'aria-label': 'Value',
@@ -183,6 +186,7 @@ export const ExpressionBuilderPredicateToken = ({
       <InlineSelect
         ariaLabel="Value"
         placeholder="Value"
+        disabled={readOnly}
         sx={{
           flex: '1 1 180px',
           minWidth: 0,
@@ -227,13 +231,15 @@ export const ExpressionBuilderPredicateToken = ({
       type={type}
       value={value ?? ''}
       error={error}
+      disabled={readOnly}
       onChange={(event) => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, event.target.value))}
       InputProps={{
-        endAdornment: hasPredicateValue(value) ? (
-          <ExpressionBuilderPredicateValueClearAdornment
-            onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, ''))}
-          />
-        ) : undefined
+        endAdornment:
+          !readOnly && hasPredicateValue(value) ? (
+            <ExpressionBuilderPredicateValueClearAdornment
+              onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, ''))}
+            />
+          ) : undefined
       }}
       inputProps={{ 'aria-label': ariaLabel }}
       sx={{
@@ -364,7 +370,7 @@ export const ExpressionBuilderPredicateToken = ({
         gap={1}
         alignItems="center"
         flexWrap="nowrap"
-        draggable
+        draggable={!readOnly}
         onDragStart={() => onDragStart(node.ui_id)}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -381,18 +387,20 @@ export const ExpressionBuilderPredicateToken = ({
           py: 1,
           transition: 'none'
         }}>
-        <DragIndicatorIcon
-          fontSize="small"
-          aria-label="Drag filter"
-          sx={{
-            color: 'text.secondary',
-            cursor: 'grab',
-            flexShrink: 0,
-            '&:active': {
-              cursor: 'grabbing'
-            }
-          }}
-        />
+        {!readOnly && (
+          <DragIndicatorIcon
+            fontSize="small"
+            aria-label="Drag filter"
+            sx={{
+              color: 'text.secondary',
+              cursor: 'grab',
+              flexShrink: 0,
+              '&:active': {
+                cursor: 'grabbing'
+              }
+            }}
+          />
+        )}
 
         <ExpressionBuilderPropertySearch
           properties={propertyOptions}
@@ -401,6 +409,7 @@ export const ExpressionBuilderPredicateToken = ({
           placeholder={property?.label ?? 'Property'}
           showSearchIcon={false}
           error={missingProperty}
+          disabled={readOnly}
           sx={{
             flex: '1.25 1 220px',
             minWidth: 0,
@@ -456,6 +465,7 @@ export const ExpressionBuilderPredicateToken = ({
         <InlineSelect
           ariaLabel="Operator"
           disableClearable
+          disabled={readOnly}
           sx={{
             flex: '1 1 180px',
             minWidth: 0,
@@ -478,14 +488,16 @@ export const ExpressionBuilderPredicateToken = ({
 
         {renderValueInput()}
 
-        <IconButton
-          aria-label="Remove filter"
-          size="small"
-          onClick={() => onRemove(node.ui_id)}
-          color="inherit"
-          sx={{ flexShrink: 0 }}>
-          <Icon path={mdiTrashCanOutline} size={0.6} />
-        </IconButton>
+        {!readOnly && (
+          <IconButton
+            aria-label="Remove filter"
+            size="small"
+            onClick={() => onRemove(node.ui_id)}
+            color="inherit"
+            sx={{ flexShrink: 0 }}>
+            <Icon path={mdiTrashCanOutline} size={0.6} />
+          </IconButton>
+        )}
       </Stack>
     </LoadingGuard>
   );

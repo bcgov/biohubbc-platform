@@ -1,5 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
+import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
 import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
 import { SystemRoleGuard } from 'guards/Guards';
@@ -66,6 +67,23 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ManagePoliciesPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Policy detail route */}
+      <Route
+        path="policy/:policyId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Policy" description="View policy details" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <PolicyDetailPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

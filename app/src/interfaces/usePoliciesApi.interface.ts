@@ -1,4 +1,5 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
+import { ExpressionTreeExpression } from './expression.interface';
 
 export enum PolicyStatus {
   REQUESTED = 'requested',
@@ -27,6 +28,7 @@ export interface IPolicyStatement {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
   policy_expression_id: string | null;
+  expression?: ExpressionTreeExpression;
 }
 
 /**
@@ -54,6 +56,7 @@ export interface ICreatePolicyStatementRequest {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
   policy_expression_id?: string | null;
+  expression?: ExpressionTreeExpression;
 }
 
 /**

@@ -1,4 +1,5 @@
-import { ICreatePolicyStatementRequest, IPolicyStatement } from 'interfaces/usePoliciesApi.interface';
+import { ICreatePolicyStatementRequest, IPolicy, IPolicyStatement } from 'interfaces/usePoliciesApi.interface';
+import type { IAddPolicyFormValues } from '../components/AddPolicyForm';
 
 /**
  * JSON Policy document structure (for Monaco editor).
@@ -85,6 +86,30 @@ export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string
 
   return JSON.stringify(policy, null, 2);
 };
+
+/**
+ * Transform a full policy object to JSON document format for editing in the Monaco editor.
+ *
+ * @param {IPolicy} policy - The complete policy object from the API (includes metadata and statements)
+ * @returns {string} Formatted JSON string representing the policy document
+ */
+export const transformPolicyToJson = (policy: IPolicy): string => {
+  return transformApiToPolicyJson(policy.statements);
+};
+
+/**
+ * Build the single-statement payload used by the policy expression-builder form.
+ *
+ * @param {IAddPolicyFormValues} values - Policy form state.
+ * @returns {ICreatePolicyStatementRequest[]} Single statement payload for create/update APIs.
+ */
+export const transformPolicyFormToApiStatements = (values: IAddPolicyFormValues): ICreatePolicyStatementRequest[] => [
+  {
+    effect: values.statement_effect,
+    submission_feature_urn: values.submission_feature_urn,
+    ...(values.expression ? { expression: values.expression } : {})
+  }
+];
 
 const URN_PATTERN = /^urn:(\*|\d+):(\*|[a-z_]+):(\*|\d+)$/;
 const STATEMENT_KEYS = new Set(['Effect', 'Resource']);

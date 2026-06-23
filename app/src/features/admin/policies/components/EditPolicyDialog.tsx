@@ -1,15 +1,14 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
-import { transformApiToPolicyJson } from '../utils/policyTransform';
-import { AddPolicyForm, AddPolicyFormYupSchema, IAddPolicyFormValues } from './AddPolicyForm';
+import { IPolicyFormValues, PolicyForm, PolicyFormYupSchema } from './PolicyForm';
 
 interface IEditPolicyDialogProps {
   open: boolean;
   isLoading: boolean;
   policy: IPolicy;
-  initialValues?: Partial<IAddPolicyFormValues>;
+  initialValues?: Partial<IPolicyFormValues>;
   onCancel: () => void;
-  onSave: (values: IAddPolicyFormValues) => void;
+  onSave: (values: IPolicyFormValues) => void;
 }
 
 /**
@@ -21,24 +20,24 @@ interface IEditPolicyDialogProps {
 export const EditPolicyDialog = (props: IEditPolicyDialogProps) => {
   const { open, isLoading, policy, initialValues, onCancel, onSave } = props;
 
-  const mergedInitialValues: IAddPolicyFormValues = {
+  const mergedInitialValues: IPolicyFormValues = {
     name: policy.name,
     description: policy.description || '',
     status: policy.status,
-    policy_json: transformApiToPolicyJson(policy.statements),
     ...initialValues
   };
 
   return (
-    <EditDialog<IAddPolicyFormValues>
+    <EditDialog<IPolicyFormValues>
       isLoading={isLoading}
       dialogTitle="Edit Policy"
       dialogSaveButtonLabel="Save"
       open={open}
+      maxWidth="md"
       component={{
-        element: <AddPolicyForm />,
+        element: <PolicyForm />,
         initialValues: mergedInitialValues,
-        validationSchema: AddPolicyFormYupSchema
+        validationSchema: PolicyFormYupSchema
       }}
       onCancel={onCancel}
       onSave={onSave}

@@ -69,7 +69,7 @@ describe('team-policies', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(getAllTeamPoliciesStub).to.have.been.calledWith(
-        { search: undefined },
+        { search: undefined, policyIds: undefined },
         {
           page: 1,
           limit: 10,
@@ -77,7 +77,43 @@ describe('team-policies', () => {
           order: 'desc'
         }
       );
-      expect(getAllTeamPoliciesCountStub).to.have.been.calledWith({ search: undefined });
+      expect(getAllTeamPoliciesCountStub).to.have.been.calledWith({ search: undefined, policyIds: undefined });
+    });
+
+    it('should pass policyIds filter to service', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {
+        page: '1',
+        limit: '10',
+        policyIds: ['33333333-3333-3333-3333-333333333333']
+      };
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const getAllTeamPoliciesStub = sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves([]);
+      const getAllTeamPoliciesCountStub = sinon
+        .stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount')
+        .resolves(0);
+
+      const requestHandler = teamPolicies.getTeamPolicies();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getAllTeamPoliciesStub).to.have.been.calledWith(
+        { search: undefined, policyIds: ['33333333-3333-3333-3333-333333333333'] },
+        {
+          page: 1,
+          limit: 10,
+          sort: undefined,
+          order: undefined
+        }
+      );
+      expect(getAllTeamPoliciesCountStub).to.have.been.calledWith({
+        search: undefined,
+        policyIds: ['33333333-3333-3333-3333-333333333333']
+      });
     });
   });
 

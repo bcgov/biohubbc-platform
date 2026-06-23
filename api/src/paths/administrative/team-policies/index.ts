@@ -47,6 +47,13 @@ GET.apiDoc = {
       required: false,
       schema: { type: 'string' },
       description: 'Search term to filter by team or policy name'
+    },
+    {
+      in: 'query',
+      name: 'policyIds',
+      required: false,
+      schema: { type: 'array', items: { type: 'string', format: 'uuid' } },
+      description: 'Policy IDs to filter by'
     }
   ],
   responses: {
@@ -71,12 +78,19 @@ export function getTeamPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const search = req.query.search as string | undefined;
+    const policyIdsQuery = req.query.policyIds ?? req.query['policyIds[]'];
+    const policyIds =
+      typeof policyIdsQuery === 'string'
+        ? [policyIdsQuery]
+        : Array.isArray(policyIdsQuery)
+        ? policyIdsQuery.map(String)
+        : undefined;
 
     try {
       await connection.open();
 
       const teamPolicyService = new TeamPolicyService(connection);
-      const filters = { search };
+      const filters = { search, policyIds };
       const pagination = makePaginationOptionsFromRequest(req);
       const [teamPolicies, count] = await Promise.all([
         teamPolicyService.getAllTeamPolicies(filters, pagination),
