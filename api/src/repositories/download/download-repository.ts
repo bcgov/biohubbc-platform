@@ -8,7 +8,6 @@ import {
   CreateDownload,
   DownloadDetailRecord,
   DownloadId,
-  DownloadListRecordBase,
   DownloadListRow,
   DownloadSource,
   HasTeams,
@@ -190,15 +189,20 @@ export class DownloadRepository extends BaseRepository {
    * Single authorization path: download_team → team → team_member.
    * Returns downloads where the user is a member of any linked team.
    *
+   * LEFT JOINs `policy` for the owning policy's `name`/`description` so the list
+   * row matches `DownloadDetailRecord` — the same shape the detail read and the
+   * gallery list return. `policy_id` is NOT NULL on `download`, so the join is
+   * effectively inner and never multiplies rows (count stays correct).
+   *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
-   * @return {Promise<{ downloads: DownloadListRecordBase[]; count: number }>}
+   * @return {Promise<{ downloads: DownloadDetailRecord[]; count: number }>}
    * @memberof DownloadRepository
    */
   async getDownloadsByTeamMembership(
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<{ downloads: DownloadListRecordBase[]; count: number }> {
+  ): Promise<{ downloads: DownloadDetailRecord[]; count: number }> {
     const knex = getKnex();
 
     // Materialization status/timing are sourced from the most-recent active version
@@ -215,6 +219,8 @@ export class DownloadRepository extends BaseRepository {
         'dv.completed_at',
         'd.downloaded_at',
         'd.create_date',
+        'p.name',
+        'p.description',
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
@@ -227,6 +233,7 @@ export class DownloadRepository extends BaseRepository {
           LIMIT 1
         ) dv ON true`
       )
+      .leftJoin('policy as p', 'p.policy_id', 'd.policy_id')
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
       .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
@@ -248,7 +255,7 @@ export class DownloadRepository extends BaseRepository {
 
     const count = response.rows[0]?.total_count ?? 0;
     // Strip the total_count column from each row before returning
-    const downloads: DownloadListRecordBase[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
+    const downloads: DownloadDetailRecord[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
     return { downloads, count };
   }

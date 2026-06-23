@@ -43,7 +43,15 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'download_version_id', 'download_status', 'create_date', 'exports'],
+                  required: [
+                    'download_id',
+                    'download_version_id',
+                    'download_status',
+                    'create_date',
+                    'name',
+                    'description',
+                    'exports'
+                  ],
                   properties: {
                     download_id: {
                       type: 'string',
@@ -60,6 +68,15 @@ GET.apiDoc = {
                     },
                     create_date: {
                       type: 'string'
+                    },
+                    name: {
+                      type: 'string',
+                      description: "The owning policy's display name."
+                    },
+                    description: {
+                      type: 'string',
+                      nullable: true,
+                      description: "The owning policy's description."
                     },
                     started_at: {
                       type: 'string',

@@ -19,10 +19,9 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
 /**
  * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
  * `DownloadRecord` with the owning policy's display fields (`name`,
- * `description`), which are joined in via `LEFT JOIN biohub.policy` on the
- * detail query only. The LIST query does not join `policy`, so the base
- * `DownloadRecord` stays untouched and the list-row schemas (built off
- * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
+ * `description`), joined in via `LEFT JOIN biohub.policy`. Both the detail read
+ * and the paginated list read carry these fields, so every download read parses
+ * against `name`/`description`.
  */
 export const DownloadDetailRecord = DownloadRecord.extend({
   name: z.string(),
@@ -31,21 +30,13 @@ export const DownloadDetailRecord = DownloadRecord.extend({
 export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
 
 /**
- * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
- * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
+ * Service-layer (and public API) private download-list shape. Extends
+ * `DownloadDetailRecord` (base download + the owning policy's `name`/`description`)
+ * with `exports[]`, attached by `DownloadService.getDownloadsByTeamMembership`
+ * via a batch-fetch from `DownloadVersionExportRepository` and grouped by
+ * download_id in JS.
  */
-export const DownloadListRecordBase = DownloadRecord;
-export type DownloadListRecordBase = z.infer<typeof DownloadListRecordBase>;
-
-/**
- * Service-layer (and public API) list-row shape. `exports[]` is attached by
- * `DownloadService.getDownloadsByTeamMembership` via a batch-fetch from
- * `DownloadVersionExportRepository` and grouped by download_id in JS. Mirrors the
- * assembly pattern used by `TicketService.getTicket` (`ticket-service.ts`) —
- * composed at the service layer rather than via SQL aggregation so repositories
- * stay single-SQL CRUD.
- */
-export const DownloadListRecord = DownloadListRecordBase.extend({
+export const DownloadListRecord = DownloadDetailRecord.extend({
   exports: z.array(DownloadVersionExportListRow)
 });
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
@@ -55,7 +46,7 @@ export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
  * from the COUNT(*) OVER() window — stripped before returning to callers. Does
  * NOT carry `exports`; those are fetched separately and attached in the service.
  */
-export const DownloadListRow = DownloadListRecordBase.extend({
+export const DownloadListRow = DownloadDetailRecord.extend({
   total_count: z.number()
 });
 export type DownloadListRow = z.infer<typeof DownloadListRow>;
