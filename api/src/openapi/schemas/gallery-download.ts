@@ -1,5 +1,4 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { DownloadVersionExportListResponseSchema } from './download-version-export';
 
 /**
  * Request body schema for POST /gallery/{galleryId}/download — adds a download to a
@@ -18,16 +17,15 @@ export const AddGalleryDownloadRequestSchema: OpenAPIV3.SchemaObject = {
     sort: {
       type: 'integer',
       nullable: true,
-      description: 'Optional display order within the gallery. NULL sorts the member last.'
+      description: 'Optional display order within the gallery. NULL sorts the record last.'
     }
   }
 };
 
 /**
- * Response schema for GET /gallery/{galleryId}/download — a gallery's download
- * members, each with its `exports[]` attached. Each item matches the download list
- * element shape (`DownloadDetailRecord` fields + the per-download `exports[]`), so
- * the gallery contents response is interchangeable with the download list element.
+ * Response schema for GET /gallery/{galleryId}/download — gallery download
+ * records. Each item matches the download detail row shape; exports are fetched
+ * through the download/export endpoints when needed.
  */
 export const GalleryDownloadListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'array',
@@ -45,8 +43,7 @@ export const GalleryDownloadListResponseSchema: OpenAPIV3.SchemaObject = {
       'downloaded_at',
       'create_date',
       'name',
-      'description',
-      'exports'
+      'description'
     ],
     properties: {
       download_id: { type: 'string', format: 'uuid' },
@@ -66,11 +63,7 @@ export const GalleryDownloadListResponseSchema: OpenAPIV3.SchemaObject = {
       downloaded_at: { type: 'string', nullable: true },
       create_date: { type: 'string' },
       name: { type: 'string', description: "The owning policy's display name." },
-      description: { type: 'string', nullable: true, description: "The owning policy's description." },
-      exports: {
-        ...DownloadVersionExportListResponseSchema,
-        description: 'Exports attached to this download, ordered by create_date DESC. Empty when no exports exist.'
-      }
+      description: { type: 'string', nullable: true, description: "The owning policy's description." }
     }
   }
 };

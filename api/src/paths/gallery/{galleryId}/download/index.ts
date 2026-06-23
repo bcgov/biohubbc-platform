@@ -2,16 +2,17 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
 import { AddGalleryDownloadRequestBody } from '../../../../models/gallery-download';
 import {
   AddGalleryDownloadRequestSchema,
   GalleryDownloadListResponseSchema
 } from '../../../../openapi/schemas/gallery-download';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { GalleryDownloadService } from '../../../../services/gallery/gallery-download-service';
 import { getLogger } from '../../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/gallery/{galleryId}/download');
 
@@ -25,7 +26,7 @@ export const POST: Operation = [
 ];
 
 GET.apiDoc = {
-  description: "Get a gallery's download members, each with its exports attached.",
+  description: 'Get gallery download records.',
   tags: ['gallery'],
   security: [{ OptionalBearer: [] }],
   parameters: [
@@ -35,14 +36,22 @@ GET.apiDoc = {
       required: true,
       schema: { type: 'integer' },
       description: 'Gallery ID.'
-    }
+    },
+    ...paginationRequestQueryParamSchema
   ],
   responses: {
     200: {
-      description: 'Array of gallery download members, each with its exports',
+      description: 'Paginated gallery download records',
       content: {
         'application/json': {
-          schema: GalleryDownloadListResponseSchema
+          schema: {
+            type: 'object',
+            required: ['downloads', 'pagination'],
+            properties: {
+              downloads: GalleryDownloadListResponseSchema,
+              pagination: paginationResponseSchema
+            }
+          }
         }
       }
     },
@@ -80,7 +89,7 @@ POST.apiDoc = {
 };
 
 /**
- * Get a gallery's download members, each with its exports attached.
+ * Get gallery download records.
  *
  * Public: a gallery is a public-facing curated collection, so an unauthenticated
  * caller can read its contents on the shared API-user connection.
@@ -97,12 +106,12 @@ export function getGalleryDownloads(): RequestHandler {
       await connection.open();
 
       const galleryDownloadService = new GalleryDownloadService(connection);
-      // Public read: scope to public galleries so a private gallery's contents surface as a 404.
-      const downloads = await galleryDownloadService.getGalleryDownloads(galleryId, true);
+      const pagination = makePaginationOptionsFromRequest(req);
+      const { downloads, count } = await galleryDownloadService.getGalleryDownloads(galleryId, pagination);
 
       await connection.commit();
 
-      return res.status(200).json(downloads);
+      return res.status(200).json({ downloads, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'getGalleryDownloads', message: 'error', error });
       await connection.rollback();
@@ -120,11 +129,6 @@ export function getGalleryDownloads(): RequestHandler {
  */
 export function addDownloadToGallery(): RequestHandler {
   return async (req, res) => {
-    const parseResult = AddGalleryDownloadRequestBody.safeParse(req.body);
-    if (!parseResult.success) {
-      throw new HTTP400('Invalid request body', parseResult.error.issues);
-    }
-
     const connection = getDBConnection(req.keycloak_token);
 
     try {
@@ -132,12 +136,9 @@ export function addDownloadToGallery(): RequestHandler {
 
       await connection.open();
 
+      const body = req.body as AddGalleryDownloadRequestBody;
       const galleryDownloadService = new GalleryDownloadService(connection);
-      await galleryDownloadService.addDownloadToGallery(
-        galleryId,
-        parseResult.data.downloadId,
-        parseResult.data.sort ?? null
-      );
+      await galleryDownloadService.addDownloadToGallery(galleryId, body.downloadId, body.sort ?? null);
 
       await connection.commit();
 

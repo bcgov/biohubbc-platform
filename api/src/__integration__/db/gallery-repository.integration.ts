@@ -1,6 +1,6 @@
 // Integration test for GalleryRepository — verifies the curated download gallery
 // CRUD SQL against the real database: the partial-unique-index slug scoping
-// (active-only), the public visibility filter, and soft-delete semantics.
+// (active-only), visibility metadata, and soft-delete semantics.
 //
 // The gallery↔download membership SQL is covered by
 // gallery-download-repository.integration.ts.
@@ -209,27 +209,12 @@ describe('GalleryRepository (integration)', function () {
       expect(found).to.be.null;
     });
 
-    it('returns a private gallery when publicOnly is not set', async () => {
+    it('returns a private gallery by ID because visibility is not access control', async () => {
       const created = await seedGallery({ visibility: 'private' });
 
       const found = await repo.findGalleryById(created.gallery_id);
       expect(found).to.not.be.null;
       expect(found!.visibility).to.equal('private');
-    });
-
-    it('hides a private gallery when publicOnly is true', async () => {
-      const created = await seedGallery({ visibility: 'private' });
-
-      const found = await repo.findGalleryById(created.gallery_id, true);
-      expect(found).to.be.null;
-    });
-
-    it('returns a public gallery when publicOnly is true', async () => {
-      const created = await seedGallery({ visibility: 'public' });
-
-      const found = await repo.findGalleryById(created.gallery_id, true);
-      expect(found).to.not.be.null;
-      expect(found!.gallery_id).to.equal(created.gallery_id);
     });
   });
 
@@ -256,17 +241,6 @@ describe('GalleryRepository (integration)', function () {
     it('throws ApiNotFoundError for a missing gallery', async () => {
       try {
         await repo.getGalleryById(-1);
-        expect.fail('Expected ApiNotFoundError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-    });
-
-    it('throws ApiNotFoundError for a private gallery when publicOnly is true', async () => {
-      const created = await seedGallery({ visibility: 'private' });
-
-      try {
-        await repo.getGalleryById(created.gallery_id, true);
         expect.fail('Expected ApiNotFoundError');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);

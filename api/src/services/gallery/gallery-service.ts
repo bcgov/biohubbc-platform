@@ -7,9 +7,10 @@ import { DBService } from '../db-service';
 /**
  * Service for managing galleries (the `gallery` table).
  *
- * Owns the slug-uniqueness business rule and the public/private visibility scope
- * on reads. The gallery↔download membership concern lives in
- * `GalleryDownloadService`, so this service stays focused on gallery CRUD.
+ * Owns the slug-uniqueness business rule. The gallery↔download membership
+ * concern lives in `GalleryDownloadService`, so this service stays focused on
+ * gallery CRUD. `visibility` is metadata for advertising/readiness, not access
+ * control.
  *
  * @export
  * @class GalleryService
@@ -65,17 +66,13 @@ export class GalleryService extends DBService {
   /**
    * Get an active gallery by ID.
    *
-   * `publicOnly` scopes the lookup to public galleries, so an anonymous read of a
-   * private gallery surfaces as a 404 rather than exposing it.
-   *
    * @param {number} galleryId - The gallery ID.
-   * @param {boolean} [publicOnly=false] - When true, only matches public galleries.
    * @return {Promise<GalleryRecord>}
    * @throws {ApiNotFoundError} when no matching active gallery is found.
    * @memberof GalleryService
    */
-  async getGalleryById(galleryId: number, publicOnly = false): Promise<GalleryRecord> {
-    return this.galleryRepository.getGalleryById(galleryId, publicOnly);
+  async getGalleryById(galleryId: number): Promise<GalleryRecord> {
+    return this.galleryRepository.getGalleryById(galleryId);
   }
 
   /**

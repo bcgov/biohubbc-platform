@@ -24,7 +24,7 @@ export const GalleryResponseSchema: OpenAPIV3.SchemaObject = {
     visibility: {
       type: 'string',
       enum: ['public', 'private'],
-      description: 'Whether the gallery is surfaced on public reads. Private galleries are admin-only.'
+      description: 'Whether the gallery should be advertised. Private galleries remain directly addressable by ID.'
     },
     description: { type: 'string', nullable: true, description: 'Optional gallery description.' },
     create_date: { type: 'string', description: 'When the gallery was created.' }
@@ -50,18 +50,29 @@ export const CreateGalleryRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['name', 'slug'],
   properties: {
-    name: { type: 'string', minLength: 1, description: 'The gallery display name. Must be non-empty.' },
+    name: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+      description: 'The gallery display name. Must be non-empty.'
+    },
     slug: {
       type: 'string',
       minLength: 1,
+      maxLength: 100,
       pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
       description: 'The short, stable, URL-safe key. Kebab-case; unique among active galleries.'
     },
     visibility: {
       type: 'string',
       enum: ['public', 'private'],
-      description: 'Whether the gallery is surfaced on public reads. Defaults to public when omitted.'
+      description: 'Whether the gallery should be advertised. Defaults to public when omitted.'
     },
-    description: { type: 'string', nullable: true, description: 'Optional gallery description.' }
+    description: {
+      type: 'string',
+      maxLength: 1000,
+      nullable: true,
+      description: 'Optional gallery description.'
+    }
   }
 };

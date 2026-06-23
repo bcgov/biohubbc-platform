@@ -163,10 +163,9 @@ describe('GalleryRepository', () => {
       expect(result).to.deep.equal(row);
     });
 
-    it('does not constrain visibility by default', async () => {
-      // Verifies: an admin read (publicOnly omitted) does not add the visibility filter
+    it('does not constrain visibility for reads', async () => {
+      // Verifies: visibility is metadata, not an access-control predicate
 
-      // Step 1: Setup mock DB to return a private gallery row
       const row = galleryRow({ gallery_id: 7, visibility: 'private' });
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -174,29 +173,10 @@ describe('GalleryRepository', () => {
       // Step 2: Create repository with mocked connection
       const repo = new GalleryRepository(mockDBConnection);
 
-      // Step 3: Read without the public scope
       const result = await repo.getGalleryById(7);
 
-      // Step 4: The private gallery is returned and no visibility predicate was added
       expect(result).to.deep.equal(row);
       expect(sqlStub.firstCall.args[0].text).to.not.match(/visibility = 'public'/);
-    });
-
-    it('adds the public visibility predicate when publicOnly is true', async () => {
-      // Verifies: a public read scopes the query to public galleries
-
-      // Step 1: Setup mock DB to return a single row
-      const sqlStub = sinon.stub().resolves(mockQueryResult([galleryRow({ gallery_id: 7 })], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new GalleryRepository(mockDBConnection);
-
-      // Step 3: Read with the public scope
-      await repo.getGalleryById(7, true);
-
-      // Step 4: The query carries the public visibility predicate
-      expect(sqlStub.firstCall.args[0].text).to.match(/visibility = 'public'/);
     });
 
     it('throws ApiNotFoundError when no row is returned', async () => {

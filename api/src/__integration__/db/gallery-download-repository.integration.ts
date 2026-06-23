@@ -1,8 +1,8 @@
 // Integration test for GalleryDownloadRepository — verifies the gallery↔download
-// membership SQL against the real database: idempotent ON CONFLICT membership,
+// membership SQL against the real database: duplicate detection,
 // soft-delete semantics, and the getGalleryDownloads LATERAL join (most-recent
 // active version resolution), both-side (gd + download) active filtering, and
-// `sort ASC NULLS LAST, create_date ASC` ordering.
+// deterministic membership ordering.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -118,14 +118,19 @@ describe('GalleryDownloadRepository (integration)', function () {
       expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
     });
 
-    it('is a dedupe no-op when re-inserting while the membership is active (ON CONFLICT)', async () => {
+    it('throws when inserting a duplicate active membership', async () => {
       const gallery = await seedGallery();
       const { download_id } = await createPolicyDownload();
 
       await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 2);
 
-      // Still exactly one active row — the conflict short-circuits the second insert.
+      try {
+        await repo.addDownloadToGallery(gallery.gallery_id, download_id, 2);
+        expect.fail('Expected duplicate active membership insert to throw');
+      } catch (error) {
+        expect(error).to.be.an('error');
+      }
+
       expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
     });
 
@@ -165,6 +170,30 @@ describe('GalleryDownloadRepository (integration)', function () {
     });
   });
 
+  // ── galleryDownloadExists ────────────────────────────────────────────────
+
+  describe('galleryDownloadExists', () => {
+    it('returns true for an active membership', async () => {
+      const gallery = await seedGallery();
+      const { download_id } = await createPolicyDownload();
+      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
+
+      expect(await repo.galleryDownloadExists(gallery.gallery_id, download_id)).to.equal(true);
+    });
+
+    it('returns false for a missing or ended membership', async () => {
+      const gallery = await seedGallery();
+      const { download_id } = await createPolicyDownload();
+
+      expect(await repo.galleryDownloadExists(gallery.gallery_id, download_id)).to.equal(false);
+
+      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
+      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
+
+      expect(await repo.galleryDownloadExists(gallery.gallery_id, download_id)).to.equal(false);
+    });
+  });
+
   // ── removeDownloadFromGallery ────────────────────────────────────────────
 
   describe('removeDownloadFromGallery', () => {
@@ -196,7 +225,7 @@ describe('GalleryDownloadRepository (integration)', function () {
   // ── getGalleryDownloads (the LATERAL-join method) ────────────────────────
 
   describe('getGalleryDownloads', () => {
-    it('returns members with joined policy fields and the version-resolved fields from the LATERAL join', async () => {
+    it('returns gallery download records with joined policy fields and the version-resolved fields from the LATERAL join', async () => {
       const gallery = await seedGallery();
       const { download_id, download_version_id } = await createPolicyDownload({
         name: 'Curated policy',
@@ -257,7 +286,7 @@ describe('GalleryDownloadRepository (integration)', function () {
       expect(members.map((m) => m.download_id)).to.not.include(download_id);
     });
 
-    it('orders by sort ASC NULLS LAST then create_date ASC (tiebreaker)', async () => {
+    it('orders by sort ASC NULLS LAST then create_date ASC then gallery_download_id ASC (tiebreaker)', async () => {
       const gallery = await seedGallery();
 
       // sort=1, sort=2, sort=null, plus a second sort=1 row at a strictly-later
@@ -284,6 +313,22 @@ describe('GalleryDownloadRepository (integration)', function () {
 
       const orderedIds = (await repo.getGalleryDownloads(gallery.gallery_id)).map((m) => m.download_id);
       expect(orderedIds).to.eql([s1.download_id, s1b.download_id, s2.download_id, sNull.download_id]);
+    });
+
+    it('applies pagination to the SQL-ordered gallery download records and returns the total count', async () => {
+      const gallery = await seedGallery();
+      const first = await createPolicyDownload({ name: 'first' });
+      const second = await createPolicyDownload({ name: 'second' });
+      const third = await createPolicyDownload({ name: 'third' });
+
+      await repo.addDownloadToGallery(gallery.gallery_id, first.download_id, 1);
+      await repo.addDownloadToGallery(gallery.gallery_id, second.download_id, 2);
+      await repo.addDownloadToGallery(gallery.gallery_id, third.download_id, 3);
+
+      const result = await repo.getGalleryDownloads(gallery.gallery_id, { page: 2, limit: 1 });
+
+      expect(result.map((member) => member.download_id)).to.eql([second.download_id]);
+      expect(await repo.getGalleryDownloadsCount(gallery.gallery_id)).to.equal(3);
     });
 
     it('returns [] for an empty gallery', async () => {

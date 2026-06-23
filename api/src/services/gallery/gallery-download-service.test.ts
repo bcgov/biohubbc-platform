@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockDownloadRecord, createMockDownloadVersionExportListRow } from '../../__mocks__/download';
+import { createMockDownloadRecord } from '../../__mocks__/download';
 import { createMockGalleryRecord } from '../../__mocks__/gallery';
 import { ApiNotFoundError } from '../../errors/api-error';
+import { HTTP409 } from '../../errors/http-error';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { GalleryDownloadRepository } from '../../repositories/gallery/gallery-download-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
 import { GalleryDownloadService } from './gallery-download-service';
@@ -27,6 +27,7 @@ describe('GalleryDownloadService', () => {
       // Step 1: Stub the gallery guard and the download existence check to pass
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord({ gallery_id: 3 }));
       sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(GalleryDownloadRepository.prototype, 'galleryDownloadExists').resolves(false);
       const addStub = sinon.stub(GalleryDownloadRepository.prototype, 'addDownloadToGallery').resolves();
 
       // Step 2: Create the service
@@ -47,6 +48,7 @@ describe('GalleryDownloadService', () => {
       // Step 1: Stub both guards to pass
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord({ gallery_id: 3 }));
       sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(GalleryDownloadRepository.prototype, 'galleryDownloadExists').resolves(false);
       const addStub = sinon.stub(GalleryDownloadRepository.prototype, 'addDownloadToGallery').resolves();
 
       // Step 2: Create the service
@@ -112,6 +114,24 @@ describe('GalleryDownloadService', () => {
         expect(addStub).to.not.have.been.called;
       }
     });
+
+    it('throws HTTP409 and does not write when the download already exists in the gallery', async () => {
+      sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord({ gallery_id: 3 }));
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(GalleryDownloadRepository.prototype, 'galleryDownloadExists').resolves(true);
+      const addStub = sinon.stub(GalleryDownloadRepository.prototype, 'addDownloadToGallery');
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryDownloadService(mockDBConnection);
+
+      try {
+        await service.addDownloadToGallery(3, 'aaaa0000-0000-0000-0000-000000000042', 1);
+        expect.fail('expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect(addStub).to.not.have.been.called;
+      }
+    });
   });
 
   describe('removeDownloadFromGallery', () => {
@@ -134,26 +154,24 @@ describe('GalleryDownloadService', () => {
   });
 
   describe('getGalleryDownloads', () => {
-    it('forwards the publicOnly flag to the gallery guard', async () => {
-      // Verifies (V3): a public contents read scopes the gallery guard to public
-      // galleries, so a private gallery's members surface as a 404.
-
+    it('uses the admin gallery guard', async () => {
       // Step 1: Stub the gallery guard to pass and the membership query to return none
       const getStub = sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads').resolves([]);
+      sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloadsCount').resolves(0);
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
       const service = new GalleryDownloadService(mockDBConnection);
 
-      // Step 3: Read the gallery's contents with the public scope
-      await service.getGalleryDownloads(1, true);
+      // Step 3: Read the gallery's contents
+      await service.getGalleryDownloads(1);
 
-      // Step 4: The gallery guard received the publicOnly flag
-      expect(getStub).to.have.been.calledOnceWith(1, true);
+      // Step 4: The admin gallery guard received the id
+      expect(getStub).to.have.been.calledOnceWith(1);
     });
 
-    it('propagates ApiNotFoundError and fetches no members or exports when the gallery is missing', async () => {
+    it('propagates ApiNotFoundError and fetches no downloads or count when the gallery is missing', async () => {
       // Verifies (S6): the gallery guard runs before any membership or export work,
       // so a missing gallery is a 404 with no wasted fetches.
 
@@ -162,7 +180,7 @@ describe('GalleryDownloadService', () => {
         .stub(GalleryRepository.prototype, 'getGalleryById')
         .rejects(new ApiNotFoundError('Gallery not found'));
       const membersStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads');
-      const exportsStub = sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds');
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloadsCount');
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -177,97 +195,43 @@ describe('GalleryDownloadService', () => {
         expect(error).to.be.instanceOf(ApiNotFoundError);
         expect(getStub).to.have.been.calledOnceWith(99);
         expect(membersStub).to.not.have.been.called;
-        expect(exportsStub).to.not.have.been.called;
+        expect(countStub).to.not.have.been.called;
       }
     });
 
-    it('returns an empty array and skips the export fetch when the gallery has no members', async () => {
-      // Verifies (S7): an existing gallery with no active members short-circuits to
-      // [] and never reaches the export batch fetch.
-
-      // Step 1: Stub the gallery guard to pass and the membership query to return none
+    it('returns empty downloads and count when the gallery has no download records', async () => {
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
       const membersStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads').resolves([]);
-      const exportsStub = sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds');
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloadsCount').resolves(0);
 
-      // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
       const service = new GalleryDownloadService(mockDBConnection);
 
-      // Step 3: Read the empty gallery's contents
       const result = await service.getGalleryDownloads(1);
 
-      // Step 4: The result is an empty array and the export fetch is skipped
-      expect(result).to.eql([]);
+      expect(result).to.eql({ downloads: [], count: 0 });
       expect(membersStub).to.have.been.calledOnceWith(1);
-      expect(exportsStub).to.not.have.been.called;
+      expect(countStub).to.have.been.calledOnceWith(1);
     });
 
-    it('attaches grouped exports to each member, with an empty array for members that have none', async () => {
-      // Verifies (S8): exports are grouped by download_id and spread onto each
-      // member; a member with no exports falls through to [] (the `?? []` decision).
-
-      // Step 1: Stub two members, one with exports and one without
-      const memberA = createMockDownloadRecord({ download_id: 'a' });
-      const memberB = createMockDownloadRecord({ download_id: 'b' });
-      const exportA1 = createMockDownloadVersionExportListRow({
-        download_version_export_id: 'ex-a1',
-        download_id: 'a'
-      });
-      const exportA2 = createMockDownloadVersionExportListRow({
-        download_version_export_id: 'ex-a2',
-        download_id: 'a'
-      });
-
+    it('uses Promise.all to fetch paginated downloads and count', async () => {
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
-      sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads').resolves([memberA, memberB]);
-      sinon
-        .stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds')
-        .resolves([exportA1, exportA2]);
+      const members = [
+        createMockDownloadRecord({ download_id: 'first' }),
+        createMockDownloadRecord({ download_id: 'second' })
+      ];
+      const membersStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads').resolves(members);
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloadsCount').resolves(7);
 
-      // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
       const service = new GalleryDownloadService(mockDBConnection);
+      const pagination = { page: 2, limit: 10, sort: 'create_date', order: 'desc' as const };
 
-      // Step 3: Read the gallery's contents
-      const result = await service.getGalleryDownloads(1);
+      const result = await service.getGalleryDownloads(1, pagination);
 
-      // Step 4: Member A carries its two exports; member B falls through to []
-      expect(result).to.have.length(2);
-      expect(result[0].download_id).to.equal('a');
-      expect(result[0].exports).to.eql([exportA1, exportA2]);
-      expect(result[1].download_id).to.equal('b');
-      expect(result[1].exports).to.eql([]);
-    });
-
-    it('passes each member’s latest download version id to the export fetch', async () => {
-      // Verifies (S9): every member's already-resolved latest download_version_id is
-      // forwarded to the batch fetch — so exports[] reflects the displayed version and no
-      // member is silently dropped from the exports lookup.
-
-      // Step 1: Stub three members with distinct download version ids
-      const versionIds = ['version-1', 'version-2', 'version-3'];
-      sinon.stub(GalleryRepository.prototype, 'getGalleryById').resolves(createMockGalleryRecord());
-      sinon
-        .stub(GalleryDownloadRepository.prototype, 'getGalleryDownloads')
-        .resolves(
-          versionIds.map((id, index) =>
-            createMockDownloadRecord({ download_id: `download-${index + 1}`, download_version_id: id })
-          )
-        );
-      const exportsStub = sinon
-        .stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds')
-        .resolves([]);
-
-      // Step 2: Create the service
-      const mockDBConnection = getMockDBConnection();
-      const service = new GalleryDownloadService(mockDBConnection);
-
-      // Step 3: Read the gallery's contents
-      await service.getGalleryDownloads(1);
-
-      // Step 4: The batch fetch receives the full download-version-id set in member order
-      expect(exportsStub).to.have.been.calledOnceWith(versionIds);
+      expect(result).to.eql({ downloads: members, count: 7 });
+      expect(membersStub).to.have.been.calledOnceWith(1, pagination);
+      expect(countStub).to.have.been.calledOnceWith(1);
     });
 
     it('preserves the member order returned by the repository', async () => {
@@ -282,7 +246,7 @@ describe('GalleryDownloadService', () => {
           createMockDownloadRecord({ download_id: 'first' }),
           createMockDownloadRecord({ download_id: 'second' })
         ]);
-      sinon.stub(DownloadVersionExportRepository.prototype, 'listExportsByDownloadVersionIds').resolves([]);
+      sinon.stub(GalleryDownloadRepository.prototype, 'getGalleryDownloadsCount').resolves(2);
 
       // Step 2: Create the service
       const mockDBConnection = getMockDBConnection();
@@ -292,7 +256,7 @@ describe('GalleryDownloadService', () => {
       const result = await service.getGalleryDownloads(1);
 
       // Step 4: The member order is preserved
-      expect(result.map((member) => member.download_id)).to.eql(['first', 'second']);
+      expect(result.downloads.map((member) => member.download_id)).to.eql(['first', 'second']);
     });
   });
 });

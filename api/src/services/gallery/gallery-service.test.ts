@@ -190,9 +190,8 @@ describe('GalleryService', () => {
   });
 
   describe('getGalleryById', () => {
-    it('forwards the publicOnly flag to the repository', async () => {
-      // Verifies (V1): a public read scopes the lookup to public galleries, so the
-      // repository receives publicOnly=true and a private gallery surfaces as a 404.
+    it('forwards admin reads to the repository get', async () => {
+      // Verifies (V1): admin reads use the unrestricted gallery lookup.
 
       // Step 1: Stub the repository get
       const getStub = sinon
@@ -203,15 +202,15 @@ describe('GalleryService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new GalleryService(mockDBConnection);
 
-      // Step 3: Read gallery 3 with the public scope
-      await service.getGalleryById(3, true);
+      // Step 3: Read gallery 3
+      await service.getGalleryById(3);
 
-      // Step 4: The repository received the publicOnly flag
-      expect(getStub).to.have.been.calledOnceWith(3, true);
+      // Step 4: The repository received the gallery id
+      expect(getStub).to.have.been.calledOnceWith(3);
     });
 
     it('propagates ApiNotFoundError when no matching gallery is found', async () => {
-      // Verifies (V2): a private gallery on a public read (or a missing gallery) is a 404.
+      // Verifies (V2): a missing gallery is a 404.
 
       // Step 1: Stub the repository get to reject as not-found
       sinon.stub(GalleryRepository.prototype, 'getGalleryById').rejects(new ApiNotFoundError('Gallery not found'));
@@ -222,7 +221,7 @@ describe('GalleryService', () => {
 
       // Step 3: The not-found error propagates
       try {
-        await service.getGalleryById(99, true);
+        await service.getGalleryById(99);
         expect.fail('expected ApiNotFoundError');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);

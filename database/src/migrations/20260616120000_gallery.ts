@@ -10,10 +10,10 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE gallery (
       gallery_id      INTEGER        GENERATED ALWAYS AS IDENTITY NOT NULL,
-      name            TEXT           NOT NULL,
-      slug            TEXT           NOT NULL,
+      name            VARCHAR(100)   NOT NULL,
+      slug            VARCHAR(100)   NOT NULL,
       visibility      TEXT           DEFAULT 'public' NOT NULL,
-      description     TEXT,
+      description     VARCHAR(1000),
       record_end_date TIMESTAMPTZ(6),
       create_date     TIMESTAMPTZ(6) DEFAULT now() NOT NULL,
       create_user     INTEGER        NOT NULL,
@@ -32,7 +32,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN gallery.gallery_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN gallery.name IS 'The display name of the gallery; may be renamed and is not a stable identifier.';
     COMMENT ON COLUMN gallery.slug IS 'A short, stable, URL-safe key for the gallery; unique among active galleries. Consumers reference a gallery by its slug rather than its mutable name.';
-    COMMENT ON COLUMN gallery.visibility IS 'Controls whether the gallery is surfaced on public reads: ''public'' is visible to anonymous callers; ''private'' is admin-only.';
+    COMMENT ON COLUMN gallery.visibility IS 'Controls whether the gallery should be advertised; it is not an access-control boundary.';
     COMMENT ON COLUMN gallery.description IS 'An optional description of the gallery.';
     COMMENT ON COLUMN gallery.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN gallery.create_date IS 'The datetime the record was created.';
@@ -65,7 +65,9 @@ export async function up(knex: Knex): Promise<void> {
       ON gallery_download(gallery_id, download_id)
       WHERE record_end_date IS NULL;
 
-    CREATE INDEX gallery_download_idx1 ON gallery_download(gallery_id);
+    CREATE INDEX gallery_download_idx1
+      ON gallery_download(gallery_id, sort ASC NULLS LAST, create_date ASC, gallery_download_id ASC)
+      WHERE record_end_date IS NULL;
     CREATE INDEX gallery_download_idx2 ON gallery_download(download_id);
 
     COMMENT ON TABLE gallery_download IS 'Join table linking downloads to a gallery, with display ordering.';

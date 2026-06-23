@@ -4,11 +4,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { addDownloadToGallery, getGalleryDownloads } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { createMockDownloadRecord, createMockDownloadVersionExportListRow } from '../../../../__mocks__/download';
+import { createMockDownloadRecord } from '../../../../__mocks__/download';
 import * as db from '../../../../database/db';
 import { ApiNotFoundError } from '../../../../errors/api-error';
-import { HTTP400, HTTPError } from '../../../../errors/http-error';
-import { DownloadListRecord } from '../../../../models/download';
+import { DownloadDetailRecord } from '../../../../models/download';
 import { GalleryDownloadService } from '../../../../services/gallery/gallery-download-service';
 
 chai.use(sinonChai);
@@ -19,20 +18,19 @@ describe('paths/gallery/{galleryId}/download/index', () => {
   });
 
   describe('getGalleryDownloads', () => {
-    it('uses the API-user connection, forwards Number(galleryId), and returns the array with exports intact', async () => {
+    it('uses the API-user connection, forwards Number(galleryId) and pagination, and returns downloads with pagination', async () => {
       const dbConnectionObj = getMockDBConnection();
       const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       const dbConnStub = sinon.stub(db.dbDependencies, 'getDBConnection');
 
-      const members: DownloadListRecord[] = [
-        { ...createMockDownloadRecord(), exports: [createMockDownloadVersionExportListRow({ part_count: 2 })] }
-      ];
+      const members: DownloadDetailRecord[] = [createMockDownloadRecord()];
       const getGalleryDownloadsStub = sinon
         .stub(GalleryDownloadService.prototype, 'getGalleryDownloads')
-        .resolves(members);
+        .resolves({ downloads: members, count: 1 });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { galleryId: '42' };
+      mockReq.query = { page: '2', limit: '10', sort: 'create_date', order: 'desc' };
 
       const requestHandler = getGalleryDownloads();
       await requestHandler(mockReq, mockRes, mockNext);
@@ -40,19 +38,30 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       // Public endpoint: shared API-user connection, never the authenticated getter.
       expect(apiUserStub).to.have.been.calledOnce;
       expect(dbConnStub).to.not.have.been.called;
-      // Public endpoint: scoped to public galleries via publicOnly=true.
-      expect(getGalleryDownloadsStub).to.have.been.calledOnceWith(42, true);
+      expect(getGalleryDownloadsStub).to.have.been.calledOnceWith(42, {
+        page: 2,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      });
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(members);
-      expect(mockRes.jsonValue[0].exports).to.have.length(1);
-      expect(mockRes.jsonValue[0].exports[0]).to.have.property('part_count', 2);
+      expect(mockRes.jsonValue.downloads).to.eql(members);
+      expect(mockRes.jsonValue.pagination).to.eql({
+        total: 1,
+        per_page: 10,
+        current_page: 2,
+        last_page: 1,
+        sort: 'create_date',
+        order: 'desc'
+      });
+      expect(mockRes.jsonValue.downloads[0]).to.not.have.property('exports');
     });
 
-    it('returns 200 with an empty array when the gallery has no members', async () => {
+    it('returns 200 with empty downloads and default pagination when the gallery has no download records', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(GalleryDownloadService.prototype, 'getGalleryDownloads').resolves([]);
+      sinon.stub(GalleryDownloadService.prototype, 'getGalleryDownloads').resolves({ downloads: [], count: 0 });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { galleryId: '42' };
@@ -61,7 +70,17 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql([]);
+      expect(mockRes.jsonValue).to.eql({
+        downloads: [],
+        pagination: {
+          total: 0,
+          per_page: 25,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        }
+      });
     });
 
     it('propagates 404 when the gallery is missing (distinct from the empty-array case)', async () => {
@@ -87,66 +106,6 @@ describe('paths/gallery/{galleryId}/download/index', () => {
   });
 
   describe('addDownloadToGallery', () => {
-    it('returns 400 when downloadId is missing', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.params = { galleryId: '5' };
-      mockReq.body = {};
-
-      const requestHandler = addDownloadToGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
-    it('returns 400 when downloadId is not a uuid', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.params = { galleryId: '5' };
-      mockReq.body = { downloadId: 'not-a-uuid' };
-
-      const requestHandler = addDownloadToGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
-    it('returns 400 on an unknown body key', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.params = { galleryId: '5' };
-      mockReq.body = { downloadId: 'aaaa0000-0000-0000-0000-000000000042', ui_id: 'leaked' };
-
-      const requestHandler = addDownloadToGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
     it('returns 201 and forwards (Number(galleryId), downloadId, null) when sort is omitted', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);

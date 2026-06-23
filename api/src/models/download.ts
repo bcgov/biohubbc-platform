@@ -20,9 +20,8 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
  * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
  * `DownloadRecord` with the owning policy's display fields (`name`,
  * `description`), joined in via `LEFT JOIN biohub.policy`. Both the detail read
- * and the paginated list read carry these fields (the list shares this shape so
- * the gallery and the private download list expose one schema), so every
- * download read parses against `name`/`description`.
+ * and the paginated list read carry these fields, so every download read parses
+ * against `name`/`description`.
  */
 export const DownloadDetailRecord = DownloadRecord.extend({
   name: z.string(),
@@ -31,14 +30,11 @@ export const DownloadDetailRecord = DownloadRecord.extend({
 export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
 
 /**
- * Service-layer (and public API) list-row shape, serving both the private
- * download list and the gallery. Extends `DownloadDetailRecord` (base download +
- * the owning policy's `name`/`description`) with `exports[]`, attached by
- * `DownloadService.getDownloadsByTeamMembership` / `GalleryService.getGalleryDownloads`
+ * Service-layer (and public API) private download-list shape. Extends
+ * `DownloadDetailRecord` (base download + the owning policy's `name`/`description`)
+ * with `exports[]`, attached by `DownloadService.getDownloadsByTeamMembership`
  * via a batch-fetch from `DownloadVersionExportRepository` and grouped by
- * download_id in JS. Mirrors the assembly pattern used by `TicketService.getTicket`
- * (`ticket-service.ts`) — composed at the service layer rather than via SQL
- * aggregation so repositories stay single-SQL CRUD.
+ * download_id in JS.
  */
 export const DownloadListRecord = DownloadDetailRecord.extend({
   exports: z.array(DownloadVersionExportListRow)

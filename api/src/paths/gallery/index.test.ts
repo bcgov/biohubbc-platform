@@ -6,7 +6,7 @@ import { createGallery, getGalleries } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { createMockGalleryRecord } from '../../__mocks__/gallery';
 import * as db from '../../database/db';
-import { HTTP400, HTTP409, HTTPError } from '../../errors/http-error';
+import { HTTP409, HTTPError } from '../../errors/http-error';
 import { GalleryService } from '../../services/gallery/gallery-service';
 
 chai.use(sinonChai);
@@ -17,64 +17,7 @@ describe('paths/gallery/index', () => {
   });
 
   describe('createGallery', () => {
-    it('returns 400 when name is missing', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { description: 'no name' };
-
-      const requestHandler = createGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
-    it('returns 400 when name is empty', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { name: '' };
-
-      const requestHandler = createGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
-    it('returns 400 on unknown body key', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { name: 'Valid name', ui_id: 'leaked-from-frontend' };
-
-      const requestHandler = createGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
-    });
-
-    it('returns 201 with the created record and forwards the parsed body (description omitted)', async () => {
+    it('returns 201 with the created record and forwards the request body (description omitted)', async () => {
       const commitStub = sinon.stub();
       const dbConnectionObj = getMockDBConnection({ commit: commitStub });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
@@ -94,7 +37,7 @@ describe('paths/gallery/index', () => {
       const requestHandler = createGallery();
       await requestHandler(mockReq, mockRes, mockNext);
 
-      // Description/visibility omitted in the body — the parsed body is passed straight through;
+      // Description/visibility omitted in the body — the request body is passed straight through;
       // the service coalesces them to their defaults.
       expect(createGalleryStub).to.have.been.calledOnceWith({ name: 'My gallery', slug: 'my-gallery' });
       expect(commitStub).to.have.been.calledOnce;

@@ -471,58 +471,6 @@ describe('DownloadVersionExportRepository', () => {
     });
   });
 
-  describe('listExportsByDownloadVersionIds', () => {
-    it('short-circuits to [] without hitting the DB when no ids are supplied', async () => {
-      // Verifies: an empty id array avoids a `= ANY('{}')` no-op round-trip entirely
-
-      // Step 1: Setup an un-resolved sql stub to detect any unexpected call
-      const sqlStub = sinon.stub();
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new DownloadVersionExportRepository(mockDBConnection);
-
-      // Step 3: Call with an empty array
-      const result = await repo.listExportsByDownloadVersionIds([]);
-
-      // Step 4: Verify the [] short-circuit and that the DB was never queried
-      expect(result).to.deep.equal([]);
-      expect(sqlStub.notCalled).to.be.true;
-      expect(sqlStub.callCount).to.equal(0);
-    });
-
-    it('keys by download version id, returns those versions exports, and excludes soft-ended groups', async () => {
-      // Verifies: scoped to the exact versions (de.download_version_id = ANY) with no
-      // version ranking, soft-ended groups are dropped (g.record_end_date IS NULL) so a
-      // retired failure never leaks, and the download_id/create_date ordering is kept so
-      // groupExportsByDownloadId still slices.
-
-      // Step 1: Setup mock DB to return an empty row set
-      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new DownloadVersionExportRepository(mockDBConnection);
-
-      // Step 3: Call with a non-empty download-version-id array
-      const ids = ['bbbb0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000002'];
-      await repo.listExportsByDownloadVersionIds(ids);
-
-      // Step 4: Verify the version-keyed filter, the absence of ranking, the soft-ended-group
-      // exclusion, and the deterministic outer ordering
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('de.download_version_id = ANY(');
-      expect(sqlText).to.not.match(/DENSE_RANK\(\)/i);
-      expect(sqlText).to.not.match(/version_rank/i);
-      expect(sqlText).to.match(/g\.record_end_date IS NULL/i);
-      expect(sqlText).to.include('ORDER BY dv.download_id ASC, de.create_date DESC');
-
-      // Step 5: The download version ids are bound into the query
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues[0]).to.deep.equal(ids);
-    });
-  });
-
   describe('listExportArtifactGroupArtifactsByExportId', () => {
     it('JOINs artifact, filters a.byte_size IS NOT NULL, orders by chunk_id ASC, binds exportId', async () => {
       // Verifies: parts are joined to artifact for file metadata, pending artifacts are excluded, parts ordered by index

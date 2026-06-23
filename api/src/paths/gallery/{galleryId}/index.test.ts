@@ -7,7 +7,6 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/
 import { createMockGalleryRecord } from '../../../__mocks__/gallery';
 import * as db from '../../../database/db';
 import { ApiNotFoundError } from '../../../errors/api-error';
-import { HTTP400, HTTPError } from '../../../errors/http-error';
 import { GalleryService } from '../../../services/gallery/gallery-service';
 
 chai.use(sinonChai);
@@ -35,8 +34,7 @@ describe('paths/gallery/{galleryId}/index', () => {
       // Public endpoint: shared API-user connection, never the authenticated getter.
       expect(apiUserStub).to.have.been.calledOnce;
       expect(dbConnStub).to.not.have.been.called;
-      // Public endpoint: scoped to public galleries via publicOnly=true.
-      expect(getGalleryByIdStub).to.have.been.calledOnceWith(42, true);
+      expect(getGalleryByIdStub).to.have.been.calledOnceWith(42);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(gallery);
     });
@@ -62,7 +60,7 @@ describe('paths/gallery/{galleryId}/index', () => {
   });
 
   describe('updateGallery', () => {
-    it('returns 200 and forwards (Number(galleryId), parsed body)', async () => {
+    it('returns 200 and forwards (Number(galleryId), request body)', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
@@ -89,26 +87,6 @@ describe('paths/gallery/{galleryId}/index', () => {
       });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(updated);
-    });
-
-    it('returns 400 on an invalid body', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.params = { galleryId: '5' };
-      mockReq.body = { name: '' };
-
-      const requestHandler = updateGallery();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
-      }
     });
 
     it('propagates 404 when the service throws ApiNotFoundError', async () => {

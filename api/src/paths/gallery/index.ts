@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
 import { CreateGalleryRequestBody } from '../../models/gallery';
 import {
   CreateGalleryRequestSchema,
@@ -114,18 +113,13 @@ POST.apiDoc = {
  */
 export function createGallery(): RequestHandler {
   return async (req, res) => {
-    const parseResult = CreateGalleryRequestBody.safeParse(req.body);
-    if (!parseResult.success) {
-      throw new HTTP400('Invalid request body', parseResult.error.issues);
-    }
-
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
 
       const galleryService = new GalleryService(connection);
-      const gallery = await galleryService.createGallery(parseResult.data);
+      const gallery = await galleryService.createGallery(req.body as CreateGalleryRequestBody);
 
       await connection.commit();
 

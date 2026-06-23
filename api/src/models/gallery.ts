@@ -1,12 +1,11 @@
 import { z } from 'zod';
 
 /**
- * A gallery's visibility on public (anonymous) reads.
+ * A gallery's advertising/readiness state.
  *
- * `public` galleries are returned by the anonymous read endpoints; `private`
- * galleries are filtered out of those reads (surfacing as a 404 so their
- * existence isn't leaked) and remain manageable only through the admin-gated
- * endpoints. Defaults to `public` when omitted on create.
+ * Galleries are addressable when active regardless of this value. `private`
+ * lets admins hide a gallery from advertised surfaces until it is ready.
+ * Defaults to `public` when omitted on create.
  */
 export const GalleryVisibility = z.enum(['public', 'private']);
 export type GalleryVisibility = z.infer<typeof GalleryVisibility>;
@@ -42,42 +41,29 @@ export type GalleryRecord = z.infer<typeof GalleryRecord>;
  * before they reach the repository, so the write layer never has to decide what
  * an absent field means.
  */
-export const CreateGallery = z.object({
-  name: z.string(),
-  slug: z.string(),
-  visibility: GalleryVisibility,
-  description: z.string().nullable()
-});
-export type CreateGallery = z.infer<typeof CreateGallery>;
+export interface CreateGallery {
+  name: string;
+  slug: string;
+  visibility: GalleryVisibility;
+  description: string | null;
+}
 
 /**
  * HTTP request body for creating a gallery.
  *
- * `.strict()` rejects unknown keys: silently accepting stray fields would mask
- * frontend decoder bugs. Failing fast at the boundary points the FE at its own
- * bug rather than letting bad data flow into a gallery.
- *
- * `slug` is required and must be a kebab-case URL key (lowercase alphanumerics
- * separated by single hyphens). `visibility` is optional and defaults to
- * `public` in the service.
+ * The OpenAPI request schema validates this shape at the route boundary.
+ * `visibility` is optional and defaults to `public` in the service.
  */
-export const CreateGalleryRequestBody = z
-  .object({
-    name: z.string().min(1),
-    slug: z
-      .string()
-      .min(1)
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'slug must be kebab-case (lowercase alphanumerics separated by hyphens)'),
-    visibility: GalleryVisibility.optional(),
-    description: z.string().nullable().optional()
-  })
-  .strict();
-export type CreateGalleryRequestBody = z.infer<typeof CreateGalleryRequestBody>;
+export interface CreateGalleryRequestBody {
+  name: string;
+  slug: string;
+  visibility?: GalleryVisibility;
+  description?: string | null;
+}
 
 /**
  * HTTP request body for updating a gallery. Intentionally identical to
  * `CreateGalleryRequestBody` — the same fields (`name`, `slug`, `visibility`,
  * `description`) are the only ones editable after creation.
  */
-export const UpdateGalleryRequestBody = CreateGalleryRequestBody;
-export type UpdateGalleryRequestBody = z.infer<typeof UpdateGalleryRequestBody>;
+export type UpdateGalleryRequestBody = CreateGalleryRequestBody;

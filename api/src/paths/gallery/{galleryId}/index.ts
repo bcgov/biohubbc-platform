@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { HTTP400 } from '../../../errors/http-error';
 import { UpdateGalleryRequestBody } from '../../../models/gallery';
 import { CreateGalleryRequestSchema, GalleryResponseSchema } from '../../../openapi/schemas/gallery';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
@@ -55,7 +54,7 @@ GET.apiDoc = {
 };
 
 PUT.apiDoc = {
-  description: "Update a gallery's name and description.",
+  description: "Update a gallery's name, slug, visibility, and description.",
   tags: ['gallery'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -127,8 +126,7 @@ export function getGalleryById(): RequestHandler {
       await connection.open();
 
       const galleryService = new GalleryService(connection);
-      // Public read: scope to public galleries so a private gallery surfaces as a 404.
-      const gallery = await galleryService.getGalleryById(galleryId, true);
+      const gallery = await galleryService.getGalleryById(galleryId);
 
       await connection.commit();
 
@@ -150,11 +148,6 @@ export function getGalleryById(): RequestHandler {
  */
 export function updateGallery(): RequestHandler {
   return async (req, res) => {
-    const parseResult = UpdateGalleryRequestBody.safeParse(req.body);
-    if (!parseResult.success) {
-      throw new HTTP400('Invalid request body', parseResult.error.issues);
-    }
-
     const connection = getDBConnection(req.keycloak_token);
 
     try {
@@ -163,7 +156,7 @@ export function updateGallery(): RequestHandler {
       await connection.open();
 
       const galleryService = new GalleryService(connection);
-      const gallery = await galleryService.updateGallery(galleryId, parseResult.data);
+      const gallery = await galleryService.updateGallery(galleryId, req.body as UpdateGalleryRequestBody);
 
       await connection.commit();
 

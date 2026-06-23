@@ -94,28 +94,16 @@ export class GalleryRepository extends BaseRepository {
   /**
    * Find an active gallery by ID, returning null when none matches.
    *
-   * `publicOnly` scopes the lookup to `visibility = 'public'`, so a private
-   * gallery is invisible to anonymous read paths: it returns null here, which the
-   * `get*` companion turns into a 404 — the gallery's existence is never leaked.
-   * Admin-gated callers omit the flag (or pass false) to see all visibilities.
-   *
    * @param {number} galleryId - The gallery ID.
-   * @param {boolean} [publicOnly=false] - When true, only matches public galleries.
    * @return {Promise<GalleryRecord | null>}
    * @memberof GalleryRepository
    */
-  async findGalleryById(galleryId: number, publicOnly = false): Promise<GalleryRecord | null> {
+  async findGalleryById(galleryId: number): Promise<GalleryRecord | null> {
     const sql = SQL`
       SELECT gallery_id, name, slug, visibility, description, create_date
       FROM gallery
-      WHERE gallery_id = ${galleryId} AND record_end_date IS NULL
+      WHERE gallery_id = ${galleryId} AND record_end_date IS NULL;
     `;
-
-    if (publicOnly) {
-      sql.append(SQL` AND visibility = 'public'`);
-    }
-
-    sql.append(SQL`;`);
 
     const response = await this.connection.sql(sql, GalleryRecord);
 
@@ -126,17 +114,14 @@ export class GalleryRepository extends BaseRepository {
    * Get an active gallery by ID, throwing if not found.
    *
    * `get*` throws on missing row (codebase convention — companion to `findGalleryById`).
-   * With `publicOnly`, a private gallery is treated as not found (404), so the
-   * anonymous read paths neither return nor acknowledge private galleries.
    *
    * @param {number} galleryId - The gallery ID.
-   * @param {boolean} [publicOnly=false] - When true, only matches public galleries.
    * @return {Promise<GalleryRecord>}
    * @throws {ApiNotFoundError} when no matching active gallery is found.
    * @memberof GalleryRepository
    */
-  async getGalleryById(galleryId: number, publicOnly = false): Promise<GalleryRecord> {
-    const gallery = await this.findGalleryById(galleryId, publicOnly);
+  async getGalleryById(galleryId: number): Promise<GalleryRecord> {
+    const gallery = await this.findGalleryById(galleryId);
 
     if (!gallery) {
       throw new ApiNotFoundError('Gallery not found', [
