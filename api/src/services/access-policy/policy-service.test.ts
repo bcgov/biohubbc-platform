@@ -9,6 +9,7 @@ import { PolicyRepository } from '../../repositories/authorization/policy-reposi
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { PolicyExpressionRepository } from '../../repositories/policy-expression-repository';
+import { PolicyExpressionService } from './policy-expression-service';
 import { PolicyService } from './policy-service';
 import { SecurityScopeService } from './security-scope-service';
 
@@ -19,6 +20,7 @@ describe('PolicyService', () => {
   let policyService: PolicyService;
 
   beforeEach(() => {
+    sinon.stub(PolicyExpressionService.prototype, 'getPolicyExpressionsByPolicyId').resolves([]);
     mockDBConnection = getMockDBConnection();
     policyService = new PolicyService(mockDBConnection);
     sinon.stub(SecurityScopeService.prototype, 'ensureSecurityScope').resolves({
@@ -498,8 +500,8 @@ describe('PolicyService', () => {
       expect(getPoliciesStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
       expect(getPolicyStatementsStub).to.have.been.called;
       expect(result).to.eql([
-        { ...mockPolicies[0], statements: [mockStatements[0]] },
-        { ...mockPolicies[1], statements: [mockStatements[0]] }
+        { ...mockPolicies[0], statements: [mockStatements[0]], expressions: [] },
+        { ...mockPolicies[1], statements: [mockStatements[0]], expressions: [] }
       ]);
     });
 
@@ -536,7 +538,8 @@ describe('PolicyService', () => {
       expect(getPolicyStatementsStub).to.have.been.calledWith('1');
       expect(result).to.eql({
         ...mockPolicy,
-        statements: [mockStatements[0]]
+        statements: [mockStatements[0]],
+        expressions: []
       });
     });
   });
@@ -593,7 +596,8 @@ describe('PolicyService', () => {
       expect(materializeTeamAccessStub).to.not.have.been.called;
       expect(result).to.eql({
         ...mockPolicy,
-        statements: [mockStatement1, mockStatement2]
+        statements: [mockStatement1, mockStatement2],
+        expressions: []
       });
     });
 
@@ -669,7 +673,7 @@ describe('PolicyService', () => {
 
       expect(insertStatementStub).to.not.have.been.called;
       expect(refreshStub).to.not.have.been.called;
-      expect(result).to.eql({ ...mockPolicy, statements: [] });
+      expect(result).to.eql({ ...mockPolicy, statements: [], expressions: [] });
     });
   });
 
@@ -711,7 +715,8 @@ describe('PolicyService', () => {
       expect(materializeTeamAccessStub).to.not.have.been.called;
       expect(result).to.eql({
         ...mockPolicy,
-        statements: []
+        statements: [],
+        expressions: []
       });
     });
 

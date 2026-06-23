@@ -12,6 +12,7 @@ interface InlineSelectProps<T extends string | number> {
   options: InlineSelectOption<T>[];
   placeholder?: string;
   disabled?: boolean;
+  disablePortal?: boolean;
   disableClearable?: boolean;
   error?: boolean;
   sx?: SxProps<Theme>;
@@ -41,6 +42,7 @@ export const InlineSelect = <T extends string | number>({
   options,
   placeholder,
   disabled,
+  disablePortal = false,
   disableClearable,
   error,
   sx,
@@ -57,7 +59,7 @@ export const InlineSelect = <T extends string | number>({
   return (
     <Autocomplete<InlineSelectOption<T>, false, boolean, false>
       size="small"
-      disablePortal
+      disablePortal={disablePortal}
       disabled={disabled}
       disableClearable={disableClearable}
       forcePopupIcon

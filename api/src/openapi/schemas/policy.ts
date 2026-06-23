@@ -6,6 +6,7 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
  * Schema for policy statement with optional policy-expression link.
@@ -56,6 +57,48 @@ export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for a policy-owned expression with its hydrated expression tree.
+ */
+export const PolicyExpressionWithExpressionSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyExpressionWithExpression',
+  type: 'object',
+  required: ['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description', 'expression'],
+  properties: {
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique identifier for the policy expression'
+    },
+    policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The policy this expression belongs to'
+    },
+    expression_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The stored root expression identifier'
+    },
+    name: {
+      type: 'string',
+      maxLength: 100,
+      nullable: true,
+      description: 'Name of the policy expression'
+    },
+    description: {
+      type: 'string',
+      maxLength: 1000,
+      nullable: true,
+      description: 'Description of the policy expression'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description: 'Expression tree for this policy expression'
+    }
+  }
+};
+
+/**
  * Schema for a policy (without statements).
  */
 export const PolicySchema: OpenAPIV3.SchemaObject = {
@@ -93,7 +136,7 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
 export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyWithStatements',
   type: 'object',
-  required: ['policy_id', 'name', 'status', 'statements'],
+  required: ['policy_id', 'name', 'status', 'statements', 'expressions'],
   properties: {
     policy_id: {
       type: 'string',
@@ -120,6 +163,11 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: PolicyStatementWithExpressionSchema,
       description: 'Policy statements'
+    },
+    expressions: {
+      type: 'array',
+      items: PolicyExpressionWithExpressionSchema,
+      description: 'Policy expressions'
     }
   }
 };
@@ -136,6 +184,23 @@ export const PoliciesListResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: PolicyWithStatementsSchema,
       description: 'List of policies with statements'
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
+ * Schema for paginated policy expressions list response.
+ */
+export const PolicyExpressionsListResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyExpressionsListResponse',
+  type: 'object',
+  required: ['expressions', 'pagination'],
+  properties: {
+    expressions: {
+      type: 'array',
+      items: PolicyExpressionWithExpressionSchema,
+      description: 'List of policy expressions'
     },
     pagination: paginationResponseSchema
   }
@@ -164,6 +229,34 @@ export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
       format: 'uuid',
       nullable: true,
       description: 'Optional existing policy expression to link to this statement'
+    }
+  }
+};
+
+/**
+ * Schema for create policy expression request body.
+ */
+export const CreatePolicyExpressionRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreatePolicyExpressionRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'expression'],
+  properties: {
+    name: {
+      type: 'string',
+      maxLength: 100,
+      description: 'Name of the policy expression'
+    },
+    description: {
+      type: 'string',
+      maxLength: 1000,
+      nullable: true,
+      description: 'Description of the policy expression'
+    },
+    expression: {
+      ...featureSearchExpressionTreeSchema,
+      description:
+        'Expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
     }
   }
 };

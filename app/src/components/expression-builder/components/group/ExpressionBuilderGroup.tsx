@@ -180,12 +180,23 @@ export const ExpressionBuilderGroup = ({
       }}
       sx={{
         alignSelf: 'stretch',
-        boxShadow: isDropTarget ? (theme) => `0 0 0 2px ${theme.palette.primary.main}` : 'none',
         borderRadius: 1,
         bgcolor: isDropTarget ? 'action.selected' : 'action.hover',
         flex: '0 1 auto',
         maxWidth: '100%',
         p: 1.5,
+        position: 'relative',
+        '&::after': {
+          border: '2px solid transparent',
+          borderRadius: 1,
+          content: '""',
+          inset: 0,
+          pointerEvents: 'none',
+          position: 'absolute'
+        },
+        '&[data-drop-active="true"]::after': {
+          borderColor: 'primary.main'
+        },
         transition: 'none'
       }}>
       <Stack direction="row" alignItems="center" gap={1}>

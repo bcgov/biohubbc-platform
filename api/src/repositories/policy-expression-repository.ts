@@ -1,7 +1,14 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { CreatePolicyExpression, PolicyExpression, UpdatePolicyExpression } from '../models/policy-expression';
+import { CountResult } from '../models/count';
+import {
+  CreatePolicyExpression,
+  PolicyExpression,
+  UpdatePolicyExpression,
+  UpdatePolicyExpressionForPolicy
+} from '../models/policy-expression';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 export class PolicyExpressionRepository extends BaseRepository {
@@ -119,6 +126,46 @@ export class PolicyExpressionRepository extends BaseRepository {
   }
 
   /**
+   * Fetch active policy expressions for a policy.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<PolicyExpression[]>} Active policy expressions.
+   */
+  async getPolicyExpressionsByPolicyId(
+    policyId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<PolicyExpression[]> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
+      .where('policy_id', policyId)
+      .whereNull('record_end_date');
+
+    this.applyPagination(query, pagination);
+
+    const response = await this.connection.knex(query, PolicyExpression);
+    return response.rows;
+  }
+
+  /**
+   * Count active policy expressions for a policy.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @return {Promise<number>} Active policy expression count.
+   */
+  async getPolicyExpressionsCountByPolicyId(policyId: string): Promise<number> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .where('policy_id', policyId)
+      .whereNull('record_end_date')
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'));
+
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
    * Patch an existing policy-expression identity to point at a different immutable expression anchor.
    *
    * The policy_expression row is policy-owned identity. Updates intentionally
@@ -157,5 +204,86 @@ export class PolicyExpressionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Update an active policy expression scoped to a policy.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} policyExpressionId - Policy-expression identifier.
+   * @param {UpdatePolicyExpressionForPolicy} payload - Update payload.
+   * @return {Promise<PolicyExpression>} Updated policy-expression row.
+   */
+  async updatePolicyExpressionForPolicy(
+    policyId: string,
+    policyExpressionId: string,
+    payload: UpdatePolicyExpressionForPolicy
+  ): Promise<PolicyExpression> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .update({
+        expression_id: payload.expression_id,
+        name: payload.name,
+        description: payload.description
+      })
+      .where('policy_id', policyId)
+      .where('policy_expression_id', policyExpressionId)
+      .whereNull('record_end_date')
+      .returning(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, PolicyExpression);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update policy_expression', [
+        'PolicyExpressionRepository->updatePolicyExpressionForPolicy',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Clear active policy statement links for a policy expression before soft-deleting it.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} policyExpressionId - Policy-expression identifier.
+   * @return {Promise<void>}
+   */
+  async clearPolicyStatementLinks(policyId: string, policyExpressionId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('policy_statement')
+      .update({ policy_expression_id: null })
+      .where('policy_id', policyId)
+      .where('policy_expression_id', policyExpressionId)
+      .whereNull('record_end_date');
+
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Soft delete an active policy expression scoped to a policy.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} policyExpressionId - Policy-expression identifier.
+   * @return {Promise<void>}
+   */
+  async deletePolicyExpression(policyId: string, policyExpressionId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .update({ record_end_date: knex.fn.now() })
+      .where('policy_id', policyId)
+      .where('policy_expression_id', policyExpressionId)
+      .whereNull('record_end_date')
+      .returning(['policy_expression_id']);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to delete policy_expression', [
+        'PolicyExpressionRepository->deletePolicyExpression',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 }

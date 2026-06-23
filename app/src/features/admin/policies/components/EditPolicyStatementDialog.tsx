@@ -2,23 +2,21 @@ import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import { EditDialog } from 'components/dialog/EditDialog';
+import CustomAutocomplete, { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
 import { useFormikContext } from 'formik';
-import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { IPolicyExpression } from 'interfaces/usePoliciesApi.interface';
 import yup from 'utils/YupSchema';
-import { PolicyExpression } from './PolicyExpression';
 
 export interface IEditPolicyStatementFormValues {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
-  expression: ExpressionTreeExpression | null;
-  expression_error?: string;
+  policy_expression_id: string;
 }
 
 export const EditPolicyStatementFormInitialValues: IEditPolicyStatementFormValues = {
   effect: 'allow',
   submission_feature_urn: 'urn:*:*:*',
-  expression: null,
-  expression_error: undefined
+  policy_expression_id: ''
 };
 
 export const EditPolicyStatementFormYupSchema = yup.object().shape({
@@ -30,16 +28,13 @@ export const EditPolicyStatementFormYupSchema = yup.object().shape({
       /^urn:(\*|\d+):(\*|[a-zA-Z0-9_]+):(\*|[^:]+)$/,
       'Invalid Policy URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
     ),
-  expression: yup.mixed<ExpressionTreeExpression>().nullable().required('Expression is required'),
-  expression_error: yup
-    .string()
-    .optional()
-    .test('valid-expression-builder-draft', 'Policy expression is invalid', (value) => !value)
+  policy_expression_id: yup.string()
 });
 
 interface IEditPolicyStatementDialogProps {
   open: boolean;
   isLoading: boolean;
+  policyExpressions: IPolicyExpression[];
   initialValues?: IEditPolicyStatementFormValues;
   mode?: 'create' | 'edit';
   dialogTitle?: string;
@@ -58,6 +53,7 @@ export const EditPolicyStatementDialog = (props: IEditPolicyStatementDialogProps
   const {
     open,
     isLoading,
+    policyExpressions,
     initialValues,
     mode = 'create',
     dialogTitle,
@@ -75,7 +71,7 @@ export const EditPolicyStatementDialog = (props: IEditPolicyStatementDialogProps
       open={open}
       maxWidth="md"
       component={{
-        element: <EditPolicyStatementForm />,
+        element: <EditPolicyStatementForm policyExpressions={policyExpressions} />,
         initialValues: initialValues ?? EditPolicyStatementFormInitialValues,
         validationSchema: EditPolicyStatementFormYupSchema
       }}
@@ -90,9 +86,19 @@ export const EditPolicyStatementDialog = (props: IEditPolicyStatementDialogProps
  *
  * @returns {JSX.Element}
  */
-const EditPolicyStatementForm = () => {
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue } =
+const EditPolicyStatementForm = ({ policyExpressions }: { policyExpressions: IPolicyExpression[] }) => {
+  const { values, handleChange, handleSubmit, errors, touched, submitCount, setFieldTouched, setFieldValue } =
     useFormikContext<IEditPolicyStatementFormValues>();
+
+  const policyExpressionOptions: ICustomAutocompleteOption<string>[] = policyExpressions.map((policyExpression) => ({
+    label: policyExpression.name ?? policyExpression.policy_expression_id,
+    value: policyExpression.policy_expression_id
+  }));
+  const selectedPolicyExpressionOption = policyExpressionOptions.find(
+    (option) => option.value === values.policy_expression_id
+  );
+  const showPolicyExpressionError =
+    Boolean(errors.policy_expression_id) && (Boolean(touched.policy_expression_id) || submitCount > 0);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -122,10 +128,23 @@ const EditPolicyStatementForm = () => {
           fullWidth
         />
 
-        <PolicyExpression
-          value={values.expression ?? undefined}
-          onChange={(expression) => setFieldValue('expression', expression, false)}
-          onValidationChange={(error) => setFieldValue('expression_error', error ?? undefined, false)}
+        <CustomAutocomplete
+          label="Expression"
+          options={policyExpressionOptions}
+          value={selectedPolicyExpressionOption ?? null}
+          getOptionLabel={(option) => option.label}
+          isOptionEqualToValue={(option, selectedOption) => option.value === selectedOption.value}
+          onChange={(_event, selectedOption) => setFieldValue('policy_expression_id', selectedOption?.value ?? '')}
+          onBlur={() => setFieldTouched('policy_expression_id', true)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Expression"
+              error={showPolicyExpressionError}
+              helperText={showPolicyExpressionError ? errors.policy_expression_id : undefined}
+              fullWidth
+            />
+          )}
         />
       </Box>
     </form>

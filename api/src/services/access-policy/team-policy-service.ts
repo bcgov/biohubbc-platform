@@ -141,6 +141,18 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
+   * Get teams associated with a policy.
+   *
+   * @param {string} policyId - Policy ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<TeamPolicyDetails[]>}
+   * @memberof TeamPolicyService
+   */
+  getTeamsByPolicyId(policyId: string, pagination?: ApiPaginationOptions): Promise<TeamPolicyDetails[]> {
+    return this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }, pagination);
+  }
+
+  /**
    * Get count of team-policy associations matching optional filters.
    *
    * @param {TeamPolicyFilters} [filters] - Optional filter set.
@@ -149,6 +161,17 @@ export class TeamPolicyService extends DBService {
    */
   getAllTeamPoliciesCount(filters?: TeamPolicyFilters): Promise<number> {
     return this.teamPolicyRepository.getAllTeamPoliciesCount(filters);
+  }
+
+  /**
+   * Get count of teams associated with a policy.
+   *
+   * @param {string} policyId - Policy ID.
+   * @return {Promise<number>}
+   * @memberof TeamPolicyService
+   */
+  getTeamsByPolicyIdCount(policyId: string): Promise<number> {
+    return this.teamPolicyRepository.getAllTeamPoliciesCount({ policyIds: [policyId] });
   }
 
   /**

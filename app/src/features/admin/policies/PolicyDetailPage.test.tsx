@@ -2,7 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { DialogContext, IDialogContext, defaultSnackbarProps } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { IPolicy, IPolicyExpression, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -12,7 +12,7 @@ import { PolicyDetailPage } from './PolicyDetailPage';
 
 vi.mock('hooks/useApi');
 
-type PolicyDetailTestRow = IPolicy['statements'][number] | ITeamPolicyDetails;
+type PolicyDetailTestRow = IPolicy['statements'][number] | IPolicyExpression | ITeamPolicyDetails;
 
 vi.mock('components/data-grid/CustomDataGrid', () => ({
   default: ({
@@ -22,16 +22,33 @@ vi.mock('components/data-grid/CustomDataGrid', () => ({
     'data-testid': dataTestId
   }: {
     rows: PolicyDetailTestRow[];
-    columns: { field: string; renderCell?: (params: { row: PolicyDetailTestRow }) => ReactNode }[];
+    columns: {
+      field: string;
+      renderCell?: (params: { row: PolicyDetailTestRow }) => ReactNode;
+      valueGetter?: (value: unknown, row: PolicyDetailTestRow) => unknown;
+    }[];
     getRowId?: (row: PolicyDetailTestRow) => string;
     'data-testid'?: string;
   }) => (
     <div data-testid={dataTestId ?? 'policy-statements-table'}>
       {rows.map((row) => (
-        <div key={getRowId?.(row) ?? ('policy_statement_id' in row ? row.policy_statement_id : row.team_policy_id)}>
+        <div
+          key={
+            getRowId?.(row) ??
+            ('policy_statement_id' in row
+              ? row.policy_statement_id
+              : 'policy_expression_id' in row
+                ? row.policy_expression_id
+                : row.team_policy_id)
+          }>
           {columns.map((column) => (
             <div key={column.field}>
-              {column.renderCell?.({ row }) ?? String(row[column.field as keyof PolicyDetailTestRow] ?? '')}
+              {column.renderCell?.({ row }) ??
+                String(
+                  column.valueGetter?.(row[column.field as keyof PolicyDetailTestRow], row) ??
+                    row[column.field as keyof PolicyDetailTestRow] ??
+                    ''
+                )}
             </div>
           ))}
         </div>
@@ -77,35 +94,40 @@ vi.mock('features/search/result/layout/table/SearchResultTableLayout', () => ({
   )
 }));
 
-vi.mock('features/admin/policies/components/PolicyExpression', () => ({
-  PolicyExpression: ({
+vi.mock('components/expression-builder/PolicyExpressionBuilder', () => ({
+  PolicyExpressionBuilder: ({
     onChange,
-    onValidationChange
+    onValidationChange,
+    readOnly
   }: {
     onChange?: (value: ExpressionTreeExpression | null) => void;
     onValidationChange?: (error: string | null) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() => {
-        onChange?.({
-          type: 'expression',
-          operator: 'AND',
-          clauses: [
-            {
-              type: 'predicate',
-              feature_property_id: 1,
-              feature_type_property_id: 1,
-              operator: 'Equals',
-              value: 'sensitive'
-            }
-          ]
-        });
-        onValidationChange?.(null);
-      }}>
-      Set expression
-    </button>
-  )
+    readOnly?: boolean;
+  }) =>
+    readOnly ? (
+      <div data-testid="readonly-policy-expression">Read-only expression</div>
+    ) : (
+      <button
+        type="button"
+        onClick={() => {
+          onChange?.({
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              {
+                type: 'predicate',
+                feature_property_id: 1,
+                feature_type_property_id: 1,
+                operator: 'Equals',
+                value: 'sensitive'
+              }
+            ]
+          });
+          onValidationChange?.(null);
+        }}>
+        Set expression
+      </button>
+    )
 }));
 
 const mockUseApi = useApi as Mock;
@@ -129,19 +151,38 @@ const policy: IPolicy = {
   name: 'Sensitive Wildlife Policy',
   description: 'Policy description',
   status: PolicyStatus.APPROVED,
+  expressions: [
+    {
+      policy_expression_id: 'policy-expression-1',
+      policy_id: 'policy-1',
+      expression_id: 'expression-1',
+      name: 'Sensitive species',
+      description: 'Filters sensitive species observations',
+      expression
+    },
+    {
+      policy_expression_id: 'policy-expression-without-name',
+      policy_id: 'policy-1',
+      expression_id: 'expression-without-name',
+      name: null,
+      description: null,
+      expression
+    }
+  ],
   statements: [
     {
       policy_statement_id: 'statement-1',
       policy_id: 'policy-1',
       effect: 'allow',
       submission_feature_urn: 'urn:*:telemetry:*',
-      expression
+      policy_expression_id: 'policy-expression-1'
     },
     {
       policy_statement_id: 'statement-2',
       policy_id: 'policy-1',
       effect: 'deny',
-      submission_feature_urn: 'urn:*:sample_site:*'
+      submission_feature_urn: 'urn:*:sample_site:*',
+      policy_expression_id: 'policy-expression-without-name'
     }
   ]
 };
@@ -188,19 +229,40 @@ const renderPage = (dialogContext?: Partial<IDialogContext>) =>
 
 describe('PolicyDetailPage', () => {
   const getPolicy = vi.fn();
+  const getPolicyExpressions = vi.fn();
+  const getPolicyTeams = vi.fn();
   const updatePolicy = vi.fn();
+  const createPolicyExpression = vi.fn();
+  const updatePolicyExpression = vi.fn();
+  const deletePolicyExpression = vi.fn();
   const updatePolicyStatus = vi.fn();
   const searchFeatures = vi.fn();
   const getTeamPolicies = vi.fn();
 
   beforeEach(() => {
     getPolicy.mockReset();
+    getPolicyExpressions.mockReset();
+    getPolicyTeams.mockReset();
     updatePolicy.mockReset();
+    createPolicyExpression.mockReset();
+    updatePolicyExpression.mockReset();
+    deletePolicyExpression.mockReset();
     updatePolicyStatus.mockReset();
     searchFeatures.mockReset();
     getTeamPolicies.mockReset();
 
     getPolicy.mockResolvedValue(policy);
+    getPolicyExpressions.mockResolvedValue({
+      expressions: policy.expressions,
+      pagination: {
+        total: policy.expressions.length,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1,
+        sort: 'name',
+        order: 'asc'
+      }
+    });
     updatePolicyStatus.mockResolvedValue({
       policy_id: 'policy-1',
       name: 'Sensitive Wildlife Policy',
@@ -216,10 +278,27 @@ describe('PolicyDetailPage', () => {
           policy_id: 'policy-1',
           effect: 'allow',
           submission_feature_urn: 'urn:1:telemetry:*',
-          expression
+          policy_expression_id: 'policy-expression-1'
         }
       ]
     });
+    createPolicyExpression.mockResolvedValue({
+      policy_expression_id: 'policy-expression-2',
+      policy_id: 'policy-1',
+      expression_id: 'expression-2',
+      name: 'Telemetry sites',
+      description: 'Filters telemetry sites',
+      expression
+    });
+    updatePolicyExpression.mockResolvedValue({
+      policy_expression_id: 'policy-expression-1',
+      policy_id: 'policy-1',
+      expression_id: 'expression-3',
+      name: 'Updated sensitive species',
+      description: 'Updated filters',
+      expression
+    });
+    deletePolicyExpression.mockResolvedValue(undefined);
     searchFeatures.mockResolvedValue({
       features: [
         {
@@ -243,8 +322,8 @@ describe('PolicyDetailPage', () => {
         totalPages: 1
       }
     });
-    getTeamPolicies.mockResolvedValue({
-      team_policies: [
+    getPolicyTeams.mockResolvedValue({
+      teams: [
         {
           team_policy_id: 'team-policy-1',
           team_id: 'team-1',
@@ -266,6 +345,11 @@ describe('PolicyDetailPage', () => {
     mockUseApi.mockReturnValue({
       policies: {
         getPolicy,
+        getPolicyExpressions,
+        getPolicyTeams,
+        createPolicyExpression,
+        updatePolicyExpression,
+        deletePolicyExpression,
         updatePolicy,
         updatePolicyStatus
       },
@@ -295,9 +379,11 @@ describe('PolicyDetailPage', () => {
       expect(getByRole('tab', { name: 'Features' })).toBeVisible();
       expect(getByRole('tab', { name: 'Teams' })).toBeVisible();
       expect(getByTestId('policy-expressions-table')).toBeVisible();
-      expect(getByText('urn:*:telemetry:*')).toBeVisible();
-      expect(getByText(/"operator":"Equals"/)).toBeVisible();
+      expect(getByText('Sensitive species')).toBeVisible();
+      expect(getByText('Filters sensitive species observations')).toBeVisible();
+      expect(getByTestId('policy-expressions-table').textContent).toContain(JSON.stringify(expression, null, 2));
     });
+    expect(getPolicyExpressions).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'name', order: 'asc' });
   });
 
   it('renders the statements section from the statements tab', async () => {
@@ -309,6 +395,8 @@ describe('PolicyDetailPage', () => {
     expect(await findByTestId('policy-statements-table')).toBeVisible();
     expect(getByText('urn:*:telemetry:*')).toBeVisible();
     expect(getByText('urn:*:sample_site:*')).toBeVisible();
+    expect(getByText('Sensitive species')).toBeVisible();
+    expect(getByText('policy-expression-without-name')).toBeVisible();
   });
 
   it('shows the policy skeleton while loading and no policy is available', async () => {
@@ -319,15 +407,16 @@ describe('PolicyDetailPage', () => {
     expect(await findByTestId('policy-skeleton')).toBeVisible();
   });
 
-  it('renders feature search results for policy statement expressions', async () => {
+  it('renders feature search results for policy statements with linked expressions', async () => {
     const user = userEvent.setup();
-    const { findByRole, findByTestId, getByText } = renderPage();
+    const { findAllByTestId, findByRole, getAllByText } = renderPage();
 
     await user.click(await findByRole('tab', { name: 'Features' }));
 
-    expect(await findByTestId('policy-feature-results-table')).toBeVisible();
-    expect(getByText('Telemetry Feature One')).toBeVisible();
+    expect(await findAllByTestId('policy-feature-results-table')).toHaveLength(2);
+    expect(getAllByText('Telemetry Feature One')).toHaveLength(2);
     expect(searchFeatures).toHaveBeenCalledWith('telemetry', expression, { page: 1, limit: 10 });
+    expect(searchFeatures).toHaveBeenCalledWith('sample_site', expression, { page: 1, limit: 10 });
   });
 
   it('renders teams with access to the policy', async () => {
@@ -340,11 +429,9 @@ describe('PolicyDetailPage', () => {
     expect(getByText('Team Alpha')).toBeVisible();
 
     await waitFor(() => {
-      expect(getTeamPolicies).toHaveBeenCalledWith(
-        { policyIds: ['policy-1'] },
-        { page: 1, limit: 10, sort: 'team_name', order: 'asc' }
-      );
+      expect(getPolicyTeams).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'team_name', order: 'asc' });
     });
+    expect(getTeamPolicies).not.toHaveBeenCalled();
   });
 
   it('updates the policy status from the header dropdown', async () => {
@@ -388,11 +475,12 @@ describe('PolicyDetailPage', () => {
           {
             effect: 'allow',
             submission_feature_urn: 'urn:*:telemetry:*',
-            expression
+            policy_expression_id: 'policy-expression-1'
           },
           {
             effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*'
+            submission_feature_urn: 'urn:*:sample_site:*',
+            policy_expression_id: 'policy-expression-without-name'
           }
         ]
       });
@@ -407,34 +495,77 @@ describe('PolicyDetailPage', () => {
     await user.click(await findByTestId('policy-expressions-add-button'));
     expect(await findByRole('heading', { name: 'Create Expression' })).toBeVisible();
 
-    await user.clear(getByRole('textbox', { name: 'Policy URN' }));
-    await user.type(getByRole('textbox', { name: 'Policy URN' }), 'urn:3:telemetry:*');
+    await user.type(getByRole('textbox', { name: 'Name' }), 'Telemetry sites');
+    await user.type(getByRole('textbox', { name: 'Description' }), 'Filters telemetry sites');
     await user.click(getByText('Set expression'));
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
-      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
-        name: 'Sensitive Wildlife Policy',
-        description: 'Policy description',
-        status: PolicyStatus.APPROVED,
-        statements: [
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:*:telemetry:*',
-            expression
-          },
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*'
-          },
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:3:telemetry:*',
-            expression
-          }
-        ]
+      expect(createPolicyExpression).toHaveBeenCalledWith('policy-1', {
+        name: 'Telemetry sites',
+        description: 'Filters telemetry sites',
+        expression
       });
     });
+    expect(updatePolicy).not.toHaveBeenCalled();
+    expect(getPolicy).toHaveBeenCalledTimes(1);
+    expect(getPolicyExpressions).toHaveBeenCalledTimes(2);
+  });
+
+  it('edits a policy expression from the row actions menu', async () => {
+    const user = userEvent.setup();
+    const { findByText, findByRole, getByRole, getByText, getByTestId } = renderPage();
+
+    await user.click(await findByText('policy-expression-policy-expression-1-menu-Edit'));
+    expect(await findByRole('heading', { name: 'Edit Expression' })).toBeVisible();
+
+    await user.clear(getByRole('textbox', { name: 'Name' }));
+    await user.type(getByRole('textbox', { name: 'Name' }), 'Updated sensitive species');
+    await user.clear(getByRole('textbox', { name: 'Description' }));
+    await user.type(getByRole('textbox', { name: 'Description' }), 'Updated filters');
+    await user.click(getByText('Set expression'));
+    await user.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => {
+      expect(updatePolicyExpression).toHaveBeenCalledWith('policy-1', 'policy-expression-1', {
+        name: 'Updated sensitive species',
+        description: 'Updated filters',
+        expression
+      });
+    });
+    expect(updatePolicy).not.toHaveBeenCalled();
+    expect(getPolicyExpressions).toHaveBeenCalledTimes(2);
+
+    await user.click(await findByRole('tab', { name: 'Statements' }));
+    expect(await findByText('Updated sensitive species')).toBeVisible();
+  });
+
+  it('deletes a policy expression from the row actions menu after confirmation', async () => {
+    const user = userEvent.setup();
+    const setYesNoDialog = vi.fn();
+    const { findByText } = renderPage({ setYesNoDialog });
+
+    await user.click(await findByText('policy-expression-policy-expression-1-menu-Delete'));
+
+    expect(setYesNoDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        dialogTitle: 'Delete Expression',
+        dialogText: 'Are you sure you want to delete this policy expression?',
+        yesButtonLabel: 'Delete'
+      })
+    );
+
+    const confirmationConfig = setYesNoDialog.mock.calls[0][0];
+    await act(async () => {
+      await confirmationConfig.onYes();
+    });
+
+    await waitFor(() => {
+      expect(deletePolicyExpression).toHaveBeenCalledWith('policy-1', 'policy-expression-1');
+    });
+    expect(updatePolicy).not.toHaveBeenCalled();
+    expect(getPolicyExpressions).toHaveBeenCalledTimes(2);
   });
 
   it('creates a policy statement from the statements toolbar', async () => {
@@ -447,7 +578,8 @@ describe('PolicyDetailPage', () => {
 
     await user.clear(getByRole('textbox', { name: 'Policy URN' }));
     await user.type(getByRole('textbox', { name: 'Policy URN' }), 'urn:1:telemetry:*');
-    await user.click(getByText('Set expression'));
+    await user.click(getByRole('combobox', { name: /Expression/ }));
+    await user.click(await findByRole('option', { name: 'Sensitive species' }));
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
@@ -459,22 +591,59 @@ describe('PolicyDetailPage', () => {
           {
             effect: 'allow',
             submission_feature_urn: 'urn:*:telemetry:*',
-            expression
+            policy_expression_id: 'policy-expression-1'
           },
           {
             effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*'
+            submission_feature_urn: 'urn:*:sample_site:*',
+            policy_expression_id: 'policy-expression-without-name'
           },
           {
             effect: 'allow',
             submission_feature_urn: 'urn:1:telemetry:*',
-            expression
+            policy_expression_id: 'policy-expression-1'
           }
         ]
       });
     });
 
     expect(getByText('urn:1:telemetry:*')).toBeVisible();
+  });
+
+  it('creates a policy statement without an expression', async () => {
+    const user = userEvent.setup();
+    const { findByTestId, findByRole, getByRole, getByTestId } = renderPage();
+
+    await user.click(await findByRole('tab', { name: 'Statements' }));
+    await user.click(await findByTestId('policy-statements-add-button'));
+
+    await user.clear(getByRole('textbox', { name: 'Policy URN' }));
+    await user.type(getByRole('textbox', { name: 'Policy URN' }), 'urn:1:telemetry:*');
+    await user.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => {
+      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
+        name: 'Sensitive Wildlife Policy',
+        description: 'Policy description',
+        status: PolicyStatus.APPROVED,
+        statements: [
+          {
+            effect: 'allow',
+            submission_feature_urn: 'urn:*:telemetry:*',
+            policy_expression_id: 'policy-expression-1'
+          },
+          {
+            effect: 'deny',
+            submission_feature_urn: 'urn:*:sample_site:*',
+            policy_expression_id: 'policy-expression-without-name'
+          },
+          {
+            effect: 'allow',
+            submission_feature_urn: 'urn:1:telemetry:*'
+          }
+        ]
+      });
+    });
   });
 
   it('edits a policy statement from the row actions menu', async () => {
@@ -498,11 +667,12 @@ describe('PolicyDetailPage', () => {
           {
             effect: 'allow',
             submission_feature_urn: 'urn:2:telemetry:*',
-            expression
+            policy_expression_id: 'policy-expression-1'
           },
           {
             effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*'
+            submission_feature_urn: 'urn:*:sample_site:*',
+            policy_expression_id: 'policy-expression-without-name'
           }
         ]
       });
@@ -539,7 +709,8 @@ describe('PolicyDetailPage', () => {
         statements: [
           {
             effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*'
+            submission_feature_urn: 'urn:*:sample_site:*',
+            policy_expression_id: 'policy-expression-without-name'
           }
         ]
       });

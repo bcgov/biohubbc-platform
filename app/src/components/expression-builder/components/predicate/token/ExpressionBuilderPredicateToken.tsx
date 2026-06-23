@@ -51,7 +51,8 @@ export const ExpressionBuilderPredicateToken = ({
   const predicate = node.predicate;
   const hasSelectedPropertyId = typeof node.feature_property_id === 'number';
   const missingProperty = !hasSelectedPropertyId;
-  const isSelectedPropertyLabelLoading = hasSelectedPropertyId && !property;
+  const fallbackPropertyLabel = hasSelectedPropertyId ? `Property #${node.feature_property_id}` : 'Property';
+  const isSelectedPropertyLabelLoading = hasSelectedPropertyId && !property && !readOnly;
   const missingOperator = !!property && !predicate?.operator;
   const missingValue =
     !!property &&
@@ -377,15 +378,25 @@ export const ExpressionBuilderPredicateToken = ({
         onDrop={handleDrop}
         sx={{
           bgcolor: 'action.hover',
-          boxShadow: isDropTarget
-            ? (theme) => `0 0 0 2px ${theme.palette.primary.main}`
-            : '0 1px 2px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
           borderRadius: 1,
           flex: '1 1 520px',
           minWidth: 0,
+          position: 'relative',
           px: 1,
           py: 1,
-          transition: 'none'
+          transition: 'none',
+          '&::after': {
+            border: '2px solid transparent',
+            borderRadius: 1,
+            content: '""',
+            inset: 0,
+            pointerEvents: 'none',
+            position: 'absolute'
+          },
+          '&[data-drop-active="true"]::after': {
+            borderColor: 'primary.main'
+          }
         }}>
         {!readOnly && (
           <DragIndicatorIcon
@@ -406,7 +417,7 @@ export const ExpressionBuilderPredicateToken = ({
           properties={propertyOptions}
           ariaLabel="Property"
           value={property ?? null}
-          placeholder={property?.label ?? 'Property'}
+          placeholder={property?.label ?? fallbackPropertyLabel}
           showSearchIcon={false}
           error={missingProperty}
           disabled={readOnly}

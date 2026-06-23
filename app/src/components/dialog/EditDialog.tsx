@@ -91,7 +91,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       initialValues={props.component.initialValues}
       enableReinitialize={true}
       validationSchema={props.component.validationSchema}
-      validateOnBlur={true}
+      validateOnBlur={false}
       validateOnChange={false}
       onSubmit={(values) => {
         props.onSave(values);

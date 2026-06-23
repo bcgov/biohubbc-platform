@@ -64,6 +64,23 @@ export const TeamPoliciesResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for policy-scoped teams list response.
+ */
+export const PolicyTeamsResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyTeamsResponse',
+  type: 'object',
+  required: ['teams', 'pagination'],
+  properties: {
+    teams: {
+      type: 'array',
+      items: TeamPolicyDetailsSchema,
+      description: 'List of teams associated with the policy'
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
  * Schema for create team-policy request body.
  */
 export const CreateTeamPolicyRequestSchema: OpenAPIV3.SchemaObject = {

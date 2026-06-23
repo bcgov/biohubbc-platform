@@ -93,7 +93,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
     setIsSaving(true);
 
     try {
-      await biohubApi.teamPolicies.createTeamPolicies(values.team_id, { policies: values.policies });
+      await biohubApi.teamPolicies.createTeamPolicies(values.team_id, { policies: [values.policy_id] });
 
       setOpenCreateDialog(false);
       refresh();

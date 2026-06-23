@@ -231,7 +231,7 @@ export const useTicketTimelineDataRequestActions = () => {
         statements: selectedPolicy.statements.map((statement) => ({
           effect: statement.effect,
           submission_feature_urn: statement.submission_feature_urn,
-          ...(statement.expression ? { expression: statement.expression } : {})
+          ...(statement.policy_expression_id ? { policy_expression_id: statement.policy_expression_id } : {})
         }))
       });
 

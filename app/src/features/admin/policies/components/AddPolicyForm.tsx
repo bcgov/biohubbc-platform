@@ -1,11 +1,11 @@
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
+import { PolicyExpressionBuilder } from 'components/expression-builder/PolicyExpressionBuilder';
 import { useFormikContext } from 'formik';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import yup from 'utils/YupSchema';
-import { PolicyExpression } from './PolicyExpression';
 
 /**
  * Form values for creating or editing a policy.
@@ -145,7 +145,7 @@ export const AddPolicyForm = () => {
         />
 
         <Box>
-          <PolicyExpression
+          <PolicyExpressionBuilder
             value={values.expression ?? undefined}
             onChange={(expression) => setFieldValue('expression', expression, false)}
             onValidationChange={(error) => setFieldValue('expression_error', error ?? undefined, false)}

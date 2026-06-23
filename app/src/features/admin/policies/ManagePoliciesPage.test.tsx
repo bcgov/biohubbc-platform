@@ -61,8 +61,22 @@ vi.mock('../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
 const mockPolicies = [
-  { policy_id: 'p1', name: 'Policy One', description: 'First policy', status: 'active', statements: [] },
-  { policy_id: 'p2', name: 'Policy Two', description: 'Second policy', status: 'active', statements: [] }
+  {
+    policy_id: 'p1',
+    name: 'Policy One',
+    description: 'First policy',
+    status: 'active',
+    statements: [],
+    expressions: []
+  },
+  {
+    policy_id: 'p2',
+    name: 'Policy Two',
+    description: 'Second policy',
+    status: 'active',
+    statements: [],
+    expressions: []
+  }
 ];
 
 const mockTeams = [

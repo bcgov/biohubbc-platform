@@ -23,3 +23,9 @@ export type CreatePolicyExpression = {
 export type UpdatePolicyExpression = {
   expressionId: string;
 };
+
+export type UpdatePolicyExpressionForPolicy = {
+  expression_id: string;
+  name?: string | null;
+  description?: string | null;
+};

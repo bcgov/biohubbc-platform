@@ -46,10 +46,6 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-vi.mock('./PolicyExpression', () => ({
-  PolicyExpression: () => <div data-testid="policy-expression" />
-}));
-
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
@@ -81,6 +77,7 @@ const policy: IPolicy = {
   name: 'Sensitive Wildlife Policy',
   description: 'Policy description',
   status: 'approved' as IPolicy['status'],
+  expressions: [],
   statements: []
 };
 

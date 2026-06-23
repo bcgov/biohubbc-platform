@@ -45,7 +45,7 @@ vi.mock('./CreateTeamPolicyDialog', () => ({
         <div>Add Assignment</div>
         <button
           data-testid="mock-create-assignment-save"
-          onClick={() => onSave({ team_id: 'team-3', policies: ['policy-3'] })}>
+          onClick={() => onSave({ team_id: 'team-3', policy_id: 'policy-3' })}>
           Save
         </button>
       </div>
@@ -83,6 +83,7 @@ const mockPolicies: IPolicy[] = [
     name: 'Data Access Policy',
     description: 'Access policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   },
   {
@@ -90,6 +91,7 @@ const mockPolicies: IPolicy[] = [
     name: 'Security Policy',
     description: 'Security policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   },
   {
@@ -97,6 +99,7 @@ const mockPolicies: IPolicy[] = [
     name: 'Admin Policy',
     description: 'Admin policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   }
 ];

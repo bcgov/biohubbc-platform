@@ -3,7 +3,12 @@ import {
   IPolicy,
   IPolicySummary,
   IPoliciesResponse,
+  ICreatePolicyExpressionRequest,
   ICreatePolicyRequest,
+  IPolicyExpression,
+  IPolicyExpressionsResponse,
+  IPolicyTeamsResponse,
+  IUpdatePolicyExpressionRequest,
   IUpdatePolicyRequest,
   IUpdatePolicyStatusRequest
 } from 'interfaces/usePoliciesApi.interface';
@@ -46,6 +51,38 @@ const usePoliciesApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get policy expressions for a policy with pagination.
+   *
+   * @param {string} policyId
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {*} {Promise<IPolicyExpressionsResponse>}
+   */
+  const getPolicyExpressions = async (
+    policyId: string,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<IPolicyExpressionsResponse> => {
+    const { data } = await axios.get(`/api/administrative/policies/${policyId}/expressions`, { params: pagination });
+
+    return data;
+  };
+
+  /**
+   * Get teams associated with a policy with pagination.
+   *
+   * @param {string} policyId
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {*} {Promise<IPolicyTeamsResponse>}
+   */
+  const getPolicyTeams = async (
+    policyId: string,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<IPolicyTeamsResponse> => {
+    const { data } = await axios.get(`/api/administrative/policies/${policyId}/teams`, { params: pagination });
+
+    return data;
+  };
+
+  /**
    * Create a new policy.
    *
    * @param {ICreatePolicyRequest} policy
@@ -55,6 +92,54 @@ const usePoliciesApi = (axios: AxiosInstance) => {
     const { data } = await axios.post('/api/administrative/policies', policy);
 
     return data;
+  };
+
+  /**
+   * Create a policy expression.
+   *
+   * @param {string} policyId
+   * @param {ICreatePolicyExpressionRequest} policyExpression
+   * @return {*} {Promise<IPolicyExpression>}
+   */
+  const createPolicyExpression = async (
+    policyId: string,
+    policyExpression: ICreatePolicyExpressionRequest
+  ): Promise<IPolicyExpression> => {
+    const { data } = await axios.post(`/api/administrative/policies/${policyId}/expressions`, policyExpression);
+
+    return data;
+  };
+
+  /**
+   * Update a policy expression.
+   *
+   * @param {string} policyId
+   * @param {string} policyExpressionId
+   * @param {IUpdatePolicyExpressionRequest} policyExpression
+   * @return {*} {Promise<IPolicyExpression>}
+   */
+  const updatePolicyExpression = async (
+    policyId: string,
+    policyExpressionId: string,
+    policyExpression: IUpdatePolicyExpressionRequest
+  ): Promise<IPolicyExpression> => {
+    const { data } = await axios.put(
+      `/api/administrative/policies/${policyId}/expressions/${policyExpressionId}`,
+      policyExpression
+    );
+
+    return data;
+  };
+
+  /**
+   * Delete a policy expression.
+   *
+   * @param {string} policyId
+   * @param {string} policyExpressionId
+   * @return {*} {Promise<void>}
+   */
+  const deletePolicyExpression = async (policyId: string, policyExpressionId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/policies/${policyId}/expressions/${policyExpressionId}`);
   };
 
   /**
@@ -96,7 +181,12 @@ const usePoliciesApi = (axios: AxiosInstance) => {
   return {
     getPolicies,
     getPolicy,
+    getPolicyExpressions,
+    getPolicyTeams,
     createPolicy,
+    createPolicyExpression,
+    updatePolicyExpression,
+    deletePolicyExpression,
     updatePolicy,
     updatePolicyStatus,
     deletePolicy

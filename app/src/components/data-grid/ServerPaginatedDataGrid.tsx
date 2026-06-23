@@ -1,4 +1,5 @@
 import {
+  DataGridProps,
   GridColDef,
   GridPaginationModel,
   GridRowId,
@@ -24,6 +25,9 @@ interface IServerPaginatedDataGridProps<T extends GridValidRowModel> {
   onRowSelectionModelChange?: (model: GridRowSelectionModel) => void;
   checkboxSelection?: boolean;
   disableMultipleRowSelection?: boolean;
+  getRowHeight?: DataGridProps<T>['getRowHeight'];
+  getEstimatedRowHeight?: DataGridProps<T>['getEstimatedRowHeight'];
+  sx?: DataGridProps<T>['sx'];
 }
 
 /**
@@ -51,7 +55,10 @@ export const ServerPaginatedDataGrid = <T extends GridValidRowModel>({
   rowSelectionModel,
   onRowSelectionModelChange,
   checkboxSelection,
-  disableMultipleRowSelection
+  disableMultipleRowSelection,
+  getRowHeight,
+  getEstimatedRowHeight,
+  sx
 }: IServerPaginatedDataGridProps<T>) => {
   return (
     <CustomDataGrid
@@ -74,18 +81,23 @@ export const ServerPaginatedDataGrid = <T extends GridValidRowModel>({
       disableColumnSelector
       checkboxSelection={checkboxSelection}
       disableMultipleRowSelection={disableMultipleRowSelection}
+      getRowHeight={getRowHeight}
+      getEstimatedRowHeight={getEstimatedRowHeight}
       rowSelectionModel={rowSelectionModel}
       onRowSelectionModelChange={onRowSelectionModelChange}
       onRowClick={(params) => {
         onRowClick?.(params.row as T);
       }}
-      sx={{
-        border: 'none',
-        '& .MuiDataGrid-columnHeaderTitle': {
-          fontWeight: 700,
-          textTransform: 'uppercase'
-        }
-      }}
+      sx={[
+        {
+          border: 'none',
+          '& .MuiDataGrid-columnHeaderTitle': {
+            fontWeight: 700,
+            textTransform: 'uppercase'
+          }
+        },
+        ...(Array.isArray(sx) ? sx : [sx])
+      ]}
     />
   );
 };

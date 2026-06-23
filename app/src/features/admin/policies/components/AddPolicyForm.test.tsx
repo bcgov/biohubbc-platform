@@ -21,8 +21,8 @@ const mockExpression = vi.hoisted(
   })
 );
 
-vi.mock('./PolicyExpression', () => ({
-  PolicyExpression: ({
+vi.mock('components/expression-builder/PolicyExpressionBuilder', () => ({
+  PolicyExpressionBuilder: ({
     value,
     onChange
   }: {

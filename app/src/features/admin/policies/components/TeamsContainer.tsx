@@ -14,8 +14,8 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IAvailableUser, ITeam } from 'interfaces/useTeamsApi.interface';
-import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
 
 /**
@@ -299,8 +299,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       field: 'description',
       headerName: 'Description',
       flex: 2,
-      minWidth: 200,
-      valueGetter: (value) => value || '-'
+      minWidth: 200
     },
     {
       field: 'member_count',

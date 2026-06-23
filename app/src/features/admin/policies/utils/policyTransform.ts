@@ -106,8 +106,7 @@ export const transformPolicyToJson = (policy: IPolicy): string => {
 export const transformPolicyFormToApiStatements = (values: IAddPolicyFormValues): ICreatePolicyStatementRequest[] => [
   {
     effect: values.statement_effect,
-    submission_feature_urn: values.submission_feature_urn,
-    ...(values.expression ? { expression: values.expression } : {})
+    submission_feature_urn: values.submission_feature_urn
   }
 ];
 

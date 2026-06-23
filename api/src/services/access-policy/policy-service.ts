@@ -8,14 +8,22 @@ import { PolicyStatementRepository } from '../../repositories/authorization/poli
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
-import { PolicyFilters, PolicyWithStatements } from './policy-service.interface';
+import { ExpressionTreeService } from '../expression-tree-service';
+import { PolicyExpressionService } from './policy-expression-service';
+import {
+  PolicyExpressionWithExpression,
+  PolicyFilters,
+  PolicyWithStatements
+} from './policy-service.interface';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
+  policyExpressionService: PolicyExpressionService;
   policyStatementRepository: PolicyStatementRepository;
   policyStatementService: PolicyStatementService;
+  expressionTreeService: ExpressionTreeService;
   securityScopeService: SecurityScopeService;
   teamPolicyRepository: TeamPolicyRepository;
 
@@ -28,8 +36,10 @@ export class PolicyService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
     this.policyStatementRepository = new PolicyStatementRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
+    this.expressionTreeService = new ExpressionTreeService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
@@ -271,7 +281,8 @@ export class PolicyService extends DBService {
     const policiesWithStatements = await Promise.all(
       policies.map(async (policy) => ({
         ...policy,
-        statements: await this.policyStatementService.getPolicyStatements(policy.policy_id)
+        statements: await this.policyStatementService.getPolicyStatements(policy.policy_id),
+        expressions: await this.getPolicyExpressionsWithExpression(policy.policy_id)
       }))
     );
 
@@ -288,7 +299,122 @@ export class PolicyService extends DBService {
   async getPolicyWithStatements(policyId: string): Promise<PolicyWithStatements> {
     const policy = await this.policyRepository.getPolicy(policyId);
     const statements = await this.policyStatementService.getPolicyStatements(policyId);
-    return { ...policy, statements };
+    const expressions = await this.getPolicyExpressionsWithExpression(policyId);
+    return { ...policy, statements, expressions };
+  }
+
+  /**
+   * Get policy expressions for a policy and hydrate each with its expression tree.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<PolicyExpressionWithExpression[]>} Policy expressions with expression trees.
+   * @memberof PolicyService
+   */
+  async getPolicyExpressionsWithExpression(
+    policyId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<PolicyExpressionWithExpression[]> {
+    const policyExpressions = await this.policyExpressionService.getPolicyExpressionsByPolicyId(policyId, pagination);
+
+    return Promise.all(
+      policyExpressions.map(async (policyExpression) => ({
+        ...policyExpression,
+        expression: await this.expressionTreeService.readExpressionTree(policyExpression.expression_id)
+      }))
+    );
+  }
+
+  /**
+   * Count policy expressions for a policy.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<number>} Active policy expression count.
+   * @memberof PolicyService
+   */
+  getPolicyExpressionsCount(policyId: string): Promise<number> {
+    return this.policyExpressionService.getPolicyExpressionsCountByPolicyId(policyId);
+  }
+
+  /**
+   * Create a policy expression and return it with its hydrated expression tree.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @param {Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>} payload - Policy expression payload.
+   * @return {Promise<PolicyExpressionWithExpression>} Created policy expression with expression tree.
+   * @memberof PolicyService
+   */
+  async createPolicyExpression(
+    policyId: string,
+    payload: Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>
+  ): Promise<PolicyExpressionWithExpression> {
+    await this.policyRepository.getPolicy(policyId);
+
+    const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
+    const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+      policyId,
+      expressionId: expression_id,
+      name: payload.name ?? undefined,
+      description: payload.description
+    });
+
+    return {
+      ...policyExpression,
+      expression: await this.expressionTreeService.readExpressionTree(policyExpression.expression_id)
+    };
+  }
+
+  /**
+   * Update a policy expression and return it with its hydrated expression tree.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @param {string} policyExpressionId - Policy-expression UUID.
+   * @param {Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>} payload - Policy expression payload.
+   * @return {Promise<PolicyExpressionWithExpression>} Updated policy expression with expression tree.
+   * @memberof PolicyService
+   */
+  async updatePolicyExpression(
+    policyId: string,
+    policyExpressionId: string,
+    payload: Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>
+  ): Promise<PolicyExpressionWithExpression> {
+    await this.policyRepository.getPolicy(policyId);
+
+    const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
+    const policyExpression = await this.policyExpressionService.updatePolicyExpressionForPolicy(
+      policyId,
+      policyExpressionId,
+      {
+        expression_id,
+        name: payload.name ?? null,
+        description: payload.description
+      }
+    );
+
+    return {
+      ...policyExpression,
+      expression: await this.expressionTreeService.readExpressionTree(policyExpression.expression_id)
+    };
+  }
+
+  /**
+   * Soft delete a policy expression.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @param {string} policyExpressionId - Policy-expression UUID.
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  async deletePolicyExpression(policyId: string, policyExpressionId: string): Promise<void> {
+    await this.policyRepository.getPolicy(policyId);
+    const policyExpression = await this.policyExpressionService.getPolicyExpressionById(policyExpressionId);
+
+    if (policyExpression.policy_id !== policyId) {
+      throw new HTTP400('Policy expression does not belong to policy');
+    }
+
+    await this.policyExpressionService.clearPolicyStatementLinks(policyId, policyExpressionId);
+    await this.policyExpressionService.deletePolicyExpression(policyId, policyExpressionId);
   }
 
   /**
@@ -311,7 +437,8 @@ export class PolicyService extends DBService {
   ): Promise<PolicyWithStatements> {
     const policy = await this.policyRepository.insertPolicy(policyData);
     const createdStatements = await this.createStatements(policy.policy_id, statements);
-    return { ...policy, statements: createdStatements };
+    const expressions = await this.getPolicyExpressionsWithExpression(policy.policy_id);
+    return { ...policy, statements: createdStatements, expressions };
   }
 
   /**
@@ -395,7 +522,8 @@ export class PolicyService extends DBService {
       await this.securityScopeService.refreshAccessForPolicyTeams(policyId, affectedTeamIds);
     }
 
-    return { ...policy, statements: finalStatements };
+    const expressions = await this.getPolicyExpressionsWithExpression(policyId);
+    return { ...policy, statements: finalStatements, expressions };
   }
 
   /**

@@ -53,6 +53,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         name: 'Test Policy',
         description: 'Test description',
         status: 'approved',
+        expressions: [],
         statements: [
           {
             policy_statement_id: 's1',
@@ -119,6 +120,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         name: 'Updated Policy',
         description: 'Updated description',
         status: 'approved',
+        expressions: [],
         statements: [
           {
             policy_statement_id: 's1',
@@ -177,6 +179,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         name: 'Policy No Statements',
         description: null,
         status: 'approved',
+        expressions: [],
         statements: []
       };
 

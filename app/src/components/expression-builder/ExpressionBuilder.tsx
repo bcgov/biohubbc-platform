@@ -110,7 +110,7 @@ export const ExpressionBuilder = ({
     handlePropertySelected,
     loadSpeciesPredicateProperty,
     refreshPropertyOptions
-  } = useExpressionBuilderProperties(recommendedSearchTerm, usedPropertyKeys);
+  } = useExpressionBuilderProperties(recommendedSearchTerm, usedPropertyKeys, !readOnly);
   const hasSuggestions = !readOnly && (suggestedProperties.length > 0 || suggestedSpecies.length > 0);
 
   const hasStartedExpressionDraft = useCallback((clause: BuilderClauseNode): boolean => {
@@ -608,7 +608,19 @@ export const ExpressionBuilder = ({
         flex: '1 1 auto',
         flexDirection: 'column',
         minHeight: 0,
-        transition: 'none'
+        position: 'relative',
+        transition: 'none',
+        '&::after': {
+          border: '2px solid transparent',
+          borderRadius: 1,
+          content: '""',
+          inset: 0,
+          pointerEvents: 'none',
+          position: 'absolute'
+        },
+        '&[data-root-drop-active="true"]::after': {
+          borderColor: 'primary.main'
+        }
       }}>
       <Box
         data-testid="expression-input-surface"

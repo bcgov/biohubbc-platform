@@ -32,19 +32,25 @@ import {
 } from 'features/admin/policies/components/EditPolicyStatementDialog';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
 import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm';
+import { PolicyExpressionDialog } from 'features/admin/policies/components/PolicyExpressionDialog';
+import { IPolicyExpressionFormValues } from 'features/admin/policies/components/PolicyExpressionForm';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
   ICreatePolicyStatementRequest,
   IPolicy,
+  IPolicyExpression,
+  IPolicyExpressionsResponse,
+  IPolicyTeamsResponse,
   IPolicyStatement,
   PolicyStatus
 } from 'interfaces/usePoliciesApi.interface';
 import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
-import { ITeamPoliciesResponse, ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
+import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { PolicySkeleton } from './PolicySkeleton';
@@ -53,6 +59,7 @@ type PolicyDetailTab = 'expressions' | 'statements' | 'features' | 'teams';
 
 type SearchablePolicyStatement = IPolicyStatement & {
   featureType: string;
+  expression: ExpressionTreeExpression;
 };
 
 const policyDetailTabs: { value: PolicyDetailTab; label: string }[] = [
@@ -98,13 +105,27 @@ export const PolicyDetailPage = () => {
   const [activeTab, setActiveTab] = useState<PolicyDetailTab>('expressions');
   const [isCreateExpressionDialogOpen, setIsCreateExpressionDialogOpen] = useState(false);
   const [isCreateStatementDialogOpen, setIsCreateStatementDialogOpen] = useState(false);
+  const [editingExpression, setEditingExpression] = useState<IPolicyExpression | null>(null);
   const [editingStatement, setEditingStatement] = useState<IPolicyStatement | null>(null);
+  const [isSavingExpression, setIsSavingExpression] = useState(false);
   const [isSavingStatement, setIsSavingStatement] = useState(false);
   const [isSavingPolicyStatus, setIsSavingPolicyStatus] = useState(false);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [isSavingPolicyDetails, setIsSavingPolicyDetails] = useState(false);
   const policyDataLoader = useDataLoader((id: string) => api.policies.getPolicy(id));
   const policy = policyDataLoader.data;
+  const expressions = useServerPaginatedDataGrid<IPolicyExpression, IPolicyExpressionsResponse>({
+    fetcher: (_search, pagination) =>
+      policyId
+        ? api.policies.getPolicyExpressions(policyId, pagination)
+        : Promise.resolve({
+            expressions: [],
+            pagination: { total: 0, current_page: 1, last_page: 1, per_page: pagination.limit }
+          }),
+    extractData: (response) => response.expressions,
+    extractTotal: (response) => response.pagination.total,
+    defaultSort: { field: 'name', sort: 'asc' }
+  });
 
   useEffect(() => {
     if (!policyId) {
@@ -117,7 +138,7 @@ export const PolicyDetailPage = () => {
   const toStatementRequest = (statement: IPolicyStatement): ICreatePolicyStatementRequest => ({
     effect: statement.effect,
     submission_feature_urn: statement.submission_feature_urn,
-    ...(statement.expression ? { expression: statement.expression } : {})
+    ...(statement.policy_expression_id ? { policy_expression_id: statement.policy_expression_id } : {})
   });
 
   const handleCloseStatementDialog = () => {
@@ -125,9 +146,17 @@ export const PolicyDetailPage = () => {
       return;
     }
 
-    setIsCreateExpressionDialogOpen(false);
     setIsCreateStatementDialogOpen(false);
     setEditingStatement(null);
+  };
+
+  const handleCloseExpressionDialog = () => {
+    if (isSavingExpression) {
+      return;
+    }
+
+    setIsCreateExpressionDialogOpen(false);
+    setEditingExpression(null);
   };
 
   const handleSaveStatements = async (
@@ -149,7 +178,6 @@ export const PolicyDetailPage = () => {
       });
 
       policyDataLoader.setData(updatedPolicy);
-      setIsCreateExpressionDialogOpen(false);
       setIsCreateStatementDialogOpen(false);
       setEditingStatement(null);
       dialogContext.setSnackbar({
@@ -178,11 +206,140 @@ export const PolicyDetailPage = () => {
         {
           effect: values.effect,
           submission_feature_urn: values.submission_feature_urn,
-          ...(values.expression ? { expression: values.expression } : {})
+          ...(values.policy_expression_id ? { policy_expression_id: values.policy_expression_id } : {})
         }
       ],
       'Created statement'
     );
+  };
+
+  const handleCreateExpression = async (values: IPolicyExpressionFormValues) => {
+    if (!policy || !values.expression) {
+      return;
+    }
+
+    try {
+      setIsSavingExpression(true);
+
+      const createdExpression = await api.policies.createPolicyExpression(policy.policy_id, {
+        name: values.name,
+        description: values.description || undefined,
+        expression: values.expression
+      });
+
+      policyDataLoader.setData({
+        ...policy,
+        expressions: [...policy.expressions, createdExpression]
+      });
+      expressions.refresh();
+      setIsCreateExpressionDialogOpen(false);
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: 'Created expression'
+      });
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setIsSavingExpression(false);
+    }
+  };
+
+  const handleEditExpression = async (values: IPolicyExpressionFormValues) => {
+    if (!policy || !editingExpression || !values.expression) {
+      return;
+    }
+
+    try {
+      setIsSavingExpression(true);
+
+      const updatedExpression = await api.policies.updatePolicyExpression(
+        policy.policy_id,
+        editingExpression.policy_expression_id,
+        {
+          name: values.name,
+          description: values.description || undefined,
+          expression: values.expression
+        }
+      );
+
+      policyDataLoader.setData({
+        ...policy,
+        expressions: policy.expressions.map((expression) =>
+          expression.policy_expression_id === updatedExpression.policy_expression_id ? updatedExpression : expression
+        )
+      });
+      expressions.refresh();
+      setEditingExpression(null);
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: 'Updated expression'
+      });
+    } catch (error) {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setIsSavingExpression(false);
+    }
+  };
+
+  const handleDeleteExpressionClick = (expression: IPolicyExpression) => {
+    if (!policy) {
+      return;
+    }
+
+    dialogContext.setYesNoDialog({
+      open: true,
+      dialogTitle: 'Delete Expression',
+      dialogText: 'Are you sure you want to delete this policy expression?',
+      yesButtonLabel: 'Delete',
+      noButtonLabel: 'Cancel',
+      onNo: () => {
+        dialogContext.setYesNoDialog({ open: false });
+      },
+      onClose: () => {
+        dialogContext.setYesNoDialog({ open: false });
+      },
+      onYes: async () => {
+        dialogContext.setYesNoDialog({ open: false });
+
+        try {
+          setIsSavingExpression(true);
+
+          await api.policies.deletePolicyExpression(policy.policy_id, expression.policy_expression_id);
+          policyDataLoader.setData({
+            ...policy,
+            expressions: policy.expressions.filter(
+              (policyExpression) => policyExpression.policy_expression_id !== expression.policy_expression_id
+            ),
+            statements: policy.statements.map((statement) =>
+              statement.policy_expression_id === expression.policy_expression_id
+                ? { ...statement, policy_expression_id: undefined }
+                : statement
+            )
+          });
+          expressions.refresh();
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: 'Deleted expression'
+          });
+        } catch (error) {
+          const apiError = error as APIError;
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: apiError.message
+          });
+        } finally {
+          setIsSavingExpression(false);
+        }
+      }
+    });
   };
 
   const handleEditStatement = async (values: IEditPolicyStatementFormValues) => {
@@ -196,7 +353,7 @@ export const PolicyDetailPage = () => {
           ? {
               effect: values.effect,
               submission_feature_urn: values.submission_feature_urn,
-              ...(values.expression ? { expression: values.expression } : {})
+              ...(values.policy_expression_id ? { policy_expression_id: values.policy_expression_id } : {})
             }
           : toStatementRequest(statement)
       ),
@@ -305,49 +462,71 @@ export const PolicyDetailPage = () => {
     }
   };
 
-  const expressionRows = useMemo(
-    () => policy?.statements.filter((statement) => statement.expression) ?? [],
-    [policy?.statements]
-  );
-
-  const expressionColumns: GridColDef<IPolicyStatement>[] = [
+  const expressionColumns: GridColDef<IPolicyExpression>[] = [
     {
-      field: 'effect',
-      headerName: 'Effect',
-      minWidth: 140,
-      renderCell: (params) => (
-        <Chip
-          size="small"
-          label={params.row.effect}
-          color={params.row.effect === 'allow' ? 'success' : 'error'}
-          variant="outlined"
-          sx={{ textTransform: 'capitalize' }}
-        />
-      )
+      field: 'name',
+      headerName: 'Name',
+      flex: 1,
+      minWidth: 220
     },
     {
-      field: 'submission_feature_urn',
-      headerName: 'Resource',
+      field: 'description',
+      headerName: 'Description',
       flex: 1,
-      minWidth: 260
+      minWidth: 260,
+      valueGetter: (_value, row) => row.description ?? ''
     },
     {
       field: 'expression',
       headerName: 'Expression',
       flex: 2,
       minWidth: 360,
+      sortable: false,
       renderCell: (params) => (
-        <Typography
-          component="span"
-          variant="body2"
+        <Box
+          component="pre"
           sx={{
             fontFamily: 'monospace',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            fontSize: '0.75rem',
+            lineHeight: 1.5,
+            m: 0,
+            overflow: 'visible',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
           }}>
-          {JSON.stringify(params.row.expression)}
-        </Typography>
+          {JSON.stringify(params.row.expression, null, 2)}
+        </Box>
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      sortable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <ContextMenuButton
+          buttonTitle={`policy-expression-${params.row.policy_expression_id}-menu`}
+          buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+          itemGroups={[
+            {
+              groupId: 'expression-actions',
+              items: [
+                {
+                  label: 'Edit',
+                  icon: <Icon path={mdiPencilOutline} size={0.875} />,
+                  onClick: () => setEditingExpression(params.row)
+                },
+                {
+                  label: 'Delete',
+                  icon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+                  onClick: () => handleDeleteExpressionClick(params.row)
+                }
+              ]
+            }
+          ]}
+        />
       )
     }
   ];
@@ -369,15 +548,22 @@ export const PolicyDetailPage = () => {
     },
     {
       field: 'submission_feature_urn',
-      headerName: 'Resource',
+      headerName: 'URN',
       flex: 1,
       minWidth: 260
     },
     {
-      field: 'expression',
+      field: 'policy_expression',
       headerName: 'Expression',
-      minWidth: 150,
-      valueGetter: (_value, row) => (row.expression ? 'Yes' : 'No')
+      flex: 1,
+      minWidth: 220,
+      valueGetter: (_value, row) => {
+        const policyExpression = policy?.expressions.find(
+          (expression) => expression.policy_expression_id === row.policy_expression_id
+        );
+
+        return policyExpression?.name || row.policy_expression_id || '';
+      }
     },
     {
       field: 'actions',
@@ -467,17 +653,29 @@ export const PolicyDetailPage = () => {
             label="Expressions"
             addLabel="Create Expression"
             onAdd={() => setIsCreateExpressionDialogOpen(true)}>
-            <CustomDataGrid
-              data-testid="policy-expressions-table"
-              rows={expressionRows}
+            <ServerPaginatedDataGrid<IPolicyExpression>
+              dataTestId="policy-expressions-table"
+              rows={expressions.rows}
               columns={expressionColumns}
-              getRowId={(row) => row.policy_statement_id}
-              disableRowSelectionOnClick
-              disableColumnSelector
+              getRowId={(row) => row.policy_expression_id}
               noRowsMessage="No Expressions"
-              hideFooter
-              autoHeight
-              sx={{ border: 'none' }}
+              rowCount={expressions.rowCount}
+              paginationModel={expressions.paginationModel}
+              setPaginationModel={expressions.handlePaginationChange}
+              sortModel={expressions.sortModel}
+              setSortModel={expressions.handleSortChange}
+              getRowHeight={() => 'auto'}
+              getEstimatedRowHeight={() => 160}
+              sx={{
+                '& .MuiDataGrid-cell': {
+                  alignItems: 'flex-start',
+                  py: 1.5
+                },
+                '& .MuiDataGrid-cell[data-field="expression"] > *': {
+                  overflow: 'visible',
+                  whiteSpace: 'normal'
+                }
+              }}
             />
           </PageSection>
         )}
@@ -503,22 +701,41 @@ export const PolicyDetailPage = () => {
           </PageSection>
         )}
 
-        {activeTab === 'features' && <PolicyFeatureResults statements={loadedPolicy.statements} />}
+        {activeTab === 'features' && (
+          <PolicyFeatureResults statements={loadedPolicy.statements} expressions={loadedPolicy.expressions} />
+        )}
 
         {activeTab === 'teams' && <PolicyTeams policyId={loadedPolicy.policy_id} />}
       </Container>
 
-      <EditPolicyStatementDialog
+      <PolicyExpressionDialog
         open={isCreateExpressionDialogOpen}
-        isLoading={isSavingStatement}
-        dialogTitle="Create Expression"
-        onCancel={handleCloseStatementDialog}
-        onSave={handleCreateStatement}
+        isLoading={isSavingExpression}
+        mode="create"
+        onCancel={handleCloseExpressionDialog}
+        onSave={handleCreateExpression}
       />
+
+      {editingExpression && (
+        <PolicyExpressionDialog
+          open={Boolean(editingExpression)}
+          isLoading={isSavingExpression}
+          mode="edit"
+          initialValues={{
+            name: editingExpression.name ?? '',
+            description: editingExpression.description ?? '',
+            expression: editingExpression.expression,
+            expression_error: undefined
+          }}
+          onCancel={handleCloseExpressionDialog}
+          onSave={handleEditExpression}
+        />
+      )}
 
       <EditPolicyStatementDialog
         open={isCreateStatementDialogOpen}
         isLoading={isSavingStatement}
+        policyExpressions={loadedPolicy.expressions}
         onCancel={handleCloseStatementDialog}
         onSave={handleCreateStatement}
       />
@@ -526,14 +743,14 @@ export const PolicyDetailPage = () => {
       <EditPolicyStatementDialog
         open={Boolean(editingStatement)}
         isLoading={isSavingStatement}
+        policyExpressions={loadedPolicy.expressions}
         mode="edit"
         initialValues={
           editingStatement
             ? {
                 effect: editingStatement.effect,
                 submission_feature_urn: editingStatement.submission_feature_urn,
-                expression: editingStatement.expression ?? null,
-                expression_error: undefined
+                policy_expression_id: editingStatement.policy_expression_id ?? ''
               }
             : undefined
         }
@@ -576,9 +793,9 @@ interface PolicyTeamsProps {
 const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
   const api = useApi();
 
-  const teams = useServerPaginatedDataGrid<ITeamPolicyDetails, ITeamPoliciesResponse>({
-    fetcher: (_search, pagination) => api.teamPolicies.getTeamPolicies({ policyIds: [policyId] }, pagination),
-    extractData: (response) => response.team_policies,
+  const teams = useServerPaginatedDataGrid<ITeamPolicyDetails, IPolicyTeamsResponse>({
+    fetcher: (_search, pagination) => api.policies.getPolicyTeams(policyId, pagination),
+    extractData: (response) => response.teams,
     extractTotal: (response) => response.pagination.total,
     defaultSort: { field: 'team_name', sort: 'asc' }
   });
@@ -621,21 +838,26 @@ const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
 
 interface PolicyFeatureResultsProps {
   statements: IPolicyStatement[];
+  expressions: IPolicyExpression[];
 }
 
 /**
- * Renders search result tables for policy statement expressions.
+ * Renders search result tables for policy statements with linked expressions.
  *
  * @param {PolicyFeatureResultsProps} props
  * @returns {JSX.Element}
  */
-const PolicyFeatureResults = ({ statements }: PolicyFeatureResultsProps) => {
+const PolicyFeatureResults = ({ statements, expressions }: PolicyFeatureResultsProps) => {
   const api = useApi();
 
   const searchableStatements = useMemo<SearchablePolicyStatement[]>(
     () =>
       statements.flatMap((statement) => {
-        if (!statement.expression) {
+        const policyExpression = expressions.find(
+          (expression) => expression.policy_expression_id === statement.policy_expression_id
+        );
+
+        if (!policyExpression) {
           return [];
         }
 
@@ -645,9 +867,9 @@ const PolicyFeatureResults = ({ statements }: PolicyFeatureResultsProps) => {
           return [];
         }
 
-        return [{ ...statement, featureType }];
+        return [{ ...statement, featureType, expression: policyExpression.expression }];
       }),
-    [statements]
+    [expressions, statements]
   );
 
   const featureSearchDataLoader = useDataLoader(
@@ -681,7 +903,9 @@ const PolicyFeatureResults = ({ statements }: PolicyFeatureResultsProps) => {
   return (
     <PageSection id="policy-features" label="Features">
       {!searchableStatements.length && (
-        <Typography color="text.secondary">No policy statement expressions with concrete feature types.</Typography>
+        <Typography color="text.secondary">
+          No policy statements with linked expressions and concrete feature types.
+        </Typography>
       )}
 
       {Boolean(searchableStatements.length) && (
