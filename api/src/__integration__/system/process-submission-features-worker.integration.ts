@@ -164,6 +164,7 @@ describe('Process Submission Features Worker', function () {
     uploadId: string;
     submissionUploadId: string;
     ticketId: string;
+    blueprintId: number;
     artifactId: string;
     objectKey: string;
   }> {
@@ -218,12 +219,17 @@ describe('Process Submission Features Worker', function () {
     // 5. ticket (required FK for submission_upload)
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
 
-    // 6. submission_upload (links submission to upload)
+    // 6. submission_upload (links submission to upload; pinned to the active default Blueprint)
+    const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
+      .where({ is_default: true })
+      .whereNull('record_end_date')
+      .select('blueprint_id');
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
-        ticket_id: ticketId
+        ticket_id: ticketId,
+        blueprint_id: blueprintId
       })
       .returning('submission_upload_id');
 
@@ -239,6 +245,7 @@ describe('Process Submission Features Worker', function () {
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
       ticketId,
+      blueprintId,
       artifactId: artifact.artifact_id,
       objectKey
     };
@@ -253,6 +260,7 @@ describe('Process Submission Features Worker', function () {
     submissionId: number;
     uploadId: string;
     ticketId: string;
+    blueprintId: number;
   }): Promise<void> {
     const connection = getAPIUserDBConnection();
     try {
@@ -262,7 +270,8 @@ describe('Process Submission Features Worker', function () {
         submission_id: params.submissionId,
         upload_id: params.uploadId,
         status: 'uploaded',
-        ticket_id: params.ticketId
+        ticket_id: params.ticketId,
+        blueprint_id: params.blueprintId
       });
       await connection.commit();
       expect(result.status).to.equal('published');
@@ -295,8 +304,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
+    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+      tarBuffer
+    );
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
 
     // Wait for the worker to finish
     const validation = await waitForValidationStatus(db, submissionId);
@@ -362,8 +373,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
+    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+      tarBuffer
+    );
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
 
     const validation = await waitForValidationStatus(db, submissionId);
     expect(validation.status).to.equal('completed');
@@ -459,9 +472,13 @@ describe('SubmissionIngestionService pipeline (system)', function () {
    * block's setupSubmissionWithTar, using Knex (auto-committed) so the service's
    * own short-lived transactions can see the rows.
    */
-  async function setupSubmissionWithTar(
-    tarBuffer: Buffer
-  ): Promise<{ submissionId: number; uploadId: string; submissionUploadId: string; ticketId: string }> {
+  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{
+    submissionId: number;
+    uploadId: string;
+    submissionUploadId: string;
+    ticketId: string;
+    blueprintId: number;
+  }> {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
 
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
@@ -513,12 +530,17 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
     createdTicketIds.push(ticketId);
 
-    // 6. submission_upload
+    // 6. submission_upload (pinned to the active default Blueprint)
+    const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
+      .where({ is_default: true })
+      .whereNull('record_end_date')
+      .select('blueprint_id');
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
-        ticket_id: ticketId
+        ticket_id: ticketId,
+        blueprint_id: blueprintId
       })
       .returning('submission_upload_id');
 
@@ -533,7 +555,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submissionId: submission.submission_id,
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
-      ticketId
+      ticketId,
+      blueprintId
     };
   }
 
@@ -552,7 +575,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
       status: 'uploaded',
-      ticket_id: setup.ticketId
+      ticket_id: setup.ticketId,
+      blueprint_id: setup.blueprintId
     });
     return { result, ...setup };
   }

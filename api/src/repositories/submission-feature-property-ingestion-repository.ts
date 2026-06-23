@@ -194,9 +194,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Clear upload-scoped rows from `submission_upload_staging_resolved_property`.
    *
-   * This table links raw staged property names to active feature/property metadata
-   * (`feature_type_property`, logical type, required/multi flags). Clearing avoids
-   * stale resolution rows on retries.
+   * This table links raw staged property names to the selected Blueprint's assignment metadata
+   * (logical type, required/multi flags). Clearing avoids stale resolution rows on retries.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -210,22 +209,27 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Populate resolved-property staging by joining raw properties to active metadata.
+   * Populate resolved-property staging by resolving raw properties through the selected Blueprint.
    *
-   * For each row in `submission_upload_staging_raw_property`, this method resolves:
-   * - matching `feature_property` by property name
-   * - matching `feature_type_property` for the feature's type
-   * - logical `feature_property_type` name
-   * - `allow_multiple` and `required_value` behavior flags
-   *
-   * Unresolved properties are preserved with nullable metadata so downstream phases
-   * can detect and report validation/resolution issues.
+   * The selected Blueprint is the one pinned to the upload (`submission_upload.blueprint_id`), passed
+   * in by the caller — it is not re-selected here. Property assignment, requiredness, and multiplicity
+   * come from the Blueprint; the logical type is still read from `feature_property_type`.
+   * `feature_type_property` supplies only the canonical `feature_type_property_id` surrogate, and only
+   * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
+   * properties are kept with a null id for later reporting.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
    */
-  async populateResolvedPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async populateResolvedPropertyStagingBySubmissionUploadId(
+    submissionUploadId: string,
+    blueprintId: number
+  ): Promise<void> {
     const sql = SQL`
+      WITH selected_blueprint AS (
+        SELECT ${blueprintId}::integer AS blueprint_id
+      )
       INSERT INTO submission_upload_staging_resolved_property (
         submission_feature_id,
         submission_upload_id,
@@ -243,9 +247,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         s.feature_type_id,
         s.property_name,
         s.value,
-        ftp.feature_type_property_id,
-        COALESCE(ftp.allow_multiple, false) AS allow_multiple,
-        COALESCE(ftp.required_value, false) AS required_value,
+        -- Surrogate id only when the Blueprint includes the feature type and assigns the property;
+        -- this gates downstream parsing.
+        CASE
+          WHEN bft.blueprint_feature_type_id IS NOT NULL
+           AND bftp.blueprint_feature_type_property_id IS NOT NULL
+          THEN ftp.feature_type_property_id
+        END AS feature_type_property_id,
+        COALESCE(bftp.allow_multiple, false) AS allow_multiple,
+        COALESCE(bftp.required_value, false) AS required_value,
         fpt.name AS property_type_name
       FROM submission_upload_staging_raw_property s
       LEFT JOIN feature_property fp
@@ -254,10 +264,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       LEFT JOIN feature_property_type fpt
         ON fpt.feature_property_type_id = fp.feature_property_type_id
        AND fpt.record_end_date IS NULL
+      LEFT JOIN selected_blueprint sb ON TRUE
+      -- Feature type included in the Blueprint.
+      LEFT JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = sb.blueprint_id
+       AND bft.feature_type_id = s.feature_type_id
+       AND bft.record_end_date IS NULL
+      -- Canonical feature-type/property pool entry; supplies the surrogate id and bridges to the
+      -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
       LEFT JOIN feature_type_property ftp
         ON ftp.feature_type_id = s.feature_type_id
        AND ftp.feature_property_id = fp.feature_property_id
        AND ftp.record_end_date IS NULL
+      -- Property assigned to the Blueprint feature type; source of requiredness and multiplicity.
+      LEFT JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ftp.feature_type_property_id
+       AND bftp.record_end_date IS NULL
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
@@ -274,7 +297,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * Note: array detection here is transport-shape handling. Logical property type
    * is still determined by `property_type_name`; multiplicity is governed by
-   * `allow_multiple` on `feature_type_property`.
+   * `allow_multiple` from the selected Blueprint's property assignment.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -961,15 +984,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record missing required-property errors for features in an upload.
    *
-   * Requiredness is evaluated by feature type against active metadata. A required property is
-   * considered present only when staging has a non-null value and, for arrays, at least one element.
+   * Requiredness comes from the selected Blueprint pinned to the upload
+   * (`submission_upload.blueprint_id`), passed in by the caller: a property is required when its
+   * `blueprint_feature_type_property.required_value` is true. A required property is considered
+   * present only when staging has a non-null value and, for arrays, at least one element.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
    */
-  async recordMissingRequiredPropertyErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async recordMissingRequiredPropertyErrorsBySubmissionUploadId(
+    submissionUploadId: string,
+    blueprintId: number
+  ): Promise<void> {
     const sql = SQL`
-      WITH upload_feature_types AS (
+      WITH selected_blueprint AS (
+        SELECT ${blueprintId}::integer AS blueprint_id
+      ),
+      upload_feature_types AS (
         SELECT DISTINCT feature_type_id
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid
@@ -980,14 +1012,28 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           ftp.feature_type_id,
           ftp.feature_type_property_id,
           fp.name AS property_name
-        FROM feature_type_property ftp
+        FROM selected_blueprint sb
+        -- Feature type included in the Blueprint.
+        JOIN blueprint_feature_type bft
+          ON bft.blueprint_id = sb.blueprint_id
+         AND bft.record_end_date IS NULL
+        -- Required properties assigned by the Blueprint.
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+         AND bftp.record_end_date IS NULL
+         AND bftp.required_value = TRUE
+        -- Canonical pool entry; bridges the assignment to its feature type / property and surrogate id.
+        -- Constrain to the Blueprint feature type: the FK on bftp.feature_type_property_id only proves
+        -- the property exists in the global pool, not that it belongs to bft.feature_type_id.
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_property_id = bftp.feature_type_property_id
+         AND ftp.feature_type_id = bft.feature_type_id
+         AND ftp.record_end_date IS NULL
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
          AND fp.record_end_date IS NULL
         JOIN upload_feature_types uft
-          ON uft.feature_type_id = ftp.feature_type_id
-        WHERE ftp.record_end_date IS NULL
-          AND COALESCE(ftp.required_value, false) = TRUE
+          ON uft.feature_type_id = bft.feature_type_id
       ),
       grouped_errors AS (
         SELECT

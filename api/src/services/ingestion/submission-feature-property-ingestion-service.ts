@@ -6,6 +6,7 @@ import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
@@ -16,6 +17,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   featureIngestionRepository: FeatureIngestionRepository;
   contributorService: ContributorService;
   submissionUploadReviewService: SubmissionUploadReviewService;
+  submissionUploadService: SubmissionUploadService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -25,6 +27,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
     this.contributorService = new ContributorService(connection);
     this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
   }
 
   /**
@@ -59,6 +62,18 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionId,
         submissionUploadId,
         contributorId: contributor.contributor_id
+      });
+
+      // Resolve the Blueprint pinned to this upload. Property resolution and requiredness checks use
+      // this Blueprint rather than re-selecting the current default (the upload is grandfathered in).
+      currentPhase = 'resolve upload blueprint';
+      const { blueprint_id: blueprintId } = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
+      defaultLog.debug({
+        label: 'indexSubmissionPropertiesBySubmissionUploadId',
+        message: 'resolved blueprint',
+        submissionId,
+        submissionUploadId,
+        blueprintId
       });
       // Cleanup for idempotency.
       currentPhase = 'cleanup existing property records and relationships';
@@ -107,7 +122,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId);
+      await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId, blueprintId);
       await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
         submissionUploadId
       );
@@ -122,7 +137,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         phase: currentPhase
       });
       await this.submissionFeaturePropertyIngestionRepository.recordMissingRequiredPropertyErrorsBySubmissionUploadId(
-        submissionUploadId
+        submissionUploadId,
+        blueprintId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordPrimitiveValidationErrorsBySubmissionUploadId(
         submissionUploadId
@@ -354,15 +370,20 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * validation, and downstream typed inserts.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
    */
-  private async populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  private async populateUploadPropertyWorkingSetBySubmissionUploadId(
+    submissionUploadId: string,
+    blueprintId: number
+  ): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearUploadPropertyWorkingSetStagingBySubmissionUploadId(
       submissionUploadId
     );
 
     await this.submissionFeaturePropertyIngestionRepository.populateResolvedPropertyStagingBySubmissionUploadId(
-      submissionUploadId
+      submissionUploadId,
+      blueprintId
     );
 
     await this.submissionFeaturePropertyIngestionRepository.populateTypedPropertyValueStagingBySubmissionUploadId(

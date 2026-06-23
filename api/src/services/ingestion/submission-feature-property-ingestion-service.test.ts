@@ -8,6 +8,7 @@ import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { ContributorService } from '../contributor-service';
 import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionFeaturePropertyIngestionService } from './submission-feature-property-ingestion-service';
 
 describe('SubmissionFeaturePropertyIngestionService', () => {
@@ -21,6 +22,14 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection({ systemUserId: () => 11 }));
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+      submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+      submission_id: 1,
+      upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      status: 'indexing',
+      ticket_id: '770e8400-e29b-41d4-a716-446655440000',
+      blueprint_id: 42
+    });
     const requestDefaultReviewsStub = sinon
       .stub(SubmissionUploadReviewService.prototype, 'requestDefaultReviewsForUpload')
       .resolves([]);
@@ -203,6 +212,14 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+      submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+      submission_id: 1,
+      upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      status: 'indexing',
+      ticket_id: '770e8400-e29b-41d4-a716-446655440000',
+      blueprint_id: 42
+    });
     const requestDefaultReviewsStub = sinon
       .stub(SubmissionUploadReviewService.prototype, 'requestDefaultReviewsForUpload')
       .resolves([]);
