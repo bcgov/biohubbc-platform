@@ -9,60 +9,12 @@ import { paginationResponseSchema } from './pagination';
 import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
- * Schema for policy statement condition.
+ * Schema for policy statement with optional expression.
  */
-export const PolicyStatementConditionSchema: OpenAPIV3.SchemaObject = {
-  title: 'PolicyStatementCondition',
+export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyStatementWithExpression',
   type: 'object',
-  required: ['policy_statement_condition_id', 'policy_statement_id', 'operator', 'key', 'value'],
-  properties: {
-    policy_statement_condition_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique identifier for the condition'
-    },
-    policy_statement_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'The policy statement this condition belongs to'
-    },
-    operator: {
-      type: 'string',
-      enum: [
-        'StringEquals',
-        'StringNotEquals',
-        'StringLike',
-        'NumericEquals',
-        'Bool',
-        'Exists',
-        'DateBefore',
-        'DateAfter',
-        'Within',
-        'Intersects',
-        'Contains',
-        'ParentOf',
-        'ChildOf'
-      ],
-      description: 'The comparison operator for the condition'
-    },
-    key: {
-      type: 'string',
-      maxLength: 500,
-      description: 'The key to evaluate'
-    },
-    value: {
-      description: 'The value to compare against'
-    }
-  }
-};
-
-/**
- * Schema for policy statement with conditions.
- */
-export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
-  title: 'PolicyStatementWithConditions',
-  type: 'object',
-  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'conditions'],
+  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'],
   properties: {
     policy_statement_id: {
       type: 'string',
@@ -83,11 +35,6 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       maxLength: 500,
       description: 'The URN pattern this statement applies to'
-    },
-    conditions: {
-      type: 'array',
-      items: PolicyStatementConditionSchema,
-      description: 'Conditions that must be met for this statement to apply'
     },
     expression: {
       ...featureSearchExpressionTreeSchema,
@@ -129,7 +76,7 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Schema for a policy with its statements and conditions.
+ * Schema for a policy with its statements.
  */
 export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyWithStatements',
@@ -159,8 +106,8 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
     },
     statements: {
       type: 'array',
-      items: PolicyStatementWithConditionsSchema,
-      description: 'Policy statements with their conditions'
+      items: PolicyStatementWithExpressionSchema,
+      description: 'Policy statements'
     }
   }
 };
@@ -199,43 +146,6 @@ export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       maxLength: 500,
       description: 'The URN pattern this statement applies to'
-    },
-    conditions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['operator', 'key', 'value'],
-        properties: {
-          operator: {
-            type: 'string',
-            enum: [
-              'StringEquals',
-              'StringNotEquals',
-              'StringLike',
-              'NumericEquals',
-              'Bool',
-              'Exists',
-              'DateBefore',
-              'DateAfter',
-              'Within',
-              'Intersects',
-              'Contains',
-              'ParentOf',
-              'ChildOf'
-            ],
-            description: 'The comparison operator'
-          },
-          key: {
-            type: 'string',
-            maxLength: 500,
-            description: 'The key to evaluate'
-          },
-          value: {
-            description: 'The value to compare against'
-          }
-        }
-      },
-      description: 'Optional conditions for this statement'
     },
     expression: {
       ...featureSearchExpressionTreeSchema,

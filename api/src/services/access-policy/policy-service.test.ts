@@ -5,12 +5,11 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
-import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
-import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ExpressionTreeService } from '../expression-tree-service';
+import { PolicyExpressionService } from './policy-expression-service';
 import { PolicyService } from './policy-service';
 import { PolicyStatementExpressionService } from './policy-statement-expression-service';
 import { SecurityScopeService } from './security-scope-service';
@@ -499,32 +498,18 @@ describe('PolicyService', () => {
       const mockStatements: PolicyStatement[] = [
         { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }
       ];
-      const mockConditions: PolicyStatementCondition[] = [
-        {
-          policy_statement_condition_id: 'c1',
-          policy_statement_id: 's1',
-          operator: PolicyConditionOperator.STRING_EQUALS,
-          key: 'test',
-          value: 'value'
-        }
-      ];
-
       const getPoliciesStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves(mockPolicies);
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves(mockStatements);
-      const getConditionsStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'getPolicyStatementConditions')
-        .resolves(mockConditions);
 
       const result = await policyService.getPoliciesWithStatements(undefined, { page: 1, limit: 10 });
 
       expect(getPoliciesStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
       expect(getPolicyStatementsStub).to.have.been.called;
-      expect(getConditionsStub).to.have.been.called;
       expect(result).to.eql([
-        { ...mockPolicies[0], statements: [{ ...mockStatements[0], conditions: mockConditions }] },
-        { ...mockPolicies[1], statements: [{ ...mockStatements[0], conditions: mockConditions }] }
+        { ...mockPolicies[0], statements: [mockStatements[0]] },
+        { ...mockPolicies[1], statements: [mockStatements[0]] }
       ]);
     });
 
@@ -549,30 +534,24 @@ describe('PolicyService', () => {
           submission_feature_urn: 'urn:*:telemetry:*'
         }
       ];
-      const mockConditions: PolicyStatementCondition[] = [];
-
       const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves(mockStatements);
-      const getConditionsStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'getPolicyStatementConditions')
-        .resolves(mockConditions);
 
       const result = await policyService.getPolicyWithStatements('1');
 
       expect(getPolicyStub).to.have.been.calledWith('1');
       expect(getPolicyStatementsStub).to.have.been.calledWith('1');
-      expect(getConditionsStub).to.have.been.calledWith('s1');
       expect(result).to.eql({
         ...mockPolicy,
-        statements: [{ ...mockStatements[0], conditions: [] }]
+        statements: [mockStatements[0]]
       });
     });
   });
 
-  describe('getStatementsWithConditions', () => {
-    it('should call repository.getPolicyStatements and return statements with conditions', async () => {
+  describe('getStatementsWithExpressions', () => {
+    it('should call repository.getPolicyStatements and return statements with expressions', async () => {
       const mockStatements: PolicyStatement[] = [
         { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' },
         {
@@ -582,37 +561,20 @@ describe('PolicyService', () => {
           submission_feature_urn: 'urn:*:sensitive:*'
         }
       ];
-      const mockConditions: PolicyStatementCondition[] = [
-        {
-          policy_statement_condition_id: 'c1',
-          policy_statement_id: 's1',
-          operator: PolicyConditionOperator.STRING_EQUALS,
-          key: 'key',
-          value: 'val'
-        }
-      ];
-
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves(mockStatements);
-      const getConditionsStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'getPolicyStatementConditions')
-        .resolves(mockConditions);
 
-      const result = await policyService.getStatementsWithConditions('1');
+      const result = await policyService.getStatementsWithExpressions('1');
 
       expect(getPolicyStatementsStub).to.have.been.calledWith('1');
-      expect(getConditionsStub).to.have.been.calledTwice;
-      expect(result).to.eql([
-        { ...mockStatements[0], conditions: mockConditions },
-        { ...mockStatements[1], conditions: mockConditions }
-      ]);
+      expect(result).to.eql([mockStatements[0], mockStatements[1]]);
     });
   });
 
   describe('createPolicyWithStatements', () => {
-    // A1: New policy with 2 ALLOW statements — scope materialization NOT called; statements + conditions inserted.
-    it('does not call materializeScopeForPolicyStatement; persists statements and conditions', async () => {
+    // A1: New policy with 2 ALLOW statements — scope materialization NOT called; statements inserted.
+    it('does not call materializeScopeForPolicyStatement; persists statements', async () => {
       const mockPolicy: Policy = { policy_id: '1', name: 'New Policy', description: 'Desc', status: 'requested' };
       const mockStatement1: PolicyStatement = {
         policy_statement_id: 's1',
@@ -626,21 +588,10 @@ describe('PolicyService', () => {
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:10:*:*'
       };
-      const mockCondition: PolicyStatementCondition = {
-        policy_statement_condition_id: 'c1',
-        policy_statement_id: 's1',
-        operator: PolicyConditionOperator.STRING_EQUALS,
-        key: 'region',
-        value: 'north'
-      };
-
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const insertStatementStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement');
       insertStatementStub.onCall(0).resolves(mockStatement1);
       insertStatementStub.onCall(1).resolves(mockStatement2);
-      const insertConditionStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
-        .resolves(mockCondition);
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
@@ -653,8 +604,7 @@ describe('PolicyService', () => {
         [
           {
             effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:telemetry:*',
-            conditions: [{ operator: PolicyConditionOperator.STRING_EQUALS, key: 'region', value: 'north' }]
+            submission_feature_urn: 'urn:*:telemetry:*'
           },
           {
             effect: PolicyEffect.ALLOW,
@@ -669,15 +619,11 @@ describe('PolicyService', () => {
         status: 'requested'
       });
       expect(insertStatementStub).to.have.been.calledTwice;
-      expect(insertConditionStub).to.have.been.calledOnce;
       expect(materializeStub).to.not.have.been.called;
       expect(materializeTeamAccessStub).to.not.have.been.called;
       expect(result).to.eql({
         ...mockPolicy,
-        statements: [
-          { ...mockStatement1, conditions: [mockCondition] },
-          { ...mockStatement2, conditions: [] }
-        ]
+        statements: [mockStatement1, mockStatement2]
       });
     });
 
@@ -706,13 +652,15 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
-      sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
       const writeExpressionTreeStub = sinon
         .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
         .resolves({ expression_id: 'expr-1' });
+      const ensurePolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
+        .resolves({ policy_expression_id: 'pe-1', policy_id: '1', expression_id: 'expr-1' });
       const replaceExpressionStub = sinon
         .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
         .resolves();
@@ -729,14 +677,15 @@ describe('PolicyService', () => {
       );
 
       expect(writeExpressionTreeStub).to.have.been.calledOnceWith(expression);
-      expect(replaceExpressionStub).to.have.been.calledOnceWith('s1', 'expr-1');
+      expect(ensurePolicyExpressionStub).to.have.been.calledOnceWith('1', 'expr-1');
+      expect(replaceExpressionStub).to.have.been.calledOnceWith('s1', 'pe-1');
       expect(materializeStub).to.not.have.been.called;
       expect(result.statements[0]).to.include({ ...mockStatement });
       expect(result.statements[0].expression).to.eql(expression);
     });
 
-    // A3: Empty statements list — no statement, condition, scope, or expression work.
-    it('skips statement, condition, scope, and expression work for an empty statement list', async () => {
+    // A3: Empty statements list — no statement, scope, or expression work.
+    it('skips statement, scope, and expression work for an empty statement list', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Empty Policy',
@@ -745,9 +694,6 @@ describe('PolicyService', () => {
       };
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const insertStatementStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves();
-      const insertConditionStub = sinon
-        .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
-        .resolves();
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
@@ -762,7 +708,6 @@ describe('PolicyService', () => {
       );
 
       expect(insertStatementStub).to.not.have.been.called;
-      expect(insertConditionStub).to.not.have.been.called;
       expect(materializeStub).to.not.have.been.called;
       expect(writeExpressionTreeStub).to.not.have.been.called;
       expect(replaceExpressionStub).to.not.have.been.called;
@@ -819,7 +764,7 @@ describe('PolicyService', () => {
       expect(materializeTeamAccessStub).to.not.have.been.called;
       expect(result).to.eql({
         ...mockPolicy,
-        statements: [{ ...newStatement, conditions: [] }]
+        statements: [newStatement]
       });
     });
 

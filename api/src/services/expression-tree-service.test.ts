@@ -202,7 +202,7 @@ describe('ExpressionTreeService', () => {
     it('reuses existing predicate and expression anchors when hashes match', async () => {
       const service = new ExpressionTreeService(getMockDBConnection());
 
-      sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
+      const insertPredicateAnchorStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
         predicate_id: 'pred-1',
         feature_property_id: 10,
         feature_type_property_id: 1,
@@ -210,24 +210,30 @@ describe('ExpressionTreeService', () => {
         predicate_hash: 'p1',
         inserted: false
       } as ResolvedPredicateAnchor);
-      sinon.stub(ExpressionRepository.prototype, 'insertExpressionAnchor').resolves({
+      const insertExpressionAnchorStub = sinon.stub(ExpressionRepository.prototype, 'insertExpressionAnchor').resolves({
         expression_id: 'expr-1',
         operator: 'AND',
         expression_hash: 'expr-hash-1',
         inserted: false
       } as ResolvedExpressionAnchor);
-      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').resolves([
-        {
-          predicate_id: 'pred-1',
-          feature_property_id: 10,
-          feature_type_property_id: 1,
-          feature_property_type_id: 1,
-          predicate_hash: 'p1'
-        }
-      ] as Predicate[]);
+      sinon.stub(PredicateRepository.prototype, 'getPredicatesByHashes').callsFake(
+        async ([predicateHash]) =>
+          [
+            {
+              predicate_id: 'pred-1',
+              feature_property_id: 10,
+              feature_type_property_id: 1,
+              feature_property_type_id: 1,
+              predicate_hash: predicateHash
+            }
+          ] as Predicate[]
+      );
       sinon
         .stub(ExpressionRepository.prototype, 'getExpressionsByHashes')
-        .resolves([{ expression_id: 'expr-1', operator: 'AND', expression_hash: 'expr-hash-1' }] as Expression[]);
+        .callsFake(
+          async ([expressionHash]) =>
+            [{ expression_id: 'expr-1', operator: 'AND', expression_hash: expressionHash }] as Expression[]
+        );
       const writePredicatePayloadStub = sinon.stub(PredicateRepository.prototype, 'writePredicatePayload').resolves();
 
       const insertExpressionClausesStub = sinon
@@ -249,6 +255,8 @@ describe('ExpressionTreeService', () => {
       });
 
       expect(result).to.eql({ expression_id: 'expr-1' });
+      expect(insertPredicateAnchorStub.notCalled).to.equal(true);
+      expect(insertExpressionAnchorStub.notCalled).to.equal(true);
       expect(writePredicatePayloadStub.notCalled).to.equal(true);
       expect(insertExpressionClausesStub.notCalled).to.equal(true);
     });

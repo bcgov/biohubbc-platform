@@ -26,7 +26,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get a policy by ID with its statements and conditions.',
+  description: 'Get a policy by ID with its statements.',
   tags: ['admin'],
   security: [
     {

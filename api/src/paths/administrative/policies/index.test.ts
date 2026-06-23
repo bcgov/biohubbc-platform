@@ -275,8 +275,7 @@ describe('paths/administrative/policies/index', () => {
             policy_statement_id: 's1',
             policy_id: '1',
             effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:*:*',
-            conditions: []
+            submission_feature_urn: 'urn:*:*:*'
           }
         ]
       };

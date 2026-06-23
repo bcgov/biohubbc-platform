@@ -17,33 +17,15 @@ export interface IPolicySummary {
   status: PolicyStatus;
 }
 
-/**
- * Policy with statements and conditions (API response).
- */
 export interface IPolicy extends IPolicySummary {
   statements: IPolicyStatement[];
 }
 
-/**
- * Policy statement with conditions.
- */
 export interface IPolicyStatement {
   policy_statement_id: string;
   policy_id: string;
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
-  conditions: IPolicyStatementCondition[];
-}
-
-/**
- * Policy statement condition.
- */
-export interface IPolicyStatementCondition {
-  policy_statement_condition_id: string;
-  policy_statement_id: string;
-  operator: string;
-  key: string;
-  value: unknown;
 }
 
 /**
@@ -70,16 +52,6 @@ export interface ICreatePolicyRequest {
 export interface ICreatePolicyStatementRequest {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
-  conditions?: ICreatePolicyConditionRequest[];
-}
-
-/**
- * Create policy condition request.
- */
-export interface ICreatePolicyConditionRequest {
-  operator: string;
-  key: string;
-  value: unknown;
 }
 
 /**

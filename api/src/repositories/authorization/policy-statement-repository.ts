@@ -140,10 +140,15 @@ export class PolicyStatementRepository extends BaseRepository {
       .select<ActivePolicyStatementWithExpression[]>(
         'ps.policy_statement_id',
         'ps.urn_feature_type',
-        'pse.expression_id'
+        'pe.expression_id'
       )
       .leftJoin('policy_statement_expression as pse', function () {
         this.on('pse.policy_statement_id', '=', 'ps.policy_statement_id').andOnNull('pse.record_end_date');
+      })
+      .leftJoin('policy_expression as pe', function () {
+        this.on('pe.policy_expression_id', '=', 'pse.policy_expression_id')
+          .andOn('pe.policy_id', '=', 'ps.policy_id')
+          .andOnNull('pe.record_end_date');
       })
       .where('ps.policy_id', policyId)
       .whereNull('ps.record_end_date')

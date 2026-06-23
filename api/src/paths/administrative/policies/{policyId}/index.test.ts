@@ -58,8 +58,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
             policy_statement_id: 's1',
             policy_id: '123',
             effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:*:*',
-            conditions: []
+            submission_feature_urn: 'urn:*:*:*'
           }
         ]
       };
@@ -125,8 +124,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
             policy_statement_id: 's1',
             policy_id: '123',
             effect: PolicyEffect.DENY,
-            submission_feature_urn: 'urn:*:telemetry:*',
-            conditions: []
+            submission_feature_urn: 'urn:*:telemetry:*'
           }
         ]
       };

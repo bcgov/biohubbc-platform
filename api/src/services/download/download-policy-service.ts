@@ -4,6 +4,7 @@ import { CreatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
+import { PolicyExpressionService } from '../access-policy/policy-expression-service';
 import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { DBService } from '../db-service';
@@ -19,6 +20,7 @@ export class DownloadPolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
   policyStatementExpressionService: PolicyStatementExpressionService;
+  policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
 
   /**
@@ -31,6 +33,7 @@ export class DownloadPolicyService extends DBService {
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
@@ -79,9 +82,13 @@ export class DownloadPolicyService extends DBService {
       });
 
       if (payload.expressionId !== null) {
+        const policyExpression = await this.policyExpressionService.ensurePolicyExpression(
+          policy.policy_id,
+          payload.expressionId
+        );
         await this.policyStatementExpressionService.replacePolicyStatementExpression(
           statement.policy_statement_id,
-          payload.expressionId
+          policyExpression.policy_expression_id
         );
       }
     }

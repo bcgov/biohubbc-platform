@@ -20,8 +20,8 @@ describe('PredicateRepository', () => {
 
   describe('insertPredicateAnchor', () => {
     it('returns inserted predicate row when a predicate anchor is created', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: true }], 1));
-      const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: true }], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
 
       const result = await repository.insertPredicateAnchor({
         feature_property_id: 11,
@@ -31,22 +31,8 @@ describe('PredicateRepository', () => {
       });
 
       expect(result).to.eql({ ...predicateRow, inserted: true });
-      expect(sqlStub.callCount).to.equal(1);
-    });
-
-    it('returns resolved predicate row on conflict', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: false }], 1));
-      const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
-
-      const result = await repository.insertPredicateAnchor({
-        feature_property_id: 11,
-        feature_type_property_id: 22,
-        feature_property_type_id: 3,
-        predicate_hash: 'hash-1'
-      });
-
-      expect(result).to.eql({ ...predicateRow, inserted: false });
-      expect(sqlStub.callCount).to.equal(1);
+      expect(knexStub.callCount).to.equal(1);
+      expect(knexStub.firstCall.args[0].toString()).to.not.include('ON CONFLICT');
     });
   });
 

@@ -168,7 +168,10 @@ describe('PolicyStatementRepository', () => {
       const queryArg = knexStub.firstCall.args[0];
       const sql = queryArg.toString();
       expect(sql).to.include('left join "policy_statement_expression"');
+      expect(sql).to.include('left join "policy_expression"');
       expect(sql).to.include('"pse"."record_end_date" is null');
+      expect(sql).to.include('"pe"."policy_id" = "ps"."policy_id"');
+      expect(sql).to.include('"pe"."record_end_date" is null');
       expect(sql).to.include('"ps"."policy_id" = \'policy-1\'');
       expect(sql).to.include('"ps"."record_end_date" is null');
       expect(sql).to.include('order by "ps"."urn_feature_type"');

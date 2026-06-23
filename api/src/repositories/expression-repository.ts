@@ -1,4 +1,3 @@
-import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { Expression, ResolvedExpressionAnchor } from '../models/expression';
@@ -9,34 +8,34 @@ export class ExpressionRepository extends BaseRepository {
   /**
    * Insert an expression anchor row for a semantic expression hash.
    *
-   * Uses an upsert on the active-hash uniqueness constraint so callers always
-   * receive a resolved anchor row.
+   * Callers are expected to pre-read by hash and reuse existing anchors. The
+   * active-hash uniqueness constraint remains the final guard for concurrent
+   * duplicate writes.
    *
    * @param {LogicalOperator} operator - Expression logical operator.
    * @param {string} expressionHash - Deterministic semantic expression hash.
    * @return {Promise<ResolvedExpressionAnchor>} Resolved expression row with insert-state flag.
-   * @throws {ApiExecuteSQLError} If upsert returns an unexpected row count.
+   * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
    */
   async insertExpressionAnchor(operator: LogicalOperator, expressionHash: string): Promise<ResolvedExpressionAnchor> {
-    const insertSql = SQL`
-      INSERT INTO expression (
+    const knex = getKnex();
+    const query = knex('expression')
+      .insert({
         operator,
-        expression_hash
-      )
-      VALUES (
-        ${operator}::logical_operator_type,
-        ${expressionHash}
-      )
-      ON CONFLICT (expression_hash) WHERE record_end_date IS NULL
-      DO UPDATE SET
-        expression_hash = EXCLUDED.expression_hash
-      RETURNING expression_id, operator::text AS operator, expression_hash, (xmax = 0) AS inserted;
-    `;
-    const response = await this.connection.sql(insertSql, ResolvedExpressionAnchor);
+        expression_hash: expressionHash
+      })
+      .returning([
+        'expression_id',
+        knex.raw('operator::text AS operator'),
+        'expression_hash',
+        knex.raw('true AS inserted')
+      ]);
+
+    const response = await this.connection.knex(query, ResolvedExpressionAnchor);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to resolve expression anchor', [
+      throw new ApiExecuteSQLError('Failed to insert expression anchor', [
         'ExpressionRepository->insertExpressionAnchor',
         `rowCount was ${rowCount}, expected 1`
       ]);

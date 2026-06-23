@@ -118,10 +118,13 @@ describe('DownloadPolicyService (integration)', function () {
       });
 
       const expressionLinks = await connection.sql(SQL`
-        SELECT pse.expression_id, pse.policy_statement_id
+        SELECT pe.expression_id, pse.policy_statement_id
         FROM policy_statement_expression pse
+        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
         JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-        WHERE ps.policy_id = ${policy_id} AND pse.record_end_date IS NULL;
+        WHERE ps.policy_id = ${policy_id}
+          AND pse.record_end_date IS NULL
+          AND pe.record_end_date IS NULL;
       `);
       expect(expressionLinks.rowCount).to.equal(2);
       const expressionIds = new Set(expressionLinks.rows.map((r: any) => r.expression_id));
@@ -198,11 +201,14 @@ describe('DownloadPolicyService (integration)', function () {
       });
 
       const linkRows = await connection.sql(SQL`
-        SELECT pse.expression_id
+        SELECT pe.expression_id
           FROM download d
           JOIN policy_statement ps USING (policy_id)
           JOIN policy_statement_expression pse USING (policy_statement_id)
-         WHERE d.download_id = ${download_id} AND pse.record_end_date IS NULL;
+          JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
+         WHERE d.download_id = ${download_id}
+           AND pse.record_end_date IS NULL
+           AND pe.record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
       const linkedExpressionId = linkRows.rows[0].expression_id as string;

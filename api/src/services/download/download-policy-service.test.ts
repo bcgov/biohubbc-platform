@@ -11,6 +11,7 @@ import { PolicyRepository } from '../../repositories/authorization/policy-reposi
 // access-grant primitives. These stubs assert on absence of calls.
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
+import { PolicyExpressionService } from '../access-policy/policy-expression-service';
 import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { SecurityScopeService } from '../access-policy/security-scope-service';
@@ -65,6 +66,9 @@ describe('DownloadPolicyService', () => {
       const replaceExpressionStub = sinon
         .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
         .resolves();
+      const ensurePolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
+        .resolves({ policy_expression_id: 'pe-1', policy_id: 'p1', expression_id: 'e1' });
 
       const result = await downloadPolicyService.createDownloadPolicy({
         name: 'My download',
@@ -93,8 +97,11 @@ describe('DownloadPolicyService', () => {
       });
 
       expect(replaceExpressionStub).to.have.been.calledTwice;
-      expect(replaceExpressionStub.firstCall.args).to.eql(['ps-1', 'e1']);
-      expect(replaceExpressionStub.secondCall.args).to.eql(['ps-2', 'e1']);
+      expect(ensurePolicyExpressionStub).to.have.been.calledTwice;
+      expect(ensurePolicyExpressionStub.firstCall.args).to.eql(['p1', 'e1']);
+      expect(ensurePolicyExpressionStub.secondCall.args).to.eql(['p1', 'e1']);
+      expect(replaceExpressionStub.firstCall.args).to.eql(['ps-1', 'pe-1']);
+      expect(replaceExpressionStub.secondCall.args).to.eql(['ps-2', 'pe-1']);
 
       expect(result).to.eql({ policy_id: 'p1' });
     });
@@ -154,6 +161,11 @@ describe('DownloadPolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementService.prototype, 'createPolicyStatement').resolves(mockStatement);
+      sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
+        policy_expression_id: 'pe-1',
+        policy_id: 'p1',
+        expression_id: 'e1'
+      });
       sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
 
       // The boundary stubs: if the production service ever wires these in, these

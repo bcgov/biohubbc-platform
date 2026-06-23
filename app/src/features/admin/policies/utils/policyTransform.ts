@@ -1,5 +1,4 @@
 import { ICreatePolicyStatementRequest, IPolicy, IPolicyStatement } from 'interfaces/usePoliciesApi.interface';
-import { PolicyConditionOperator } from './policyJsonSchema';
 
 /**
  * JSON Policy document structure (for Monaco editor).
@@ -15,16 +14,6 @@ export interface IPolicyDocument {
 export interface IPolicyDocumentStatement {
   Effect: 'Allow' | 'Deny';
   Resource: string;
-  Condition?: IPolicyDocumentCondition[];
-}
-
-/**
- * JSON Policy condition structure.
- */
-export interface IPolicyDocumentCondition {
-  Operator: PolicyConditionOperator;
-  Key: string;
-  Value: unknown;
 }
 
 /**
@@ -57,13 +46,7 @@ export const transformPolicyJsonToApi = (policyJson: string): ICreatePolicyState
 
   return policy.Statement.map((stmt) => ({
     effect: stmt.Effect.toLowerCase() as 'allow' | 'deny',
-    submission_feature_urn: stmt.Resource,
-    conditions: stmt.Condition?.map((cond) => ({
-      operator: cond.Operator,
-      key: cond.Key,
-      // Stringify the value for JSON storage in the database
-      value: JSON.stringify(cond.Value)
-    }))
+    submission_feature_urn: stmt.Resource
   }));
 };
 
@@ -78,15 +61,7 @@ export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string
     Version: '2025-12-01',
     Statement: statements.map((stmt) => ({
       Effect: stmt.effect === 'allow' ? 'Allow' : 'Deny',
-      Resource: stmt.submission_feature_urn,
-      ...(stmt.conditions &&
-        stmt.conditions.length > 0 && {
-          Condition: stmt.conditions.map((cond) => ({
-            Operator: cond.operator as PolicyConditionOperator,
-            Key: cond.key,
-            Value: cond.value
-          }))
-        })
+      Resource: stmt.submission_feature_urn
     }))
   };
 
@@ -106,54 +81,9 @@ export const transformPolicyToJson = (policy: IPolicy): string => {
 const URN_PATTERN = /^urn:(\*|\d+):(\*|[a-z_]+):(\*|\d+)$/;
 
 /**
- * Validate a single condition object within a policy statement.
- *
- * @param {Partial<IPolicyDocumentCondition>} cond - The condition object to validate (expects Operator, Key, Value properties)
- * @param {number} stmtIndex - Zero-based index of the parent statement in the policy (used for error messages)
- * @param {number} condIndex - Zero-based index of this condition within the statement's Condition array
- * @returns {string | null} Error message if validation fails, null if valid
- */
-const validateCondition = (
-  cond: Partial<IPolicyDocumentCondition>,
-  stmtIndex: number,
-  condIndex: number
-): string | null => {
-  if (!cond.Operator) {
-    return `Statement ${stmtIndex + 1}, Condition ${condIndex + 1}: Operator is required`;
-  }
-  if (!cond.Key) {
-    return `Statement ${stmtIndex + 1}, Condition ${condIndex + 1}: Key is required`;
-  }
-  if (cond.Value === undefined) {
-    return `Statement ${stmtIndex + 1}, Condition ${condIndex + 1}: Value is required`;
-  }
-  return null;
-};
-
-/**
- * Validate the conditions array for a policy statement.
- *
- * @param {Partial<IPolicyDocumentCondition>[] | unknown} conditions - The Condition array from a statement (should be an array of condition objects)
- * @param {number} stmtIndex - Zero-based index of the parent statement in the policy (used for error messages)
- * @returns {string | null} Error message if validation fails, null if all conditions are valid
- */
-const validateConditions = (conditions: unknown, stmtIndex: number): string | null => {
-  if (!Array.isArray(conditions)) {
-    return `Statement ${stmtIndex + 1}: Condition must be an array`;
-  }
-  for (let j = 0; j < conditions.length; j++) {
-    const error = validateCondition(conditions[j], stmtIndex, j);
-    if (error) {
-      return error;
-    }
-  }
-  return null;
-};
-
-/**
  * Validate a single policy statement object.
  *
- * @param {Partial<IPolicyDocumentStatement>} stmt - The statement object to validate (expects Effect, Resource, and optional Condition properties)
+ * @param {Partial<IPolicyDocumentStatement>} stmt - The statement object to validate (expects Effect and Resource properties)
  * @param {number} index - Zero-based index of this statement in the policy's Statement array (used for error messages)
  * @returns {string | null} Error message if validation fails, null if valid
  */
@@ -167,18 +97,11 @@ const validateStatement = (stmt: Partial<IPolicyDocumentStatement>, index: numbe
   if (!URN_PATTERN.test(stmt.Resource)) {
     return `Statement ${index + 1}: Invalid Resource URN format. Expected: urn:<submissionId>:<featureType>:<featureId>`;
   }
-  if (stmt.Condition) {
-    return validateConditions(stmt.Condition, index);
-  }
   return null;
 };
 
 /**
  * Validate a policy JSON string for structural correctness.
- *
- * Note: This performs basic structural validation only. Detailed validation
- * (operator/key/value compatibility) is handled by the database trigger
- * tr_validate_policy_condition_key().
  *
  * @param {string} policyJson - JSON string representing the policy document to validate
  * @returns {PolicyValidationResult} Validation result with parsed policy on success, or error message on failure

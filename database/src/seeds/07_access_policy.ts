@@ -85,27 +85,6 @@ export async function seed(knex: Knex): Promise<void> {
     telemetryStatement = inserted;
   }
 
-  const telemetryConditionValue = JSON.stringify(new Date().toISOString());
-  const telemetryConditionExists = await knex('policy_statement_condition')
-    .where({
-      policy_statement_id: telemetryStatement.policy_statement_id,
-      operator: 'DateBefore',
-      key: 'start_date',
-      value: telemetryConditionValue
-    })
-    .whereNull('record_end_date')
-    .first();
-
-  if (!telemetryConditionExists) {
-    await knex('policy_statement_condition').insert({
-      policy_statement_id: telemetryStatement.policy_statement_id,
-      operator: 'DateBefore',
-      key: 'start_date',
-      value: telemetryConditionValue,
-      create_user: createUser
-    });
-  }
-
   // Add all non-system users (IDIR/BCEID) to Telemetry Team (skip if already member)
   await knex.raw(
     `

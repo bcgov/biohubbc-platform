@@ -1,6 +1,10 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { CreatePolicyStatementExpression, PolicyStatementExpression } from '../models/policy-statement-expression';
+import {
+  CreatePolicyStatementExpression,
+  PolicyStatementExpression,
+  PolicyStatementExpressionWithExpression
+} from '../models/policy-statement-expression';
 import { BaseRepository } from './base-repository';
 
 export class PolicyStatementExpressionRepository extends BaseRepository {
@@ -20,7 +24,7 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
       })
       .where('policy_statement_id', policyStatementId)
       .whereNull('record_end_date')
-      .returning(['policy_statement_expression_id', 'policy_statement_id', 'expression_id']);
+      .returning(['policy_statement_expression_id', 'policy_statement_id', 'policy_expression_id']);
 
     const response = await this.connection.knex(query, PolicyStatementExpression);
     return response.rows;
@@ -37,7 +41,7 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('policy_statement_expression')
       .insert(payload)
-      .returning(['policy_statement_expression_id', 'policy_statement_id', 'expression_id']);
+      .returning(['policy_statement_expression_id', 'policy_statement_id', 'policy_expression_id']);
 
     const response = await this.connection.knex(query, PolicyStatementExpression);
 
@@ -62,7 +66,7 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
   async getPolicyStatementExpressionById(policyStatementExpressionId: string): Promise<PolicyStatementExpression> {
     const knex = getKnex();
     const query = knex('policy_statement_expression')
-      .select(['policy_statement_expression_id', 'policy_statement_id', 'expression_id'])
+      .select(['policy_statement_expression_id', 'policy_statement_id', 'policy_expression_id'])
       .where('policy_statement_expression_id', policyStatementExpressionId)
       .whereNull('record_end_date');
 
@@ -86,35 +90,44 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
   }
 
   /**
-   * Fetch all active expression links for a policy statement.
+   * Fetch all active expression links for a policy statement, including the linked root expression id.
    *
    * @param {string} policyStatementId - Policy statement identifier.
-   * @return {Promise<PolicyStatementExpression[]>} Active link rows.
+   * @return {Promise<PolicyStatementExpressionWithExpression[]>} Active link rows.
    */
   async getPolicyStatementExpressionsByPolicyStatementId(
     policyStatementId: string
-  ): Promise<PolicyStatementExpression[]> {
+  ): Promise<PolicyStatementExpressionWithExpression[]> {
     const knex = getKnex();
-    const query = knex('policy_statement_expression')
-      .select(['policy_statement_expression_id', 'policy_statement_id', 'expression_id'])
-      .where('policy_statement_id', policyStatementId)
-      .whereNull('record_end_date');
+    const query = knex('policy_statement_expression as pse')
+      .select([
+        'pse.policy_statement_expression_id',
+        'pse.policy_statement_id',
+        'pse.policy_expression_id',
+        'pe.expression_id'
+      ])
+      .join('policy_expression as pe', 'pe.policy_expression_id', 'pse.policy_expression_id')
+      .where('pse.policy_statement_id', policyStatementId)
+      .whereNull('pse.record_end_date')
+      .whereNull('pe.record_end_date');
 
-    const response = await this.connection.knex(query, PolicyStatementExpression);
+    const response = await this.connection.knex(query, PolicyStatementExpressionWithExpression);
     return response.rows;
   }
 
   /**
-   * Fetch all active policy-statement links that reference an expression.
+   * Fetch all active policy-statement links that reference a policy expression.
    *
-   * @param {string} expressionId - Expression identifier.
+   * @param {string} policyExpressionId - Policy-expression identifier.
    * @return {Promise<PolicyStatementExpression[]>} Active link rows.
    */
-  async getPolicyStatementExpressionsByExpressionId(expressionId: string): Promise<PolicyStatementExpression[]> {
+  async getPolicyStatementExpressionsByPolicyExpressionId(
+    policyExpressionId: string
+  ): Promise<PolicyStatementExpression[]> {
     const knex = getKnex();
     const query = knex('policy_statement_expression')
-      .select(['policy_statement_expression_id', 'policy_statement_id', 'expression_id'])
-      .where('expression_id', expressionId)
+      .select(['policy_statement_expression_id', 'policy_statement_id', 'policy_expression_id'])
+      .where('policy_expression_id', policyExpressionId)
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, PolicyStatementExpression);

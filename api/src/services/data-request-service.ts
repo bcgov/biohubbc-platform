@@ -12,6 +12,7 @@ import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { TeamMemberService } from './access-policy/team-member-service';
@@ -36,6 +37,7 @@ export class DataRequestService extends DBService {
   teamMemberService: TeamMemberService;
   expressionTreeService: ExpressionTreeService;
   policyStatementExpressionService: PolicyStatementExpressionService;
+  policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
 
   /**
@@ -53,6 +55,7 @@ export class DataRequestService extends DBService {
     this.teamMemberService = new TeamMemberService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
@@ -148,8 +151,8 @@ export class DataRequestService extends DBService {
    *   (`POST /api/tickets/{ticketId}/data-request`) intentionally passes the admin's
    *   picker selection as-is and does not auto-add anyone.
    * - **One expression tree, many statement links.** When `featureTypes` is supplied
-   *   with a non-null expression, the expression tree is persisted once and linked to
-   *   every per-feature-type statement using the same `expression_id`. This keeps
+   *   with a non-null expression, the expression tree is persisted once, wrapped by
+   *   one policy expression, and linked to every per-feature-type statement. This keeps
    *   `expression_tree` row counts proportional to requests, not to statements.
    * - **Pre-validate feature-type names against the live catalog.** A typo or stale
    *   frontend identifier would otherwise produce a policy describing an empty slice;
@@ -215,10 +218,14 @@ export class DataRequestService extends DBService {
     );
 
     if (expressionId !== null) {
+      const policyExpression = await this.policyExpressionService.ensurePolicyExpression(
+        policy.policy_id,
+        expressionId
+      );
       for (const statement of policy.statements) {
         await this.policyStatementExpressionService.replacePolicyStatementExpression(
           statement.policy_statement_id,
-          expressionId
+          policyExpression.policy_expression_id
         );
       }
     }

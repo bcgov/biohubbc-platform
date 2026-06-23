@@ -656,10 +656,13 @@ export class ExpressionTreeService extends DBService {
    * keyed by semantic hash and can be reused; the typed payload table is written
    * only when the anchor is first inserted.
    *
-   * Concurrency-safe flow:
+   * Reuse flow:
    * 1. Reuse preloaded id when present.
-   * 2. Upsert anchor by hash and return resolved id + insert-state.
-   * 3. Write typed payload row only when the anchor is newly inserted.
+   * 2. Insert anchor by hash.
+   * 3. Write typed payload row for the new anchor.
+   *
+   * Concurrent duplicate writes are guarded by the active predicate-hash
+   * uniqueness constraint.
    *
    * @private
    * @param {ExpressionTreePredicateWithHash} clause - Hashed predicate clause.
@@ -702,8 +705,11 @@ export class ExpressionTreeService extends DBService {
    * Steps:
    * 1. Reuse existing anchor when hash is already known.
    * 2. Resolve child clauses (predicate ids / child expression ids).
-   * 3. Upsert expression anchor by hash.
-   * 4. Insert clause edges only when the anchor is newly inserted.
+   * 3. Insert expression anchor by hash.
+   * 4. Insert clause edges for the new anchor.
+   *
+   * Concurrent duplicate writes are guarded by the active expression-hash
+   * uniqueness constraint.
    *
    * @private
    * @param {ExpressionTreeExpressionWithHash} expression - Hashed expression node.

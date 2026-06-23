@@ -12,6 +12,7 @@ import { TeamPolicy } from '../models/team-policy';
 import { Ticket } from '../models/ticket';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
 import { PolicyWithStatements } from './access-policy/policy-service.interface';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
@@ -70,8 +71,7 @@ describe('DataRequestService', () => {
       policy_statement_id: id,
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
       effect: PolicyEffect.ALLOW,
-      submission_feature_urn: `urn:*:f${idx}:*`,
-      conditions: []
+      submission_feature_urn: `urn:*:f${idx}:*`
     }))
   });
 
@@ -375,6 +375,11 @@ describe('DataRequestService', () => {
     const createPolicyStub = sinon
       .stub(PolicyService.prototype, 'createPolicyWithStatements')
       .resolves(buildMockPolicy(['st-1', 'st-2']));
+    sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
+      policy_expression_id: 'pe-1',
+      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+      expression_id: 'expr-1'
+    });
     sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
@@ -428,6 +433,11 @@ describe('DataRequestService', () => {
       .resolves({ team_id: 'policy-team', name: 'policy', description: null, member_count: 0 });
     sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
     sinon.stub(PolicyService.prototype, 'createPolicyWithStatements').resolves(buildMockPolicy(['st-1', 'st-2']));
+    sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
+      policy_expression_id: 'pe-1',
+      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+      expression_id: 'expr-1'
+    });
     sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
@@ -451,8 +461,8 @@ describe('DataRequestService', () => {
     expect(writeExpressionStub).to.have.been.calledOnceWith(expression);
   });
 
-  it('createDataRequestForTicket links the same expression_id to every policy statement', async () => {
-    // Verifies: each created statement is linked to the SAME expression_id via the statement-expression service.
+  it('createDataRequestForTicket links the same policy expression to every policy statement', async () => {
+    // Verifies: each created statement is linked to the SAME policy expression via the statement-expression service.
     // This is the back half of "one tree, many links".
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
@@ -472,6 +482,13 @@ describe('DataRequestService', () => {
     sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
     // Step 2: policy creation returns two statements whose ids drive the link calls.
     sinon.stub(PolicyService.prototype, 'createPolicyWithStatements').resolves(buildMockPolicy(['st-1', 'st-2']));
+    const ensurePolicyExpressionStub = sinon
+      .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
+      .resolves({
+        policy_expression_id: 'pe-1',
+        policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+        expression_id: 'expr-1'
+      });
     const replaceStub = sinon
       .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
       .resolves();
@@ -492,10 +509,11 @@ describe('DataRequestService', () => {
       expression: buildMockExpression()
     });
 
-    // Step 4: both statements get linked to the same expression id.
+    // Step 4: both statements get linked to the same policy expression id.
+    expect(ensurePolicyExpressionStub).to.have.been.calledOnceWith('f6a7b8c9-d0e1-2345-fabc-456789012345', 'expr-1');
     expect(replaceStub).to.have.callCount(2);
-    expect(replaceStub.getCall(0).args).to.deep.equal(['st-1', 'expr-1']);
-    expect(replaceStub.getCall(1).args).to.deep.equal(['st-2', 'expr-1']);
+    expect(replaceStub.getCall(0).args).to.deep.equal(['st-1', 'pe-1']);
+    expect(replaceStub.getCall(1).args).to.deep.equal(['st-2', 'pe-1']);
   });
 
   it('createDataRequestForTicket skips expression writes when expression is null', async () => {
@@ -674,6 +692,11 @@ describe('DataRequestService', () => {
     const replaceStub = sinon
       .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
       .resolves();
+    sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
+      policy_expression_id: 'pe-1',
+      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+      expression_id: 'expr-1'
+    });
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
       team_id: 'policy-team',

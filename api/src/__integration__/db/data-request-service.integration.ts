@@ -191,10 +191,12 @@ describe('DataRequestService (integration)', function () {
       ).rows.map((r: any) => r.policy_statement_id);
 
       const links = await connection.sql(SQL`
-        SELECT pse.expression_id
+        SELECT pe.expression_id
         FROM policy_statement_expression pse
+        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
         WHERE pse.policy_statement_id = ANY(${statementIds}::uuid[])
-          AND pse.record_end_date IS NULL;
+          AND pse.record_end_date IS NULL
+          AND pe.record_end_date IS NULL;
       `);
       expect(links.rowCount).to.equal(1);
 
@@ -241,11 +243,13 @@ describe('DataRequestService (integration)', function () {
       expect(statements.every((s) => s.effect === 'allow')).to.equal(true);
 
       const links = await connection.sql(SQL`
-        SELECT pse.expression_id, pse.policy_statement_id
+        SELECT pe.expression_id, pse.policy_statement_id
         FROM policy_statement_expression pse
+        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
         JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
         WHERE ps.policy_id = ${dataRequest.policy_id}
           AND pse.record_end_date IS NULL
+          AND pe.record_end_date IS NULL
           AND ps.record_end_date IS NULL;
       `);
       expect(links.rowCount).to.equal(2);

@@ -4,6 +4,7 @@ import { PolicyEffect } from '../models/policy-statement';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { DBService } from './db-service';
 
@@ -12,6 +13,7 @@ export class SecurityRuleExpressionService extends DBService {
   securityRuleRepository: SecurityRuleRepository;
   policyStatementRepository: PolicyStatementRepository;
   policyStatementExpressionService: PolicyStatementExpressionService;
+  policyExpressionService: PolicyExpressionService;
 
   /**
    * Build a security-rule expression service.
@@ -24,6 +26,7 @@ export class SecurityRuleExpressionService extends DBService {
     this.securityRuleRepository = new SecurityRuleRepository(connection);
     this.policyStatementRepository = new PolicyStatementRepository(connection);
     this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
   }
 
   /**
@@ -76,9 +79,14 @@ export class SecurityRuleExpressionService extends DBService {
       throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
     }
 
+    const policyExpression = await this.policyExpressionService.ensurePolicyExpression(
+      securityRule.policy_id,
+      expressionId
+    );
+
     await this.policyStatementExpressionService.replacePolicyStatementExpression(
       mappedStatement.policy_statement_id,
-      expressionId
+      policyExpression.policy_expression_id
     );
   }
 

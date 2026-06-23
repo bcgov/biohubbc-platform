@@ -8,7 +8,7 @@ import { PolicyStatementExpressionRepository } from './policy-statement-expressi
 const policyStatementExpressionRow = {
   policy_statement_expression_id: 'pse-1',
   policy_statement_id: 'ps-1',
-  expression_id: 'expr-1'
+  policy_expression_id: 'pe-1'
 };
 
 describe('PolicyStatementExpressionRepository', () => {
@@ -23,7 +23,7 @@ describe('PolicyStatementExpressionRepository', () => {
 
       const result = await repository.insertPolicyStatementExpression({
         policy_statement_id: 'ps-1',
-        expression_id: 'expr-1'
+        policy_expression_id: 'pe-1'
       });
 
       expect(result).to.eql(policyStatementExpressionRow);

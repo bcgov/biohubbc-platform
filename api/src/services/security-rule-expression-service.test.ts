@@ -5,6 +5,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { SecurityRuleExpressionService } from './security-rule-expression-service';
 
@@ -51,6 +52,13 @@ describe('SecurityRuleExpressionService', () => {
       const replacePolicyStatementExpressionStub = sinon
         .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
         .resolves();
+      const ensurePolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
+        .resolves({
+          policy_expression_id: '33333333-3333-3333-3333-333333333333',
+          policy_id: '11111111-1111-1111-1111-111111111111',
+          expression_id: 'expr-new'
+        });
 
       await service.replaceSecurityRuleExpression(7, 'expr-new');
 
@@ -64,7 +72,13 @@ describe('SecurityRuleExpressionService', () => {
       expect(getActiveRulesStub.calledOnce).to.equal(true);
       expect(getPolicyStatementsStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111')).to.equal(true);
       expect(
-        replacePolicyStatementExpressionStub.calledOnceWithExactly('22222222-2222-2222-2222-222222222222', 'expr-new')
+        ensurePolicyExpressionStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', 'expr-new')
+      ).to.equal(true);
+      expect(
+        replacePolicyStatementExpressionStub.calledOnceWithExactly(
+          '22222222-2222-2222-2222-222222222222',
+          '33333333-3333-3333-3333-333333333333'
+        )
       ).to.equal(true);
     });
 
@@ -101,15 +115,25 @@ describe('SecurityRuleExpressionService', () => {
       const replacePolicyStatementExpressionStub = sinon
         .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
         .resolves();
+      const ensurePolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
+        .resolves({
+          policy_expression_id: '33333333-3333-3333-3333-333333333333',
+          policy_id: '11111111-1111-1111-1111-111111111111',
+          expression_id: 'expr-current'
+        });
 
       await service.replaceSecurityRuleExpression(7, 'expr-current');
 
       expect(endStub.called).to.equal(false);
       expect(insertStub.called).to.equal(false);
       expect(
+        ensurePolicyExpressionStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', 'expr-current')
+      ).to.equal(true);
+      expect(
         replacePolicyStatementExpressionStub.calledOnceWithExactly(
           '22222222-2222-2222-2222-222222222222',
-          'expr-current'
+          '33333333-3333-3333-3333-333333333333'
         )
       ).to.equal(true);
     });

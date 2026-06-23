@@ -32,7 +32,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get all policies with their statements and conditions.',
+  description: 'Get all policies with their statements.',
   tags: ['admin'],
   security: [
     {
