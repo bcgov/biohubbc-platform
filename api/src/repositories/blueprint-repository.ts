@@ -5,7 +5,9 @@ export class BlueprintRepository extends BaseRepository {
   /**
    * Find a Blueprint's id only if it is currently available for new uploads.
    *
-   * A Blueprint is available when `record_end_date IS NULL` (not soft-deleted). This is the only
+   * A Blueprint is available when `record_end_date IS NULL` (not soft-deleted) and
+   * `record_effective_date <= now()` (live, not a draft or future-dated). A null
+   * `record_effective_date` represents a draft Blueprint that is not yet available. This is the only
    * availability check applied to a caller-provided `blueprint_id`; once stored on an upload the
    * Blueprint is grandfathered in and is not re-validated during indexing.
    *
@@ -20,7 +22,8 @@ export class BlueprintRepository extends BaseRepository {
         blueprint
       WHERE
         blueprint_id = ${blueprintId}
-        AND record_end_date IS NULL;
+        AND record_end_date IS NULL
+        AND record_effective_date <= now();
     `;
 
     const response = await this.connection.sql<{ blueprint_id: number }>(sqlStatement);

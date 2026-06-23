@@ -27,7 +27,9 @@ describe('BlueprintRepository', () => {
       expect(sqlText).to.contain('FROM');
       expect(sqlText).to.contain('blueprint');
       expect(sqlText).to.contain('record_end_date IS NULL');
-      // Availability for a caller-provided id is gated only on record_end_date, not the default flag.
+      expect(sqlText).to.contain('record_effective_date <= now()');
+      // Availability for a caller-provided id is gated on record_end_date and record_effective_date,
+      // not the default flag.
       expect(sqlText).to.not.contain('is_default');
       expect(sqlStub.firstCall.args[0].values).to.include(7);
     });
