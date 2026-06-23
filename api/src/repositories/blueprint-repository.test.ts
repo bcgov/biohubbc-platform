@@ -41,7 +41,7 @@ describe('BlueprintRepository', () => {
 
       const result = await repo.findActiveBlueprintById(99);
 
-      expect(result).to.equal(null);
+      expect(result).to.be.null;
     });
   });
 
@@ -67,7 +67,7 @@ describe('BlueprintRepository', () => {
 
       const result = await repo.findDefaultBlueprintId();
 
-      expect(result).to.equal(null);
+      expect(result).to.be.null;
     });
   });
 });

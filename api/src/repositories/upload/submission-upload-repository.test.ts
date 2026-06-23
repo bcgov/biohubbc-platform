@@ -313,7 +313,7 @@ describe('SubmissionUploadRepository', () => {
 
       const result = await repo.findMostRecentBlueprintIdBySubmissionId(123);
 
-      expect(result).to.equal(null);
+      expect(result).to.be.null;
     });
   });
 
