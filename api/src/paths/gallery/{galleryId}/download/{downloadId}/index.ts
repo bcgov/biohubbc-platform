@@ -4,7 +4,7 @@ import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { GalleryService } from '../../../../../services/gallery/gallery-service';
+import { GalleryDownloadService } from '../../../../../services/gallery/gallery-download-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/gallery/{galleryId}/download/{downloadId}');
@@ -59,8 +59,8 @@ export function removeDownloadFromGallery(): RequestHandler {
 
       await connection.open();
 
-      const galleryService = new GalleryService(connection);
-      await galleryService.removeDownloadFromGallery(galleryId, downloadId);
+      const galleryDownloadService = new GalleryDownloadService(connection);
+      await galleryDownloadService.removeDownloadFromGallery(galleryId, downloadId);
 
       await connection.commit();
 

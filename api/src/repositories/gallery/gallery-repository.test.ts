@@ -9,38 +9,50 @@ import { GalleryRepository } from './gallery-repository';
 
 chai.use(sinonChai);
 
+const galleryRow = (overrides?: Partial<GalleryRecord>): GalleryRecord => ({
+  gallery_id: 1,
+  name: 'Caribou',
+  slug: 'caribou',
+  visibility: 'public',
+  description: 'Caribou downloads',
+  create_date: '2026-01-01T00:00:00.000Z',
+  ...overrides
+});
+
 describe('GalleryRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
 
   describe('createGallery', () => {
-    it('binds name and description into the INSERT and returns the created row', async () => {
-      // Verifies: the payload's name + description are passed INTO the query (not echoed from the mock)
+    it('binds name, slug, visibility and description into the INSERT and returns the created row', async () => {
+      // Verifies: the payload fields are passed INTO the query (not echoed from the mock)
 
       // Step 1: Setup mock DB to return a single inserted gallery row
-      const row: GalleryRecord = {
-        gallery_id: 1,
-        name: 'Caribou',
-        description: 'Caribou downloads',
-        create_date: '2026-01-01T00:00:00.000Z'
-      };
+      const row = galleryRow();
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       // Step 2: Create repository with mocked connection
       const repo = new GalleryRepository(mockDBConnection);
 
-      // Step 3: Call createGallery with a real name and description
-      const result = await repo.createGallery({ name: 'Caribou', description: 'Caribou downloads' });
+      // Step 3: Call createGallery with a real payload
+      const result = await repo.createGallery({
+        name: 'Caribou',
+        slug: 'caribou',
+        visibility: 'public',
+        description: 'Caribou downloads'
+      });
 
       // Step 4: Verify the returned row
       expect(result).to.deep.equal(row);
 
-      // Step 5: Verify the name + description were bound INTO the query, not just echoed
+      // Step 5: Verify the fields were bound INTO the query, not just echoed
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include('Caribou');
+      expect(sqlValues).to.include('caribou');
+      expect(sqlValues).to.include('public');
       expect(sqlValues).to.include('Caribou downloads');
     });
 
@@ -48,12 +60,7 @@ describe('GalleryRepository', () => {
       // Verifies: a null description flows INTO the query rather than being dropped
 
       // Step 1: Setup mock DB to return a single inserted gallery row with null description
-      const row: GalleryRecord = {
-        gallery_id: 2,
-        name: 'Moose',
-        description: null,
-        create_date: '2026-01-01T00:00:00.000Z'
-      };
+      const row = galleryRow({ gallery_id: 2, name: 'Moose', slug: 'moose', description: null });
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -61,7 +68,12 @@ describe('GalleryRepository', () => {
       const repo = new GalleryRepository(mockDBConnection);
 
       // Step 3: Call createGallery with a null description
-      const result = await repo.createGallery({ name: 'Moose', description: null });
+      const result = await repo.createGallery({
+        name: 'Moose',
+        slug: 'moose',
+        visibility: 'public',
+        description: null
+      });
 
       // Step 4: Verify the returned row
       expect(result).to.deep.equal(row);
@@ -84,7 +96,7 @@ describe('GalleryRepository', () => {
 
       // Step 3: Call createGallery and expect it to throw
       try {
-        await repo.createGallery({ name: 'Caribou', description: null });
+        await repo.createGallery({ name: 'Caribou', slug: 'caribou', visibility: 'public', description: null });
         expect.fail('Expected ApiExecuteSQLError');
       } catch (err: any) {
         // Step 4: Verify the error type and message
@@ -94,17 +106,50 @@ describe('GalleryRepository', () => {
     });
   });
 
+  describe('findActiveGalleryBySlug', () => {
+    it('binds the slug and returns the row when an active gallery matches', async () => {
+      // Verifies: the slug-uniqueness lookup binds the slug and returns the found row
+
+      // Step 1: Setup mock DB to return a single matching row
+      const row = galleryRow({ slug: 'home' });
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new GalleryRepository(mockDBConnection);
+
+      // Step 3: Look up by slug
+      const result = await repo.findActiveGalleryBySlug('home');
+
+      // Step 4: Verify the row is returned and the slug was bound into the query
+      expect(result).to.deep.equal(row);
+      expect(sqlStub.firstCall.args[0].values).to.include('home');
+    });
+
+    it('returns null when no active gallery has the slug', async () => {
+      // Verifies: a free slug yields null (find* semantics) rather than throwing
+
+      // Step 1: Setup mock DB to return zero rows
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new GalleryRepository(mockDBConnection);
+
+      // Step 3: Look up a free slug
+      const result = await repo.findActiveGalleryBySlug('nope');
+
+      // Step 4: Verify null is returned
+      expect(result).to.be.null;
+    });
+  });
+
   describe('getGalleryById', () => {
     it('returns the gallery row when found', async () => {
       // Verifies: getGalleryById resolves a found row (via findGalleryById -> connection.sql)
 
       // Step 1: Setup mock DB to return a single gallery row
-      const row: GalleryRecord = {
-        gallery_id: 7,
-        name: 'Caribou',
-        description: 'Caribou downloads',
-        create_date: '2026-01-01T00:00:00.000Z'
-      };
+      const row = galleryRow({ gallery_id: 7 });
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -116,6 +161,42 @@ describe('GalleryRepository', () => {
 
       // Step 4: Verify the returned row
       expect(result).to.deep.equal(row);
+    });
+
+    it('does not constrain visibility by default', async () => {
+      // Verifies: an admin read (publicOnly omitted) does not add the visibility filter
+
+      // Step 1: Setup mock DB to return a private gallery row
+      const row = galleryRow({ gallery_id: 7, visibility: 'private' });
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new GalleryRepository(mockDBConnection);
+
+      // Step 3: Read without the public scope
+      const result = await repo.getGalleryById(7);
+
+      // Step 4: The private gallery is returned and no visibility predicate was added
+      expect(result).to.deep.equal(row);
+      expect(sqlStub.firstCall.args[0].text).to.not.match(/visibility = 'public'/);
+    });
+
+    it('adds the public visibility predicate when publicOnly is true', async () => {
+      // Verifies: a public read scopes the query to public galleries
+
+      // Step 1: Setup mock DB to return a single row
+      const sqlStub = sinon.stub().resolves(mockQueryResult([galleryRow({ gallery_id: 7 })], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new GalleryRepository(mockDBConnection);
+
+      // Step 3: Read with the public scope
+      await repo.getGalleryById(7, true);
+
+      // Step 4: The query carries the public visibility predicate
+      expect(sqlStub.firstCall.args[0].text).to.match(/visibility = 'public'/);
     });
 
     it('throws ApiNotFoundError when no row is returned', async () => {
@@ -155,7 +236,7 @@ describe('GalleryRepository', () => {
 
       // Step 3: Call updateGallery and expect it to throw
       try {
-        await repo.updateGallery(123, { name: 'Caribou', description: null });
+        await repo.updateGallery(123, { name: 'Caribou', slug: 'caribou', visibility: 'public', description: null });
         expect.fail('Expected ApiNotFoundError');
       } catch (err: any) {
         // Step 4: Verify it is ApiNotFoundError, not ApiExecuteSQLError
@@ -165,32 +246,40 @@ describe('GalleryRepository', () => {
       }
     });
 
-    it('binds galleryId, name, and description into the UPDATE and returns the updated row', async () => {
-      // Verifies: galleryId + name + description flow INTO the query and the updated row is returned
+    it('binds galleryId and the gallery fields into the UPDATE and returns the updated row', async () => {
+      // Verifies: galleryId + name + slug + visibility + description flow INTO the query and the updated row is returned
 
       // Step 1: Setup mock DB to return the single updated gallery row
-      const row: GalleryRecord = {
+      const row = galleryRow({
         gallery_id: 55,
         name: 'Caribou (edited)',
-        description: 'Updated description',
-        create_date: '2026-01-01T00:00:00.000Z'
-      };
+        slug: 'caribou-edited',
+        visibility: 'private',
+        description: 'Updated description'
+      });
       const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       // Step 2: Create repository with mocked connection
       const repo = new GalleryRepository(mockDBConnection);
 
-      // Step 3: Call updateGallery with an id and a new name/description
-      const result = await repo.updateGallery(55, { name: 'Caribou (edited)', description: 'Updated description' });
+      // Step 3: Call updateGallery with an id and new fields
+      const result = await repo.updateGallery(55, {
+        name: 'Caribou (edited)',
+        slug: 'caribou-edited',
+        visibility: 'private',
+        description: 'Updated description'
+      });
 
       // Step 4: Verify the returned row
       expect(result).to.deep.equal(row);
 
-      // Step 5: Verify galleryId, name, and description were bound into the query
+      // Step 5: Verify the fields were bound into the query
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(55);
       expect(sqlValues).to.include('Caribou (edited)');
+      expect(sqlValues).to.include('caribou-edited');
+      expect(sqlValues).to.include('private');
       expect(sqlValues).to.include('Updated description');
     });
   });
@@ -211,50 +300,6 @@ describe('GalleryRepository', () => {
 
       // Step 4: Verify the delete SQL was issued
       expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('addDownloadToGallery', () => {
-    it('does not throw on conflict (rowCount 0) and binds gallery_id, download_id, and sort', async () => {
-      // Verifies: a conflict (rowCount=0) is a valid no-op, and the three values flow INTO the query
-
-      // Step 1: Setup mock DB to return zero rows (ON CONFLICT DO NOTHING)
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new GalleryRepository(mockDBConnection);
-
-      // Step 3: Call addDownloadToGallery with a real numeric sort
-      await repo.addDownloadToGallery(10, 'dddd0000-0000-0000-0000-000000000001', 3);
-
-      // Step 4: Verify it did not throw and bound all three values
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(10);
-      expect(sqlValues).to.include('dddd0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.include(3);
-    });
-
-    it('does not throw on insert (rowCount 1) and binds a null sort', async () => {
-      // Verifies: a successful insert (rowCount=1) resolves, and a null sort flows INTO the query
-
-      // Step 1: Setup mock DB to return one inserted row
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new GalleryRepository(mockDBConnection);
-
-      // Step 3: Call addDownloadToGallery with a null sort
-      await repo.addDownloadToGallery(10, 'dddd0000-0000-0000-0000-000000000002', null);
-
-      // Step 4: Verify it did not throw and bound gallery_id, download_id, and the null sort
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(10);
-      expect(sqlValues).to.include('dddd0000-0000-0000-0000-000000000002');
-      expect(sqlValues).to.include(null);
     });
   });
 });

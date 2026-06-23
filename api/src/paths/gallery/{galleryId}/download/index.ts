@@ -3,14 +3,14 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { HTTP400 } from '../../../../errors/http-error';
-import { AddGalleryDownloadRequestBody } from '../../../../models/gallery';
+import { AddGalleryDownloadRequestBody } from '../../../../models/gallery-download';
 import {
   AddGalleryDownloadRequestSchema,
   GalleryDownloadListResponseSchema
-} from '../../../../openapi/schemas/gallery';
+} from '../../../../openapi/schemas/gallery-download';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { GalleryService } from '../../../../services/gallery/gallery-service';
+import { GalleryDownloadService } from '../../../../services/gallery/gallery-download-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/gallery/{galleryId}/download');
@@ -96,8 +96,9 @@ export function getGalleryDownloads(): RequestHandler {
 
       await connection.open();
 
-      const galleryService = new GalleryService(connection);
-      const downloads = await galleryService.getGalleryDownloads(galleryId);
+      const galleryDownloadService = new GalleryDownloadService(connection);
+      // Public read: scope to public galleries so a private gallery's contents surface as a 404.
+      const downloads = await galleryDownloadService.getGalleryDownloads(galleryId, true);
 
       await connection.commit();
 
@@ -131,8 +132,12 @@ export function addDownloadToGallery(): RequestHandler {
 
       await connection.open();
 
-      const galleryService = new GalleryService(connection);
-      await galleryService.addDownloadToGallery(galleryId, parseResult.data.downloadId, parseResult.data.sort ?? null);
+      const galleryDownloadService = new GalleryDownloadService(connection);
+      await galleryDownloadService.addDownloadToGallery(
+        galleryId,
+        parseResult.data.downloadId,
+        parseResult.data.sort ?? null
+      );
 
       await connection.commit();
 

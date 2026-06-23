@@ -127,7 +127,8 @@ export function getGalleryById(): RequestHandler {
       await connection.open();
 
       const galleryService = new GalleryService(connection);
-      const gallery = await galleryService.getGalleryById(galleryId);
+      // Public read: scope to public galleries so a private gallery surfaces as a 404.
+      const gallery = await galleryService.getGalleryById(galleryId, true);
 
       await connection.commit();
 

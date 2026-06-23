@@ -11,6 +11,8 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TABLE gallery (
       gallery_id      INTEGER        GENERATED ALWAYS AS IDENTITY NOT NULL,
       name            TEXT           NOT NULL,
+      slug            TEXT           NOT NULL,
+      visibility      TEXT           DEFAULT 'public' NOT NULL,
       description     TEXT,
       record_end_date TIMESTAMPTZ(6),
       create_date     TIMESTAMPTZ(6) DEFAULT now() NOT NULL,
@@ -18,16 +20,19 @@ export async function up(knex: Knex): Promise<void> {
       update_date     TIMESTAMPTZ(6),
       update_user     INTEGER,
       revision_count  INTEGER        DEFAULT 0 NOT NULL,
-      CONSTRAINT gallery_pk PRIMARY KEY (gallery_id)
+      CONSTRAINT gallery_pk         PRIMARY KEY (gallery_id),
+      CONSTRAINT gallery_visibility_check CHECK (visibility IN ('public', 'private'))
     );
 
     CREATE UNIQUE INDEX gallery_nuk1
-      ON gallery(name)
+      ON gallery(slug)
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE gallery IS 'A curated, reusable collection of downloads for display in curated areas of the application.';
     COMMENT ON COLUMN gallery.gallery_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN gallery.name IS 'The display name of the gallery; unique among active galleries.';
+    COMMENT ON COLUMN gallery.name IS 'The display name of the gallery; may be renamed and is not a stable identifier.';
+    COMMENT ON COLUMN gallery.slug IS 'A short, stable, URL-safe key for the gallery; unique among active galleries. Consumers reference a gallery by its slug rather than its mutable name.';
+    COMMENT ON COLUMN gallery.visibility IS 'Controls whether the gallery is surfaced on public reads: ''public'' is visible to anonymous callers; ''private'' is admin-only.';
     COMMENT ON COLUMN gallery.description IS 'An optional description of the gallery.';
     COMMENT ON COLUMN gallery.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN gallery.create_date IS 'The datetime the record was created.';

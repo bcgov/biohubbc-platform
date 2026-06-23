@@ -7,8 +7,8 @@ const DB_ADMIN = process.env.DB_ADMIN;
  * Seed a single 'Home' gallery for local and test environments only.
  *
  * Production galleries are created by an admin or a consumer migration, so gallery ids are not stable
- * across environments. Consumers must therefore reference a gallery by its name rather than its id.
- * This seed exists purely to give local/test environments a 'Home' gallery to reference by name.
+ * across environments. Consumers must therefore reference a gallery by its slug rather than its id.
+ * This seed exists purely to give local/test environments a 'home' gallery to reference by slug.
  */
 export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`
@@ -16,48 +16,53 @@ export async function seed(knex: Knex): Promise<void> {
     set search_path = ${DB_SCHEMA};
   `);
 
-  // check if the 'Home' gallery already exists among active records
+  // check if the 'home' gallery already exists among active records
   const response = await knex.raw(`
-    ${getActiveGalleryByNameSQL('Home')}
+    ${getActiveGalleryBySlugSQL('home')}
   `);
 
   // if the fetch returns no rows, then the gallery does not exist and should be added
   if (!response?.rows?.[0]) {
     await knex.raw(`
-      ${insertGallerySQL('Home', 'Downloads featured on the BioHub home screen')}
+      ${insertGallerySQL('Home', 'home', 'Downloads featured on the BioHub home screen')}
     `);
   }
 }
 
 /**
- * SQL to fetch an active (non-soft-deleted) gallery by name.
+ * SQL to fetch an active (non-soft-deleted) gallery by slug.
  *
- * @param {string} name
+ * @param {string} slug
  */
-const getActiveGalleryByNameSQL = (name: string) => `
+const getActiveGalleryBySlugSQL = (slug: string) => `
   SELECT
-    name
+    slug
   FROM
     gallery
   WHERE
-    name = '${name}'
+    slug = '${slug}'
   AND
     record_end_date IS NULL;
 `;
 
 /**
- * SQL to insert a gallery row, attributing creation to the database admin user.
+ * SQL to insert a public gallery row, attributing creation to the database admin user.
  *
  * @param {string} name
+ * @param {string} slug
  * @param {string} description
  */
-const insertGallerySQL = (name: string, description: string) => `
+const insertGallerySQL = (name: string, slug: string, description: string) => `
   INSERT INTO gallery (
     name,
+    slug,
+    visibility,
     description,
     create_user
   ) VALUES (
     '${name}',
+    '${slug}',
+    'public',
     '${description}',
     (SELECT system_user_id FROM "system_user" WHERE LOWER(user_identifier) = LOWER('${DB_ADMIN}'))
   );

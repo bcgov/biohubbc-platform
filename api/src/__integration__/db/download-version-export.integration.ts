@@ -938,28 +938,28 @@ describe('Download version export state machine (integration)', function () {
   // nothing (no fallback to an older version), the lookup never accumulates every
   // version's exports, and a soft-ended export group never surfaces.
 
-  describe('listExportsByDownloadVersionIds', () => {
-    /** Add a fresh READY version (with a parquet artifact, no export) to an existing download. */
-    async function addReadyVersion(downloadId: string): Promise<string> {
-      const versionId = (await versionRepo.createDownloadVersion(downloadId)).download_version_id;
-      await versionRepo.updateDownloadVersionStatus(versionId, DownloadStatusEnum.READY, {
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        materialized_at: new Date().toISOString()
-      });
-      const { artifact_id } = await artifactService.insertArtifact({
-        bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/versions/${versionId}/dataset/data.parquet`,
-        byte_size: 1024,
-        artifact_status: 'uploaded',
-        checksum_sha256: randomUUID().replace(/-/g, '').repeat(2).slice(0, 64),
-        uploaded_at: new Date().toISOString(),
-        format: 'parquet'
-      });
-      await versionRepo.createDownloadVersionArtifact(versionId, artifact_id, 'dataset');
-      return versionId;
-    }
+  /** Add a fresh READY version (with a parquet artifact, no export) to an existing download. */
+  async function addReadyVersion(downloadId: string): Promise<string> {
+    const versionId = (await versionRepo.createDownloadVersion(downloadId)).download_version_id;
+    await versionRepo.updateDownloadVersionStatus(versionId, DownloadStatusEnum.READY, {
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      materialized_at: new Date().toISOString()
+    });
+    const { artifact_id } = await artifactService.insertArtifact({
+      bucket: 'test-bucket',
+      object_key: `downloads/${downloadId}/versions/${versionId}/dataset/data.parquet`,
+      byte_size: 1024,
+      artifact_status: 'uploaded',
+      checksum_sha256: randomUUID().replaceAll('-', '').repeat(2).slice(0, 64),
+      uploaded_at: new Date().toISOString(),
+      format: 'parquet'
+    });
+    await versionRepo.createDownloadVersionArtifact(versionId, artifact_id, 'dataset');
+    return versionId;
+  }
 
+  describe('listExportsByDownloadVersionIds', () => {
     it('returns the exports of exactly the requested version', async () => {
       const { downloadId, downloadVersionId: v1, systemUserId } = await seedReadyDownloadWithVersionArtifact();
       stubPublish();

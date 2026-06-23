@@ -6,7 +6,7 @@ import { removeDownloadFromGallery } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { ApiNotFoundError } from '../../../../../errors/api-error';
-import { GalleryService } from '../../../../../services/gallery/gallery-service';
+import { GalleryDownloadService } from '../../../../../services/gallery/gallery-download-service';
 
 chai.use(sinonChai);
 
@@ -20,7 +20,7 @@ describe('paths/gallery/{galleryId}/download/{downloadId}/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const removeStub = sinon.stub(GalleryService.prototype, 'removeDownloadFromGallery').resolves();
+      const removeStub = sinon.stub(GalleryDownloadService.prototype, 'removeDownloadFromGallery').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -41,7 +41,7 @@ describe('paths/gallery/{galleryId}/download/{downloadId}/index', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       sinon
-        .stub(GalleryService.prototype, 'removeDownloadFromGallery')
+        .stub(GalleryDownloadService.prototype, 'removeDownloadFromGallery')
         .rejects(new ApiNotFoundError('Gallery not found'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

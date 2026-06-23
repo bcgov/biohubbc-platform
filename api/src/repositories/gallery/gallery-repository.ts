@@ -1,11 +1,13 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { DownloadDetailRecord } from '../../models/download';
 import { CreateGallery, GalleryRecord } from '../../models/gallery';
 import { BaseRepository } from '../base-repository';
 
 /**
  * A repository class for accessing gallery data.
+ *
+ * Scoped to the `gallery` table itself — CRUD plus the slug-uniqueness lookup.
+ * The gallery↔download join lives in `GalleryDownloadRepository`.
  *
  * @export
  * @class GalleryRepository
@@ -24,9 +26,9 @@ export class GalleryRepository extends BaseRepository {
    */
   async createGallery(payload: CreateGallery): Promise<GalleryRecord> {
     const sql = SQL`
-      INSERT INTO gallery (name, description)
-      VALUES (${payload.name}, ${payload.description})
-      RETURNING gallery_id, name, description, create_date;
+      INSERT INTO gallery (name, slug, visibility, description)
+      VALUES (${payload.name}, ${payload.slug}, ${payload.visibility}, ${payload.description})
+      RETURNING gallery_id, name, slug, visibility, description, create_date;
     `;
 
     const response = await this.connection.sql(sql, GalleryRecord);
@@ -49,7 +51,7 @@ export class GalleryRepository extends BaseRepository {
    */
   async getGalleries(): Promise<GalleryRecord[]> {
     const sql = SQL`
-      SELECT gallery_id, name, description, create_date
+      SELECT gallery_id, name, slug, visibility, description, create_date
       FROM gallery
       WHERE record_end_date IS NULL
       ORDER BY name ASC;
@@ -61,24 +63,27 @@ export class GalleryRepository extends BaseRepository {
   }
 
   /**
-   * Find the active gallery with the given name, returning null when none exists.
+   * Find the active gallery with the given slug, returning null when none exists.
    *
-   * The name-uniqueness pre-check helper: a gallery name is unique only among
+   * The slug-uniqueness pre-check helper: a gallery slug is unique only among
    * active galleries (the `gallery_nuk1` partial index is scoped to
-   * `record_end_date IS NULL`), so soft-deleting a gallery frees its name for
+   * `record_end_date IS NULL`), so soft-deleting a gallery frees its slug for
    * reuse. The service calls this to surface a 409 before attempting an insert
    * that would otherwise hit the partial unique index. A null result means the
-   * name is free, so this uses `find*` (returns null) rather than `get*` (throws).
+   * slug is free, so this uses `find*` (returns null) rather than `get*` (throws).
    *
-   * @param {string} name - The gallery name to look up.
+   * Slug — not name — is the stable consumer key: a gallery may be renamed
+   * without breaking consumers, so uniqueness is enforced on slug.
+   *
+   * @param {string} slug - The gallery slug to look up.
    * @return {Promise<GalleryRecord | null>}
    * @memberof GalleryRepository
    */
-  async findActiveGalleryByName(name: string): Promise<GalleryRecord | null> {
+  async findActiveGalleryBySlug(slug: string): Promise<GalleryRecord | null> {
     const sql = SQL`
-      SELECT gallery_id, name, description, create_date
+      SELECT gallery_id, name, slug, visibility, description, create_date
       FROM gallery
-      WHERE name = ${name} AND record_end_date IS NULL;
+      WHERE slug = ${slug} AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, GalleryRecord);
@@ -87,18 +92,30 @@ export class GalleryRepository extends BaseRepository {
   }
 
   /**
-   * Get an active gallery by ID, returning null when none matches.
+   * Find an active gallery by ID, returning null when none matches.
+   *
+   * `publicOnly` scopes the lookup to `visibility = 'public'`, so a private
+   * gallery is invisible to anonymous read paths: it returns null here, which the
+   * `get*` companion turns into a 404 — the gallery's existence is never leaked.
+   * Admin-gated callers omit the flag (or pass false) to see all visibilities.
    *
    * @param {number} galleryId - The gallery ID.
+   * @param {boolean} [publicOnly=false] - When true, only matches public galleries.
    * @return {Promise<GalleryRecord | null>}
    * @memberof GalleryRepository
    */
-  async findGalleryById(galleryId: number): Promise<GalleryRecord | null> {
+  async findGalleryById(galleryId: number, publicOnly = false): Promise<GalleryRecord | null> {
     const sql = SQL`
-      SELECT gallery_id, name, description, create_date
+      SELECT gallery_id, name, slug, visibility, description, create_date
       FROM gallery
-      WHERE gallery_id = ${galleryId} AND record_end_date IS NULL;
+      WHERE gallery_id = ${galleryId} AND record_end_date IS NULL
     `;
+
+    if (publicOnly) {
+      sql.append(SQL` AND visibility = 'public'`);
+    }
+
+    sql.append(SQL`;`);
 
     const response = await this.connection.sql(sql, GalleryRecord);
 
@@ -109,14 +126,17 @@ export class GalleryRepository extends BaseRepository {
    * Get an active gallery by ID, throwing if not found.
    *
    * `get*` throws on missing row (codebase convention — companion to `findGalleryById`).
+   * With `publicOnly`, a private gallery is treated as not found (404), so the
+   * anonymous read paths neither return nor acknowledge private galleries.
    *
    * @param {number} galleryId - The gallery ID.
+   * @param {boolean} [publicOnly=false] - When true, only matches public galleries.
    * @return {Promise<GalleryRecord>}
-   * @throws {ApiNotFoundError} when no active gallery matches the given ID.
+   * @throws {ApiNotFoundError} when no matching active gallery is found.
    * @memberof GalleryRepository
    */
-  async getGalleryById(galleryId: number): Promise<GalleryRecord> {
-    const gallery = await this.findGalleryById(galleryId);
+  async getGalleryById(galleryId: number, publicOnly = false): Promise<GalleryRecord> {
+    const gallery = await this.findGalleryById(galleryId, publicOnly);
 
     if (!gallery) {
       throw new ApiNotFoundError('Gallery not found', [
@@ -129,7 +149,7 @@ export class GalleryRepository extends BaseRepository {
   }
 
   /**
-   * Update an active gallery's name and description.
+   * Update an active gallery's name, slug, visibility, and description.
    *
    * Throws `ApiNotFoundError` (not `ApiExecuteSQLError`) when no row is updated.
    * The `AND record_end_date IS NULL` scope means a zero-row result is not an
@@ -145,9 +165,12 @@ export class GalleryRepository extends BaseRepository {
   async updateGallery(galleryId: number, payload: CreateGallery): Promise<GalleryRecord> {
     const sql = SQL`
       UPDATE gallery
-      SET name = ${payload.name}, description = ${payload.description}
+      SET name = ${payload.name},
+          slug = ${payload.slug},
+          visibility = ${payload.visibility},
+          description = ${payload.description}
       WHERE gallery_id = ${galleryId} AND record_end_date IS NULL
-      RETURNING gallery_id, name, description, create_date;
+      RETURNING gallery_id, name, slug, visibility, description, create_date;
     `;
 
     const response = await this.connection.sql(sql, GalleryRecord);
@@ -182,124 +205,5 @@ export class GalleryRepository extends BaseRepository {
     `;
 
     await this.connection.sql(sql);
-  }
-
-  /**
-   * Add a download to a gallery, idempotently.
-   *
-   * The `ON CONFLICT (gallery_id, download_id) WHERE record_end_date IS NULL
-   * DO NOTHING` clause matches the `gallery_download_nuk1` partial unique index
-   * and produces three outcomes:
-   *   1. New membership → an active row is inserted.
-   *   2. Already-active membership → silent no-op, so a gallery holds each
-   *      download at most once.
-   *   3. Previously-removed membership → the partial index ignores the inactive
-   *      (soft-deleted) row, so a fresh active row is inserted while the old
-   *      soft-deleted row remains as history.
-   *
-   * No rowCount guard: a conflict (rowCount=0) is a valid no-op, not a failure.
-   *
-   * @param {number} galleryId - The gallery ID.
-   * @param {string} downloadId - The download ID.
-   * @param {number | null} sort - Manual display order; null sorts last.
-   * @return {Promise<void>}
-   * @memberof GalleryRepository
-   */
-  async addDownloadToGallery(galleryId: number, downloadId: string, sort: number | null): Promise<void> {
-    const sql = SQL`
-      INSERT INTO gallery_download (gallery_id, download_id, sort)
-      VALUES (${galleryId}, ${downloadId}, ${sort})
-      ON CONFLICT (gallery_id, download_id) WHERE record_end_date IS NULL DO NOTHING;
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Remove a download from a gallery, idempotently.
-   *
-   * Intentionally skips the rowCount guard: soft-delete is idempotent by design,
-   * so removing an already-removed or never-present member is a no-op success,
-   * not an error. (This deviates from guarded deletes elsewhere in the codebase;
-   * the no-op-is-success contract here is deliberate.)
-   *
-   * @param {number} galleryId - The gallery ID.
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<void>}
-   * @memberof GalleryRepository
-   */
-  async removeDownloadFromGallery(galleryId: number, downloadId: string): Promise<void> {
-    const sql = SQL`
-      UPDATE gallery_download
-      SET record_end_date = now()
-      WHERE gallery_id = ${galleryId}
-        AND download_id = ${downloadId}
-        AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * List a gallery's active download members with their policy display fields.
-   *
-   * Ordering is explicit `sort ASC NULLS LAST, create_date ASC`: positioned
-   * items come first in ascending order; unsorted members (null `sort`) trail
-   * the positioned ones, oldest-first. `NULLS LAST` is stated explicitly so the
-   * placement of unsorted members can't silently flip if the sort direction ever
-   * changes.
-   *
-   * Both the membership row (`gd`) and the download row (`d`) are filtered to
-   * `record_end_date IS NULL`, so a soft-deleted download never leaks into a
-   * public curated list even if its gallery_download link is still active.
-   *
-   * Materialization status/timing (`download_status`, `started_at`, `completed_at`)
-   * and `download_version_id` live on `download_version`, not `download`. There is
-   * no stored "current version" pointer, so they are resolved from the most-recent
-   * active version via a `LATERAL` subquery (ordered `create_date DESC`, `LIMIT 1`) —
-   * effectively inner, since a committed download always has ≥1 active version. This
-   * mirrors `DownloadRepository.findDownloadById` so a gallery member carries the
-   * same `DownloadDetailRecord` shape as a directly-fetched download.
-   *
-   * Returns flat rows — each download's `exports[]` is attached later at the
-   * service layer so this method stays single-SQL CRUD.
-   *
-   * @param {number} galleryId - The gallery ID.
-   * @return {Promise<DownloadDetailRecord[]>}
-   * @memberof GalleryRepository
-   */
-  async getGalleryDownloads(galleryId: number): Promise<DownloadDetailRecord[]> {
-    const sql = SQL`
-      SELECT
-        d.download_id,
-        dv.download_version_id,
-        dv.status AS download_status,
-        d.format,
-        d.metadata,
-        dv.started_at,
-        dv.completed_at,
-        d.downloaded_at,
-        d.create_date,
-        p.name,
-        p.description
-      FROM gallery_download gd
-      INNER JOIN download d ON d.download_id = gd.download_id
-      INNER JOIN LATERAL (
-        SELECT download_version_id, status, started_at, completed_at
-        FROM download_version
-        WHERE download_id = d.download_id AND record_end_date IS NULL
-        ORDER BY create_date DESC, download_version_id DESC
-        LIMIT 1
-      ) dv ON true
-      LEFT JOIN policy p ON p.policy_id = d.policy_id
-      WHERE gd.gallery_id = ${galleryId}
-        AND gd.record_end_date IS NULL
-        AND d.record_end_date IS NULL
-      ORDER BY gd.sort ASC NULLS LAST, gd.create_date ASC;
-    `;
-
-    const response = await this.connection.sql(sql, DownloadDetailRecord);
-
-    return response.rows;
   }
 }

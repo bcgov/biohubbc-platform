@@ -1,9 +1,9 @@
 // Integration test for GalleryRepository — verifies the curated download gallery
-// CRUD + membership SQL against the real database: the partial-unique-index name
-// scoping (active-only), soft-delete semantics, idempotent ON CONFLICT membership,
-// and the getGalleryDownloads LATERAL join (most-recent active version resolution),
-// both-side (gd + download) active filtering, and `sort ASC NULLS LAST, create_date
-// ASC` ordering.
+// CRUD SQL against the real database: the partial-unique-index slug scoping
+// (active-only), the public visibility filter, and soft-delete semantics.
+//
+// The gallery↔download membership SQL is covered by
+// gallery-download-repository.integration.ts.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -16,20 +16,24 @@ import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
-import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { GalleryRecord, GalleryVisibility } from '../../models/gallery';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
-import { DownloadPolicyService } from '../../services/download/download-policy-service';
-import { DownloadService } from '../../services/download/download-service';
+
+/** Unique gallery name per call. */
+function uniqueName(prefix = 'Gallery'): string {
+  return `${prefix} ${randomUUID().slice(0, 8)}`;
+}
+
+/** Unique gallery slug per call — the active-slug partial unique index (gallery_nuk1) rejects dupes. */
+function uniqueSlug(prefix = 'gallery'): string {
+  return `${prefix}-${randomUUID().slice(0, 8)}`;
+}
 
 describe('GalleryRepository (integration)', function () {
   this.timeout(15000);
 
   let connection: IDBConnection;
   let repo: GalleryRepository;
-  let policyService: DownloadPolicyService;
-  let downloadService: DownloadService;
-  let versionRepo: DownloadVersionRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -38,12 +42,7 @@ describe('GalleryRepository (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    // All seed services + the repo under test share the SAME connection (and thus
-    // the same rolled-back transaction), so seeded rows are visible to the repo.
     repo = new GalleryRepository(connection);
-    policyService = new DownloadPolicyService(connection);
-    downloadService = new DownloadService(connection);
-    versionRepo = new DownloadVersionRepository(connection);
   });
 
   afterEach(async () => {
@@ -53,45 +52,16 @@ describe('GalleryRepository (integration)', function () {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  /** Unique gallery name per call — the active-name partial unique index (gallery_nuk1) rejects dupes. */
-  function uniqueName(prefix = 'Gallery'): string {
-    return `${prefix} ${randomUUID().slice(0, 8)}`;
-  }
-
-  /**
-   * Seed a fully-readable download: policy → download → active download_version.
-   * `download.policy_id` is NOT NULL and a download with no active version is
-   * invisible to getGalleryDownloads' INNER JOIN LATERAL, so all three links are
-   * required for the member to surface. Mirrors download-service.integration.ts's
-   * createPolicyDownload helper, using the same shared connection.
-   */
-  async function createPolicyDownload(opts?: {
-    name?: string;
-    description?: string | null;
-  }): Promise<{ download_id: string; policy_id: string; download_version_id: string }> {
-    const { policy_id } = await policyService.createDownloadPolicy({
-      name: opts?.name ?? uniqueName('Policy'),
-      description: opts?.description ?? null,
-      featureTypes: ['dataset'],
-      expressionId: null
+  /** Create an active gallery with sensible unique defaults; callers override what matters. */
+  function seedGallery(
+    overrides?: Partial<{ name: string; slug: string; visibility: GalleryVisibility; description: string | null }>
+  ): Promise<GalleryRecord> {
+    return repo.createGallery({
+      name: overrides?.name ?? uniqueName(),
+      slug: overrides?.slug ?? uniqueSlug(),
+      visibility: overrides?.visibility ?? 'public',
+      description: overrides?.description ?? null
     });
-    const { download_id } = await downloadService.createDownload({
-      policyId: policy_id,
-      format: 'parquet',
-      requestedBy: connection.systemUserId()
-    });
-    const version = await versionRepo.createDownloadVersion(download_id);
-    return { download_id, policy_id, download_version_id: version.download_version_id };
-  }
-
-  /** Count of ACTIVE gallery_download rows for a (gallery, download) pair. */
-  async function activeLinkCount(galleryId: number, downloadId: string): Promise<number> {
-    const result = await connection.sql(SQL`
-      SELECT count(*)::int AS count
-      FROM gallery_download
-      WHERE gallery_id = ${galleryId} AND download_id = ${downloadId} AND record_end_date IS NULL;
-    `);
-    return result.rows[0].count;
   }
 
   // ── createGallery ──────────────────────────────────────────────────────────
@@ -99,21 +69,29 @@ describe('GalleryRepository (integration)', function () {
   describe('createGallery', () => {
     it('inserts and returns the created gallery record', async () => {
       const name = uniqueName();
-      const result = await repo.createGallery({ name, description: 'A described gallery' });
+      const slug = uniqueSlug();
+      const result = await repo.createGallery({ name, slug, visibility: 'public', description: 'A described gallery' });
 
       expect(result.gallery_id).to.be.a('number');
       expect(result.name).to.equal(name);
+      expect(result.slug).to.equal(slug);
+      expect(result.visibility).to.equal('public');
       expect(result.description).to.equal('A described gallery');
       expect(result.create_date).to.be.a('string');
     });
 
-    it('throws on a duplicate ACTIVE name (gallery_nuk1)', async () => {
-      const name = uniqueName();
-      await repo.createGallery({ name, description: null });
+    it('persists a private visibility', async () => {
+      const result = await seedGallery({ visibility: 'private' });
+      expect(result.visibility).to.equal('private');
+    });
+
+    it('throws on a duplicate ACTIVE slug (gallery_nuk1)', async () => {
+      const slug = uniqueSlug();
+      await seedGallery({ slug });
 
       try {
-        await repo.createGallery({ name, description: null });
-        expect.fail('Expected duplicate-name insert to throw');
+        await seedGallery({ slug });
+        expect.fail('Expected duplicate-slug insert to throw');
       } catch (error) {
         // Partial unique index violation surfaces as a SQL error. The clean 409 is
         // applied above this layer by the service pre-check (see gallery-service).
@@ -121,17 +99,27 @@ describe('GalleryRepository (integration)', function () {
       }
     });
 
-    it('allows name reuse after the prior gallery with that name is soft-deleted', async () => {
-      const name = uniqueName();
-      const first = await repo.createGallery({ name, description: null });
+    it('allows a duplicate display NAME (only slug is unique)', async () => {
+      const name = uniqueName('Shared');
+      const first = await seedGallery({ name });
+      // Same name, different slug — must succeed since name is no longer unique.
+      const second = await seedGallery({ name });
 
-      // Soft-delete frees the name — gallery_nuk1 is scoped to record_end_date IS NULL.
-      await repo.deleteGallery(first.gallery_id);
-
-      const second = await repo.createGallery({ name, description: 'reused' });
-      expect(second.gallery_id).to.be.a('number');
       expect(second.gallery_id).to.not.equal(first.gallery_id);
       expect(second.name).to.equal(name);
+    });
+
+    it('allows slug reuse after the prior gallery with that slug is soft-deleted', async () => {
+      const slug = uniqueSlug();
+      const first = await seedGallery({ slug });
+
+      // Soft-delete frees the slug — gallery_nuk1 is scoped to record_end_date IS NULL.
+      await repo.deleteGallery(first.gallery_id);
+
+      const second = await seedGallery({ slug });
+      expect(second.gallery_id).to.be.a('number');
+      expect(second.gallery_id).to.not.equal(first.gallery_id);
+      expect(second.slug).to.equal(slug);
     });
   });
 
@@ -139,8 +127,8 @@ describe('GalleryRepository (integration)', function () {
 
   describe('getGalleries', () => {
     it('excludes soft-deleted galleries (active-only)', async () => {
-      const active = await repo.createGallery({ name: uniqueName(), description: null });
-      const deleted = await repo.createGallery({ name: uniqueName(), description: null });
+      const active = await seedGallery();
+      const deleted = await seedGallery();
       await repo.deleteGallery(deleted.gallery_id);
 
       const ids = (await repo.getGalleries()).map((g) => g.gallery_id);
@@ -154,8 +142,8 @@ describe('GalleryRepository (integration)', function () {
       const suffix = randomUUID().slice(0, 8);
       const zName = `ZZZ ${suffix}`;
       const aName = `AAA ${suffix}`;
-      await repo.createGallery({ name: zName, description: null });
-      await repo.createGallery({ name: aName, description: null });
+      await seedGallery({ name: zName });
+      await seedGallery({ name: aName });
 
       const names = (await repo.getGalleries()).map((g) => g.name);
       expect(names.indexOf(aName)).to.be.lessThan(names.indexOf(zName));
@@ -170,29 +158,29 @@ describe('GalleryRepository (integration)', function () {
     });
   });
 
-  // ── findActiveGalleryByName ──────────────────────────────────────────────
+  // ── findActiveGalleryBySlug ──────────────────────────────────────────────
 
-  describe('findActiveGalleryByName', () => {
-    it('returns the record for an exact active-name match', async () => {
-      const name = uniqueName();
-      const created = await repo.createGallery({ name, description: null });
+  describe('findActiveGalleryBySlug', () => {
+    it('returns the record for an exact active-slug match', async () => {
+      const slug = uniqueSlug();
+      const created = await seedGallery({ slug });
 
-      const found = await repo.findActiveGalleryByName(name);
+      const found = await repo.findActiveGalleryBySlug(slug);
       expect(found).to.not.be.null;
       expect(found!.gallery_id).to.equal(created.gallery_id);
     });
 
-    it('returns null for a soft-deleted name', async () => {
-      const name = uniqueName();
-      const created = await repo.createGallery({ name, description: null });
+    it('returns null for a soft-deleted slug', async () => {
+      const slug = uniqueSlug();
+      const created = await seedGallery({ slug });
       await repo.deleteGallery(created.gallery_id);
 
-      const found = await repo.findActiveGalleryByName(name);
+      const found = await repo.findActiveGalleryBySlug(slug);
       expect(found).to.be.null;
     });
 
     it('returns null when no gallery matches', async () => {
-      const found = await repo.findActiveGalleryByName(uniqueName('NoSuch'));
+      const found = await repo.findActiveGalleryBySlug(uniqueSlug('nosuch'));
       expect(found).to.be.null;
     });
   });
@@ -201,7 +189,7 @@ describe('GalleryRepository (integration)', function () {
 
   describe('findGalleryById', () => {
     it('returns the record for an active gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
 
       const found = await repo.findGalleryById(created.gallery_id);
       expect(found).to.not.be.null;
@@ -209,7 +197,7 @@ describe('GalleryRepository (integration)', function () {
     });
 
     it('returns null for a soft-deleted gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
       await repo.deleteGallery(created.gallery_id);
 
       const found = await repo.findGalleryById(created.gallery_id);
@@ -220,18 +208,41 @@ describe('GalleryRepository (integration)', function () {
       const found = await repo.findGalleryById(-1);
       expect(found).to.be.null;
     });
+
+    it('returns a private gallery when publicOnly is not set', async () => {
+      const created = await seedGallery({ visibility: 'private' });
+
+      const found = await repo.findGalleryById(created.gallery_id);
+      expect(found).to.not.be.null;
+      expect(found!.visibility).to.equal('private');
+    });
+
+    it('hides a private gallery when publicOnly is true', async () => {
+      const created = await seedGallery({ visibility: 'private' });
+
+      const found = await repo.findGalleryById(created.gallery_id, true);
+      expect(found).to.be.null;
+    });
+
+    it('returns a public gallery when publicOnly is true', async () => {
+      const created = await seedGallery({ visibility: 'public' });
+
+      const found = await repo.findGalleryById(created.gallery_id, true);
+      expect(found).to.not.be.null;
+      expect(found!.gallery_id).to.equal(created.gallery_id);
+    });
   });
 
   describe('getGalleryById', () => {
     it('returns the record for an active gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
 
       const found = await repo.getGalleryById(created.gallery_id);
       expect(found.gallery_id).to.equal(created.gallery_id);
     });
 
     it('throws ApiNotFoundError for a soft-deleted gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
       await repo.deleteGallery(created.gallery_id);
 
       try {
@@ -250,40 +261,69 @@ describe('GalleryRepository (integration)', function () {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
     });
+
+    it('throws ApiNotFoundError for a private gallery when publicOnly is true', async () => {
+      const created = await seedGallery({ visibility: 'private' });
+
+      try {
+        await repo.getGalleryById(created.gallery_id, true);
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
   });
 
   // ── updateGallery ────────────────────────────────────────────────────────
 
   describe('updateGallery', () => {
     it('returns the updated record for an active gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: 'before' });
+      const created = await seedGallery({ description: 'before' });
       const newName = uniqueName('Updated');
+      const newSlug = uniqueSlug('updated');
 
-      const updated = await repo.updateGallery(created.gallery_id, { name: newName, description: 'after' });
+      const updated = await repo.updateGallery(created.gallery_id, {
+        name: newName,
+        slug: newSlug,
+        visibility: 'private',
+        description: 'after'
+      });
       expect(updated.gallery_id).to.equal(created.gallery_id);
       expect(updated.name).to.equal(newName);
+      expect(updated.slug).to.equal(newSlug);
+      expect(updated.visibility).to.equal('private');
       expect(updated.description).to.equal('after');
     });
 
     it('throws ApiNotFoundError for a soft-deleted gallery', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
       await repo.deleteGallery(created.gallery_id);
 
       try {
-        await repo.updateGallery(created.gallery_id, { name: uniqueName('Updated'), description: null });
+        await repo.updateGallery(created.gallery_id, {
+          name: uniqueName('Updated'),
+          slug: uniqueSlug('updated'),
+          visibility: 'public',
+          description: null
+        });
         expect.fail('Expected ApiNotFoundError');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
     });
 
-    it('allows a no-op rename to the gallery’s own current name', async () => {
-      // A self-rename must not trip the unique index against the row's own value.
-      const created = await repo.createGallery({ name: uniqueName('Self'), description: 'before' });
+    it('allows a no-op update to the gallery’s own current slug', async () => {
+      // A self-update must not trip the unique index against the row's own value.
+      const created = await seedGallery({ description: 'before' });
 
-      const updated = await repo.updateGallery(created.gallery_id, { name: created.name, description: 'after' });
+      const updated = await repo.updateGallery(created.gallery_id, {
+        name: created.name,
+        slug: created.slug,
+        visibility: created.visibility,
+        description: 'after'
+      });
       expect(updated.gallery_id).to.equal(created.gallery_id);
-      expect(updated.name).to.equal(created.name);
+      expect(updated.slug).to.equal(created.slug);
       expect(updated.description).to.equal('after');
     });
   });
@@ -292,7 +332,7 @@ describe('GalleryRepository (integration)', function () {
 
   describe('deleteGallery', () => {
     it('stamps record_end_date so the gallery is no longer findable', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
 
       await repo.deleteGallery(created.gallery_id);
 
@@ -300,201 +340,13 @@ describe('GalleryRepository (integration)', function () {
     });
 
     it('is a no-op (no error) when called twice', async () => {
-      const created = await repo.createGallery({ name: uniqueName(), description: null });
+      const created = await seedGallery();
 
       await repo.deleteGallery(created.gallery_id);
       // Second delete matches no active row — idempotent no-op, must not throw.
       await repo.deleteGallery(created.gallery_id);
 
       expect(await repo.findGalleryById(created.gallery_id)).to.be.null;
-    });
-  });
-
-  // ── addDownloadToGallery ─────────────────────────────────────────────────
-
-  describe('addDownloadToGallery', () => {
-    it('inserts a fresh active membership row', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
-    });
-
-    it('is a dedupe no-op when re-inserting while the membership is active (ON CONFLICT)', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 2);
-
-      // Still exactly one active row — the conflict short-circuits the second insert.
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
-    });
-
-    it('inserts a new active row when re-added after removal (partial index ignores the ended row)', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
-      // The ended row is invisible to gallery_download_nuk1, so this inserts afresh.
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
-
-      // And the soft-deleted row is still around as history (total = 2).
-      const total = await connection.sql(SQL`
-        SELECT count(*)::int AS count
-        FROM gallery_download
-        WHERE gallery_id = ${gallery.gallery_id} AND download_id = ${download_id};
-      `);
-      expect(total.rows[0].count).to.equal(2);
-    });
-
-    it('persists sort = null', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, null);
-
-      const row = await connection.sql(SQL`
-        SELECT sort
-        FROM gallery_download
-        WHERE gallery_id = ${gallery.gallery_id} AND download_id = ${download_id} AND record_end_date IS NULL;
-      `);
-      expect(row.rowCount).to.equal(1);
-      expect(row.rows[0].sort).to.be.null;
-    });
-  });
-
-  // ── removeDownloadFromGallery ────────────────────────────────────────────
-
-  describe('removeDownloadFromGallery', () => {
-    it('ends an active link so it is excluded from getGalleryDownloads', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
-
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(0);
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members.map((m) => m.download_id)).to.not.include(download_id);
-    });
-
-    it('is a no-op (no error) when the link is already removed', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
-      // Second remove matches no active row — idempotent no-op, must not throw.
-      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
-
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(0);
-    });
-  });
-
-  // ── getGalleryDownloads (the LATERAL-join method just fixed) ──────────────
-
-  describe('getGalleryDownloads', () => {
-    it('returns members with joined policy fields and the version-resolved fields from the LATERAL join', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id, download_version_id } = await createPolicyDownload({
-        name: 'Curated policy',
-        description: 'A curated policy description'
-      });
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members).to.have.length(1);
-      const member = members[0];
-
-      // Joined policy display fields.
-      expect(member.name).to.equal('Curated policy');
-      expect(member.description).to.equal('A curated policy description');
-
-      // Version-resolved fields carried from the INNER JOIN LATERAL (download_version).
-      expect(member.download_id).to.equal(download_id);
-      expect(member.download_version_id).to.equal(download_version_id);
-      expect(member.download_status).to.equal(DownloadStatusEnum.PENDING);
-    });
-
-    it('returns a member with description: null when the policy description is NULL', async () => {
-      // download.policy_id is NOT NULL, so the reachable nullable-field case is a
-      // policy with a NULL description (LEFT JOIN policy yields description = null).
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload({ name: 'Null-desc policy', description: null });
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members).to.have.length(1);
-      expect(members[0].name).to.equal('Null-desc policy');
-      expect(members[0].description).to.be.null;
-    });
-
-    it('excludes a member whose gallery_download link has been ended', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-      await repo.removeDownloadFromGallery(gallery.gallery_id, download_id);
-
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members).to.eql([]);
-    });
-
-    it('excludes a member whose download is soft-deleted even though the link is still active', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-      const { download_id } = await createPolicyDownload();
-      await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
-
-      // gd link stays active; soft-delete the download itself — the both-side
-      // (gd + d) record_end_date IS NULL filter must drop it.
-      await connection.sql(SQL`UPDATE download SET record_end_date = now() WHERE download_id = ${download_id};`);
-
-      // Membership link is still active...
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
-      // ...but the soft-deleted download is filtered out.
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members.map((m) => m.download_id)).to.not.include(download_id);
-    });
-
-    it('orders by sort ASC NULLS LAST then create_date ASC (tiebreaker)', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-
-      // sort=1, sort=2, sort=null, plus a second sort=1 row at a strictly-later
-      // create_date so the create_date ASC tiebreaker (not just sort) is exercised.
-      const s1 = await createPolicyDownload({ name: 'sort-1-older' });
-      const s2 = await createPolicyDownload({ name: 'sort-2' });
-      const sNull = await createPolicyDownload({ name: 'sort-null' });
-      const s1b = await createPolicyDownload({ name: 'sort-1-newer' });
-
-      await repo.addDownloadToGallery(gallery.gallery_id, s1.download_id, 1);
-      await repo.addDownloadToGallery(gallery.gallery_id, s2.download_id, 2);
-      await repo.addDownloadToGallery(gallery.gallery_id, sNull.download_id, null);
-
-      // The second sort=1 row must be strictly NEWER so the create_date ASC tiebreaker
-      // is deterministic (both share sort=1; the older one must come first). create_date
-      // defaults to the transaction-frozen now(), so all inserts share an identical
-      // create_date and the audit trigger makes it immutable on UPDATE (it forces
-      // new.create_date = old.create_date). So set the later create_date at INSERT time
-      // via raw SQL — the trigger only stamps create_user on INSERT, not create_date.
-      await connection.sql(SQL`
-        INSERT INTO gallery_download (gallery_id, download_id, sort, create_date)
-        VALUES (${gallery.gallery_id}, ${s1b.download_id}, 1, now() + interval '1 second');
-      `);
-
-      const orderedIds = (await repo.getGalleryDownloads(gallery.gallery_id)).map((m) => m.download_id);
-      expect(orderedIds).to.eql([s1.download_id, s1b.download_id, s2.download_id, sNull.download_id]);
-    });
-
-    it('returns [] for an empty gallery', async () => {
-      const gallery = await repo.createGallery({ name: uniqueName(), description: null });
-
-      const members = await repo.getGalleryDownloads(gallery.gallery_id);
-      expect(members).to.eql([]);
     });
   });
 });

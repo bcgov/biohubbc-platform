@@ -9,7 +9,7 @@ import * as db from '../../../../database/db';
 import { ApiNotFoundError } from '../../../../errors/api-error';
 import { HTTP400, HTTPError } from '../../../../errors/http-error';
 import { DownloadListRecord } from '../../../../models/download';
-import { GalleryService } from '../../../../services/gallery/gallery-service';
+import { GalleryDownloadService } from '../../../../services/gallery/gallery-download-service';
 
 chai.use(sinonChai);
 
@@ -27,7 +27,9 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const members: DownloadListRecord[] = [
         { ...createMockDownloadRecord(), exports: [createMockDownloadVersionExportListRow({ part_count: 2 })] }
       ];
-      const getGalleryDownloadsStub = sinon.stub(GalleryService.prototype, 'getGalleryDownloads').resolves(members);
+      const getGalleryDownloadsStub = sinon
+        .stub(GalleryDownloadService.prototype, 'getGalleryDownloads')
+        .resolves(members);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { galleryId: '42' };
@@ -38,7 +40,8 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       // Public endpoint: shared API-user connection, never the authenticated getter.
       expect(apiUserStub).to.have.been.calledOnce;
       expect(dbConnStub).to.not.have.been.called;
-      expect(getGalleryDownloadsStub).to.have.been.calledOnceWith(42);
+      // Public endpoint: scoped to public galleries via publicOnly=true.
+      expect(getGalleryDownloadsStub).to.have.been.calledOnceWith(42, true);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(members);
       expect(mockRes.jsonValue[0].exports).to.have.length(1);
@@ -49,7 +52,7 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(GalleryService.prototype, 'getGalleryDownloads').resolves([]);
+      sinon.stub(GalleryDownloadService.prototype, 'getGalleryDownloads').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { galleryId: '42' };
@@ -65,7 +68,9 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(GalleryService.prototype, 'getGalleryDownloads').rejects(new ApiNotFoundError('Gallery not found'));
+      sinon
+        .stub(GalleryDownloadService.prototype, 'getGalleryDownloads')
+        .rejects(new ApiNotFoundError('Gallery not found'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { galleryId: '999' };
@@ -146,7 +151,7 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const addStub = sinon.stub(GalleryService.prototype, 'addDownloadToGallery').resolves();
+      const addStub = sinon.stub(GalleryDownloadService.prototype, 'addDownloadToGallery').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -165,7 +170,7 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const addStub = sinon.stub(GalleryService.prototype, 'addDownloadToGallery').resolves();
+      const addStub = sinon.stub(GalleryDownloadService.prototype, 'addDownloadToGallery').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -179,13 +184,17 @@ describe('paths/gallery/{galleryId}/download/index', () => {
       expect(mockRes.statusValue).to.equal(201);
     });
 
-    it('rolls back, releases, and propagates 400 when the service throws (non-existent download)', async () => {
+    it('rolls back, releases, and propagates 404 when the service throws (non-existent download)', async () => {
       const rollbackStub = sinon.stub();
       const releaseStub = sinon.stub();
       const dbConnectionObj = getMockDBConnection({ rollback: rollbackStub, release: releaseStub });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(GalleryService.prototype, 'addDownloadToGallery').rejects(new HTTP400('Download not found'));
+      // The service now defers to getDownloadById, which throws ApiNotFoundError (404)
+      // for a missing download rather than a hand-rolled 400.
+      sinon
+        .stub(GalleryDownloadService.prototype, 'addDownloadToGallery')
+        .rejects(new ApiNotFoundError('Download not found'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
@@ -198,8 +207,7 @@ describe('paths/gallery/{galleryId}/download/index', () => {
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
       } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect(error).to.be.instanceOf(HTTP400);
+        expect(error).to.be.instanceOf(ApiNotFoundError);
         expect(rollbackStub).to.have.been.calledOnce;
         expect(releaseStub).to.have.been.calledOnce;
       }

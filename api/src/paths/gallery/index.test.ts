@@ -79,19 +79,24 @@ describe('paths/gallery/index', () => {
       const dbConnectionObj = getMockDBConnection({ commit: commitStub });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const created = createMockGalleryRecord({ gallery_id: 7, name: 'My gallery', description: null });
+      const created = createMockGalleryRecord({
+        gallery_id: 7,
+        name: 'My gallery',
+        slug: 'my-gallery',
+        description: null
+      });
       const createGalleryStub = sinon.stub(GalleryService.prototype, 'createGallery').resolves(created);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { name: 'My gallery' };
+      mockReq.body = { name: 'My gallery', slug: 'my-gallery' };
 
       const requestHandler = createGallery();
       await requestHandler(mockReq, mockRes, mockNext);
 
-      // Description omitted in the body — the parsed body is passed straight through; the
-      // service coalesces description to null.
-      expect(createGalleryStub).to.have.been.calledOnceWith({ name: 'My gallery' });
+      // Description/visibility omitted in the body — the parsed body is passed straight through;
+      // the service coalesces them to their defaults.
+      expect(createGalleryStub).to.have.been.calledOnceWith({ name: 'My gallery', slug: 'my-gallery' });
       expect(commitStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.eql(created);
@@ -105,11 +110,11 @@ describe('paths/gallery/index', () => {
 
       sinon
         .stub(GalleryService.prototype, 'createGallery')
-        .rejects(new HTTP409('A gallery with this name already exists'));
+        .rejects(new HTTP409('A gallery with this slug already exists'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
-      mockReq.body = { name: 'Duplicate' };
+      mockReq.body = { name: 'Duplicate', slug: 'duplicate' };
 
       const requestHandler = createGallery();
 

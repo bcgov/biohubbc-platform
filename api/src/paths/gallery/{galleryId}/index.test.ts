@@ -35,7 +35,8 @@ describe('paths/gallery/{galleryId}/index', () => {
       // Public endpoint: shared API-user connection, never the authenticated getter.
       expect(apiUserStub).to.have.been.calledOnce;
       expect(dbConnStub).to.not.have.been.called;
-      expect(getGalleryByIdStub).to.have.been.calledOnceWith(42);
+      // Public endpoint: scoped to public galleries via publicOnly=true.
+      expect(getGalleryByIdStub).to.have.been.calledOnceWith(42, true);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(gallery);
     });
@@ -65,18 +66,27 @@ describe('paths/gallery/{galleryId}/index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const updated = createMockGalleryRecord({ gallery_id: 5, name: 'Renamed', description: 'New desc' });
+      const updated = createMockGalleryRecord({
+        gallery_id: 5,
+        name: 'Renamed',
+        slug: 'renamed',
+        description: 'New desc'
+      });
       const updateGalleryStub = sinon.stub(GalleryService.prototype, 'updateGallery').resolves(updated);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
       mockReq.params = { galleryId: '5' };
-      mockReq.body = { name: 'Renamed', description: 'New desc' };
+      mockReq.body = { name: 'Renamed', slug: 'renamed', description: 'New desc' };
 
       const requestHandler = updateGallery();
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(updateGalleryStub).to.have.been.calledOnceWith(5, { name: 'Renamed', description: 'New desc' });
+      expect(updateGalleryStub).to.have.been.calledOnceWith(5, {
+        name: 'Renamed',
+        slug: 'renamed',
+        description: 'New desc'
+      });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(updated);
     });
@@ -110,7 +120,7 @@ describe('paths/gallery/{galleryId}/index', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
       mockReq.params = { galleryId: '999' };
-      mockReq.body = { name: 'Renamed' };
+      mockReq.body = { name: 'Renamed', slug: 'renamed' };
 
       const requestHandler = updateGallery();
 
@@ -133,7 +143,7 @@ describe('paths/gallery/{galleryId}/index', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
       mockReq.params = { galleryId: '999' };
-      mockReq.body = { name: 'Renamed' };
+      mockReq.body = { name: 'Renamed', slug: 'renamed' };
 
       const requestHandler = updateGallery();
 
