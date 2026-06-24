@@ -5,9 +5,9 @@ import { useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { ApiPaginationResponseParams } from 'types/pagination';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -128,7 +128,7 @@ export const useSearchResultDownload = ({
 
   /**
    * Closes the create-download dialog without submitting.
-   * Does not reset expression, sidebar tab, or pagination state.
+   * Does not reset expression or pagination state.
    */
   const handleCancelCreateDownload = useCallback(() => {
     setIsCreateDownloadDialogOpen(false);

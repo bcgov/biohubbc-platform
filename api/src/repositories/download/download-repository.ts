@@ -378,8 +378,6 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Stream base feature rows for a filter-based download, filtered by feature type.
    *
-   * Same cursor pattern as streamFeatureBaseByCartIdAndType but uses raw SQL
-   * search subquery with bindings instead of a legacy join.
    *
    * Must be called within an open transaction (cursors require tx context).
    *
