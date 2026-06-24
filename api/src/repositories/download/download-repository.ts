@@ -378,7 +378,6 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Stream base feature rows for a filter-based download, filtered by feature type.
    *
-   *
    * Must be called within an open transaction (cursors require tx context).
    *
    * @param {string} downloadId - The download ID (used for cursor naming).
