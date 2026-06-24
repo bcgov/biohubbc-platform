@@ -11,11 +11,16 @@ interface MockDataGridProps {
   rows: SearchFeatureResultWithRelevancy[];
   columns: GridColDef[];
   onRowClick?: (params: { row: SearchFeatureResultWithRelevancy }) => void;
+  paginationModel?: { page: number; pageSize: number };
+  pageSizeOptions?: number[];
 }
 
 vi.mock('components/data-grid/CustomDataGrid', () => ({
-  default: ({ rows, columns, onRowClick }: MockDataGridProps) => (
-    <div data-testid="mock-data-grid">
+  default: ({ rows, columns, onRowClick, paginationModel, pageSizeOptions }: MockDataGridProps) => (
+    <div
+      data-testid="mock-data-grid"
+      data-has-pagination-model={String(Boolean(paginationModel))}
+      data-page-size-options={pageSizeOptions?.join(',')}>
       <div data-testid="columns">{columns.map((column) => column.headerName).join('|')}</div>
       {rows.map((row) => (
         <div key={row.uuid} data-testid={`row-${row.submission_feature_id}`} onClick={() => onRowClick?.({ row })}>
@@ -157,5 +162,16 @@ describe('SearchResultTableLayout', () => {
     expect(getByTestId('cell-property:count')).toHaveTextContent('12');
     expect(getByTestId('cell-property:tags')).toHaveTextContent('coastal, survey');
     expect(getByTestId('cell-property:scientific_name').querySelector('.MuiTypography-root')).toBeInTheDocument();
+  });
+
+  it('does not configure internal data grid pagination', () => {
+    const results = Array.from({ length: 25 }, (_value, index) =>
+      createMockSearchFeature(index + 1, `Dataset ${index + 1}`, false)
+    );
+
+    const { getByTestId } = render(<SearchResultTableLayout results={results} featureTypeProperties={[]} />);
+
+    expect(getByTestId('mock-data-grid')).toHaveAttribute('data-has-pagination-model', 'false');
+    expect(getByTestId('mock-data-grid')).not.toHaveAttribute('data-page-size-options');
   });
 });

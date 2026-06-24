@@ -52,7 +52,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   };
 
   return (
-    <Box display="flex" flexDirection="column" height="100%" overflow="hidden">
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Box flex="0 0 auto">
         <Box display="flex" alignItems="center" justifyContent="space-between" p={3}>
           <Typography variant="h3" component="h1">
@@ -76,9 +76,10 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
       </Box>
 
       <Box
-        flex="1 1 auto"
-        mt="-1px"
         sx={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          mt: '-1px',
           overflowY: 'auto'
         }}>
         <List>

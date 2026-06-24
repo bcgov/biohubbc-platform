@@ -78,6 +78,7 @@ const mockCreateDataRequest = vi.fn();
 const mockGetAvailableUsers = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
+const mockSetResultSearchParams = vi.fn();
 
 const codesPayload = {
   feature_type_with_properties: [
@@ -133,7 +134,7 @@ describe('SearchResultPage', () => {
       properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
-      setSearchParams: vi.fn(),
+      setSearchParams: mockSetResultSearchParams,
       pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
@@ -143,6 +144,15 @@ describe('SearchResultPage', () => {
 
     expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
     expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
+  });
+
+  it('updates the result limit when the rows-per-page control changes', () => {
+    const { getByRole } = renderPage();
+
+    fireEvent.mouseDown(getByRole('combobox', { name: /rows per page/i }));
+    fireEvent.click(getByRole('option', { name: /25/i }));
+
+    expect(mockSetResultSearchParams).toHaveBeenCalledWith({ limit: '25' });
   });
 
   it('opens an OkDialog when Create Download is clicked with zero results', () => {

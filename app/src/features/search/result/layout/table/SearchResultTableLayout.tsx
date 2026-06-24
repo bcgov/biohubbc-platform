@@ -87,15 +87,11 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
       onRowClick={(params) => {
         onClick?.(params.row as SearchFeatureResultWithRelevancy);
       }}
-      pageSizeOptions={[5, 10, 20]}
       disableRowSelectionOnClick
       disableColumnSelector
       disableColumnMenu
       hideFooter
       sortingOrder={['asc', 'desc']}
-      initialState={{
-        pagination: { paginationModel: { pageSize: 10 } }
-      }}
       sx={{
         minWidth: '100%',
         '& .MuiDataGrid-root': {

@@ -176,6 +176,56 @@ describe('useSearchResults', () => {
     );
   });
 
+  it('uses updated limit in the next request after page size changes', async () => {
+    vi.useFakeTimers();
+
+    let currentSearchParams = new URLSearchParams('page=2&limit=10');
+    const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
+      currentSearchParams = nextSearchParams;
+    });
+
+    (useSearchQueryParams as Mock).mockImplementation(() => ({
+      searchParams: currentSearchParams,
+      setSearchParams
+    }));
+
+    const { result, rerender } = renderHook(() => useSearchResults('species_observation', true, null));
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    mockSearchFeatures.mockClear();
+
+    act(() => {
+      result.current.setSearchParams({ [URL_PARAMS.LIMIT]: '50', [URL_PARAMS.PAGE]: '1' });
+    });
+    rerender();
+
+    expect(setSearchParams).toHaveBeenCalledWith(new URLSearchParams('limit=50&page=1'));
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      {
+        page: 1,
+        limit: 50,
+        sort: undefined,
+        order: undefined
+      },
+      expectAbortOptions
+    );
+  });
+
   it('sets loading immediately while a debounced URL-param search is pending', async () => {
     vi.useFakeTimers();
 
