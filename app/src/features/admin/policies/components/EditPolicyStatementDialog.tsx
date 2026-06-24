@@ -4,19 +4,12 @@ import TextField from '@mui/material/TextField';
 import { EditDialog } from 'components/dialog/EditDialog';
 import CustomAutocomplete, { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
 import { useFormikContext } from 'formik';
-import { IPolicyExpression } from 'interfaces/usePoliciesApi.interface';
+import { ICreatePolicyStatementRequest, IPolicyExpression } from 'interfaces/usePoliciesApi.interface';
 import yup from 'utils/YupSchema';
 
-export interface IEditPolicyStatementFormValues {
-  effect: 'allow' | 'deny';
-  submission_feature_urn: string;
-  policy_expression_id: string;
-}
-
-export const EditPolicyStatementFormInitialValues: IEditPolicyStatementFormValues = {
+export const EditPolicyStatementFormInitialValues: ICreatePolicyStatementRequest = {
   effect: 'allow',
-  submission_feature_urn: 'urn:*:*:*',
-  policy_expression_id: ''
+  submission_feature_urn: 'urn:*:*:*'
 };
 
 export const EditPolicyStatementFormYupSchema = yup.object().shape({
@@ -35,12 +28,12 @@ interface IEditPolicyStatementDialogProps {
   open: boolean;
   isLoading: boolean;
   policyExpressions: IPolicyExpression[];
-  initialValues?: IEditPolicyStatementFormValues;
+  initialValues?: ICreatePolicyStatementRequest;
   mode?: 'create' | 'edit';
   dialogTitle?: string;
   dialogSaveButtonLabel?: string;
   onCancel: () => void;
-  onSave: (values: IEditPolicyStatementFormValues) => void;
+  onSave: (values: ICreatePolicyStatementRequest) => void;
 }
 
 /**
@@ -64,7 +57,7 @@ export const EditPolicyStatementDialog = (props: IEditPolicyStatementDialogProps
   const isEditMode = mode === 'edit';
 
   return (
-    <EditDialog<IEditPolicyStatementFormValues>
+    <EditDialog<ICreatePolicyStatementRequest>
       isLoading={isLoading}
       dialogTitle={dialogTitle ?? (isEditMode ? 'Edit Statement' : 'Create Statement')}
       dialogSaveButtonLabel={dialogSaveButtonLabel ?? (isEditMode ? 'Save' : 'Create')}
@@ -88,7 +81,7 @@ export const EditPolicyStatementDialog = (props: IEditPolicyStatementDialogProps
  */
 const EditPolicyStatementForm = ({ policyExpressions }: { policyExpressions: IPolicyExpression[] }) => {
   const { values, handleChange, handleSubmit, errors, touched, submitCount, setFieldTouched, setFieldValue } =
-    useFormikContext<IEditPolicyStatementFormValues>();
+    useFormikContext<ICreatePolicyStatementRequest>();
 
   const policyExpressionOptions: ICustomAutocompleteOption<string>[] = policyExpressions.map((policyExpression) => ({
     label: policyExpression.name ?? policyExpression.policy_expression_id,
@@ -134,7 +127,7 @@ const EditPolicyStatementForm = ({ policyExpressions }: { policyExpressions: IPo
           value={selectedPolicyExpressionOption ?? null}
           getOptionLabel={(option) => option.label}
           isOptionEqualToValue={(option, selectedOption) => option.value === selectedOption.value}
-          onChange={(_event, selectedOption) => setFieldValue('policy_expression_id', selectedOption?.value ?? '')}
+          onChange={(_event, selectedOption) => setFieldValue('policy_expression_id', selectedOption?.value)}
           onBlur={() => setFieldTouched('policy_expression_id', true)}
           renderInput={(params) => (
             <TextField

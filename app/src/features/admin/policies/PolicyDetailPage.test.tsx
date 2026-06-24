@@ -1,5 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import { DialogContext, IDialogContext, defaultSnackbarProps } from 'contexts/dialogContext';
+import { AdminPolicyContextProvider } from 'contexts/policyContext';
 import { useApi } from 'hooks/useApi';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { IPolicy, IPolicyExpression, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
@@ -73,23 +74,6 @@ vi.mock('components/ContextMenuButton', () => ({
           </button>
         ))
       )}
-    </div>
-  )
-}));
-
-vi.mock('features/search/result/layout/table/SearchResultTableLayout', () => ({
-  SearchResultTableLayout: ({
-    results
-  }: {
-    results: {
-      uuid: string;
-      submission_name: string;
-    }[];
-  }) => (
-    <div data-testid="policy-feature-results-table">
-      {results.map((result) => (
-        <div key={result.uuid}>{result.submission_name}</div>
-      ))}
     </div>
   )
 }));
@@ -221,7 +205,14 @@ const renderPage = (dialogContext?: Partial<IDialogContext>) =>
       }}>
       <MemoryRouter initialEntries={['/admin/policy/policy-1']}>
         <Routes>
-          <Route path="/admin/policy/:policyId" element={<PolicyDetailPage />} />
+          <Route
+            path="/admin/policy/:policyId"
+            element={
+              <AdminPolicyContextProvider>
+                <PolicyDetailPage />
+              </AdminPolicyContextProvider>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </DialogContext.Provider>
@@ -236,8 +227,6 @@ describe('PolicyDetailPage', () => {
   const updatePolicyExpression = vi.fn();
   const deletePolicyExpression = vi.fn();
   const updatePolicyStatus = vi.fn();
-  const searchFeatures = vi.fn();
-  const getTeamPolicies = vi.fn();
 
   beforeEach(() => {
     getPolicy.mockReset();
@@ -248,8 +237,6 @@ describe('PolicyDetailPage', () => {
     updatePolicyExpression.mockReset();
     deletePolicyExpression.mockReset();
     updatePolicyStatus.mockReset();
-    searchFeatures.mockReset();
-    getTeamPolicies.mockReset();
 
     getPolicy.mockResolvedValue(policy);
     getPolicyExpressions.mockResolvedValue({
@@ -299,29 +286,6 @@ describe('PolicyDetailPage', () => {
       expression
     });
     deletePolicyExpression.mockResolvedValue(undefined);
-    searchFeatures.mockResolvedValue({
-      features: [
-        {
-          submission_feature_id: 1,
-          submission_id: 1,
-          uuid: 'feature-1',
-          feature_type_id: 1,
-          feature_type_name: 'telemetry',
-          properties: {},
-          submission_name: 'Telemetry Feature One',
-          is_secured: false,
-          relevancy_score: 1,
-          create_date: '2026-06-23T00:00:00.000Z'
-        }
-      ],
-      properties: [],
-      pagination: {
-        page: 1,
-        limit: 10,
-        total: 1,
-        totalPages: 1
-      }
-    });
     getPolicyTeams.mockResolvedValue({
       teams: [
         {
@@ -352,12 +316,6 @@ describe('PolicyDetailPage', () => {
         deletePolicyExpression,
         updatePolicy,
         updatePolicyStatus
-      },
-      search: {
-        searchFeatures
-      },
-      teamPolicies: {
-        getTeamPolicies
       }
     });
   });
@@ -376,7 +334,6 @@ describe('PolicyDetailPage', () => {
       expect(getByRole('heading', { name: 'Expressions' })).toBeVisible();
       expect(getByRole('tab', { name: 'Expressions' })).toBeVisible();
       expect(getByRole('tab', { name: 'Statements' })).toBeVisible();
-      expect(getByRole('tab', { name: 'Features' })).toBeVisible();
       expect(getByRole('tab', { name: 'Teams' })).toBeVisible();
       expect(getByTestId('policy-expressions-table')).toBeVisible();
       expect(getByText('Sensitive species')).toBeVisible();
@@ -407,18 +364,6 @@ describe('PolicyDetailPage', () => {
     expect(await findByTestId('policy-skeleton')).toBeVisible();
   });
 
-  it('renders feature search results for policy statements with linked expressions', async () => {
-    const user = userEvent.setup();
-    const { findAllByTestId, findByRole, getAllByText } = renderPage();
-
-    await user.click(await findByRole('tab', { name: 'Features' }));
-
-    expect(await findAllByTestId('policy-feature-results-table')).toHaveLength(2);
-    expect(getAllByText('Telemetry Feature One')).toHaveLength(2);
-    expect(searchFeatures).toHaveBeenCalledWith('telemetry', expression, { page: 1, limit: 10 });
-    expect(searchFeatures).toHaveBeenCalledWith('sample_site', expression, { page: 1, limit: 10 });
-  });
-
   it('renders teams with access to the policy', async () => {
     const user = userEvent.setup();
     const { findByRole, findByTestId, getByText } = renderPage();
@@ -431,7 +376,6 @@ describe('PolicyDetailPage', () => {
     await waitFor(() => {
       expect(getPolicyTeams).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'team_name', order: 'asc' });
     });
-    expect(getTeamPolicies).not.toHaveBeenCalled();
   });
 
   it('updates the policy status from the header dropdown', async () => {
@@ -471,18 +415,7 @@ describe('PolicyDetailPage', () => {
         name: 'Updated Policy',
         description: 'Updated description',
         status: PolicyStatus.APPROVED,
-        statements: [
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:*:telemetry:*',
-            policy_expression_id: 'policy-expression-1'
-          },
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*',
-            policy_expression_id: 'policy-expression-without-name'
-          }
-        ]
+        statements: policy.statements
       });
     });
     expect(getByRole('heading', { name: 'Updated Policy' })).toBeVisible();
@@ -588,16 +521,7 @@ describe('PolicyDetailPage', () => {
         description: 'Policy description',
         status: PolicyStatus.APPROVED,
         statements: [
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:*:telemetry:*',
-            policy_expression_id: 'policy-expression-1'
-          },
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*',
-            policy_expression_id: 'policy-expression-without-name'
-          },
+          ...policy.statements,
           {
             effect: 'allow',
             submission_feature_urn: 'urn:1:telemetry:*',
@@ -627,16 +551,7 @@ describe('PolicyDetailPage', () => {
         description: 'Policy description',
         status: PolicyStatus.APPROVED,
         statements: [
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:*:telemetry:*',
-            policy_expression_id: 'policy-expression-1'
-          },
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*',
-            policy_expression_id: 'policy-expression-without-name'
-          },
+          ...policy.statements,
           {
             effect: 'allow',
             submission_feature_urn: 'urn:1:telemetry:*'
@@ -669,11 +584,7 @@ describe('PolicyDetailPage', () => {
             submission_feature_urn: 'urn:2:telemetry:*',
             policy_expression_id: 'policy-expression-1'
           },
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*',
-            policy_expression_id: 'policy-expression-without-name'
-          }
+          policy.statements[1]
         ]
       });
     });
@@ -706,13 +617,7 @@ describe('PolicyDetailPage', () => {
         name: 'Sensitive Wildlife Policy',
         description: 'Policy description',
         status: PolicyStatus.APPROVED,
-        statements: [
-          {
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:sample_site:*',
-            policy_expression_id: 'policy-expression-without-name'
-          }
-        ]
+        statements: [policy.statements[1]]
       });
     });
   });

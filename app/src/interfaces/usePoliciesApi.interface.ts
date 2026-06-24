@@ -24,7 +24,7 @@ export interface IPolicy extends IPolicySummary {
   expressions: IPolicyExpression[];
 }
 
-export interface IPolicyStatement {
+export interface IPolicyStatement extends ICreatePolicyStatementRequest {
   policy_statement_id: string;
   policy_id: string;
   effect: 'allow' | 'deny';
