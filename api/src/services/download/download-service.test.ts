@@ -16,6 +16,7 @@ import { DownloadVersionExportRepository } from '../../repositories/download/dow
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
+import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPolicyService } from './download-policy-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
@@ -641,6 +642,102 @@ describe('DownloadService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
       }
+    });
+  });
+
+  describe('listDownloadParquetUrls', () => {
+    const DOWNLOAD_ID = 'dl-1';
+    const VERSION_ID = 'ver-1';
+
+    it('returns feature_type, url, and expires_at per Parquet artifact', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const artifacts = [
+        {
+          artifact_id: 'art-1',
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet`
+        },
+        {
+          artifact_id: 'art-2',
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Observation/data.parquet`
+        }
+      ];
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .resolves(artifacts);
+      const signedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .callsFake(async (_bucket, key) => `https://s3.example.com/${key}?sig=x`);
+
+      const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
+
+      expect(signedUrlStub).to.have.been.calledTwice;
+      expect(result).to.have.length(2);
+      expect(result[0].feature_type).to.equal('Animal');
+      expect(result[0].url).to.equal(
+        `https://s3.example.com/downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet?sig=x`
+      );
+      expect(result[0].expires_at).to.be.a('string');
+      expect(result[1].feature_type).to.equal('Observation');
+    });
+
+    it('passes 1800 seconds as the expiry to getSignedUrl', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+        {
+          artifact_id: 'art-1',
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet`
+        }
+      ]);
+
+      const signedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .resolves('https://s3.example.com/signed');
+
+      await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
+
+      expect(signedUrlStub.firstCall.args[2]).to.equal(1800);
+    });
+
+    it('filters out artifacts whose key does not match the Parquet shape', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const artifacts = [
+        {
+          artifact_id: 'art-1',
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet`
+        },
+        {
+          artifact_id: 'art-zip',
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/exports/exp-1/biohub-exp-1-part-1.zip`
+        }
+      ];
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .resolves(artifacts);
+      sinon.stub(ObjectStorageService.prototype, 'getSignedUrl').resolves('https://s3.example.com/signed');
+
+      const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
+
+      expect(result).to.have.length(1);
+      expect(result[0].feature_type).to.equal('Animal');
+    });
+
+    it('returns an empty array when the download has no artifacts', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([]);
+
+      const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
+
+      expect(result).to.deep.equal([]);
     });
   });
 });

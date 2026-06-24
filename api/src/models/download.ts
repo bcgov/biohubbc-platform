@@ -147,6 +147,21 @@ export const DownloadArtifactInfo = z.object({
 export type DownloadArtifactInfo = z.infer<typeof DownloadArtifactInfo>;
 
 /**
+ * A single entry in the presigned-URL endpoint's `parts[]` response.
+ *
+ * - `feature_type` — feature type name for the Parquet file, parsed from the S3
+ *   object key shape `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+ * - `url` — presigned S3 URL minted at request time; clients must not cache it.
+ * - `expires_at` — ISO timestamp when the URL expires (30 minutes from request time).
+ */
+export const DownloadParquetPart = z.object({
+  feature_type: z.string(),
+  url: z.string(),
+  expires_at: z.string()
+});
+export type DownloadParquetPart = z.infer<typeof DownloadParquetPart>;
+
+/**
  * Row shape for the Parquet download pipeline.
  *
  * Mirrors DownloadFeatureData but uses `parent_uuid` instead of full parent denormalization.
