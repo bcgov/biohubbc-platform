@@ -141,6 +141,8 @@ GET.apiDoc = {
  * download_id (UUID), not through this listing endpoint. Without a user identity there
  * is no way to scope "my downloads", so allowing unauthenticated access would return
  * every anonymous download in the system.
+ *
+ * @returns {RequestHandler}
  */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {

@@ -3,6 +3,12 @@ import { getNumberEnv } from '../utils/env-utils';
 export const SIGNED_URL_EXPIRY_DOWNLOAD = 432000; // 5 days
 
 /**
+ * Presigned URL expiry for the API-key presigned-URL endpoint (30 minutes).
+ * Short-lived by design — scripts should re-request a fresh URL per download attempt.
+ */
+export const SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD = 60 * 30; // 30 minutes
+
+/**
  * Default `download_export.max_part_size_bytes` (500 MB). Applied by the service
  * when a client omits `max_part_size_bytes` on export creation.
  */
