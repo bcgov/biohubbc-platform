@@ -7,7 +7,7 @@ import { useCallback, useRef } from 'react';
  * - First call executes immediately.
  * - Any overlapping call returns `undefined` and does not execute.
  *
- * Use this for write paths that must not overlap (for example, cart mutations).
+ * Use this for write paths that must not overlap.
  */
 export const useSerializedAsync = () => {
   const inProgressRef = useRef(false);

@@ -3,11 +3,8 @@ import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
-import { APIError } from 'hooks/api/useAxios';
-import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
-import { useCallback, useMemo } from 'react';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
 
@@ -25,10 +22,9 @@ interface SearchResultOptionsProps {
 }
 
 /**
- * Chooses the active result layout and wires per-row cart actions.
+ * Chooses the active result layout.
  *
- * Selects the active result layout and keeps cart membership/error handling near
- * the rendered row controls. The parent owns search state and pagination.
+ * Selects the active result layout. The parent owns search state and pagination.
  *
  * @param {SearchResultOptionsProps} props - Rows, loading state, selected view, and result-click callback.
  * @returns {JSX.Element} Loading, empty, table, or card result content.
@@ -40,48 +36,7 @@ export const SearchResultOptions = ({
   view,
   onClick
 }: SearchResultOptionsProps) => {
-  const { features, addToCart, removeFromCart } = useCartContext();
-  const dialogContext = useDialogContext();
-
   const hasResults = rows.length > 0;
-
-  const cartFeatureIds = useMemo(() => {
-    return new Set(features.map((f) => f.submission_feature_id));
-  }, [features]);
-
-  /**
-   * Adds one rendered search result to the cart.
-   * Add failures are reported through the global snackbar.
-   *
-   * @param {SearchFeatureResultWithRelevancy} result - Result row selected for cart addition.
-   */
-  const handleAddToCart = useCallback(
-    async (result: SearchFeatureResultWithRelevancy) => {
-      try {
-        await addToCart([result]);
-      } catch (error) {
-        dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-      }
-    },
-    [addToCart, dialogContext]
-  );
-
-  /**
-   * Removes one rendered search result from the cart.
-   * Remove failures are reported through the global snackbar.
-   *
-   * @param {number} featureId - Submission feature id to remove from the cart.
-   */
-  const handleRemoveFromCart = useCallback(
-    async (featureId: number) => {
-      try {
-        await removeFromCart([featureId]);
-      } catch (error) {
-        dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-      }
-    },
-    [removeFromCart, dialogContext]
-  );
 
   return (
     <LoadingGuard
@@ -101,15 +56,7 @@ export const SearchResultOptions = ({
           [SEARCH_RESULT_VIEW.TABLE]: (
             <SearchResultTableLayout results={rows} featureTypeProperties={featureTypeProperties} onClick={onClick} />
           ),
-          [SEARCH_RESULT_VIEW.LIST]: (
-            <SearchResultCardLayout
-              results={rows}
-              cartFeatureIds={cartFeatureIds}
-              onClick={onClick}
-              onAddToCart={handleAddToCart}
-              onRemoveFromCart={handleRemoveFromCart}
-            />
-          )
+          [SEARCH_RESULT_VIEW.LIST]: <SearchResultCardLayout results={rows} onClick={onClick} />
         }}
       />
     </LoadingGuard>

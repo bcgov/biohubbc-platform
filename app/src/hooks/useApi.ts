@@ -3,7 +3,6 @@ import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
-import { useCartApi } from './api/useCartApi';
 import { useDownloadApi } from './api/useDownloadApi';
 import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
@@ -55,8 +54,6 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
-  const cart = useCartApi(apiAxios);
-
   const download = useDownloadApi(apiAxios);
 
   const downloadExport = useDownloadExportApi(apiAxios);
@@ -84,7 +81,6 @@ export const useApi = () => {
     policies,
     search,
     teams,
-    cart,
     download,
     downloadExport,
     teamPolicies,

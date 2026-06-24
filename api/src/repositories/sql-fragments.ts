@@ -10,7 +10,7 @@ import { Knex } from 'knex';
 
 /**
  * Closure-based "effectively secured" check used on every security-resolving path —
- * the hot read paths (search / cart / download) and the scope-anchor recompute write
+ * the hot read paths (search / download) and the scope-anchor recompute write
  * path: a feature is effectively secured when it or an ancestor has an active security
  * rule that is past its effective date.
  *
@@ -19,7 +19,7 @@ import { Knex } from 'knex';
  * pure parent-ancestry reach including the feature's own self-loop `(F, F)` — joined
  * to the security tables. The ancestry lookup is served by the closure primary key on
  * `source_submission_feature_id`; the security joins are index-served on
- * `target_submission_feature_id`. This matters because it runs on every search, cart,
+ * `target_submission_feature_id`. This matters because it runs on every search
  * and download request.
  *
  * Fails closed on missing closure rows. The closure is built by an async recompute job

@@ -1,5 +1,4 @@
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
@@ -12,7 +11,6 @@ import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links'
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
-import { useSearchResultCartActions } from './hooks/useSearchResultCartActions';
 import { useSearchResultDataRequest } from './hooks/useSearchResultDataRequest';
 import { useSearchResultDownload } from './hooks/useSearchResultDownload';
 import { useSearchResultExpression } from './hooks/useSearchResultExpression';
@@ -57,19 +55,16 @@ export const SearchResultPage = () => {
     expressionTree,
     expressionApplyRevision
   );
-  const { cart, handleAddAllToCart } = useSearchResultCartActions(rows);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
     useSearchResultPagingSort({ pagination, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
-    setDownloadView,
     isCreateDownloadDialogOpen,
     isSubmittingDownload,
     handleOpenCreateDownload,
     handleCreateDownload,
-    handleCancelCreateDownload,
-    handleCheckout
+    handleCancelCreateDownload
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
   const {
     isCreateDataRequestDialogOpen,
@@ -85,16 +80,7 @@ export const SearchResultPage = () => {
   if (routeConfig) {
     return (
       <LoadingGuard>
-        <ResultPageContainer
-          rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
-          rightSidebar={
-            <DownloadSidebar
-              cart={cart}
-              activeView={downloadView}
-              onViewChange={setDownloadView}
-              onDownload={handleCheckout}
-            />
-          }>
+        <ResultPageContainer rightSidebarTitle={downloadView} rightSidebar={<DownloadSidebar />}>
           <SearchResultPageHeader
             activeFeatureType={routeConfig.featureTypeName}
             featureTypeLinks={featureTypeLinks}
@@ -116,7 +102,6 @@ export const SearchResultPage = () => {
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
             isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
-            onAddAllToCart={handleAddAllToCart}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}
