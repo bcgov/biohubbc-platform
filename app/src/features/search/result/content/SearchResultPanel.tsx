@@ -115,7 +115,7 @@ export const SearchResultPanel = ({
 
         <Divider />
 
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           <SearchResultOptions
             rows={rows}
             featureTypeProperties={featureTypeProperties}
