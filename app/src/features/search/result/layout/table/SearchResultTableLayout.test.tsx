@@ -3,7 +3,7 @@ import { cleanup, fireEvent, within } from '@testing-library/react';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import type { ReactNode } from 'react';
-import { createMockSearchFeature } from 'test-helpers/cart-helpers';
+import { createMockSearchFeature } from 'test-helpers/search-result-helpers';
 import { render } from 'test-helpers/test-utils';
 import { SearchResultTableLayout } from './SearchResultTableLayout';
 

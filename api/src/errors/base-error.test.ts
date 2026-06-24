@@ -19,7 +19,7 @@ describe('BaseError', () => {
   });
 
   it('preserves prototype chain for ApiError subclasses', () => {
-    const err = new ApiNotFoundError('Cart not found');
+    const err = new ApiNotFoundError('Resource not found');
 
     expect(err).to.be.instanceOf(Error);
     expect(err).to.be.instanceOf(ApiError);

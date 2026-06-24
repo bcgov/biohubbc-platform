@@ -1,11 +1,10 @@
-import { CartContextProvider } from 'contexts/cartContext';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import { PublicDownloadPage } from 'features/download/PublicDownloadPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
-import { Navigate, Outlet, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import { PortalRouter } from './portal/PortalRouter';
@@ -15,45 +14,37 @@ import { SubmissionRouter } from './submission/SubmissionRouter';
 export const AppRouter = () => {
   return (
     <Routes>
-      {/* Search and Submission routes share CartContextProvider */}
       <Route
+        path="/"
         element={
-          <CartContextProvider>
-            <Outlet />
-          </CartContextProvider>
-        }>
-        <Route
-          path="/"
-          element={
-            <BaseLayout>
-              <PageTitle title="Search Data" description="Search and download data" />
-              <SearchPage />
-            </BaseLayout>
-          }
-        />
+          <BaseLayout>
+            <PageTitle title="Search Data" description="Search and download data" />
+            <SearchPage />
+          </BaseLayout>
+        }
+      />
 
-        {/* Search Routes */}
-        <Route
-          path="/search/*"
-          element={
-            <>
-              <PageTitle title="Search Data" description="Search and download data" />
-              <SearchRouter />
-            </>
-          }
-        />
+      {/* Search Routes */}
+      <Route
+        path="/search/*"
+        element={
+          <>
+            <PageTitle title="Search Data" description="Search and download data" />
+            <SearchRouter />
+          </>
+        }
+      />
 
-        {/* Submission Routes */}
-        <Route
-          path="/submission/*"
-          element={
-            <BaseLayout>
-              <PageTitle title="Submission Details" description="Details of a specific submission" />
-              <SubmissionRouter />
-            </BaseLayout>
-          }
-        />
-      </Route>
+      {/* Submission Routes */}
+      <Route
+        path="/submission/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="Submission Details" description="Details of a specific submission" />
+            <SubmissionRouter />
+          </BaseLayout>
+        }
+      />
 
       {/* Admin Routes */}
       <Route

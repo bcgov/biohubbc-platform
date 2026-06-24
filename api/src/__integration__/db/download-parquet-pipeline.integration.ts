@@ -404,7 +404,7 @@ describe('Download Parquet pipeline (integration)', function () {
    * Helper: stream base feature rows via the search-query path (filtered by
    * submission_id), then hydrate with typed property values.
    *
-   * The cart cursor is gone — every download flow now resolves features through
+   * The legacy cursor is gone — every download flow now resolves features through
    * an expression-evaluator subquery. For these tests we substitute a simple
    * "all features for this submission" subquery so each test's fixture set is
    * the unit under hydration; the typed-table joins are what we actually verify.

@@ -94,7 +94,7 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
 /**
  * Stubbable dependency surface. Production callers route through this bag so
  * tests can replace individual builders with sinon stubs (ESM exports cannot
- * be reassigned directly). Mirrors the `dependencies` pattern in `cart-service.ts`.
+ * be reassigned directly).
  */
 export const dependencies = {
   buildExpressionTreeFeatureIdsSubquery,

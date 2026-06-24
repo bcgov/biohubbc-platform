@@ -1,37 +1,24 @@
-import { mdiCheck, mdiLock, mdiPlus } from '@mdi/js';
+import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Card, CardActionArea, CardActions, CardHeader, Chip, IconButton, Stack, Typography } from '@mui/material';
+import { Card, CardActionArea, CardHeader, Chip, Stack, Typography } from '@mui/material';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 
 interface SearchResultCardProps {
   /** Result row represented by this card. */
   result: SearchFeatureResultWithRelevancy;
-  /** Whether the result is already in the cart. */
-  isInCart: boolean;
   /** Opens the selected result's feature detail page. */
   onClick: (result: SearchFeatureResultWithRelevancy) => void;
-  /** Adds this result to the cart. */
-  onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
-  /** Removes this result from the cart by submission feature id. */
-  onRemoveFromCart?: (featureId: number) => void;
 }
 
 /**
  * Displays a single search result in list/card mode.
  *
- * Displays one result summary with secured state, feature-type chip, and the
- * cart action matching current cart membership.
+ * Displays one result summary with secured state and feature-type chip.
  *
- * @param {SearchResultCardProps} props - Result row, cart state, and card action callbacks.
+ * @param {SearchResultCardProps} props - Result row and click callback.
  * @returns {JSX.Element} Search result card.
  */
-export const SearchResultCard = ({
-  result,
-  isInCart,
-  onClick,
-  onAddToCart,
-  onRemoveFromCart
-}: SearchResultCardProps) => {
+export const SearchResultCard = ({ result, onClick }: SearchResultCardProps) => {
   return (
     <Card elevation={0}>
       <CardActionArea onClick={() => onClick(result)}>
@@ -73,27 +60,6 @@ export const SearchResultCard = ({
           }}
         />
       </CardActionArea>
-      <CardActions sx={{ px: 2, py: 1.5, gap: 0.5, display: 'flex', justifyContent: 'flex-end' }}>
-        {isInCart ? (
-          <IconButton
-            size="small"
-            title="Remove from Cart"
-            onClick={() => {
-              onRemoveFromCart?.(result.submission_feature_id);
-            }}>
-            <Icon path={mdiCheck} size={1} />
-          </IconButton>
-        ) : (
-          <IconButton
-            size="small"
-            title="Add to Cart"
-            onClick={() => {
-              onAddToCart?.(result);
-            }}>
-            <Icon path={mdiPlus} size={1} />
-          </IconButton>
-        )}
-      </CardActions>
     </Card>
   );
 };
