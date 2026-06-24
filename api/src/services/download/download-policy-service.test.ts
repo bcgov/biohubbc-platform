@@ -64,11 +64,17 @@ describe('DownloadPolicyService', () => {
       createStatementStub.onCall(0).resolves(mockStatement1);
       createStatementStub.onCall(1).resolves(mockStatement2);
       const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
-        .resolves({ policy_expression_id: 'pe-1', policy_id: 'p1', expression_id: 'e1' });
+        .resolves({
+          policy_expression_id: 'pe-1',
+          policy_id: 'p1',
+          expression_id: 'e1',
+          name: null,
+          description: null
+        });
 
       const result = await downloadPolicyService.createDownloadPolicy({
         name: 'My download',
@@ -98,8 +104,8 @@ describe('DownloadPolicyService', () => {
 
       expect(replaceExpressionStub).to.have.been.calledTwice;
       expect(ensurePolicyExpressionStub).to.have.been.calledTwice;
-      expect(ensurePolicyExpressionStub.firstCall.args).to.eql(['p1', 'e1']);
-      expect(ensurePolicyExpressionStub.secondCall.args).to.eql(['p1', 'e1']);
+      expect(ensurePolicyExpressionStub.firstCall.args).to.eql([{ policyId: 'p1', expressionId: 'e1' }]);
+      expect(ensurePolicyExpressionStub.secondCall.args).to.eql([{ policyId: 'p1', expressionId: 'e1' }]);
       expect(replaceExpressionStub.firstCall.args).to.eql(['ps-1', 'pe-1']);
       expect(replaceExpressionStub.secondCall.args).to.eql(['ps-2', 'pe-1']);
 
@@ -131,7 +137,7 @@ describe('DownloadPolicyService', () => {
       createStatementStub.onCall(0).resolves(mockStatement1);
       createStatementStub.onCall(1).resolves(mockStatement2);
       const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
 
       await downloadPolicyService.createDownloadPolicy({
@@ -164,9 +170,11 @@ describe('DownloadPolicyService', () => {
       sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
         policy_expression_id: 'pe-1',
         policy_id: 'p1',
-        expression_id: 'e1'
+        expression_id: 'e1',
+        name: null,
+        description: null
       });
-      sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
+      sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
 
       // The boundary stubs: if the production service ever wires these in, these
       // assertions fail and the access-grant boundary is restored.
@@ -206,7 +214,7 @@ describe('DownloadPolicyService', () => {
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementService.prototype, 'createPolicyStatement').resolves(mockStatement);
-      sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
+      sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
 
       // null -> undefined
       await downloadPolicyService.createDownloadPolicy({

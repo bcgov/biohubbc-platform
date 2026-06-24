@@ -13,7 +13,7 @@ describe('PolicyStatementExpressionService', () => {
     sinon.restore();
   });
 
-  describe('replacePolicyStatementExpression', () => {
+  describe('setPolicyStatementExpression', () => {
     it('ends active links and inserts the replacement link when the expression changes', async () => {
       const service = new PolicyStatementExpressionService(getMockDBConnection());
 
@@ -49,7 +49,7 @@ describe('PolicyStatementExpressionService', () => {
           policy_expression_id: 'pe-new'
         } as any);
 
-      await service.replacePolicyStatementExpression('ps-1', 'pe-new');
+      await service.setPolicyStatementExpression('ps-1', 'pe-new');
 
       expect(endStub.calledOnceWithExactly('ps-1')).to.equal(true);
       expect(
@@ -80,7 +80,7 @@ describe('PolicyStatementExpressionService', () => {
       );
 
       try {
-        await service.replacePolicyStatementExpression('ps-1', 'pe-new');
+        await service.setPolicyStatementExpression('ps-1', 'pe-new');
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiValidationError);

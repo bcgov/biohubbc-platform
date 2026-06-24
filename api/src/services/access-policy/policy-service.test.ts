@@ -629,13 +629,20 @@ describe('PolicyService', () => {
 
     // A2: Statement with expression — expression persisted; scope materialization NOT called.
     it('persists statement expressions without materializing scopes', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Expression Policy', description: null, status: 'requested' };
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Expression Policy',
+        description: null,
+        status: 'requested'
+      };
+
       const mockStatement: PolicyStatement = {
         policy_statement_id: 's1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:*:sampling_site:*'
       };
+
       const expression = {
         type: 'expression' as const,
         operator: 'AND' as const,
@@ -652,17 +659,27 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
+
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
+
       const writeExpressionTreeStub = sinon
         .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
         .resolves({ expression_id: 'expr-1' });
+
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
-        .resolves({ policy_expression_id: 'pe-1', policy_id: '1', expression_id: 'expr-1' });
-      const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .resolves({
+          policy_expression_id: 'pe-1',
+          policy_id: '1',
+          expression_id: 'expr-1',
+          name: null,
+          description: null
+        });
+
+      const setExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
 
       const result = await policyService.createPolicyWithStatements(
@@ -676,11 +693,18 @@ describe('PolicyService', () => {
         ]
       );
 
-      expect(writeExpressionTreeStub).to.have.been.calledOnceWith(expression);
-      expect(ensurePolicyExpressionStub).to.have.been.calledOnceWith('1', 'expr-1');
-      expect(replaceExpressionStub).to.have.been.calledOnceWith('s1', 'pe-1');
+      expect(writeExpressionTreeStub).to.have.been.calledOnceWithExactly(expression);
+
+      expect(ensurePolicyExpressionStub).to.have.been.calledOnceWithExactly({
+        policyId: '1',
+        expressionId: 'expr-1'
+      });
+
+      expect(setExpressionStub).to.have.been.calledOnceWithExactly('s1', 'pe-1');
+
       expect(materializeStub).to.not.have.been.called;
-      expect(result.statements[0]).to.include({ ...mockStatement });
+
+      expect(result.statements[0]).to.include(mockStatement);
       expect(result.statements[0].expression).to.eql(expression);
     });
 
@@ -699,7 +723,7 @@ describe('PolicyService', () => {
         .resolves('scope-1');
       const writeExpressionTreeStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves();
       const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
 
       const result = await policyService.createPolicyWithStatements(

@@ -49,15 +49,17 @@ describe('SecurityRuleExpressionService', () => {
           submission_feature_urn: 'urn:*:*:*'
         }
       ] as any);
-      const replacePolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+      const setPolicyStatementExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
         .resolves({
           policy_expression_id: '33333333-3333-3333-3333-333333333333',
           policy_id: '11111111-1111-1111-1111-111111111111',
-          expression_id: 'expr-new'
+          expression_id: 'expr-new',
+          name: null,
+          description: null
         });
 
       await service.replaceSecurityRuleExpression(7, 'expr-new');
@@ -72,10 +74,13 @@ describe('SecurityRuleExpressionService', () => {
       expect(getActiveRulesStub.calledOnce).to.equal(true);
       expect(getPolicyStatementsStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111')).to.equal(true);
       expect(
-        ensurePolicyExpressionStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', 'expr-new')
+        ensurePolicyExpressionStub.calledOnceWithExactly({
+          policyId: '11111111-1111-1111-1111-111111111111',
+          expressionId: 'expr-new'
+        })
       ).to.equal(true);
       expect(
-        replacePolicyStatementExpressionStub.calledOnceWithExactly(
+        setPolicyStatementExpressionStub.calledOnceWithExactly(
           '22222222-2222-2222-2222-222222222222',
           '33333333-3333-3333-3333-333333333333'
         )
@@ -112,15 +117,17 @@ describe('SecurityRuleExpressionService', () => {
           submission_feature_urn: 'urn:*:*:*'
         }
       ] as any);
-      const replacePolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+      const setPolicyStatementExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
         .resolves({
           policy_expression_id: '33333333-3333-3333-3333-333333333333',
           policy_id: '11111111-1111-1111-1111-111111111111',
-          expression_id: 'expr-current'
+          expression_id: 'expr-current',
+          name: null,
+          description: null
         });
 
       await service.replaceSecurityRuleExpression(7, 'expr-current');
@@ -128,10 +135,13 @@ describe('SecurityRuleExpressionService', () => {
       expect(endStub.called).to.equal(false);
       expect(insertStub.called).to.equal(false);
       expect(
-        ensurePolicyExpressionStub.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', 'expr-current')
+        ensurePolicyExpressionStub.calledOnceWithExactly({
+          policyId: '11111111-1111-1111-1111-111111111111',
+          expressionId: 'expr-current'
+        })
       ).to.equal(true);
       expect(
-        replacePolicyStatementExpressionStub.calledOnceWithExactly(
+        setPolicyStatementExpressionStub.calledOnceWithExactly(
           '22222222-2222-2222-2222-222222222222',
           '33333333-3333-3333-3333-333333333333'
         )
@@ -165,14 +175,14 @@ describe('SecurityRuleExpressionService', () => {
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves([] as any);
-      const replacePolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+      const setPolicyStatementExpressionStub = sinon
+        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
         .resolves();
 
       await service.replaceSecurityRuleExpression(7, 'expr-new');
 
       expect(getPolicyStatementsStub.called).to.equal(false);
-      expect(replacePolicyStatementExpressionStub.called).to.equal(false);
+      expect(setPolicyStatementExpressionStub.called).to.equal(false);
     });
   });
 });

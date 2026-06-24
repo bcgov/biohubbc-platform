@@ -13,12 +13,9 @@ export const PolicyExpression = z.object({
 
 export type PolicyExpression = z.infer<typeof PolicyExpression>;
 
-export const CreatePolicyExpression = PolicyExpression.pick({
-  policy_id: true,
-  expression_id: true
-}).extend({
-  name: z.string().nullable().optional(),
-  description: z.string().nullable().optional()
-});
-
-export type CreatePolicyExpression = z.infer<typeof CreatePolicyExpression>;
+export type CreatePolicyExpression = {
+  policyId: string;
+  expressionId: string;
+  name?: string | null;
+  description?: string | null;
+};

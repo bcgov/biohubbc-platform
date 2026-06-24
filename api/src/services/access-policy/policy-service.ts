@@ -447,9 +447,12 @@ export class PolicyService extends DBService {
         });
 
         if (stmt.expression) {
-          const { expression_id } = await this.expressionTreeService.writeExpressionTree(stmt.expression);
-          const policyExpression = await this.policyExpressionService.ensurePolicyExpression(policyId, expression_id);
-          await this.policyStatementExpressionService.replacePolicyStatementExpression(
+          const { expression_id: expressionId } = await this.expressionTreeService.writeExpressionTree(stmt.expression);
+          const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+            policyId,
+            expressionId
+          });
+          await this.policyStatementExpressionService.setPolicyStatementExpression(
             statement.policy_statement_id,
             policyExpression.policy_expression_id
           );

@@ -36,7 +36,7 @@ export class PolicyStatementExpressionService extends DBService {
    * @param {string} policyExpressionId - Policy expression identifier.
    * @return {Promise<void>} Resolves once the link points to `policyExpressionId`.
    */
-  async replacePolicyStatementExpression(policyStatementId: string, policyExpressionId: string): Promise<void> {
+  async setPolicyStatementExpression(policyStatementId: string, policyExpressionId: string): Promise<void> {
     await this.assertPolicyExpressionBelongsToStatementPolicy(policyStatementId, policyExpressionId);
 
     const existingLinks =
@@ -79,7 +79,7 @@ export class PolicyStatementExpressionService extends DBService {
 
     if (policyStatement.policy_id !== policyExpression.policy_id) {
       throw new ApiValidationError('Policy expression does not belong to the policy statement policy', [
-        'PolicyStatementExpressionService->replacePolicyStatementExpression',
+        'PolicyStatementExpressionService->setPolicyStatementExpression',
         { policyStatementId, policyExpressionId }
       ]);
     }

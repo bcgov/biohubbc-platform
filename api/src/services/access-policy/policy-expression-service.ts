@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { PolicyExpression } from '../../models/policy-expression';
+import { CreatePolicyExpression, PolicyExpression } from '../../models/policy-expression';
 import { PolicyExpressionRepository } from '../../repositories/policy-expression-repository';
 import { DBService } from '../db-service';
 
@@ -20,30 +20,11 @@ export class PolicyExpressionService extends DBService {
    * Return the active policy-expression row for a policy/expression pair,
    * creating it when it does not already exist.
    *
-   * @param {string} policyId - Policy identifier.
-   * @param {string} expressionId - Root expression identifier.
+   * @param {CreatePolicyExpression} data
    * @return {Promise<PolicyExpression>} Existing or created policy expression.
    */
-  async ensurePolicyExpression(
-    policyId: string,
-    expressionId: string,
-    options?: { name?: string; description?: string | null }
-  ): Promise<PolicyExpression> {
-    const existing = await this.policyExpressionRepository.getPolicyExpressionByPolicyAndExpressionId(
-      policyId,
-      expressionId
-    );
-
-    if (existing) {
-      return existing;
-    }
-
-    return this.policyExpressionRepository.insertPolicyExpression({
-      policy_id: policyId,
-      expression_id: expressionId,
-      name: options?.name ?? null,
-      description: options?.description ?? null
-    });
+  async ensurePolicyExpression(data: CreatePolicyExpression): Promise<PolicyExpression> {
+    return this.policyExpressionRepository.ensurePolicyExpression(data);
   }
 
   /**

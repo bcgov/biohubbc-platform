@@ -82,11 +82,11 @@ export class DownloadPolicyService extends DBService {
       });
 
       if (payload.expressionId !== null) {
-        const policyExpression = await this.policyExpressionService.ensurePolicyExpression(
-          policy.policy_id,
-          payload.expressionId
-        );
-        await this.policyStatementExpressionService.replacePolicyStatementExpression(
+        const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+          policyId: policy.policy_id,
+          expressionId: payload.expressionId
+        });
+        await this.policyStatementExpressionService.setPolicyStatementExpression(
           statement.policy_statement_id,
           policyExpression.policy_expression_id
         );

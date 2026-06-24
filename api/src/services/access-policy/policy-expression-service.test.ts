@@ -11,71 +11,85 @@ describe('PolicyExpressionService', () => {
   });
 
   describe('ensurePolicyExpression', () => {
-    it('returns existing policy expression when active row exists', async () => {
+    it('delegates to repository with policy and expression ids', async () => {
       const service = new PolicyExpressionService(getMockDBConnection());
-      const existing = {
+
+      const policyExpression = {
         policy_expression_id: 'pe-1',
         policy_id: 'policy-1',
         expression_id: 'expr-1',
         name: null,
         description: null
       };
-      sinon.stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves(existing);
-      const insertStub = sinon.stub(PolicyExpressionRepository.prototype, 'insertPolicyExpression');
 
-      const result = await service.ensurePolicyExpression('policy-1', 'expr-1');
+      const ensureStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'ensurePolicyExpression')
+        .resolves(policyExpression);
 
-      expect(result).to.eql(existing);
-      expect(insertStub).to.not.have.been.called;
-    });
+      const result = await service.ensurePolicyExpression({
+        policyId: 'policy-1',
+        expressionId: 'expr-1'
+      });
 
-    it('creates policy expression when no active row exists', async () => {
-      const service = new PolicyExpressionService(getMockDBConnection());
-      const created = {
-        policy_expression_id: 'pe-1',
-        policy_id: 'policy-1',
-        expression_id: 'expr-1',
-        name: null,
-        description: null
-      };
-      sinon.stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves(null);
-      const insertStub = sinon.stub(PolicyExpressionRepository.prototype, 'insertPolicyExpression').resolves(created);
-
-      const result = await service.ensurePolicyExpression('policy-1', 'expr-1');
-
-      expect(result).to.eql(created);
-      expect(insertStub).to.have.been.calledOnceWithExactly({
-        policy_id: 'policy-1',
-        expression_id: 'expr-1',
-        name: null,
-        description: null
+      expect(result).to.eql(policyExpression);
+      expect(ensureStub).to.have.been.calledOnceWithExactly({
+        policyId: 'policy-1',
+        expressionId: 'expr-1'
       });
     });
 
-    it('passes through provided policy expression metadata when creating', async () => {
+    it('delegates metadata to repository when provided', async () => {
       const service = new PolicyExpressionService(getMockDBConnection());
-      const created = {
+
+      const policyExpression = {
         policy_expression_id: 'pe-1',
         policy_id: 'policy-1',
         expression_id: 'expr-1',
         name: 'Named expression',
         description: 'Useful expression'
       };
-      sinon.stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves(null);
-      const insertStub = sinon.stub(PolicyExpressionRepository.prototype, 'insertPolicyExpression').resolves(created);
 
-      const result = await service.ensurePolicyExpression('policy-1', 'expr-1', {
+      const ensureStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'ensurePolicyExpression')
+        .resolves(policyExpression);
+
+      const result = await service.ensurePolicyExpression({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
         name: 'Named expression',
         description: 'Useful expression'
       });
 
-      expect(result).to.eql(created);
-      expect(insertStub).to.have.been.calledOnceWithExactly({
+      expect(result).to.eql(policyExpression);
+      expect(ensureStub).to.have.been.calledOnceWithExactly({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
+        name: 'Named expression',
+        description: 'Useful expression'
+      });
+    });
+  });
+
+  describe('getPolicyExpressionById', () => {
+    it('delegates to repository', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+
+      const policyExpression = {
+        policy_expression_id: 'pe-1',
         policy_id: 'policy-1',
         expression_id: 'expr-1',
-        name: 'Named expression',
-        description: 'Useful expression'
-      });
+        name: null,
+        description: null
+      };
+
+      const getStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionById')
+        .resolves(policyExpression);
+
+      const result = await service.getPolicyExpressionById('pe-1');
+
+      expect(result).to.eql(policyExpression);
+      expect(getStub).to.have.been.calledOnceWithExactly('pe-1');
     });
   });
 });

@@ -79,12 +79,12 @@ export class SecurityRuleExpressionService extends DBService {
       throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
     }
 
-    const policyExpression = await this.policyExpressionService.ensurePolicyExpression(
-      securityRule.policy_id,
-      expressionId
-    );
+    const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+      policyId: securityRule.policy_id,
+      expressionId: expressionId
+    });
 
-    await this.policyStatementExpressionService.replacePolicyStatementExpression(
+    await this.policyStatementExpressionService.setPolicyStatementExpression(
       mappedStatement.policy_statement_id,
       policyExpression.policy_expression_id
     );

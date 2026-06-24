@@ -378,9 +378,11 @@ describe('DataRequestService', () => {
     sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
       policy_expression_id: 'pe-1',
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
-      expression_id: 'expr-1'
+      expression_id: 'expr-1',
+      name: null,
+      description: null
     });
-    sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
+    sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
       team_id: 'policy-team',
@@ -436,9 +438,11 @@ describe('DataRequestService', () => {
     sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
       policy_expression_id: 'pe-1',
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
-      expression_id: 'expr-1'
+      expression_id: 'expr-1',
+      name: null,
+      description: null
     });
-    sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression').resolves();
+    sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
       team_id: 'policy-team',
@@ -487,10 +491,12 @@ describe('DataRequestService', () => {
       .resolves({
         policy_expression_id: 'pe-1',
         policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
-        expression_id: 'expr-1'
+        expression_id: 'expr-1',
+        name: null,
+        description: null
       });
-    const replaceStub = sinon
-      .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+    const setExpressionStub = sinon
+      .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
       .resolves();
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
@@ -510,10 +516,13 @@ describe('DataRequestService', () => {
     });
 
     // Step 4: both statements get linked to the same policy expression id.
-    expect(ensurePolicyExpressionStub).to.have.been.calledOnceWith('f6a7b8c9-d0e1-2345-fabc-456789012345', 'expr-1');
-    expect(replaceStub).to.have.callCount(2);
-    expect(replaceStub.getCall(0).args).to.deep.equal(['st-1', 'pe-1']);
-    expect(replaceStub.getCall(1).args).to.deep.equal(['st-2', 'pe-1']);
+    expect(ensurePolicyExpressionStub).to.have.been.calledOnceWith({
+      policyId: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+      expressionId: 'expr-1'
+    });
+    expect(setExpressionStub).to.have.callCount(2);
+    expect(setExpressionStub.getCall(0).args).to.deep.equal(['st-1', 'pe-1']);
+    expect(setExpressionStub.getCall(1).args).to.deep.equal(['st-2', 'pe-1']);
   });
 
   it('createDataRequestForTicket skips expression writes when expression is null', async () => {
@@ -527,7 +536,7 @@ describe('DataRequestService', () => {
       .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
       .resolves([{ feature_type_id: 1, name: 'observation' }]);
     const writeExpressionStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
-    const replaceStub = sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression');
+    const setExpressionStub = sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression');
 
     sinon
       .stub(TeamService.prototype, 'createTeam')
@@ -558,7 +567,7 @@ describe('DataRequestService', () => {
 
     // Step 3: no expression-tree writes and no statement-expression links.
     expect(writeExpressionStub).to.not.have.been.called;
-    expect(replaceStub).to.not.have.been.called;
+    expect(setExpressionStub).to.not.have.been.called;
 
     // Step 4: policy is still created with the single ALLOW statement.
     expect(createPolicyStub).to.have.been.calledOnce;
@@ -567,16 +576,15 @@ describe('DataRequestService', () => {
     ]);
   });
 
-  it('createDataRequestForTicket preserves the deny-all statement and skips precheck when featureTypes is omitted', async () => {
-    // Verifies: the admin/ticket-bound flow with no featureTypes preserves the deny-all baseline policy
-    // and does NOT consult the feature-type catalog or the expression services.
+  it('createDataRequestForTicket creates a policy with no statements and skips precheck when featureTypes is omitted', async () => {
+    // Verifies: the admin/ticket-bound flow with no featureTypes creates a draft policy
+    // with no statements and does NOT consult the feature-type catalog or expression services.
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
 
-    // Step 1: spy precheck/expression to verify they are NOT invoked.
     const getActiveStub = sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap');
     const writeExpressionStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
-    const replaceStub = sinon.stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression');
+    const setExpressionStub = sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression');
 
     sinon
       .stub(TeamService.prototype, 'createTeam')
@@ -584,35 +592,34 @@ describe('DataRequestService', () => {
       .resolves({ team_id: 'dr-team', name: 'dr', description: null, member_count: 0 })
       .onSecondCall()
       .resolves({ team_id: 'policy-team', name: 'policy', description: null, member_count: 0 });
+
     sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
+
     const createPolicyStub = sinon
       .stub(PolicyService.prototype, 'createPolicyWithStatements')
-      .resolves(buildMockPolicy(['st-1']));
+      .resolves(buildMockPolicy());
+
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
       team_id: 'policy-team',
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345'
     } as TeamPolicy);
+
     sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
     sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
-    // Step 2: act with no featureTypes.
     await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
       requested_by: 1,
       reason: 'r',
       system_user_ids: [2, 3]
     });
 
-    // Step 3: precheck and expression services were never touched.
     expect(getActiveStub).to.not.have.been.called;
     expect(writeExpressionStub).to.not.have.been.called;
-    expect(replaceStub).to.not.have.been.called;
+    expect(setExpressionStub).to.not.have.been.called;
 
-    // Step 4: deny-all baseline preserved.
     expect(createPolicyStub).to.have.been.calledOnce;
-    expect(createPolicyStub.firstCall.args[1]).to.deep.equal([
-      { effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }
-    ]);
+    expect(createPolicyStub.firstCall.args[1]).to.deep.equal([]);
   });
 
   it('createDataRequestForTicket throws HTTP400 and skips policy/team-policy/repo writes when an unknown featureType is supplied', async () => {
@@ -689,13 +696,15 @@ describe('DataRequestService', () => {
     const createPolicyStub = sinon
       .stub(PolicyService.prototype, 'createPolicyWithStatements')
       .resolves(buildMockPolicy(['st-1', 'st-2']));
-    const replaceStub = sinon
-      .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
+    const setExpressionStub = sinon
+      .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
       .resolves();
     sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression').resolves({
       policy_expression_id: 'pe-1',
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
-      expression_id: 'expr-1'
+      expression_id: 'expr-1',
+      name: null,
+      description: null
     });
     sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
       team_policy_id: 'tp-1',
@@ -722,7 +731,7 @@ describe('DataRequestService', () => {
 
     // Step 4: expression write fires once; both statements link to it.
     expect(writeExpressionStub).to.have.callCount(1);
-    expect(replaceStub).to.have.callCount(2);
+    expect(setExpressionStub).to.have.callCount(2);
   });
 
   it('createDataRequestForTicket links team_policy to the policy team (not the data-request team)', async () => {
