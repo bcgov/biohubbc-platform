@@ -6,15 +6,14 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
-import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
- * Schema for policy statement with optional expression.
+ * Schema for policy statement with optional policy-expression link.
  */
 export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyStatementWithExpression',
   type: 'object',
-  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'],
+  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id'],
   properties: {
     policy_statement_id: {
       type: 'string',
@@ -36,9 +35,11 @@ export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       description: 'The URN pattern this statement applies to'
     },
-    expression: {
-      ...featureSearchExpressionTreeSchema,
-      description: 'Optional expression tree that builds the runtime feature graph for this statement'
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'Optional policy-owned expression linked to this statement'
     }
   }
 };
@@ -147,10 +148,11 @@ export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       description: 'The URN pattern this statement applies to'
     },
-    expression: {
-      ...featureSearchExpressionTreeSchema,
-      description:
-        'Optional expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'Optional existing policy expression to link to this statement'
     }
   }
 };

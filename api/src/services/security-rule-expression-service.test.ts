@@ -6,7 +6,7 @@ import { PolicyStatementRepository } from '../repositories/authorization/policy-
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
 import { PolicyExpressionService } from './access-policy/policy-expression-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
+import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { SecurityRuleExpressionService } from './security-rule-expression-service';
 
 describe('SecurityRuleExpressionService', () => {
@@ -49,8 +49,8 @@ describe('SecurityRuleExpressionService', () => {
           submission_feature_urn: 'urn:*:*:*'
         }
       ] as any);
-      const setPolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
+      const updatePolicyStatementStub = sinon
+        .stub(PolicyStatementService.prototype, 'updatePolicyStatement')
         .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
@@ -80,10 +80,9 @@ describe('SecurityRuleExpressionService', () => {
         })
       ).to.equal(true);
       expect(
-        setPolicyStatementExpressionStub.calledOnceWithExactly(
-          '22222222-2222-2222-2222-222222222222',
-          '33333333-3333-3333-3333-333333333333'
-        )
+        updatePolicyStatementStub.calledOnceWithExactly('22222222-2222-2222-2222-222222222222', {
+          policy_expression_id: '33333333-3333-3333-3333-333333333333'
+        })
       ).to.equal(true);
     });
 
@@ -117,8 +116,8 @@ describe('SecurityRuleExpressionService', () => {
           submission_feature_urn: 'urn:*:*:*'
         }
       ] as any);
-      const setPolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
+      const updatePolicyStatementStub = sinon
+        .stub(PolicyStatementService.prototype, 'updatePolicyStatement')
         .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
@@ -141,10 +140,9 @@ describe('SecurityRuleExpressionService', () => {
         })
       ).to.equal(true);
       expect(
-        setPolicyStatementExpressionStub.calledOnceWithExactly(
-          '22222222-2222-2222-2222-222222222222',
-          '33333333-3333-3333-3333-333333333333'
-        )
+        updatePolicyStatementStub.calledOnceWithExactly('22222222-2222-2222-2222-222222222222', {
+          policy_expression_id: '33333333-3333-3333-3333-333333333333'
+        })
       ).to.equal(true);
     });
 
@@ -175,14 +173,14 @@ describe('SecurityRuleExpressionService', () => {
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves([] as any);
-      const setPolicyStatementExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
+      const updatePolicyStatementStub = sinon
+        .stub(PolicyStatementService.prototype, 'updatePolicyStatement')
         .resolves();
 
       await service.replaceSecurityRuleExpression(7, 'expr-new');
 
       expect(getPolicyStatementsStub.called).to.equal(false);
-      expect(setPolicyStatementExpressionStub.called).to.equal(false);
+      expect(updatePolicyStatementStub.called).to.equal(false);
     });
   });
 });

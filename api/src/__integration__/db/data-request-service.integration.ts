@@ -182,20 +182,12 @@ describe('DataRequestService (integration)', function () {
       const statements = await activeStatements(dataRequest.policy_id);
       expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
 
-      // Exactly one expression_statement link pointing at our expression row
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-
       const links = await connection.sql(SQL`
         SELECT pe.expression_id
-        FROM policy_statement_expression pse
-        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
-        WHERE pse.policy_statement_id = ANY(${statementIds}::uuid[])
-          AND pse.record_end_date IS NULL
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
+        WHERE ps.policy_id = ${dataRequest.policy_id}
+          AND ps.record_end_date IS NULL
           AND pe.record_end_date IS NULL;
       `);
       expect(links.rowCount).to.equal(1);
@@ -243,12 +235,10 @@ describe('DataRequestService (integration)', function () {
       expect(statements.every((s) => s.effect === 'allow')).to.equal(true);
 
       const links = await connection.sql(SQL`
-        SELECT pe.expression_id, pse.policy_statement_id
-        FROM policy_statement_expression pse
-        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
+        SELECT pe.expression_id, ps.policy_statement_id
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
         WHERE ps.policy_id = ${dataRequest.policy_id}
-          AND pse.record_end_date IS NULL
           AND pe.record_end_date IS NULL
           AND ps.record_end_date IS NULL;
       `);
@@ -274,16 +264,12 @@ describe('DataRequestService (integration)', function () {
       const statements = await activeStatements(dataRequest.policy_id);
       expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
 
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-
       const links = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_expression
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]) AND record_end_date IS NULL;
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${dataRequest.policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(links.rows[0].n).to.equal(0);
     });
@@ -315,15 +301,12 @@ describe('DataRequestService (integration)', function () {
       expect(statements).to.deep.equal([{ urn: 'urn:*:*:*', effect: 'deny' }]);
 
       // No expression rows or links for the deny-all path.
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
       const links = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_expression
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]) AND record_end_date IS NULL;
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${dataRequest.policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(links.rows[0].n).to.equal(0);
 

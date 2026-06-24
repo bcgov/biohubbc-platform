@@ -72,56 +72,46 @@ export async function up(knex: Knex): Promise<void> {
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     ----------------------------------------------------------------------------------------
-    -- 2. Add the future policy_expression reference to policy_statement_expression.
-    --
-    -- This stays nullable until the backfill below populates active rows and adds the active-row
-    -- check constraint.
+    -- 2. Add the final policy-owned expression reference to policy_statement.
     ----------------------------------------------------------------------------------------
-    ALTER TABLE policy_statement_expression
+    ALTER TABLE policy_statement
       ADD COLUMN policy_expression_id uuid;
 
     ----------------------------------------------------------------------------------------
-    -- 3. End stale active statement-expression links whose parent policy, statement, or
-    --    expression is inactive.
+    -- 3. Stage active legacy statement-expression links.
     --
-    -- The new active-row constraint below is defined on policy_statement_expression itself.
-    -- Old service deletes soft-ended parents without soft-ending child expression links, so
-    -- normalize those stale links before the active-only backfill.
+    -- policy_statement_expression is legacy source data only in this migration. Do not alter
+    -- it: filter stale child links here by requiring the parent policy, statement, and root
+    -- expression to all be active.
     ----------------------------------------------------------------------------------------
-    UPDATE policy_statement_expression pse
-    SET record_end_date = now()
-    FROM policy_statement ps,
-      policy p,
-      expression e
-    WHERE ps.policy_statement_id = pse.policy_statement_id
-      AND p.policy_id = ps.policy_id
-      AND e.expression_id = pse.expression_id
-      AND pse.record_end_date IS NULL
-      AND (
-        ps.record_end_date IS NOT NULL
-        OR p.record_end_date IS NOT NULL
-        OR e.record_end_date IS NOT NULL
-      );
+    CREATE TEMP TABLE tmp_policy_statement_expression_active ON COMMIT DROP AS
+    SELECT
+      pse.policy_statement_expression_id,
+      pse.policy_statement_id,
+      ps.policy_id,
+      pse.expression_id,
+      e.expression_hash,
+      pse.create_date,
+      pse.create_user
+    FROM policy_statement_expression pse
+    JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
+    JOIN policy p ON p.policy_id = ps.policy_id
+    JOIN expression e ON e.expression_id = pse.expression_id
+    WHERE pse.record_end_date IS NULL
+      AND ps.record_end_date IS NULL
+      AND p.record_end_date IS NULL
+      AND e.record_end_date IS NULL;
 
     ----------------------------------------------------------------------------------------
     -- 4. Backfill active policy_expression identities.
-    --
-    -- Historical policy_statement_expression rows are intentionally not backfilled. The new
-    -- policy_expression_id column is required only for active rows by the check constraint added
-    -- below.
     ----------------------------------------------------------------------------------------
     WITH active_policy_expressions AS (
       SELECT
-        ps.policy_id,
-        pse.expression_id,
-        min(pse.create_user) AS create_user
-      FROM policy_statement_expression pse
-      JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-      JOIN expression e ON e.expression_id = pse.expression_id
-      WHERE pse.record_end_date IS NULL
-        AND ps.record_end_date IS NULL
-        AND e.record_end_date IS NULL
-      GROUP BY ps.policy_id, pse.expression_id
+        active_links.policy_id,
+        active_links.expression_id,
+        min(active_links.create_user) AS create_user
+      FROM tmp_policy_statement_expression_active active_links
+      GROUP BY active_links.policy_id, active_links.expression_id
     )
     INSERT INTO policy_expression (
       policy_id,
@@ -142,54 +132,15 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 5. Backfill active policy_statement_expression.policy_expression_id while expression_id
-    --    still exists.
-    ----------------------------------------------------------------------------------------
-    UPDATE policy_statement_expression pse
-    SET policy_expression_id = pe.policy_expression_id
-    FROM policy_statement ps,
-      expression e,
-      policy_expression pe
-    WHERE ps.policy_statement_id = pse.policy_statement_id
-      AND e.expression_id = pse.expression_id
-      AND pe.policy_id = ps.policy_id
-      AND pe.expression_id = pse.expression_id
-      AND pe.record_end_date IS NULL
-      AND pse.record_end_date IS NULL
-      AND ps.record_end_date IS NULL
-      AND e.record_end_date IS NULL;
-
-    ALTER TABLE policy_statement_expression
-      ADD CONSTRAINT policy_statement_expression_chk1
-        CHECK (record_end_date IS NOT NULL OR policy_expression_id IS NOT NULL);
-
-    ----------------------------------------------------------------------------------------
-    -- 6. Stage statements with multiple distinct active expressions.
+    -- 5. Stage statements with multiple distinct active expressions.
     --
     -- Duplicate active links to the same expression are handled later as duplicate rows rather
     -- than wrapped in a noisy single-child AND.
     ----------------------------------------------------------------------------------------
     CREATE TEMP TABLE tmp_policy_statement_expression_merge_clause ON COMMIT DROP AS
-    WITH active_links AS (
-      SELECT
-        pse.policy_statement_expression_id,
-        pse.policy_statement_id,
-        ps.policy_id,
-        pe.expression_id,
-        e.expression_hash,
-        pse.create_user
-      FROM policy_statement_expression pse
-      JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-      JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
-      JOIN expression e ON e.expression_id = pe.expression_id
-      WHERE pse.record_end_date IS NULL
-        AND ps.record_end_date IS NULL
-        AND pe.record_end_date IS NULL
-        AND e.record_end_date IS NULL
-    ),
-    multi_expression_statements AS (
+    WITH multi_expression_statements AS (
       SELECT policy_statement_id
-      FROM active_links
+      FROM tmp_policy_statement_expression_active
       GROUP BY policy_statement_id
       HAVING count(DISTINCT expression_id) > 1
     )
@@ -203,7 +154,7 @@ export async function up(knex: Knex): Promise<void> {
         PARTITION BY active_links.policy_statement_id
         ORDER BY active_links.expression_hash, active_links.expression_id
       ) AS sequence
-    FROM active_links
+    FROM tmp_policy_statement_expression_active active_links
     JOIN multi_expression_statements
       ON multi_expression_statements.policy_statement_id = active_links.policy_statement_id
     GROUP BY
@@ -237,7 +188,7 @@ export async function up(knex: Knex): Promise<void> {
     GROUP BY merge_clause.policy_statement_id, merge_clause.policy_id;
 
     ----------------------------------------------------------------------------------------
-    -- 7. Create or reuse the merged AND expression anchors.
+    -- 6. Create or reuse the merged AND expression anchors.
     --
     -- The merged expression hash is built to match ExpressionTreeService stableStringify({
     --   type: 'expression',
@@ -263,7 +214,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 8. Attach each original expression as a child of its merged AND expression.
+    -- 7. Attach each original expression as a child of its merged AND expression.
     ----------------------------------------------------------------------------------------
     INSERT INTO expression_clause (
       expression_id,
@@ -291,7 +242,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 9. Create or reuse the policy-owned identity for each merged expression.
+    -- 8. Create or reuse the policy-owned identity for each merged expression.
     ----------------------------------------------------------------------------------------
     INSERT INTO policy_expression (
       policy_id,
@@ -319,27 +270,17 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 10. Repoint one active statement-expression row to the merged policy expression.
+    -- 9. Resolve the final policy-owned expression link for each statement.
+    --
+    -- Multi-expression statements point to the synthesized AND expression. Statements with
+    -- exactly one distinct active expression point to that expression's policy-owned identity.
     ----------------------------------------------------------------------------------------
-    WITH retained AS (
+    CREATE TEMP TABLE tmp_policy_statement_policy_expression_link ON COMMIT DROP AS
+    WITH multi_statement_links AS (
       SELECT
-        ranked.policy_statement_expression_id,
+        merge_group.policy_statement_id,
         merged_policy_expression.policy_expression_id
-      FROM (
-        SELECT
-          pse.policy_statement_id,
-          pse.policy_statement_expression_id,
-          row_number() OVER (
-            PARTITION BY pse.policy_statement_id
-            ORDER BY pse.create_date, pse.policy_statement_expression_id
-          ) AS row_number
-        FROM policy_statement_expression pse
-        JOIN tmp_policy_statement_expression_merge merge_group
-          ON merge_group.policy_statement_id = pse.policy_statement_id
-        WHERE pse.record_end_date IS NULL
-      ) ranked
-      JOIN tmp_policy_statement_expression_merge merge_group
-        ON merge_group.policy_statement_id = ranked.policy_statement_id
+      FROM tmp_policy_statement_expression_merge merge_group
       JOIN expression merged_expression
         ON merged_expression.expression_hash = merge_group.merged_expression_hash
        AND merged_expression.record_end_date IS NULL
@@ -347,64 +288,69 @@ export async function up(knex: Knex): Promise<void> {
         ON merged_policy_expression.policy_id = merge_group.policy_id
        AND merged_policy_expression.expression_id = merged_expression.expression_id
        AND merged_policy_expression.record_end_date IS NULL
-      WHERE ranked.row_number = 1
-    )
-    UPDATE policy_statement_expression pse
-    SET policy_expression_id = retained.policy_expression_id
-    FROM retained
-    WHERE pse.policy_statement_expression_id = retained.policy_statement_expression_id;
-
-    ----------------------------------------------------------------------------------------
-    -- 11. After any required merge has repointed the retained row, keep exactly one active
-    --     policy_statement_expression row per statement and soft-delete the rest.
-    ----------------------------------------------------------------------------------------
-    WITH ranked AS (
+    ),
+    single_expression_statements AS (
+      SELECT policy_statement_id
+      FROM tmp_policy_statement_expression_active
+      GROUP BY policy_statement_id
+      HAVING count(DISTINCT expression_id) = 1
+    ),
+    single_statement_links AS (
       SELECT
-        policy_statement_expression_id,
-        row_number() OVER (
-          PARTITION BY policy_statement_id
-          ORDER BY create_date, policy_statement_expression_id
-        ) AS row_number
-      FROM policy_statement_expression pse
-      WHERE pse.record_end_date IS NULL
+        single_links.policy_statement_id,
+        pe.policy_expression_id
+      FROM (
+        SELECT
+          active_links.policy_statement_id,
+          active_links.policy_id,
+          active_links.expression_id
+        FROM tmp_policy_statement_expression_active active_links
+        JOIN single_expression_statements
+          ON single_expression_statements.policy_statement_id = active_links.policy_statement_id
+        GROUP BY
+          active_links.policy_statement_id,
+          active_links.policy_id,
+          active_links.expression_id
+      ) single_links
+      JOIN policy_expression pe
+        ON pe.policy_id = single_links.policy_id
+       AND pe.expression_id = single_links.expression_id
+       AND pe.record_end_date IS NULL
     )
-    UPDATE policy_statement_expression pse
-    SET record_end_date = now()
-    FROM ranked
-    WHERE ranked.policy_statement_expression_id = pse.policy_statement_expression_id
-      AND ranked.row_number > 1;
+    SELECT policy_statement_id, policy_expression_id
+    FROM multi_statement_links
+    UNION ALL
+    SELECT policy_statement_id, policy_expression_id
+    FROM single_statement_links;
 
     ----------------------------------------------------------------------------------------
-    -- 12. Swap policy_statement_expression to the new policy_expression reference.
+    -- 10. Move the final expression link onto policy_statement and remove the obsolete
+    --     legacy table.
     ----------------------------------------------------------------------------------------
-    DROP INDEX IF EXISTS policy_statement_expression_nuk1;
-    DROP INDEX IF EXISTS policy_statement_expression_idx2;
-    DROP INDEX IF EXISTS policy_statement_expression_idx3;
+    UPDATE policy_statement ps
+    SET policy_expression_id = link.policy_expression_id
+    FROM tmp_policy_statement_policy_expression_link link
+    WHERE link.policy_statement_id = ps.policy_statement_id;
 
-    ALTER TABLE policy_statement_expression
-      DROP CONSTRAINT IF EXISTS policy_statement_expression_fk2;
+    ALTER TABLE policy_expression
+      ADD CONSTRAINT policy_expression_uk1 UNIQUE (policy_expression_id, policy_id);
 
-    ALTER TABLE policy_statement_expression
-      ADD CONSTRAINT policy_statement_expression_fk2
-        FOREIGN KEY (policy_expression_id)
-        REFERENCES policy_expression(policy_expression_id)
-        ON DELETE CASCADE,
-      DROP COLUMN expression_id;
+    ALTER TABLE policy_statement
+      ADD CONSTRAINT policy_statement_fk2
+        FOREIGN KEY (policy_expression_id, policy_id)
+        REFERENCES policy_expression(policy_expression_id, policy_id);
 
-    CREATE UNIQUE INDEX policy_statement_expression_nuk1
-      ON policy_statement_expression(policy_statement_id)
+    CREATE INDEX policy_statement_idx3 ON policy_statement(policy_expression_id);
+    CREATE INDEX policy_statement_idx4
+      ON policy_statement(policy_expression_id)
       WHERE record_end_date IS NULL;
 
-    CREATE INDEX policy_statement_expression_idx2 ON policy_statement_expression(policy_expression_id);
-    CREATE INDEX policy_statement_expression_idx3
-      ON policy_statement_expression(policy_expression_id)
-      WHERE record_end_date IS NULL;
+    COMMENT ON COLUMN policy_statement.policy_expression_id IS 'Optional foreign key to the policy-owned expression linked to this statement.';
 
-    COMMENT ON TABLE policy_statement_expression IS 'Join table linking a policy statement to at most one active policy-owned expression.';
-    COMMENT ON COLUMN policy_statement_expression.policy_expression_id IS 'Foreign key to policy_expression.';
+    DROP TABLE IF EXISTS policy_statement_expression;
 
     ----------------------------------------------------------------------------------------
-    -- 13. Drop legacy policy statement condition tables.
+    -- 11. Drop legacy policy statement condition tables.
     ----------------------------------------------------------------------------------------
     DROP TABLE IF EXISTS policy_statement_condition_expression;
     DROP TABLE IF EXISTS policy_statement_condition;
@@ -661,34 +607,48 @@ export async function down(knex: Knex): Promise<void> {
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     ----------------------------------------------------------------------------------------
-    -- 2. Restore policy_statement_expression.expression_id and legacy indexes.
+    -- 2. Restore legacy policy_statement_expression from policy_statement.policy_expression_id.
     --
     -- This down migration restores the legacy schema shape. It does not reconstruct the exact
     -- pre-migration active row set:
     -- - active rows merged during up remain represented by the synthesized AND expression
-    -- - historical rows not backfilled during up may have null expression_id after rollback
+    -- - historical policy_statement_expression rows removed during up are not reconstructed
     ----------------------------------------------------------------------------------------
-    ALTER TABLE policy_statement_expression
-      ADD COLUMN expression_id uuid;
-
-    UPDATE policy_statement_expression pse
-    SET expression_id = pe.expression_id
-    FROM policy_expression pe
-    WHERE pe.policy_expression_id = pse.policy_expression_id;
-
-    DROP INDEX IF EXISTS policy_statement_expression_nuk1;
-    DROP INDEX IF EXISTS policy_statement_expression_idx2;
-    DROP INDEX IF EXISTS policy_statement_expression_idx3;
-
-    ALTER TABLE policy_statement_expression
-      DROP CONSTRAINT IF EXISTS policy_statement_expression_fk2,
-      DROP CONSTRAINT IF EXISTS policy_statement_expression_chk1;
-
-    ALTER TABLE policy_statement_expression
-      ADD CONSTRAINT policy_statement_expression_fk2
+    CREATE TABLE policy_statement_expression (
+      policy_statement_expression_id uuid DEFAULT public.gen_random_uuid() NOT NULL,
+      policy_statement_id uuid NOT NULL,
+      expression_id uuid NOT NULL,
+      record_end_date timestamptz(6),
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
+      CONSTRAINT policy_statement_expression_pk PRIMARY KEY (policy_statement_expression_id),
+      CONSTRAINT policy_statement_expression_fk1
+        FOREIGN KEY (policy_statement_id)
+        REFERENCES policy_statement(policy_statement_id)
+        ON DELETE CASCADE,
+      CONSTRAINT policy_statement_expression_fk2
         FOREIGN KEY (expression_id)
         REFERENCES expression(expression_id)
-        ON DELETE CASCADE;
+        ON DELETE CASCADE
+    );
+
+    INSERT INTO policy_statement_expression (
+      policy_statement_id,
+      expression_id,
+      create_user
+    )
+    SELECT
+      ps.policy_statement_id,
+      pe.expression_id,
+      ps.create_user
+    FROM policy_statement ps
+    JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
+    WHERE ps.policy_expression_id IS NOT NULL
+      AND ps.record_end_date IS NULL
+      AND pe.record_end_date IS NULL;
 
     CREATE UNIQUE INDEX policy_statement_expression_nuk1
       ON policy_statement_expression(policy_statement_id, expression_id)
@@ -700,13 +660,32 @@ export async function down(knex: Knex): Promise<void> {
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE policy_statement_expression IS 'Join table linking a policy statement to a root expression. Only active root expressions (no active parent) are allowed.';
+    COMMENT ON COLUMN policy_statement_expression.policy_statement_expression_id IS 'System generated UUID surrogate primary key identifier.';
+    COMMENT ON COLUMN policy_statement_expression.policy_statement_id IS 'Foreign key to policy_statement.';
     COMMENT ON COLUMN policy_statement_expression.expression_id IS 'Foreign key to root expression.';
+    COMMENT ON COLUMN policy_statement_expression.record_end_date IS 'Timestamp for soft delete; null when record is active.';
+    COMMENT ON COLUMN policy_statement_expression.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN policy_statement_expression.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN policy_statement_expression.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN policy_statement_expression.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN policy_statement_expression.revision_count IS 'Revision count used for concurrency control.';
 
-    UPDATE policy_statement_expression
-    SET policy_expression_id = NULL;
+    CREATE TRIGGER audit_policy_statement_expression
+      BEFORE INSERT OR UPDATE OR DELETE ON policy_statement_expression
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_policy_statement_expression
+      AFTER INSERT OR UPDATE OR DELETE ON policy_statement_expression
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
-    ALTER TABLE policy_statement_expression
+    DROP INDEX IF EXISTS policy_statement_idx3;
+    DROP INDEX IF EXISTS policy_statement_idx4;
+
+    ALTER TABLE policy_statement
+      DROP CONSTRAINT IF EXISTS policy_statement_fk2,
       DROP COLUMN IF EXISTS policy_expression_id;
+
+    ALTER TABLE policy_expression
+      DROP CONSTRAINT IF EXISTS policy_expression_uk1;
 
     DROP TABLE IF EXISTS policy_expression;
   `);

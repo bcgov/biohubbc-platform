@@ -12,7 +12,6 @@ import { PolicyRepository } from '../../repositories/authorization/policy-reposi
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { PolicyExpressionService } from '../access-policy/policy-expression-service';
-import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { SecurityScopeService } from '../access-policy/security-scope-service';
 import { DownloadPolicyService } from './download-policy-service';
@@ -63,9 +62,6 @@ describe('DownloadPolicyService', () => {
       const createStatementStub = sinon.stub(PolicyStatementService.prototype, 'createPolicyStatement');
       createStatementStub.onCall(0).resolves(mockStatement1);
       createStatementStub.onCall(1).resolves(mockStatement2);
-      const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
-        .resolves();
       const ensurePolicyExpressionStub = sinon
         .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
         .resolves({
@@ -94,20 +90,18 @@ describe('DownloadPolicyService', () => {
       expect(createStatementStub.firstCall.args[0]).to.eql({
         policy_id: 'p1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:a:*'
+        submission_feature_urn: 'urn:*:a:*',
+        policy_expression_id: 'pe-1'
       });
       expect(createStatementStub.secondCall.args[0]).to.eql({
         policy_id: 'p1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:b:*'
+        submission_feature_urn: 'urn:*:b:*',
+        policy_expression_id: 'pe-1'
       });
 
-      expect(replaceExpressionStub).to.have.been.calledTwice;
-      expect(ensurePolicyExpressionStub).to.have.been.calledTwice;
+      expect(ensurePolicyExpressionStub).to.have.been.calledOnce;
       expect(ensurePolicyExpressionStub.firstCall.args).to.eql([{ policyId: 'p1', expressionId: 'e1' }]);
-      expect(ensurePolicyExpressionStub.secondCall.args).to.eql([{ policyId: 'p1', expressionId: 'e1' }]);
-      expect(replaceExpressionStub.firstCall.args).to.eql(['ps-1', 'pe-1']);
-      expect(replaceExpressionStub.secondCall.args).to.eql(['ps-2', 'pe-1']);
 
       expect(result).to.eql({ policy_id: 'p1' });
     });
@@ -136,9 +130,7 @@ describe('DownloadPolicyService', () => {
       const createStatementStub = sinon.stub(PolicyStatementService.prototype, 'createPolicyStatement');
       createStatementStub.onCall(0).resolves(mockStatement1);
       createStatementStub.onCall(1).resolves(mockStatement2);
-      const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
-        .resolves();
+      const ensurePolicyExpressionStub = sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression');
 
       await downloadPolicyService.createDownloadPolicy({
         name: 'My download',
@@ -148,7 +140,7 @@ describe('DownloadPolicyService', () => {
       });
 
       expect(createStatementStub).to.have.been.calledTwice;
-      expect(replaceExpressionStub).to.not.have.been.called;
+      expect(ensurePolicyExpressionStub).to.not.have.been.called;
     });
 
     it('does not invoke security-scope or team-policy access-grant primitives (AC #5)', async () => {
@@ -174,8 +166,6 @@ describe('DownloadPolicyService', () => {
         name: null,
         description: null
       });
-      sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
-
       // The boundary stubs: if the production service ever wires these in, these
       // assertions fail and the access-grant boundary is restored.
       const createScopeStub = sinon
@@ -214,7 +204,6 @@ describe('DownloadPolicyService', () => {
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementService.prototype, 'createPolicyStatement').resolves(mockStatement);
-      sinon.stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression').resolves();
 
       // null -> undefined
       await downloadPolicyService.createDownloadPolicy({

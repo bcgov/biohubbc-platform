@@ -105,8 +105,7 @@ describe('Download Worker', function () {
       //    downloads themselves — must run before any other delete so the chain still resolves.
       await deleteDownloadsAndArtifacts();
 
-      // 1b. Policy statement expressions, then statements, then the owning policies — children first.
-      await deleteByIds('biohub.policy_statement_expression', 'policy_statement_id', createdPolicyStatementIds);
+      // 1b. Policy statements, then the owning policies.
       await deleteByIds('biohub.policy_statement', 'policy_statement_id', createdPolicyStatementIds);
       await deleteByIds('biohub.policy', 'policy_id', createdPolicyIds);
 

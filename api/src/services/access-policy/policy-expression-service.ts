@@ -27,13 +27,4 @@ export class PolicyExpressionService extends DBService {
     return this.policyExpressionRepository.ensurePolicyExpression(data);
   }
 
-  /**
-   * Fetch one active policy expression by id.
-   *
-   * @param {string} policyExpressionId - Policy-expression identifier.
-   * @return {Promise<PolicyExpression>} Active policy expression.
-   */
-  getPolicyExpressionById(policyExpressionId: string): Promise<PolicyExpression> {
-    return this.policyExpressionRepository.getPolicyExpressionById(policyExpressionId);
-  }
 }

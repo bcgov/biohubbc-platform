@@ -1,9 +1,9 @@
-import { ICreatePolicyStatementRequest, IPolicy, IPolicyStatement } from 'interfaces/usePoliciesApi.interface';
+import { ICreatePolicyStatementRequest, IPolicyStatement } from 'interfaces/usePoliciesApi.interface';
 
 /**
  * JSON Policy document structure (for Monaco editor).
  */
-export interface IPolicyDocument {
+interface IPolicyDocument {
   Version: string;
   Statement: IPolicyDocumentStatement[];
 }
@@ -11,7 +11,7 @@ export interface IPolicyDocument {
 /**
  * JSON Policy statement structure.
  */
-export interface IPolicyDocumentStatement {
+interface IPolicyDocumentStatement {
   Effect: 'Allow' | 'Deny';
   Resource: string;
 }
@@ -20,7 +20,7 @@ export interface IPolicyDocumentStatement {
  * Result type for policy JSON validation.
  * Discriminated union that provides the parsed policy on success, or an error message on failure.
  */
-export type PolicyValidationResult = { valid: true; policy: IPolicyDocument } | { valid: false; error: string };
+type PolicyValidationResult = { valid: true; policy: IPolicyDocument } | { valid: false; error: string };
 
 /**
  * Default empty policy document.
@@ -41,13 +41,31 @@ export const defaultPolicyDocument: IPolicyDocument = {
  * @param {string} policyJson - JSON string representing the policy document (IPolicyDocument structure)
  * @returns {ICreatePolicyStatementRequest[]} Array of policy statement requests ready for API submission
  */
-export const transformPolicyJsonToApi = (policyJson: string): ICreatePolicyStatementRequest[] => {
+export const transformPolicyJsonToApi = (
+  policyJson: string,
+  existingStatements: IPolicyStatement[] = []
+): ICreatePolicyStatementRequest[] => {
   const policy: IPolicyDocument = JSON.parse(policyJson);
+  const existingStatementsByShape = new Map<string, IPolicyStatement[]>();
 
-  return policy.Statement.map((stmt) => ({
-    effect: stmt.Effect.toLowerCase() as 'allow' | 'deny',
-    submission_feature_urn: stmt.Resource
-  }));
+  for (const statement of existingStatements) {
+    const key = getStatementShapeKey(statement.effect, statement.submission_feature_urn);
+    const matches = existingStatementsByShape.get(key) ?? [];
+    matches.push(statement);
+    existingStatementsByShape.set(key, matches);
+  }
+
+  return policy.Statement.map((stmt) => {
+    const effect = stmt.Effect.toLowerCase() as 'allow' | 'deny';
+    const existingMatches = existingStatementsByShape.get(getStatementShapeKey(effect, stmt.Resource)) ?? [];
+    const existingStatement = existingMatches.shift();
+
+    return {
+      effect,
+      submission_feature_urn: stmt.Resource,
+      ...(existingStatement?.policy_expression_id ? { policy_expression_id: existingStatement.policy_expression_id } : {})
+    };
+  });
 };
 
 /**
@@ -68,17 +86,10 @@ export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string
   return JSON.stringify(policy, null, 2);
 };
 
-/**
- * Transform a full policy object to JSON document format for editing in the Monaco editor.
- *
- * @param {IPolicy} policy - The complete policy object from the API (includes metadata and statements)
- * @returns {string} Formatted JSON string representing the policy document
- */
-export const transformPolicyToJson = (policy: IPolicy): string => {
-  return transformApiToPolicyJson(policy.statements);
-};
-
 const URN_PATTERN = /^urn:(\*|\d+):(\*|[a-z_]+):(\*|\d+)$/;
+const STATEMENT_KEYS = new Set(['Effect', 'Resource']);
+
+const getStatementShapeKey = (effect: 'allow' | 'deny', resource: string): string => `${effect}:${resource}`;
 
 /**
  * Validate a single policy statement object.
@@ -88,6 +99,10 @@ const URN_PATTERN = /^urn:(\*|\d+):(\*|[a-z_]+):(\*|\d+)$/;
  * @returns {string | null} Error message if validation fails, null if valid
  */
 const validateStatement = (stmt: Partial<IPolicyDocumentStatement>, index: number): string | null => {
+  const unsupportedKey = Object.keys(stmt).find((key) => !STATEMENT_KEYS.has(key));
+  if (unsupportedKey) {
+    return `Statement ${index + 1}: Unsupported field "${unsupportedKey}"`;
+  }
   if (!stmt.Effect || !['Allow', 'Deny'].includes(stmt.Effect)) {
     return `Statement ${index + 1}: Effect must be "Allow" or "Deny"`;
   }

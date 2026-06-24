@@ -44,9 +44,10 @@ export class PolicyStatementRepository extends BaseRepository {
       .insert({
         policy_id: policyStatementData.policy_id,
         effect: policyStatementData.effect,
-        submission_feature_urn: policyStatementData.submission_feature_urn
+        submission_feature_urn: policyStatementData.submission_feature_urn,
+        policy_expression_id: policyStatementData.policy_expression_id ?? null
       })
-      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn']);
+      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id']);
 
     const response = await this.connection.knex(query, PolicyStatement);
 
@@ -70,9 +71,15 @@ export class PolicyStatementRepository extends BaseRepository {
   async getPolicyStatement(policyStatementId: string): Promise<PolicyStatement> {
     const knex = getKnex();
     const query = knex
-      .table('policy_statement')
-      .select(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'])
-      .where('policy_statement_id', policyStatementId);
+      .table('policy_statement as ps')
+      .select([
+        'ps.policy_statement_id',
+        'ps.policy_id',
+        'ps.effect',
+        'ps.submission_feature_urn',
+        'ps.policy_expression_id'
+      ])
+      .where('ps.policy_statement_id', policyStatementId);
 
     const response = await this.connection.knex(query, PolicyStatement);
 
@@ -103,10 +110,16 @@ export class PolicyStatementRepository extends BaseRepository {
   async getPolicyStatements(policyId: string): Promise<PolicyStatement[]> {
     const knex = getKnex();
     const query = knex
-      .table('policy_statement')
-      .select(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'])
-      .where('policy_id', policyId)
-      .whereNull('record_end_date');
+      .table('policy_statement as ps')
+      .select([
+        'ps.policy_statement_id',
+        'ps.policy_id',
+        'ps.effect',
+        'ps.submission_feature_urn',
+        'ps.policy_expression_id'
+      ])
+      .where('ps.policy_id', policyId)
+      .whereNull('ps.record_end_date');
 
     const response = await this.connection.knex(query, PolicyStatement);
 
@@ -142,11 +155,8 @@ export class PolicyStatementRepository extends BaseRepository {
         'ps.urn_feature_type',
         'pe.expression_id'
       )
-      .leftJoin('policy_statement_expression as pse', function () {
-        this.on('pse.policy_statement_id', '=', 'ps.policy_statement_id').andOnNull('pse.record_end_date');
-      })
       .leftJoin('policy_expression as pe', function () {
-        this.on('pe.policy_expression_id', '=', 'pse.policy_expression_id')
+        this.on('pe.policy_expression_id', '=', 'ps.policy_expression_id')
           .andOn('pe.policy_id', '=', 'ps.policy_id')
           .andOnNull('pe.record_end_date');
       })
@@ -172,16 +182,29 @@ export class PolicyStatementRepository extends BaseRepository {
     policyStatementData: UpdatePolicyStatement
   ): Promise<PolicyStatement> {
     const knex = getKnex();
+    const updateData: Record<string, string | null | undefined> = {};
+
+    if (policyStatementData.policy_id !== undefined) {
+      updateData.policy_id = policyStatementData.policy_id;
+    }
+    if (policyStatementData.effect !== undefined) {
+      updateData.effect = policyStatementData.effect;
+    }
+    if (policyStatementData.submission_feature_urn !== undefined) {
+      updateData.submission_feature_urn = policyStatementData.submission_feature_urn;
+    }
+    if (policyStatementData.policy_expression_id !== undefined) {
+      updateData.policy_expression_id = policyStatementData.policy_expression_id;
+    }
+    if (policyStatementData.record_end_date !== undefined) {
+      updateData.record_end_date = policyStatementData.record_end_date;
+    }
+
     const query = knex
       .table('policy_statement')
-      .update({
-        policy_id: policyStatementData.policy_id,
-        effect: policyStatementData.effect,
-        submission_feature_urn: policyStatementData.submission_feature_urn,
-        record_end_date: policyStatementData.record_end_date
-      })
+      .update(updateData)
       .where('policy_statement_id', policyStatementId)
-      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn']);
+      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id']);
 
     const response = await this.connection.knex(query, PolicyStatement);
 

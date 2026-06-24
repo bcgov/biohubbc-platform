@@ -69,27 +69,4 @@ describe('PolicyExpressionService', () => {
       });
     });
   });
-
-  describe('getPolicyExpressionById', () => {
-    it('delegates to repository', async () => {
-      const service = new PolicyExpressionService(getMockDBConnection());
-
-      const policyExpression = {
-        policy_expression_id: 'pe-1',
-        policy_id: 'policy-1',
-        expression_id: 'expr-1',
-        name: null,
-        description: null
-      };
-
-      const getStub = sinon
-        .stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionById')
-        .resolves(policyExpression);
-
-      const result = await service.getPolicyExpressionById('pe-1');
-
-      expect(result).to.eql(policyExpression);
-      expect(getStub).to.have.been.calledOnceWithExactly('pe-1');
-    });
-  });
 });

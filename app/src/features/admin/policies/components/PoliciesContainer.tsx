@@ -209,7 +209,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
     setIsLoading(true);
 
     try {
-      const statements = transformPolicyJsonToApi(values.policy_json);
+      const statements = transformPolicyJsonToApi(values.policy_json, editingPolicy.statements);
 
       await biohubApi.policies.updatePolicy(editingPolicy.policy_id, {
         name: values.name,

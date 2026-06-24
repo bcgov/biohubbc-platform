@@ -2,7 +2,6 @@ import {
   defaultPolicyDocument,
   transformApiToPolicyJson,
   transformPolicyJsonToApi,
-  transformPolicyToJson,
   validatePolicyJson
 } from './policyTransform';
 
@@ -33,6 +32,63 @@ describe('policyTransform', () => {
         { effect: 'deny', submission_feature_urn: 'urn:1:observation:2' }
       ]);
     });
+
+    it('preserves existing policy expression links for unchanged statements', () => {
+      const result = transformPolicyJsonToApi(
+        JSON.stringify({
+          Version: '2025-12-01',
+          Statement: [
+            { Effect: 'Allow', Resource: 'urn:*:telemetry:*' },
+            { Effect: 'Deny', Resource: 'urn:1:observation:2' }
+          ]
+        }),
+        [
+          {
+            policy_statement_id: 'uuid-stmt-1',
+            policy_id: 'uuid-policy-1',
+            effect: 'allow',
+            submission_feature_urn: 'urn:*:telemetry:*',
+            policy_expression_id: 'uuid-policy-expression-1'
+          },
+          {
+            policy_statement_id: 'uuid-stmt-2',
+            policy_id: 'uuid-policy-1',
+            effect: 'deny',
+            submission_feature_urn: 'urn:1:observation:2',
+            policy_expression_id: null
+          }
+        ]
+      );
+
+      expect(result).toEqual([
+        {
+          effect: 'allow',
+          submission_feature_urn: 'urn:*:telemetry:*',
+          policy_expression_id: 'uuid-policy-expression-1'
+        },
+        { effect: 'deny', submission_feature_urn: 'urn:1:observation:2' }
+      ]);
+    });
+
+    it('does not carry expression links onto changed statements', () => {
+      const result = transformPolicyJsonToApi(
+        JSON.stringify({
+          Version: '2025-12-01',
+          Statement: [{ Effect: 'Allow', Resource: 'urn:*:observation:*' }]
+        }),
+        [
+          {
+            policy_statement_id: 'uuid-stmt-1',
+            policy_id: 'uuid-policy-1',
+            effect: 'allow',
+            submission_feature_urn: 'urn:*:telemetry:*',
+            policy_expression_id: 'uuid-policy-expression-1'
+          }
+        ]
+      );
+
+      expect(result).toEqual([{ effect: 'allow', submission_feature_urn: 'urn:*:observation:*' }]);
+    });
   });
 
   describe('transformApiToPolicyJson', () => {
@@ -42,37 +98,19 @@ describe('policyTransform', () => {
           policy_statement_id: 'uuid-stmt-1',
           policy_id: 'uuid-policy-1',
           effect: 'allow',
-          submission_feature_urn: 'urn:*:telemetry:*'
+          submission_feature_urn: 'urn:*:telemetry:*',
+          policy_expression_id: 'uuid-policy-expression-1'
         }
       ]);
 
       expect(JSON.parse(result)).toEqual({
         Version: '2025-12-01',
-        Statement: [{ Effect: 'Allow', Resource: 'urn:*:telemetry:*' }]
-      });
-    });
-  });
-
-  describe('transformPolicyToJson', () => {
-    it('transforms a policy to JSON policy document', () => {
-      const result = transformPolicyToJson({
-        policy_id: 'uuid-policy-1',
-        name: 'Policy',
-        description: null,
-        status: 'approved' as any,
-        statements: [
+        Statement: [
           {
-            policy_statement_id: 'uuid-stmt-1',
-            policy_id: 'uuid-policy-1',
-            effect: 'deny',
-            submission_feature_urn: 'urn:*:*:*'
+            Effect: 'Allow',
+            Resource: 'urn:*:telemetry:*'
           }
         ]
-      });
-
-      expect(JSON.parse(result)).toEqual({
-        Version: '2025-12-01',
-        Statement: [{ Effect: 'Deny', Resource: 'urn:*:*:*' }]
       });
     });
   });
@@ -100,6 +138,20 @@ describe('policyTransform', () => {
       expect(result).toEqual({
         valid: false,
         error: 'Statement 1: Invalid Resource URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
+      });
+    });
+
+    it('returns error for expression fields because the JSON editor does not manage expressions', () => {
+      const result = validatePolicyJson(
+        JSON.stringify({
+          Version: '2025-12-01',
+          Statement: [{ Effect: 'Allow', Resource: 'urn:*:*:*', PolicyExpressionId: 'uuid-policy-expression-1' }]
+        })
+      );
+
+      expect(result).toEqual({
+        valid: false,
+        error: 'Statement 1: Unsupported field "PolicyExpressionId"'
       });
     });
   });

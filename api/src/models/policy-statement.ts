@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { ExpressionTree } from './expression-tree';
 
 export enum PolicyEffect {
   ALLOW = 'allow',
@@ -10,7 +9,8 @@ export const PolicyStatement = z.object({
   policy_statement_id: z.string().uuid(),
   policy_id: z.string().uuid(),
   effect: z.nativeEnum(PolicyEffect),
-  submission_feature_urn: z.string().max(500)
+  submission_feature_urn: z.string().max(500),
+  policy_expression_id: z.string().nullable()
 });
 
 export type PolicyStatement = z.infer<typeof PolicyStatement>;
@@ -30,17 +30,19 @@ export interface CreatePolicyStatement {
   policy_id: string;
   effect: PolicyEffect;
   submission_feature_urn: string;
+  policy_expression_id?: string | null;
 }
 
 export interface CreatePolicyStatementPayload {
   effect: PolicyEffect;
   submission_feature_urn: string;
-  expression?: ExpressionTree;
+  policy_expression_id?: string | null;
 }
 
 export interface UpdatePolicyStatement {
   policy_id?: string;
   effect?: PolicyEffect;
   submission_feature_urn?: string;
+  policy_expression_id?: string | null;
   record_end_date?: string;
 }

@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
-import { ApiNotFoundError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { PolicyExpressionRepository } from './policy-expression-repository';
 
 const policyExpressionRow = {
@@ -16,28 +16,6 @@ const policyExpressionRow = {
 describe('PolicyExpressionRepository', () => {
   afterEach(() => {
     sinon.restore();
-  });
-
-  describe('insertPolicyExpression', () => {
-    it('inserts and returns the policy_expression row', async () => {
-      const knexStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
-      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
-
-      const result = await repository.insertPolicyExpression({
-        policy_id: 'policy-1',
-        expression_id: 'expr-1',
-        name: null,
-        description: null
-      });
-
-      expect(result).to.eql(policyExpressionRow);
-      const sqlText = knexStub.firstCall.args[0].toString();
-      expect(sqlText).to.include('insert into "policy_expression"');
-      expect(sqlText).to.not.include('ON CONFLICT');
-      expect(sqlText).to.include(
-        'returning "policy_expression_id", "policy_id", "expression_id", "name", "description"'
-      );
-    });
   });
 
   describe('getPolicyExpressionById', () => {
@@ -54,14 +32,40 @@ describe('PolicyExpressionRepository', () => {
     });
   });
 
-  describe('getPolicyExpressionByPolicyAndExpressionId', () => {
-    it('returns null when row is missing', async () => {
-      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+  describe('ensurePolicyExpression', () => {
+    it('maps camelCase payload fields to snake_case database columns', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.getPolicyExpressionByPolicyAndExpressionId('policy-1', 'expr-1');
+      const result = await repository.ensurePolicyExpression({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
+        name: null,
+        description: null
+      });
 
-      expect(result).to.be.null;
+      expect(result).to.eql(policyExpressionRow);
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('INSERT INTO policy_expression');
+      expect(sqlText).to.include('policy_id');
+      expect(sqlText).to.include('expression_id');
+      expect(sqlText).to.not.include('policyId');
+      expect(sqlText).to.not.include('expressionId');
+    });
+
+    it('throws when ensure does not return one row', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      try {
+        await repository.ensurePolicyExpression({
+          policyId: 'policy-1',
+          expressionId: 'expr-1'
+        });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+      }
     });
   });
 });

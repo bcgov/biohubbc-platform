@@ -8,7 +8,7 @@ import { FeatureIngestionRepository } from '../repositories/ingestion/feature-in
 import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
 import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
+import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
@@ -30,7 +30,7 @@ export class DataRequestService extends DBService {
   teamPolicyService: TeamPolicyService;
   teamMemberService: TeamMemberService;
   expressionTreeService: ExpressionTreeService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
+  policyStatementService: PolicyStatementService;
   policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
 
@@ -48,7 +48,7 @@ export class DataRequestService extends DBService {
     this.teamPolicyService = new TeamPolicyService(connection);
     this.teamMemberService = new TeamMemberService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
     this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
@@ -196,10 +196,9 @@ export class DataRequestService extends DBService {
       });
 
       for (const statement of policy.statements) {
-        await this.policyStatementExpressionService.setPolicyStatementExpression(
-          statement.policy_statement_id,
-          policyExpression.policy_expression_id
-        );
+        await this.policyStatementService.updatePolicyStatement(statement.policy_statement_id, {
+          policy_expression_id: policyExpression.policy_expression_id
+        });
       }
     }
 

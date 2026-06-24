@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { publishComputeScopeAnchorsJob } from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
+import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { getLogger } from '../../utils/logger';
 import { computeScopeHash } from '../../utils/scope-hash';
 import { DBService } from '../db-service';
@@ -28,6 +29,7 @@ const defaultLog = getLogger('security-scope-service');
  */
 export class SecurityScopeService extends DBService {
   securityScopeRepository: SecurityScopeRepository;
+  teamPolicyRepository: TeamPolicyRepository;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -40,6 +42,7 @@ export class SecurityScopeService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.securityScopeRepository = new SecurityScopeRepository(connection);
+    this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
 
   /**
@@ -233,6 +236,35 @@ export class SecurityScopeService extends DBService {
     const materialized = await this.materializePolicyStatementScopes(policyId);
     if (materialized) {
       await this.grantTeamAccessForPolicy(teamId, policyId);
+    }
+  }
+
+  /**
+   * Reconcile all derived access-cache rows for a policy after an access-defining
+   * policy source changes.
+   *
+   * The source write has already happened before this method is called. This
+   * method materializes the current approved ALLOW statement scopes, then
+   * rebuilds each linked team's access grants from the current policy chain.
+   * Rebuilding instead of only inserting is important for mutations that can
+   * remove access, such as DENY changes, status gates, deleted statements, or
+   * changed statement URNs. Statement expression links are export filters, not
+   * standing access grants, so changing only `policy_expression_id` does not need
+   * this rebuild.
+   *
+   * @param policyId UUID of the policy whose derived access rows should be reconciled
+   */
+  async refreshAccessForPolicy(policyId: string): Promise<void> {
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+
+    if (teamPolicies.length === 0) {
+      return;
+    }
+
+    await this.materializePolicyStatementScopes(policyId);
+
+    for (const teamPolicy of teamPolicies) {
+      await this.rebuildTeamSecurityScopes(teamPolicy.team_id);
     }
   }
 

@@ -8,7 +8,7 @@ import {
  * Marker severity levels matching Monaco's MarkerSeverity enum.
  * Defined here to avoid importing monaco-editor in tests.
  */
-export const ValidationMarkerSeverity = {
+const ValidationMarkerSeverity = {
   Error: 8,
   Warning: 4,
   Info: 2,
@@ -46,7 +46,7 @@ interface IStatement {
   Resource: string;
 }
 
-export const findLineNumber = (text: string, searchString: string, startLine = 1): number => {
+const findLineNumber = (text: string, searchString: string, startLine = 1): number => {
   const lines = text.split('\n');
   for (let i = startLine - 1; i < lines.length; i++) {
     if (lines[i].includes(searchString)) {
@@ -54,14 +54,6 @@ export const findLineNumber = (text: string, searchString: string, startLine = 1
     }
   }
   return 1;
-};
-
-export const findColumnRange = (line: string, value: string): { start: number; end: number } => {
-  const index = line.indexOf(value);
-  if (index === -1) {
-    return { start: 1, end: line.length + 1 };
-  }
-  return { start: index + 1, end: index + value.length + 1 };
 };
 
 const createMarker = (

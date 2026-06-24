@@ -26,6 +26,7 @@ export interface IPolicyStatement {
   policy_id: string;
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
+  policy_expression_id: string | null;
 }
 
 /**
@@ -52,6 +53,7 @@ export interface ICreatePolicyRequest {
 export interface ICreatePolicyStatementRequest {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
+  policy_expression_id?: string | null;
 }
 
 /**

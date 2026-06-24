@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScope } from '../../models/security-scope';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
+import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);
@@ -400,6 +401,36 @@ describe('SecurityScopeService', () => {
       // Sequential for-await — second statement never reached, team grant never runs.
       expect(insertScopeStub).to.have.been.calledOnce;
       expect(insertTeamGrantStub).not.to.have.been.called;
+    });
+  });
+
+  describe('refreshAccessForPolicy', () => {
+    it('returns without materializing when no teams are linked to the policy', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
+      const materializeStub = sinon.stub(service, 'materializePolicyStatementScopes').resolves(true);
+      const rebuildStub = sinon.stub(service, 'rebuildTeamSecurityScopes').resolves();
+
+      await service.refreshAccessForPolicy('policy-1');
+
+      expect(materializeStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
+    });
+
+    it('materializes current policy scopes once and rebuilds each linked team', async () => {
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        { team_policy_id: 'tp-1', team_id: 'team-1', policy_id: 'policy-1' },
+        { team_policy_id: 'tp-2', team_id: 'team-2', policy_id: 'policy-1' }
+      ] as any);
+      const materializeStub = sinon.stub(service, 'materializePolicyStatementScopes').resolves(true);
+      const rebuildStub = sinon.stub(service, 'rebuildTeamSecurityScopes').resolves();
+
+      await service.refreshAccessForPolicy('policy-1');
+
+      expect(materializeStub).to.have.been.calledOnceWith('policy-1');
+      expect(rebuildStub).to.have.been.calledTwice;
+      expect(rebuildStub.firstCall).to.have.been.calledWith('team-1');
+      expect(rebuildStub.secondCall).to.have.been.calledWith('team-2');
+      expect(materializeStub).to.have.been.calledBefore(rebuildStub);
     });
   });
 

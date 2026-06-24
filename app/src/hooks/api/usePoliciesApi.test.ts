@@ -57,7 +57,8 @@ describe('usePoliciesApi', () => {
             policy_statement_id: 's1',
             policy_id: '123',
             effect: 'allow',
-            submission_feature_urn: 'urn:*:*:*'
+            submission_feature_urn: 'urn:*:*:*',
+            policy_expression_id: null
           }
         ]
       };

@@ -5,14 +5,14 @@ import { PolicyStatementRepository } from '../repositories/authorization/policy-
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
 import { PolicyExpressionService } from './access-policy/policy-expression-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
+import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { DBService } from './db-service';
 
 export class SecurityRuleExpressionService extends DBService {
   securityRuleExpressionRepository: SecurityRuleExpressionRepository;
   securityRuleRepository: SecurityRuleRepository;
   policyStatementRepository: PolicyStatementRepository;
-  policyStatementExpressionService: PolicyStatementExpressionService;
+  policyStatementService: PolicyStatementService;
   policyExpressionService: PolicyExpressionService;
 
   /**
@@ -25,7 +25,7 @@ export class SecurityRuleExpressionService extends DBService {
     this.securityRuleExpressionRepository = new SecurityRuleExpressionRepository(connection);
     this.securityRuleRepository = new SecurityRuleRepository(connection);
     this.policyStatementRepository = new PolicyStatementRepository(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
     this.policyExpressionService = new PolicyExpressionService(connection);
   }
 
@@ -84,10 +84,9 @@ export class SecurityRuleExpressionService extends DBService {
       expressionId: expressionId
     });
 
-    await this.policyStatementExpressionService.setPolicyStatementExpression(
-      mappedStatement.policy_statement_id,
-      policyExpression.policy_expression_id
-    );
+    await this.policyStatementService.updatePolicyStatement(mappedStatement.policy_statement_id, {
+      policy_expression_id: policyExpression.policy_expression_id
+    });
   }
 
   /**

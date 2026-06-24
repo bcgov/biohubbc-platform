@@ -22,7 +22,8 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:biohub:submission:1'
+          submission_feature_urn: 'urn:biohub:submission:1',
+          policy_expression_id: null
         }
       ];
       const mockQueryResponse = {
@@ -30,8 +31,9 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        knex: knexStub
       });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
@@ -41,6 +43,7 @@ describe('PolicyStatementRepository', () => {
         submission_feature_urn: 'urn:biohub:submission:1'
       });
 
+      expect(knexStub).to.have.been.calledOnce;
       expect(result).to.eql(mockRows[0]);
     });
 
@@ -73,7 +76,8 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: 'DENY',
-          submission_feature_urn: 'urn:biohub:submission:2'
+          submission_feature_urn: 'urn:biohub:submission:2',
+          policy_expression_id: 'pe-1'
         }
       ];
       const mockResponse = {
@@ -81,19 +85,23 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockResponse
-      });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.getPolicyStatement('1');
 
       expect(result).to.eql(mockRows[0]);
+      const sql = knexStub.firstCall.args[0].toString();
+      expect(sql).to.not.include('policy_statement_expression');
+      expect(sql).to.include('"ps"."policy_expression_id"');
+      expect(sql).to.include('"ps"."policy_statement_id" = \'1\'');
     });
 
     it('throws error if not found', async () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
 
@@ -115,13 +123,15 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: mockPolicyId,
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:biohub:submission:1'
+          submission_feature_urn: 'urn:biohub:submission:1',
+          policy_expression_id: null
         },
         {
           policy_statement_id: 2,
           policy_id: mockPolicyId,
           effect: 'DENY',
-          submission_feature_urn: 'urn:biohub:submission:2'
+          submission_feature_urn: 'urn:biohub:submission:2',
+          policy_expression_id: 'pe-1'
         }
       ];
       const mockResponse = {
@@ -129,12 +139,18 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.getPolicyStatements(mockPolicyId);
 
       expect(result).to.eql(mockRows);
+      const sql = knexStub.firstCall.args[0].toString();
+      expect(sql).to.not.include('policy_statement_expression');
+      expect(sql).to.include('"ps"."policy_expression_id"');
+      expect(sql).to.include('"ps"."policy_id" = \'10\'');
+      expect(sql).to.include('"ps"."record_end_date" is null');
     });
   });
 
@@ -167,9 +183,9 @@ describe('PolicyStatementRepository', () => {
       // record_end_date guard, and ps.policy_id filter.
       const queryArg = knexStub.firstCall.args[0];
       const sql = queryArg.toString();
-      expect(sql).to.include('left join "policy_statement_expression"');
+      expect(sql).to.not.include('policy_statement_expression');
       expect(sql).to.include('left join "policy_expression"');
-      expect(sql).to.include('"pse"."record_end_date" is null');
+      expect(sql).to.include('"pe"."policy_expression_id" = "ps"."policy_expression_id"');
       expect(sql).to.include('"pe"."policy_id" = "ps"."policy_id"');
       expect(sql).to.include('"pe"."record_end_date" is null');
       expect(sql).to.include('"ps"."policy_id" = \'policy-1\'');
@@ -179,7 +195,8 @@ describe('PolicyStatementRepository', () => {
 
     it('returns [] for a policy with no active statements (does NOT throw)', async () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.getActiveStatementsWithExpressionByPolicyId('policy-empty');
@@ -195,7 +212,8 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:biohub:submission:updated'
+          submission_feature_urn: 'urn:biohub:submission:updated',
+          policy_expression_id: null
         }
       ];
       const mockResponse = {
@@ -203,7 +221,8 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.updatePolicyStatement('1', {
@@ -212,7 +231,37 @@ describe('PolicyStatementRepository', () => {
         submission_feature_urn: 'urn:biohub:submission:updated'
       });
 
+      expect(knexStub).to.have.been.calledOnce;
       expect(result).to.eql(mockRows[0]);
+    });
+
+    it('omits undefined fields from partial updates', async () => {
+      const mockRows = [
+        {
+          policy_statement_id: 1,
+          policy_id: '123abc',
+          effect: PolicyEffect.DENY,
+          submission_feature_urn: 'urn:biohub:submission:1',
+          policy_expression_id: null
+        }
+      ];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new PolicyStatementRepository(mockDBConnection);
+      await repository.updatePolicyStatement('1', {
+        effect: PolicyEffect.DENY
+      });
+
+      const sql = knexStub.firstCall.args[0].toString();
+      expect(sql).to.include('"effect" = \'deny\'');
+      expect(sql).to.not.include('set "policy_expression_id"');
+      expect(sql).to.not.include('set "submission_feature_urn"');
     });
 
     it('throws error if update fails', async () => {

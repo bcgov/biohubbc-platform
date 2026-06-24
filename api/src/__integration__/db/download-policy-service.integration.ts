@@ -1,5 +1,5 @@
 // Integration test for DownloadPolicyService — verifies that creating a download
-// policy writes the expected policy + policy_statement + policy_statement_expression
+// policy writes the expected policy + policy_statement links
 // rows against a real database, and that download policies are intentionally
 // scope-free (no team_policy / security_scope rows) so they can never act as a
 // backdoor for granting access.
@@ -95,12 +95,13 @@ describe('DownloadPolicyService (integration)', function () {
       expect(statements.rows[0].submission_feature_urn).to.equal('urn:*:dataset:*');
       expect(statements.rows[1].urn_feature_type).to.equal('sample_site');
 
-      // Broad path: no expression links.
+      // Broad path: no statement-level expression links.
       const expressionLinks = await connection.sql(SQL`
-        SELECT pse.policy_statement_expression_id
-        FROM policy_statement_expression pse
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-        WHERE ps.policy_id = ${policy_id} AND pse.record_end_date IS NULL;
+        SELECT policy_statement_id
+        FROM policy_statement
+        WHERE policy_id = ${policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(expressionLinks.rowCount).to.equal(0);
     });
@@ -118,12 +119,10 @@ describe('DownloadPolicyService (integration)', function () {
       });
 
       const expressionLinks = await connection.sql(SQL`
-        SELECT pe.expression_id, pse.policy_statement_id
-        FROM policy_statement_expression pse
-        JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
+        SELECT pe.expression_id, ps.policy_statement_id
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
         WHERE ps.policy_id = ${policy_id}
-          AND pse.record_end_date IS NULL
           AND pe.record_end_date IS NULL;
       `);
       expect(expressionLinks.rowCount).to.equal(2);
@@ -169,7 +168,7 @@ describe('DownloadPolicyService (integration)', function () {
       expect(scopeJoinRows.rows[0].n).to.equal(0);
     });
 
-    it('audit chain: download → policy → policy_statement → policy_statement_expression → expression round-trips the original tree', async () => {
+    it('audit chain: download → policy → policy_statement → policy_expression → expression round-trips the original tree', async () => {
       // U5 (audit chain): walk download → policy → statement → expression link
       // → expression and confirm the persisted tree round-trips deep-equal.
       const inputTree: ExpressionTree = {
@@ -204,10 +203,8 @@ describe('DownloadPolicyService (integration)', function () {
         SELECT pe.expression_id
           FROM download d
           JOIN policy_statement ps USING (policy_id)
-          JOIN policy_statement_expression pse USING (policy_statement_id)
-          JOIN policy_expression pe ON pe.policy_expression_id = pse.policy_expression_id
+          JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
          WHERE d.download_id = ${download_id}
-           AND pse.record_end_date IS NULL
            AND pe.record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);

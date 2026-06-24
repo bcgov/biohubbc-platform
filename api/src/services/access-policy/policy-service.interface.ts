@@ -1,4 +1,3 @@
-import { ExpressionTree } from '../../models/expression-tree';
 import { Policy } from '../../models/policy';
 import { PolicyStatement } from '../../models/policy-statement';
 
@@ -18,15 +17,8 @@ export interface PolicyFilters {
 }
 
 /**
- * A policy statement with its optional expression tree.
- */
-export interface PolicyStatementWithExpression extends PolicyStatement {
-  expression?: ExpressionTree;
-}
-
-/**
  * A policy with its statements.
  */
 export interface PolicyWithStatements extends Policy {
-  statements: PolicyStatementWithExpression[];
+  statements: PolicyStatement[];
 }

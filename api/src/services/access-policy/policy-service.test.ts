@@ -8,10 +8,8 @@ import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
-import { ExpressionTreeService } from '../expression-tree-service';
-import { PolicyExpressionService } from './policy-expression-service';
+import { PolicyExpressionRepository } from '../../repositories/policy-expression-repository';
 import { PolicyService } from './policy-service';
-import { PolicyStatementExpressionService } from './policy-statement-expression-service';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);
@@ -21,9 +19,6 @@ describe('PolicyService', () => {
   let policyService: PolicyService;
 
   beforeEach(() => {
-    sinon
-      .stub(PolicyStatementExpressionService.prototype, 'getPolicyStatementExpressionsByPolicyStatementId')
-      .resolves([]);
     mockDBConnection = getMockDBConnection();
     policyService = new PolicyService(mockDBConnection);
   });
@@ -496,7 +491,13 @@ describe('PolicyService', () => {
         { policy_id: '2', name: 'Policy 2', description: 'Desc 2', status: 'approved' }
       ];
       const mockStatements: PolicyStatement[] = [
-        { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }
+        {
+          policy_statement_id: 's1',
+          policy_id: '1',
+          effect: PolicyEffect.ALLOW,
+          submission_feature_urn: 'urn:*:*:*',
+          policy_expression_id: null
+        }
       ];
       const getPoliciesStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves(mockPolicies);
       const getPolicyStatementsStub = sinon
@@ -531,7 +532,8 @@ describe('PolicyService', () => {
           policy_statement_id: 's1',
           policy_id: '1',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:*:telemetry:*'
+          submission_feature_urn: 'urn:*:telemetry:*',
+          policy_expression_id: null
         }
       ];
       const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
@@ -550,28 +552,6 @@ describe('PolicyService', () => {
     });
   });
 
-  describe('getStatementsWithExpressions', () => {
-    it('should call repository.getPolicyStatements and return statements with expressions', async () => {
-      const mockStatements: PolicyStatement[] = [
-        { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' },
-        {
-          policy_statement_id: 's2',
-          policy_id: '1',
-          effect: PolicyEffect.DENY,
-          submission_feature_urn: 'urn:*:sensitive:*'
-        }
-      ];
-      const getPolicyStatementsStub = sinon
-        .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
-        .resolves(mockStatements);
-
-      const result = await policyService.getStatementsWithExpressions('1');
-
-      expect(getPolicyStatementsStub).to.have.been.calledWith('1');
-      expect(result).to.eql([mockStatements[0], mockStatements[1]]);
-    });
-  });
-
   describe('createPolicyWithStatements', () => {
     // A1: New policy with 2 ALLOW statements — scope materialization NOT called; statements inserted.
     it('does not call materializeScopeForPolicyStatement; persists statements', async () => {
@@ -580,13 +560,15 @@ describe('PolicyService', () => {
         policy_statement_id: 's1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:telemetry:*'
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: null
       };
       const mockStatement2: PolicyStatement = {
         policy_statement_id: 's2',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:10:*:*'
+        submission_feature_urn: 'urn:10:*:*',
+        policy_expression_id: null
       };
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const insertStatementStub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement');
@@ -598,6 +580,7 @@ describe('PolicyService', () => {
       const materializeTeamAccessStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
         .resolves();
+      sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
 
       const result = await policyService.createPolicyWithStatements(
         { name: 'New Policy', description: 'Desc', status: 'requested' } as CreatePolicy,
@@ -627,11 +610,11 @@ describe('PolicyService', () => {
       });
     });
 
-    // A2: Statement with expression — expression persisted; scope materialization NOT called.
-    it('persists statement expressions without materializing scopes', async () => {
+    // A2: Statement with a policy expression id — link persisted; scope materialization NOT called.
+    it('links statements to existing policy expressions without materializing scopes', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
-        name: 'Expression Policy',
+        name: 'Expression Link Policy',
         description: null,
         status: 'requested'
       };
@@ -640,76 +623,53 @@ describe('PolicyService', () => {
         policy_statement_id: 's1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:sampling_site:*'
+        submission_feature_urn: 'urn:*:sampling_site:*',
+        policy_expression_id: null
       };
-
-      const expression = {
-        type: 'expression' as const,
-        operator: 'AND' as const,
-        clauses: [
-          {
-            type: 'predicate' as const,
-            feature_property_id: 10,
-            feature_type_property_id: 20,
-            operator: 'Equals' as const,
-            value: 'caribou'
-          }
-        ]
-      };
+      const linkedStatement: PolicyStatement = { ...mockStatement, policy_expression_id: 'pe-1' };
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
-      sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
+      const insertStatementStub = sinon
+        .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
+        .resolves(linkedStatement);
+      sinon.stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionById').resolves({
+        policy_expression_id: 'pe-1',
+        policy_id: '1',
+        expression_id: 'e1',
+        name: null,
+        description: null
+      });
 
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
-
-      const writeExpressionTreeStub = sinon
-        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
-        .resolves({ expression_id: 'expr-1' });
-
-      const ensurePolicyExpressionStub = sinon
-        .stub(PolicyExpressionService.prototype, 'ensurePolicyExpression')
-        .resolves({
-          policy_expression_id: 'pe-1',
-          policy_id: '1',
-          expression_id: 'expr-1',
-          name: null,
-          description: null
-        });
-
-      const setExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
-        .resolves();
+      sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
 
       const result = await policyService.createPolicyWithStatements(
-        { name: 'Expression Policy', status: 'requested' } as CreatePolicy,
+        { name: 'Expression Link Policy', status: 'requested' } as CreatePolicy,
         [
           {
             effect: PolicyEffect.ALLOW,
             submission_feature_urn: 'urn:*:sampling_site:*',
-            expression
+            policy_expression_id: 'pe-1'
           }
         ]
       );
 
-      expect(writeExpressionTreeStub).to.have.been.calledOnceWithExactly(expression);
-
-      expect(ensurePolicyExpressionStub).to.have.been.calledOnceWithExactly({
-        policyId: '1',
-        expressionId: 'expr-1'
+      expect(insertStatementStub).to.have.been.calledOnceWithExactly({
+        policy_id: '1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:*:sampling_site:*',
+        policy_expression_id: 'pe-1'
       });
-
-      expect(setExpressionStub).to.have.been.calledOnceWithExactly('s1', 'pe-1');
 
       expect(materializeStub).to.not.have.been.called;
 
-      expect(result.statements[0]).to.include(mockStatement);
-      expect(result.statements[0].expression).to.eql(expression);
+      expect(result.statements[0]).to.eql(linkedStatement);
     });
 
-    // A3: Empty statements list — no statement, scope, or expression work.
-    it('skips statement, scope, and expression work for an empty statement list', async () => {
+    // A3: Empty statements list — no statement, scope, or expression-link work.
+    it('skips statement, scope, and expression-link work for an empty statement list', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Empty Policy',
@@ -721,11 +681,6 @@ describe('PolicyService', () => {
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
         .resolves('scope-1');
-      const writeExpressionTreeStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves();
-      const replaceExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'setPolicyStatementExpression')
-        .resolves();
-
       const result = await policyService.createPolicyWithStatements(
         { name: 'Empty Policy', description: 'No statements', status: 'requested' } as CreatePolicy,
         []
@@ -733,8 +688,6 @@ describe('PolicyService', () => {
 
       expect(insertStatementStub).to.not.have.been.called;
       expect(materializeStub).to.not.have.been.called;
-      expect(writeExpressionTreeStub).to.not.have.been.called;
-      expect(replaceExpressionStub).to.not.have.been.called;
       expect(result).to.eql({ ...mockPolicy, statements: [] });
     });
   });
@@ -760,12 +713,14 @@ describe('PolicyService', () => {
         policy_statement_id: 'new-s1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:telemetry:*'
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: null
       };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatements[0]);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
       sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
@@ -804,7 +759,8 @@ describe('PolicyService', () => {
         policy_statement_id: 'new-s1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:telemetry:*'
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: null
       };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
@@ -825,6 +781,7 @@ describe('PolicyService', () => {
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
         .resolves(true);
       const grantTeamAccessStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, [
         { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
@@ -832,10 +789,11 @@ describe('PolicyService', () => {
 
       expect(materializeStub).to.not.have.been.called;
       expect(materializePolicyStub).to.have.been.calledOnceWith('1');
-      expect(grantTeamAccessStub).to.have.been.calledThrice;
-      expect(grantTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
-      expect(grantTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
-      expect(grantTeamAccessStub.thirdCall).to.have.been.calledWith('team-3', '1');
+      expect(grantTeamAccessStub).to.not.have.been.called;
+      expect(rebuildStub).to.have.been.calledThrice;
+      expect(rebuildStub.firstCall).to.have.been.calledWith('team-1');
+      expect(rebuildStub.secondCall).to.have.been.calledWith('team-2');
+      expect(rebuildStub.thirdCall).to.have.been.calledWith('team-3');
     });
 
     // B3: Approved + 0 linked teams — no team-access materialization.
@@ -885,8 +843,9 @@ describe('PolicyService', () => {
       expect(materializeTeamAccessStub).to.not.have.been.called;
     });
 
-    // B5: Ordering — delete old statements, then create new ones, then cleanup, then per-team materialization.
-    it('orders delete-old statements before createStatements before cleanup before team-access materialization', async () => {
+    // B5: Ordering — statement deletion owns stale-scope cleanup; statement
+    // creation then owns access refresh for the rebuilt statement set.
+    it('orders delete-old statements before cleanup before createStatements before access refresh', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Approved Policy',
@@ -898,19 +857,22 @@ describe('PolicyService', () => {
           policy_statement_id: 'old-s1',
           policy_id: '1',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:old:*:*'
+          submission_feature_urn: 'urn:old:*:*',
+          policy_expression_id: null
         }
       ];
       const newStatement: PolicyStatement = {
         policy_statement_id: 'new-s1',
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:telemetry:*'
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: null
       };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves(existingStatements);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatements[0]);
       sinon
         .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
         .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
@@ -929,15 +891,15 @@ describe('PolicyService', () => {
       ]);
 
       expect(deleteStub).to.have.been.calledBefore(insertStmtStub);
-      expect(insertStmtStub).to.have.been.calledBefore(cleanupStub);
-      expect(cleanupStub).to.have.been.calledBefore(materializePolicyStub);
+      expect(deleteStub).to.have.been.calledBefore(cleanupStub);
+      expect(cleanupStub).to.have.been.calledBefore(insertStmtStub);
+      expect(insertStmtStub).to.have.been.calledBefore(materializePolicyStub);
     });
 
-    // B6: Approved + linked teams + empty replacement statement list — the tail
-    // block still runs policy-wide materialization and grants once per team.
-    // This is the deliberate-revocation path: the cache rebuilds against the
-    // (now empty) ALLOW set.
-    it('fires policy-wide materialization once and per-team grant when an approved policy is updated with no statements', async () => {
+    // B6: Approved + linked teams + empty replacement statement list, with no
+    // previous statements, performs no statement/link mutation and therefore no
+    // access refresh.
+    it('does not refresh access when an approved policy update has no statement changes', async () => {
       const mockPolicy: Policy = {
         policy_id: '1',
         name: 'Approved Policy',
@@ -956,13 +918,13 @@ describe('PolicyService', () => {
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
         .resolves(true);
       const grantTeamAccessStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       await policyService.updatePolicyWithStatements('1', {} as UpdatePolicy, []);
 
-      expect(materializePolicyStub).to.have.been.calledOnceWith('1');
-      expect(grantTeamAccessStub).to.have.been.calledTwice;
-      expect(grantTeamAccessStub.firstCall).to.have.been.calledWith('team-1', '1');
-      expect(grantTeamAccessStub.secondCall).to.have.been.calledWith('team-2', '1');
+      expect(materializePolicyStub).to.not.have.been.called;
+      expect(grantTeamAccessStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
     });
 
     // B7: Combined { status: 'approved', statements } on a reviewed policy with linked teams.
@@ -1003,6 +965,7 @@ describe('PolicyService', () => {
       sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
       sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(newStatement);
       sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
       const materializePolicyStub = sinon
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
         .resolves(true);
@@ -1090,12 +1053,10 @@ describe('PolicyService', () => {
       expect(insertStmtStub).to.not.have.been.called;
     });
 
-    // B10: Same-status combined update on an approved policy. The shared
-    // `applyCacheFanOutForTransition` is a no-op on same-status calls, so the tail
-    // block at the end of `updatePolicyWithStatements` is the only path that
-    // re-derives the cache. Without it, a statement swap would leave the team
-    // pointing at the deleted statements' scope mappings.
-    it('fires the tail materialize when the combined update is same-status approved + statements', async () => {
+    // B10: Same-status policy-only update on an approved policy. The shared
+    // `applyCacheFanOutForTransition` is a no-op on same-status calls, and no
+    // statement mutation exists to trigger statement-level refresh.
+    it('does not materialize access for a same-status approved update with no statement changes', async () => {
       const approvedPolicy: Policy = {
         policy_id: '1',
         name: 'Approved',
@@ -1118,8 +1079,8 @@ describe('PolicyService', () => {
 
       await policyService.updatePolicyWithStatements('1', { status: 'approved' } as UpdatePolicy, []);
 
-      expect(materializePolicyStub).to.have.been.calledOnceWith('1');
-      expect(grantTeamAccessStub).to.have.been.calledOnceWith('team-1', '1');
+      expect(materializePolicyStub).to.not.have.been.called;
+      expect(grantTeamAccessStub).to.not.have.been.called;
     });
   });
 });

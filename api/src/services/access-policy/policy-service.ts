@@ -2,24 +2,18 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
-import { CreatePolicyStatementPayload } from '../../models/policy-statement';
+import { CreatePolicyStatementPayload, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
-import { ExpressionTreeService } from '../expression-tree-service';
-import { PolicyExpressionService } from './policy-expression-service';
-import { PolicyFilters, PolicyStatementWithExpression, PolicyWithStatements } from './policy-service.interface';
-import { PolicyStatementExpressionService } from './policy-statement-expression-service';
+import { PolicyFilters, PolicyWithStatements } from './policy-service.interface';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
-  policyExpressionService: PolicyExpressionService;
-  expressionTreeService: ExpressionTreeService;
   securityScopeService: SecurityScopeService;
   teamPolicyRepository: TeamPolicyRepository;
 
@@ -33,9 +27,6 @@ export class PolicyService extends DBService {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
-    this.policyExpressionService = new PolicyExpressionService(connection);
-    this.expressionTreeService = new ExpressionTreeService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
@@ -274,7 +265,7 @@ export class PolicyService extends DBService {
     const policiesWithStatements = await Promise.all(
       policies.map(async (policy) => ({
         ...policy,
-        statements: await this.getStatementsWithExpressions(policy.policy_id)
+        statements: await this.policyStatementService.getPolicyStatements(policy.policy_id)
       }))
     );
 
@@ -290,36 +281,8 @@ export class PolicyService extends DBService {
    */
   async getPolicyWithStatements(policyId: string): Promise<PolicyWithStatements> {
     const policy = await this.policyRepository.getPolicy(policyId);
-    const statements = await this.getStatementsWithExpressions(policyId);
-    return { ...policy, statements };
-  }
-
-  /**
-   * Get policy statements and hydrate each with its expression.
-   *
-   * @param {string} policyId - Policy UUID.
-   * @return {Promise<PolicyStatementWithExpression[]>} Statements with expressions.
-   * @memberof PolicyService
-   */
-  async getStatementsWithExpressions(policyId: string): Promise<PolicyStatementWithExpression[]> {
     const statements = await this.policyStatementService.getPolicyStatements(policyId);
-
-    return Promise.all(
-      statements.map(async (stmt) => {
-        const expressionLinks =
-          await this.policyStatementExpressionService.getPolicyStatementExpressionsByPolicyStatementId(
-            stmt.policy_statement_id
-          );
-        const expression = expressionLinks[0]
-          ? await this.expressionTreeService.readExpressionTree(expressionLinks[0].expression_id)
-          : undefined;
-
-        return {
-          ...stmt,
-          ...(expression ? { expression } : {})
-        };
-      })
-    );
+    return { ...policy, statements };
   }
 
   /**
@@ -351,13 +314,9 @@ export class PolicyService extends DBService {
    *
    * Order is deliberate: status-transition validation runs first so a rejected
    * transition cannot leave the statement set replaced and the policy row
-   * unchanged. Statements are replaced next, then stale scope mappings are
-   * cleaned up, then the policy row is written. The shared transition helper
-   * runs last so the single cache orchestration sees the new statement set.
-   *
-   * For approved policies whose status did not change, the helper is a no-op
-   * — but the statement set still changed, so the cache is re-derived here
-   * with a per-team materialize against the new mappings.
+   * unchanged. Statement deletion owns stale-scope cleanup; statement creation
+   * owns access refresh for same-status statement changes. The shared
+   * transition helper runs last and handles only status-change fan-out.
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
@@ -381,24 +340,14 @@ export class PolicyService extends DBService {
       this.assertValidStatusTransition(previousStatus, policyData.status);
     }
 
-    // Capture existing statement associations + linked teams before replacement.
+    // Capture existing statement associations before replacement.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
-    const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
-
-    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
-    const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
-
     await Promise.all(
       existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
     );
 
     // Rebuild statements from the incoming payload.
     const createdStatements = await this.createStatements(policyId, statements);
-
-    // Remove outdated scope mappings for teams linked to this policy.
-    if (oldStatementIds.length > 0) {
-      await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
-    }
 
     // Write the policy row directly — validation already ran above so we do
     // not need to re-enter the public `updatePolicy` path (which would also
@@ -408,57 +357,31 @@ export class PolicyService extends DBService {
 
     await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus);
 
-    // Statement-set replacement on an approved policy with linked teams must
-    // re-derive the cache even when status did not change — the transition
-    // helper is a no-op on same-status calls, and the new mappings do not
-    // exist in `team_security_scope` until we materialize.
-    if (previousStatus === nextStatus && nextStatus === 'approved' && affectedTeamIds.length > 0) {
-      // Materialize the policy-wide scope mappings once, then grant per team.
-      const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
-      if (materialized) {
-        for (const teamId of affectedTeamIds) {
-          await this.securityScopeService.grantTeamAccessForPolicy(teamId, policyId);
-        }
-      }
-    }
-
     return { ...policy, statements: createdStatements };
   }
 
   /**
-   * Create policy statements and their expressions.
+   * Create policy statements and link them to existing policy expressions.
    *
    * @private
    * @param {string} policyId - Policy UUID.
    * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
-   * @return {Promise<PolicyStatementWithExpression[]>} Created statements with expressions.
+   * @return {Promise<PolicyStatement[]>} Created statements with expression links.
    * @memberof PolicyService
    */
   private async createStatements(
     policyId: string,
     statements: CreatePolicyStatementPayload[]
-  ): Promise<PolicyStatementWithExpression[]> {
+  ): Promise<PolicyStatement[]> {
     return Promise.all(
       statements.map(async (stmt) => {
         const statement = await this.policyStatementService.createPolicyStatement({
           policy_id: policyId,
           effect: stmt.effect,
-          submission_feature_urn: stmt.submission_feature_urn
+          submission_feature_urn: stmt.submission_feature_urn,
+          policy_expression_id: stmt.policy_expression_id
         });
-
-        if (stmt.expression) {
-          const { expression_id: expressionId } = await this.expressionTreeService.writeExpressionTree(stmt.expression);
-          const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
-            policyId,
-            expressionId
-          });
-          await this.policyStatementExpressionService.setPolicyStatementExpression(
-            statement.policy_statement_id,
-            policyExpression.policy_expression_id
-          );
-        }
-
-        return { ...statement, ...(stmt.expression ? { expression: stmt.expression } : {}) };
+        return statement;
       })
     );
   }
