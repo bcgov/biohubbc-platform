@@ -104,7 +104,7 @@ describe('Security scope search (integration)', function () {
    * endpoints must be active features of the same upload). `createTestFeature` mints its OWN upload
    * per call and cannot place a parent + child under one upload, so the closure-driven search-security
    * fixtures insert features directly here under a shared upload. Mirrors the insertFeatureRow helper in
-   * cart-submission-feature-service.integration.ts / expression-evaluation.integration.ts.
+   * expression-evaluation.integration.ts.
    *
    * @returns The new submission_feature_id.
    */

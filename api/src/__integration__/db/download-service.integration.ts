@@ -3,7 +3,7 @@
 // returns `{ policy_id, requested_by }` for the pipeline, status transitions
 // behave, and the team-based access flows (`claimDownload`,
 // `getAuthorizedDownload`, `getDownloadsByTeamMembership`) still work after
-// the cart→policy refactor.
+// the policy-backed download refactor.
 //
 // DownloadService = request-time operations (path handlers)
 // DownloadPipelineService = background processing (pg-boss job handler only)

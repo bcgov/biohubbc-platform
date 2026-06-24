@@ -1,4 +1,4 @@
-// System integration test: end-to-end cart → download → export → CSV.
+// System integration test: end-to-end download → export → CSV.
 //
 // Mirrors `scripts/test_telemetry_export.py` end-to-end, against a real DB +
 // MinIO. The pipeline reads telemetry from `submission_feature` + the typed
@@ -130,7 +130,7 @@ describe('Ingest → Download → Export (system integration)', function () {
     );
   }
 
-  it('telemetry: cart → download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
+  it('telemetry: download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
     const submissionId = await createTestSubmission(connection);
 
     const telemetryData = {

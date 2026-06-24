@@ -1,5 +1,3 @@
-import { CartContext } from 'contexts/cartContext';
-import { ICartContext } from 'contexts/cartContext.interface';
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
@@ -99,23 +97,6 @@ export const usePolicyAutocompleteContext = (): IPolicyAutocompleteContext => {
   if (!context) {
     throw new Error(
       'PolicyAutocompleteContext is undefined, please verify you are calling usePolicyAutocompleteContext() as child of a <PolicyAutocompleteContextProvider> component.'
-    );
-  }
-
-  return context;
-};
-
-/**
- * Returns an instance of `ICartContext` from `CartContext`.
- *
- * @return {*}  {ICartContext}
- */
-export const useCartContext = (): ICartContext => {
-  const context = useContext(CartContext);
-
-  if (!context) {
-    throw new Error(
-      'CartContext is undefined, please verify you are calling useCartContext() as child of a <CartContextProvider> component.'
     );
   }
 

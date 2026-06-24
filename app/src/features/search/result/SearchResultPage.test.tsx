@@ -1,7 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCodesContext, useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SearchResultPage } from './SearchResultPage';
@@ -69,7 +69,6 @@ import { useSearchResults } from './hooks/useSearchResults';
 const mockUseApi = useApi as Mock;
 const mockUseAuthStateContext = useAuthStateContext as Mock;
 const mockUseCodesContext = useCodesContext as Mock;
-const mockUseCartContext = useCartContext as Mock;
 const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
 
@@ -117,12 +116,6 @@ describe('SearchResultPage', () => {
     });
     mockUseCodesContext.mockReturnValue({
       codesDataLoader: { isReady: true, data: codesPayload }
-    });
-    mockUseCartContext.mockReturnValue({
-      features: [],
-      pagination: { total: 0 },
-      addToCart: vi.fn(),
-      checkout: vi.fn()
     });
     mockUseDialogContext.mockReturnValue({
       setSnackbar: mockSetSnackbar,

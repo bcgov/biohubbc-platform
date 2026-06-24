@@ -1,9 +1,7 @@
-import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getUserGuid } from '../../utils/keycloak-utils';
-import { CartService } from '../cart-service';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
 import { UserService } from '../user-service';
@@ -69,23 +67,7 @@ export interface AuthorizeByContributor {
   discriminator: 'Contributor';
 }
 
-/**
- * Authorization rule that checks if the cart belongs to the system user.
- *
- * @export
- * @interface AuthorizeByCart
- */
-export interface AuthorizeByCart {
-  cartId: string;
-  discriminator: 'Cart';
-}
-
-export type AuthorizeRule =
-  | AuthorizeBySystemRoles
-  | AuthorizeBySystemUser
-  | AuthorizeByContributor
-  | AuthorizeByTeam
-  | AuthorizeByCart;
+export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser | AuthorizeByContributor | AuthorizeByTeam;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -157,9 +139,6 @@ export class AuthorizationService extends DBService {
           break;
         case 'Team':
           authorizeResults.push(await this.authorizeByTeam(authorizeRule));
-          break;
-        case 'Cart':
-          authorizeResults.push(await this.authorizeByCart(authorizeRule));
           break;
       }
     }
@@ -250,54 +229,6 @@ export class AuthorizationService extends DBService {
 
     const teamAuthorizationService = new TeamAuthorizationService(this.connection);
     return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
-  }
-
-  /**
-   * Check if the user is authorized to access the cart
-   *
-   * @param {AuthorizeByCart} authorizeByCart
-   * @return {Promise<boolean>}
-   */
-  async authorizeByCart(authorizeByCart: AuthorizeByCart): Promise<boolean> {
-    const { cartId } = authorizeByCart;
-
-    // Fetch the cart based on the cartId
-    const cartService = new CartService(this.connection);
-    const cart = await cartService.findCartById(cartId);
-
-    // Cart does not exist
-    if (!cart) {
-      return false;
-    }
-
-    // Only active carts are accessible
-    if (cart.cart_status !== 'active') {
-      return false;
-    }
-
-    // Deny access to carts whose validity window has ended
-    const recordEndDate = cart.record_end_date ? dayjs(cart.record_end_date) : null;
-    const cartValidityEnded = recordEndDate !== null && (!recordEndDate.isValid() || !recordEndDate.isAfter(dayjs()));
-    if (cartValidityEnded) {
-      return false;
-    }
-
-    // Ensure we have the current system user
-    const currentUser = await this.getCachedSystemUser();
-
-    // If the cart has a system_user_id (created by an authenticated user), and the current user is authenticated
-    if (cart.system_user_id && currentUser) {
-      // Check if the authenticated user is the owner of the cart
-      return cart.system_user_id === currentUser.system_user_id;
-    }
-
-    // If the cart was created by an unauthenticated user (no system_user_id set)
-    if (!cart.system_user_id) {
-      // Allow access for both authenticated and non-authenticated users (there is no ownership to verify)
-      return true;
-    }
-
-    return false;
   }
 
   /**
