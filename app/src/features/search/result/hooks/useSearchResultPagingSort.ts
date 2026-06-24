@@ -70,7 +70,7 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
    */
   const handlePageSizeChange = useCallback(
     (limit: number) => {
-      setSearchParams({ [URL_PARAMS.LIMIT]: String(limit), [URL_PARAMS.PAGE]: '1' });
+      setSearchParams({ [URL_PARAMS.LIMIT]: String(limit) });
     },
     [setSearchParams]
   );
