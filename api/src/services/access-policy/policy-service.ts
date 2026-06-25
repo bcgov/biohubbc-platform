@@ -137,12 +137,14 @@ export class PolicyService extends DBService {
   /**
    * Apply the access-cache side effects implied by a policy status transition.
    *
-   * The cache materializes lazily and reflects standing access only: a row
-   * exists iff a live `team_policy` links a team to an approved policy with at
-   * least one ALLOW statement. Two transitions move rows in or out:
+   * The cache materializes lazily and reflects standing access only: a
+   * `team_security_scope` row exists iff a live `team_policy` links a team to
+   * an approved policy with at least one ALLOW statement. Anchor computation is
+   * queued only when a policy has linked teams that can use those anchors. Two
+   * transitions move rows in or out:
    *
-   *   - `* → approved` materializes scope + mapping + team-grant rows for each
-   *     linked team.
+   *   - `* → approved` materializes statement-scope anchors once, then inserts
+   *     team-grant rows for each linked team.
    *   - `approved → *` rebuilds each linked team from the remaining policy
    *     chain. Without the reverse direction, a downgraded policy would
    *     silently keep granting access.
@@ -164,24 +166,26 @@ export class PolicyService extends DBService {
       return;
     }
 
-    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
-    if (teamPolicies.length === 0) {
-      return;
-    }
-
     if (to === 'approved') {
       // Materialize the shared statement-scope rows once for this policy, then
-      // grant access per team. The statement-scope work depends only on the
-      // policy, so splitting these avoids re-running the policy-wide INSERTs
-      // and re-publishing anchor jobs for every team in the fan-out.
+      // grant access per linked team. A policy without a live team link grants
+      // access to nobody, so leave anchor computation until a team_policy link
+      // exists.
+      const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+      if (teamPolicies.length === 0) {
+        return;
+      }
+
       const materialized = await this.securityScopeService.materializePolicyStatementScopes(policyId);
       if (!materialized) {
         return;
       }
+
       for (const teamPolicy of teamPolicies) {
         await this.securityScopeService.grantTeamAccessForPolicy(teamPolicy.team_id, policyId);
       }
     } else if (from === 'approved') {
+      const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
       for (const teamPolicy of teamPolicies) {
         await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
       }

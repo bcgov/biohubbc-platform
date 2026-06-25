@@ -18,7 +18,7 @@ export const EditPolicyStatementFormYupSchema = yup.object().shape({
     .string()
     .required('Policy URN is required')
     .matches(
-      /^urn:(\*|\d+):(\*|[a-zA-Z0-9_]+):(\*|[^:]+)$/,
+      /^urn:(\*|\d+):(\*|\w+):(\*|[^:]+)$/,
       'Invalid Policy URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
     ),
   policy_expression_id: yup.string().nullable()

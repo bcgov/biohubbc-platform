@@ -600,8 +600,7 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * A live `team_policy` link is required: a scope without one grants access to
    * no team, so anchor recomputation for it is wasted work. Gating here keeps
-   * anchor-compute jobs scoped to the access cache only — the invariant captured
-   * in SIMSBIOHUB-985.
+   * anchor-compute jobs scoped to the standing-access cache.
    *
    * @param submissionId The submission ID to match against scope URNs
    * @returns Array of SecurityScopeId rows for matching scopes

@@ -1,36 +1,25 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { TeamPolicyService } from '../../../../services/access-policy/team-policy-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../../../constants/roles';
+import { getDBConnection } from '../../../../../database/db';
+import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
+import { TeamPolicyService } from '../../../../../services/access-policy/team-policy-service';
+import { getLogger } from '../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/team-policies/{teamPolicyId}');
+const defaultLog = getLogger('paths/administrative/policies/team/{teamPolicyId}');
 
 export const DELETE: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  deleteTeamPolicy()
+  authorizeRequestHandler(() => ({
+    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+  })),
+  deletePolicyTeamAssignment()
 ];
 
 DELETE.apiDoc = {
   description: 'Delete a team-policy association.',
   tags: ['admin'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
+  security: [{ Bearer: [] }],
   parameters: [
     {
       in: 'path',
@@ -52,14 +41,13 @@ DELETE.apiDoc = {
 };
 
 /**
- * Delete a team-policy association (soft delete).
+ * Delete a team-policy association.
  *
  * @returns {RequestHandler}
  */
-export function deleteTeamPolicy(): RequestHandler {
+export function deletePolicyTeamAssignment(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
-
     const teamPolicyId = req.params.teamPolicyId;
 
     try {
@@ -72,7 +60,7 @@ export function deleteTeamPolicy(): RequestHandler {
 
       return res.status(204).send();
     } catch (error) {
-      defaultLog.error({ label: 'deleteTeamPolicy', message: 'error', error });
+      defaultLog.error({ label: 'deletePolicyTeamAssignment', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

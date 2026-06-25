@@ -39,7 +39,7 @@ describe('PolicyExpressionRepository', () => {
 
       const result = await repository.getPolicyExpressionByPolicyAndExpressionId('policy-1', 'expr-1');
 
-      expect(result).to.equal(null);
+      expect(result).to.be.null;
       const sqlText = knexStub.firstCall.args[0].toString();
       expect(sqlText).to.include('from "policy_expression"');
       expect(sqlText).to.include('"policy_id" = \'policy-1\'');

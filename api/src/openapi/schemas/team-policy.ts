@@ -86,17 +86,12 @@ export const PolicyTeamsResponseSchema: OpenAPIV3.SchemaObject = {
 export const CreateTeamPolicyRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'CreateTeamPolicyRequest',
   type: 'object',
-  required: ['team_id', 'policy_id'],
+  required: ['team_id'],
   properties: {
     team_id: {
       type: 'string',
       format: 'uuid',
       description: 'ID of the team to associate'
-    },
-    policy_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'ID of the policy to associate'
     }
   }
 };

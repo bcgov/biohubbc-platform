@@ -13,7 +13,7 @@ export interface ITeamPolicyDetails {
 }
 
 /**
- * Response from GET /api/administrative/team-policies.
+ * Response from GET /api/administrative/policies/team.
  */
 export interface ITeamPoliciesResponse {
   team_policies: ITeamPolicyDetails[];
@@ -21,22 +21,21 @@ export interface ITeamPoliciesResponse {
 }
 
 /**
- * Search and filter params for GET /api/administrative/team-policies.
+ * Search and filter params for GET /api/administrative/policies/team.
  */
 export interface ITeamPolicySearchParams extends ApiSearchParams {
   policyIds?: string[];
 }
 
 /**
- * Request payload for creating a team-policy association.
+ * Request payload for associating a team to a policy.
  */
 export interface ICreateTeamPolicyRequest {
   team_id: string;
-  policy_id: string;
 }
 
 /**
- * Response from POST /api/administrative/team-policies.
+ * Response from POST /api/administrative/policies/{policyId}/team.
  */
 export interface ITeamPolicy {
   team_policy_id: string;

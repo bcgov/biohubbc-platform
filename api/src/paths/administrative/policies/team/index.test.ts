@@ -2,20 +2,20 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import * as db from '../../../database/db';
-import { TeamPolicy, TeamPolicyDetails } from '../../../models/team-policy';
-import { TeamPolicyService } from '../../../services/access-policy/team-policy-service';
-import * as teamPolicies from './index';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../../database/db';
+import { TeamPolicyDetails } from '../../../../models/team-policy';
+import { TeamPolicyService } from '../../../../services/access-policy/team-policy-service';
+import { getPolicyTeamAssignments } from './index';
 
 chai.use(sinonChai);
 
-describe('team-policies', () => {
-  describe('getTeamPolicies', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
+describe('paths/administrative/policies/team/index', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
 
+  describe('getPolicyTeamAssignments', () => {
     it('should return team policies with pagination on success', async () => {
       const mockDBConnection = getMockDBConnection();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -43,7 +43,7 @@ describe('team-policies', () => {
       sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves(mockTeamPolicies);
       sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount').resolves(1);
 
-      const requestHandler = teamPolicies.getTeamPolicies();
+      const requestHandler = getPolicyTeamAssignments();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -64,7 +64,7 @@ describe('team-policies', () => {
         .stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount')
         .resolves(0);
 
-      const requestHandler = teamPolicies.getTeamPolicies();
+      const requestHandler = getPolicyTeamAssignments();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -97,7 +97,7 @@ describe('team-policies', () => {
         .stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount')
         .resolves(0);
 
-      const requestHandler = teamPolicies.getTeamPolicies();
+      const requestHandler = getPolicyTeamAssignments();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -114,40 +114,6 @@ describe('team-policies', () => {
         search: undefined,
         policyIds: ['33333333-3333-3333-3333-333333333333']
       });
-    });
-  });
-
-  describe('createTeamPolicy', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should create a team policy and return 201 on success', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.body = {
-        team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
-      };
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-
-      const mockResponse: TeamPolicy = {
-        team_policy_id: '11111111-1111-1111-1111-111111111111',
-        team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333',
-        record_end_date: null
-      };
-
-      sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves(mockResponse);
-
-      const requestHandler = teamPolicies.createTeamPolicy();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.eql(mockResponse);
     });
   });
 });

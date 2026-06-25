@@ -176,7 +176,7 @@ describe('SecurityScopeService', () => {
   });
 
   describe('refreshAccessForPolicy', () => {
-    it('returns without materializing when no teams are linked to the policy', async () => {
+    it('skips materialization and grant rebuilds when no teams are linked to the policy', async () => {
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
       const materializeStub = sinon.stub(service, 'materializePolicyStatementScopes').resolves(true);
       const rebuildStub = sinon.stub(service, 'rebuildTeamSecurityScopes').resolves();

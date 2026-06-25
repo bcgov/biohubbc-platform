@@ -115,7 +115,7 @@ export const ExpressionBuilder = ({
 
   const hasStartedExpressionDraft = useCallback((clause: BuilderClauseNode): boolean => {
     if (clause.type === 'expression') {
-      return clause.clauses.some(hasStartedExpressionDraft);
+      return clause.clauses.some((childClause) => hasStartedExpressionDraft(childClause));
     }
 
     return clause.feature_property_id !== null;
@@ -193,7 +193,7 @@ export const ExpressionBuilder = ({
       return;
     }
 
-    const hasStartedDraft = rootNode.clauses.some(hasStartedExpressionDraft);
+    const hasStartedDraft = rootNode.clauses.some((clause) => hasStartedExpressionDraft(clause));
 
     if (!hasStartedDraft) {
       onValidationChange?.(null);

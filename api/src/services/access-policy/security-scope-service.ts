@@ -15,12 +15,11 @@ const defaultLog = getLogger('security-scope-service');
  * Service for managing the team-access scope cache — the normalized model that
  * replaces the materialized team_feature cache.
  *
- * The cache only describes standing access grants. It materializes lazily when a
- * team gains access through a `team_policy` link or when a policy's status flips
- * to `approved`. Statement creation alone never produces cache rows — a policy
- * without a `team_policy` link is a stored filter expression, not an access grant.
- * Non-access policies (download, data_request, security_reason) consequently
- * leave the cache untouched until they are linked to a team and approved.
+ * The cache only describes standing access grants. Statement-scope anchor
+ * computation materializes lazily when a live `team_policy` link exists for an
+ * approved policy. Statement creation alone never produces cache rows — a policy
+ * without approval and a linked team is a stored filter expression, not an
+ * access grant.
  *
  * `security_scope` is intentionally based only on the statement's URN envelope.
  * `policy_expression_id` narrows
@@ -28,9 +27,10 @@ const defaultLog = getLogger('security-scope-service');
  * envelope used for secured-anchor traversal.
  *
  * Materialization order: policy statements reference reusable `security_scope`
- * rows when they are written. Approval paths enqueue anchor recomputation for
- * the active statement scopes before granting team access. Revocation-only paths
- * just rebuild the derived `team_security_scope` grants from the policy chain.
+ * rows when they are written. Team-link and linked approval paths enqueue anchor
+ * recomputation for the active statement scopes before granting team access.
+ * Revocation-only paths just rebuild the derived `team_security_scope` grants
+ * from the policy chain.
  *
  * Repository handles all SQL; this service handles sequencing and decision logic.
  */
@@ -218,7 +218,8 @@ export class SecurityScopeService extends DBService {
    * Use this when the caller has already fetched the team-policy links as part
    * of a larger policy mutation. It avoids re-reading `team_policy` while
    * preserving the same materialize-then-rebuild ordering as
-   * `refreshAccessForPolicy`.
+   * `refreshAccessForPolicy`. No team links means no standing access can be
+   * granted, so anchor recomputation is skipped until a team_policy link exists.
    *
    * @param policyId UUID of the policy whose derived access rows should be reconciled
    * @param teamIds UUIDs of linked teams to rebuild

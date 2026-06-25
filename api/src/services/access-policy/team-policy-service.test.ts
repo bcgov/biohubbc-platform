@@ -400,6 +400,9 @@ describe('TeamPolicyService', () => {
         ...mockTeamPolicy,
         record_end_date: null
       });
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
       const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       const updateData: UpdateTeamPolicy = {
@@ -409,7 +412,9 @@ describe('TeamPolicyService', () => {
       const result = await service.updateTeamPolicy('11111111-1111-1111-1111-111111111111', updateData);
 
       expect(updateStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(materializeStub).to.have.been.calledOnceWith('33333333-3333-3333-3333-333333333333');
       expect(rebuildStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(materializeStub).to.have.been.calledBefore(rebuildStub);
       expect(result).to.eql({
         ...mockTeamPolicy,
         record_end_date: null

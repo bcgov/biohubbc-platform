@@ -31,6 +31,12 @@ import type {
   WriteExpressionClause
 } from './expression-tree-service.interface';
 
+interface ReconstructExpressionTreeContext {
+  expressionsById: Map<string, Expression>;
+  clausesByExpressionId: Map<string, ExpressionClause[]>;
+  predicatesById: Map<string, ReadPredicateNodeRow>;
+}
+
 /**
  * Service for writing and reading reusable expression trees.
  *
@@ -187,80 +193,95 @@ export class ExpressionTreeService extends DBService {
     const readPredicates = await this.predicateRepository.readPredicateNodes([...predicateIds]);
     const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
 
-    const buildExpressionTree = (
-      currentExpressionId: string,
-      currentVisitedExpressionIds: Set<string>
-    ): ExpressionTreeExpression => {
-      if (currentVisitedExpressionIds.has(currentExpressionId)) {
-        throw new ApiGeneralError('Cycle detected in expression tree', [
-          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-          `expressionId=${currentExpressionId}`
-        ]);
-      }
+    return this.buildExpressionTreeFromStorage(expressionId, visitedExpressionIds, {
+      expressionsById,
+      clausesByExpressionId,
+      predicatesById
+    });
+  }
 
-      const expression = expressionsById.get(currentExpressionId);
+  /**
+   * Build an API expression tree from already-hydrated storage rows.
+   *
+   * @private
+   * @param {string} currentExpressionId - Expression id to build.
+   * @param {Set<string>} currentVisitedExpressionIds - Path-local set used for cycle detection.
+   * @param {ReconstructExpressionTreeContext} context - Hydrated storage rows keyed by id.
+   * @return {ExpressionTreeExpression} Reconstructed expression node.
+   * @memberof ExpressionTreeService
+   */
+  private buildExpressionTreeFromStorage(
+    currentExpressionId: string,
+    currentVisitedExpressionIds: Set<string>,
+    context: ReconstructExpressionTreeContext
+  ): ExpressionTreeExpression {
+    if (currentVisitedExpressionIds.has(currentExpressionId)) {
+      throw new ApiGeneralError('Cycle detected in expression tree', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionId=${currentExpressionId}`
+      ]);
+    }
 
-      if (!expression) {
-        throw new ApiGeneralError('Missing expression row while reconstructing expression tree', [
-          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-          `expressionId=${currentExpressionId}`
-        ]);
-      }
+    const expression = context.expressionsById.get(currentExpressionId);
 
-      const links = clausesByExpressionId.get(currentExpressionId) ?? [];
+    if (!expression) {
+      throw new ApiGeneralError('Missing expression row while reconstructing expression tree', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionId=${currentExpressionId}`
+      ]);
+    }
 
-      if (links.length === 0) {
-        throw new ApiGeneralError('Expression has no active clauses', [
-          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-          `expressionId=${currentExpressionId}`
-        ]);
-      }
+    const links = context.clausesByExpressionId.get(currentExpressionId) ?? [];
 
-      const nextVisitedExpressionIds = new Set(currentVisitedExpressionIds);
-      nextVisitedExpressionIds.add(currentExpressionId);
-      const readClauses: ReadExpressionClause[] = [];
+    if (links.length === 0) {
+      throw new ApiGeneralError('Expression has no active clauses', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionId=${currentExpressionId}`
+      ]);
+    }
 
-      for (const link of links) {
-        if (link.predicate_id) {
-          const predicateRow = predicatesById.get(link.predicate_id);
+    const nextVisitedExpressionIds = new Set(currentVisitedExpressionIds);
+    nextVisitedExpressionIds.add(currentExpressionId);
+    const readClauses: ReadExpressionClause[] = [];
 
-          if (!predicateRow) {
-            throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
-              'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-              `predicateId=${link.predicate_id}`,
-              `expressionId=${currentExpressionId}`
-            ]);
-          }
+    for (const link of links) {
+      if (link.predicate_id) {
+        const predicateRow = context.predicatesById.get(link.predicate_id);
 
-          readClauses.push({
-            sequence: link.sequence,
-            clause: this.parseReadPredicateRow(predicateRow, link.predicate_id)
-          });
-          continue;
-        }
-
-        if (!link.child_expression_id) {
-          throw new ApiGeneralError('Invalid expression clause target', [
+        if (!predicateRow) {
+          throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
             'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-            `expressionClauseId=${link.expression_clause_id}`
+            `predicateId=${link.predicate_id}`,
+            `expressionId=${currentExpressionId}`
           ]);
         }
 
         readClauses.push({
           sequence: link.sequence,
-          clause: buildExpressionTree(link.child_expression_id, nextVisitedExpressionIds)
+          clause: this.parseReadPredicateRow(predicateRow, link.predicate_id)
         });
+        continue;
       }
 
-      return {
-        type: 'expression',
-        operator: expression.operator,
-        // Storage is expected to be ordered by sequence, but sort defensively.
-        clauses: readClauses.toSorted((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
-      };
-    };
+      if (!link.child_expression_id) {
+        throw new ApiGeneralError('Invalid expression clause target', [
+          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+          `expressionClauseId=${link.expression_clause_id}`
+        ]);
+      }
 
-    return buildExpressionTree(expressionId, visitedExpressionIds);
+      readClauses.push({
+        sequence: link.sequence,
+        clause: this.buildExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds, context)
+      });
+    }
+
+    return {
+      type: 'expression',
+      operator: expression.operator,
+      // Storage is expected to be ordered by sequence, but sort defensively.
+      clauses: readClauses.toSorted((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
+    };
   }
 
   /**

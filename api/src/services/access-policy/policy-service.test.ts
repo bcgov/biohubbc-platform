@@ -209,7 +209,7 @@ describe('PolicyService', () => {
       expect(materializeStub).to.not.have.been.called;
     });
 
-    // C4: requested → reviewed + 1 team_policy → neither orchestration branch fires; getTeamPolicies still called.
+    // C4: requested → reviewed + 1 team_policy → neither orchestration branch fires.
     it('skips both orchestration branches when transitioning between non-approved statuses', async () => {
       const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'requested' };
       const updatedPolicy: Policy = { ...currentPolicy, status: 'reviewed' };
@@ -226,7 +226,7 @@ describe('PolicyService', () => {
 
       await policyService.updatePolicy('1', { status: 'reviewed' } as UpdatePolicy);
 
-      expect(getTeamPoliciesStub).to.have.been.calledOnceWith({ policyIds: ['1'] });
+      expect(getTeamPoliciesStub).to.not.have.been.called;
       expect(materializeStub).to.not.have.been.called;
       expect(rebuildStub).to.not.have.been.called;
     });
@@ -274,8 +274,9 @@ describe('PolicyService', () => {
       expect(rebuildStub).to.not.have.been.called;
     });
 
-    // C7: reviewed → approved + zero linked team_policies → neither materialize nor rebuild fires.
-    it('skips orchestration when no team policies are linked to the policy', async () => {
+    // C7: reviewed → approved + zero linked team_policies → no standing access,
+    // so both anchor materialization and team grants are skipped.
+    it('skips scope materialization when approving a policy with no linked teams', async () => {
       const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'reviewed' };
       const updatedPolicy: Policy = { ...currentPolicy, status: 'approved' };
 
@@ -283,14 +284,16 @@ describe('PolicyService', () => {
       const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
       const materializeStub = sinon
-        .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
-        .resolves();
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantTeamAccessStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
       const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
 
       expect(updateStub).to.have.been.calledOnce;
       expect(materializeStub).to.not.have.been.called;
+      expect(grantTeamAccessStub).to.not.have.been.called;
       expect(rebuildStub).to.not.have.been.called;
     });
 
@@ -318,13 +321,15 @@ describe('PolicyService', () => {
     });
 
     // C9: denied → approved is allowed and uses the same cache orchestration as any transition into approved.
-    it('allows approving from denied and skips grants when no team policies are linked', async () => {
+    it('allows approving from denied and skips materialization when no team policies are linked', async () => {
       const currentPolicy: Policy = { policy_id: '1', name: 'P', description: null, status: 'denied' };
       const updatedPolicy: Policy = { ...currentPolicy, status: 'approved' };
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
       const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
-      const materializePolicyStub = sinon.stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes');
+      const materializePolicyStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
       const grantTeamAccessStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy');
 
       const result = await policyService.updatePolicy('1', { status: 'approved' } as UpdatePolicy);
@@ -369,15 +374,19 @@ describe('PolicyService', () => {
       expect(rebuildStub).to.not.have.been.called;
     });
 
-    it('fetches team policies but skips fan-out when no team_policy links exist', async () => {
+    it('skips scope materialization when no team_policy links exist on approval', async () => {
       const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([]);
-      const materializeStub = sinon.stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess');
+      const materializePolicyStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const grantTeamAccessStub = sinon.stub(SecurityScopeService.prototype, 'grantTeamAccessForPolicy').resolves();
       const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes');
 
       await invoke('reviewed', 'approved');
 
       expect(getTeamPoliciesStub).to.have.been.calledOnceWith({ policyIds: [policyId] });
-      expect(materializeStub).to.not.have.been.called;
+      expect(materializePolicyStub).to.not.have.been.called;
+      expect(grantTeamAccessStub).to.not.have.been.called;
       expect(rebuildStub).to.not.have.been.called;
     });
 
@@ -435,7 +444,7 @@ describe('PolicyService', () => {
       expect(materializeStub).to.not.have.been.called;
     });
 
-    it('fetches team policies but fires neither branch for transitions not involving approved', async () => {
+    it('fires neither branch and skips team-policy reads for transitions not involving approved', async () => {
       const getTeamPoliciesStub = sinon
         .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
         .resolves(linkedTeamPolicies);
@@ -444,7 +453,7 @@ describe('PolicyService', () => {
 
       await invoke('requested', 'reviewed');
 
-      expect(getTeamPoliciesStub).to.have.been.calledOnce;
+      expect(getTeamPoliciesStub).to.not.have.been.called;
       expect(materializeStub).to.not.have.been.called;
       expect(rebuildStub).to.not.have.been.called;
     });

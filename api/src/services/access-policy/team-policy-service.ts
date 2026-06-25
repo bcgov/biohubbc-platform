@@ -199,6 +199,10 @@ export class TeamPolicyService extends DBService {
     const wasActive = existingTeamPolicy.record_end_date === null;
     const isActive = updatedTeamPolicy.record_end_date === null;
 
+    if (!wasActive && isActive) {
+      await this.securityScopeService.materializePolicyStatementScopes(existingTeamPolicy.policy_id);
+    }
+
     if (wasActive !== isActive) {
       await this.securityScopeService.rebuildTeamSecurityScopes(existingTeamPolicy.team_id);
     }
