@@ -159,10 +159,10 @@ export async function setupScopeChain(
     ? inserted.security_scope_id
     : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
 
-  await scopeRepo.connection.query('UPDATE policy_statement SET security_scope_id = $1 WHERE policy_statement_id = $2', [
-    scopeId,
-    policyStatementId
-  ]);
+  await scopeRepo.connection.query(
+    'UPDATE policy_statement SET security_scope_id = $1 WHERE policy_statement_id = $2',
+    [scopeId, policyStatementId]
+  );
   await computeAnchors(scopeRepo, scopeId);
 
   return scopeId;

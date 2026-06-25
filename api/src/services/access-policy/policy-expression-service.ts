@@ -38,6 +38,16 @@ export class PolicyExpressionService extends DBService {
   }
 
   /**
+   * Insert a new user-visible policy-expression identity.
+   *
+   * @param {CreatePolicyExpression} data - Policy-expression payload.
+   * @return {Promise<PolicyExpression>} Inserted policy expression.
+   */
+  async createPolicyExpression(data: CreatePolicyExpression): Promise<PolicyExpression> {
+    return this.policyExpressionRepository.insertPolicyExpression(data);
+  }
+
+  /**
    * Fetch one active policy expression by id.
    *
    * @param {string} policyExpressionId - Policy-expression identifier.
@@ -45,6 +55,17 @@ export class PolicyExpressionService extends DBService {
    */
   getPolicyExpressionById(policyExpressionId: string): Promise<PolicyExpression> {
     return this.policyExpressionRepository.getPolicyExpressionById(policyExpressionId);
+  }
+
+  /**
+   * Fetch one active policy expression by policy and expression anchor.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} expressionId - Expression anchor identifier.
+   * @return {Promise<PolicyExpression | null>} Matching active policy expression, when present.
+   */
+  getPolicyExpressionByPolicyAndExpressionId(policyId: string, expressionId: string): Promise<PolicyExpression | null> {
+    return this.policyExpressionRepository.getPolicyExpressionByPolicyAndExpressionId(policyId, expressionId);
   }
 
   /**

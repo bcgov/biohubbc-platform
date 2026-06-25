@@ -781,11 +781,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(
-        mockConnection,
-        { securityScopeId: 'scope-uuid-456' },
-        { startAfter }
-      );
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' }, { startAfter });
 
       const options = sendStub.firstCall.args[2];
       expect(options.startAfter).to.equal(startAfter);
@@ -874,7 +870,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns published status with jobId when boss.send returns a job ID', async () => {
@@ -991,7 +987,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns published status with jobId when boss.send returns a job ID', async () => {

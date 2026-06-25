@@ -156,10 +156,9 @@ describe('SecurityScopeService', () => {
     });
 
     it('A6: publish failure on the first statement aborts before the team grant runs', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy').resolves([
-        { security_scope_id: scopeIdOne },
-        { security_scope_id: scopeIdTwo }
-      ]);
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ security_scope_id: scopeIdOne }, { security_scope_id: scopeIdTwo }]);
 
       sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')

@@ -1,7 +1,7 @@
+import { ExpressionTree } from '../../models/expression-tree';
 import { Policy } from '../../models/policy';
 import { PolicyExpression } from '../../models/policy-expression';
 import { PolicyStatement } from '../../models/policy-statement';
-import { ExpressionTree } from '../../models/expression-tree';
 
 /**
  * Optional filters when querying policies.

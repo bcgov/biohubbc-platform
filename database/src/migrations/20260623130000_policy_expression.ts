@@ -310,8 +310,14 @@ export async function up(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS urn_feature_id;
 
     CREATE UNIQUE INDEX policy_statement_nuk1
-      ON policy_statement(policy_id, effect, security_scope_id, (record_end_date is NULL))
-      WHERE record_end_date IS NULL;
+      ON policy_statement(policy_expression_id, security_scope_id)
+      WHERE record_end_date IS NULL
+        AND policy_expression_id IS NOT NULL;
+
+    CREATE UNIQUE INDEX policy_statement_nuk2
+      ON policy_statement(policy_id, effect, security_scope_id)
+      WHERE record_end_date IS NULL
+        AND policy_expression_id IS NULL;
 
     DROP TABLE IF EXISTS policy_statement_scope;
 
@@ -973,6 +979,7 @@ export async function down(knex: Knex): Promise<void> {
     -- security_scope row each statement currently references.
     ----------------------------------------------------------------------------------------
     DROP INDEX IF EXISTS policy_statement_nuk1;
+    DROP INDEX IF EXISTS policy_statement_nuk2;
 
     ALTER TABLE policy_statement
       ADD COLUMN IF NOT EXISTS submission_feature_urn varchar(500),

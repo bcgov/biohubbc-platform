@@ -215,11 +215,21 @@ export class PolicyStatementRepository extends BaseRepository {
       WITH updated AS (
         UPDATE policy_statement
         SET
-          policy_id = CASE WHEN ${policyStatementData.policy_id !== undefined} THEN ${policyStatementData.policy_id ?? null} ELSE policy_id END,
-          effect = CASE WHEN ${policyStatementData.effect !== undefined} THEN ${policyStatementData.effect ?? null} ELSE effect END,
-          security_scope_id = CASE WHEN ${policyStatementData.security_scope_id !== undefined} THEN ${policyStatementData.security_scope_id ?? null} ELSE security_scope_id END,
-          policy_expression_id = CASE WHEN ${policyStatementData.policy_expression_id !== undefined} THEN ${policyStatementData.policy_expression_id ?? null} ELSE policy_expression_id END,
-          record_end_date = CASE WHEN ${policyStatementData.record_end_date !== undefined} THEN ${policyStatementData.record_end_date ?? null} ELSE record_end_date END
+          policy_id = CASE WHEN ${policyStatementData.policy_id !== undefined} THEN ${
+      policyStatementData.policy_id ?? null
+    } ELSE policy_id END,
+          effect = CASE WHEN ${policyStatementData.effect !== undefined} THEN ${
+      policyStatementData.effect ?? null
+    } ELSE effect END,
+          security_scope_id = CASE WHEN ${policyStatementData.security_scope_id !== undefined} THEN ${
+      policyStatementData.security_scope_id ?? null
+    } ELSE security_scope_id END,
+          policy_expression_id = CASE WHEN ${policyStatementData.policy_expression_id !== undefined} THEN ${
+      policyStatementData.policy_expression_id ?? null
+    } ELSE policy_expression_id END,
+          record_end_date = CASE WHEN ${policyStatementData.record_end_date !== undefined} THEN ${
+      policyStatementData.record_end_date ?? null
+    } ELSE record_end_date END
         WHERE policy_statement_id = ${policyStatementId}
         RETURNING policy_statement_id, policy_id, effect, security_scope_id, policy_expression_id
       )

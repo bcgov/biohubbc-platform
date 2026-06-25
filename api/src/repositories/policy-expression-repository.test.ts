@@ -32,6 +32,36 @@ describe('PolicyExpressionRepository', () => {
     });
   });
 
+  describe('getPolicyExpressionByPolicyAndExpressionId', () => {
+    it('returns null when no active policy expression exists for the policy and expression', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.getPolicyExpressionByPolicyAndExpressionId('policy-1', 'expr-1');
+
+      expect(result).to.equal(null);
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('from "policy_expression"');
+      expect(sqlText).to.include('"policy_id" = \'policy-1\'');
+      expect(sqlText).to.include('"expression_id" = \'expr-1\'');
+      expect(sqlText).to.include('"record_end_date" is null');
+    });
+
+    it('throws when more than one active policy expression exists for the policy and expression', async () => {
+      const knexStub = sinon
+        .stub()
+        .resolves(mockQueryResult([policyExpressionRow, { ...policyExpressionRow, policy_expression_id: 'pe-2' }], 2));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      try {
+        await repository.getPolicyExpressionByPolicyAndExpressionId('policy-1', 'expr-1');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+      }
+    });
+  });
+
   describe('ensurePolicyExpression', () => {
     it('maps camelCase payload fields to snake_case database columns', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
@@ -47,6 +77,7 @@ describe('PolicyExpressionRepository', () => {
       expect(result).to.eql(policyExpressionRow);
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('INSERT INTO policy_expression');
+      expect(sqlText).to.include('json_build_array($1::uuid, $2::uuid)');
       expect(sqlText).to.include('policy_id');
       expect(sqlText).to.include('expression_id');
       expect(sqlText).to.not.include('policyId');
@@ -66,6 +97,64 @@ describe('PolicyExpressionRepository', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
       }
+    });
+  });
+
+  describe('insertPolicyExpression', () => {
+    it('inserts a new policy expression row', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.insertPolicyExpression({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
+        name: 'Expression',
+        description: null
+      });
+
+      expect(result).to.eql(policyExpressionRow);
+      const sqlText = knexStub.firstCall.args[0].toSQL().sql;
+      expect(sqlText).to.include('insert into "policy_expression"');
+    });
+  });
+
+  describe('getPolicyExpressionsByPolicyId', () => {
+    it('returns one active policy expression per expression id with pagination', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.getPolicyExpressionsByPolicyId('policy-1', {
+        page: 2,
+        limit: 10,
+        sort: 'name',
+        order: 'asc'
+      });
+
+      expect(result).to.eql([policyExpressionRow]);
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('row_number() over (partition by expression_id');
+      expect(sqlText).to.include('where "policy_id" = \'policy-1\'');
+      expect(sqlText).to.include('"record_end_date" is null');
+      expect(sqlText).to.include('"expression_rank" = 1');
+      expect(sqlText).to.include('order by "name" asc');
+      expect(sqlText).to.include('limit 10');
+      expect(sqlText).to.include('offset 10');
+    });
+  });
+
+  describe('getPolicyExpressionsCountByPolicyId', () => {
+    it('counts distinct active expression ids for a policy', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 2 }], 1));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.getPolicyExpressionsCountByPolicyId('policy-1');
+
+      expect(result).to.equal(2);
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('coalesce(count(distinct expression_id), 0)::integer as count');
+      expect(sqlText).to.include('from "policy_expression"');
+      expect(sqlText).to.include('"policy_id" = \'policy-1\'');
+      expect(sqlText).to.include('"record_end_date" is null');
     });
   });
 

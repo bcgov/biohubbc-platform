@@ -1,5 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
+import { ApiConflictError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
 import { CreatePolicyStatementPayload, PolicyStatement } from '../../models/policy-statement';
@@ -10,11 +11,7 @@ import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyExpressionService } from './policy-expression-service';
-import {
-  PolicyExpressionWithExpression,
-  PolicyFilters,
-  PolicyWithStatements
-} from './policy-service.interface';
+import { PolicyExpressionWithExpression, PolicyFilters, PolicyWithStatements } from './policy-service.interface';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
 
@@ -351,7 +348,9 @@ export class PolicyService extends DBService {
     await this.policyRepository.getPolicy(policyId);
 
     const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
-    const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+    await this.assertPolicyExpressionDoesNotExist(policyId, expression_id);
+
+    const policyExpression = await this.policyExpressionService.createPolicyExpression({
       policyId,
       expressionId: expression_id,
       name: payload.name ?? undefined,
@@ -381,6 +380,8 @@ export class PolicyService extends DBService {
     await this.policyRepository.getPolicy(policyId);
 
     const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
+    await this.assertPolicyExpressionDoesNotExist(policyId, expression_id, policyExpressionId);
+
     const policyExpression = await this.policyExpressionService.updatePolicyExpressionForPolicy(
       policyId,
       policyExpressionId,
@@ -415,6 +416,41 @@ export class PolicyService extends DBService {
 
     await this.policyExpressionService.clearPolicyStatementLinks(policyId, policyExpressionId);
     await this.policyExpressionService.deletePolicyExpression(policyId, policyExpressionId);
+  }
+
+  /**
+   * Assert that a policy does not already have another active policy expression
+   * for the same reusable expression anchor.
+   *
+   * The database unique index remains the final concurrency guard, but this
+   * check lets API callers receive a domain conflict instead of a raw
+   * `policy_expression_nuk1` violation.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @param {string} expressionId - Reusable expression anchor UUID.
+   * @param {string} [currentPolicyExpressionId] - Existing policy-expression UUID to ignore during update.
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  private async assertPolicyExpressionDoesNotExist(
+    policyId: string,
+    expressionId: string,
+    currentPolicyExpressionId?: string
+  ): Promise<void> {
+    const existingPolicyExpression = await this.policyExpressionService.getPolicyExpressionByPolicyAndExpressionId(
+      policyId,
+      expressionId
+    );
+
+    if (!existingPolicyExpression || existingPolicyExpression.policy_expression_id === currentPolicyExpressionId) {
+      return;
+    }
+
+    throw new ApiConflictError('Policy expression already exists for policy', [
+      'PolicyService->assertPolicyExpressionDoesNotExist',
+      { policyId, expressionId, policyExpressionId: existingPolicyExpression.policy_expression_id }
+    ]);
   }
 
   /**

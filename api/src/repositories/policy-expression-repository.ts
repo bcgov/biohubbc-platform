@@ -45,6 +45,70 @@ export class PolicyExpressionRepository extends BaseRepository {
   }
 
   /**
+   * Fetch one active policy expression by policy and expression anchor.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} expressionId - Expression anchor identifier.
+   * @return {Promise<PolicyExpression | null>} Matching active row, when present.
+   */
+  async getPolicyExpressionByPolicyAndExpressionId(
+    policyId: string,
+    expressionId: string
+  ): Promise<PolicyExpression | null> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
+      .where('policy_id', policyId)
+      .where('expression_id', expressionId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, PolicyExpression);
+
+    if (response.rowCount !== 0 && response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'PolicyExpressionRepository->getPolicyExpressionByPolicyAndExpressionId',
+        `expected rowCount=0|1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Insert a new policy-expression identity for a policy.
+   *
+   * This intentionally does not deduplicate on `(policy_id, expression_id)`.
+   * Multiple user-visible policy expressions may reference the same reusable
+   * expression anchor while retaining distinct names/descriptions and ids.
+   *
+   * @param {CreatePolicyExpression} payload - Policy-expression creation payload.
+   * @returns {Promise<PolicyExpression>} Inserted policy-expression row.
+   * @throws {ApiExecuteSQLError} If the row cannot be inserted.
+   */
+  async insertPolicyExpression(payload: CreatePolicyExpression): Promise<PolicyExpression> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .insert({
+        policy_id: payload.policyId,
+        expression_id: payload.expressionId,
+        name: payload.name ?? null,
+        description: payload.description ?? null
+      })
+      .returning(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, PolicyExpression);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert policy_expression', [
+        'PolicyExpressionRepository->insertPolicyExpression',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Return the active policy-expression row for a policy/expression pair,
    * creating it if needed.
    *
@@ -59,7 +123,7 @@ export class PolicyExpressionRepository extends BaseRepository {
       WITH advisory_lock AS (
         SELECT pg_advisory_xact_lock(
           hashtext('policy_expression'),
-          hashtext(json_build_array(${payload.policyId}, ${payload.expressionId})::text)
+          hashtext(json_build_array(${payload.policyId}::uuid, ${payload.expressionId}::uuid)::text)
         )
       ),
       existing_policy_expression AS (
@@ -137,10 +201,23 @@ export class PolicyExpressionRepository extends BaseRepository {
     pagination?: ApiPaginationOptions
   ): Promise<PolicyExpression[]> {
     const knex = getKnex();
-    const query = knex('policy_expression')
-      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
+    const uniquePolicyExpressions = knex('policy_expression')
+      .select([
+        'policy_expression_id',
+        'policy_id',
+        'expression_id',
+        'name',
+        'description',
+        knex.raw(
+          'row_number() over (partition by expression_id order by create_date asc, policy_expression_id asc) as expression_rank'
+        )
+      ])
       .where('policy_id', policyId)
       .whereNull('record_end_date');
+    const query = knex
+      .from(uniquePolicyExpressions.as('policy_expression'))
+      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
+      .where('expression_rank', 1);
 
     this.applyPagination(query, pagination);
 
@@ -159,7 +236,7 @@ export class PolicyExpressionRepository extends BaseRepository {
     const query = knex('policy_expression')
       .where('policy_id', policyId)
       .whereNull('record_end_date')
-      .select(knex.raw('coalesce(count(*), 0)::integer as count'));
+      .select(knex.raw('coalesce(count(distinct expression_id), 0)::integer as count'));
 
     const response = await this.connection.knex(query, CountResult);
     return response.rows[0]?.count ?? 0;

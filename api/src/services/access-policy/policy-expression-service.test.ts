@@ -72,6 +72,60 @@ describe('PolicyExpressionService', () => {
     });
   });
 
+  describe('createPolicyExpression', () => {
+    it('delegates to repository insertion', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+
+      const policyExpression = {
+        policy_expression_id: 'pe-1',
+        policy_id: 'policy-1',
+        expression_id: 'expr-1',
+        name: 'Named expression',
+        description: null
+      };
+
+      const insertStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'insertPolicyExpression')
+        .resolves(policyExpression);
+
+      const result = await service.createPolicyExpression({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
+        name: 'Named expression',
+        description: null
+      });
+
+      expect(result).to.eql(policyExpression);
+      expect(insertStub).to.have.been.calledOnceWithExactly({
+        policyId: 'policy-1',
+        expressionId: 'expr-1',
+        name: 'Named expression',
+        description: null
+      });
+    });
+  });
+
+  describe('getPolicyExpressionByPolicyAndExpressionId', () => {
+    it('passes through to the repository', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+      const row = {
+        policy_expression_id: 'pe-1',
+        policy_id: 'policy-1',
+        expression_id: 'expr-1',
+        name: null,
+        description: null
+      };
+      const repositoryStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'getPolicyExpressionByPolicyAndExpressionId')
+        .resolves(row);
+
+      const result = await service.getPolicyExpressionByPolicyAndExpressionId('policy-1', 'expr-1');
+
+      expect(result).to.eql(row);
+      expect(repositoryStub).to.have.been.calledOnceWithExactly('policy-1', 'expr-1');
+    });
+  });
+
   describe('updatePolicyExpression', () => {
     it('delegates pointer patching to the repository', async () => {
       const service = new PolicyExpressionService(getMockDBConnection());

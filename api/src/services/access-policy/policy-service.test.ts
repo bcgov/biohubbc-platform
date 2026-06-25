@@ -3,12 +3,14 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ApiConflictError } from '../../errors/api-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { PolicyExpressionRepository } from '../../repositories/policy-expression-repository';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyExpressionService } from './policy-expression-service';
 import { PolicyService } from './policy-service';
 import { SecurityScopeService } from './security-scope-service';
@@ -541,6 +543,209 @@ describe('PolicyService', () => {
         statements: [mockStatements[0]],
         expressions: []
       });
+    });
+  });
+
+  describe('createPolicyExpression', () => {
+    it('creates a policy expression when the policy does not already use the resolved expression id', async () => {
+      const expression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 19,
+            feature_type_property_id: null,
+            operator: 'Contains',
+            value: 'x'
+          }
+        ]
+      } as const;
+      const policyExpression = {
+        policy_expression_id: 'pe-new',
+        policy_id: 'policy-1',
+        expression_id: 'expr-existing',
+        name: 'Expression',
+        description: null
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
+        policy_id: 'policy-1',
+        name: 'Policy',
+        description: null,
+        status: 'requested'
+      });
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-existing' });
+      sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(expression);
+      sinon.stub(PolicyExpressionService.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves(null);
+      const createPolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'createPolicyExpression')
+        .resolves(policyExpression);
+      const ensurePolicyExpressionStub = sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression');
+
+      const result = await policyService.createPolicyExpression('policy-1', {
+        name: 'Expression',
+        description: null,
+        expression
+      });
+
+      expect(createPolicyExpressionStub).to.have.been.calledOnceWithExactly({
+        policyId: 'policy-1',
+        expressionId: 'expr-existing',
+        name: 'Expression',
+        description: null
+      });
+      expect(ensurePolicyExpressionStub).to.not.have.been.called;
+      expect(result).to.eql({ ...policyExpression, expression });
+    });
+
+    it('throws conflict when the policy already has an active policy expression for the resolved expression id', async () => {
+      const expression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 19,
+            feature_type_property_id: null,
+            operator: 'Contains',
+            value: 'x'
+          }
+        ]
+      } as const;
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
+        policy_id: 'policy-1',
+        name: 'Policy',
+        description: null,
+        status: 'requested'
+      });
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-existing' });
+      sinon.stub(PolicyExpressionService.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves({
+        policy_expression_id: 'pe-existing',
+        policy_id: 'policy-1',
+        expression_id: 'expr-existing',
+        name: 'Existing',
+        description: null
+      });
+      const createPolicyExpressionStub = sinon.stub(PolicyExpressionService.prototype, 'createPolicyExpression');
+
+      try {
+        await policyService.createPolicyExpression('policy-1', {
+          name: 'Expression',
+          description: null,
+          expression
+        });
+        expect.fail('expected createPolicyExpression to throw');
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+        expect(error.message).to.equal('Policy expression already exists for policy');
+      }
+
+      expect(createPolicyExpressionStub).to.not.have.been.called;
+    });
+  });
+
+  describe('updatePolicyExpression', () => {
+    it('throws conflict when another active policy expression already uses the resolved expression id', async () => {
+      const expression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 19,
+            feature_type_property_id: null,
+            operator: 'Contains',
+            value: 'x'
+          }
+        ]
+      } as const;
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
+        policy_id: 'policy-1',
+        name: 'Policy',
+        description: null,
+        status: 'requested'
+      });
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-existing' });
+      sinon.stub(PolicyExpressionService.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves({
+        policy_expression_id: 'pe-other',
+        policy_id: 'policy-1',
+        expression_id: 'expr-existing',
+        name: 'Existing',
+        description: null
+      });
+      const updatePolicyExpressionStub = sinon.stub(
+        PolicyExpressionService.prototype,
+        'updatePolicyExpressionForPolicy'
+      );
+
+      try {
+        await policyService.updatePolicyExpression('policy-1', 'pe-current', {
+          name: 'Expression',
+          description: null,
+          expression
+        });
+        expect.fail('expected updatePolicyExpression to throw');
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+        expect(error.message).to.equal('Policy expression already exists for policy');
+      }
+
+      expect(updatePolicyExpressionStub).to.not.have.been.called;
+    });
+
+    it('allows updating metadata when the resolved expression id belongs to the same policy expression', async () => {
+      const expression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_property_id: 19,
+            feature_type_property_id: null,
+            operator: 'Contains',
+            value: 'x'
+          }
+        ]
+      } as const;
+      const policyExpression = {
+        policy_expression_id: 'pe-current',
+        policy_id: 'policy-1',
+        expression_id: 'expr-existing',
+        name: 'Renamed',
+        description: null
+      };
+
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
+        policy_id: 'policy-1',
+        name: 'Policy',
+        description: null,
+        status: 'requested'
+      });
+      sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-existing' });
+      sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(expression);
+      sinon.stub(PolicyExpressionService.prototype, 'getPolicyExpressionByPolicyAndExpressionId').resolves({
+        ...policyExpression,
+        name: 'Old'
+      });
+      const updatePolicyExpressionStub = sinon
+        .stub(PolicyExpressionService.prototype, 'updatePolicyExpressionForPolicy')
+        .resolves(policyExpression);
+
+      const result = await policyService.updatePolicyExpression('policy-1', 'pe-current', {
+        name: 'Renamed',
+        description: null,
+        expression
+      });
+
+      expect(updatePolicyExpressionStub).to.have.been.calledOnceWithExactly('policy-1', 'pe-current', {
+        expression_id: 'expr-existing',
+        name: 'Renamed',
+        description: null
+      });
+      expect(result).to.eql({ ...policyExpression, expression });
     });
   });
 

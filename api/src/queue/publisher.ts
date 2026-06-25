@@ -617,8 +617,7 @@ export const publishComputeScopeAnchorsJob = async (
 
     await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);
 
-    const startAfter =
-      mergedOptions.startAfter ?? new Date(Date.now() + COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS * 1000);
+    const startAfter = mergedOptions.startAfter ?? new Date(Date.now() + COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS * 1000);
 
     const jobId = await boss.send(JobQueues.COMPUTE_SCOPE_ANCHORS, data, {
       ...mergedOptions,
