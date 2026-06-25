@@ -37,6 +37,12 @@ interface ReconstructExpressionTreeContext {
   predicatesById: Map<string, ReadPredicateNodeRow>;
 }
 
+interface ReconstructHydrationContext {
+  expressionsById: Map<string, Expression>;
+  clausesByExpressionId: Map<string, ExpressionClause[]>;
+  predicateIds: Set<string>;
+}
+
 /**
  * Service for writing and reading reusable expression trees.
  *
@@ -157,37 +163,11 @@ export class ExpressionTreeService extends DBService {
         continue;
       }
 
-      const [expressions, clauses] = await Promise.all([
-        this.expressionRepository.getExpressionsByIds(expressionIdsToRead),
-        this.expressionClauseRepository.getExpressionClausesByExpressionIds(expressionIdsToRead)
-      ]);
-
-      for (const expression of expressions) {
-        expressionsById.set(expression.expression_id, expression);
-        clausesByExpressionId.set(expression.expression_id, []);
-      }
-
-      for (const clause of clauses) {
-        const expressionClauses = clausesByExpressionId.get(clause.expression_id) ?? [];
-        expressionClauses.push(clause);
-        clausesByExpressionId.set(clause.expression_id, expressionClauses);
-
-        if (clause.predicate_id) {
-          predicateIds.add(clause.predicate_id);
-          continue;
-        }
-
-        if (!clause.child_expression_id) {
-          throw new ApiGeneralError('Invalid expression clause target', [
-            'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-            `expressionClauseId=${clause.expression_clause_id}`
-          ]);
-        }
-
-        if (!expressionsById.has(clause.child_expression_id)) {
-          pendingExpressionIds.push(clause.child_expression_id);
-        }
-      }
+      pendingExpressionIds = await this.hydrateExpressionTreeStorageBatch(expressionIdsToRead, {
+        expressionsById,
+        clausesByExpressionId,
+        predicateIds
+      });
     }
 
     const readPredicates = await this.predicateRepository.readPredicateNodes([...predicateIds]);
@@ -198,6 +178,86 @@ export class ExpressionTreeService extends DBService {
       clausesByExpressionId,
       predicatesById
     });
+  }
+
+  /**
+   * Hydrate one breadth-first batch of expression and clause rows.
+   *
+   * @private
+   * @param {string[]} expressionIdsToRead - Expression ids in the current read batch.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @return {Promise<string[]>} Child expression ids that still need hydration.
+   * @memberof ExpressionTreeService
+   */
+  private async hydrateExpressionTreeStorageBatch(
+    expressionIdsToRead: string[],
+    context: ReconstructHydrationContext
+  ): Promise<string[]> {
+    const [expressions, clauses] = await Promise.all([
+      this.expressionRepository.getExpressionsByIds(expressionIdsToRead),
+      this.expressionClauseRepository.getExpressionClausesByExpressionIds(expressionIdsToRead)
+    ]);
+
+    for (const expression of expressions) {
+      context.expressionsById.set(expression.expression_id, expression);
+      context.clausesByExpressionId.set(expression.expression_id, []);
+    }
+
+    return this.recordHydratedExpressionClauses(clauses, context);
+  }
+
+  /**
+   * Record hydrated clause rows and collect unresolved child expression ids.
+   *
+   * @private
+   * @param {ExpressionClause[]} clauses - Clause rows from the current read batch.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @return {string[]} Child expression ids that still need hydration.
+   * @memberof ExpressionTreeService
+   */
+  private recordHydratedExpressionClauses(clauses: ExpressionClause[], context: ReconstructHydrationContext): string[] {
+    const pendingExpressionIds: string[] = [];
+
+    for (const clause of clauses) {
+      this.recordHydratedExpressionClause(clause, context, pendingExpressionIds);
+    }
+
+    return pendingExpressionIds;
+  }
+
+  /**
+   * Record one hydrated clause row.
+   *
+   * @private
+   * @param {ExpressionClause} clause - Clause row from storage.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @param {string[]} pendingExpressionIds - Child expression ids queued for hydration.
+   * @memberof ExpressionTreeService
+   */
+  private recordHydratedExpressionClause(
+    clause: ExpressionClause,
+    context: ReconstructHydrationContext,
+    pendingExpressionIds: string[]
+  ): void {
+    const expressionClauses = context.clausesByExpressionId.get(clause.expression_id) ?? [];
+    expressionClauses.push(clause);
+    context.clausesByExpressionId.set(clause.expression_id, expressionClauses);
+
+    if (clause.predicate_id) {
+      context.predicateIds.add(clause.predicate_id);
+      return;
+    }
+
+    if (!clause.child_expression_id) {
+      throw new ApiGeneralError('Invalid expression clause target', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionClauseId=${clause.expression_clause_id}`
+      ]);
+    }
+
+    if (!context.expressionsById.has(clause.child_expression_id)) {
+      pendingExpressionIds.push(clause.child_expression_id);
+    }
   }
 
   /**
