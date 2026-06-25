@@ -7,6 +7,7 @@ import { IDBConnection } from '../../database/db';
 import { Team } from '../../models/team';
 import { TeamMember, TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamMemberService } from './team-member-service';
 import { TeamService } from './team-service';
 
@@ -203,9 +204,13 @@ describe('TeamService', () => {
     expect(result).to.eql(mockTeam);
   });
 
-  it('deleteTeam calls repository.deleteTeam', async () => {
+  it('deleteTeam calls repository.deleteTeam and rebuilds team security scopes', async () => {
     const stub = sinon.stub(TeamRepository.prototype, 'deleteTeam').resolves();
+    const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
     await service.deleteTeam('11111111-1111-1111-1111-111111111111');
+
     expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+    expect(rebuildStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111');
   });
 });

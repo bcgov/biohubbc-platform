@@ -246,6 +246,10 @@ export class TicketService extends DBService {
     const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
     this.assertCanDeleteTicket(dataRequests.map((dataRequest) => dataRequest.status));
 
+    await Promise.all(
+      dataRequests.map((dataRequest) => this.dataRequestService.deleteDataRequest(dataRequest.data_request_id))
+    );
+
     await this.ticketRepository.deleteTicket(ticketId);
   }
 

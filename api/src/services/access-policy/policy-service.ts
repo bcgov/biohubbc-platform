@@ -2,23 +2,26 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { ApiConflictError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
-import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
+import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { CreatePolicyStatementPayload, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
-import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyExpressionService } from './policy-expression-service';
-import { PolicyExpressionWithExpression, PolicyFilters, PolicyWithStatements } from './policy-service.interface';
+import {
+  CacheFanOutTransition,
+  PolicyExpressionWithExpression,
+  PolicyFilters,
+  PolicyWithStatements
+} from './policy-service.interface';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyExpressionService: PolicyExpressionService;
-  policyStatementRepository: PolicyStatementRepository;
   policyStatementService: PolicyStatementService;
   expressionTreeService: ExpressionTreeService;
   securityScopeService: SecurityScopeService;
@@ -34,7 +37,6 @@ export class PolicyService extends DBService {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyExpressionService = new PolicyExpressionService(connection);
-    this.policyStatementRepository = new PolicyStatementRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
@@ -89,8 +91,7 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Update policy fields, validate lifecycle transitions, and keep the access
-   * cache in sync with the resulting status.
+   * Update policy fields and keep the access cache in sync with the resulting status.
    *
    * The access cache (`security_scope`,
    * `team_security_scope`) must mirror the policy's approval state: an
@@ -99,7 +100,7 @@ export class PolicyService extends DBService {
    * each linked team when a policy leaves `approved`, the cache would silently
    * keep granting access through a downgraded or denied policy.
    *
-   * Validation runs before any cache writes so a rejected status change cannot
+   * The row write runs before cache orchestration so rejected persistence cannot
    * mutate the cache. Teams are processed sequentially to pin grant ordering
    * and keep the connection-use window bounded.
    *
@@ -109,7 +110,7 @@ export class PolicyService extends DBService {
    * @memberof PolicyService
    */
   async updatePolicy(policyId: string, policyData: UpdatePolicy): Promise<Policy> {
-    // Updates that do not include a status value bypass workflow validation.
+    // Updates that do not include a status value cannot affect approval-derived cache state.
     if (policyData.status === undefined) {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
@@ -120,13 +121,15 @@ export class PolicyService extends DBService {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
-    this.assertValidStatusTransition(currentPolicy.status, policyData.status);
-
     const updated = await this.policyRepository.updatePolicy(policyId, policyData);
 
     // Cache orchestration runs only after the row write succeeds — a rejected
     // status write must not mutate the cache.
-    await this.applyCacheFanOutForTransition(policyId, currentPolicy.status, policyData.status);
+    await this.applyCacheFanOutForTransition({
+      policyId,
+      from: currentPolicy.status,
+      to: policyData.status
+    });
 
     return updated;
   }
@@ -152,24 +155,16 @@ export class PolicyService extends DBService {
    * connection-use window bounded.
    *
    * @private
-   * @param {string} policyId - Policy UUID.
-   * @param {PolicyStatus} from - Status the policy held before the write.
-   * @param {PolicyStatus} to - Status the policy holds after the write.
+   * @param {CacheFanOutTransition} transition - Policy status transition context.
    * @return {Promise<void>}
    * @memberof PolicyService
    */
-  private async applyCacheFanOutForTransition(
-    policyId: string,
-    from: PolicyStatus,
-    to: PolicyStatus,
-    linkedTeamPolicies?: { team_id: string }[]
-  ): Promise<void> {
+  private async applyCacheFanOutForTransition({ policyId, from, to }: CacheFanOutTransition): Promise<void> {
     if (from === to) {
       return;
     }
 
-    const teamPolicies =
-      linkedTeamPolicies ?? (await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }));
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
     if (teamPolicies.length === 0) {
       return;
     }
@@ -190,54 +185,6 @@ export class PolicyService extends DBService {
       for (const teamPolicy of teamPolicies) {
         await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
       }
-    }
-  }
-
-  /**
-   * Validate lifecycle transition between two policy status values.
-   *
-   * Encodes the full transition matrix plus the additional "requested cannot
-   * jump directly to approved" guard so callers compose a single validation
-   * call. Throws `HTTP400` on invalid transitions; same-status calls should be
-   * filtered by the caller before reaching this method.
-   *
-   * @private
-   * @param {PolicyStatus} current - Current policy status.
-   * @param {PolicyStatus} next - Target policy status.
-   * @return {void}
-   * @memberof PolicyService
-   */
-  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
-    if (next === 'approved') {
-      this.assertCanApproveRequest(current);
-    }
-
-    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
-      requested: ['reviewed', 'denied'],
-      reviewed: ['approved', 'denied'],
-      approved: ['reviewed', 'denied'],
-      denied: ['reviewed']
-    };
-
-    if (!validTransitions[current].includes(next)) {
-      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
-    }
-  }
-
-  /**
-   * Assert that a request can be approved based on policy readiness.
-   *
-   * @private
-   * @param {(PolicyStatus)} current - Current policy status.
-   * @return {void}
-   * @memberof PolicyService
-   */
-  private assertCanApproveRequest(current: PolicyStatus): void {
-    // Direct transitions from requested to approved are blocked by this branch workflow.
-    const blockedStatuses = new Set(['requested']);
-
-    if (blockedStatuses.has(current)) {
-      throw new HTTP400(`Cannot approve request while policy is '${current}'`);
     }
   }
 
@@ -414,7 +361,18 @@ export class PolicyService extends DBService {
       throw new HTTP400('Policy expression does not belong to policy');
     }
 
-    await this.policyExpressionService.clearPolicyStatementLinks(policyId, policyExpressionId);
+    const hasActiveStatementReferences = await this.policyExpressionService.hasActivePolicyStatementReferences(
+      policyId,
+      policyExpressionId
+    );
+
+    if (hasActiveStatementReferences) {
+      throw new ApiConflictError('Cannot delete policy expression while active policy statements reference it', [
+        'PolicyService->deletePolicyExpression',
+        { policyId, policyExpressionId }
+      ]);
+    }
+
     await this.policyExpressionService.deletePolicyExpression(policyId, policyExpressionId);
   }
 
@@ -475,91 +433,6 @@ export class PolicyService extends DBService {
     const createdStatements = await this.createStatements(policy.policy_id, statements);
     const expressions = await this.getPolicyExpressionsWithExpression(policy.policy_id);
     return { ...policy, statements: createdStatements, expressions };
-  }
-
-  /**
-   * Update a policy and reconcile its statement set.
-   *
-   * Order is deliberate: status-transition validation runs first so a rejected
-   * transition cannot leave the statement set replaced and the policy row
-   * unchanged. Existing statement rows are patched positionally, surplus rows
-   * are soft-deleted, and missing rows are created. Statement create/update
-   * calls refresh policy access for scope-defining changes; when rows are only
-   * deleted, this method performs the final same-status access refresh. Status
-   * transition fan-out is handled once through `applyCacheFanOutForTransition`.
-   * Scope anchors are preserved across policy mutations.
-   *
-   * @param {string} policyId - Policy UUID.
-   * @param {UpdatePolicy} policyData - Partial policy update payload.
-   * @param {CreatePolicyStatementPayload[]} statements - Replacement statement payloads.
-   * @return {Promise<PolicyWithStatements>} Updated policy with rebuilt statements.
-   * @memberof PolicyService
-   */
-  async updatePolicyWithStatements(
-    policyId: string,
-    policyData: UpdatePolicy,
-    statements: CreatePolicyStatementPayload[]
-  ): Promise<PolicyWithStatements> {
-    // Capture state up front so we can decide validation + final orchestration.
-    const previousPolicy = await this.policyRepository.getPolicy(policyId);
-    const previousStatus = previousPolicy.status;
-    const nextStatus = policyData.status ?? previousStatus;
-
-    // Validate the status transition before any mutation so a rejected
-    // transition cannot leave the statement set replaced and the row unchanged.
-    if (policyData.status !== undefined && policyData.status !== previousStatus) {
-      this.assertValidStatusTransition(previousStatus, policyData.status);
-    }
-
-    // Capture existing statement associations before replacement.
-    const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
-    const statementsChanged = existingStatements.length > 0 || statements.length > 0;
-    const needsTeamPolicies = statementsChanged || previousStatus !== nextStatus;
-    const teamPolicies = needsTeamPolicies
-      ? await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] })
-      : [];
-    const affectedTeamIds = teamPolicies.map((teamPolicy) => teamPolicy.team_id);
-
-    const patchedStatements: PolicyStatement[] = [];
-    const patchCount = Math.min(existingStatements.length, statements.length);
-
-    for (let index = 0; index < patchCount; index++) {
-      const existingStatement = existingStatements[index];
-      const incomingStatement = statements[index];
-
-      patchedStatements.push(
-        await this.policyStatementService.updatePolicyStatement(existingStatement.policy_statement_id, {
-          effect: incomingStatement.effect,
-          submission_feature_urn: incomingStatement.submission_feature_urn,
-          policy_expression_id: incomingStatement.policy_expression_id
-        })
-      );
-    }
-
-    const deletedStatements = existingStatements.slice(statements.length);
-    if (deletedStatements.length > 0) {
-      await Promise.all(
-        deletedStatements.map((stmt) => this.policyStatementRepository.deletePolicyStatement(stmt.policy_statement_id))
-      );
-    }
-
-    const createdStatements = await this.createStatements(policyId, statements.slice(existingStatements.length));
-    const finalStatements = [...patchedStatements, ...createdStatements];
-
-    // Write the policy row directly — validation already ran above so we do
-    // not need to re-enter the public `updatePolicy` path (which would also
-    // orchestrate, doubling the fan-out). The shared transition helper below
-    // owns the cache side effect.
-    const policy = await this.policyRepository.updatePolicy(policyId, policyData);
-
-    await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus, teamPolicies);
-
-    if (previousStatus === nextStatus && deletedStatements.length > 0) {
-      await this.securityScopeService.refreshAccessForPolicyTeams(policyId, affectedTeamIds);
-    }
-
-    const expressions = await this.getPolicyExpressionsWithExpression(policyId);
-    return { ...policy, statements: finalStatements, expressions };
   }
 
   /**

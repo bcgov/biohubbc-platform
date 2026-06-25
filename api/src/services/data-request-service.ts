@@ -231,14 +231,25 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Soft delete a data request.
+   * Soft delete a data request and revoke its generated policy grant.
+   *
+   * Data-request access is implemented through the linked policy. Deleting only
+   * the request wrapper would leave an approved policy and its team grants live.
+   * Soft-delete the request row and policy together through `PolicyService` so
+   * affected teams' `team_security_scope` rows are rebuilt from the remaining
+   * policy chain.
    *
    * @param {string} dataRequestId - Data request UUID.
    * @return {Promise<void>}
    * @memberof DataRequestService
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
-    await this.dataRequestRepository.deleteDataRequest(dataRequestId);
+    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+
+    await Promise.all([
+      this.dataRequestRepository.deleteDataRequest(dataRequestId),
+      this.policyService.deletePolicy(dataRequest.policy_id)
+    ]);
   }
 
   /**

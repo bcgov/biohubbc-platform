@@ -261,8 +261,8 @@ describe('expression-evaluation (integration)', function () {
     const systemUserId = connection.systemUserId();
 
     const scope = await connection.sql(SQL`
-      INSERT INTO security_scope (scope_hash)
-      VALUES (${`test-scope-${anchorSubmissionFeatureId}`})
+      INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+      VALUES (${`test-scope-${anchorSubmissionFeatureId}`}, '*', '*', '*')
       RETURNING security_scope_id;
     `);
     const securityScopeId = scope.rows[0].security_scope_id;

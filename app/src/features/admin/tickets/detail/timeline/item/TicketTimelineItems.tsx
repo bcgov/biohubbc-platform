@@ -5,7 +5,7 @@ import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   ITicketArtifact,

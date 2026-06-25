@@ -1,8 +1,8 @@
 // Integration test for DownloadPolicyService — verifies that creating a download
 // policy writes the expected policy + policy_statement links
 // rows against a real database, and that download policies are intentionally
-// scope-free (no team_policy / security_scope rows) so they can never act as a
-// backdoor for granting access.
+// grant-free (no team_policy / team_security_scope rows) so they can never act
+// as a backdoor for granting access.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -138,11 +138,11 @@ describe('DownloadPolicyService (integration)', function () {
       expect(statementIds.size).to.equal(2);
     });
 
-    it('does not write team_policy or security_scope rows for the new policy', async () => {
+    it('does not write team_policy or team_security_scope grant rows for the new policy', async () => {
       // U4 (AC #5): download policies define the feature set to export, not who
-      // can read it. Skipping team_policy / security_scope keeps create-download
-      // from being a backdoor for granting access; export-time enforcement is
-      // the security boundary.
+      // can read it. Statements still point at security_scope rows, but skipping
+      // team_policy / team_security_scope keeps create-download from being a
+      // backdoor for granting access; export-time enforcement is the security boundary.
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'No Scope Leak',
         description: null,
@@ -155,21 +155,22 @@ describe('DownloadPolicyService (integration)', function () {
       `);
       expect(teamPolicies.rows[0].n).to.equal(0);
 
-      // security_scope rows are linked to policy_statement rows via the
-      // policy_statement_scope join table. A scope-free policy must produce
-      // zero rows in that join for any of its statements.
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement WHERE policy_id = ${policy_id};
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-      expect(statementIds.length).to.be.greaterThan(0);
-
-      const scopeJoinRows = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_scope
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]);
+      const statements = await connection.sql(SQL`
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${policy_id}
+          AND security_scope_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
-      expect(scopeJoinRows.rows[0].n).to.equal(0);
+      expect(statements.rows[0].n).to.equal(1);
+
+      const teamScopeGrants = await connection.sql(SQL`
+        SELECT count(*)::int AS n
+        FROM team_security_scope tss
+        JOIN policy_statement ps USING (security_scope_id)
+        WHERE ps.policy_id = ${policy_id};
+      `);
+      expect(teamScopeGrants.rows[0].n).to.equal(0);
     });
 
     it('audit chain: download → policy → policy_statement → policy_expression → expression round-trips the original tree', async () => {

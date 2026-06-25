@@ -20,8 +20,15 @@ import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IServerPaginationProps } from 'types/pagination';
+import yup from 'utils/YupSchema';
+import { CreatePolicyForm } from './CreatePolicyForm';
 import { EditPolicyDialog } from './EditPolicyDialog';
-import { IPolicyFormValues, PolicyForm, PolicyFormInitialValues, PolicyFormYupSchema } from './PolicyForm';
+import { ICreatePolicyFormValues, IPolicyFormValues } from './PolicyForm.interface';
+
+const createPolicyFormYupSchema = yup.object().shape({
+  name: yup.string().required('Policy name is required'),
+  description: yup.string()
+});
 
 /**
  * Props for the PoliciesContainer component.
@@ -61,6 +68,10 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
   const [openEditPolicyDialog, setOpenEditPolicyDialog] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<IPolicy | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const createPolicyFormInitialValues: ICreatePolicyFormValues = {
+    name: '',
+    description: ''
+  };
 
   /**
    * Display a snackbar notification with the given props.
@@ -159,17 +170,16 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
    * Transforms the form values to API format and creates the policy.
    * Shows success snackbar or error dialog based on result.
    *
-   * @param {IPolicyFormValues} values - Form values from the add policy dialog
+   * @param {ICreatePolicyFormValues} values - Form values from the add policy dialog
    * @returns {Promise<void>}
    */
-  const handleAddPolicySave = async (values: IPolicyFormValues) => {
+  const handleAddPolicySave = async (values: ICreatePolicyFormValues) => {
     setIsLoading(true);
 
     try {
       await biohubApi.policies.createPolicy({
         name: values.name,
         description: values.description || undefined,
-        status: values.status,
         statements: []
       });
 
@@ -206,13 +216,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
       await biohubApi.policies.updatePolicy(editingPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
-        status: values.status,
-        statements: editingPolicy.statements.map((statement) => ({
-          effect: statement.effect,
-          submission_feature_urn: statement.submission_feature_urn,
-          ...(statement.policy_expression_id ? { policy_expression_id: statement.policy_expression_id } : {}),
-          ...(statement.expression ? { expression: statement.expression } : {})
-        }))
+        status: values.status
       });
 
       setOpenEditPolicyDialog(false);
@@ -355,9 +359,9 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
         dialogSaveButtonLabel={'Create'}
         maxWidth="md"
         component={{
-          element: <PolicyForm />,
-          initialValues: PolicyFormInitialValues,
-          validationSchema: PolicyFormYupSchema
+          element: <CreatePolicyForm />,
+          initialValues: createPolicyFormInitialValues,
+          validationSchema: createPolicyFormYupSchema
         }}
         onCancel={() => setOpenAddPolicyDialog(false)}
         onSave={handleAddPolicySave}

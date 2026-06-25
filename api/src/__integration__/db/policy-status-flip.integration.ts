@@ -110,9 +110,12 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
 
   async function countPolicyStatementScopes(policyId: string): Promise<number> {
     const result = await connection.sql(SQL`
-      SELECT count(*)::integer AS count FROM policy_statement_scope pss
-      JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
-      WHERE ps.policy_id = ${policyId};
+      SELECT count(*)::integer AS count
+      FROM policy_statement ps
+      WHERE ps.policy_id = ${policyId}
+        AND ps.security_scope_id IS NOT NULL
+        AND ps.effect = 'allow'
+        AND ps.record_end_date IS NULL;
     `);
     return result.rows[0].count;
   }
@@ -207,8 +210,10 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     expect(await countTeamScopes(teamId)).to.equal(1);
 
     const linked = await connection.sql(SQL`
-      SELECT policy_statement_id FROM policy_statement_scope
-      WHERE policy_statement_id IN (${liveStmt}, ${endedStmt});
+      SELECT policy_statement_id FROM policy_statement
+      WHERE policy_statement_id IN (${liveStmt}, ${endedStmt})
+        AND security_scope_id IS NOT NULL
+        AND record_end_date IS NULL;
     `);
     expect(linked.rows.map((r: { policy_statement_id: string }) => r.policy_statement_id)).to.deep.equal([liveStmt]);
   });

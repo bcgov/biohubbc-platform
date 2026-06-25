@@ -137,14 +137,14 @@ export class PolicyExpressionService extends DBService {
   }
 
   /**
-   * Clear active statement links for a policy expression.
+   * Check whether an active policy expression is referenced by active statements.
    *
    * @param {string} policyId - Policy identifier.
    * @param {string} policyExpressionId - Policy-expression identifier.
-   * @return {Promise<void>}
+   * @return {Promise<boolean>} True when an active statement still references the expression.
    */
-  clearPolicyStatementLinks(policyId: string, policyExpressionId: string): Promise<void> {
-    return this.policyExpressionRepository.clearPolicyStatementLinks(policyId, policyExpressionId);
+  hasActivePolicyStatementReferences(policyId: string, policyExpressionId: string): Promise<boolean> {
+    return this.policyExpressionRepository.hasActivePolicyStatementReferences(policyId, policyExpressionId);
   }
 
   /**

@@ -3,30 +3,8 @@ import TextField from '@mui/material/TextField';
 import CustomAutocomplete, { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
 import { useFormikContext } from 'formik';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import yup from 'utils/YupSchema';
-
-export interface IPolicyFormValues {
-  name: string;
-  description: string;
-  status: PolicyStatus;
-}
-
-export const PolicyFormInitialValues: IPolicyFormValues = {
-  name: '',
-  description: '',
-  status: PolicyStatus.REQUESTED
-};
-
-const policyStatusOptions: ICustomAutocompleteOption<PolicyStatus>[] = Object.values(PolicyStatus).map((status) => ({
-  value: status,
-  label: status.charAt(0).toUpperCase() + status.slice(1)
-}));
-
-export const PolicyFormYupSchema = yup.object().shape({
-  name: yup.string().required('Policy name is required'),
-  description: yup.string(),
-  status: yup.mixed<PolicyStatus>().required('Status is required')
-});
+import { useMemo } from 'react';
+import { IPolicyFormValues } from './PolicyForm.interface';
 
 /**
  * Metadata-only policy form used by policy table create/edit dialogs.
@@ -36,7 +14,18 @@ export const PolicyFormYupSchema = yup.object().shape({
 export const PolicyForm = () => {
   const { values, handleChange, handleSubmit, errors, touched, setFieldValue, setFieldTouched } =
     useFormikContext<IPolicyFormValues>();
-  const selectedStatus = policyStatusOptions.find((option) => option.value === values.status) ?? null;
+  const policyStatusOptions = useMemo<ICustomAutocompleteOption<PolicyStatus>[]>(
+    () =>
+      Object.values(PolicyStatus).map((status) => ({
+        value: status,
+        label: status.charAt(0).toUpperCase() + status.slice(1)
+      })),
+    []
+  );
+  const selectedStatus = useMemo(
+    () => policyStatusOptions.find((option) => option.value === values.status) ?? null,
+    [policyStatusOptions, values.status]
+  );
 
   return (
     <form onSubmit={handleSubmit}>

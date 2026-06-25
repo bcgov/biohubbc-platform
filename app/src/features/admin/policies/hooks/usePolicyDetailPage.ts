@@ -1,4 +1,4 @@
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { IPolicyExpressionFormValues } from 'features/admin/policies/components/PolicyExpressionForm';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, usePolicyContext } from 'hooks/useContext';
@@ -116,41 +116,6 @@ export const usePolicyDetailPage = () => {
   };
 
   /**
-   * Persists the full statement list through the policy update endpoint.
-   *
-   * @param statements - Complete statement payload to save for the current policy.
-   * @param snackbarMessage - Success message to show after the policy update completes.
-   */
-  const handleSaveStatements = async (
-    statements: ICreatePolicyStatementRequest[],
-    snackbarMessage: string
-  ): Promise<void> => {
-    if (!policy) {
-      return;
-    }
-
-    try {
-      setIsSavingStatement(true);
-
-      const updatedPolicy = await api.policies.updatePolicy(policy.policy_id, {
-        name: policy.name,
-        description: policy.description || undefined,
-        status: policy.status,
-        statements
-      });
-
-      policyDataLoader.setData(updatedPolicy);
-      setIsCreateStatementDialogOpen(false);
-      setEditingStatement(null);
-      setSnackbar(snackbarMessage);
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingStatement(false);
-    }
-  };
-
-  /**
    * Adds a new statement to the current policy using values from the statement dialog.
    *
    * @param values - Statement request submitted by the statement dialog.
@@ -160,7 +125,22 @@ export const usePolicyDetailPage = () => {
       return;
     }
 
-    await handleSaveStatements([...policy.statements, values], 'Created statement');
+    try {
+      setIsSavingStatement(true);
+
+      const createdStatement = await api.policies.createPolicyStatement(policy.policy_id, values);
+
+      policyDataLoader.setData({
+        ...policy,
+        statements: [...policy.statements, createdStatement]
+      });
+      setIsCreateStatementDialogOpen(false);
+      setSnackbar('Created statement');
+    } catch (error) {
+      setErrorSnackbar(error as Error);
+    } finally {
+      setIsSavingStatement(false);
+    }
   };
 
   /**
@@ -268,11 +248,6 @@ export const usePolicyDetailPage = () => {
             ...policy,
             expressions: policy.expressions.filter(
               (policyExpression) => policyExpression.policy_expression_id !== expression.policy_expression_id
-            ),
-            statements: policy.statements.map((statement) =>
-              statement.policy_expression_id === expression.policy_expression_id
-                ? { ...statement, policy_expression_id: null }
-                : statement
             )
           });
           expressions.refresh();
@@ -296,14 +271,28 @@ export const usePolicyDetailPage = () => {
       return;
     }
 
-    await handleSaveStatements(
-      policy.statements.map((statement) =>
-        statement.policy_statement_id === editingStatement.policy_statement_id
-          ? values
-          : statement
-      ),
-      'Updated statement'
-    );
+    try {
+      setIsSavingStatement(true);
+
+      const updatedStatement = await api.policies.updatePolicyStatement(
+        policy.policy_id,
+        editingStatement.policy_statement_id,
+        values
+      );
+
+      policyDataLoader.setData({
+        ...policy,
+        statements: policy.statements.map((statement) =>
+          statement.policy_statement_id === updatedStatement.policy_statement_id ? updatedStatement : statement
+        )
+      });
+      setEditingStatement(null);
+      setSnackbar('Updated statement');
+    } catch (error) {
+      setErrorSnackbar(error as Error);
+    } finally {
+      setIsSavingStatement(false);
+    }
   };
 
   /**
@@ -330,12 +319,23 @@ export const usePolicyDetailPage = () => {
       },
       onYes: async () => {
         dialogContext.setYesNoDialog({ open: false });
-        await handleSaveStatements(
-          policy.statements.filter(
-            (policyStatement) => policyStatement.policy_statement_id !== statement.policy_statement_id
-          ),
-          'Deleted statement'
-        );
+
+        try {
+          setIsSavingStatement(true);
+
+          await api.policies.deletePolicyStatement(policy.policy_id, statement.policy_statement_id);
+          policyDataLoader.setData({
+            ...policy,
+            statements: policy.statements.filter(
+              (policyStatement) => policyStatement.policy_statement_id !== statement.policy_statement_id
+            )
+          });
+          setSnackbar('Deleted statement');
+        } catch (error) {
+          setErrorSnackbar(error as Error);
+        } finally {
+          setIsSavingStatement(false);
+        }
       }
     });
   };
@@ -397,11 +397,13 @@ export const usePolicyDetailPage = () => {
       const updatedPolicy = await api.policies.updatePolicy(policy.policy_id, {
         name: values.name,
         description: values.description || undefined,
-        status: values.status,
-        statements: policy.statements
+        status: values.status
       });
 
-      policyDataLoader.setData(updatedPolicy);
+      policyDataLoader.setData({
+        ...policy,
+        ...updatedPolicy
+      });
       setIsEditPolicyDialogOpen(false);
       setSnackbar('Updated policy');
     } catch (error) {

@@ -77,9 +77,9 @@ export class PolicyExpressionRepository extends BaseRepository {
   /**
    * Insert a new policy-expression identity for a policy.
    *
-   * This intentionally does not deduplicate on `(policy_id, expression_id)`.
-   * Multiple user-visible policy expressions may reference the same reusable
-   * expression anchor while retaining distinct names/descriptions and ids.
+   * The database enforces one active policy expression per `(policy_id,
+   * expression_id)` pair. Callers should check for an existing row first when
+   * they need to return a domain conflict instead of a raw unique violation.
    *
    * @param {CreatePolicyExpression} payload - Policy-expression creation payload.
    * @returns {Promise<PolicyExpression>} Inserted policy-expression row.
@@ -201,28 +201,35 @@ export class PolicyExpressionRepository extends BaseRepository {
     pagination?: ApiPaginationOptions
   ): Promise<PolicyExpression[]> {
     const knex = getKnex();
-    const uniquePolicyExpressions = knex('policy_expression')
-      .select([
-        'policy_expression_id',
-        'policy_id',
-        'expression_id',
-        'name',
-        'description',
-        knex.raw(
-          'row_number() over (partition by expression_id order by create_date asc, policy_expression_id asc) as expression_rank'
-        )
-      ])
+    const query = knex('policy_expression')
+      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
       .where('policy_id', policyId)
       .whereNull('record_end_date');
-    const query = knex
-      .from(uniquePolicyExpressions.as('policy_expression'))
-      .select(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description'])
-      .where('expression_rank', 1);
 
     this.applyPagination(query, pagination);
 
     const response = await this.connection.knex(query, PolicyExpression);
     return response.rows;
+  }
+
+  /**
+   * Check whether an active policy expression is referenced by any active policy statement.
+   *
+   * @param {string} policyId - Policy identifier.
+   * @param {string} policyExpressionId - Policy-expression identifier.
+   * @return {Promise<boolean>} True when an active statement still references the expression.
+   */
+  async hasActivePolicyStatementReferences(policyId: string, policyExpressionId: string): Promise<boolean> {
+    const knex = getKnex();
+    const query = knex('policy_statement')
+      .where('policy_id', policyId)
+      .where('policy_expression_id', policyExpressionId)
+      .whereNull('record_end_date')
+      .first('policy_statement_id');
+
+    const response = await this.connection.knex(query);
+
+    return (response.rowCount ?? 0) > 0;
   }
 
   /**
@@ -236,7 +243,7 @@ export class PolicyExpressionRepository extends BaseRepository {
     const query = knex('policy_expression')
       .where('policy_id', policyId)
       .whereNull('record_end_date')
-      .select(knex.raw('coalesce(count(distinct expression_id), 0)::integer as count'));
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'));
 
     const response = await this.connection.knex(query, CountResult);
     return response.rows[0]?.count ?? 0;
@@ -318,24 +325,6 @@ export class PolicyExpressionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Clear active policy statement links for a policy expression before soft-deleting it.
-   *
-   * @param {string} policyId - Policy identifier.
-   * @param {string} policyExpressionId - Policy-expression identifier.
-   * @return {Promise<void>}
-   */
-  async clearPolicyStatementLinks(policyId: string, policyExpressionId: string): Promise<void> {
-    const knex = getKnex();
-    const query = knex('policy_statement')
-      .update({ policy_expression_id: null })
-      .where('policy_id', policyId)
-      .where('policy_expression_id', policyExpressionId)
-      .whereNull('record_end_date');
-
-    await this.connection.knex(query);
   }
 
   /**

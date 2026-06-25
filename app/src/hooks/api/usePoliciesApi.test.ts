@@ -108,17 +108,14 @@ describe('usePoliciesApi', () => {
     it('updates an existing policy', async () => {
       const updateData = {
         name: 'Updated Policy',
-        status: PolicyStatus.APPROVED,
-        statements: []
+        status: PolicyStatus.APPROVED
       };
 
-      const mockResponse: IPolicy = {
+      const mockResponse = {
         policy_id: '123',
         name: 'Updated Policy',
         description: null,
-        status: PolicyStatus.APPROVED,
-        expressions: [],
-        statements: []
+        status: PolicyStatus.APPROVED
       };
 
       mock.onPut('/api/administrative/policies/123').reply(200, mockResponse);
@@ -126,6 +123,58 @@ describe('usePoliciesApi', () => {
       const result = await usePoliciesApi(axios).updatePolicy('123', updateData);
 
       expect(result.name).toEqual('Updated Policy');
+    });
+  });
+
+  describe('createPolicyStatement', () => {
+    it('creates a policy statement', async () => {
+      const mockResponse = {
+        policy_statement_id: 's1',
+        policy_id: '123',
+        effect: 'allow',
+        submission_feature_urn: 'urn:*:*:*',
+        policy_expression_id: null
+      };
+
+      mock.onPost('/api/administrative/policies/123/statements').reply(201, mockResponse);
+
+      const result = await usePoliciesApi(axios).createPolicyStatement('123', {
+        effect: 'allow',
+        submission_feature_urn: 'urn:*:*:*',
+        policy_expression_id: null
+      });
+
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('updatePolicyStatement', () => {
+    it('updates a policy statement', async () => {
+      const mockResponse = {
+        policy_statement_id: 's1',
+        policy_id: '123',
+        effect: 'deny',
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: 'pe-1'
+      };
+
+      mock.onPut('/api/administrative/policies/123/statements/s1').reply(200, mockResponse);
+
+      const result = await usePoliciesApi(axios).updatePolicyStatement('123', 's1', {
+        effect: 'deny',
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: 'pe-1'
+      });
+
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('deletePolicyStatement', () => {
+    it('deletes a policy statement', async () => {
+      mock.onDelete('/api/administrative/policies/123/statements/s1').reply(204);
+
+      await expect(usePoliciesApi(axios).deletePolicyStatement('123', 's1')).resolves.toBeUndefined();
     });
   });
 

@@ -119,7 +119,7 @@ describe('PolicyExpressionRepository', () => {
   });
 
   describe('getPolicyExpressionsByPolicyId', () => {
-    it('returns one active policy expression per expression id with pagination', async () => {
+    it('returns active policy expressions with pagination', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([policyExpressionRow], 1));
       const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
 
@@ -132,18 +132,42 @@ describe('PolicyExpressionRepository', () => {
 
       expect(result).to.eql([policyExpressionRow]);
       const sqlText = knexStub.firstCall.args[0].toString();
-      expect(sqlText).to.include('row_number() over (partition by expression_id');
       expect(sqlText).to.include('where "policy_id" = \'policy-1\'');
       expect(sqlText).to.include('"record_end_date" is null');
-      expect(sqlText).to.include('"expression_rank" = 1');
+      expect(sqlText).to.not.include('expression_rank');
       expect(sqlText).to.include('order by "name" asc');
       expect(sqlText).to.include('limit 10');
       expect(sqlText).to.include('offset 10');
     });
   });
 
+  describe('hasActivePolicyStatementReferences', () => {
+    it('returns true when an active statement references the policy expression', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ policy_statement_id: 'statement-1' }], 1));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.hasActivePolicyStatementReferences('policy-1', 'pe-1');
+
+      expect(result).to.equal(true);
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('from "policy_statement"');
+      expect(sqlText).to.include('"policy_id" = \'policy-1\'');
+      expect(sqlText).to.include('"policy_expression_id" = \'pe-1\'');
+      expect(sqlText).to.include('"record_end_date" is null');
+    });
+
+    it('returns false when no active statement references the policy expression', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.hasActivePolicyStatementReferences('policy-1', 'pe-1');
+
+      expect(result).to.equal(false);
+    });
+  });
+
   describe('getPolicyExpressionsCountByPolicyId', () => {
-    it('counts distinct active expression ids for a policy', async () => {
+    it('counts active policy expression rows for a policy', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 2 }], 1));
       const repository = new PolicyExpressionRepository(getMockDBConnection({ knex: knexStub }));
 
@@ -151,7 +175,7 @@ describe('PolicyExpressionRepository', () => {
 
       expect(result).to.equal(2);
       const sqlText = knexStub.firstCall.args[0].toString();
-      expect(sqlText).to.include('coalesce(count(distinct expression_id), 0)::integer as count');
+      expect(sqlText).to.include('coalesce(count(*), 0)::integer as count');
       expect(sqlText).to.include('from "policy_expression"');
       expect(sqlText).to.include('"policy_id" = \'policy-1\'');
       expect(sqlText).to.include('"record_end_date" is null');

@@ -1,6 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { cleanup, render, waitFor } from 'test-helpers/test-utils';
+import { cleanup, fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import { PolicyExpressionDialog } from './PolicyExpressionDialog';
 
 const mockExpression = vi.hoisted(
@@ -82,7 +82,7 @@ describe('PolicyExpressionDialog', () => {
     const user = userEvent.setup();
     const { getByLabelText, getByTestId, queryByText, onSave } = renderDialog();
 
-    await user.type(getByLabelText('Name *'), 'Sensitive species');
+    fireEvent.change(getByLabelText('Name *'), { target: { value: 'Sensitive species' } });
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
@@ -95,7 +95,7 @@ describe('PolicyExpressionDialog', () => {
     const user = userEvent.setup();
     const { getByLabelText, getByText, getByTestId, onSave } = renderDialog();
 
-    await user.type(getByLabelText('Name *'), 'Sensitive species');
+    fireEvent.change(getByLabelText('Name *'), { target: { value: 'Sensitive species' } });
     await user.click(getByText('Set expression'));
     await user.click(getByText('Set invalid expression'));
     await user.click(getByTestId('edit-dialog-save-button'));
@@ -109,8 +109,10 @@ describe('PolicyExpressionDialog', () => {
     const user = userEvent.setup();
     const { getByLabelText, getByText, getByTestId, onSave } = renderDialog();
 
-    await user.type(getByLabelText('Name *'), 'Sensitive species');
-    await user.type(getByLabelText('Description'), 'Filters sensitive species observations');
+    fireEvent.change(getByLabelText('Name *'), { target: { value: 'Sensitive species' } });
+    fireEvent.change(getByLabelText('Description'), {
+      target: { value: 'Filters sensitive species observations' }
+    });
     await user.click(getByText('Set expression'));
     await user.click(getByTestId('edit-dialog-save-button'));
 

@@ -24,13 +24,12 @@ export interface IPolicy extends IPolicySummary {
   expressions: IPolicyExpression[];
 }
 
-export interface IPolicyStatement extends ICreatePolicyStatementRequest {
+export interface IPolicyStatement {
   policy_statement_id: string;
   policy_id: string;
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
   policy_expression_id: string | null;
-  expression?: ExpressionTreeExpression;
 }
 
 export interface IPolicyExpression {
@@ -72,7 +71,6 @@ export interface IPolicyTeamsResponse {
 export interface ICreatePolicyRequest {
   name: string;
   description?: string;
-  status?: PolicyStatus;
   statements: ICreatePolicyStatementRequest[];
 }
 
@@ -83,7 +81,6 @@ export interface ICreatePolicyStatementRequest {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
   policy_expression_id?: string | null;
-  expression?: ExpressionTreeExpression;
 }
 
 /**
@@ -96,18 +93,12 @@ export interface ICreatePolicyExpressionRequest {
 }
 
 /**
- * Update policy expression request.
- */
-export type IUpdatePolicyExpressionRequest = ICreatePolicyExpressionRequest;
-
-/**
  * Update policy request payload.
  */
 export interface IUpdatePolicyRequest {
   name: string;
   description?: string;
   status?: PolicyStatus;
-  statements: ICreatePolicyStatementRequest[];
 }
 
 /**

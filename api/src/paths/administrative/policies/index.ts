@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
-import { CreatePolicyDefinition } from '../../../models/policy';
+import { CreatePolicyStatementPayload } from '../../../models/policy-statement';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
@@ -16,6 +16,12 @@ import { getLogger } from '../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/policies');
+
+interface CreatePolicyRequestBody {
+  name: string;
+  description?: string;
+  statements: CreatePolicyStatementPayload[];
+}
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -150,7 +156,7 @@ export function createPolicy(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const { name, description, statements } = req.body as CreatePolicyDefinition;
+    const { name, description, statements } = req.body as CreatePolicyRequestBody;
 
     try {
       await connection.open();

@@ -7,7 +7,7 @@ import { IPolicy, IPolicyExpression, PolicyStatus } from 'interfaces/usePolicies
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { act, render, waitFor } from 'test-helpers/test-utils';
+import { act, fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PolicyDetailPage } from './PolicyDetailPage';
 
@@ -223,6 +223,9 @@ describe('PolicyDetailPage', () => {
   const getPolicyExpressions = vi.fn();
   const getPolicyTeams = vi.fn();
   const updatePolicy = vi.fn();
+  const createPolicyStatement = vi.fn();
+  const updatePolicyStatement = vi.fn();
+  const deletePolicyStatement = vi.fn();
   const createPolicyExpression = vi.fn();
   const updatePolicyExpression = vi.fn();
   const deletePolicyExpression = vi.fn();
@@ -233,6 +236,9 @@ describe('PolicyDetailPage', () => {
     getPolicyExpressions.mockReset();
     getPolicyTeams.mockReset();
     updatePolicy.mockReset();
+    createPolicyStatement.mockReset();
+    updatePolicyStatement.mockReset();
+    deletePolicyStatement.mockReset();
     createPolicyExpression.mockReset();
     updatePolicyExpression.mockReset();
     deletePolicyExpression.mockReset();
@@ -257,18 +263,26 @@ describe('PolicyDetailPage', () => {
       status: PolicyStatus.DENIED
     });
     updatePolicy.mockResolvedValue({
-      ...policy,
-      statements: [
-        ...policy.statements,
-        {
-          policy_statement_id: 'statement-3',
-          policy_id: 'policy-1',
-          effect: 'allow',
-          submission_feature_urn: 'urn:1:telemetry:*',
-          policy_expression_id: 'policy-expression-1'
-        }
-      ]
+      policy_id: 'policy-1',
+      name: 'Sensitive Wildlife Policy',
+      description: 'Policy description',
+      status: PolicyStatus.APPROVED
     });
+    createPolicyStatement.mockResolvedValue({
+      policy_statement_id: 'statement-3',
+      policy_id: 'policy-1',
+      effect: 'allow',
+      submission_feature_urn: 'urn:1:telemetry:*',
+      policy_expression_id: 'policy-expression-1'
+    });
+    updatePolicyStatement.mockResolvedValue({
+      policy_statement_id: 'statement-1',
+      policy_id: 'policy-1',
+      effect: 'allow',
+      submission_feature_urn: 'urn:2:telemetry:*',
+      policy_expression_id: 'policy-expression-1'
+    });
+    deletePolicyStatement.mockResolvedValue(undefined);
     createPolicyExpression.mockResolvedValue({
       policy_expression_id: 'policy-expression-2',
       policy_id: 'policy-1',
@@ -314,6 +328,9 @@ describe('PolicyDetailPage', () => {
         createPolicyExpression,
         updatePolicyExpression,
         deletePolicyExpression,
+        createPolicyStatement,
+        updatePolicyStatement,
+        deletePolicyStatement,
         updatePolicy,
         updatePolicyStatus
       }
@@ -404,18 +421,15 @@ describe('PolicyDetailPage', () => {
     await user.click(await findByTestId('edit-policy-button'));
     expect(await findByRole('heading', { name: 'Edit Policy' })).toBeVisible();
 
-    await user.clear(getByLabelText('Policy Name *'));
-    await user.type(getByLabelText('Policy Name *'), 'Updated Policy');
-    await user.clear(getByLabelText('Description'));
-    await user.type(getByLabelText('Description'), 'Updated description');
+    fireEvent.change(getByLabelText('Policy Name *'), { target: { value: 'Updated Policy' } });
+    fireEvent.change(getByLabelText('Description'), { target: { value: 'Updated description' } });
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
       expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
         name: 'Updated Policy',
         description: 'Updated description',
-        status: PolicyStatus.APPROVED,
-        statements: policy.statements
+        status: PolicyStatus.APPROVED
       });
     });
     expect(getByRole('heading', { name: 'Updated Policy' })).toBeVisible();
@@ -428,8 +442,8 @@ describe('PolicyDetailPage', () => {
     await user.click(await findByTestId('policy-expressions-add-button'));
     expect(await findByRole('heading', { name: 'Create Expression' })).toBeVisible();
 
-    await user.type(getByRole('textbox', { name: 'Name' }), 'Telemetry sites');
-    await user.type(getByRole('textbox', { name: 'Description' }), 'Filters telemetry sites');
+    fireEvent.change(getByRole('textbox', { name: 'Name' }), { target: { value: 'Telemetry sites' } });
+    fireEvent.change(getByRole('textbox', { name: 'Description' }), { target: { value: 'Filters telemetry sites' } });
     await user.click(getByText('Set expression'));
     await user.click(getByTestId('edit-dialog-save-button'));
 
@@ -452,10 +466,8 @@ describe('PolicyDetailPage', () => {
     await user.click(await findByText('policy-expression-policy-expression-1-menu-Edit'));
     expect(await findByRole('heading', { name: 'Edit Expression' })).toBeVisible();
 
-    await user.clear(getByRole('textbox', { name: 'Name' }));
-    await user.type(getByRole('textbox', { name: 'Name' }), 'Updated sensitive species');
-    await user.clear(getByRole('textbox', { name: 'Description' }));
-    await user.type(getByRole('textbox', { name: 'Description' }), 'Updated filters');
+    fireEvent.change(getByRole('textbox', { name: 'Name' }), { target: { value: 'Updated sensitive species' } });
+    fireEvent.change(getByRole('textbox', { name: 'Description' }), { target: { value: 'Updated filters' } });
     await user.click(getByText('Set expression'));
     await user.click(getByTestId('edit-dialog-save-button'));
 
@@ -509,27 +521,19 @@ describe('PolicyDetailPage', () => {
     await user.click(await findByTestId('policy-statements-add-button'));
     expect(await findByRole('heading', { name: 'Create Statement' })).toBeVisible();
 
-    await user.clear(getByRole('textbox', { name: 'Policy URN' }));
-    await user.type(getByRole('textbox', { name: 'Policy URN' }), 'urn:1:telemetry:*');
+    fireEvent.change(getByRole('textbox', { name: 'Policy URN' }), { target: { value: 'urn:1:telemetry:*' } });
     await user.click(getByRole('combobox', { name: /Expression/ }));
     await user.click(await findByRole('option', { name: 'Sensitive species' }));
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
-      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
-        name: 'Sensitive Wildlife Policy',
-        description: 'Policy description',
-        status: PolicyStatus.APPROVED,
-        statements: [
-          ...policy.statements,
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:1:telemetry:*',
-            policy_expression_id: 'policy-expression-1'
-          }
-        ]
+      expect(createPolicyStatement).toHaveBeenCalledWith('policy-1', {
+        effect: 'allow',
+        submission_feature_urn: 'urn:1:telemetry:*',
+        policy_expression_id: 'policy-expression-1'
       });
     });
+    expect(updatePolicy).not.toHaveBeenCalled();
 
     expect(getByText('urn:1:telemetry:*')).toBeVisible();
   });
@@ -546,19 +550,12 @@ describe('PolicyDetailPage', () => {
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
-      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
-        name: 'Sensitive Wildlife Policy',
-        description: 'Policy description',
-        status: PolicyStatus.APPROVED,
-        statements: [
-          ...policy.statements,
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:1:telemetry:*'
-          }
-        ]
+      expect(createPolicyStatement).toHaveBeenCalledWith('policy-1', {
+        effect: 'allow',
+        submission_feature_urn: 'urn:1:telemetry:*'
       });
     });
+    expect(updatePolicy).not.toHaveBeenCalled();
   });
 
   it('edits a policy statement from the row actions menu', async () => {
@@ -574,20 +571,34 @@ describe('PolicyDetailPage', () => {
     await user.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {
-      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
-        name: 'Sensitive Wildlife Policy',
-        description: 'Policy description',
-        status: PolicyStatus.APPROVED,
-        statements: [
-          {
-            effect: 'allow',
-            submission_feature_urn: 'urn:2:telemetry:*',
-            policy_expression_id: 'policy-expression-1'
-          },
-          policy.statements[1]
-        ]
+      expect(updatePolicyStatement).toHaveBeenCalledWith('policy-1', 'statement-1', {
+        effect: 'allow',
+        submission_feature_urn: 'urn:2:telemetry:*',
+        policy_expression_id: 'policy-expression-1'
       });
     });
+    expect(updatePolicy).not.toHaveBeenCalled();
+  });
+
+  it('clears a policy expression link when editing a statement', async () => {
+    const user = userEvent.setup();
+    const { findByText, findByRole, getByLabelText, getByTestId } = renderPage();
+
+    await user.click(await findByRole('tab', { name: 'Statements' }));
+    await user.click(await findByText('policy-statement-statement-1-menu-Edit'));
+    expect(await findByRole('heading', { name: 'Edit Statement' })).toBeVisible();
+
+    await user.click(getByLabelText('Clear'));
+    await user.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => {
+      expect(updatePolicyStatement).toHaveBeenCalledWith('policy-1', 'statement-1', {
+        effect: 'allow',
+        submission_feature_urn: 'urn:*:telemetry:*',
+        policy_expression_id: null
+      });
+    });
+    expect(updatePolicy).not.toHaveBeenCalled();
   });
 
   it('deletes a policy statement from the row actions menu after confirmation', async () => {
@@ -613,12 +624,8 @@ describe('PolicyDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(updatePolicy).toHaveBeenCalledWith('policy-1', {
-        name: 'Sensitive Wildlife Policy',
-        description: 'Policy description',
-        status: PolicyStatus.APPROVED,
-        statements: [policy.statements[1]]
-      });
+      expect(deletePolicyStatement).toHaveBeenCalledWith('policy-1', 'statement-1');
     });
+    expect(updatePolicy).not.toHaveBeenCalled();
   });
 });

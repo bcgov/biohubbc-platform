@@ -1,4 +1,4 @@
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
@@ -227,15 +227,13 @@ export const useTicketTimelineDataRequestActions = () => {
       const updatedPolicy = await api.policies.updatePolicy(selectedPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
-        status: values.status,
-        statements: selectedPolicy.statements.map((statement) => ({
-          effect: statement.effect,
-          submission_feature_urn: statement.submission_feature_urn,
-          ...(statement.policy_expression_id ? { policy_expression_id: statement.policy_expression_id } : {})
-        }))
+        status: values.status
       });
 
-      setSelectedPolicy(updatedPolicy);
+      setSelectedPolicy({
+        ...selectedPolicy,
+        ...updatedPolicy
+      });
 
       const latestTicket = ticketDataLoader.data;
       if (latestTicket) {

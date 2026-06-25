@@ -832,4 +832,19 @@ describe('DataRequestService', () => {
     expect(updateStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
     expect(result).to.be.undefined;
   });
+
+  it('deleteDataRequest soft deletes the request and deletes the linked policy to revoke access', async () => {
+    const mockDB = getMockDBConnection();
+    const service = new DataRequestService(mockDB);
+
+    const getStub = sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+    const deleteRequestStub = sinon.stub(DataRequestRepository.prototype, 'deleteDataRequest').resolves();
+    const deletePolicyStub = sinon.stub(PolicyService.prototype, 'deletePolicy').resolves();
+
+    await service.deleteDataRequest(mockDataRequest.data_request_id);
+
+    expect(getStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
+    expect(deleteRequestStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
+    expect(deletePolicyStub).to.have.been.calledOnceWith(mockDataRequest.policy_id);
+  });
 });

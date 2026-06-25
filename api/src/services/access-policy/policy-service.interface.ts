@@ -1,5 +1,5 @@
 import { ExpressionTree } from '../../models/expression-tree';
-import { Policy } from '../../models/policy';
+import { Policy, PolicyStatus } from '../../models/policy';
 import { PolicyExpression } from '../../models/policy-expression';
 import { PolicyStatement } from '../../models/policy-statement';
 
@@ -32,3 +32,9 @@ export interface PolicyWithStatements extends Policy {
   statements: PolicyStatement[];
   expressions: PolicyExpressionWithExpression[];
 }
+
+export type CacheFanOutTransition = {
+  policyId: string;
+  from: PolicyStatus;
+  to: PolicyStatus;
+};

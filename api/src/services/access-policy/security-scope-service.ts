@@ -28,8 +28,9 @@ const defaultLog = getLogger('security-scope-service');
  * envelope used for secured-anchor traversal.
  *
  * Materialization order: policy statements reference reusable `security_scope`
- * rows when they are written. Approval/team-policy changes only rebuild the
- * derived team grants and enqueue anchor recomputation.
+ * rows when they are written. Approval paths enqueue anchor recomputation for
+ * the active statement scopes before granting team access. Revocation-only paths
+ * just rebuild the derived `team_security_scope` grants from the policy chain.
  *
  * Repository handles all SQL; this service handles sequencing and decision logic.
  */

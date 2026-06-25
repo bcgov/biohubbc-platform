@@ -180,7 +180,7 @@ describe('PoliciesContainer', () => {
       const mockRefresh = vi.fn();
 
       // Step 3: Render component with mock refresh prop
-      const { getByTestId, getByLabelText, getByRole } = renderComponent({ refresh: mockRefresh });
+      const { getByTestId, getByLabelText, getByRole, queryByLabelText } = renderComponent({ refresh: mockRefresh });
 
       // Step 4: Click "Add" button to open dialog
       fireEvent.click(getByTestId('policies-add-button'));
@@ -189,6 +189,7 @@ describe('PoliciesContainer', () => {
       await waitFor(() => {
         expect(getByLabelText('Policy Name *')).toBeVisible();
       });
+      expect(queryByLabelText('Status *')).not.toBeInTheDocument();
 
       // Step 6: Fill form fields
       fireEvent.change(getByLabelText('Policy Name *'), { target: { value: 'New Policy' } });
@@ -207,6 +208,7 @@ describe('PoliciesContainer', () => {
           })
         );
       });
+      expect(mockUseApi.policies.createPolicy.mock.calls[0][0]).not.toHaveProperty('status');
 
       // Step 9: Verify refresh was called after success
       await waitFor(() => {

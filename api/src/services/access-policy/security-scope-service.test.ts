@@ -56,10 +56,6 @@ describe('SecurityScopeService', () => {
   describe('materializeStatementScopesAndTeamAccess', () => {
     const teamId = 'team-1';
     const policyId = 'policy-1';
-    const statementOneId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-    const statementTwoId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-    const urnOne = 'urn:10:telemetry:*';
-    const urnTwo = 'urn:10:observation:*';
     const scopeIdOne = '11111111-1111-1111-1111-111111111111';
     const scopeIdTwo = '22222222-2222-2222-2222-222222222222';
 

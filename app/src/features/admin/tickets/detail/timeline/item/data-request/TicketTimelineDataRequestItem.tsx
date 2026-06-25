@@ -1,6 +1,6 @@
 import { Button, Stack, Typography } from '@mui/material';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { TicketTimelineItem } from '../layout/TicketTimelineItem';

@@ -147,6 +147,20 @@ describe('PolicyExpressionService', () => {
     });
   });
 
+  describe('hasActivePolicyStatementReferences', () => {
+    it('delegates to the repository with the policy and policy expression ids', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+      const repositoryStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'hasActivePolicyStatementReferences')
+        .resolves(true);
+
+      const result = await service.hasActivePolicyStatementReferences('policy-1', 'pe-1');
+
+      expect(result).to.equal(true);
+      expect(repositoryStub).to.have.been.calledOnceWithExactly('policy-1', 'pe-1');
+    });
+  });
+
   describe('updatePolicyExpressionTree', () => {
     it('resolves the incoming tree to an expression id, then patches the existing policy expression', async () => {
       const service = new PolicyExpressionService(getMockDBConnection());

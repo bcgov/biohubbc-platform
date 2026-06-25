@@ -309,13 +309,26 @@ export async function up(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS urn_feature_type,
       DROP COLUMN IF EXISTS urn_feature_id;
 
+    ----------------------------------------------------------------------------------------
+    -- 3i. Retire active DENY statements before tightening active-statement uniqueness.
+    --
+    -- DENY statements are not used by the authorization/access-cache model: team access is
+    -- derived only from active approved ALLOW statements. Keeping an active DENY beside an
+    -- ALLOW for the same policy expression/scope would only block the new uniqueness rule
+    -- without changing runtime behavior, so soft-delete active DENY rows during migration.
+    ----------------------------------------------------------------------------------------
+    UPDATE policy_statement
+    SET record_end_date = now()
+    WHERE effect = 'deny'
+      AND record_end_date IS NULL;
+
     CREATE UNIQUE INDEX policy_statement_nuk1
       ON policy_statement(policy_expression_id, security_scope_id)
       WHERE record_end_date IS NULL
         AND policy_expression_id IS NOT NULL;
 
     CREATE UNIQUE INDEX policy_statement_nuk2
-      ON policy_statement(policy_id, effect, security_scope_id)
+      ON policy_statement(policy_id, security_scope_id)
       WHERE record_end_date IS NULL
         AND policy_expression_id IS NULL;
 

@@ -39,8 +39,8 @@ export class DownloadPolicyService extends DBService {
    * + optional expression links (one per statement when an expression is provided).
    *
    * Download policies define the feature set to export, not who can read it. Skipping
-   * team_policy / security_scope here keeps create-download from being a backdoor for
-   * granting access; export-time enforcement is the security boundary.
+   * team_policy / team_security_scope grants keeps create-download from being a
+   * backdoor for granting access; export-time enforcement is the security boundary.
    *
    * The policy is created with status 'approved' on insert, bypassing the pending ->
    * reviewed -> approved review flow that PolicyService.updatePolicy enforces. Download

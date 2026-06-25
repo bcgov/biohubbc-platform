@@ -106,7 +106,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
       }
     });
 
-    it('should call service.updatePolicyWithStatements and return the updated policy', async () => {
+    it('should call service.updatePolicy and return the updated policy', async () => {
       const dbConnectionObj = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -115,25 +115,14 @@ describe('paths/administrative/policies/{policyId}/index', () => {
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockUpdatedPolicy: PolicyWithStatements = {
+      const mockUpdatedPolicy = {
         policy_id: '123',
         name: 'Updated Policy',
         description: 'Updated description',
-        status: 'approved',
-        expressions: [],
-        statements: [
-          {
-            policy_statement_id: 's1',
-            policy_id: '123',
-            effect: PolicyEffect.DENY,
-            submission_feature_urn: 'urn:*:telemetry:*'
-          }
-        ]
+        status: 'reviewed' as const
       };
 
-      const updatePolicyWithStatementsStub = sinon
-        .stub(PolicyService.prototype, 'updatePolicyWithStatements')
-        .resolves(mockUpdatedPolicy);
+      const updatePolicyStub = sinon.stub(PolicyService.prototype, 'updatePolicy').resolves(mockUpdatedPolicy);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -143,69 +132,18 @@ describe('paths/administrative/policies/{policyId}/index', () => {
       mockReq.body = {
         name: 'Updated Policy',
         description: 'Updated description',
-        status: 'reviewed',
-        statements: [
-          {
-            effect: PolicyEffect.DENY,
-            submission_feature_urn: 'urn:*:telemetry:*'
-          }
-        ]
+        status: 'reviewed'
       };
 
       const requestHandler = updatePolicy();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(updatePolicyWithStatementsStub).to.have.been.calledOnceWith(
-        '123',
-        { name: 'Updated Policy', description: 'Updated description', status: 'reviewed' },
-        [{ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:telemetry:*' }]
-      );
-      expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(mockUpdatedPolicy);
-    });
-
-    it('should call service.updatePolicyWithStatements with provided empty statements array', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub()
+      expect(updatePolicyStub).to.have.been.calledOnceWith('123', {
+        name: 'Updated Policy',
+        description: 'Updated description',
+        status: 'reviewed'
       });
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const mockUpdatedPolicy: PolicyWithStatements = {
-        policy_id: '123',
-        name: 'Policy No Statements',
-        description: null,
-        status: 'approved',
-        expressions: [],
-        statements: []
-      };
-
-      const updatePolicyWithStatementsStub = sinon
-        .stub(PolicyService.prototype, 'updatePolicyWithStatements')
-        .resolves(mockUpdatedPolicy);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.params = {
-        policyId: '123'
-      };
-      mockReq.body = {
-        name: 'Policy No Statements',
-        statements: []
-      };
-
-      const requestHandler = updatePolicy();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(updatePolicyWithStatementsStub).to.have.been.calledOnceWith(
-        '123',
-        { name: 'Policy No Statements', description: undefined, status: undefined },
-        []
-      );
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockUpdatedPolicy);
     });

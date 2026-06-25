@@ -1,6 +1,8 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
-import { IPolicyFormValues, PolicyForm, PolicyFormYupSchema } from './PolicyForm';
+import yup from 'utils/YupSchema';
+import { PolicyForm } from './PolicyForm';
+import { IPolicyFormValues } from './PolicyForm.interface';
 
 interface IEditPolicyDialogProps {
   open: boolean;
@@ -10,6 +12,12 @@ interface IEditPolicyDialogProps {
   onCancel: () => void;
   onSave: (values: IPolicyFormValues) => void;
 }
+
+const policyFormYupSchema = yup.object().shape({
+  name: yup.string().required('Policy name is required'),
+  description: yup.string(),
+  status: yup.mixed<IPolicyFormValues['status']>().required('Status is required')
+});
 
 /**
  * Shared edit-policy dialog for policy management workflows.
@@ -37,7 +45,7 @@ export const EditPolicyDialog = (props: IEditPolicyDialogProps) => {
       component={{
         element: <PolicyForm />,
         initialValues: mergedInitialValues,
-        validationSchema: PolicyFormYupSchema
+        validationSchema: policyFormYupSchema
       }}
       onCancel={onCancel}
       onSave={onSave}

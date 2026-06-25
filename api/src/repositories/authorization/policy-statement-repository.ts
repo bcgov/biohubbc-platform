@@ -104,7 +104,8 @@ export class PolicyStatementRepository extends BaseRepository {
         ),
         'ps.policy_expression_id'
       ])
-      .where('ps.policy_statement_id', policyStatementId);
+      .where('ps.policy_statement_id', policyStatementId)
+      .whereNull('ps.record_end_date');
 
     const response = await this.connection.knex(query, PolicyStatement);
 
@@ -231,6 +232,7 @@ export class PolicyStatementRepository extends BaseRepository {
       policyStatementData.record_end_date ?? null
     } ELSE record_end_date END
         WHERE policy_statement_id = ${policyStatementId}
+          AND record_end_date IS NULL
         RETURNING policy_statement_id, policy_id, effect, security_scope_id, policy_expression_id
       )
       SELECT
@@ -271,6 +273,7 @@ export class PolicyStatementRepository extends BaseRepository {
         record_end_date: knex.fn.now()
       })
       .where('policy_statement_id', policyStatementId)
+      .whereNull('record_end_date')
       .returning(['policy_statement_id']);
 
     const response = await this.connection.knex(query);

@@ -123,6 +123,7 @@ describe('GalleryDownloadRepository (integration)', function () {
       const { download_id } = await createPolicyDownload();
 
       await repo.addDownloadToGallery(gallery.gallery_id, download_id, 1);
+      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
 
       try {
         await repo.addDownloadToGallery(gallery.gallery_id, download_id, 2);
@@ -130,8 +131,6 @@ describe('GalleryDownloadRepository (integration)', function () {
       } catch (error) {
         expect(error).to.be.an('error');
       }
-
-      expect(await activeLinkCount(gallery.gallery_id, download_id)).to.equal(1);
     });
 
     it('inserts a new active row when re-added after removal (partial index ignores the ended row)', async () => {

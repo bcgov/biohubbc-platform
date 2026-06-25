@@ -98,6 +98,7 @@ describe('PolicyStatementRepository', () => {
       expect(sql).to.not.include('policy_statement_expression');
       expect(sql).to.include('"ps"."policy_expression_id"');
       expect(sql).to.include('"ps"."policy_statement_id" = \'1\'');
+      expect(sql).to.include('"ps"."record_end_date" is null');
     });
 
     it('throws error if not found', async () => {
@@ -267,6 +268,7 @@ describe('PolicyStatementRepository', () => {
       const sql = knexStub.firstCall.args[0].text;
       expect(sql).to.include('effect = CASE WHEN');
       expect(sql).to.include('policy_expression_id = CASE WHEN');
+      expect(sql).to.include('AND record_end_date IS NULL');
       expect(sql).to.not.include('SET submission_feature_urn');
     });
 
@@ -302,6 +304,9 @@ describe('PolicyStatementRepository', () => {
       await repository.deletePolicyStatement('1');
 
       expect(knexStub).to.have.been.calledOnce;
+      const sql = knexStub.firstCall.args[0].toString();
+      expect(sql).to.include('"policy_statement_id" = \'1\'');
+      expect(sql).to.include('"record_end_date" is null');
     });
 
     it('throws error if delete fails', async () => {

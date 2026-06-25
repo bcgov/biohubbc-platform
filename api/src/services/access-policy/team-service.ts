@@ -3,6 +3,7 @@ import { CreateTeam, Team, UpdateTeam } from '../../models/team';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamMemberService } from './team-member-service';
 import { TeamFilters } from './team-service.interface';
 
@@ -14,6 +15,7 @@ import { TeamFilters } from './team-service.interface';
 export class TeamService extends DBService {
   teamRepository: TeamRepository;
   teamMemberService: TeamMemberService;
+  securityScopeService: SecurityScopeService;
 
   /**
    * Creates a TeamService instance.
@@ -24,6 +26,7 @@ export class TeamService extends DBService {
     super(connection);
     this.teamRepository = new TeamRepository(connection);
     this.teamMemberService = new TeamMemberService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -129,5 +132,6 @@ export class TeamService extends DBService {
    */
   async deleteTeam(teamId: string): Promise<void> {
     await this.teamRepository.deleteTeam(teamId);
+    await this.securityScopeService.rebuildTeamSecurityScopes(teamId);
   }
 }

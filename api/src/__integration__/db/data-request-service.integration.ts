@@ -1,7 +1,7 @@
 // Integration test for DataRequestService — verifies that creating a data
 // request writes the expected ticket + team + policy + statement + expression
 // + team_policy rows against a real database for the search-driven flow, and
-// preserves the deny-all baseline for the administrative ticket-bound flow.
+// preserves the no-statement baseline for the administrative ticket-bound flow.
 //
 // Also verifies:
 //   - The service treats `system_user_ids` as the canonical team membership and
@@ -279,7 +279,7 @@ describe('DataRequestService (integration)', function () {
   });
 
   describe('createDataRequestForTicket (legacy ticket-bound flow)', () => {
-    it('I4: empty `featureTypes` preserves the deny-all baseline; the admin flow seeds both teams from the picker selection as-is (requester not auto-added)', async () => {
+    it('I4: empty `featureTypes` preserves the no-statement baseline; the admin flow seeds both teams from the picker selection as-is (requester not auto-added)', async () => {
       const requester = await createUser('I4-req');
       const collaborator = await createUser('I4-coll');
 
@@ -292,18 +292,18 @@ describe('DataRequestService (integration)', function () {
 
       const dataRequest = await service.createDataRequestForTicket(ticket.ticket_id, {
         requested_by: requester,
-        reason: 'I4 admin/legacy flow — deny-all baseline must be preserved',
+        reason: 'I4 admin/legacy flow — no-statement baseline must be preserved',
         // The admin ticket flow (`POST /api/tickets/{ticketId}/data-request`) passes the picker
         // selection through verbatim. To put the requester on the access list, the caller
         // includes them explicitly — see service docstring.
         system_user_ids: [requester, collaborator]
       });
 
-      // Single DENY statement covering all feature types.
+      // Empty featureTypes intentionally creates no policy statements.
       const statements = await activeStatements(dataRequest.policy_id);
-      expect(statements).to.deep.equal([{ urn: 'urn:*:*:*', effect: 'deny' }]);
+      expect(statements).to.deep.equal([]);
 
-      // No expression rows or links for the deny-all path.
+      // No expression rows or links for the no-statement path.
       const links = await connection.sql(SQL`
         SELECT count(*)::int AS n
         FROM policy_statement

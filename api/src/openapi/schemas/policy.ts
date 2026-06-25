@@ -293,7 +293,8 @@ export const CreatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
 export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdatePolicyRequest',
   type: 'object',
-  required: ['name', 'statements'],
+  additionalProperties: false,
+  required: ['name'],
   properties: {
     name: {
       type: 'string',
@@ -309,11 +310,6 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       enum: ['requested', 'reviewed', 'approved', 'denied'],
       description: 'Optional lifecycle state for the policy'
-    },
-    statements: {
-      type: 'array',
-      items: CreatePolicyStatementPayloadSchema,
-      description: 'Policy statements (replaces existing)'
     }
   }
 };

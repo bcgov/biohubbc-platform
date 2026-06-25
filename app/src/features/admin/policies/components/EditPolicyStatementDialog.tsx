@@ -21,7 +21,7 @@ export const EditPolicyStatementFormYupSchema = yup.object().shape({
       /^urn:(\*|\d+):(\*|[a-zA-Z0-9_]+):(\*|[^:]+)$/,
       'Invalid Policy URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
     ),
-  policy_expression_id: yup.string()
+  policy_expression_id: yup.string().nullable()
 });
 
 interface IEditPolicyStatementDialogProps {
@@ -127,7 +127,7 @@ const EditPolicyStatementForm = ({ policyExpressions }: { policyExpressions: IPo
           value={selectedPolicyExpressionOption ?? null}
           getOptionLabel={(option) => option.label}
           isOptionEqualToValue={(option, selectedOption) => option.value === selectedOption.value}
-          onChange={(_event, selectedOption) => setFieldValue('policy_expression_id', selectedOption?.value)}
+          onChange={(_event, selectedOption) => setFieldValue('policy_expression_id', selectedOption?.value ?? null)}
           onBlur={() => setFieldTouched('policy_expression_id', true)}
           renderInput={(params) => (
             <TextField
