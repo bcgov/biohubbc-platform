@@ -4,6 +4,7 @@ import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
 import { CreatePolicyStatementPayload, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
+import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
@@ -13,6 +14,7 @@ import { SecurityScopeService } from './security-scope-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
+  policyStatementRepository: PolicyStatementRepository;
   policyStatementService: PolicyStatementService;
   securityScopeService: SecurityScopeService;
   teamPolicyRepository: TeamPolicyRepository;
@@ -26,6 +28,7 @@ export class PolicyService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
+    this.policyStatementRepository = new PolicyStatementRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
@@ -82,7 +85,7 @@ export class PolicyService extends DBService {
    * Update policy fields, validate lifecycle transitions, and keep the access
    * cache in sync with the resulting status.
    *
-   * The access cache (`security_scope`, `policy_statement_scope`,
+   * The access cache (`security_scope`,
    * `team_security_scope`) must mirror the policy's approval state: an
    * approved policy with linked `team_policies` must have rows; a non-approved
    * policy must not. The reverse direction is load-bearing — without rebuilding
@@ -148,12 +151,18 @@ export class PolicyService extends DBService {
    * @return {Promise<void>}
    * @memberof PolicyService
    */
-  private async applyCacheFanOutForTransition(policyId: string, from: PolicyStatus, to: PolicyStatus): Promise<void> {
+  private async applyCacheFanOutForTransition(
+    policyId: string,
+    from: PolicyStatus,
+    to: PolicyStatus,
+    linkedTeamPolicies?: { team_id: string }[]
+  ): Promise<void> {
     if (from === to) {
       return;
     }
 
-    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+    const teamPolicies =
+      linkedTeamPolicies ?? (await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }));
     if (teamPolicies.length === 0) {
       return;
     }
@@ -226,26 +235,23 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Delete a policy and run associated cleanup.
+   * Soft-delete a policy and rebuild linked teams' scope grants.
+   *
+   * Deleting a policy revokes standing access through `team_security_scope`.
+   * Scope anchors are intentionally preserved because they are reusable cache
+   * rows and do not grant access without a team scope grant.
    *
    * @param {string} policyId - Policy UUID.
    * @return {Promise<void>}
    * @memberof PolicyService
    */
   async deletePolicy(policyId: string): Promise<void> {
-    const [teamPolicies, statements] = await Promise.all([
-      this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }),
-      this.policyStatementService.getPolicyStatements(policyId)
-    ]);
-
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
     const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
-    const statementIds = statements.map((s) => s.policy_statement_id);
 
     await this.policyRepository.deletePolicy(policyId);
 
-    if (statementIds.length > 0) {
-      await this.securityScopeService.cleanupScopesForDeletedStatements(statementIds, affectedTeamIds);
-    }
+    await this.securityScopeService.rebuildTeamSecurityScopesForTeams(affectedTeamIds);
   }
 
   /**
@@ -288,12 +294,11 @@ export class PolicyService extends DBService {
   /**
    * Create a policy and its associated statements.
    *
-   * Statement creation no longer materializes security scopes. The access-cache
-   * (`security_scope`, `policy_statement_scope`, `team_security_scope`) is only
-   * populated when a `team_policy` link exists and the policy is approved — that
-   * fan-out lives in `SecurityScopeService.materializePolicyStatementScopes` +
-   * `grantTeamAccessForPolicy` and fires from `TeamPolicyService.createTeamPolicy`
-   * and from policy approval.
+   * Each statement resolves or reuses its canonical `security_scope` row, writes
+   * any existing policy-expression link, and asks the security-scope service to
+   * refresh derived access for the policy. For a new policy with no team links
+   * this is a no-op; for an already-linked approved policy it keeps team grants
+   * current.
    *
    * @param {CreatePolicy} policyData - Policy payload.
    * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
@@ -310,13 +315,16 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Update a policy and fully replace its statements.
+   * Update a policy and reconcile its statement set.
    *
    * Order is deliberate: status-transition validation runs first so a rejected
    * transition cannot leave the statement set replaced and the policy row
-   * unchanged. Statement deletion owns stale-scope cleanup; statement creation
-   * owns access refresh for same-status statement changes. The shared
-   * transition helper runs last and handles only status-change fan-out.
+   * unchanged. Existing statement rows are patched positionally, surplus rows
+   * are soft-deleted, and missing rows are created. Statement create/update
+   * calls refresh policy access for scope-defining changes; when rows are only
+   * deleted, this method performs the final same-status access refresh. Status
+   * transition fan-out is handled once through `applyCacheFanOutForTransition`.
+   * Scope anchors are preserved across policy mutations.
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
@@ -342,12 +350,38 @@ export class PolicyService extends DBService {
 
     // Capture existing statement associations before replacement.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
-    await Promise.all(
-      existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
-    );
+    const statementsChanged = existingStatements.length > 0 || statements.length > 0;
+    const needsTeamPolicies = statementsChanged || previousStatus !== nextStatus;
+    const teamPolicies = needsTeamPolicies
+      ? await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] })
+      : [];
+    const affectedTeamIds = teamPolicies.map((teamPolicy) => teamPolicy.team_id);
 
-    // Rebuild statements from the incoming payload.
-    const createdStatements = await this.createStatements(policyId, statements);
+    const patchedStatements: PolicyStatement[] = [];
+    const patchCount = Math.min(existingStatements.length, statements.length);
+
+    for (let index = 0; index < patchCount; index++) {
+      const existingStatement = existingStatements[index];
+      const incomingStatement = statements[index];
+
+      patchedStatements.push(
+        await this.policyStatementService.updatePolicyStatement(existingStatement.policy_statement_id, {
+          effect: incomingStatement.effect,
+          submission_feature_urn: incomingStatement.submission_feature_urn,
+          policy_expression_id: incomingStatement.policy_expression_id
+        })
+      );
+    }
+
+    const deletedStatements = existingStatements.slice(statements.length);
+    if (deletedStatements.length > 0) {
+      await Promise.all(
+        deletedStatements.map((stmt) => this.policyStatementRepository.deletePolicyStatement(stmt.policy_statement_id))
+      );
+    }
+
+    const createdStatements = await this.createStatements(policyId, statements.slice(existingStatements.length));
+    const finalStatements = [...patchedStatements, ...createdStatements];
 
     // Write the policy row directly — validation already ran above so we do
     // not need to re-enter the public `updatePolicy` path (which would also
@@ -355,13 +389,21 @@ export class PolicyService extends DBService {
     // owns the cache side effect.
     const policy = await this.policyRepository.updatePolicy(policyId, policyData);
 
-    await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus);
+    await this.applyCacheFanOutForTransition(policyId, previousStatus, nextStatus, teamPolicies);
 
-    return { ...policy, statements: createdStatements };
+    if (previousStatus === nextStatus && deletedStatements.length > 0) {
+      await this.securityScopeService.refreshAccessForPolicyTeams(policyId, affectedTeamIds);
+    }
+
+    return { ...policy, statements: finalStatements };
   }
 
   /**
-   * Create policy statements and link them to existing policy expressions.
+   * Create policy statements for a policy.
+   *
+   * Delegates each row to `PolicyStatementService.createPolicyStatement`, which
+   * resolves reusable security scopes, validates policy-expression links, and
+   * refreshes derived policy access as needed.
    *
    * @private
    * @param {string} policyId - Policy UUID.

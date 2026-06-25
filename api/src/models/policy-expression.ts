@@ -19,3 +19,7 @@ export type CreatePolicyExpression = {
   name?: string | null;
   description?: string | null;
 };
+
+export type UpdatePolicyExpression = {
+  expressionId: string;
+};

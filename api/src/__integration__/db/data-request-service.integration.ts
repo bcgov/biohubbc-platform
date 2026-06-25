@@ -16,8 +16,8 @@
 // Uses a transaction that is ROLLED BACK after each test, so no data is
 // persisted. pg-boss is not running in the `make test-db` environment, so the
 // anchor-computation publisher invoked indirectly via
-// `SecurityScopeService.createScopeForPolicyStatement` is stubbed in
-// `beforeEach` — same pattern as `security-scope-search.integration.ts`.
+// The anchor-job publisher is stubbed in `beforeEach` — same pattern as
+// `security-scope-search.integration.ts`.
 //
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
@@ -119,11 +119,14 @@ describe('DataRequestService (integration)', function () {
    */
   async function activeStatements(policyId: string): Promise<{ urn: string; effect: string }[]> {
     const result = await connection.sql(SQL`
-      SELECT submission_feature_urn AS urn, effect
-      FROM policy_statement
-      WHERE policy_id = ${policyId}
-        AND record_end_date IS NULL
-      ORDER BY submission_feature_urn;
+      SELECT
+        concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS urn,
+        ps.effect
+      FROM policy_statement ps
+      JOIN security_scope ss ON ss.security_scope_id = ps.security_scope_id
+      WHERE ps.policy_id = ${policyId}
+        AND ps.record_end_date IS NULL
+      ORDER BY urn;
     `);
     return result.rows.map((r: any) => ({ urn: r.urn, effect: r.effect }));
   }

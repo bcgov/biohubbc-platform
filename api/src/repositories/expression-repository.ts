@@ -93,6 +93,41 @@ export class ExpressionRepository extends BaseRepository {
   }
 
   /**
+   * Fetch active expression anchors by id.
+   *
+   * @param {string[]} expressionIds - Expression identifiers.
+   * @return {Promise<Expression[]>} Matching active expression rows.
+   */
+  async getExpressionsByIds(expressionIds: string[]): Promise<Expression[]> {
+    if (expressionIds.length === 0) {
+      return [];
+    }
+
+    const uniqueExpressionIds = [...new Set(expressionIds)];
+    const knex = getKnex();
+    const query = knex('expression')
+      .select(['expression_id', knex.raw('operator::text AS operator'), 'expression_hash'])
+      .whereIn('expression_id', uniqueExpressionIds)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, Expression);
+    const rows = response.rows;
+
+    const byId = new Map(rows.map((row) => [row.expression_id, row]));
+
+    return uniqueExpressionIds.map((expressionId) => {
+      const row = byId.get(expressionId);
+      if (!row) {
+        throw new ApiNotFoundError('expression not found', [
+          'ExpressionRepository->getExpressionsByIds',
+          { expressionId }
+        ]);
+      }
+      return row;
+    });
+  }
+
+  /**
    * Fetch one active expression anchor row by id.
    *
    * @param {string} expressionId - Expression identifier.

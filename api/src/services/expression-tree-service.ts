@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import type { Expression } from '../models/expression';
+import type { ExpressionClause } from '../models/expression-clause';
 import type { InternalTypedPredicate } from '../models/expression-predicate';
 import type {
   ExpressionTree,
@@ -112,17 +114,19 @@ export class ExpressionTreeService extends DBService {
   }
 
   /**
-   * Reconstruct an expression node recursively from storage rows.
+   * Reconstruct an expression node from storage rows.
    *
-   * Read reconstruction walks the persisted graph from an expression anchor
-   * through its ordered `expression_clause` links. Predicate links are hydrated
-   * in batch for the current node; expression links recurse into child nodes.
+   * Read reconstruction first hydrates the persisted graph from the root
+   * expression anchor through its ordered `expression_clause` links, batching
+   * expression and clause reads by tree level. Predicate links are hydrated once
+   * after all reachable clauses are known. The final API tree is then assembled
+   * from in-memory maps.
    *
    * This routine:
-   * 1. Guards against cycles during traversal (defensive check in service layer).
-   * 2. Loads expression anchor + ordered clause links.
-   * 3. Hydrates predicate clauses in batch per expression node.
-   * 4. Re-enters recursively for child expression clauses.
+   * 1. Loads expression anchors and ordered clause links in batches.
+   * 2. Hydrates all predicate leaves in one read.
+   * 3. Guards against cycles during in-memory assembly.
+   * 4. Re-enters recursively for child expression clauses without more DB I/O.
    *
    * @private
    * @param {string} expressionId - Expression id to reconstruct.
@@ -134,78 +138,129 @@ export class ExpressionTreeService extends DBService {
     expressionId: string,
     visitedExpressionIds: Set<string>
   ): Promise<ExpressionTreeExpression> {
-    if (visitedExpressionIds.has(expressionId)) {
-      throw new ApiGeneralError('Cycle detected in expression tree', [
-        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-        `expressionId=${expressionId}`
+    const expressionsById = new Map<string, Expression>();
+    const clausesByExpressionId = new Map<string, ExpressionClause[]>();
+    const predicateIds = new Set<string>();
+    let pendingExpressionIds = [expressionId];
+
+    while (pendingExpressionIds.length > 0) {
+      const expressionIdsToRead = [...new Set(pendingExpressionIds)].filter((id) => !expressionsById.has(id));
+      pendingExpressionIds = [];
+
+      if (expressionIdsToRead.length === 0) {
+        continue;
+      }
+
+      const [expressions, clauses] = await Promise.all([
+        this.expressionRepository.getExpressionsByIds(expressionIdsToRead),
+        this.expressionClauseRepository.getExpressionClausesByExpressionIds(expressionIdsToRead)
       ]);
+
+      for (const expression of expressions) {
+        expressionsById.set(expression.expression_id, expression);
+        clausesByExpressionId.set(expression.expression_id, []);
+      }
+
+      for (const clause of clauses) {
+        const expressionClauses = clausesByExpressionId.get(clause.expression_id) ?? [];
+        expressionClauses.push(clause);
+        clausesByExpressionId.set(clause.expression_id, expressionClauses);
+
+        if (clause.predicate_id) {
+          predicateIds.add(clause.predicate_id);
+          continue;
+        }
+
+        if (!clause.child_expression_id) {
+          throw new ApiGeneralError('Invalid expression clause target', [
+            'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+            `expressionClauseId=${clause.expression_clause_id}`
+          ]);
+        }
+
+        if (!expressionsById.has(clause.child_expression_id)) {
+          pendingExpressionIds.push(clause.child_expression_id);
+        }
+      }
     }
 
-    const nextVisitedExpressionIds = new Set(visitedExpressionIds);
-    nextVisitedExpressionIds.add(expressionId);
-
-    // The expression anchor stores only node identity: logical operator and hash.
-    const expression = await this.expressionRepository.getExpressionById(expressionId);
-
-    // Clause rows are the only source of child ordering and branch structure.
-    const links = await this.expressionClauseRepository.getExpressionClausesByExpressionId(expressionId);
-
-    if (links.length === 0) {
-      throw new ApiGeneralError('Expression has no active clauses', [
-        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-        `expressionId=${expressionId}`
-      ]);
-    }
-
-    const predicateIds = links.map((link) => link.predicate_id).filter((value): value is string => !!value);
-
-    // Batch-read predicate payload projections once per expression node to avoid
-    // N+1 reads while still preserving clause order below.
-    const readPredicates = await this.predicateRepository.readPredicateNodes(predicateIds);
+    const readPredicates = await this.predicateRepository.readPredicateNodes([...predicateIds]);
     const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
 
-    const readClauses: ReadExpressionClause[] = [];
+    const buildExpressionTree = (
+      currentExpressionId: string,
+      currentVisitedExpressionIds: Set<string>
+    ): ExpressionTreeExpression => {
+      if (currentVisitedExpressionIds.has(currentExpressionId)) {
+        throw new ApiGeneralError('Cycle detected in expression tree', [
+          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+          `expressionId=${currentExpressionId}`
+        ]);
+      }
 
-    for (const link of links) {
-      if (link.predicate_id) {
-        const predicateRow = predicatesById.get(link.predicate_id);
+      const expression = expressionsById.get(currentExpressionId);
 
-        if (!predicateRow) {
-          throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
+      if (!expression) {
+        throw new ApiGeneralError('Missing expression row while reconstructing expression tree', [
+          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+          `expressionId=${currentExpressionId}`
+        ]);
+      }
+
+      const links = clausesByExpressionId.get(currentExpressionId) ?? [];
+
+      if (links.length === 0) {
+        throw new ApiGeneralError('Expression has no active clauses', [
+          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+          `expressionId=${currentExpressionId}`
+        ]);
+      }
+
+      const nextVisitedExpressionIds = new Set(currentVisitedExpressionIds);
+      nextVisitedExpressionIds.add(currentExpressionId);
+      const readClauses: ReadExpressionClause[] = [];
+
+      for (const link of links) {
+        if (link.predicate_id) {
+          const predicateRow = predicatesById.get(link.predicate_id);
+
+          if (!predicateRow) {
+            throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
+              'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+              `predicateId=${link.predicate_id}`,
+              `expressionId=${currentExpressionId}`
+            ]);
+          }
+
+          readClauses.push({
+            sequence: link.sequence,
+            clause: this.parseReadPredicateRow(predicateRow, link.predicate_id)
+          });
+          continue;
+        }
+
+        if (!link.child_expression_id) {
+          throw new ApiGeneralError('Invalid expression clause target', [
             'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-            `predicateId=${link.predicate_id}`,
-            `expressionId=${expressionId}`
+            `expressionClauseId=${link.expression_clause_id}`
           ]);
         }
 
         readClauses.push({
           sequence: link.sequence,
-          clause: this.parseReadPredicateRow(predicateRow, link.predicate_id)
+          clause: buildExpressionTree(link.child_expression_id, nextVisitedExpressionIds)
         });
-        continue;
       }
 
-      if (!link.child_expression_id) {
-        throw new ApiGeneralError('Invalid expression clause target', [
-          'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-          `expressionClauseId=${link.expression_clause_id}`
-        ]);
-      }
-
-      readClauses.push({
-        sequence: link.sequence,
-        // Child expressions are stored by id, so reconstruct that subtree before
-        // sorting the current node's clauses back into sequence order.
-        clause: await this.reconstructExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds)
-      });
-    }
-
-    return {
-      type: 'expression',
-      operator: expression.operator,
-      // Storage is expected to be ordered by sequence, but sort defensively.
-      clauses: readClauses.toSorted((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
+      return {
+        type: 'expression',
+        operator: expression.operator,
+        // Storage is expected to be ordered by sequence, but sort defensively.
+        clauses: readClauses.toSorted((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
+      };
     };
+
+    return buildExpressionTree(expressionId, visitedExpressionIds);
   }
 
   /**

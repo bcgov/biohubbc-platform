@@ -71,7 +71,8 @@ export class TeamAuthorizationRepository extends BaseRepository {
 
   /**
    * Find an active team policy for a user that grants access to a submission feature.
-   * Uses a CTE to resolve the feature's URN parts, then joins policy_statement (URN match) → policy → team_policy → team_member.
+   * Uses a CTE to resolve the feature's URN parts, then joins
+   * policy_statement → security_scope (URN match) → policy → team_policy → team_member.
    *
    * @param {number} systemUserId
    * @param {number} submissionFeatureId
@@ -94,10 +95,12 @@ export class TeamAuthorizationRepository extends BaseRepository {
       )
       SELECT tp.team_policy_id, tm.record_end_date
       FROM policy_statement ps
+      INNER JOIN security_scope ss
+        ON ss.security_scope_id = ps.security_scope_id
       INNER JOIN feature_urn_parts f
-        ON (ps.urn_submission_id = f.submission_id_part OR ps.urn_submission_id = '*')
-        AND (ps.urn_feature_type = f.feature_type_name OR ps.urn_feature_type = '*')
-        AND (ps.urn_feature_id = f.submission_feature_id::text OR ps.urn_feature_id = '*')
+        ON (ss.urn_submission_id = f.submission_id_part OR ss.urn_submission_id = '*')
+        AND (ss.urn_feature_type = f.feature_type_name OR ss.urn_feature_type = '*')
+        AND (ss.urn_feature_id = f.submission_feature_id::text OR ss.urn_feature_id = '*')
       INNER JOIN policy p
         ON p.policy_id = ps.policy_id
         AND p.record_end_date IS NULL

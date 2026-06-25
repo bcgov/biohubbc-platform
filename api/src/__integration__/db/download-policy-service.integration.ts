@@ -84,10 +84,14 @@ describe('DownloadPolicyService (integration)', function () {
       expect(policyRow.rows[0].status).to.equal('approved');
 
       const statements = await connection.sql(SQL`
-        SELECT urn_feature_type, submission_feature_urn, effect
-        FROM policy_statement
-        WHERE policy_id = ${policy_id} AND record_end_date IS NULL
-        ORDER BY urn_feature_type;
+        SELECT
+          ss.urn_feature_type,
+          concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS submission_feature_urn,
+          ps.effect
+        FROM policy_statement ps
+        JOIN security_scope ss ON ss.security_scope_id = ps.security_scope_id
+        WHERE ps.policy_id = ${policy_id} AND ps.record_end_date IS NULL
+        ORDER BY ss.urn_feature_type;
       `);
       expect(statements.rowCount).to.equal(2);
       expect(statements.rows[0].urn_feature_type).to.equal('dataset');

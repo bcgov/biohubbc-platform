@@ -77,7 +77,6 @@ describe('computeScopeAnchorsJobHandler', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
-    sinon.stub(SecurityScopeService.prototype, 'deleteOrphanedScopeData').resolves();
     const deleteStaleStub = sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorBatch');
     const batchStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch');
 
@@ -87,8 +86,8 @@ describe('computeScopeAnchorsJobHandler', () => {
     expect(deleteStaleStub).not.to.have.been.called;
     expect(batchStub).not.to.have.been.called;
 
-    // 2 connections: resolve URN + deleteOrphanedScopeData
-    expect(mockDBConnection.open).to.have.been.calledTwice;
+    // 1 connection: resolve URN only. Cached anchors are preserved.
+    expect(mockDBConnection.open).to.have.been.calledOnce;
   });
 
   it('should roll back and throw on computation failure', async () => {
@@ -172,9 +171,8 @@ describe('computeScopeAnchorsJobHandler', () => {
 
     await computeScopeAnchorsJobHandler([createMockJob('scope-1', 'job-1'), createMockJob('scope-2', 'job-2')]);
 
-    // Each job: resolve URN (null → orphan path, no stale/insert batches) = 1 connection per job
-    // Plus deleteOrphanedScopeData = 1 connection per job = 2 per job
-    expect(openStub.callCount).to.equal(4);
+    // Each job: resolve URN (null -> skip path, no stale/insert batches) = 1 connection per job
+    expect(openStub.callCount).to.equal(2);
   });
 
   it('should handle empty jobs array', async () => {

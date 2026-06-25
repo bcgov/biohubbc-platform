@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { CreatePolicyExpression, PolicyExpression } from '../models/policy-expression';
+import { CreatePolicyExpression, PolicyExpression, UpdatePolicyExpression } from '../models/policy-expression';
 import { BaseRepository } from './base-repository';
 
 export class PolicyExpressionRepository extends BaseRepository {
@@ -111,6 +111,47 @@ export class PolicyExpressionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to ensure policy_expression', [
         'PolicyExpressionRepository->ensurePolicyExpression',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Patch an existing policy-expression identity to point at a different immutable expression anchor.
+   *
+   * The policy_expression row is policy-owned identity. Updates intentionally
+   * mutate this pointer instead of soft-deleting the policy_expression and
+   * inserting a replacement row, so statement links keep the same
+   * policy_expression_id while the referenced expression tree changes.
+   *
+   * @param {string} policyExpressionId - Existing policy-expression identifier.
+   * @param {UpdatePolicyExpression} payload - Replacement expression pointer.
+   * @returns {Promise<PolicyExpression>} Updated policy-expression row.
+   */
+  async updatePolicyExpression(policyExpressionId: string, payload: UpdatePolicyExpression): Promise<PolicyExpression> {
+    const knex = getKnex();
+    const query = knex('policy_expression')
+      .update({
+        expression_id: payload.expressionId
+      })
+      .where('policy_expression_id', policyExpressionId)
+      .whereNull('record_end_date')
+      .returning(['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, PolicyExpression);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('policy_expression not found', [
+        'PolicyExpressionRepository->updatePolicyExpression',
+        { policyExpressionId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update policy_expression', [
+        'PolicyExpressionRepository->updatePolicyExpression',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }

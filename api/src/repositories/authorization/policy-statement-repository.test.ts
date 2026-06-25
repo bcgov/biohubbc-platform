@@ -22,6 +22,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
+          security_scope_id: '11111111-1111-1111-1111-111111111111',
           submission_feature_urn: 'urn:biohub:submission:1',
           policy_expression_id: null
         }
@@ -31,19 +32,19 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const knexStub = sinon.stub().resolves(mockQueryResponse);
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({
-        knex: knexStub
+        sql: sqlStub
       });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.insertPolicyStatement({
         policy_id: '123abc',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:biohub:submission:1'
+        security_scope_id: '11111111-1111-1111-1111-111111111111'
       });
 
-      expect(knexStub).to.have.been.calledOnce;
+      expect(sqlStub).to.have.been.calledOnce;
       expect(result).to.eql(mockRows[0]);
     });
 
@@ -51,7 +52,7 @@ describe('PolicyStatementRepository', () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        sql: async () => mockQueryResponse
       });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
@@ -60,7 +61,7 @@ describe('PolicyStatementRepository', () => {
         await repository.insertPolicyStatement({
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:biohub:submission:1'
+          security_scope_id: '11111111-1111-1111-1111-111111111111'
         });
         expect.fail();
       } catch (error) {
@@ -76,6 +77,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: 'DENY',
+          security_scope_id: '11111111-1111-1111-1111-111111111111',
           submission_feature_urn: 'urn:biohub:submission:2',
           policy_expression_id: 'pe-1'
         }
@@ -123,6 +125,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: mockPolicyId,
           effect: PolicyEffect.ALLOW,
+          security_scope_id: '11111111-1111-1111-1111-111111111111',
           submission_feature_urn: 'urn:biohub:submission:1',
           policy_expression_id: null
         },
@@ -130,6 +133,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 2,
           policy_id: mockPolicyId,
           effect: 'DENY',
+          security_scope_id: '22222222-2222-2222-2222-222222222222',
           submission_feature_urn: 'urn:biohub:submission:2',
           policy_expression_id: 'pe-1'
         }
@@ -190,7 +194,7 @@ describe('PolicyStatementRepository', () => {
       expect(sql).to.include('"pe"."record_end_date" is null');
       expect(sql).to.include('"ps"."policy_id" = \'policy-1\'');
       expect(sql).to.include('"ps"."record_end_date" is null');
-      expect(sql).to.include('order by "ps"."urn_feature_type"');
+      expect(sql).to.include('order by "ss"."urn_feature_type"');
     });
 
     it('returns [] for a policy with no active statements (does NOT throw)', async () => {
@@ -212,6 +216,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
+          security_scope_id: '11111111-1111-1111-1111-111111111111',
           submission_feature_urn: 'urn:biohub:submission:updated',
           policy_expression_id: null
         }
@@ -221,17 +226,17 @@ describe('PolicyStatementRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const knexStub = sinon.stub().resolves(mockResponse);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const sqlStub = sinon.stub().resolves(mockResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       const result = await repository.updatePolicyStatement('1', {
         policy_id: '123abc',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:biohub:submission:updated'
+        security_scope_id: '11111111-1111-1111-1111-111111111111'
       });
 
-      expect(knexStub).to.have.been.calledOnce;
+      expect(sqlStub).to.have.been.calledOnce;
       expect(result).to.eql(mockRows[0]);
     });
 
@@ -241,6 +246,7 @@ describe('PolicyStatementRepository', () => {
           policy_statement_id: 1,
           policy_id: '123abc',
           effect: PolicyEffect.DENY,
+          security_scope_id: '11111111-1111-1111-1111-111111111111',
           submission_feature_urn: 'urn:biohub:submission:1',
           policy_expression_id: null
         }
@@ -251,22 +257,22 @@ describe('PolicyStatementRepository', () => {
       } as unknown as Promise<QueryResult<any>>;
 
       const knexStub = sinon.stub().resolves(mockResponse);
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ sql: knexStub });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       await repository.updatePolicyStatement('1', {
         effect: PolicyEffect.DENY
       });
 
-      const sql = knexStub.firstCall.args[0].toString();
-      expect(sql).to.include('"effect" = \'deny\'');
-      expect(sql).to.not.include('set "policy_expression_id"');
-      expect(sql).to.not.include('set "submission_feature_urn"');
+      const sql = knexStub.firstCall.args[0].text;
+      expect(sql).to.include('effect = CASE WHEN');
+      expect(sql).to.include('policy_expression_id = CASE WHEN');
+      expect(sql).to.not.include('SET submission_feature_urn');
     });
 
     it('throws error if update fails', async () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
 
@@ -274,7 +280,7 @@ describe('PolicyStatementRepository', () => {
         await repository.updatePolicyStatement('1', {
           policy_id: '123abc',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:biohub:submission:updated'
+          security_scope_id: '11111111-1111-1111-1111-111111111111'
         });
         expect.fail();
       } catch (error) {

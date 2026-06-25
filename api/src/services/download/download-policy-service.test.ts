@@ -13,7 +13,6 @@ import { TeamPolicyRepository } from '../../repositories/authorization/team-poli
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { PolicyExpressionService } from '../access-policy/policy-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
-import { SecurityScopeService } from '../access-policy/security-scope-service';
 import { DownloadPolicyService } from './download-policy-service';
 
 chai.use(sinonChai);
@@ -168,9 +167,6 @@ describe('DownloadPolicyService', () => {
       });
       // The boundary stubs: if the production service ever wires these in, these
       // assertions fail and the access-grant boundary is restored.
-      const createScopeStub = sinon
-        .stub(SecurityScopeService.prototype, 'materializeScopeForPolicyStatement')
-        .resolves('scope-1');
       const insertTeamPolicyStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
         team_policy_id: 'tp1',
         team_id: 't1',
@@ -184,7 +180,6 @@ describe('DownloadPolicyService', () => {
         expressionId: 'e1'
       });
 
-      expect(createScopeStub).to.not.have.been.called;
       expect(insertTeamPolicyStub).to.not.have.been.called;
     });
 

@@ -36,7 +36,7 @@ export class SecurityRuleExpressionService extends DBService {
    * 1. Load active security-rule links.
    * 2. Soft-delete existing links when the target changes.
    * 3. Insert the replacement active link when needed.
-   * 4. Synchronize the mapped `urn:*:*:*` ALLOW policy statement expression link.
+   * 4. Synchronize the mapped `urn:*:*:*` ALLOW policy statement expression.
    *
    * Notes:
    * - Policy synchronization runs regardless of whether the security-rule link was already correct.
@@ -79,11 +79,17 @@ export class SecurityRuleExpressionService extends DBService {
       throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
     }
 
+    if (mappedStatement.policy_expression_id) {
+      await this.policyExpressionService.updatePolicyExpression(mappedStatement.policy_expression_id, {
+        expressionId
+      });
+      return;
+    }
+
     const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
       policyId: securityRule.policy_id,
-      expressionId: expressionId
+      expressionId
     });
-
     await this.policyStatementService.updatePolicyStatement(mappedStatement.policy_statement_id, {
       policy_expression_id: policyExpression.policy_expression_id
     });

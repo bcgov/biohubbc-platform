@@ -20,8 +20,8 @@ export class TeamPolicyService extends DBService {
    * Create a team policy record and materialize the access cache for the pair.
    *
    * Inserting a `team_policy` link is the trigger that lazily builds the
-   * normalized scope cache (`security_scope`, `policy_statement_scope`,
-   * `team_security_scope`) for the team. The materialization runs via
+   * normalized scope cache (`security_scope`, `team_security_scope`) for the
+   * team. The materialization runs via
    * `SecurityScopeService.materializePolicyStatementScopes` followed by
    * `grantTeamAccessForPolicy`. The first call short-circuits when the policy
    * is not `status='approved'` or has no `ALLOW` statements — so unapproved or

@@ -21,6 +21,7 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { PolicyService } from '../../services/access-policy/policy-service';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
+import { computeScopeHash } from '../../utils/scope-hash';
 import { createTeam } from '../helpers/test-rbac-helpers';
 
 describe('Policy status flip + lazy scope materialization (integration)', function () {
@@ -65,9 +66,19 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
 
   async function insertStatement(policyId: string, urn: string, effect: 'allow' | 'deny'): Promise<string> {
     const systemUserId = connection.systemUserId();
+    const scopeHash = computeScopeHash(urn);
+    const [, urnSubmissionId, urnFeatureType, urnFeatureId] = urn.split(':');
+    const scopeResult = await connection.sql(SQL`
+      INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+      VALUES (${scopeHash}, ${urnSubmissionId}, ${urnFeatureType}, ${urnFeatureId})
+      ON CONFLICT (scope_hash) DO UPDATE SET scope_hash = EXCLUDED.scope_hash
+      RETURNING security_scope_id;
+    `);
+    const securityScopeId = scopeResult.rows[0].security_scope_id;
+
     const result = await connection.sql(SQL`
-      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, ${effect}::policy_effect, ${urn}, ${systemUserId})
+      INSERT INTO policy_statement (policy_id, effect, security_scope_id, create_user)
+      VALUES (${policyId}, ${effect}::policy_effect, ${securityScopeId}, ${systemUserId})
       RETURNING policy_statement_id;
     `);
     return result.rows[0].policy_statement_id;

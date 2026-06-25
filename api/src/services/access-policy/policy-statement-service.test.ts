@@ -25,6 +25,13 @@ describe('PolicyStatementService', () => {
   beforeEach(() => {
     mockDBConnection = getMockDBConnection();
     service = new PolicyStatementService(mockDBConnection);
+    sinon.stub(SecurityScopeService.prototype, 'ensureSecurityScope').resolves({
+      security_scope_id: '55555555-5555-5555-5555-555555555555',
+      scope_hash: 'scope-hash',
+      urn_submission_id: '1',
+      urn_feature_type: 'dataset',
+      urn_feature_id: '1'
+    });
   });
 
   afterEach(() => {
@@ -51,7 +58,12 @@ describe('PolicyStatementService', () => {
 
       const result = await service.createPolicyStatement(input);
 
-      expect(stub).to.have.been.calledWith(input);
+      expect(stub).to.have.been.calledWith({
+        policy_id: input.policy_id,
+        effect: input.effect,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: undefined
+      });
       expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
       expect(result).to.eql(mockStatement);
     });
@@ -84,7 +96,12 @@ describe('PolicyStatementService', () => {
       };
       const result = await service.createPolicyStatement(input);
 
-      expect(insertStub).to.have.been.calledOnceWithExactly(input);
+      expect(insertStub).to.have.been.calledOnceWithExactly({
+        policy_id: input.policy_id,
+        effect: input.effect,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: input.policy_expression_id
+      });
       expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
       expect(result).to.eql(linkedStatement);
     });
@@ -162,7 +179,13 @@ describe('PolicyStatementService', () => {
 
       const result = await service.updatePolicyStatement('11111111-1111-1111-1111-111111111111', updateData);
 
-      expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111', {
+        policy_id: undefined,
+        effect: updateData.effect,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: undefined,
+        record_end_date: undefined
+      });
       expect(refreshStub).to.not.have.been.called;
       expect(result).to.eql(mockStatement);
     });
@@ -172,6 +195,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         submission_feature_urn: 'urn:1:dataset:1',
         policy_expression_id: null
       };
@@ -197,7 +221,13 @@ describe('PolicyStatementService', () => {
       };
       const result = await service.updatePolicyStatement('11111111-1111-1111-1111-111111111111', updateData);
 
-      expect(updateStub).to.have.been.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', updateData);
+      expect(updateStub).to.have.been.calledOnceWithExactly('11111111-1111-1111-1111-111111111111', {
+        policy_id: undefined,
+        effect: undefined,
+        security_scope_id: undefined,
+        policy_expression_id: updateData.policy_expression_id,
+        record_end_date: undefined
+      });
       expect(refreshStub).to.not.have.been.called;
       expect(result).to.eql(linkedStatement);
     });
@@ -207,6 +237,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         submission_feature_urn: 'urn:1:dataset:1',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
@@ -223,11 +254,12 @@ describe('PolicyStatementService', () => {
       expect(result).to.eql(unlinkedStatement);
     });
 
-    it('cleans old statement scopes and refreshes access when the URN changes', async () => {
+    it('refreshes access when the URN changes', async () => {
       const existingStatement: PolicyStatement = {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
+        security_scope_id: '44444444-4444-4444-4444-444444444444',
         submission_feature_urn: 'urn:1:dataset:1',
         policy_expression_id: null
       };
@@ -237,17 +269,12 @@ describe('PolicyStatementService', () => {
       };
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatement);
       sinon.stub(PolicyStatementRepository.prototype, 'updatePolicyStatement').resolves(updatedStatement);
-      sinon
-        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
-        .resolves([{ team_policy_id: 'tp-1', team_id: 'team-1', policy_id: existingStatement.policy_id } as any]);
-      const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
       const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
 
       await service.updatePolicyStatement(existingStatement.policy_statement_id, {
         submission_feature_urn: 'urn:1:dataset:2'
       });
 
-      expect(cleanupStub).to.have.been.calledOnceWith([existingStatement.policy_statement_id], ['team-1']);
       expect(refreshStub).to.have.been.calledOnceWith(existingStatement.policy_id);
     });
 
@@ -286,6 +313,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         submission_feature_urn: 'urn:1:dataset:1',
         policy_expression_id: null
       };
@@ -294,13 +322,13 @@ describe('PolicyStatementService', () => {
         .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
         .resolves([{ team_policy_id: 'tp-1', team_id: 'team-1', policy_id: mockStatement.policy_id } as any]);
       const stub = sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
-      const cleanupStub = sinon.stub(SecurityScopeService.prototype, 'cleanupScopesForDeletedStatements').resolves();
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopesForTeams').resolves();
       const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
 
       await service.deletePolicyStatement('11111111-1111-1111-1111-111111111111');
 
       expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
-      expect(cleanupStub).to.have.been.calledOnceWith(['11111111-1111-1111-1111-111111111111'], ['team-1']);
+      expect(rebuildStub).to.have.been.calledOnceWith(['team-1']);
       expect(refreshStub).to.not.have.been.called;
     });
   });

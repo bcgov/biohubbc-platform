@@ -1,7 +1,12 @@
+import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreatePolicyStatement, PolicyStatement, UpdatePolicyStatement } from '../../models/policy-statement';
+import {
+  CreatePolicyStatementRecord,
+  PolicyStatement,
+  UpdatePolicyStatementRecord
+} from '../../models/policy-statement';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -33,23 +38,39 @@ export class PolicyStatementRepository extends BaseRepository {
   /**
    * Insert a new policy statement record.
    *
-   * @param {CreatePolicyStatement} policyStatementData - The data for the policy statement to insert.
+   * @param {CreatePolicyStatementRecord} policyStatementData - The data for the policy statement to insert.
    * @return {Promise<PolicyStatement>} - The created policy statement record.
    * @memberof PolicyStatementRepository
    */
-  async insertPolicyStatement(policyStatementData: CreatePolicyStatement): Promise<PolicyStatement> {
-    const knex = getKnex();
-    const query = knex
-      .table('policy_statement')
-      .insert({
-        policy_id: policyStatementData.policy_id,
-        effect: policyStatementData.effect,
-        submission_feature_urn: policyStatementData.submission_feature_urn,
-        policy_expression_id: policyStatementData.policy_expression_id ?? null
-      })
-      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id']);
+  async insertPolicyStatement(policyStatementData: CreatePolicyStatementRecord): Promise<PolicyStatement> {
+    const sqlStatement = SQL`
+      WITH inserted AS (
+        INSERT INTO policy_statement (
+          policy_id,
+          effect,
+          security_scope_id,
+          policy_expression_id
+        )
+        VALUES (
+          ${policyStatementData.policy_id},
+          ${policyStatementData.effect},
+          ${policyStatementData.security_scope_id},
+          ${policyStatementData.policy_expression_id ?? null}
+        )
+        RETURNING policy_statement_id, policy_id, effect, security_scope_id, policy_expression_id
+      )
+      SELECT
+        inserted.policy_statement_id,
+        inserted.policy_id,
+        inserted.effect,
+        inserted.security_scope_id,
+        concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS submission_feature_urn,
+        inserted.policy_expression_id
+      FROM inserted
+      JOIN security_scope ss ON ss.security_scope_id = inserted.security_scope_id;
+    `;
 
-    const response = await this.connection.knex(query, PolicyStatement);
+    const response = await this.connection.sql(sqlStatement, PolicyStatement);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert policy statement', [
@@ -72,11 +93,15 @@ export class PolicyStatementRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('policy_statement as ps')
+      .join('security_scope as ss', 'ss.security_scope_id', 'ps.security_scope_id')
       .select([
         'ps.policy_statement_id',
         'ps.policy_id',
         'ps.effect',
-        'ps.submission_feature_urn',
+        'ps.security_scope_id',
+        knex.raw(
+          "concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) as submission_feature_urn"
+        ),
         'ps.policy_expression_id'
       ])
       .where('ps.policy_statement_id', policyStatementId);
@@ -111,11 +136,15 @@ export class PolicyStatementRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('policy_statement as ps')
+      .join('security_scope as ss', 'ss.security_scope_id', 'ps.security_scope_id')
       .select([
         'ps.policy_statement_id',
         'ps.policy_id',
         'ps.effect',
-        'ps.submission_feature_urn',
+        'ps.security_scope_id',
+        knex.raw(
+          "concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) as submission_feature_urn"
+        ),
         'ps.policy_expression_id'
       ])
       .where('ps.policy_id', policyId)
@@ -152,9 +181,10 @@ export class PolicyStatementRepository extends BaseRepository {
       .table('policy_statement as ps')
       .select<ActivePolicyStatementWithExpression[]>(
         'ps.policy_statement_id',
-        'ps.urn_feature_type',
+        'ss.urn_feature_type',
         'pe.expression_id'
       )
+      .join('security_scope as ss', 'ss.security_scope_id', 'ps.security_scope_id')
       .leftJoin('policy_expression as pe', function () {
         this.on('pe.policy_expression_id', '=', 'ps.policy_expression_id')
           .andOn('pe.policy_id', '=', 'ps.policy_id')
@@ -162,7 +192,7 @@ export class PolicyStatementRepository extends BaseRepository {
       })
       .where('ps.policy_id', policyId)
       .whereNull('ps.record_end_date')
-      .orderBy('ps.urn_feature_type');
+      .orderBy('ss.urn_feature_type');
 
     const response = await this.connection.knex(query, ActivePolicyStatementWithExpression);
 
@@ -173,40 +203,38 @@ export class PolicyStatementRepository extends BaseRepository {
    * Update an existing policy statement record.
    *
    * @param {string} policyStatementId - The ID of the policy statement to update.
-   * @param {UpdatePolicyStatement} policyStatementData - The data to update.
+   * @param {UpdatePolicyStatementRecord} policyStatementData - The data to update.
    * @return {Promise<PolicyStatement>} - The updated policy statement record.
    * @memberof PolicyStatementRepository
    */
   async updatePolicyStatement(
     policyStatementId: string,
-    policyStatementData: UpdatePolicyStatement
+    policyStatementData: UpdatePolicyStatementRecord
   ): Promise<PolicyStatement> {
-    const knex = getKnex();
-    const updateData: Record<string, string | null | undefined> = {};
+    const sqlStatement = SQL`
+      WITH updated AS (
+        UPDATE policy_statement
+        SET
+          policy_id = CASE WHEN ${policyStatementData.policy_id !== undefined} THEN ${policyStatementData.policy_id ?? null} ELSE policy_id END,
+          effect = CASE WHEN ${policyStatementData.effect !== undefined} THEN ${policyStatementData.effect ?? null} ELSE effect END,
+          security_scope_id = CASE WHEN ${policyStatementData.security_scope_id !== undefined} THEN ${policyStatementData.security_scope_id ?? null} ELSE security_scope_id END,
+          policy_expression_id = CASE WHEN ${policyStatementData.policy_expression_id !== undefined} THEN ${policyStatementData.policy_expression_id ?? null} ELSE policy_expression_id END,
+          record_end_date = CASE WHEN ${policyStatementData.record_end_date !== undefined} THEN ${policyStatementData.record_end_date ?? null} ELSE record_end_date END
+        WHERE policy_statement_id = ${policyStatementId}
+        RETURNING policy_statement_id, policy_id, effect, security_scope_id, policy_expression_id
+      )
+      SELECT
+        updated.policy_statement_id,
+        updated.policy_id,
+        updated.effect,
+        updated.security_scope_id,
+        concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS submission_feature_urn,
+        updated.policy_expression_id
+      FROM updated
+      JOIN security_scope ss ON ss.security_scope_id = updated.security_scope_id;
+    `;
 
-    if (policyStatementData.policy_id !== undefined) {
-      updateData.policy_id = policyStatementData.policy_id;
-    }
-    if (policyStatementData.effect !== undefined) {
-      updateData.effect = policyStatementData.effect;
-    }
-    if (policyStatementData.submission_feature_urn !== undefined) {
-      updateData.submission_feature_urn = policyStatementData.submission_feature_urn;
-    }
-    if (policyStatementData.policy_expression_id !== undefined) {
-      updateData.policy_expression_id = policyStatementData.policy_expression_id;
-    }
-    if (policyStatementData.record_end_date !== undefined) {
-      updateData.record_end_date = policyStatementData.record_end_date;
-    }
-
-    const query = knex
-      .table('policy_statement')
-      .update(updateData)
-      .where('policy_statement_id', policyStatementId)
-      .returning(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id']);
-
-    const response = await this.connection.knex(query, PolicyStatement);
+    const response = await this.connection.sql(sqlStatement, PolicyStatement);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update policy statement', [

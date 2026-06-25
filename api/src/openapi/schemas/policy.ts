@@ -13,7 +13,14 @@ import { paginationResponseSchema } from './pagination';
 export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyStatementWithExpression',
   type: 'object',
-  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'policy_expression_id'],
+  required: [
+    'policy_statement_id',
+    'policy_id',
+    'effect',
+    'security_scope_id',
+    'submission_feature_urn',
+    'policy_expression_id'
+  ],
   properties: {
     policy_statement_id: {
       type: 'string',
@@ -30,9 +37,13 @@ export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
       enum: ['allow', 'deny'],
       description: 'Whether the statement allows or denies access'
     },
+    security_scope_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Reusable security scope this policy-specific statement references'
+    },
     submission_feature_urn: {
       type: 'string',
-      maxLength: 500,
       description: 'The URN pattern this statement applies to'
     },
     policy_expression_id: {

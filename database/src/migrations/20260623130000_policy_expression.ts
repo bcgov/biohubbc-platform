@@ -78,7 +78,251 @@ export async function up(knex: Knex): Promise<void> {
       ADD COLUMN policy_expression_id uuid;
 
     ----------------------------------------------------------------------------------------
-    -- 3. Stage active legacy statement-expression links.
+    -- 3. Move reusable statement scopes onto security_scope and reference them directly.
+    --
+    -- The previous model stored the URN envelope on policy_statement, then derived
+    -- policy_statement_scope rows as a statement -> scope mapping. The new model
+    -- stores the reusable URN envelope on security_scope and makes policy_statement
+    -- reference security_scope_id directly. Policy statements remain policy-specific;
+    -- only the scope envelope is shared.
+    ----------------------------------------------------------------------------------------
+
+    ----------------------------------------------------------------------------------------
+    -- 3a. Add URN components to security_scope.
+    --
+    -- These columns become the canonical representation of the scope's URN. Keep
+    -- them nullable until existing rows are backfilled and orphaned derived rows
+    -- are removed.
+    ----------------------------------------------------------------------------------------
+    ALTER TABLE security_scope
+      ADD COLUMN IF NOT EXISTS urn_submission_id varchar(20),
+      ADD COLUMN IF NOT EXISTS urn_feature_type varchar(100),
+      ADD COLUMN IF NOT EXISTS urn_feature_id varchar(20);
+
+    ----------------------------------------------------------------------------------------
+    -- 3b. Backfill existing scope rows from the old policy_statement_scope mapping.
+    --
+    -- Existing non-orphaned scopes can be resolved through:
+    -- security_scope -> policy_statement_scope -> policy_statement. Because scope_hash
+    -- was derived from the statement URN, every statement sharing a scope has the
+    -- same decomposed URN parts.
+    ----------------------------------------------------------------------------------------
+    UPDATE security_scope ss
+    SET
+      urn_submission_id = ps.urn_submission_id,
+      urn_feature_type = ps.urn_feature_type,
+      urn_feature_id = ps.urn_feature_id
+    FROM policy_statement_scope pss
+    JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+    WHERE ss.security_scope_id = pss.security_scope_id
+      AND ss.urn_submission_id IS NULL;
+
+    ----------------------------------------------------------------------------------------
+    -- 3c. Remove orphaned scope cache rows that cannot be backfilled.
+    --
+    -- Orphaned security_scope rows from the old derived model have no remaining
+    -- policy_statement_scope row, so the old schema no longer has a source URN for
+    -- them. They grant no access without a statement, so remove their derived cache
+    -- data before making the new URN columns NOT NULL.
+    ----------------------------------------------------------------------------------------
+    DELETE FROM team_security_scope tss
+    USING security_scope ss
+    WHERE tss.security_scope_id = ss.security_scope_id
+      AND ss.urn_submission_id IS NULL;
+
+    DELETE FROM security_scope_anchor ssa
+    USING security_scope ss
+    WHERE ssa.security_scope_id = ss.security_scope_id
+      AND ss.urn_submission_id IS NULL;
+
+    DELETE FROM security_scope
+    WHERE urn_submission_id IS NULL;
+
+    ----------------------------------------------------------------------------------------
+    -- 3d. Create any missing reusable scope rows directly from policy_statement.
+    --
+    -- Some policy statements may not have been materialized into the old derived
+    -- policy_statement_scope table yet. Insert one reusable security_scope row per
+    -- distinct statement URN so every statement can reference security_scope_id.
+    ----------------------------------------------------------------------------------------
+    INSERT INTO security_scope (
+      scope_hash,
+      urn_submission_id,
+      urn_feature_type,
+      urn_feature_id
+    )
+    SELECT DISTINCT
+      encode(sha256(convert_to(ps.submission_feature_urn, 'UTF8')), 'hex') AS scope_hash,
+      ps.urn_submission_id,
+      ps.urn_feature_type,
+      ps.urn_feature_id
+    FROM policy_statement ps
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM security_scope ss
+      WHERE ss.scope_hash = encode(sha256(convert_to(ps.submission_feature_urn, 'UTF8')), 'hex')
+    );
+
+    ----------------------------------------------------------------------------------------
+    -- 3e. Attach policy_statement directly to security_scope.
+    --
+    -- This replaces policy_statement_scope as the source-of-truth relationship.
+    -- The scope hash is used only as the migration bridge from old statement URNs
+    -- to the reusable security_scope row.
+    ----------------------------------------------------------------------------------------
+    ALTER TABLE policy_statement
+      ADD COLUMN IF NOT EXISTS security_scope_id uuid;
+
+    UPDATE policy_statement ps
+    SET security_scope_id = ss.security_scope_id
+    FROM security_scope ss
+    WHERE ss.scope_hash = encode(sha256(convert_to(ps.submission_feature_urn, 'UTF8')), 'hex')
+      AND ps.security_scope_id IS NULL;
+
+    ALTER TABLE security_scope
+      ALTER COLUMN urn_submission_id SET NOT NULL,
+      ALTER COLUMN urn_feature_type SET NOT NULL,
+      ALTER COLUMN urn_feature_id SET NOT NULL;
+
+    ----------------------------------------------------------------------------------------
+    -- 3f. Move URN validation from policy_statement to security_scope.
+    --
+    -- Foreign keys cannot represent the wildcard '*' segments, so keep trigger
+    -- validation for concrete submission IDs, feature types, and feature IDs.
+    -- This is the same integrity protection the legacy policy_statement trigger
+    -- provided, attached to the table that now owns the URN envelope.
+    ----------------------------------------------------------------------------------------
+    CREATE OR REPLACE FUNCTION biohub.tr_security_scope_urn_validation()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY INVOKER
+    AS $function$
+    BEGIN
+      IF NEW.urn_submission_id IS NULL OR NEW.urn_feature_type IS NULL OR NEW.urn_feature_id IS NULL THEN
+        RAISE EXCEPTION 'Invalid security_scope URN: submission_id, feature_type, and feature_id are required';
+      END IF;
+
+      IF NEW.urn_submission_id != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM biohub.submission s WHERE s.submission_id = NEW.urn_submission_id::integer
+        ) THEN
+          RAISE EXCEPTION 'Invalid security_scope URN: submission_id % does not exist', NEW.urn_submission_id;
+        END IF;
+      END IF;
+
+      IF NEW.urn_feature_type != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM biohub.feature_type ft WHERE ft.name = NEW.urn_feature_type
+        ) THEN
+          RAISE EXCEPTION 'Invalid security_scope URN: feature_type % does not exist', NEW.urn_feature_type;
+        END IF;
+      END IF;
+
+      IF NEW.urn_feature_id != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature f
+          WHERE f.submission_feature_id = NEW.urn_feature_id::integer
+        ) THEN
+          RAISE EXCEPTION 'Invalid security_scope URN: submission_feature_id % does not exist', NEW.urn_feature_id;
+        END IF;
+      END IF;
+
+      IF NEW.urn_feature_id != '*' AND NEW.urn_feature_type != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature f
+          JOIN biohub.feature_type ft ON f.feature_type_id = ft.feature_type_id
+          WHERE f.submission_feature_id = NEW.urn_feature_id::integer
+            AND ft.name = NEW.urn_feature_type
+        ) THEN
+          RAISE EXCEPTION 'Invalid security_scope URN: submission_feature_id % does not have feature_type %',
+            NEW.urn_feature_id, NEW.urn_feature_type;
+        END IF;
+      END IF;
+
+      IF NEW.urn_submission_id != '*' AND NEW.urn_feature_id != '*' AND NEW.urn_feature_type != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature f
+          JOIN biohub.feature_type ft ON f.feature_type_id = ft.feature_type_id
+          WHERE f.submission_feature_id = NEW.urn_feature_id::integer
+            AND f.submission_id = NEW.urn_submission_id::integer
+            AND ft.name = NEW.urn_feature_type
+        ) THEN
+          RAISE EXCEPTION 'Invalid security_scope URN: submission_feature_id % does not belong to submission_id % or feature_type %',
+            NEW.urn_feature_id, NEW.urn_submission_id, NEW.urn_feature_type;
+        END IF;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $function$;
+
+    CREATE TRIGGER security_scope_urn_validation
+      BEFORE INSERT OR UPDATE OF urn_submission_id, urn_feature_type, urn_feature_id ON biohub.security_scope
+      FOR EACH ROW
+      EXECUTE PROCEDURE biohub.tr_security_scope_urn_validation();
+
+    ----------------------------------------------------------------------------------------
+    -- 3g. Index and constrain the new direct statement -> scope relationship.
+    --
+    -- The active statement uniqueness rule moves from submission_feature_urn to
+    -- security_scope_id after every statement has been backfilled.
+    ----------------------------------------------------------------------------------------
+    CREATE INDEX IF NOT EXISTS security_scope_idx1 ON security_scope(urn_submission_id);
+    CREATE INDEX IF NOT EXISTS security_scope_idx2 ON security_scope(urn_feature_type);
+    CREATE INDEX IF NOT EXISTS security_scope_idx3 ON security_scope(urn_feature_id);
+    CREATE INDEX IF NOT EXISTS policy_statement_idx5 ON policy_statement(security_scope_id);
+    CREATE INDEX IF NOT EXISTS policy_statement_idx6
+      ON policy_statement(security_scope_id)
+      WHERE record_end_date IS NULL;
+
+    ALTER TABLE policy_statement
+      ALTER COLUMN security_scope_id SET NOT NULL,
+      ADD CONSTRAINT policy_statement_fk3
+        FOREIGN KEY (security_scope_id)
+        REFERENCES security_scope(security_scope_id);
+
+    ----------------------------------------------------------------------------------------
+    -- 3h. Drop legacy policy_statement URN storage.
+    --
+    -- After every statement references security_scope_id, policy_statement no longer
+    -- owns the URN. Drop the old validation/decomposition triggers before dropping
+    -- the columns they read, then recreate the active-statement uniqueness rule on
+    -- security_scope_id instead of submission_feature_urn.
+    ----------------------------------------------------------------------------------------
+    DROP INDEX IF EXISTS policy_statement_nuk1;
+    DROP INDEX IF EXISTS policy_statement_submission_feature_urn_idx;
+    DROP INDEX IF EXISTS policy_statement_urn_submission_id_idx;
+    DROP INDEX IF EXISTS policy_statement_urn_feature_type_idx;
+    DROP INDEX IF EXISTS policy_statement_urn_feature_id_idx;
+
+    DROP TRIGGER IF EXISTS policy_statement_urn_validation ON biohub.policy_statement;
+    DROP TRIGGER IF EXISTS tr_policy_statement_urn_decompose ON policy_statement;
+    DROP FUNCTION IF EXISTS tr_policy_statement_urn_decompose();
+
+    ALTER TABLE policy_statement
+      DROP CONSTRAINT IF EXISTS submission_feature_urn_format_check,
+      DROP COLUMN IF EXISTS submission_feature_urn,
+      DROP COLUMN IF EXISTS urn_submission_id,
+      DROP COLUMN IF EXISTS urn_feature_type,
+      DROP COLUMN IF EXISTS urn_feature_id;
+
+    CREATE UNIQUE INDEX policy_statement_nuk1
+      ON policy_statement(policy_id, effect, security_scope_id, (record_end_date is NULL))
+      WHERE record_end_date IS NULL;
+
+    DROP TABLE IF EXISTS policy_statement_scope;
+
+    COMMENT ON TABLE security_scope IS 'Canonical reusable URN access envelope. Deduplicated by scope_hash; same URN always maps to the same scope, regardless of which policy statement references it. Policy expression filters are not part of this standing access scope.';
+    COMMENT ON COLUMN security_scope.urn_submission_id IS 'Decomposed submission_id segment from the scope URN. Value is * for wildcard match.';
+    COMMENT ON COLUMN security_scope.urn_feature_type IS 'Decomposed feature_type_name segment from the scope URN. Value is * for wildcard match.';
+    COMMENT ON COLUMN security_scope.urn_feature_id IS 'Decomposed submission_feature_id segment from the scope URN. Value is * for wildcard match.';
+    COMMENT ON COLUMN policy_statement.security_scope_id IS 'Foreign key to the reusable URN-based security scope for this statement. Policy statements remain policy-specific; only the scope envelope is shared.';
+
+    ----------------------------------------------------------------------------------------
+    -- 4. Stage active legacy statement-expression links.
     --
     -- policy_statement_expression is legacy source data only in this migration. Do not alter
     -- it: filter stale child links here by requiring the parent policy, statement, and root
@@ -103,7 +347,7 @@ export async function up(knex: Knex): Promise<void> {
       AND e.record_end_date IS NULL;
 
     ----------------------------------------------------------------------------------------
-    -- 4. Backfill active policy_expression identities.
+    -- 5. Backfill active policy_expression identities.
     ----------------------------------------------------------------------------------------
     WITH active_policy_expressions AS (
       SELECT
@@ -132,7 +376,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 5. Stage statements with multiple distinct active expressions.
+    -- 6. Stage statements with multiple distinct active expressions.
     --
     -- Duplicate active links to the same expression are handled later as duplicate rows rather
     -- than wrapped in a noisy single-child AND.
@@ -188,7 +432,7 @@ export async function up(knex: Knex): Promise<void> {
     GROUP BY merge_clause.policy_statement_id, merge_clause.policy_id;
 
     ----------------------------------------------------------------------------------------
-    -- 6. Create or reuse the merged AND expression anchors.
+    -- 7. Create or reuse the merged AND expression anchors.
     --
     -- The merged expression hash is built to match ExpressionTreeService stableStringify({
     --   type: 'expression',
@@ -214,7 +458,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 7. Attach each original expression as a child of its merged AND expression.
+    -- 8. Attach each original expression as a child of its merged AND expression.
     ----------------------------------------------------------------------------------------
     INSERT INTO expression_clause (
       expression_id,
@@ -242,7 +486,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 8. Create or reuse the policy-owned identity for each merged expression.
+    -- 9. Create or reuse the policy-owned identity for each merged expression.
     ----------------------------------------------------------------------------------------
     INSERT INTO policy_expression (
       policy_id,
@@ -270,7 +514,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     ----------------------------------------------------------------------------------------
-    -- 9. Resolve the final policy-owned expression link for each statement.
+    -- 10. Resolve the final policy-owned expression link for each statement.
     --
     -- Multi-expression statements point to the synthesized AND expression. Statements with
     -- exactly one distinct active expression point to that expression's policy-owned identity.
@@ -324,7 +568,7 @@ export async function up(knex: Knex): Promise<void> {
     FROM single_statement_links;
 
     ----------------------------------------------------------------------------------------
-    -- 10. Move the final expression link onto policy_statement and remove the obsolete
+    -- 11. Move the final expression link onto policy_statement and remove the obsolete
     --     legacy table.
     ----------------------------------------------------------------------------------------
     UPDATE policy_statement ps
@@ -345,12 +589,14 @@ export async function up(knex: Knex): Promise<void> {
       ON policy_statement(policy_expression_id)
       WHERE record_end_date IS NULL;
 
-    COMMENT ON COLUMN policy_statement.policy_expression_id IS 'Optional foreign key to the policy-owned expression linked to this statement.';
+    COMMENT ON COLUMN policy_statement.policy_expression_id IS 'Optional foreign key to the policy-owned expression linked to this statement. This expression is a downstream filter and is not part of URN-based security_scope/team_security_scope materialization.';
+
+    COMMENT ON TABLE team_security_scope IS 'Grants a team access to a URN-based security scope. Derived from the team_policy -> policy_statement.security_scope_id chain. Rebuilt synchronously on policy/team-policy mutations (~30 rows per team at scale). Policy expression filters are evaluated by consumers and are not materialized here.';
 
     DROP TABLE IF EXISTS policy_statement_expression;
 
     ----------------------------------------------------------------------------------------
-    -- 11. Drop legacy policy statement condition tables.
+    -- 12. Drop legacy policy statement condition tables.
     ----------------------------------------------------------------------------------------
     DROP TABLE IF EXISTS policy_statement_condition_expression;
     DROP TABLE IF EXISTS policy_statement_condition;
@@ -677,6 +923,141 @@ export async function down(knex: Knex): Promise<void> {
       AFTER INSERT OR UPDATE OR DELETE ON policy_statement_expression
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
+    ----------------------------------------------------------------------------------------
+    -- 3. Restore legacy policy_statement URN columns and policy_statement_scope.
+    --
+    -- Roll back the direct policy_statement.security_scope_id relationship to the
+    -- old policy_statement-owned URN model. The legacy URN columns can be
+    -- reconstructed from security_scope because security_scope owns the canonical
+    -- URN envelope in the up migration.
+    ----------------------------------------------------------------------------------------
+
+    ----------------------------------------------------------------------------------------
+    -- 3a. Recreate policy_statement URN columns from security_scope.
+    --
+    -- Down migrations need the old denormalized statement URN columns before the
+    -- direct security_scope_id column can be removed. Rebuild them from the
+    -- security_scope row each statement currently references.
+    ----------------------------------------------------------------------------------------
+    DROP INDEX IF EXISTS policy_statement_nuk1;
+
+    ALTER TABLE policy_statement
+      ADD COLUMN IF NOT EXISTS submission_feature_urn varchar(500),
+      ADD COLUMN IF NOT EXISTS urn_submission_id varchar(20),
+      ADD COLUMN IF NOT EXISTS urn_feature_type varchar(100),
+      ADD COLUMN IF NOT EXISTS urn_feature_id varchar(20);
+
+    UPDATE policy_statement ps
+    SET
+      submission_feature_urn = 'urn:' || ss.urn_submission_id || ':' || ss.urn_feature_type || ':' || ss.urn_feature_id,
+      urn_submission_id = ss.urn_submission_id,
+      urn_feature_type = ss.urn_feature_type,
+      urn_feature_id = ss.urn_feature_id
+    FROM security_scope ss
+    WHERE ss.security_scope_id = ps.security_scope_id;
+
+    ----------------------------------------------------------------------------------------
+    -- 3b. Restore legacy constraints, indexes, and decomposition trigger.
+    --
+    -- Once every statement has a reconstructed URN, make those legacy columns
+    -- required again and restore the old index/trigger behavior around
+    -- policy_statement.submission_feature_urn.
+    ----------------------------------------------------------------------------------------
+    ALTER TABLE policy_statement
+      ALTER COLUMN submission_feature_urn SET NOT NULL,
+      ALTER COLUMN urn_submission_id SET NOT NULL,
+      ALTER COLUMN urn_feature_type SET NOT NULL,
+      ALTER COLUMN urn_feature_id SET NOT NULL,
+      ADD CONSTRAINT submission_feature_urn_format_check
+        CHECK (submission_feature_urn ~ '^urn:(\\*|[0-9]+):([a-zA-Z0-9_]+|\\*):(\\*|[^:]+)$');
+
+    CREATE UNIQUE INDEX policy_statement_nuk1
+      ON policy_statement(policy_id, effect, submission_feature_urn, (record_end_date is NULL))
+      WHERE record_end_date IS NULL;
+    CREATE INDEX policy_statement_submission_feature_urn_idx ON policy_statement(submission_feature_urn);
+    CREATE INDEX policy_statement_urn_submission_id_idx ON policy_statement(urn_submission_id);
+    CREATE INDEX policy_statement_urn_feature_type_idx ON policy_statement(urn_feature_type);
+    CREATE INDEX policy_statement_urn_feature_id_idx ON policy_statement(urn_feature_id);
+
+    CREATE OR REPLACE FUNCTION tr_policy_statement_urn_decompose()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+      urn_parts TEXT[];
+    BEGIN
+      urn_parts := string_to_array(NEW.submission_feature_urn, ':');
+      NEW.urn_submission_id := urn_parts[2];
+      NEW.urn_feature_type := urn_parts[3];
+      NEW.urn_feature_id := urn_parts[4];
+      RETURN NEW;
+    END;
+    $$;
+
+    CREATE TRIGGER tr_policy_statement_urn_decompose
+      BEFORE INSERT OR UPDATE OF submission_feature_urn ON policy_statement
+      FOR EACH ROW
+      EXECUTE FUNCTION tr_policy_statement_urn_decompose();
+
+    CREATE TRIGGER policy_statement_urn_validation
+      BEFORE INSERT ON biohub.policy_statement
+      FOR EACH ROW
+      EXECUTE PROCEDURE biohub.tr_policy_statement_urn_validation();
+
+    ----------------------------------------------------------------------------------------
+    -- 3c. Remove security_scope-owned URN validation.
+    --
+    -- The down schema once again validates policy_statement.submission_feature_urn,
+    -- so the security_scope trigger introduced by this migration is no longer used.
+    ----------------------------------------------------------------------------------------
+    DROP TRIGGER IF EXISTS security_scope_urn_validation ON biohub.security_scope;
+    DROP FUNCTION IF EXISTS biohub.tr_security_scope_urn_validation();
+
+    ----------------------------------------------------------------------------------------
+    -- 3d. Recreate the legacy policy_statement_scope derived mapping.
+    --
+    -- The old access workflows expect a derived policy_statement_scope row for
+    -- each statement. Preserve the current direct mapping before dropping the
+    -- direct policy_statement.security_scope_id column.
+    ----------------------------------------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS policy_statement_scope (
+      policy_statement_scope_id UUID DEFAULT public.gen_random_uuid(),
+      policy_statement_id UUID NOT NULL,
+      security_scope_id UUID NOT NULL,
+      CONSTRAINT policy_statement_scope_pk PRIMARY KEY (policy_statement_scope_id),
+      CONSTRAINT policy_statement_scope_fk1 FOREIGN KEY (policy_statement_id) REFERENCES policy_statement(policy_statement_id),
+      CONSTRAINT policy_statement_scope_fk2 FOREIGN KEY (security_scope_id) REFERENCES security_scope(security_scope_id)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS policy_statement_scope_uk1
+      ON policy_statement_scope(policy_statement_id);
+
+    INSERT INTO policy_statement_scope (policy_statement_id, security_scope_id)
+    SELECT ps.policy_statement_id, ps.security_scope_id
+    FROM policy_statement ps
+    WHERE ps.security_scope_id IS NOT NULL
+    ON CONFLICT (policy_statement_id) DO NOTHING;
+
+    DROP INDEX IF EXISTS policy_statement_idx5;
+    DROP INDEX IF EXISTS policy_statement_idx6;
+
+    ----------------------------------------------------------------------------------------
+    -- 3e. Remove the direct statement -> scope foreign key.
+    --
+    -- At this point policy_statement_scope carries the mapping needed by the old
+    -- schema, so the direct statement column and its supporting indexes can go.
+    ----------------------------------------------------------------------------------------
+    ALTER TABLE policy_statement
+      DROP CONSTRAINT IF EXISTS policy_statement_fk3,
+      DROP COLUMN IF EXISTS security_scope_id;
+
+    ----------------------------------------------------------------------------------------
+    -- 3f. Remove the policy_expression additions from policy_statement.
+    --
+    -- The legacy policy_statement_expression table has already been rebuilt from
+    -- policy_statement.policy_expression_id, so remove the new statement pointer
+    -- and the reusable policy_expression table.
+    ----------------------------------------------------------------------------------------
     DROP INDEX IF EXISTS policy_statement_idx3;
     DROP INDEX IF EXISTS policy_statement_idx4;
 

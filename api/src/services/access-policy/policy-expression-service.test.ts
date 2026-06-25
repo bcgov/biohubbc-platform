@@ -2,7 +2,9 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ExpressionTree } from '../../models/expression-tree';
 import { PolicyExpressionRepository } from '../../repositories/policy-expression-repository';
+import { ExpressionTreeService } from '../expression-tree-service';
 import { PolicyExpressionService } from './policy-expression-service';
 
 describe('PolicyExpressionService', () => {
@@ -67,6 +69,64 @@ describe('PolicyExpressionService', () => {
         name: 'Named expression',
         description: 'Useful expression'
       });
+    });
+  });
+
+  describe('updatePolicyExpression', () => {
+    it('delegates pointer patching to the repository', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+      const policyExpression = {
+        policy_expression_id: 'pe-1',
+        policy_id: 'policy-1',
+        expression_id: 'expr-2',
+        name: null,
+        description: null
+      };
+      const updateStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'updatePolicyExpression')
+        .resolves(policyExpression);
+
+      const result = await service.updatePolicyExpression('pe-1', { expressionId: 'expr-2' });
+
+      expect(result).to.eql(policyExpression);
+      expect(updateStub).to.have.been.calledOnceWithExactly('pe-1', { expressionId: 'expr-2' });
+    });
+  });
+
+  describe('updatePolicyExpressionTree', () => {
+    it('resolves the incoming tree to an expression id, then patches the existing policy expression', async () => {
+      const service = new PolicyExpressionService(getMockDBConnection());
+      const expression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'predicate',
+            feature_type_property_id: 1,
+            operator: 'Equals',
+            value: 'A'
+          }
+        ]
+      } as ExpressionTree;
+      const policyExpression = {
+        policy_expression_id: 'pe-1',
+        policy_id: 'policy-1',
+        expression_id: 'expr-2',
+        name: null,
+        description: null
+      };
+      const writeStub = sinon
+        .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
+        .resolves({ expression_id: 'expr-2' });
+      const updateStub = sinon
+        .stub(PolicyExpressionRepository.prototype, 'updatePolicyExpression')
+        .resolves(policyExpression);
+
+      const result = await service.updatePolicyExpressionTree('pe-1', expression);
+
+      expect(result).to.eql(policyExpression);
+      expect(writeStub).to.have.been.calledOnceWithExactly(expression);
+      expect(updateStub).to.have.been.calledOnceWithExactly('pe-1', { expressionId: 'expr-2' });
     });
   });
 });

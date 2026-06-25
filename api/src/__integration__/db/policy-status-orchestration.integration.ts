@@ -175,7 +175,7 @@ describe('Policy status orchestration (integration)', function () {
     const teamPolicyService = new TeamPolicyService(connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
 
-    // One security_scope, one policy_statement_scope mapping, one team grant.
+    // One security_scope, one policy_statement.security_scope_id mapping, one team grant.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(1);
 
@@ -249,7 +249,7 @@ describe('Policy status orchestration (integration)', function () {
     expect(await countTeamScopesForPolicy(teamA, policyId)).to.equal(0);
     expect(await countTeamScopesForPolicy(teamB, policyId)).to.equal(0);
 
-    // Shared scope row and policy_statement_scope mapping survive the downgrade —
+    // Shared scope row and policy_statement.security_scope_id mapping survive the downgrade —
     // the rebuild only touches per-team grants, not the global cache rows.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
 
