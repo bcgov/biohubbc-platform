@@ -62,7 +62,8 @@ describe('useSearchApi', () => {
           last_page: 1,
           sort: 'relevance',
           order: 'desc'
-        }
+        },
+        has_more_secured_features: false
       };
 
       mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
@@ -104,7 +105,8 @@ describe('useSearchApi', () => {
           last_page: 1,
           sort: undefined,
           order: undefined
-        }
+        },
+        has_more_secured_features: false
       };
 
       mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
@@ -131,7 +133,8 @@ describe('useSearchApi', () => {
           last_page: 1,
           sort: undefined,
           order: undefined
-        }
+        },
+        has_more_secured_features: false
       };
 
       mock.onPost('/api/search/feature/telemetry').reply(200, mockResponse);
@@ -157,7 +160,8 @@ describe('useSearchApi', () => {
           last_page: 1,
           sort: undefined,
           order: undefined
-        }
+        },
+        has_more_secured_features: false
       };
 
       mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);

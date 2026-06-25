@@ -6,7 +6,7 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
+import { buildSecurityFilter, isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -84,6 +84,64 @@ export class SearchFeatureRepository extends BaseRepository {
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Checks whether the expression matched secured features that are not visible to the caller.
+   *
+   * This is the source of the `has_more_secured_features` flag. It is a sibling of the visible search
+   * query that reuses the same expression criteria and feature-type filter, but deliberately does NOT
+   * apply the caller access filter before checking for inaccessible secured matches — otherwise the
+   * very features we want to detect would already be removed.
+   *
+   * Implemented as an `EXISTS`/`LIMIT 1` probe over the unhydrated candidate set:
+   * - For authenticated users: true when any matched feature is effectively secured AND not accessible
+   *   to the caller.
+   * - For anonymous users: true when any matched feature is effectively secured (none are accessible).
+   *
+   * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
+   * @param {number | null} [systemUserId] - Security context (null = anonymous)
+   * @return {Promise<boolean>} True if matching secured features exist that the caller cannot access
+   */
+  async hasInaccessibleSecuredFeaturesByExpressionTree(
+    anchorFeatureType: string,
+    expressionTree: NormalizedExpressionTreeExpression | undefined,
+    systemUserId?: number | null
+  ): Promise<boolean> {
+    const knex = getKnex();
+
+    // Candidate anchor features matched by the expression, WITHOUT the caller access filter.
+    const expressionFeatureIds = expressionTree
+      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
+      : null;
+
+    // Reuse the unhydrated matching-features builder with systemUserId=undefined so it applies only the
+    // feature-type + expression filter and NO security filter.
+    const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(
+      knex,
+      anchorFeatureType,
+      expressionFeatureIds,
+      undefined
+    );
+
+    const existsQuery = knex
+      .select(knex.raw('1'))
+      .from(matchingFeatures.as('mf'))
+      .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
+      .limit(1);
+
+    // Authenticated: a secured match is "hidden" only if the caller cannot access it.
+    // Anonymous (null/undefined): every secured match is hidden, so the secured check alone suffices.
+    if (systemUserId) {
+      existsQuery.whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId]);
+    }
+
+    const response = await this.connection.knex(existsQuery);
+
+    return response.rows.length > 0;
   }
 
   /**

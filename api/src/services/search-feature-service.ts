@@ -64,14 +64,19 @@ export class SearchFeatureService extends DBService {
    * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; count: number }>}
+   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; count: number; has_more_secured_features: boolean }>}
    */
   async searchFeaturesByExpressionTreeWithCount(
     anchorFeatureType: string,
     expressionTree: ExpressionTree | undefined,
     pagination?: ApiPaginationOptions,
     systemUserId?: number | null
-  ): Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; count: number }> {
+  ): Promise<{
+    features: SearchFeatureResultWithRelevancy[];
+    properties: FeatureTypeProperty[];
+    count: number;
+    has_more_secured_features: boolean;
+  }> {
     defaultLog.debug({
       label: 'searchFeaturesByExpressionTreeWithCount',
       anchorFeatureType,
@@ -84,7 +89,7 @@ export class SearchFeatureService extends DBService {
       ? await this.semanticValidator.validateExpressionTree(expressionTree)
       : undefined;
 
-    const [features, properties, count] = await Promise.all([
+    const [features, properties, count, has_more_secured_features] = await Promise.all([
       this.searchFeatureRepository.searchFeaturesByExpressionTree(
         anchorFeatureType,
         normalizedExpressionTree,
@@ -100,10 +105,15 @@ export class SearchFeatureService extends DBService {
         anchorFeatureType,
         normalizedExpressionTree,
         systemUserId
+      ),
+      this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
+        anchorFeatureType,
+        normalizedExpressionTree,
+        systemUserId
       )
     ]);
 
-    return { features, properties, count };
+    return { features, properties, count, has_more_secured_features };
   }
 
   /**

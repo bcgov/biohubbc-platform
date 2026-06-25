@@ -1,7 +1,11 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
-import { buildBroadFeatureTypeSubquery, buildExpressionTreeFeatureIdsSubquery } from './expression-evaluation';
+import {
+  buildBroadFeatureTypeSubquery,
+  buildExpressionTreeFeatureIdsSubquery,
+  buildUnfilteredExpressionTreeFeatureIdsSubquery
+} from './expression-evaluation';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -352,6 +356,38 @@ describe('expression-evaluation', () => {
       // Anonymous: emits NOT EXISTS (uppercase, raw SQL fragment) with no scope-anchor branch
       expect(sql.toLowerCase()).to.include('not exists');
       expect(sql).to.not.include('security_scope_anchor');
+    });
+  });
+
+  describe('buildUnfilteredExpressionTreeFeatureIdsSubquery', () => {
+    const expressionTree: NormalizedExpressionTreeExpression = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          ...normalizedPredicate(10, null, {
+            type: 'number',
+            operator: 'Exists'
+          })
+        }
+      ]
+    };
+
+    it('emits the same expression criteria as the filtered variant', () => {
+      const sql = buildUnfilteredExpressionTreeFeatureIdsSubquery('dataset', expressionTree).toString();
+
+      expect(sql).to.include('"ft"."name" = \'dataset\'');
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('"p"."submission_feature_id"');
+    });
+
+    it('applies NO security/access filter (the candidate set before access filtering)', () => {
+      const sql = buildUnfilteredExpressionTreeFeatureIdsSubquery('dataset', expressionTree).toString();
+
+      // Neither the authenticated scope-grant probe nor the anonymous NOT-secured probe is emitted.
+      expect(sql).to.not.include('security_scope_anchor');
+      expect(sql).to.not.include('team_security_scope');
+      expect(sql).to.not.include('submission_feature_security');
     });
   });
 });

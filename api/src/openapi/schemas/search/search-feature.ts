@@ -135,7 +135,7 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
  */
 export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['features', 'properties', 'pagination'],
+  required: ['features', 'properties', 'pagination', 'has_more_secured_features'],
   properties: {
     features: {
       type: 'array',
@@ -145,6 +145,11 @@ export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: featureSearchPropertySchema
     },
-    pagination: paginationResponseSchema
+    pagination: paginationResponseSchema,
+    has_more_secured_features: {
+      type: 'boolean',
+      description:
+        'True when the search matched secured features that were excluded from the results because the caller cannot access them.'
+    }
   }
 };

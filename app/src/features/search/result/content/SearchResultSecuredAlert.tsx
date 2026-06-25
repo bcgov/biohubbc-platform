@@ -10,11 +10,12 @@ interface SearchResultSecuredAlertProps {
 }
 
 /**
- * Displays the secured-results notice shown above search results when one or more
- * returned rows are hidden by data security rules.
+ * Displays the secured-results notice shown above search results when the search
+ * matched secured features the caller cannot access (and were therefore hidden).
  *
- * Rendered when current rows include secured records. Navigation stays in the
- * parent and is passed in as the access-request callback.
+ * Rendered when the search response reports hidden secured matches
+ * (`has_more_secured_features`), not merely when visible rows are secured.
+ * Navigation stays in the parent and is passed in as the access-request callback.
  *
  * @param {SearchResultSecuredAlertProps} props - Callback for the "Request Access" action.
  * @returns {JSX.Element} Standard alert banner explaining secured results.

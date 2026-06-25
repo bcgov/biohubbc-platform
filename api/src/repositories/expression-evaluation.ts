@@ -92,13 +92,39 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
 }
 
 /**
+ * Build a Knex subquery that returns submission_feature_id rows matching the given normalized
+ * expression tree, scoped to the anchor feature type, WITHOUT any security/access filtering.
+ *
+ * This is the expression-matched candidate set *before* the caller access filter is applied.
+ * It exists solely to detect whether a search matched secured features the caller cannot see
+ * (`has_more_secured_features`) — it must never be used to return feature rows to a caller,
+ * because it does not exclude inaccessible secured features.
+ *
+ * Routes through the same `buildExpressionTargetIdsQuery` substrate as the filtered variant, but
+ * passes `systemUserId = undefined` so `buildSecurityFilter` returns `null` at every layer (both
+ * the evidence-level and target-level filters), leaving the candidate set unfiltered.
+ *
+ * @param {string} anchorFeatureType - Route anchor/result feature type
+ * @param {NormalizedExpressionTreeExpression} normalizedExpression - Normalized expression tree criteria
+ * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows, no security filter applied
+ */
+export function buildUnfilteredExpressionTreeFeatureIdsSubquery(
+  anchorFeatureType: string,
+  normalizedExpression: NormalizedExpressionTreeExpression
+): Knex.QueryBuilder {
+  const knex = getKnex();
+  return buildExpressionTargetIdsQuery(anchorFeatureType, normalizedExpression, knex, undefined);
+}
+
+/**
  * Stubbable dependency surface. Production callers route through this bag so
  * tests can replace individual builders with sinon stubs (ESM exports cannot
  * be reassigned directly).
  */
 export const dependencies = {
   buildExpressionTreeFeatureIdsSubquery,
-  buildBroadFeatureTypeSubquery
+  buildBroadFeatureTypeSubquery,
+  buildUnfilteredExpressionTreeFeatureIdsSubquery
 };
 
 /**

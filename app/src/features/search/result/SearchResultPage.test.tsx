@@ -341,10 +341,12 @@ describe('SearchResultPage', () => {
     );
   });
 
-  it('P1: hides the secured-results banner when no rows are secured', () => {
+  it('P1: hides the secured-results banner when there are no hidden secured matches, even if a visible row is secured', () => {
+    // A visible secured row the caller CAN see must not, by itself, surface the banner.
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
       properties: [],
+      hasMoreSecuredFeatures: false,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -356,13 +358,11 @@ describe('SearchResultPage', () => {
     expect(queryByRole('button', { name: /request access/i })).not.toBeInTheDocument();
   });
 
-  it('P2: shows the banner and opens the create-data-request dialog without navigating', async () => {
+  it('P2: shows the banner when secured matches are hidden and opens the create-data-request dialog without navigating', async () => {
     mockUseSearchResults.mockReturnValue({
-      rows: [
-        { uuid: 'result-1', submission_feature_id: 1, is_secured: false },
-        { uuid: 'result-2', submission_feature_id: 2, is_secured: true }
-      ],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -382,8 +382,9 @@ describe('SearchResultPage', () => {
     mockCreateDataRequest.mockResolvedValue({});
     mockUseParams.mockReturnValue({ featureType: 'DATASET' });
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -409,8 +410,9 @@ describe('SearchResultPage', () => {
   it('P4: surfaces an API error and keeps the create-data-request dialog open on failure', async () => {
     mockCreateDataRequest.mockRejectedValue({ message: 'Server exploded' });
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),

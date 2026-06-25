@@ -100,6 +100,9 @@ describe('SearchFeatureService', () => {
       const propertiesStub = sinon
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeProperties')
         .resolves(mockProperties);
+      const hiddenSecuredStub = sinon
+        .stub(SearchFeatureRepository.prototype, 'hasInaccessibleSecuredFeaturesByExpressionTree')
+        .resolves(true);
 
       const result = await service.searchFeaturesByExpressionTreeWithCount('dataset', tree);
 
@@ -108,7 +111,13 @@ describe('SearchFeatureService', () => {
       expect(searchStub.firstCall.args).to.deep.equal(['dataset', normalized, undefined, undefined]);
       expect(propertiesStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
       expect(countStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
-      expect(result).to.deep.equal({ features: mockFeatures, properties: mockProperties, count: 123 });
+      expect(hiddenSecuredStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
+      expect(result).to.deep.equal({
+        features: mockFeatures,
+        properties: mockProperties,
+        count: 123,
+        has_more_secured_features: true
+      });
     });
   });
 
