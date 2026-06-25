@@ -7,6 +7,7 @@ import {
   IngestionErrorSummaryRow
 } from '../models/submission-feature-property-ingestion';
 import { BaseRepository } from './base-repository';
+import { isActive } from './sql-fragments';
 
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
@@ -227,9 +228,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     submissionUploadId: string,
     blueprintId: number
   ): Promise<void> {
-    const sql = SQL`
+    const sql = SQL(
+      [
+        `
       WITH selected_blueprint AS (
-        SELECT ${blueprintId}::integer AS blueprint_id
+        SELECT `,
+        `::integer AS blueprint_id
       )
       INSERT INTO submission_upload_staging_resolved_property (
         submission_feature_id,
@@ -257,29 +261,34 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_raw_property s
       LEFT JOIN feature_property fp
         ON fp.name = s.property_name
-       AND fp.record_end_date IS NULL
+       AND ${isActive('fp')}
       LEFT JOIN feature_property_type fpt
         ON fpt.feature_property_type_id = fp.feature_property_type_id
-       AND fpt.record_end_date IS NULL
+       AND ${isActive('fpt')}
       LEFT JOIN selected_blueprint sb ON TRUE
       -- Feature type included in the Blueprint.
       LEFT JOIN blueprint_feature_type bft
         ON bft.blueprint_id = sb.blueprint_id
        AND bft.feature_type_id = s.feature_type_id
-       AND bft.record_end_date IS NULL
+       AND ${isActive('bft')}
       -- Canonical feature-type/property pool entry; supplies the surrogate id and bridges to the
       -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
       LEFT JOIN feature_type_property ftp
         ON ftp.feature_type_id = s.feature_type_id
        AND ftp.feature_property_id = fp.feature_property_id
-       AND ftp.record_end_date IS NULL
+       AND ${isActive('ftp')}
       -- Property assigned to the Blueprint feature type; source of requiredness and multiplicity.
       LEFT JOIN blueprint_feature_type_property bftp
         ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
        AND bftp.feature_type_property_id = ftp.feature_type_property_id
-       AND bftp.record_end_date IS NULL
-      WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
-    `;
+       AND ${isActive('bftp')}
+      WHERE s.submission_upload_id = `,
+        `::uuid;
+    `
+      ],
+      blueprintId,
+      submissionUploadId
+    );
     await this.connection.sql(sql);
   }
 
@@ -994,14 +1003,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     submissionUploadId: string,
     blueprintId: number
   ): Promise<void> {
-    const sql = SQL`
+    const sql = SQL(
+      [
+        `
       WITH selected_blueprint AS (
-        SELECT ${blueprintId}::integer AS blueprint_id
+        SELECT `,
+        `::integer AS blueprint_id
       ),
       upload_feature_types AS (
         SELECT DISTINCT feature_type_id
         FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        WHERE submission_upload_id = `,
+        `::uuid
           AND record_end_date IS NULL
       ),
       required_properties AS (
@@ -1013,11 +1026,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         -- Feature type included in the Blueprint.
         JOIN blueprint_feature_type bft
           ON bft.blueprint_id = sb.blueprint_id
-         AND bft.record_end_date IS NULL
+         AND ${isActive('bft')}
         -- Required properties assigned by the Blueprint.
         JOIN blueprint_feature_type_property bftp
           ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-         AND bftp.record_end_date IS NULL
+         AND ${isActive('bftp')}
          AND bftp.required_value = TRUE
         -- Canonical pool entry; bridges the assignment to its feature type / property and surrogate id.
         -- Constrain to the Blueprint feature type: the FK on bftp.feature_type_property_id only proves
@@ -1025,10 +1038,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = bftp.feature_type_property_id
          AND ftp.feature_type_id = bft.feature_type_id
-         AND ftp.record_end_date IS NULL
+         AND ${isActive('ftp')}
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
-         AND fp.record_end_date IS NULL
+         AND ${isActive('fp')}
         JOIN upload_feature_types uft
           ON uft.feature_type_id = bft.feature_type_id
       ),
@@ -1043,12 +1056,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         FROM submission_feature sf
         JOIN required_properties rp
           ON rp.feature_type_id = sf.feature_type_id
-        WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-          AND sf.record_end_date IS NULL
+        WHERE sf.submission_upload_id = `,
+        `::uuid
+          AND ${isActive('sf')}
           AND NOT EXISTS (
             SELECT 1
             FROM submission_upload_staging_raw_property raw
-            WHERE raw.submission_upload_id = ${submissionUploadId}::uuid
+            WHERE raw.submission_upload_id = `,
+        `::uuid
               AND raw.submission_feature_id = sf.submission_feature_id
               AND raw.property_name = rp.property_name
               AND raw.value IS NOT NULL
@@ -1085,7 +1100,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         count = submission_feature_error.count + EXCLUDED.count,
         error_message = EXCLUDED.error_message,
         details = COALESCE(EXCLUDED.details, submission_feature_error.details);
-    `;
+    `
+      ],
+      blueprintId,
+      submissionUploadId,
+      submissionUploadId,
+      submissionUploadId
+    );
 
     await this.connection.sql(sql);
   }
@@ -1357,7 +1378,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @returns {Promise<void>}
    */
   async recordFeaturePropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
+    const sql = SQL(
+      [
+        `
       WITH format_errors AS (
         SELECT
           c.submission_upload_id,
@@ -1366,7 +1389,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'INVALID_FEATURE_REFERENCE_FORMAT'::text AS error_code,
           'Feature property value must match feature::<source_id>'::text AS error_message
         FROM submission_upload_staging_feature_candidate c
-        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        WHERE c.submission_upload_id = `,
+        `::uuid
           AND NOT c.is_format_valid
       ),
       unresolved AS (
@@ -1377,7 +1401,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'UNRESOLVED_FEATURE_REFERENCE'::text AS error_code,
           'Failed to resolve feature reference source_id within upload'::text AS error_message
         FROM submission_upload_staging_feature_candidate c
-        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        WHERE c.submission_upload_id = `,
+        `::uuid
           AND c.is_format_valid
           AND c.referenced_submission_feature_id IS NULL
       ),
@@ -1393,11 +1418,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         -- allowed-target set (keyed by feature_type_property_id) can be checked.
         JOIN blueprint_feature_type_property bftp
           ON bftp.blueprint_feature_type_property_id = c.blueprint_feature_type_property_id
-         AND bftp.record_end_date IS NULL
+         AND ${isActive('bftp')}
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = bftp.feature_type_property_id
-         AND ftp.record_end_date IS NULL
-        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+         AND ${isActive('ftp')}
+        WHERE c.submission_upload_id = `,
+        `::uuid
           AND c.is_format_valid
           AND c.referenced_submission_feature_id IS NOT NULL
           AND c.referenced_submission_feature_id <> c.submission_feature_id
@@ -1406,7 +1432,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             FROM feature_type_property_feature ftpf
             WHERE ftpf.feature_type_property_id = bftp.feature_type_property_id
               AND ftpf.target_feature_type_id = c.referenced_feature_type_id
-              AND ftpf.record_end_date IS NULL
+              AND ${isActive('ftpf')}
           )
       ),
       self_reference AS (
@@ -1417,7 +1443,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'INVALID_FEATURE_REFERENCE_SELF'::text AS error_code,
           'Feature property cannot reference its own feature'::text AS error_message
         FROM submission_upload_staging_feature_candidate c
-        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        WHERE c.submission_upload_id = `,
+        `::uuid
           AND c.is_format_valid
           AND c.referenced_submission_feature_id IS NOT NULL
           AND c.referenced_submission_feature_id = c.submission_feature_id
@@ -1474,7 +1501,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         count = submission_feature_error.count + EXCLUDED.count,
         error_message = EXCLUDED.error_message,
         details = COALESCE(EXCLUDED.details, submission_feature_error.details);
-    `;
+    `
+      ],
+      submissionUploadId,
+      submissionUploadId,
+      submissionUploadId,
+      submissionUploadId
+    );
 
     await this.connection.sql(sql);
   }
@@ -2054,7 +2087,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @returns {Promise<void>}
    */
   async insertFeaturePropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
+    const sql = SQL(
+      [
+        `
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
         blueprint_feature_type_property_id,
@@ -2069,17 +2104,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       -- allowed-target set (keyed by feature_type_property_id) can be checked.
       JOIN blueprint_feature_type_property bftp
         ON bftp.blueprint_feature_type_property_id = c.blueprint_feature_type_property_id
-       AND bftp.record_end_date IS NULL
+       AND ${isActive('bftp')}
       JOIN feature_type_property ftp
         ON ftp.feature_type_property_id = bftp.feature_type_property_id
-       AND ftp.record_end_date IS NULL
+       AND ${isActive('ftp')}
       JOIN submission_feature src
         ON src.submission_feature_id = c.submission_feature_id
-       AND src.record_end_date IS NULL
+       AND ${isActive('src')}
       JOIN submission_feature tgt
         ON tgt.submission_feature_id = c.referenced_submission_feature_id
-       AND tgt.record_end_date IS NULL
-      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+       AND ${isActive('tgt')}
+      WHERE c.submission_upload_id = `,
+        `::uuid
         AND c.is_format_valid
         AND c.referenced_submission_feature_id IS NOT NULL
         AND c.referenced_submission_feature_id <> c.submission_feature_id
@@ -2088,7 +2124,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           FROM feature_type_property_feature ftpf
           WHERE ftpf.feature_type_property_id = bftp.feature_type_property_id
             AND ftpf.target_feature_type_id = c.referenced_feature_type_id
-            AND ftpf.record_end_date IS NULL
+            AND ${isActive('ftpf')}
         )
       ON CONFLICT (
         submission_feature_id,
@@ -2096,7 +2132,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         referenced_submission_feature_id
       )
       DO NOTHING;
-    `;
+    `
+      ],
+      submissionUploadId
+    );
 
     await this.connection.sql(sql);
   }

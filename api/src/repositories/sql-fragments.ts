@@ -9,6 +9,15 @@
 import { Knex } from 'knex';
 
 /**
+ * Active-row filter for soft-deleted tables (`record_end_date IS NULL`).
+ *
+ * @param alias Table alias or qualified column prefix (e.g. 'bft', 'sf_sec')
+ */
+export function isActive(alias: string): string {
+  return `${alias}.record_end_date IS NULL`;
+}
+
+/**
  * Closure-based "effectively secured" check used on every security-resolving path —
  * the hot read paths (search / download) and the scope-anchor recompute write
  * path: a feature is effectively secured when it or an ancestor has an active security
@@ -46,7 +55,7 @@ export function isEffectivelySecured(featureIdExpr: string): string {
       JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
       WHERE c.source_submission_feature_id = ${featureIdExpr}
         AND c.is_ancestor = true
-        AND sfs.record_end_date IS NULL
+        AND ${isActive('sfs')}
         AND sfs.status = 'active'
         AND sf_sec.record_effective_date <= now()
     )
@@ -96,10 +105,10 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
         JOIN team t ON t.team_id = tss.team_id
-          AND t.record_end_date IS NULL
+          AND ${isActive('t')}
         JOIN team_member tm ON tm.team_id = tss.team_id
           AND tm.system_user_id = ?  -- bound by caller
-          AND tm.record_end_date IS NULL
+          AND ${isActive('tm')}
         WHERE c.source_submission_feature_id = ${featureIdExpr}
           AND c.is_ancestor = true
       )

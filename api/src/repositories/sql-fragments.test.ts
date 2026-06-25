@@ -1,8 +1,14 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
+import { isAccessibleToUser, isActive, isEffectivelySecured } from './sql-fragments';
 
 describe('sql-fragments', () => {
+  describe('isActive', () => {
+    it('returns the soft-delete active-row predicate for a table alias', () => {
+      expect(isActive('bft')).to.equal('bft.record_end_date IS NULL');
+    });
+  });
+
   describe('isEffectivelySecured', () => {
     it('reads the precomputed closure ancestry instead of a recursive parent walk', () => {
       // Verifies: the closure-based fragment probes submission_feature_closure on the
