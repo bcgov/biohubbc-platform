@@ -15,8 +15,43 @@ import {
   jsonStringifyObjectProperties,
   pluralize,
   safeJSONParse,
-  safeJSONStringify
+  safeJSONStringify,
+  stripOidcParams
 } from './Utils';
+
+describe('stripOidcParams', () => {
+  it('removes all OIDC response params while preserving application query params', () => {
+    const href =
+      'https://biohub.example/search/species_observation?expr=eyJhYmMiOjF9&page=2&code=abc&state=xyz&session_state=s1&iss=https%3A%2F%2Fkc';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation?expr=eyJhYmMiOjF9&page=2');
+  });
+
+  it('removes OIDC error params (error, error_description)', () => {
+    const href = 'https://biohub.example/search/dataset?search=caribou&error=access_denied&error_description=denied';
+
+    expect(stripOidcParams(href)).toEqual('/search/dataset?search=caribou');
+  });
+
+  it('returns the path with no query string when only OIDC params are present', () => {
+    const href = 'https://biohub.example/search/species_observation?code=abc&state=xyz';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation');
+  });
+
+  it('preserves a path that has no query string', () => {
+    const href = 'https://biohub.example/search/species_observation';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation');
+  });
+
+  it('keeps an application param that merely shares a substring with an OIDC param', () => {
+    // `state_code` must survive — only exact-name OIDC params are stripped.
+    const href = 'https://biohub.example/search/dataset?state_code=BC&code=abc';
+
+    expect(stripOidcParams(href)).toEqual('/search/dataset?state_code=BC');
+  });
+});
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {

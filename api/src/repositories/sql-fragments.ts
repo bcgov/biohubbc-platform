@@ -84,16 +84,22 @@ export function isEffectivelySecured(featureIdExpr: string): string {
  *
  * 1. The feature is NOT effectively secured (no active approved security rule in its
  *    ancestry), OR
- * 2. The user has a team scope grant via a `security_scope_anchor` on an ancestor.
+ * 2. The caller's team holds a scope anchored on this feature or one of its ancestors
+ *    (`security_scope_anchor` reachable via the caller's `team_member`).
  *
  * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
  *
  * This reads the precomputed `submission_feature_closure` ancestry subset
- * (`is_ancestor = true`) instead of doing a recursive parent walk. Branch 1 reuses
- * `isEffectivelySecured`; Branch 2 probes the closure for an ancestor that is
- * a scope anchor the user's team can reach. Both are cheap PK-served closure probes
- * (`source_submission_feature_id`), so the old concern of walking the ancestor chain
- * twice no longer applies — there is no recursive walk at all.
+ * (`is_ancestor = true`, which includes the feature's own self-loop) instead of doing a
+ * recursive parent walk. Branch 1 reuses `isEffectivelySecured`; Branch 2 probes the closure
+ * for an ancestor that is a scope anchor the user's team can reach. Both are cheap PK-served
+ * closure probes (`source_submission_feature_id`), so the old concern of walking the ancestor
+ * chain twice no longer applies — there is no recursive walk at all.
+ *
+ * Note: a caller that has already established the feature is effectively secured (e.g. the
+ * hidden-secured probe) still passes the whole expression here — Branch 1 then re-evaluates
+ * `isEffectivelySecured` (a couple of indexed PK probes) and short-circuits to Branch 2. The cost
+ * is small, and using the canonical check keeps the probe consistent with the visible-results filter.
  *
  * @param featureIdExpr SQL expression for the starting submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'aggregated_results.submission_feature_id')
@@ -104,7 +110,7 @@ export function isAccessibleToUser(featureIdExpr: string): string {
     WHERE
       -- Branch 1: feature is NOT effectively secured
       NOT ${isEffectivelySecured(featureIdExpr)}
-      -- Branch 2: user has a team scope grant via an ancestor that is a scope anchor
+      -- Branch 2: the caller's team holds a scope anchored on this feature or one of its ancestors
       OR EXISTS (
         SELECT 1
         FROM submission_feature_closure c

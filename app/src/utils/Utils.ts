@@ -287,6 +287,23 @@ export const buildUrl = (...urlParts: (string | undefined)[]): string => {
     .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
 
+/** OIDC authorization-response query params appended by Keycloak to the return URL after login. */
+const OIDC_RESPONSE_PARAMS = ['code', 'state', 'session_state', 'iss', 'error', 'error_description'];
+
+/**
+ * Strips the OIDC authorization-response params from a return URL while preserving any original
+ * application query params (e.g. the encoded `expr` search expression). Used by the post-login
+ * `onSigninCallback` so the user lands back on the same search results after authenticating.
+ *
+ * @param {string} href The full return URL (e.g. `window.location.href`).
+ * @returns The path + remaining query string, with the OIDC response params removed.
+ */
+export const stripOidcParams = (href: string): string => {
+  const url = new URL(href);
+  OIDC_RESPONSE_PARAMS.forEach((param) => url.searchParams.delete(param));
+  return `${url.pathname}${url.search}`;
+};
+
 /**
  * Generates the <title> tag text for a React route
  * @param pageName The name of the page, e.g. 'Projects'

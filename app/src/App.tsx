@@ -7,7 +7,7 @@ import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
 import { BrowserRouter } from 'react-router-dom';
 import appTheme from 'themes/appTheme';
-import { buildUrl } from 'utils/Utils';
+import { buildUrl, stripOidcParams } from 'utils/Utils';
 
 const App = () => {
   return (
@@ -36,7 +36,9 @@ const App = () => {
               userStore: new WebStorageStateStore({ store: window.localStorage }),
               onSigninCallback: (_): void => {
                 // See https://github.com/authts/react-oidc-context#getting-started
-                window.history.replaceState({}, document.title, window.location.pathname);
+                // Strip only the OIDC response params so any original search params on the
+                // return URL (e.g. the encoded `expr` search expression) are preserved.
+                globalThis.history.replaceState({}, document.title, stripOidcParams(globalThis.location.href));
               }
             };
 

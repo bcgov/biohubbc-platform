@@ -42,12 +42,8 @@ export const SearchResultPage = () => {
     [codesDataLoader.data?.feature_type_with_properties]
   );
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, properties, isLoading, searchParams, setSearchParams, pagination } = useSearchResults(
-    routeConfig?.featureTypeName,
-    Boolean(routeConfig),
-    expressionTree,
-    expressionApplyRevision
-  );
+  const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
+    useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
     useSearchResultPagingSort({ pagination, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
@@ -68,7 +64,9 @@ export const SearchResultPage = () => {
   } = useSearchResultDataRequest({ featureType: routeConfig?.featureTypeName, expressionTree });
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
-  const hasSecuredResults = rows.some((row) => row.is_secured);
+  // Show the "request access" banner when the search matched secured features hidden from the caller,
+  // not merely because visible rows the caller can already see are secured.
+  const hasHiddenSecuredResults = hasMoreSecuredFeatures;
 
   if (routeConfig) {
     return (
@@ -83,7 +81,7 @@ export const SearchResultPage = () => {
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
-          {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
+          {hasHiddenSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
 
           <SearchResultPanel
             rows={rows}

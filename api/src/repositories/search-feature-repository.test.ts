@@ -170,6 +170,97 @@ describe('SearchFeatureRepository', () => {
     });
   });
 
+  describe('hasInaccessibleSecuredFeaturesByExpressionTree', () => {
+    const expressionTree: NormalizedExpressionTreeExpression = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          ...normalizedPredicate(46, null, {
+            type: 'string',
+            operator: 'Equals',
+            value: 'moose'
+          })
+        }
+      ]
+    };
+
+    it('should build the candidate set from the UNFILTERED expression subquery (no access filter pre-applied)', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const unfilteredStub = Sinon.stub(
+        expressionEvaluation,
+        'buildUnfilteredExpressionTreeFeatureIdsSubquery'
+      ).returns(getKnex()('unfiltered_table').select('submission_feature_id'));
+      const filteredStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
+
+      await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', expressionTree, 42);
+
+      // The hidden-secured check must use the unfiltered candidate set, never the access-filtered one.
+      expect(unfilteredStub.calledOnce).to.equal(true);
+      expect(unfilteredStub.getCall(0).args).to.deep.equal(['telemetry', expressionTree]);
+      expect(filteredStub.notCalled).to.equal(true);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      // The unfiltered subquery is the candidate source directly (it already restricts to active
+      // anchor-type features), so it is selected FROM rather than re-wrapped/whereIn'd by feature type.
+      expect(sql).to.include('unfiltered_table');
+      expect(sql).to.not.include('"sf"."submission_feature_id" in');
+      expect(sql).to.include('limit 1');
+    });
+
+    it('should check effectively-secured and not-accessible (anchor-only) for authenticated users', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ '?column?': 1 }] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42);
+
+      expect(result).to.equal(true);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      // effectively-secured probe over the matched candidate set
+      expect(sql).to.include('submission_feature_closure');
+      expect(sql).to.include('submission_feature_security');
+      // authenticated accessibility probe, negated (isAccessibleToUser → team_member bound to the caller)
+      expect(sql).to.include('NOT EXISTS');
+      expect(sql).to.include('team_member');
+      expect(sql).to.include('security_scope_anchor');
+      // anchor-only: no direct URN scope grant probe is emitted (consistent with the visible-results filter)
+      expect(sql).to.not.include('urn_submission_id');
+    });
+
+    it('should check only effectively-secured for anonymous users (no accessibility probe)', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, null);
+
+      expect(result).to.equal(false);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include('submission_feature_security');
+      // anonymous: every secured match is hidden, so no team-based accessibility probe is emitted
+      expect(sql).to.not.include('team_member');
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+
+    it('should return true when the EXISTS probe yields a row and false otherwise', async () => {
+      const truthyKnex = Sinon.stub().resolves({ rowCount: 1, rows: [{ '?column?': 1 }] });
+      const trueRepo = new SearchFeatureRepository(getMockDBConnection({ knex: truthyKnex }));
+      expect(await trueRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42)).to.equal(true);
+
+      const emptyKnex = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const falseRepo = new SearchFeatureRepository(getMockDBConnection({ knex: emptyKnex }));
+      expect(await falseRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42)).to.equal(
+        false
+      );
+    });
+  });
+
   describe('searchFeaturesByExpressionTreeProperties', () => {
     it('should build a typed-property schema query over the filtered feature set', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
