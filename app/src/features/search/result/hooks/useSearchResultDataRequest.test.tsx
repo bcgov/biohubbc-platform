@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { CreateDataRequestDialogValues } from 'features/data-request/components/CreateDataRequestDialog';
@@ -8,10 +9,18 @@ import { Mock, vi } from 'vitest';
 import { useSearchResultDataRequest } from './useSearchResultDataRequest';
 
 vi.mock('hooks/useApi');
+vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 
 const mockCreateDataRequest = vi.fn();
 const mockSetSnackbar = vi.fn();
+const mockSigninRedirect = vi.fn();
+
+const setupAuth = (isAuthenticated: boolean) => {
+  (useAuthStateContext as Mock).mockReturnValue({
+    auth: { isAuthenticated, signinRedirect: mockSigninRedirect }
+  });
+};
 
 const expressionTree: ExpressionTreeExpression = {
   type: 'expression',
@@ -45,13 +54,17 @@ describe('useSearchResultDataRequest', () => {
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar: mockSetSnackbar
     });
+
+    setupAuth(true);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('H1: opens the dialog without calling the API', () => {
+  it('H1: opens the dialog without calling the API or redirecting (authenticated)', () => {
+    setupAuth(true);
+
     const { result } = renderHook(() => useSearchResultDataRequest({ featureType: 'observation', expressionTree }));
 
     expect(result.current.isCreateDataRequestDialogOpen).toBe(false);
@@ -62,6 +75,38 @@ describe('useSearchResultDataRequest', () => {
 
     expect(result.current.isCreateDataRequestDialogOpen).toBe(true);
     expect(mockCreateDataRequest).not.toHaveBeenCalled();
+    expect(mockSigninRedirect).not.toHaveBeenCalled();
+  });
+
+  it('H1b: unauthenticated open redirects to login preserving the search location and does not open the dialog', () => {
+    setupAuth(false);
+
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        origin: 'https://biohub.example',
+        pathname: '/search/species_observation',
+        search: '?expr=eyJhYmMiOjF9&page=2'
+      }
+    });
+
+    try {
+      const { result } = renderHook(() => useSearchResultDataRequest({ featureType: 'observation', expressionTree }));
+
+      act(() => {
+        result.current.handleOpenCreateDataRequest();
+      });
+
+      expect(result.current.isCreateDataRequestDialogOpen).toBe(false);
+      expect(mockCreateDataRequest).not.toHaveBeenCalled();
+      expect(mockSigninRedirect).toHaveBeenCalledTimes(1);
+      expect(mockSigninRedirect).toHaveBeenCalledWith({
+        redirect_uri: 'https://biohub.example/search/species_observation?expr=eyJhYmMiOjF9&page=2'
+      });
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
   });
 
   it('H2: closes the dialog when featureType changes', () => {

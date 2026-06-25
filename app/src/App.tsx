@@ -36,7 +36,13 @@ const App = () => {
               userStore: new WebStorageStateStore({ store: window.localStorage }),
               onSigninCallback: (_): void => {
                 // See https://github.com/authts/react-oidc-context#getting-started
-                window.history.replaceState({}, document.title, window.location.pathname);
+                // Strip only the OIDC response params so any original search params on the
+                // return URL (e.g. the encoded `expr` search expression) are preserved.
+                const url = new URL(window.location.href);
+                ['code', 'state', 'session_state', 'iss', 'error', 'error_description'].forEach((param) =>
+                  url.searchParams.delete(param)
+                );
+                window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
               }
             };
 
