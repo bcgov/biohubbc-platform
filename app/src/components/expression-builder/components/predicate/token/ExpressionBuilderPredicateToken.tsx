@@ -253,13 +253,13 @@ export const ExpressionBuilderPredicateToken = ({
           fontSize: '0.875rem',
           height: 36,
           minHeight: 36,
-          padding: '0 56px 0 6px !important',
+          padding: '0 4px 0 6px !important',
           transition: 'box-shadow 120ms ease'
         },
         '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
           height: 24,
           lineHeight: '24px',
-          padding: '8px !important'
+          padding: '8px 0 8px 8px !important'
         },
         '&& input[type="date"], && input[type="time"]': {
           paddingRight: '0 !important'
@@ -302,7 +302,7 @@ export const ExpressionBuilderPredicateToken = ({
         gap={1}
         sx={{
           flex: datetimeInputCount > 1 ? '2 1 360px' : '1 1 180px',
-          minWidth: datetimeInputCount > 1 ? 320 : 160
+          minWidth: datetimeInputCount > 1 ? 340 : 160
         }}>
         {showDate &&
           renderDatetimeValueField({
@@ -311,8 +311,8 @@ export const ExpressionBuilderPredicateToken = ({
             value: datetimeValue.date_value,
             error: datetimeMissingValue,
             ariaLabel: 'Date',
-            flex: '1 0 156px',
-            minWidth: 156
+            flex: '1 1 180px',
+            minWidth: 180
           })}
         {showTime &&
           renderDatetimeValueField({
@@ -321,8 +321,8 @@ export const ExpressionBuilderPredicateToken = ({
             value: datetimeValue.time_value,
             error: datetimeMissingValue,
             ariaLabel: 'Time',
-            flex: '1 0 132px',
-            minWidth: 132
+            flex: '1 1 150px',
+            minWidth: 150
           })}
       </Stack>
     );

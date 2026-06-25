@@ -19,7 +19,6 @@ import type { ReadPredicateNodeRow } from '../models/predicate';
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
-import { parseTimestamp } from '../utils/timestamp';
 import { DBService } from './db-service';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 import type {
@@ -592,27 +591,14 @@ export class ExpressionTreeService extends DBService {
           );
         }
 
-        // Public/internal timestamp predicates keep a scalar string value, but
-        // storage and SQL comparison logic operate on split date/time columns.
-        // Hash on the parsed parts so date-only, time-only, and datetime values
-        // preserve the same semantics used by persistence/search.
-        const parsedTimestamp = parseTimestamp(predicate.value);
-
-        if (!parsedTimestamp) {
-          throw new ApiGeneralError('Unsupported timestamp predicate value for normalization', [
-            'ExpressionTreeService->buildNormalizedPredicateIdentityForHash',
-            { value: predicate.value }
-          ]);
-        }
-
         return this.buildPredicateIdentity(
           feature_property_id,
           feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
-            date: parsedTimestamp.date_value ?? '',
-            time: parsedTimestamp.time_value ?? ''
+            date: predicate.value.date_value ?? '',
+            time: predicate.value.time_value ?? ''
           }
         );
       }

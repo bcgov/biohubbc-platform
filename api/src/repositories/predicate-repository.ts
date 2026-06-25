@@ -3,7 +3,6 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import type { InternalTypedPredicate } from '../models/expression-predicate';
 import { Predicate, PredicateResolveInput, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
-import { parseTimestamp } from '../utils/timestamp';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -344,18 +343,15 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<InternalTypedPredicate, { type: 'timestamp' }>
   ): Knex.QueryBuilder {
-    const parsedValue =
-      predicate.operator === 'Exists' || predicate.value === undefined ? null : parseTimestamp(predicate.value);
-
-    if (predicate.operator !== 'Exists' && !parsedValue) {
-      throw new ApiGeneralError('Timestamp predicate value is not a supported temporal literal', [
+    if (predicate.operator !== 'Exists' && predicate.value === undefined) {
+      throw new ApiGeneralError('Timestamp predicate value is required', [
         'PredicateRepository->buildTimestampPredicateInsert',
-        { value: predicate.value }
+        { predicate }
       ]);
     }
 
-    const dateValue = parsedValue?.date_value ?? null;
-    const timeValue = parsedValue?.time_value ?? null;
+    const dateValue = predicate.operator === 'Exists' ? null : predicate.value?.date_value ?? null;
+    const timeValue = predicate.operator === 'Exists' ? null : predicate.value?.time_value ?? null;
 
     return knex('predicate_timestamp').insert({
       predicate_id: predicateId,
