@@ -118,14 +118,9 @@ export class SearchFeatureRepository extends BaseRepository {
       ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
       : null;
 
-    // Reuse the unhydrated matching-features builder with systemUserId=undefined so it applies only the
+    // Reuse the unhydrated matching-features builder, omitting systemUserId so it applies only the
     // feature-type + expression filter and NO security filter.
-    const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(
-      knex,
-      anchorFeatureType,
-      expressionFeatureIds,
-      undefined
-    );
+    const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(knex, anchorFeatureType, expressionFeatureIds);
 
     const existsQuery = knex
       .select(knex.raw('1'))

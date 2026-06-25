@@ -113,7 +113,8 @@ export function buildUnfilteredExpressionTreeFeatureIdsSubquery(
   normalizedExpression: NormalizedExpressionTreeExpression
 ): Knex.QueryBuilder {
   const knex = getKnex();
-  return buildExpressionTargetIdsQuery(anchorFeatureType, normalizedExpression, knex, undefined);
+  // systemUserId omitted → buildSecurityFilter returns null at every layer → no access filtering.
+  return buildExpressionTargetIdsQuery(anchorFeatureType, normalizedExpression, knex);
 }
 
 /**
