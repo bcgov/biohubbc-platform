@@ -24,7 +24,7 @@ export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
       .returning([
         'submission_feature_property_number_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'value'
       ]);
 
@@ -52,7 +52,12 @@ export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyNumber> {
     const knex = getKnex();
     const query = knex('submission_feature_property_number')
-      .select(['submission_feature_property_number_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
+      .select([
+        'submission_feature_property_number_id',
+        'submission_feature_id',
+        'blueprint_feature_type_property_id',
+        'value'
+      ])
       .where('submission_feature_property_number_id', submissionFeaturePropertyNumberId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
@@ -86,7 +91,12 @@ export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyNumber[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_number')
-      .select(['submission_feature_property_number_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
+      .select([
+        'submission_feature_property_number_id',
+        'submission_feature_id',
+        'blueprint_feature_type_property_id',
+        'value'
+      ])
       .where('submission_feature_id', submissionFeatureId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
@@ -95,19 +105,24 @@ export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_number rows by feature type property id.
+   * Get submission_feature_property_number rows by blueprint feature type property id.
    *
-   * @param {number} featureTypePropertyId
+   * @param {number} blueprintFeatureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyNumber[]>}
    * @memberof SubmissionFeaturePropertyNumberRepository
    */
-  async getSubmissionFeaturePropertyNumberByFeatureTypePropertyId(
-    featureTypePropertyId: number
+  async getSubmissionFeaturePropertyNumberByBlueprintFeatureTypePropertyId(
+    blueprintFeatureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyNumber[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_number')
-      .select(['submission_feature_property_number_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
-      .where('feature_type_property_id', featureTypePropertyId);
+      .select([
+        'submission_feature_property_number_id',
+        'submission_feature_id',
+        'blueprint_feature_type_property_id',
+        'value'
+      ])
+      .where('blueprint_feature_type_property_id', blueprintFeatureTypePropertyId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
 

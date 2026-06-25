@@ -28,7 +28,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       .returning([
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'date_value',
         'time_value'
       ]);
@@ -60,7 +60,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       .select([
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'date_value',
         'time_value'
       ])
@@ -100,7 +100,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       .select([
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'date_value',
         'time_value'
       ])
@@ -112,25 +112,25 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
   }
 
   /**
-   * Get submission_feature_property_timestamp rows by feature type property id.
+   * Get submission_feature_property_timestamp rows by blueprint feature type property id.
    *
-   * @param {number} featureTypePropertyId
+   * @param {number} blueprintFeatureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyTimestamp[]>}
    * @memberof SubmissionFeaturePropertyTimestampRepository
    */
-  async getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(
-    featureTypePropertyId: number
+  async getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId(
+    blueprintFeatureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyTimestamp[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_timestamp')
       .select([
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'date_value',
         'time_value'
       ])
-      .where('feature_type_property_id', featureTypePropertyId);
+      .where('blueprint_feature_type_property_id', blueprintFeatureTypePropertyId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
 

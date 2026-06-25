@@ -114,7 +114,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   interface FeatureScenario {
     submissionId: number;
     uploadId: string;
-    featureTypePropertyId: number;
+    blueprintFeatureTypePropertyId: number;
     propertyName: string;
     /** Insert a submission_feature into this scenario's submission + upload. */
     insertFeature: (featureTypeName: string, sourceId: string, data?: Record<string, unknown>) => Promise<number>;
@@ -132,7 +132,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   }): Promise<FeatureScenario> {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
-    const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+    const { blueprintFeatureTypePropertyId, propertyName } = await createFeatureTypeProperty(
       connection,
       config?.sourceFeatureTypeName ?? 'mortality',
       config?.allowedTargetFeatureTypeName === undefined ? 'observation_subcount' : config.allowedTargetFeatureTypeName,
@@ -142,7 +142,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     return {
       submissionId,
       uploadId,
-      featureTypePropertyId,
+      blueprintFeatureTypePropertyId,
       propertyName,
       insertFeature: (featureTypeName, sourceId, data = {}) =>
         insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName, sourceId, data })
@@ -157,7 +157,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   /** Canonical property-feature rows for a source feature. */
   function getPropertyFeatureRows(
     sourceFeatureId: number
-  ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
+  ): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
 
@@ -175,7 +175,8 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   // --- scenarios -----------------------------------------------------------
 
   it('1: happy path — one canonical row, no errors', async () => {
-    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
+    const { submissionId, uploadId, blueprintFeatureTypePropertyId, propertyName, insertFeature } =
+      await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
     const sourceFeatureId = await insertFeature('mortality', 'period-1', {
@@ -189,11 +190,12 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     const rows = await getPropertyFeatureRows(sourceFeatureId);
     expect(rows).to.have.lengthOf(1);
     expect(rows[0].referenced_submission_feature_id).to.equal(targetFeatureId);
-    expect(rows[0].feature_type_property_id).to.equal(featureTypePropertyId);
+    expect(rows[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
   });
 
   it('2: idempotent rerun — identical canonical row set, no duplicates/orphans', async () => {
-    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
+    const { submissionId, uploadId, blueprintFeatureTypePropertyId, propertyName, insertFeature } =
+      await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
     const sourceFeatureId = await insertFeature('mortality', 'period-1', {
@@ -209,7 +211,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(firstRun).to.have.lengthOf(1);
     expect(secondRun).to.deep.equal(firstRun);
     expect(secondRun[0].referenced_submission_feature_id).to.equal(targetFeatureId);
-    expect(secondRun[0].feature_type_property_id).to.equal(featureTypePropertyId);
+    expect(secondRun[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
   });
 
   it('3: unresolved reference (feature::nope) — one UNRESOLVED_FEATURE_REFERENCE, zero canonical rows', async () => {

@@ -45,23 +45,29 @@ describe('SearchRepository (integration)', function () {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  async function getFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
+  async function getBlueprintFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
     const result = await connection.sql(SQL`
-      SELECT ftp.feature_type_property_id
-      FROM feature_type_property ftp
+      SELECT bftp.blueprint_feature_type_property_id
+      FROM blueprint_feature_type_property bftp
+      JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+      JOIN blueprint b ON b.blueprint_id = bft.blueprint_id
+      JOIN feature_type_property ftp ON ftp.feature_type_property_id = bftp.feature_type_property_id
       JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
       JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
       WHERE ft.name = ${featureTypeName}
         AND fp.name = ${propertyName}
+        AND b.is_default = true
+        AND b.record_end_date IS NULL
+        AND bftp.record_end_date IS NULL
         AND ftp.record_end_date IS NULL
       LIMIT 1;
     `);
 
     if (!result.rows[0]) {
-      throw new Error(`No feature_type_property row for (${featureTypeName}, ${propertyName})`);
+      throw new Error(`No blueprint_feature_type_property row for (${featureTypeName}, ${propertyName})`);
     }
 
-    return result.rows[0].feature_type_property_id;
+    return result.rows[0].blueprint_feature_type_property_id;
   }
 
   async function addStringProperty(
@@ -71,10 +77,10 @@ describe('SearchRepository (integration)', function () {
     value: string
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const ftpId = await getBlueprintFeatureTypePropertyId(featureTypeName, propertyName);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
       VALUES (${submissionFeatureId}, ${ftpId}, ${value}, ${systemUserId});
     `);
   }
@@ -86,10 +92,10 @@ describe('SearchRepository (integration)', function () {
     contributorCodesetCodeId: number
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const ftpId = await getBlueprintFeatureTypePropertyId(featureTypeName, propertyName);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, contributor_codeset_code_id, create_user)
+      INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
       VALUES (${submissionFeatureId}, ${ftpId}, ${contributorCodesetCodeId}, ${systemUserId});
     `);
   }
@@ -101,10 +107,10 @@ describe('SearchRepository (integration)', function () {
     taxonId: number
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const ftpId = await getBlueprintFeatureTypePropertyId(featureTypeName, propertyName);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, taxon_id, create_user)
+      INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
       VALUES (${submissionFeatureId}, ${ftpId}, ${taxonId}, ${systemUserId});
     `);
   }

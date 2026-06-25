@@ -21,17 +21,17 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     const sqlStatement = SQL`
       INSERT INTO submission_feature_property_geometry (
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       ) VALUES (
         ${payload.submission_feature_id},
-        ${payload.feature_type_property_id},
+        ${payload.blueprint_feature_type_property_id},
         ST_GeomFromGeoJSON(${JSON.stringify(payload.value)})
       )
       RETURNING
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value;
     `;
 
@@ -61,7 +61,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       SELECT
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value
       FROM submission_feature_property_geometry
       WHERE submission_feature_property_geometry_id = ${submissionFeaturePropertyGeometryId};
@@ -100,7 +100,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       SELECT
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value
       FROM submission_feature_property_geometry
       WHERE submission_feature_id = ${submissionFeatureId};
@@ -112,23 +112,23 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
   }
 
   /**
-   * Get submission_feature_property_geometry rows by feature type property id.
+   * Get submission_feature_property_geometry rows by blueprint feature type property id.
    *
-   * @param {number} featureTypePropertyId
+   * @param {number} blueprintFeatureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyGeometry[]>}
    * @memberof SubmissionFeaturePropertyGeometryRepository
    */
-  async getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-    featureTypePropertyId: number
+  async getSubmissionFeaturePropertyGeometryByBlueprintFeatureTypePropertyId(
+    blueprintFeatureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyGeometry[]> {
     const sqlStatement = SQL`
       SELECT
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value
       FROM submission_feature_property_geometry
-      WHERE feature_type_property_id = ${featureTypePropertyId};
+      WHERE blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);

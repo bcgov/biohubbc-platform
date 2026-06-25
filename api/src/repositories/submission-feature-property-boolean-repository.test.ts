@@ -14,7 +14,7 @@ describe('SubmissionFeaturePropertyBooleanRepository', () => {
   const mockRow: SubmissionFeaturePropertyBoolean = {
     submission_feature_property_boolean_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: true
   };
 
@@ -25,7 +25,7 @@ describe('SubmissionFeaturePropertyBooleanRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyBoolean({
         submission_feature_id: 10,
-        feature_type_property_id: 20,
+        blueprint_feature_type_property_id: 20,
         value: true
       });
 
@@ -39,7 +39,7 @@ describe('SubmissionFeaturePropertyBooleanRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyBoolean({
           submission_feature_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           value: true
         });
         expect.fail();
@@ -90,10 +90,10 @@ describe('SubmissionFeaturePropertyBooleanRepository', () => {
       expect(result).to.eql([mockRow]);
     });
 
-    it('lists by feature_type_property_id', async () => {
+    it('lists by blueprint_feature_type_property_id', async () => {
       const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
       const repository = new SubmissionFeaturePropertyBooleanRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId(20);
+      const result = await repository.getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
   });

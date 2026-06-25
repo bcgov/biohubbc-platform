@@ -75,7 +75,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
   async function insertCandidate(params: {
     uploadId: string;
     sourceFeatureId: number;
-    featureTypePropertyId: number;
+    blueprintFeatureTypePropertyId: number;
     propertyName?: string;
     rawValue?: string;
     isFormatValid?: boolean;
@@ -86,7 +86,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     const {
       uploadId,
       sourceFeatureId,
-      featureTypePropertyId,
+      blueprintFeatureTypePropertyId,
       propertyName = 'site_ref',
       rawValue = 'feature::area1',
       isFormatValid = true,
@@ -100,7 +100,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         submission_upload_id,
         submission_feature_id,
         property_name,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         raw_value,
         is_format_valid,
         parsed_source_id,
@@ -111,7 +111,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         ${uploadId}::uuid,
         ${sourceFeatureId},
         ${propertyName},
-        ${featureTypePropertyId},
+        ${blueprintFeatureTypePropertyId},
         ${JSON.stringify(rawValue)}::jsonb,
         ${isFormatValid},
         ${parsedSourceId},
@@ -148,17 +148,21 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     uploadId: string;
     sourceFeatureId: number;
     featureTypePropertyId: number;
+    blueprintFeatureTypePropertyId: number;
     allowedFeatureTypeIds: number[];
   }> {
     const { submissionId, uploadId } = await seedUpload();
     const sourceFeatureId = await createTestFeature(connection, submissionId, sourceType, {});
-    const { featureTypePropertyId, allowedFeatureTypeIds } = await createFeatureTypeProperty(
-      connection,
-      sourceType,
-      allowedTargetType,
-      allowMultiple
-    );
-    return { submissionId, uploadId, sourceFeatureId, featureTypePropertyId, allowedFeatureTypeIds };
+    const { featureTypePropertyId, blueprintFeatureTypePropertyId, allowedFeatureTypeIds } =
+      await createFeatureTypeProperty(connection, sourceType, allowedTargetType, allowMultiple);
+    return {
+      submissionId,
+      uploadId,
+      sourceFeatureId,
+      featureTypePropertyId,
+      blueprintFeatureTypePropertyId,
+      allowedFeatureTypeIds
+    };
   }
 
   /** All grouped error rows for an upload scope. */
@@ -169,7 +173,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
   /** Canonical property-feature rows for a source feature. */
   function getPropertyFeatureRows(
     sourceFeatureId: number
-  ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
+  ): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
 
@@ -181,20 +185,20 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     Array<{
       count: number;
       property_name: string | null;
-      feature_type_property_id: number | null;
+      blueprint_feature_type_property_id: number | null;
       source_id: string | null;
     }>
   > {
     const result = await connection.sql<{
       count: number;
       property_name: string | null;
-      feature_type_property_id: number | null;
+      blueprint_feature_type_property_id: number | null;
       source_id: string | null;
     }>(SQL`
       SELECT
         count,
         property_name,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         details->>'source_id' AS source_id
       FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid
@@ -208,12 +212,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
   describe('recordFeaturePropertyResolutionErrorsBySubmissionUploadId', () => {
     it('records INVALID_FEATURE_REFERENCE_FORMAT for malformed values', async () => {
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'garbage-value',
         isFormatValid: false,
         parsedSourceId: null
@@ -229,12 +233,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('records UNRESOLVED_FEATURE_REFERENCE when resolution misses', async () => {
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::nope',
         parsedSourceId: 'nope'
       });
@@ -248,14 +252,14 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records INVALID_FEATURE_REFERENCE_TYPE when resolved type not allowed', async () => {
       // Config allows sample_site, but the candidate resolved to a sample_technique feature.
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
       const wrongTypeFeatureId = await createTestFeature(connection, submissionId, 'sample_technique', {});
       const wrongTypeId = await featureTypeIdByName(connection, 'sample_technique');
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::tech1',
         parsedSourceId: 'tech1',
         referencedFeatureId: wrongTypeFeatureId,
@@ -271,7 +275,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records INVALID_FEATURE_REFERENCE_TYPE when property has no allowed target', async () => {
       // Config allows NO target — every reference is rejected.
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig(
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig(
         'sample_period',
         null
       );
@@ -281,7 +285,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         referencedFeatureId: targetFeatureId,
         referencedFeatureTypeId: targetTypeId
       });
@@ -295,7 +299,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records INVALID_FEATURE_REFERENCE_SELF (and no TYPE error) for a self-reference', async () => {
       // Source is a sample_site; config allows sample_site; candidate points at its own feature.
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig(
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig(
         'sample_site',
         'sample_site'
       );
@@ -304,7 +308,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::self',
         parsedSourceId: 'self',
         referencedFeatureId: sourceFeatureId,
@@ -321,7 +325,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('ignores a soft-deleted feature_type_property config (type branch)', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId, blueprintFeatureTypePropertyId } =
+        await seedSourceAndConfig();
       await softDeleteFeatureTypeProperty(featureTypePropertyId);
 
       const wrongTypeFeatureId = await createTestFeature(connection, submissionId, 'sample_technique', {});
@@ -330,7 +335,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::tech1',
         parsedSourceId: 'tech1',
         referencedFeatureId: wrongTypeFeatureId,
@@ -344,14 +349,14 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('aggregates duplicate errors into one grouped row with a count', async () => {
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
 
-      // Two malformed candidates sharing property_name + feature_type_property_id.
+      // Two malformed candidates sharing property_name + blueprint_feature_type_property_id.
       for (let i = 0; i < 2; i++) {
         await insertCandidate({
           uploadId,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           rawValue: 'garbage-' + i,
           isFormatValid: false,
           parsedSourceId: null
@@ -377,12 +382,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const typeA = await featureTypeIdByName(connection, 'sample_period');
       const typeB = await featureTypeIdByName(connection, 'sample_site');
       // Distinct configs so the two cyclic edges fall into separate grouped error rows.
-      const { featureTypePropertyId: ftpA } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpA } = await createFeatureTypeProperty(
         connection,
         'sample_period',
         'sample_site'
       );
-      const { featureTypePropertyId: ftpB } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpB } = await createFeatureTypeProperty(
         connection,
         'sample_site',
         'sample_period'
@@ -391,7 +396,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureA,
-        featureTypePropertyId: ftpA,
+        blueprintFeatureTypePropertyId: ftpA,
         propertyName: 'a_to_b',
         rawValue: 'feature::b',
         parsedSourceId: 'b',
@@ -401,7 +406,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureB,
-        featureTypePropertyId: ftpB,
+        blueprintFeatureTypePropertyId: ftpB,
         propertyName: 'b_to_a',
         rawValue: 'feature::a',
         parsedSourceId: 'a',
@@ -424,17 +429,17 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const typeA = await featureTypeIdByName(connection, 'sample_period');
       const typeB = await featureTypeIdByName(connection, 'sample_site');
       const typeC = await featureTypeIdByName(connection, 'sample_technique');
-      const { featureTypePropertyId: ftpA } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpA } = await createFeatureTypeProperty(
         connection,
         'sample_period',
         'sample_site'
       );
-      const { featureTypePropertyId: ftpB } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpB } = await createFeatureTypeProperty(
         connection,
         'sample_site',
         'sample_technique'
       );
-      const { featureTypePropertyId: ftpC } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpC } = await createFeatureTypeProperty(
         connection,
         'sample_technique',
         'sample_period'
@@ -443,7 +448,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureA,
-        featureTypePropertyId: ftpA,
+        blueprintFeatureTypePropertyId: ftpA,
         propertyName: 'a_to_b',
         rawValue: 'feature::b',
         parsedSourceId: 'b',
@@ -453,7 +458,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureB,
-        featureTypePropertyId: ftpB,
+        blueprintFeatureTypePropertyId: ftpB,
         propertyName: 'b_to_c',
         rawValue: 'feature::c',
         parsedSourceId: 'c',
@@ -463,7 +468,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureC,
-        featureTypePropertyId: ftpC,
+        blueprintFeatureTypePropertyId: ftpC,
         propertyName: 'c_to_a',
         rawValue: 'feature::a',
         parsedSourceId: 'a',
@@ -488,7 +493,11 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       // Feature type / config are irrelevant to cycle detection (it reads only the edge endpoints), so
       // reuse one feature type and one config for the whole ring; distinct property names keep each
       // cyclic edge in its own grouped error row.
-      const { featureTypePropertyId: ftp } = await createFeatureTypeProperty(connection, 'sample_site', 'sample_site');
+      const { blueprintFeatureTypePropertyId: ftp } = await createFeatureTypeProperty(
+        connection,
+        'sample_site',
+        'sample_site'
+      );
 
       const N = 55; // > old cap of 50
       const features: number[] = [];
@@ -500,7 +509,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         await insertCandidate({
           uploadId,
           sourceFeatureId: features[i],
-          featureTypePropertyId: ftp,
+          blueprintFeatureTypePropertyId: ftp,
           propertyName: `edge_${i}`,
           rawValue: `feature::f${(i + 1) % N}`,
           parsedSourceId: `f${(i + 1) % N}`,
@@ -523,12 +532,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const featureC = await createTestFeature(connection, submissionId, 'sample_technique', {});
       const typeB = await featureTypeIdByName(connection, 'sample_site');
       const typeC = await featureTypeIdByName(connection, 'sample_technique');
-      const { featureTypePropertyId: ftpA } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpA } = await createFeatureTypeProperty(
         connection,
         'sample_period',
         'sample_site'
       );
-      const { featureTypePropertyId: ftpB } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpB } = await createFeatureTypeProperty(
         connection,
         'sample_site',
         'sample_technique'
@@ -537,7 +546,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureA,
-        featureTypePropertyId: ftpA,
+        blueprintFeatureTypePropertyId: ftpA,
         propertyName: 'a_to_b',
         rawValue: 'feature::b',
         parsedSourceId: 'b',
@@ -547,7 +556,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureB,
-        featureTypePropertyId: ftpB,
+        blueprintFeatureTypePropertyId: ftpB,
         propertyName: 'b_to_c',
         rawValue: 'feature::c',
         parsedSourceId: 'c',
@@ -564,12 +573,16 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const { submissionId, uploadId } = await seedUpload();
       const featureA = await createTestFeature(connection, submissionId, 'sample_site', {});
       const typeA = await featureTypeIdByName(connection, 'sample_site');
-      const { featureTypePropertyId: ftpA } = await createFeatureTypeProperty(connection, 'sample_site', 'sample_site');
+      const { blueprintFeatureTypePropertyId: ftpA } = await createFeatureTypeProperty(
+        connection,
+        'sample_site',
+        'sample_site'
+      );
 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureA,
-        featureTypePropertyId: ftpA,
+        blueprintFeatureTypePropertyId: ftpA,
         propertyName: 'a_to_a',
         rawValue: 'feature::a',
         parsedSourceId: 'a',
@@ -588,12 +601,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const featureB = await createTestFeature(connection, submissionId, 'sample_site', {});
       const typeA = await featureTypeIdByName(connection, 'sample_period');
       const typeB = await featureTypeIdByName(connection, 'sample_site');
-      const { featureTypePropertyId: ftpA } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpA } = await createFeatureTypeProperty(
         connection,
         'sample_period',
         'sample_site'
       );
-      const { featureTypePropertyId: ftpB } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId: ftpB } = await createFeatureTypeProperty(
         connection,
         'sample_site',
         'sample_period'
@@ -603,7 +616,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureA,
-        featureTypePropertyId: ftpA,
+        blueprintFeatureTypePropertyId: ftpA,
         propertyName: 'a_to_b',
         rawValue: 'feature::b',
         parsedSourceId: 'b',
@@ -614,7 +627,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId: featureB,
-        featureTypePropertyId: ftpB,
+        blueprintFeatureTypePropertyId: ftpB,
         propertyName: 'b_to_a',
         rawValue: 'garbage',
         isFormatValid: false,
@@ -633,14 +646,14 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
   describe('insertFeaturePropertiesBySubmissionUploadId', () => {
     it('inserts one canonical row when all gates pass', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
       const targetFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {});
       const targetTypeId = await featureTypeIdByName(connection, 'sample_site');
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         referencedFeatureId: targetFeatureId,
         referencedFeatureTypeId: targetTypeId
       });
@@ -650,18 +663,18 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const rows = await getPropertyFeatureRows(sourceFeatureId);
       expect(rows).to.have.lengthOf(1);
       expect(rows[0].referenced_submission_feature_id).to.equal(targetFeatureId);
-      expect(rows[0].feature_type_property_id).to.equal(featureTypePropertyId);
+      expect(rows[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
     });
 
     it('skips candidates with invalid format', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
       const targetFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {});
       const targetTypeId = await featureTypeIdByName(connection, 'sample_site');
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'garbage',
         isFormatValid: false,
         parsedSourceId: null,
@@ -675,12 +688,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('skips candidates with null resolution', async () => {
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::nope',
         parsedSourceId: 'nope'
       });
@@ -691,14 +704,14 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('skips candidates whose resolved type is not allowed', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
       const wrongTypeFeatureId = await createTestFeature(connection, submissionId, 'sample_technique', {});
       const wrongTypeId = await featureTypeIdByName(connection, 'sample_technique');
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::tech1',
         parsedSourceId: 'tech1',
         referencedFeatureId: wrongTypeFeatureId,
@@ -711,7 +724,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('excludes self-references', async () => {
-      const { uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig(
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig(
         'sample_site',
         'sample_site'
       );
@@ -720,7 +733,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         rawValue: 'feature::self',
         parsedSourceId: 'self',
         referencedFeatureId: sourceFeatureId,
@@ -735,7 +748,11 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     it('skips candidates whose source or target feature was soft-deleted after staging (resolve-once staleness guard)', async () => {
       const { submissionId, uploadId } = await seedUpload();
       const targetTypeId = await featureTypeIdByName(connection, 'sample_site');
-      const { featureTypePropertyId } = await createFeatureTypeProperty(connection, 'sample_period', 'sample_site');
+      const { blueprintFeatureTypePropertyId } = await createFeatureTypeProperty(
+        connection,
+        'sample_period',
+        'sample_site'
+      );
 
       // Helper: soft-delete a feature (the concurrent mutation the guard defends against).
       const softDelete = (featureId: number) =>
@@ -761,7 +778,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         await insertCandidate({
           uploadId,
           sourceFeatureId: source,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureId: target,
           referencedFeatureTypeId: targetTypeId
         });
@@ -780,7 +797,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('dedups exact-duplicate references to one row', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig(
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig(
         'sample_period',
         'sample_site',
         true
@@ -793,7 +810,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         await insertCandidate({
           uploadId,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureId: targetFeatureId,
           referencedFeatureTypeId: targetTypeId
         });
@@ -805,14 +822,14 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('writes only submission_feature_property_feature, never submission_feature_feature', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
       const targetFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {});
       const targetTypeId = await featureTypeIdByName(connection, 'sample_site');
 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         referencedFeatureId: targetFeatureId,
         referencedFeatureTypeId: targetTypeId
       });
@@ -830,7 +847,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     });
 
     it('ignores a soft-deleted feature_type_property config', async () => {
-      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId } = await seedSourceAndConfig();
+      const { submissionId, uploadId, sourceFeatureId, featureTypePropertyId, blueprintFeatureTypePropertyId } =
+        await seedSourceAndConfig();
       const targetFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {});
       const targetTypeId = await featureTypeIdByName(connection, 'sample_site');
       await softDeleteFeatureTypeProperty(featureTypePropertyId);
@@ -838,7 +856,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       await insertCandidate({
         uploadId,
         sourceFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         referencedFeatureId: targetFeatureId,
         referencedFeatureTypeId: targetTypeId
       });
@@ -867,7 +885,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       expect(errors[0].count).to.equal(3);
       expect(errors[0].source_id).to.equal('A');
       expect(errors[0].property_name).to.equal(null);
-      expect(errors[0].feature_type_property_id).to.equal(null);
+      expect(errors[0].blueprint_feature_type_property_id).to.equal(null);
     });
 
     it('records one row per distinct duplicated source_id with correct counts', async () => {
@@ -888,12 +906,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       expect(errors[0].source_id).to.equal('A');
       expect(errors[0].count).to.equal(2);
       expect(errors[0].property_name).to.equal(null);
-      expect(errors[0].feature_type_property_id).to.equal(null);
+      expect(errors[0].blueprint_feature_type_property_id).to.equal(null);
 
       expect(errors[1].source_id).to.equal('B');
       expect(errors[1].count).to.equal(3);
       expect(errors[1].property_name).to.equal(null);
-      expect(errors[1].feature_type_property_id).to.equal(null);
+      expect(errors[1].blueprint_feature_type_property_id).to.equal(null);
     });
 
     it('records zero rows when every source_id is unique', async () => {

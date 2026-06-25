@@ -19,13 +19,13 @@ describe('SubmissionFeaturePropertyCodeService', () => {
   const mockRow: SubmissionFeaturePropertyCode = {
     submission_feature_property_code_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     contributor_codeset_code_id: 30
   };
 
   const createPayload: CreateSubmissionFeaturePropertyCode = {
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     contributor_codeset_code_id: 30
   };
 
@@ -65,16 +65,16 @@ describe('SubmissionFeaturePropertyCodeService', () => {
     expect(result).to.eql([mockRow]);
   });
 
-  it('delegates getByFeatureTypePropertyId', async () => {
+  it('delegates getByBlueprintFeatureTypePropertyId', async () => {
     const service = new SubmissionFeaturePropertyCodeService(getMockDBConnection());
     const stub = sinon
       .stub(
         SubmissionFeaturePropertyCodeRepository.prototype,
-        'getSubmissionFeaturePropertyCodesByFeatureTypePropertyId'
+        'getSubmissionFeaturePropertyCodesByBlueprintFeatureTypePropertyId'
       )
       .resolves([mockRow]);
 
-    const result = await service.getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(20);
+    const result = await service.getSubmissionFeaturePropertyCodesByBlueprintFeatureTypePropertyId(20);
 
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);

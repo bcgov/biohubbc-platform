@@ -196,10 +196,28 @@ describe('expression-evaluation (integration)', function () {
     featureTypePropertyId: number = SAMPLE_SITE_NAME_FTP_ID
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
+    // Indexed rows reference the Blueprint assignment; resolve the default Blueprint's
+    // blueprint_feature_type_property_id for the canonical feature_type_property_id slot (which the
+    // matching namePredicate(...) is expressed against). The seed assigns every active property.
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_string
-        (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value}, ${systemUserId});
+        (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      VALUES (
+        ${submissionFeatureId},
+        (
+          SELECT bftp.blueprint_feature_type_property_id
+          FROM blueprint_feature_type_property bftp
+          JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+          JOIN blueprint b ON b.blueprint_id = bft.blueprint_id
+          WHERE bftp.feature_type_property_id = ${featureTypePropertyId}
+            AND b.is_default = true
+            AND b.record_end_date IS NULL
+            AND bftp.record_end_date IS NULL
+          LIMIT 1
+        ),
+        ${value},
+        ${systemUserId}
+      );
     `);
   }
 
@@ -221,24 +239,24 @@ describe('expression-evaluation (integration)', function () {
 
   /**
    * Insert a property edge (submission_feature_property_feature) source -> referenced, using the supplied
-   * feature_type_property_id (mint one via createFeatureTypeProperty on the source type). In the closure
-   * this stores (source=feature, target=referenced): closureForward(feature) reaches the referenced
+   * blueprint_feature_type_property_id (mint one via createFeatureTypeProperty on the source type). In the
+   * closure this stores (source=feature, target=referenced): closureForward(feature) reaches the referenced
    * feature; closureReverse(referenced) reaches the referencing feature.
    */
   async function insertPropertyEdge(
     sourceFeatureId: number,
     referencedFeatureId: number,
-    featureTypePropertyId: number
+    blueprintFeatureTypePropertyId: number
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         referenced_submission_feature_id,
         create_user
       )
-      VALUES (${sourceFeatureId}, ${featureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
+      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
     `);
   }
 
@@ -343,10 +361,14 @@ describe('expression-evaluation (integration)', function () {
     return { submissionId, uploadId, d, a, c };
   }
 
-  /** Mint a real feature_type_property usable as a property-edge label, from source type to target type. */
+  /** Mint a Blueprint property assignment usable as a property-edge label, from source type to target type. */
   async function mintPropertyEdgeLabel(sourceFeatureType: string, targetFeatureType: string): Promise<number> {
-    const { featureTypePropertyId } = await createFeatureTypeProperty(connection, sourceFeatureType, targetFeatureType);
-    return featureTypePropertyId;
+    const { blueprintFeatureTypePropertyId } = await createFeatureTypeProperty(
+      connection,
+      sourceFeatureType,
+      targetFeatureType
+    );
+    return blueprintFeatureTypePropertyId;
   }
 
   // === broad feature-type projection (no closure needed) ===================

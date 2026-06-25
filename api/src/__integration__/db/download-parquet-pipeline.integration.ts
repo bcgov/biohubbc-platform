@@ -233,7 +233,7 @@ describe('Download Parquet pipeline (integration)', function () {
   /**
    * Helper: insert a typed property row into the appropriate submission_feature_property_* table.
    *
-   * For string/number/boolean/timestamp/geometry: inserts (submission_feature_id, feature_type_property_id, value, create_user).
+   * For string/number/boolean/timestamp/geometry: inserts (submission_feature_id, blueprint_feature_type_property_id, value, create_user).
    * For code: value is the contributor_codeset_code_id.
    * For taxon: value is the taxon_id.
    * For geometry: value is a GeoJSON string passed through ST_GeomFromGeoJSON.
@@ -241,43 +241,90 @@ describe('Download Parquet pipeline (integration)', function () {
   async function insertTypedPropertyRow(
     tableName: string,
     submissionFeatureId: number,
-    featureTypePropertyId: number,
+    blueprintFeatureTypePropertyId: number,
     value: unknown
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
 
     if (tableName === 'submission_feature_property_code') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, contributor_codeset_code_id, create_user)
-        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
+        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number}, ${systemUserId});
       `);
     } else if (tableName === 'submission_feature_property_taxon') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, taxon_id, create_user)
-        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
+        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number}, ${systemUserId});
       `);
     } else if (tableName === 'submission_feature_property_geometry') {
       await connection.query(
-        `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+        `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
          VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
-        [submissionFeatureId, featureTypePropertyId, value as string, systemUserId]
+        [submissionFeatureId, blueprintFeatureTypePropertyId, value as string, systemUserId]
       );
     } else if (tableName === 'submission_feature_property_timestamp') {
       const ts = value as { date_value: string | null; time_value: string | null };
       await connection.query(
         `INSERT INTO submission_feature_property_timestamp
-           (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
+           (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
          VALUES ($1, $2, $3, $4, $5)`,
-        [submissionFeatureId, featureTypePropertyId, ts.date_value, ts.time_value, systemUserId]
+        [submissionFeatureId, blueprintFeatureTypePropertyId, ts.date_value, ts.time_value, systemUserId]
       );
     } else {
       // string, number, boolean — all use a `value` column
       await connection.query(
-        `INSERT INTO ${tableName} (submission_feature_id, feature_type_property_id, value, create_user)
+        `INSERT INTO ${tableName} (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
          VALUES ($1, $2, $3, $4)`,
-        [submissionFeatureId, featureTypePropertyId, value, systemUserId]
+        [submissionFeatureId, blueprintFeatureTypePropertyId, value, systemUserId]
       );
     }
+  }
+
+  /**
+   * Assign an existing feature_type_property to the active default Blueprint and return the
+   * blueprint_feature_type_property_id. Indexed submission_feature_property_* rows reference this
+   * Blueprint-assignment surrogate, and the download read-path joins through it, so directly-seeded
+   * typed rows must carry a real assignment id.
+   */
+  async function assignPropertyToDefaultBlueprint(
+    featureTypeName: string,
+    featureTypePropertyId: number
+  ): Promise<number> {
+    const systemUserId = connection.systemUserId();
+
+    const bftResult = await connection.sql(SQL`
+      WITH inserted AS (
+        INSERT INTO blueprint_feature_type (blueprint_id, feature_type_id, create_user)
+        VALUES (
+          (SELECT blueprint_id FROM blueprint WHERE is_default = true AND record_end_date IS NULL LIMIT 1),
+          (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
+          ${systemUserId}
+        )
+        ON CONFLICT (blueprint_id, feature_type_id)
+        WHERE record_end_date IS NULL
+        DO NOTHING
+        RETURNING blueprint_feature_type_id
+      )
+      SELECT blueprint_feature_type_id FROM inserted
+      UNION ALL
+      SELECT bft.blueprint_feature_type_id
+      FROM blueprint_feature_type bft
+      JOIN blueprint b USING (blueprint_id)
+      JOIN feature_type ft USING (feature_type_id)
+      WHERE b.is_default = true
+        AND b.record_end_date IS NULL
+        AND bft.record_end_date IS NULL
+        AND ft.name = ${featureTypeName}
+      LIMIT 1;
+    `);
+    const blueprintFeatureTypeId = bftResult.rows[0].blueprint_feature_type_id;
+
+    const bftpResult = await connection.sql(SQL`
+      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_type_property_id, create_user)
+      VALUES (${blueprintFeatureTypeId}, ${featureTypePropertyId}, ${systemUserId})
+      RETURNING blueprint_feature_type_property_id;
+    `);
+    return bftpResult.rows[0].blueprint_feature_type_property_id;
   }
 
   /**
@@ -291,7 +338,7 @@ describe('Download Parquet pipeline (integration)', function () {
    * @param contributorCodesetKey - Codeset key (e.g. 'sex') — maps to `contributor_codeset.key`.
    * @param contributorCodesetCodeKey - Code key within the codeset (e.g. 'male') — maps to `contributor_codeset_code.key`.
    * @param codeLabel - The human-readable label (e.g. 'male') — what the Parquet pipeline outputs.
-   * @returns { featureTypePropertyId, contributorCodesetCodeId }
+   * @returns { blueprintFeatureTypePropertyId, contributorCodesetCodeId }
    */
   async function insertCodeFeatureProperty(
     featureTypeName: string,
@@ -299,7 +346,7 @@ describe('Download Parquet pipeline (integration)', function () {
     contributorCodesetKey: string,
     contributorCodesetCodeKey: string,
     codeLabel: string
-  ): Promise<{ featureTypePropertyId: number; contributorCodesetCodeId: number }> {
+  ): Promise<{ blueprintFeatureTypePropertyId: number; contributorCodesetCodeId: number }> {
     const systemUserId = connection.systemUserId();
 
     await connection.sql(SQL`
@@ -351,7 +398,12 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const contributorCodesetCodeId = codeResult.rows[0].contributor_codeset_code_id;
 
-    return { featureTypePropertyId, contributorCodesetCodeId };
+    const blueprintFeatureTypePropertyId = await assignPropertyToDefaultBlueprint(
+      featureTypeName,
+      featureTypePropertyId
+    );
+
+    return { blueprintFeatureTypePropertyId, contributorCodesetCodeId };
   }
 
   /**
@@ -361,7 +413,7 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string,
     propertyName: string,
     scientificName: string
-  ): Promise<{ featureTypePropertyId: number; taxonId: number }> {
+  ): Promise<{ blueprintFeatureTypePropertyId: number; taxonId: number }> {
     const systemUserId = connection.systemUserId();
 
     const taxonTypeResult = await connection.sql(SQL`
@@ -397,7 +449,12 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const taxonId = taxonResult.rows[0].taxon_id;
 
-    return { featureTypePropertyId, taxonId };
+    const blueprintFeatureTypePropertyId = await assignPropertyToDefaultBlueprint(
+      featureTypeName,
+      featureTypePropertyId
+    );
+
+    return { blueprintFeatureTypePropertyId, taxonId };
   }
 
   /**
@@ -551,7 +608,7 @@ describe('Download Parquet pipeline (integration)', function () {
         sex_code: 'code::sex::male'
       });
 
-      const { featureTypePropertyId, contributorCodesetCodeId } = await insertCodeFeatureProperty(
+      const { blueprintFeatureTypePropertyId, contributorCodesetCodeId } = await insertCodeFeatureProperty(
         'capture',
         'sex_code',
         'sex',
@@ -562,7 +619,7 @@ describe('Download Parquet pipeline (integration)', function () {
       await insertTypedPropertyRow(
         'submission_feature_property_code',
         captureFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         contributorCodesetCodeId
       );
 
@@ -581,12 +638,16 @@ describe('Download Parquet pipeline (integration)', function () {
         species: 'Ursus arctos'
       });
 
-      const { featureTypePropertyId, taxonId } = await insertTaxonFeatureProperty('capture', 'species', 'Ursus arctos');
+      const { blueprintFeatureTypePropertyId, taxonId } = await insertTaxonFeatureProperty(
+        'capture',
+        'species',
+        'Ursus arctos'
+      );
 
       await insertTypedPropertyRow(
         'submission_feature_property_taxon',
         captureFeatureId,
-        featureTypePropertyId,
+        blueprintFeatureTypePropertyId,
         taxonId
       );
 
@@ -608,7 +669,7 @@ describe('Download Parquet pipeline (integration)', function () {
           name: 'ref-1'
         });
 
-        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+        const { blueprintFeatureTypePropertyId, propertyName } = await createFeatureTypeProperty(
           connection,
           'capture',
           'observation_subcount',
@@ -618,7 +679,7 @@ describe('Download Parquet pipeline (integration)', function () {
         await insertSubmissionFeaturePropertyFeature(
           connection,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureId
         );
 
@@ -649,7 +710,7 @@ describe('Download Parquet pipeline (integration)', function () {
         // Sanity: ids are inserted in ascending order
         expect(referencedFeatureId1).to.be.lessThan(referencedFeatureId2);
 
-        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+        const { blueprintFeatureTypePropertyId, propertyName } = await createFeatureTypeProperty(
           connection,
           'capture',
           'observation_subcount',
@@ -660,13 +721,13 @@ describe('Download Parquet pipeline (integration)', function () {
         await insertSubmissionFeaturePropertyFeature(
           connection,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureId2
         );
         await insertSubmissionFeaturePropertyFeature(
           connection,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureId1
         );
 
@@ -714,7 +775,7 @@ describe('Download Parquet pipeline (integration)', function () {
           name: 'soft-deleted'
         });
 
-        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+        const { blueprintFeatureTypePropertyId, propertyName } = await createFeatureTypeProperty(
           connection,
           'capture',
           'observation_subcount',
@@ -724,13 +785,13 @@ describe('Download Parquet pipeline (integration)', function () {
         await insertSubmissionFeaturePropertyFeature(
           connection,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureLiveId
         );
         await insertSubmissionFeaturePropertyFeature(
           connection,
           sourceFeatureId,
-          featureTypePropertyId,
+          blueprintFeatureTypePropertyId,
           referencedFeatureDeletedId
         );
 

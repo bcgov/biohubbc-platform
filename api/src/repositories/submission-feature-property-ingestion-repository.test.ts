@@ -160,7 +160,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_feature_property_code');
       expect(sqlText).to.include('submission_feature_id');
-      expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
       expect(sqlText).to.include('contributor_codeset_code_id');
       expect(sqlText).to.include('FROM submission_upload_staging_code_candidate c');
       expect(sqlText).to.include('AND c.is_format_valid');
@@ -180,7 +180,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_feature_property_taxon');
       expect(sqlText).to.include('submission_feature_id');
-      expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
       expect(sqlText).to.include('taxon_id');
       expect(sqlText).to.include('FROM submission_upload_staging_taxon_candidate c');
       expect(sqlText).to.include('AND c.taxon_id IS NOT NULL');
@@ -245,7 +245,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const rows = [
         {
           property_name: 'count',
-          feature_type_property_id: 22,
+          blueprint_feature_type_property_id: 22,
           error_code: 'TYPE_MISMATCH',
           error_message: 'Property value type mismatch',
           count: 3,
@@ -322,7 +322,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
       expect(sqlText).to.include('ON CONFLICT');
       expect(sqlText).to.match(
-        /ON CONFLICT\s*\(\s*submission_upload_id,\s*error_code,\s*feature_type_property_id,\s*property_name\s*\)/
+        /ON CONFLICT\s*\(\s*submission_upload_id,\s*error_code,\s*blueprint_feature_type_property_id,\s*property_name\s*\)/
       );
       expect(sqlText).to.not.include('submission_feature_id');
     });

@@ -19,14 +19,14 @@ describe('SubmissionFeaturePropertyTimestampService', () => {
   const mockRow: SubmissionFeaturePropertyTimestamp = {
     submission_feature_property_timestamp_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     date_value: '2026-01-01',
     time_value: '00:00:00'
   };
 
   const createPayload: CreateSubmissionFeaturePropertyTimestamp = {
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     date_value: '2026-01-01',
     time_value: '00:00:00'
   };
@@ -63,15 +63,15 @@ describe('SubmissionFeaturePropertyTimestampService', () => {
     expect(result).to.eql([mockRow]);
   });
 
-  it('delegates getByFeatureTypePropertyId', async () => {
+  it('delegates getByBlueprintFeatureTypePropertyId', async () => {
     const service = new SubmissionFeaturePropertyTimestampService(getMockDBConnection());
     const stub = sinon
       .stub(
         SubmissionFeaturePropertyTimestampRepository.prototype,
-        'getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId'
+        'getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId'
       )
       .resolves([mockRow]);
-    const result = await service.getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(20);
+    const result = await service.getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId(20);
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
   });

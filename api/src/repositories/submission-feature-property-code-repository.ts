@@ -24,7 +24,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
       .returning([
         'submission_feature_property_code_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'contributor_codeset_code_id'
       ]);
 
@@ -55,7 +55,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
       .select([
         'submission_feature_property_code_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'contributor_codeset_code_id'
       ])
       .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId)
@@ -95,7 +95,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
       .select([
         'submission_feature_property_code_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'contributor_codeset_code_id'
       ])
       .where('submission_feature_id', submissionFeatureId)
@@ -107,24 +107,24 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_code rows by feature_type_property_id.
+   * Get submission_feature_property_code rows by blueprint_feature_type_property_id.
    *
-   * @param {number} featureTypePropertyId
+   * @param {number} blueprintFeatureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeRepository
    */
-  async getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(
-    featureTypePropertyId: number
+  async getSubmissionFeaturePropertyCodesByBlueprintFeatureTypePropertyId(
+    blueprintFeatureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
       .select([
         'submission_feature_property_code_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'contributor_codeset_code_id'
       ])
-      .where('feature_type_property_id', featureTypePropertyId)
+      .where('blueprint_feature_type_property_id', blueprintFeatureTypePropertyId)
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -147,7 +147,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
       .select([
         'submission_feature_property_code_id',
         'submission_feature_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'contributor_codeset_code_id'
       ])
       .where('contributor_codeset_code_id', contributorCodesetCodeId)

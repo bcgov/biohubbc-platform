@@ -19,13 +19,13 @@ describe('SubmissionFeaturePropertyBooleanService', () => {
   const mockRow: SubmissionFeaturePropertyBoolean = {
     submission_feature_property_boolean_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: true
   };
 
   const createPayload: CreateSubmissionFeaturePropertyBoolean = {
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: true
   };
   it('delegates create', async () => {
@@ -61,15 +61,15 @@ describe('SubmissionFeaturePropertyBooleanService', () => {
     expect(result).to.eql([mockRow]);
   });
 
-  it('delegates getByFeatureTypePropertyId', async () => {
+  it('delegates getByBlueprintFeatureTypePropertyId', async () => {
     const service = new SubmissionFeaturePropertyBooleanService(getMockDBConnection());
     const stub = sinon
       .stub(
         SubmissionFeaturePropertyBooleanRepository.prototype,
-        'getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId'
+        'getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId'
       )
       .resolves([mockRow]);
-    const result = await service.getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId(20);
+    const result = await service.getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId(20);
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
   });

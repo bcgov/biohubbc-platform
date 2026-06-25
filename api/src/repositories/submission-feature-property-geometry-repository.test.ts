@@ -19,7 +19,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
   const mockRow: SubmissionFeaturePropertyGeometry = {
     submission_feature_property_geometry_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: mockGeometry
   };
 
@@ -34,7 +34,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyGeometry({
         submission_feature_id: 10,
-        feature_type_property_id: 20,
+        blueprint_feature_type_property_id: 20,
         value: mockGeometry
       });
 
@@ -49,7 +49,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyGeometry({
           submission_feature_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           value: mockGeometry
         });
         expect.fail();
@@ -106,12 +106,12 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       expect(result).to.eql([mockRow]);
     });
 
-    it('lists by feature_type_property_id', async () => {
+    it('lists by blueprint_feature_type_property_id', async () => {
       const repository = new SubmissionFeaturePropertyGeometryRepository(
         getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([mockRow])) })
       );
 
-      const result = await repository.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(20);
+      const result = await repository.getSubmissionFeaturePropertyGeometryByBlueprintFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
   });

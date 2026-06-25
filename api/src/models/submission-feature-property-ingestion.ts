@@ -13,7 +13,7 @@ export const IngestionErrorCountRow = z.object({
  */
 export const IngestionErrorSummaryRow = z.object({
   property_name: z.string().nullable(),
-  feature_type_property_id: z.number().nullable(),
+  blueprint_feature_type_property_id: z.number().nullable(),
   error_code: z.string(),
   error_message: z.string(),
   count: z.number(),

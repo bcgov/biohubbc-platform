@@ -354,7 +354,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .resolves([
         {
           property_name: 'count',
-          feature_type_property_id: 22,
+          blueprint_feature_type_property_id: 22,
           error_code: 'TYPE_MISMATCH',
           error_message: 'Property value type mismatch',
           count: 2,

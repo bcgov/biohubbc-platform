@@ -36,11 +36,11 @@ export class SubmissionFeaturePropertyBooleanService extends DBService {
     );
   }
 
-  getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId(
-    featureTypePropertyId: number
+  getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId(
+    blueprintFeatureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyBoolean[]> {
-    return this.submissionFeaturePropertyBooleanRepository.getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId(
-      featureTypePropertyId
+    return this.submissionFeaturePropertyBooleanRepository.getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId(
+      blueprintFeatureTypePropertyId
     );
   }
 }

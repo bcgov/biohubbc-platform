@@ -163,7 +163,7 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('"p"."feature_type_property_id" = 123');
+      expect(sql).to.include('"bftp"."feature_type_property_id" = 123');
     });
 
     it('should project related predicate evidence to anchor feature ids through the content walk and closure probes', () => {

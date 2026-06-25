@@ -56,15 +56,21 @@ export async function featureTypeIdByName(connection: IDBConnection, name: strin
  * @param allowedTargetFeatureTypeNames Allowed target feature type name(s). Pass a single string,
  *   an array of names, or null for "no permitted target".
  * @param allowMultiple Whether the property may carry multiple references.
- * @returns The new feature_type_property_id, the resolved allowed feature_type_ids (empty when no
- *   targets), and the feature_property.name to use as the data.properties key on source features.
+ * @returns The new feature_type_property_id, the blueprint assignment's blueprint_feature_type_property_id
+ *   (which indexed rows reference), the resolved allowed feature_type_ids (empty when no targets), and the
+ *   feature_property.name to use as the data.properties key on source features.
  */
 export async function createFeatureTypeProperty(
   connection: IDBConnection,
   sourceFeatureTypeName: string,
   allowedTargetFeatureTypeNames: string | string[] | null,
   allowMultiple = false
-): Promise<{ featureTypePropertyId: number; allowedFeatureTypeIds: number[]; propertyName: string }> {
+): Promise<{
+  featureTypePropertyId: number;
+  blueprintFeatureTypePropertyId: number;
+  allowedFeatureTypeIds: number[];
+  propertyName: string;
+}> {
   const systemUserId = connection.systemUserId();
 
   await connection.sql(SQL`
@@ -137,25 +143,37 @@ export async function createFeatureTypeProperty(
   `);
   const blueprintFeatureTypeId: number = bftResult.rows[0].blueprint_feature_type_id;
 
-  await connection.sql(SQL`
-    INSERT INTO blueprint_feature_type_property (
-      blueprint_feature_type_id,
-      feature_type_property_id,
-      required_value,
-      allow_multiple,
-      create_user
+  const bftpResult = await connection.sql(SQL`
+    WITH inserted AS (
+      INSERT INTO blueprint_feature_type_property (
+        blueprint_feature_type_id,
+        feature_type_property_id,
+        required_value,
+        allow_multiple,
+        create_user
+      )
+      VALUES (
+        ${blueprintFeatureTypeId},
+        ${featureTypePropertyId},
+        false,
+        ${allowMultiple},
+        ${systemUserId}
+      )
+      ON CONFLICT (blueprint_feature_type_id, feature_type_property_id)
+      WHERE record_end_date IS NULL
+      DO NOTHING
+      RETURNING blueprint_feature_type_property_id
     )
-    VALUES (
-      ${blueprintFeatureTypeId},
-      ${featureTypePropertyId},
-      false,
-      ${allowMultiple},
-      ${systemUserId}
-    )
-    ON CONFLICT (blueprint_feature_type_id, feature_type_property_id)
-    WHERE record_end_date IS NULL
-    DO NOTHING;
+    SELECT blueprint_feature_type_property_id FROM inserted
+    UNION ALL
+    SELECT blueprint_feature_type_property_id
+    FROM blueprint_feature_type_property
+    WHERE blueprint_feature_type_id = ${blueprintFeatureTypeId}
+      AND feature_type_property_id = ${featureTypePropertyId}
+      AND record_end_date IS NULL
+    LIMIT 1;
   `);
+  const blueprintFeatureTypePropertyId: number = bftpResult.rows[0].blueprint_feature_type_property_id;
 
   const targetNames =
     allowedTargetFeatureTypeNames === null
@@ -178,7 +196,7 @@ export async function createFeatureTypeProperty(
     `);
   }
 
-  return { featureTypePropertyId, allowedFeatureTypeIds, propertyName };
+  return { featureTypePropertyId, blueprintFeatureTypePropertyId, allowedFeatureTypeIds, propertyName };
 }
 
 /**
@@ -215,13 +233,13 @@ export async function getSubmissionFeatureErrors(
  * The link table has no `value` column — the "value" of a feature-typed property is
  * the set of referenced submission_feature_ids carried by these rows. FK semantics:
  * both `submission_feature_id` (source) and `referenced_submission_feature_id` point
- * at `biohub.submission_feature`, and `feature_type_property_id` must be a property
- * declared on the source feature's type.
+ * at `biohub.submission_feature`, and `blueprint_feature_type_property_id` must be a Blueprint
+ * assignment of a property declared on the source feature's type.
  */
 export async function insertSubmissionFeaturePropertyFeature(
   connection: IDBConnection,
   sourceSubmissionFeatureId: number,
-  featureTypePropertyId: number,
+  blueprintFeatureTypePropertyId: number,
   referencedSubmissionFeatureId: number
 ): Promise<void> {
   const systemUserId = connection.systemUserId();
@@ -229,13 +247,13 @@ export async function insertSubmissionFeaturePropertyFeature(
   await connection.sql(SQL`
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
-      feature_type_property_id,
+      blueprint_feature_type_property_id,
       referenced_submission_feature_id,
       create_user
     )
     VALUES (
       ${sourceSubmissionFeatureId},
-      ${featureTypePropertyId},
+      ${blueprintFeatureTypePropertyId},
       ${referencedSubmissionFeatureId},
       ${systemUserId}
     );
@@ -246,9 +264,9 @@ export async function insertSubmissionFeaturePropertyFeature(
 export async function getPropertyFeatureRows(
   connection: IDBConnection,
   sourceFeatureId: number
-): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
+): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
   const result = await connection.sql(SQL`
-    SELECT referenced_submission_feature_id, feature_type_property_id
+    SELECT referenced_submission_feature_id, blueprint_feature_type_property_id
     FROM submission_feature_property_feature
     WHERE submission_feature_id = ${sourceFeatureId}
     ORDER BY referenced_submission_feature_id;

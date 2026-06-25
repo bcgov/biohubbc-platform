@@ -14,7 +14,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
   const mockRow: SubmissionFeaturePropertyTimestamp = {
     submission_feature_property_timestamp_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     date_value: '2026-01-01',
     time_value: '00:00:00'
   };
@@ -26,7 +26,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyTimestamp({
         submission_feature_id: 10,
-        feature_type_property_id: 20,
+        blueprint_feature_type_property_id: 20,
         date_value: '2026-01-01',
         time_value: '00:00:00'
       });
@@ -41,7 +41,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyTimestamp({
           submission_feature_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           date_value: '2026-01-01',
           time_value: '00:00:00'
         });
@@ -93,10 +93,10 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
       expect(result).to.eql([mockRow]);
     });
 
-    it('lists by feature_type_property_id', async () => {
+    it('lists by blueprint_feature_type_property_id', async () => {
       const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
       const repository = new SubmissionFeaturePropertyTimestampRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(20);
+      const result = await repository.getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
   });
