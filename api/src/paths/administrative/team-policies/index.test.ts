@@ -29,6 +29,7 @@ describe('team-policies', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Test Team',
           policy_name: 'Test Policy'
         }
@@ -99,7 +100,8 @@ describe('team-policies', () => {
       const mockResponse: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
       sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves(mockResponse);

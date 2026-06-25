@@ -30,7 +30,7 @@ export class TeamPolicyRepository extends BaseRepository {
         team_id: teamPolicyData.team_id,
         policy_id: teamPolicyData.policy_id
       })
-      .returning(['team_policy_id', 'team_id', 'policy_id']);
+      .returning(['team_policy_id', 'team_id', 'policy_id', 'record_end_date']);
 
     const response = await this.connection.knex(query, TeamPolicy);
 
@@ -55,7 +55,7 @@ export class TeamPolicyRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('team_policy')
-      .select(['team_policy_id', 'team_id', 'policy_id'])
+      .select(['team_policy_id', 'team_id', 'policy_id', 'record_end_date'])
       .where('team_policy_id', teamPolicyId);
 
     const response = await this.connection.knex(query, TeamPolicy);
@@ -85,7 +85,14 @@ export class TeamPolicyRepository extends BaseRepository {
   async getTeamPolicies(filters?: TeamPolicyFilters, pagination?: ApiPaginationOptions): Promise<TeamPolicyDetails[]> {
     const knex = getKnex();
     const query = knex
-      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
+      .select([
+        'tp.team_policy_id',
+        'tp.team_id',
+        'tp.policy_id',
+        'tp.record_end_date',
+        't.name as team_name',
+        'p.name as policy_name'
+      ])
       .from('team_policy as tp')
       .innerJoin('team as t', 'tp.team_id', 't.team_id')
       .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
@@ -120,7 +127,14 @@ export class TeamPolicyRepository extends BaseRepository {
   ): Promise<TeamPolicyDetails[]> {
     const knex = getKnex();
     const query = knex
-      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
+      .select([
+        'tp.team_policy_id',
+        'tp.team_id',
+        'tp.policy_id',
+        'tp.record_end_date',
+        't.name as team_name',
+        'p.name as policy_name'
+      ])
       .from('team_policy as tp')
       .innerJoin('team as t', 'tp.team_id', 't.team_id')
       .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
@@ -181,7 +195,7 @@ export class TeamPolicyRepository extends BaseRepository {
         record_end_date: teamPolicyData.record_end_date
       })
       .where('team_policy_id', teamPolicyId)
-      .returning(['team_policy_id', 'team_id', 'policy_id']);
+      .returning(['team_policy_id', 'team_id', 'policy_id', 'record_end_date']);
 
     const response = await this.connection.knex(query, TeamPolicy);
 

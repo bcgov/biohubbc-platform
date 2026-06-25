@@ -57,6 +57,7 @@ const mockTeamPolicies: ITeamPolicyDetails[] = [
     team_policy_id: 'tp-1',
     team_id: 'team-1',
     policy_id: 'policy-1',
+    record_end_date: null,
     team_name: 'Alpha Team',
     policy_name: 'Data Access Policy'
   },
@@ -64,6 +65,7 @@ const mockTeamPolicies: ITeamPolicyDetails[] = [
     team_policy_id: 'tp-2',
     team_id: 'team-2',
     policy_id: 'policy-2',
+    record_end_date: null,
     team_name: 'Beta Team',
     policy_name: 'Security Policy'
   }

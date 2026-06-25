@@ -567,6 +567,29 @@ export async function up(knex: Knex): Promise<void> {
     SELECT policy_statement_id, policy_expression_id
     FROM single_statement_links;
 
+    DO $$
+    BEGIN
+      IF EXISTS (
+        WITH expected AS (
+          SELECT policy_statement_id
+          FROM tmp_policy_statement_expression_active
+          GROUP BY policy_statement_id
+        ),
+        actual AS (
+          SELECT policy_statement_id, count(*) AS link_count
+          FROM tmp_policy_statement_policy_expression_link
+          GROUP BY policy_statement_id
+        )
+        SELECT 1
+        FROM expected
+        LEFT JOIN actual ON actual.policy_statement_id = expected.policy_statement_id
+        WHERE actual.link_count IS DISTINCT FROM 1
+      ) THEN
+        RAISE EXCEPTION 'Cannot migrate policy_statement_expression rows: expected exactly one policy_expression link per staged policy statement';
+      END IF;
+    END;
+    $$;
+
     ----------------------------------------------------------------------------------------
     -- 11. Move the final expression link onto policy_statement and remove the obsolete
     --     legacy table.
@@ -576,13 +599,23 @@ export async function up(knex: Knex): Promise<void> {
     FROM tmp_policy_statement_policy_expression_link link
     WHERE link.policy_statement_id = ps.policy_statement_id;
 
-    ALTER TABLE policy_expression
-      ADD CONSTRAINT policy_expression_uk1 UNIQUE (policy_expression_id, policy_id);
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM tmp_policy_statement_policy_expression_link link
+        JOIN policy_statement ps ON ps.policy_statement_id = link.policy_statement_id
+        WHERE ps.policy_expression_id IS DISTINCT FROM link.policy_expression_id
+      ) THEN
+        RAISE EXCEPTION 'Failed to backfill policy_statement.policy_expression_id for one or more staged policy statements';
+      END IF;
+    END;
+    $$;
 
     ALTER TABLE policy_statement
       ADD CONSTRAINT policy_statement_fk2
-        FOREIGN KEY (policy_expression_id, policy_id)
-        REFERENCES policy_expression(policy_expression_id, policy_id);
+        FOREIGN KEY (policy_expression_id)
+        REFERENCES policy_expression(policy_expression_id);
 
     CREATE INDEX policy_statement_idx3 ON policy_statement(policy_expression_id);
     CREATE INDEX policy_statement_idx4
@@ -1052,7 +1085,23 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS security_scope_id;
 
     ----------------------------------------------------------------------------------------
-    -- 3f. Remove the policy_expression additions from policy_statement.
+    -- 3f. Remove security_scope-owned URN storage.
+    --
+    -- The legacy schema stores URN details on policy_statement and maps statements
+    -- to security scopes through policy_statement_scope, so remove the canonical
+    -- security_scope URN columns and indexes introduced by the up migration.
+    ----------------------------------------------------------------------------------------
+    DROP INDEX IF EXISTS security_scope_idx1;
+    DROP INDEX IF EXISTS security_scope_idx2;
+    DROP INDEX IF EXISTS security_scope_idx3;
+
+    ALTER TABLE security_scope
+      DROP COLUMN IF EXISTS urn_submission_id,
+      DROP COLUMN IF EXISTS urn_feature_type,
+      DROP COLUMN IF EXISTS urn_feature_id;
+
+    ----------------------------------------------------------------------------------------
+    -- 3g. Remove the policy_expression additions from policy_statement.
     --
     -- The legacy policy_statement_expression table has already been rebuilt from
     -- policy_statement.policy_expression_id, so remove the new statement pointer
@@ -1064,9 +1113,6 @@ export async function down(knex: Knex): Promise<void> {
     ALTER TABLE policy_statement
       DROP CONSTRAINT IF EXISTS policy_statement_fk2,
       DROP COLUMN IF EXISTS policy_expression_id;
-
-    ALTER TABLE policy_expression
-      DROP CONSTRAINT IF EXISTS policy_expression_uk1;
 
     DROP TABLE IF EXISTS policy_expression;
   `);

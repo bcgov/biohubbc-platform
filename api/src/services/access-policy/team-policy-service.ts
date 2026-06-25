@@ -44,7 +44,8 @@ export class TeamPolicyService extends DBService {
       return {
         team_policy_id: existingPolicy.team_policy_id,
         team_id: existingPolicy.team_id,
-        policy_id: existingPolicy.policy_id
+        policy_id: existingPolicy.policy_id,
+        record_end_date: existingPolicy.record_end_date
       };
     }
 
@@ -151,15 +152,35 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
-   * Update an existing team policy record.
+   * Update a team policy and rebuild the team's security scope grants if active state changes.
+   *
+   * The only mutable team-policy field is currently `record_end_date`. Changing
+   * it can add or remove a policy from the active chain, so the derived
+   * `team_security_scope` cache only needs a rebuild when this update moves the
+   * link into or out of that active chain.
    *
    * @param {string} teamPolicyId - The ID of the team policy to update.
    * @param {UpdateTeamPolicy} teamPolicyData - Partial data to update the team policy record.
    * @return {Promise<TeamPolicy>} - The updated team policy record.
    * @memberof TeamPolicyService
    */
-  updateTeamPolicy(teamPolicyId: string, teamPolicyData: UpdateTeamPolicy): Promise<TeamPolicy> {
-    return this.teamPolicyRepository.updateTeamPolicy(teamPolicyId, teamPolicyData);
+  async updateTeamPolicy(teamPolicyId: string, teamPolicyData: UpdateTeamPolicy): Promise<TeamPolicy> {
+    const existingTeamPolicy = await this.teamPolicyRepository.getTeamPolicy(teamPolicyId);
+
+    if (teamPolicyData.record_end_date === undefined) {
+      return existingTeamPolicy;
+    }
+
+    const updatedTeamPolicy = await this.teamPolicyRepository.updateTeamPolicy(teamPolicyId, teamPolicyData);
+
+    const wasActive = existingTeamPolicy.record_end_date === null;
+    const isActive = updatedTeamPolicy.record_end_date === null;
+
+    if (wasActive !== isActive) {
+      await this.securityScopeService.rebuildTeamSecurityScopes(existingTeamPolicy.team_id);
+    }
+
+    return updatedTeamPolicy;
   }
 
   /**

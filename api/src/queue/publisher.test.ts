@@ -34,7 +34,8 @@ describe('publisher', () => {
     submission_id: 123,
     upload_id: 'upload-uuid-1',
     status: 'uploaded',
-    ticket_id: '11111111-1111-1111-1111-111111111111'
+    ticket_id: '11111111-1111-1111-1111-111111111111',
+    blueprint_id: 1
   };
 
   describe('publishProcessSubmissionFeaturesJob', () => {
@@ -719,21 +720,27 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('anchors-job-id');
     });
 
-    it('uses 30 minute timeout with retry backoff', async () => {
-      const mockConnection = getMockDBConnection();
-      const sendStub = sinon.stub().resolves('anchors-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+    it('uses 30 minute timeout with retry backoff and a 20 second cooldown', async () => {
+      const clock = sinon.useFakeTimers(new Date('2026-06-24T12:00:00.000Z'));
+      try {
+        const mockConnection = getMockDBConnection();
+        const sendStub = sinon.stub().resolves('anchors-job-id');
+        const createQueueStub = sinon.stub().resolves();
+        const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+        sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 
-      const options = sendStub.firstCall.args[2];
-      expect(options.retryLimit).to.equal(3);
-      expect(options.retryDelay).to.equal(60);
-      expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 30);
+        const options = sendStub.firstCall.args[2];
+        expect(options.retryLimit).to.equal(3);
+        expect(options.retryDelay).to.equal(60);
+        expect(options.retryBackoff).to.equal(true);
+        expect(options.expireInSeconds).to.equal(60 * 30);
+        expect(options.startAfter).to.deep.equal(new Date('2026-06-24T12:00:20.000Z'));
+      } finally {
+        clock.restore();
+      }
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
@@ -751,7 +758,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
     });
 
-    it('uses global singletonKey to serialize all anchor computation jobs', async () => {
+    it('uses a per-scope singletonKey to coalesce repeated anchor computation jobs for the same scope', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -762,7 +769,26 @@ describe('publisher', () => {
       await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('scope-anchors');
+      expect(options.singletonKey).to.equal('scope-anchors-scope-uuid-456');
+    });
+
+    it('honours an explicit startAfter override', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+      const startAfter = new Date('2026-06-24T12:05:00.000Z');
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeAnchorsJob(
+        mockConnection,
+        { securityScopeId: 'scope-uuid-456' },
+        { startAfter }
+      );
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.startAfter).to.equal(startAfter);
     });
 
     it('returns duplicate status when send returns null', async () => {

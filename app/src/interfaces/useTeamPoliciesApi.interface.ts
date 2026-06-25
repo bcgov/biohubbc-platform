@@ -7,6 +7,7 @@ export interface ITeamPolicyDetails {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
   team_name: string;
   policy_name: string;
 }
@@ -34,6 +35,7 @@ export interface ITeamPolicy {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
 }
 
 /**
@@ -50,6 +52,7 @@ export interface ITeamPolicyAssignment {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
 }
 
 /**

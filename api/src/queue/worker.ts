@@ -221,7 +221,7 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
 
   // Create main queue with dead letter queue and retry configuration.
-  // policy: 'short' enforces the global singletonKey used by anchor jobs.
+  // policy: 'short' enforces the per-scope singletonKey used by anchor jobs.
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS, {
     deadLetter: JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
     retryLimit: 3,

@@ -13,7 +13,7 @@ import { paginationResponseSchema } from './pagination';
 export const TeamPolicyDetailsSchema: OpenAPIV3.SchemaObject = {
   title: 'TeamPolicyDetails',
   type: 'object',
-  required: ['team_policy_id', 'team_id', 'policy_id', 'team_name', 'policy_name'],
+  required: ['team_policy_id', 'team_id', 'policy_id', 'record_end_date', 'team_name', 'policy_name'],
   properties: {
     team_policy_id: {
       type: 'string',
@@ -29,6 +29,11 @@ export const TeamPolicyDetailsSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       format: 'uuid',
       description: 'ID of the policy'
+    },
+    record_end_date: {
+      type: 'string',
+      nullable: true,
+      description: 'Soft-delete timestamp for the team-policy association'
     },
     team_name: {
       type: 'string',
@@ -104,7 +109,7 @@ export const CreateTeamPoliciesRequestSchema: OpenAPIV3.SchemaObject = {
 export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
   title: 'TeamPolicy',
   type: 'object',
-  required: ['team_policy_id', 'team_id', 'policy_id'],
+  required: ['team_policy_id', 'team_id', 'policy_id', 'record_end_date'],
   properties: {
     team_policy_id: {
       type: 'string',
@@ -120,6 +125,11 @@ export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       format: 'uuid',
       description: 'ID of the policy'
+    },
+    record_end_date: {
+      type: 'string',
+      nullable: true,
+      description: 'Soft-delete timestamp for the team-policy association'
     }
   }
 };

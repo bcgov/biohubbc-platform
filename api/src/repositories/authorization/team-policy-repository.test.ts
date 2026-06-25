@@ -16,7 +16,7 @@ describe('TeamPolicyRepository', () => {
 
   describe('insertTeamPolicy', () => {
     it('returns a team policy record on success', async () => {
-      const mockRows = [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc' }];
+      const mockRows = [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc', record_end_date: null }];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
@@ -47,7 +47,7 @@ describe('TeamPolicyRepository', () => {
 
   describe('getTeamPolicy', () => {
     it('returns a team policy by ID', async () => {
-      const mockRows = [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc' }];
+      const mockRows = [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc', record_end_date: null }];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
@@ -80,8 +80,22 @@ describe('TeamPolicyRepository', () => {
   describe('getTeamPolicies', () => {
     it('returns all team policies', async () => {
       const mockRows = [
-        { team_policy_id: 1, team_id: '11', policy_id: '123abc', team_name: 'Team 1', policy_name: 'Policy A' },
-        { team_policy_id: 2, team_id: '11', policy_id: '456xyz', team_name: 'Team 1', policy_name: 'Policy B' }
+        {
+          team_policy_id: 1,
+          team_id: '11',
+          policy_id: '123abc',
+          record_end_date: null,
+          team_name: 'Team 1',
+          policy_name: 'Policy A'
+        },
+        {
+          team_policy_id: 2,
+          team_id: '11',
+          policy_id: '456xyz',
+          record_end_date: null,
+          team_name: 'Team 1',
+          policy_name: 'Policy B'
+        }
       ];
       const mockResponse = {
         rowCount: 2,
@@ -111,6 +125,7 @@ describe('TeamPolicyRepository', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Test Team',
           policy_name: 'Test Policy'
         }
@@ -136,6 +151,7 @@ describe('TeamPolicyRepository', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Test Team',
           policy_name: 'Test Policy'
         }
@@ -160,6 +176,7 @@ describe('TeamPolicyRepository', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Test Team',
           policy_name: 'Test Policy'
         }
@@ -184,7 +201,7 @@ describe('TeamPolicyRepository', () => {
     it('returns updated team policy record', async () => {
       const mockResponse = {
         rowCount: 1,
-        rows: [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc' }]
+        rows: [{ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc', record_end_date: null }]
       } as unknown as Promise<QueryResult<any>>;
 
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
@@ -192,7 +209,7 @@ describe('TeamPolicyRepository', () => {
       const repository = new TeamPolicyRepository(mockConnection);
       const result = await repository.updateTeamPolicy('1', { record_end_date: new Date().toISOString() });
 
-      expect(result).to.eql({ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc' });
+      expect(result).to.eql({ team_policy_id: 1, team_id: '456xyz', policy_id: '123abc', record_end_date: null });
     });
 
     it('throws error if update fails', async () => {
