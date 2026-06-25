@@ -38,11 +38,11 @@ const App = () => {
                 // See https://github.com/authts/react-oidc-context#getting-started
                 // Strip only the OIDC response params so any original search params on the
                 // return URL (e.g. the encoded `expr` search expression) are preserved.
-                const url = new URL(window.location.href);
+                const url = new URL(globalThis.location.href);
                 ['code', 'state', 'session_state', 'iss', 'error', 'error_description'].forEach((param) =>
                   url.searchParams.delete(param)
                 );
-                window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+                globalThis.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
               }
             };
 

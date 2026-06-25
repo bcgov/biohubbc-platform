@@ -46,7 +46,7 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
    */
   const handleOpenCreateDataRequest = useCallback(() => {
     if (!auth.isAuthenticated) {
-      const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+      const redirectUri = `${globalThis.location.origin}${globalThis.location.pathname}${globalThis.location.search}`;
       auth.signinRedirect({ redirect_uri: redirectUri });
       return;
     }
