@@ -5,7 +5,7 @@ import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
-import { IAddPolicyFormValues } from 'features/admin/policies/components/AddPolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   ITicketArtifact,
@@ -29,7 +29,7 @@ interface ITicketTimelineItemsProps {
   onArtifactLinkClick: (artifact: ITicketArtifact) => Promise<void>;
   onEditComment: (ticketCommentId: string) => void;
   onDeleteComment: (ticketCommentId: string) => void;
-  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IAddPolicyFormValues>) => void;
+  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IPolicyFormValues>) => void;
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;

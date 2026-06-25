@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { SECURITY_SCOPE_ANCHOR_BATCH_SIZE } from '../../constants/security';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { PolicyEffect, PolicyStatementUrn } from '../../models/policy-statement';
+import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
@@ -12,8 +12,8 @@ import { isEffectivelySecured } from '../sql-fragments';
  * Repository for security scope tables — the normalized access model that replaces
  * the materialized team_feature cache.
  *
- * All four scope tables (`security_scope`, `policy_statement_scope`,
- * `security_scope_anchor`, `team_security_scope`) are derived data.
+ * The scope cache tables (`security_scope`, `security_scope_anchor`,
+ * `team_security_scope`) are derived data.
  * They use hard-delete, not soft-delete, because they are recomputable
  * from the operational source of truth (policy_statement, team_policy).
  */
@@ -29,20 +29,66 @@ export class SecurityScopeRepository extends BaseRepository {
    * already exists. The service handles the existing-scope case with a separate lookup.
    *
    * @param scopeHash SHA-256 hex of the normalized URN string
+   * @param urn URN components stored on the reusable scope row
    * @returns The inserted SecurityScope, or null if scope_hash already exists
    */
-  async insertSecurityScope(scopeHash: string): Promise<SecurityScope | null> {
+  async insertSecurityScope(scopeHash: string, urn?: SecurityScopeUrn): Promise<SecurityScope | null> {
+    const scopeUrn = urn ?? {
+      urn_submission_id: '*',
+      urn_feature_type: '*',
+      urn_feature_id: '*'
+    };
     const sqlStatement = SQL`
-      INSERT INTO security_scope (scope_hash)
-      VALUES (${scopeHash})
+      INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+      VALUES (${scopeHash}, ${scopeUrn.urn_submission_id}, ${scopeUrn.urn_feature_type}, ${scopeUrn.urn_feature_id})
       ON CONFLICT (scope_hash) DO NOTHING
-      RETURNING security_scope_id, scope_hash;
+      RETURNING security_scope_id, scope_hash, urn_submission_id, urn_feature_type, urn_feature_id;
     `;
 
     const response = await this.connection.sql(sqlStatement, SecurityScope);
 
     if (response.rowCount === 0) {
       return null;
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert or return the existing security scope for a scope_hash in one roundtrip.
+   *
+   * Uses an INSERT CTE plus fallback SELECT instead of `ON CONFLICT DO UPDATE`
+   * so reusing an existing scope does not fire update/audit triggers.
+   *
+   * @param scopeHash SHA-256 hex of the normalized URN string
+   * @param urn URN components stored on the reusable scope row
+   * @returns The inserted or existing SecurityScope
+   */
+  async ensureSecurityScope(scopeHash: string, urn: SecurityScopeUrn): Promise<SecurityScope> {
+    const sqlStatement = SQL`
+      WITH inserted AS (
+        INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+        VALUES (${scopeHash}, ${urn.urn_submission_id}, ${urn.urn_feature_type}, ${urn.urn_feature_id})
+        ON CONFLICT (scope_hash) DO NOTHING
+        RETURNING security_scope_id, scope_hash, urn_submission_id, urn_feature_type, urn_feature_id
+      )
+      SELECT security_scope_id, scope_hash, urn_submission_id, urn_feature_type, urn_feature_id
+      FROM inserted
+      UNION ALL
+      SELECT security_scope_id, scope_hash, urn_submission_id, urn_feature_type, urn_feature_id
+      FROM security_scope
+      WHERE scope_hash = ${scopeHash}
+        AND NOT EXISTS (SELECT 1 FROM inserted)
+      LIMIT 1;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SecurityScope);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to ensure security scope', [
+        'SecurityScopeRepository->ensureSecurityScope',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
     }
 
     return response.rows[0];
@@ -61,6 +107,7 @@ export class SecurityScopeRepository extends BaseRepository {
   async getSecurityScopeByScopeHash(scopeHash: string): Promise<SecurityScope> {
     const sqlStatement = SQL`
       SELECT security_scope_id, scope_hash
+           , urn_submission_id, urn_feature_type, urn_feature_id
       FROM security_scope
       WHERE scope_hash = ${scopeHash};
     `;
@@ -78,45 +125,6 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Create a mapping between a policy statement and a security scope.
-   *
-   * One policy statement maps to exactly one scope. Multiple statements
-   * can share the same scope (via scope_hash deduplication).
-   *
-   * @param policyStatementId UUID of the policy statement
-   * @param securityScopeId UUID of the security scope
-   */
-  async insertPolicyStatementScope(policyStatementId: string, securityScopeId: string): Promise<void> {
-    const sqlStatement = SQL`
-      INSERT INTO policy_statement_scope (policy_statement_id, security_scope_id)
-      VALUES (${policyStatementId}, ${securityScopeId})
-      ON CONFLICT (policy_statement_id) DO NOTHING;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Hard-delete policy_statement_scope rows for the given policy statement IDs.
-   *
-   * Called when policy statements are soft-deleted — the derived mapping must be
-   * cleaned up even though the source policy_statement uses soft-delete.
-   * Scope tables are derived data with no audit trail requirement.
-   *
-   * @param policyStatementIds UUIDs of the policy statements being removed
-   */
-  async deletePolicyStatementScopes(policyStatementIds: string[]): Promise<void> {
-    if (policyStatementIds.length === 0) {
-      return;
-    }
-
-    const knex = getKnex();
-    const query = knex.table('policy_statement_scope').whereIn('policy_statement_id', policyStatementIds).del();
-
-    await this.connection.knex(query);
-  }
-
-  /**
    * Delete one keyset-paginated batch of stale anchors for a security scope.
    *
    * An anchor becomes stale when its feature is no longer effectively secured
@@ -129,9 +137,9 @@ export class SecurityScopeRepository extends BaseRepository {
    * Called before the keyset insert loop so valid anchors are never deleted —
    * no transient search gap where the walk-up strategy can't find a matching anchor.
    *
-   * Handles both live and orphaned scopes: an anchor is stale if NO active policy
-   * statement validates it. For orphaned scopes (zero policy_statement_scope rows),
-   * the NOT EXISTS subquery finds nothing, so all anchors are deleted.
+   * Runs only for scopes currently referenced by an active approved ALLOW
+   * statement. Anchors are reusable cache rows and do not grant access without
+   * `team_security_scope`, so orphaned scopes keep their anchors for future reuse.
    *
    * **Why keyset pagination:** With ~10% of features secured per submission,
    * a scope can have 50k+ anchors. The monolithic DELETE runs
@@ -152,11 +160,24 @@ export class SecurityScopeRepository extends BaseRepository {
       anchor_submission_feature_id: number;
       page_last_id: number;
     }>(
-      `WITH batch AS (
+      `WITH active_scope AS (
+         SELECT 1
+         FROM security_scope ss
+         JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
+         JOIN policy p ON p.policy_id = ps.policy_id
+         WHERE ss.security_scope_id = $1
+           AND ps.record_end_date IS NULL
+           AND ps.effect = '${PolicyEffect.ALLOW}'
+           AND p.record_end_date IS NULL
+           AND p.status = 'approved'
+         LIMIT 1
+       ),
+       batch AS (
          SELECT ssa.anchor_submission_feature_id
          FROM security_scope_anchor ssa
          WHERE ssa.security_scope_id = $1
            AND ssa.anchor_submission_feature_id > $2
+           AND EXISTS (SELECT 1 FROM active_scope)
          ORDER BY ssa.anchor_submission_feature_id
          LIMIT $3
        )
@@ -166,20 +187,20 @@ export class SecurityScopeRepository extends BaseRepository {
        FROM batch b
        WHERE NOT EXISTS (
          SELECT 1
-         FROM policy_statement_scope pss
-         JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+         FROM security_scope ss
+         JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
          JOIN policy p ON p.policy_id = ps.policy_id
          JOIN submission_feature anchor_sf ON anchor_sf.submission_feature_id = b.anchor_submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = anchor_sf.feature_type_id
-         WHERE pss.security_scope_id = $1
+         WHERE ss.security_scope_id = $1
            AND ps.record_end_date IS NULL
            AND ps.effect = '${PolicyEffect.ALLOW}'
            AND p.record_end_date IS NULL
            AND p.status = 'approved'
            AND anchor_sf.record_end_date IS NULL
-           AND (ps.urn_submission_id = anchor_sf.submission_id::text OR ps.urn_submission_id = '*')
-           AND (ps.urn_feature_type = ft.name                       OR ps.urn_feature_type = '*')
-           AND (ps.urn_feature_id = anchor_sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+           AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
+           AND (ss.urn_feature_type = ft.name                       OR ss.urn_feature_type = '*')
+           AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
            AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
            AND anchor_sf.record_effective_date <= now()
        )`,
@@ -202,12 +223,25 @@ export class SecurityScopeRepository extends BaseRepository {
     // No stale anchors in this batch — check if the batch had any anchors at all
     // to advance the cursor past valid anchors.
     const boundaryResult = await this.connection.query<{ last_id: number }>(
-      `SELECT MAX(ssa.anchor_submission_feature_id) AS last_id
+      `WITH active_scope AS (
+         SELECT 1
+         FROM security_scope ss
+         JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
+         JOIN policy p ON p.policy_id = ps.policy_id
+         WHERE ss.security_scope_id = $1
+           AND ps.record_end_date IS NULL
+           AND ps.effect = '${PolicyEffect.ALLOW}'
+           AND p.record_end_date IS NULL
+           AND p.status = 'approved'
+         LIMIT 1
+       )
+       SELECT MAX(ssa.anchor_submission_feature_id) AS last_id
        FROM (
          SELECT ssa.anchor_submission_feature_id
          FROM security_scope_anchor ssa
          WHERE ssa.security_scope_id = $1
            AND ssa.anchor_submission_feature_id > $2
+           AND EXISTS (SELECT 1 FROM active_scope)
          ORDER BY ssa.anchor_submission_feature_id
          LIMIT $3
        ) ssa`,
@@ -222,39 +256,21 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Clean up all derived data for an orphaned scope (no active policy statements).
-   *
-   * Deletes both `security_scope_anchor` and `team_security_scope` rows — no team
-   * should retain access to a scope that has no policy statements backing it.
-   * The service's `rebuildTeamSecurityScopes` handles known affected teams, but
-   * cleaning by scope_id here catches any team_security_scope rows that weren't
-   * covered (e.g., race between team-policy creation and scope orphaning).
-   *
-   * @param securityScopeId UUID of the orphaned security scope
-   */
-  async deleteOrphanedScopeData(securityScopeId: string): Promise<void> {
-    await this.connection.query(`DELETE FROM security_scope_anchor WHERE security_scope_id = $1`, [securityScopeId]);
-
-    await this.connection.query(`DELETE FROM team_security_scope WHERE security_scope_id = $1`, [securityScopeId]);
-  }
-
-  /**
    * Resolve the URN pattern for a security scope.
    *
-   * Returns the URN components (submission_id, feature_type, feature_id) from the
-   * scope's originating policy statement. LIMIT 1 without ORDER BY is safe: scope_hash
-   * = SHA-256(urn), so all policy statements sharing a scope have identical URN components.
+   * Returns the reusable scope URN components when at least one active approved
+   * ALLOW statement still references the scope.
    *
    * @param securityScopeId UUID of the security scope
    * @returns URN components, or null if the scope has no active policy statements
    */
   async resolveUrnForScope(securityScopeId: string): Promise<SecurityScopeUrn | null> {
     const result = await this.connection.query<SecurityScopeUrn>(
-      `SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
-       FROM policy_statement_scope pss
-       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+      `SELECT ss.urn_submission_id, ss.urn_feature_type, ss.urn_feature_id
+       FROM security_scope ss
+       JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
        JOIN policy p ON p.policy_id = ps.policy_id
-       WHERE pss.security_scope_id = $1
+       WHERE ss.security_scope_id = $1
          AND ps.record_end_date IS NULL
          AND ps.effect = '${PolicyEffect.ALLOW}'
          AND p.record_end_date IS NULL
@@ -426,39 +442,13 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Get the security_scope_id for each of the given policy statement IDs.
-   *
-   * Called before deleting policy_statement_scope rows so the service can
-   * identify which scopes may become orphaned after deletion.
-   *
-   * @param policyStatementIds UUIDs of the policy statements
-   * @returns Distinct security_scope_id values referenced by those statements
-   */
-  async findScopeIdsForStatements(policyStatementIds: string[]): Promise<SecurityScopeId[]> {
-    if (policyStatementIds.length === 0) {
-      return [];
-    }
-
-    const knex = getKnex();
-    const query = knex
-      .distinct('security_scope_id')
-      .from('policy_statement_scope')
-      .whereIn('policy_statement_id', policyStatementIds);
-
-    const response = await this.connection.knex(query, SecurityScopeId);
-
-    return response.rows;
-  }
-
-  /**
-   * Filter a list of scope IDs to those with no remaining policy_statement_scope
-   * references. Called after deleting policy_statement_scope rows to identify
-   * which scopes became orphaned and need anchor cleanup via the background job.
+   * Filter a list of scope IDs to those with no remaining active approved ALLOW
+   * statement references.
    *
    * @param scopeIds Candidate scope IDs to check
-   * @returns Scope IDs that have zero policy_statement_scope references
+   * @returns Scope IDs that no longer grant standing access through any policy
    */
-  async findOrphanedScopeIds(scopeIds: string[]): Promise<SecurityScopeId[]> {
+  async findScopeIdsWithoutActiveApprovedAllowStatements(scopeIds: string[]): Promise<SecurityScopeId[]> {
     if (scopeIds.length === 0) {
       return [];
     }
@@ -467,7 +457,16 @@ export class SecurityScopeRepository extends BaseRepository {
     const query = knex
       .select('s.security_scope_id')
       .from(knex.raw('unnest(?::UUID[]) AS s(security_scope_id)', [scopeIds]))
-      .whereNotIn('s.security_scope_id', knex.select('security_scope_id').from('policy_statement_scope'));
+      .whereNotExists(function () {
+        this.select(knex.raw('1'))
+          .from('policy_statement as ps')
+          .join('policy as p', 'p.policy_id', 'ps.policy_id')
+          .whereRaw('ps.security_scope_id = s.security_scope_id')
+          .whereNull('ps.record_end_date')
+          .where('ps.effect', PolicyEffect.ALLOW)
+          .whereNull('p.record_end_date')
+          .where('p.status', 'approved');
+      });
 
     const response = await this.connection.knex(query, SecurityScopeId);
 
@@ -492,7 +491,7 @@ export class SecurityScopeRepository extends BaseRepository {
   async insertTeamSecurityScopesForPolicy(teamId: string, policyId: string): Promise<void> {
     const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
-      SELECT tp.team_id, pss.security_scope_id
+      SELECT tp.team_id, ps.security_scope_id
       FROM team_policy tp
       JOIN policy p
         ON p.policy_id = tp.policy_id
@@ -502,8 +501,6 @@ export class SecurityScopeRepository extends BaseRepository {
         ON ps.policy_id = p.policy_id
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
-      JOIN policy_statement_scope pss
-        ON pss.policy_statement_id = ps.policy_statement_id
       JOIN team t
         ON t.team_id = tp.team_id
         AND t.record_end_date IS NULL
@@ -532,7 +529,7 @@ export class SecurityScopeRepository extends BaseRepository {
   /**
    * Re-derive team_security_scope rows for a team from the active policy chain.
    *
-   * Walks team_policy → policy_statement → policy_statement_scope to find all
+   * Walks team_policy → policy_statement.security_scope_id to find all
    * scopes the team should have access to. ON CONFLICT DO NOTHING handles
    * duplicate scopes reached through multiple policies.
    *
@@ -541,7 +538,7 @@ export class SecurityScopeRepository extends BaseRepository {
   async insertTeamSecurityScopesFromPolicyChain(teamId: string): Promise<void> {
     const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
-      SELECT tp.team_id, pss.security_scope_id
+      SELECT tp.team_id, ps.security_scope_id
       FROM team_policy tp
       JOIN team t
         ON t.team_id = tp.team_id
@@ -554,8 +551,6 @@ export class SecurityScopeRepository extends BaseRepository {
         ON ps.policy_id = tp.policy_id
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
-      JOIN policy_statement_scope pss
-        ON pss.policy_statement_id = ps.policy_statement_id
       WHERE tp.team_id = ${teamId}
         AND tp.record_end_date IS NULL
       ON CONFLICT (team_id, security_scope_id) DO NOTHING;
@@ -577,11 +572,11 @@ export class SecurityScopeRepository extends BaseRepository {
    * statements, or does not exist — callers treat `[]` as a no-op signal.
    *
    * @param policyId UUID of the policy
-   * @returns Array of `{ policy_statement_id, submission_feature_urn }` for active ALLOW statements
+   * @returns Array of `{ security_scope_id }` for active ALLOW statements
    */
-  async findActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<PolicyStatementUrn[]> {
+  async findActiveAllowStatementsForApprovedPolicy(policyId: string): Promise<SecurityScopeId[]> {
     const sqlStatement = SQL`
-      SELECT ps.policy_statement_id, ps.submission_feature_urn
+      SELECT DISTINCT ps.security_scope_id
       FROM policy p
       JOIN policy_statement ps
         ON ps.policy_id = p.policy_id
@@ -592,7 +587,7 @@ export class SecurityScopeRepository extends BaseRepository {
         AND p.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sqlStatement, PolicyStatementUrn);
+    const response = await this.connection.sql(sqlStatement, SecurityScopeId);
 
     return response.rows;
   }
@@ -605,24 +600,23 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * A live `team_policy` link is required: a scope without one grants access to
    * no team, so anchor recomputation for it is wasted work. Gating here keeps
-   * anchor-compute jobs scoped to the access cache only — the invariant captured
-   * in SIMSBIOHUB-985.
+   * anchor-compute jobs scoped to the standing-access cache.
    *
    * @param submissionId The submission ID to match against scope URNs
    * @returns Array of SecurityScopeId rows for matching scopes
    */
   async findScopeIdsMatchingSubmission(submissionId: number): Promise<SecurityScopeId[]> {
     const sqlStatement = SQL`
-      SELECT DISTINCT pss.security_scope_id
+      SELECT DISTINCT ps.security_scope_id
       FROM policy_statement ps
-      JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
+      JOIN security_scope ss ON ss.security_scope_id = ps.security_scope_id
       JOIN policy p ON p.policy_id = ps.policy_id
       JOIN team_policy tp ON tp.policy_id = p.policy_id AND tp.record_end_date IS NULL
       WHERE ps.record_end_date IS NULL
         AND ps.effect = ${PolicyEffect.ALLOW}
         AND p.record_end_date IS NULL
         AND p.status = 'approved'
-        AND (ps.urn_submission_id = ${String(submissionId)} OR ps.urn_submission_id = '*');
+        AND (ss.urn_submission_id = ${String(submissionId)} OR ss.urn_submission_id = '*');
     `;
 
     const response = await this.connection.sql(sqlStatement, SecurityScopeId);

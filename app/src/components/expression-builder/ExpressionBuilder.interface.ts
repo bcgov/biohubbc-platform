@@ -4,6 +4,7 @@ import type {
   ExpressionPropertyType,
   ExpressionPredicateOperator
 } from 'interfaces/expression.interface';
+import { ReactNode } from 'react';
 
 export interface BuilderExpressionNode extends Omit<ExpressionTreeExpression, 'clauses'> {
   ui_id: string;
@@ -49,8 +50,26 @@ export interface ExpressionBuilderProperty {
 export interface ExpressionBuilderProps {
   value?: ExpressionTreeExpression;
   recommendedSearchTerm?: string;
+  readOnly?: boolean;
+  slots?: ExpressionBuilderSlots;
+  onChange?: (value: ExpressionTreeExpression | null) => unknown;
+  onValidationChange?: (error: string | null) => unknown;
   onApply?: (value: ExpressionTreeExpression | null) => unknown;
-  onCancel?: () => unknown;
+}
+
+export interface ExpressionBuilderSlotProps {
+  hasSuggestions: boolean;
+  suggestedProperties: ExpressionBuilderProperty[];
+  suggestedSpecies: ExpressionBuilderSearchOption[];
+  onSuggestedPropertyClick: (property: ExpressionBuilderProperty) => unknown;
+  onSuggestedSpeciesClick: (species: ExpressionBuilderSearchOption) => unknown;
+  onAddCondition: () => unknown;
+  onApply: () => unknown;
+}
+
+export interface ExpressionBuilderSlots {
+  header?: (props: ExpressionBuilderSlotProps) => ReactNode;
+  footer?: (props: ExpressionBuilderSlotProps) => ReactNode;
 }
 
 export interface BuilderValidation {

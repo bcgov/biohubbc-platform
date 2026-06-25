@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
-import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
-import { CustomMultiAutocompleteFormik } from 'components/fields/CustomMultiAutocompleteFormik';
+import { AutocompleteInputChangeReason } from '@mui/material/Autocomplete';
+import { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
+import CustomAutocompleteFormik from 'components/fields/CustomAutocompleteFormik';
 import { SearchAutocomplete } from 'components/search/SearchAutocomplete';
 import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { useFormikContext } from 'formik';
@@ -10,7 +11,7 @@ import yup from 'utils/YupSchema';
 
 export interface ITeamPolicyFormValues {
   team_id: string;
-  policies: string[];
+  policy_id: string;
 }
 
 export interface ITeamPolicyFormProps {
@@ -22,12 +23,12 @@ export interface ITeamPolicyFormProps {
 
 export const TeamPolicyFormInitialValues: ITeamPolicyFormValues = {
   team_id: '',
-  policies: []
+  policy_id: ''
 };
 
 export const TeamPolicyFormYupSchema = yup.object().shape({
   team_id: yup.string().required('Team is required'),
-  policies: yup.array().of(yup.string().required()).min(1, 'At least one policy is required').required()
+  policy_id: yup.string().required('Policy is required')
 });
 
 /**
@@ -45,7 +46,7 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
     value: team.team_id
   }));
 
-  const policyOptions: ICustomMultiAutocompleteOption[] = policies.map((policy) => ({
+  const policyOptions: ICustomAutocompleteOption<string>[] = policies.map((policy) => ({
     label: policy.name,
     value: policy.policy_id
   }));
@@ -67,13 +68,17 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
       </Box>
 
       <Box>
-        <CustomMultiAutocompleteFormik
-          name="policies"
+        <CustomAutocompleteFormik
+          id="policy_id"
+          name="policy_id"
           options={policyOptions}
           label="Policy"
           required
-          chipVisible
-          onSearchInput={onPolicySearch}
+          onInputChange={(_event, value, reason: AutocompleteInputChangeReason) => {
+            if (reason !== 'reset') {
+              onPolicySearch(value);
+            }
+          }}
         />
       </Box>
     </Box>

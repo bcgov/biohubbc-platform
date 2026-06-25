@@ -220,12 +220,14 @@ export const registerWorkers = async (): Promise<void> => {
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
 
-  // Create main queue with dead letter queue and retry configuration
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' enforces the per-scope singletonKey used by anchor jobs.
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS, {
     deadLetter: JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
     retryLimit: 3,
     retryDelay: 60,
-    retryBackoff: true
+    retryBackoff: true,
+    policy: 'short'
   });
 
   // Register compute scope anchors job handler

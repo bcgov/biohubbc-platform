@@ -1,4 +1,4 @@
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { ApiPaginationResponseParams, ApiSearchParams } from 'types/pagination';
 
 /**
  * Team-policy association with team and policy names for display.
@@ -7,12 +7,13 @@ export interface ITeamPolicyDetails {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
   team_name: string;
   policy_name: string;
 }
 
 /**
- * Response from GET /api/administrative/team-policies.
+ * Response from GET /api/administrative/policies/team.
  */
 export interface ITeamPoliciesResponse {
   team_policies: ITeamPolicyDetails[];
@@ -20,20 +21,27 @@ export interface ITeamPoliciesResponse {
 }
 
 /**
- * Request payload for creating a team-policy association.
+ * Search and filter params for GET /api/administrative/policies/team.
  */
-export interface ICreateTeamPolicyRequest {
-  team_id: string;
-  policy_id: string;
+export interface ITeamPolicySearchParams extends ApiSearchParams {
+  policyIds?: string[];
 }
 
 /**
- * Response from POST /api/administrative/team-policies.
+ * Request payload for associating a team to a policy.
+ */
+export interface ICreateTeamPolicyRequest {
+  team_id: string;
+}
+
+/**
+ * Response from POST /api/administrative/policies/{policyId}/team.
  */
 export interface ITeamPolicy {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
 }
 
 /**
@@ -50,6 +58,7 @@ export interface ITeamPolicyAssignment {
   team_policy_id: string;
   team_id: string;
   policy_id: string;
+  record_end_date: string | null;
 }
 
 /**

@@ -1,19 +1,14 @@
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
-import {
-  CreateDataRequest,
-  CreateDataRequestPayload,
-  DataRequest,
-  DataRequestFilters,
-  UpdateDataRequest
-} from '../models/data-request';
+import { CreateDataRequestPayload, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
 import { CreatePolicyStatementPayload, PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
+import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
@@ -35,7 +30,8 @@ export class DataRequestService extends DBService {
   teamPolicyService: TeamPolicyService;
   teamMemberService: TeamMemberService;
   expressionTreeService: ExpressionTreeService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
+  policyStatementService: PolicyStatementService;
+  policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
 
   /**
@@ -52,7 +48,8 @@ export class DataRequestService extends DBService {
     this.teamPolicyService = new TeamPolicyService(connection);
     this.teamMemberService = new TeamMemberService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
@@ -138,26 +135,12 @@ export class DataRequestService extends DBService {
   /**
    * Create a data request for an existing ticket.
    *
-   * Business rules this method encodes:
+   * Creates separate teams for data-request access and policy ownership. When
+   * feature types and an expression are provided, the expression tree is written
+   * once and linked to each generated feature-type statement through a shared
+   * policy expression.
    *
-   * - **`system_user_ids` is the canonical access list for both teams.** The caller
-   *   decides who belongs in the data-request and policy teams; the service does not
-   *   union the requester back in. The user-facing route (`POST /api/data-request`) is
-   *   responsible for adding `requested_by` into `system_user_ids` before calling, since
-   *   in that flow the requester is the principal subject. The admin ticket flow
-   *   (`POST /api/tickets/{ticketId}/data-request`) intentionally passes the admin's
-   *   picker selection as-is and does not auto-add anyone.
-   * - **One expression tree, many statement links.** When `featureTypes` is supplied
-   *   with a non-null expression, the expression tree is persisted once and linked to
-   *   every per-feature-type statement using the same `expression_id`. This keeps
-   *   `expression_tree` row counts proportional to requests, not to statements.
-   * - **Pre-validate feature-type names against the live catalog.** A typo or stale
-   *   frontend identifier would otherwise produce a policy describing an empty slice;
-   *   failing fast keeps the transaction from creating half-built request artifacts.
-   * - **Empty/omitted `featureTypes` preserves the deny-all baseline.** The
-   *   administrative ticket-bound flow has no expression context and needs the
-   *   reviewer-authored baseline; the reviewer hand-authors a real policy during the
-   *   requested → reviewed → approved lifecycle.
+   * If no feature types are provided, the policy is created with no statements.
    *
    * @param {string} ticketId - Existing ticket identifier.
    * @param {CreateDataRequestPayload} payload - Ticket-owned create payload.
@@ -170,39 +153,31 @@ export class DataRequestService extends DBService {
       this._createTeamWithMembers(payload.system_user_ids)
     ]);
 
-    // Branch on whether the caller supplied an explicit feature-type scope.
     const featureTypes = payload.featureTypes ?? [];
-    let statements: CreatePolicyStatementPayload[];
+    const statements: CreatePolicyStatementPayload[] = [];
     let expressionId: string | null = null;
 
     if (featureTypes.length > 0) {
-      // Pre-validate feature-type names against the live catalog. A typo or stale frontend
-      // identifier would otherwise produce a policy describing an empty slice; failing fast
-      // keeps the transaction from creating half-built request artifacts.
-      const active = await this.featureIngestionRepository.getActiveFeatureTypeMap();
-      const known = new Set(active.map((row) => row.name));
-      const unknown = featureTypes.filter((name) => !known.has(name));
-      if (unknown.length > 0) {
-        throw new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes: unknown }]);
+      const activeFeatureTypes = await this.featureIngestionRepository.getActiveFeatureTypeMap();
+      const activeFeatureTypeNames = new Set(activeFeatureTypes.map((row) => row.name));
+
+      const unknownFeatureTypes = featureTypes.filter((featureType) => !activeFeatureTypeNames.has(featureType));
+
+      if (unknownFeatureTypes.length > 0) {
+        throw new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes }]);
       }
 
-      // Persist the expression once, link to every statement (one tree, many links). We do NOT
-      // put `expression` on the CreatePolicyStatementPayload elements — PolicyService would then
-      // call writeExpressionTree per statement, producing duplicate expression_tree rows.
       if (payload.expression !== null && payload.expression !== undefined) {
-        const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
-        expressionId = result.expression_id;
+        const expressionTree = await this.expressionTreeService.writeExpressionTree(payload.expression);
+        expressionId = expressionTree.expression_id;
       }
 
-      statements = featureTypes.map((featureType) => ({
-        effect: PolicyEffect.ALLOW,
-        submission_feature_urn: `urn:*:${featureType}:*`
-      }));
-    } else {
-      // Admin ticket-bound flow has no expression context. Preserve today's deny-all baseline
-      // so the reviewer can hand-author a real policy during the requested → reviewed → approved
-      // lifecycle.
-      statements = [{ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }];
+      statements.push(
+        ...featureTypes.map((featureType) => ({
+          effect: PolicyEffect.ALLOW,
+          submission_feature_urn: `urn:*:${featureType}:*`
+        }))
+      );
     }
 
     const policy = await this.policyService.createPolicyWithStatements(
@@ -215,29 +190,30 @@ export class DataRequestService extends DBService {
     );
 
     if (expressionId !== null) {
+      const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+        policyId: policy.policy_id,
+        expressionId
+      });
+
       for (const statement of policy.statements) {
-        await this.policyStatementExpressionService.replacePolicyStatementExpression(
-          statement.policy_statement_id,
-          expressionId
-        );
+        await this.policyStatementService.updatePolicyStatement(statement.policy_statement_id, {
+          policy_expression_id: policyExpression.policy_expression_id
+        });
       }
     }
 
-    // Explicitly associate the policy team with the policy so membership grants policy visibility/control.
     await this.teamPolicyService.createTeamPolicy({
       team_id: policyTeam.team_id,
       policy_id: policy.policy_id
     });
 
-    const payloadWithIds: CreateDataRequest = {
+    const dataRequest = await this.dataRequestRepository.createDataRequest({
       requested_by: payload.requested_by,
       reason: payload.reason,
       team_id: dataRequestTeam.team_id,
       ticket_id: ticketId,
       policy_id: policy.policy_id
-    };
-
-    const dataRequest = await this.dataRequestRepository.createDataRequest(payloadWithIds);
+    });
 
     return this.getDataRequestById(dataRequest.data_request_id);
   }
@@ -255,14 +231,25 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Soft delete a data request.
+   * Soft delete a data request and revoke its generated policy grant.
+   *
+   * Data-request access is implemented through the linked policy. Deleting only
+   * the request wrapper would leave an approved policy and its team grants live.
+   * Soft-delete the request row and policy together through `PolicyService` so
+   * affected teams' `team_security_scope` rows are rebuilt from the remaining
+   * policy chain.
    *
    * @param {string} dataRequestId - Data request UUID.
    * @return {Promise<void>}
    * @memberof DataRequestService
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
-    await this.dataRequestRepository.deleteDataRequest(dataRequestId);
+    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+
+    await Promise.all([
+      this.dataRequestRepository.deleteDataRequest(dataRequestId),
+      this.policyService.deletePolicy(dataRequest.policy_id)
+    ]);
   }
 
   /**

@@ -4,7 +4,7 @@ import { CreatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
+import { PolicyExpressionService } from '../access-policy/policy-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { DBService } from '../db-service';
 
@@ -18,7 +18,7 @@ export interface CreateDownloadPolicyPayload {
 export class DownloadPolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
+  policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
 
   /**
@@ -30,7 +30,7 @@ export class DownloadPolicyService extends DBService {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
@@ -39,8 +39,8 @@ export class DownloadPolicyService extends DBService {
    * + optional expression links (one per statement when an expression is provided).
    *
    * Download policies define the feature set to export, not who can read it. Skipping
-   * team_policy / security_scope here keeps create-download from being a backdoor for
-   * granting access; export-time enforcement is the security boundary.
+   * team_policy / team_security_scope grants keeps create-download from being a
+   * backdoor for granting access; export-time enforcement is the security boundary.
    *
    * The policy is created with status 'approved' on insert, bypassing the pending ->
    * reviewed -> approved review flow that PolicyService.updatePolicy enforces. Download
@@ -70,20 +70,21 @@ export class DownloadPolicyService extends DBService {
     };
 
     const policy = await this.policyRepository.insertPolicy(policyData);
+    const policyExpression =
+      payload.expressionId === null
+        ? null
+        : await this.policyExpressionService.ensurePolicyExpression({
+            policyId: policy.policy_id,
+            expressionId: payload.expressionId
+          });
 
     for (const featureType of payload.featureTypes) {
-      const statement = await this.policyStatementService.createPolicyStatement({
+      await this.policyStatementService.createPolicyStatement({
         policy_id: policy.policy_id,
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: `urn:*:${featureType}:*`
+        submission_feature_urn: `urn:*:${featureType}:*`,
+        policy_expression_id: policyExpression?.policy_expression_id ?? null
       });
-
-      if (payload.expressionId !== null) {
-        await this.policyStatementExpressionService.replacePolicyStatementExpression(
-          statement.policy_statement_id,
-          payload.expressionId
-        );
-      }
     }
 
     return { policy_id: policy.policy_id };

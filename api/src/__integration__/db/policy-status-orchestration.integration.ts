@@ -1,10 +1,11 @@
 // Integration tests for the team-link invariant on the security-scope cache.
 //
-// Every `team_security_scope` and `policy_statement_scope` row must walk back
+// Every `team_security_scope` row must walk back
 // to a live `team_policy` ⨝ `policy(status='approved')` ⨝ `policy_statement(effect='ALLOW')`.
 // Statement creation alone never produces cache rows — the cache materializes
 // lazily on `team_policy` create or on the status flip into `approved`, and is
-// rebuilt on `team_policy` delete or on the flip away from `approved`.
+// rebuilt on `team_policy` delete, `policy_statement` delete, or on the flip
+// away from `approved`.
 //
 // These tests exercise the real service stack so the production orchestration
 // (PolicyService, TeamPolicyService, DataRequestService, DownloadPolicyService,
@@ -26,6 +27,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { PolicyService } from '../../services/access-policy/policy-service';
+import { PolicyStatementService } from '../../services/access-policy/policy-statement-service';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { TeamPolicyService } from '../../services/access-policy/team-policy-service';
 import { DataRequestService } from '../../services/data-request-service';
@@ -84,26 +86,52 @@ describe('Policy status orchestration (integration)', function () {
   async function countTeamScopesForPolicy(teamId: string, policyId: string): Promise<number> {
     const result = await connection.sql(
       SQL`
-        SELECT count(*)::integer AS count
+        SELECT count(DISTINCT tss.security_scope_id)::integer AS count
         FROM team_security_scope tss
-        JOIN policy_statement_scope pss USING (security_scope_id)
-        JOIN policy_statement ps USING (policy_statement_id)
+        JOIN policy_statement ps USING (security_scope_id)
         WHERE tss.team_id = ${teamId}
-          AND ps.policy_id = ${policyId};
+          AND ps.policy_id = ${policyId}
+          AND ps.record_end_date IS NULL;
       `,
       CountRow
     );
     return result.rows[0].count;
   }
 
-  /** Count `policy_statement_scope` rows that belong to a policy's statements. */
+  /** Count team grants justified by a policy through the live policy chain. */
+  async function countLiveTeamScopesForPolicy(teamId: string, policyId: string): Promise<number> {
+    const result = await connection.sql(
+      SQL`
+        SELECT count(DISTINCT tss.security_scope_id)::integer AS count
+        FROM team_security_scope tss
+        JOIN policy_statement ps USING (security_scope_id)
+        JOIN policy p USING (policy_id)
+        JOIN team_policy tp
+          ON tp.team_id = tss.team_id
+          AND tp.policy_id = p.policy_id
+          AND tp.record_end_date IS NULL
+        WHERE tss.team_id = ${teamId}
+          AND p.policy_id = ${policyId}
+          AND p.status = 'approved'
+          AND p.record_end_date IS NULL
+          AND ps.effect = 'allow'
+          AND ps.record_end_date IS NULL;
+      `,
+      CountRow
+    );
+    return result.rows[0].count;
+  }
+
+  /** Count active ALLOW policy statements that have a security_scope_id. */
   async function countPolicyStatementScopes(policyId: string): Promise<number> {
     const result = await connection.sql(
       SQL`
         SELECT count(*)::integer AS count
-        FROM policy_statement_scope pss
-        JOIN policy_statement ps USING (policy_statement_id)
-        WHERE ps.policy_id = ${policyId};
+        FROM policy_statement ps
+        WHERE ps.policy_id = ${policyId}
+          AND ps.effect = 'allow'
+          AND ps.security_scope_id IS NOT NULL
+          AND ps.record_end_date IS NULL;
       `,
       CountRow
     );
@@ -114,11 +142,13 @@ describe('Policy status orchestration (integration)', function () {
   async function getScopeIdsForPolicy(policyId: string): Promise<string[]> {
     const result = await connection.sql(
       SQL`
-        SELECT DISTINCT pss.security_scope_id
-        FROM policy_statement_scope pss
-        JOIN policy_statement ps USING (policy_statement_id)
+        SELECT DISTINCT ps.security_scope_id
+        FROM policy_statement ps
         WHERE ps.policy_id = ${policyId}
-        ORDER BY pss.security_scope_id;
+          AND ps.effect = 'allow'
+          AND ps.security_scope_id IS NOT NULL
+          AND ps.record_end_date IS NULL
+        ORDER BY ps.security_scope_id;
       `,
       SecurityScopeIdRow
     );
@@ -142,8 +172,11 @@ describe('Policy status orchestration (integration)', function () {
   async function hasSecurityScopeRowForStatement(policyStatementId: string): Promise<boolean> {
     const result = await connection.sql(
       SQL`
-        SELECT count(*)::integer AS count FROM policy_statement_scope
-        WHERE policy_statement_id = ${policyStatementId};
+        SELECT count(*)::integer AS count
+        FROM policy_statement
+        WHERE policy_statement_id = ${policyStatementId}
+          AND security_scope_id IS NOT NULL
+          AND record_end_date IS NULL;
       `,
       CountRow
     );
@@ -165,7 +198,7 @@ describe('Policy status orchestration (integration)', function () {
 
   // ── I1: TeamPolicyService.createTeamPolicy lazily materializes ───────
 
-  it('I1: createTeamPolicy on approved policy + ALLOW statement materializes one scope, one mapping, one team grant; publisher called once', async () => {
+  it('I1: createTeamPolicy on approved policy + ALLOW statement materializes one statement scope, one team grant; publisher called once', async () => {
     const policyId = await createPolicy(connection, 'I1-approved-allow');
     await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
 
@@ -175,7 +208,7 @@ describe('Policy status orchestration (integration)', function () {
     const teamPolicyService = new TeamPolicyService(connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
 
-    // One security_scope, one policy_statement_scope mapping, one team grant.
+    // One security_scope, one policy_statement.security_scope_id mapping, one team grant.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(1);
 
@@ -200,11 +233,11 @@ describe('Policy status orchestration (integration)', function () {
     const teamId = await createTeam(connection, 'I2 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
 
-    // Link the team before approval — the cache must stay empty until the flip.
+    // Link the team before approval — team grants must stay empty until the flip.
     const teamPolicyService = new TeamPolicyService(connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
 
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(0);
     expect(publisherStub.callCount).to.equal(0);
 
@@ -223,7 +256,7 @@ describe('Policy status orchestration (integration)', function () {
 
   // ── I3: PolicyService.updatePolicy(approved → reviewed) ungrants all teams ─
 
-  it('I3: flipping a policy out of approved removes every linked team’s team_security_scope rows; shared scope + mapping rows stay', async () => {
+  it('I3: flipping a policy out of approved removes every linked team’s team_security_scope rows; shared statement scope links stay', async () => {
     const policyId = await createPolicy(connection, 'I3-approved');
     await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
 
@@ -249,7 +282,7 @@ describe('Policy status orchestration (integration)', function () {
     expect(await countTeamScopesForPolicy(teamA, policyId)).to.equal(0);
     expect(await countTeamScopesForPolicy(teamB, policyId)).to.equal(0);
 
-    // Shared scope row and policy_statement_scope mapping survive the downgrade —
+    // Shared scope row and policy_statement.security_scope_id mapping survive the downgrade —
     // the rebuild only touches per-team grants, not the global cache rows.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
 
@@ -263,7 +296,7 @@ describe('Policy status orchestration (integration)', function () {
   it('I3b: downgrading one of two approved policies justifying the same scope leaves the team’s access intact via the other policy', async () => {
     // A team can reach the same scope through two different approved policies
     // (different statements, identical URN → identical scope_hash → shared
-    // `security_scope` row, two `policy_statement_scope` rows pointing at it).
+    // `security_scope` row, two policy statements pointing at it).
     // Downgrading one of the policies must NOT drop the team's `team_security_scope`
     // row, because the other policy still justifies it. This is the multi-policy
     // form of Edge Case #3 — the rebuild must walk the full live policy chain,
@@ -283,7 +316,7 @@ describe('Policy status orchestration (integration)', function () {
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyA });
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyB });
 
-    // Pre-flip state: one shared scope, two mappings (one per statement), one team grant.
+    // Pre-flip state: one shared scope, two statement links, one team grant.
     const scopeIdsForA = await getScopeIdsForPolicy(policyA);
     const scopeIdsForB = await getScopeIdsForPolicy(policyB);
     expect(scopeIdsForA).to.have.lengthOf(1);
@@ -300,8 +333,8 @@ describe('Policy status orchestration (integration)', function () {
     // Policy A's statement now walks back to Policy B's.
     expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal(scopeIdsForA);
 
-    // Both `policy_statement_scope` mapping rows persist — rebuild operates per
-    // team and never deletes scope mappings.
+    // Both statement security_scope_id links persist — rebuild operates per
+    // team and never deletes statement scope links.
     expect(await hasSecurityScopeRowForStatement(statementA)).to.equal(true);
     expect(await hasSecurityScopeRowForStatement(statementB)).to.equal(true);
 
@@ -309,9 +342,35 @@ describe('Policy status orchestration (integration)', function () {
     expect(publisherStub.callCount).to.equal(publishCountBeforeFlip);
   });
 
-  // ── I4: DataRequestService.createDataRequestForTicket stays scope-free ───
+  // ── I3c: approved → denied revokes access without recomputing anchors ─
 
-  it('I4: creating a data-request (status=requested, DENY policy) creates no scope, mapping, or team grant rows; publisher silent', async () => {
+  it('I3c: flipping an approved policy to denied removes the team grant and publishes no anchor jobs', async () => {
+    const policyId = await createPolicy(connection, 'I3c-approved-denied');
+    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+
+    const teamId = await createTeam(connection, 'I3c Team');
+    await addTeamMember(connection, teamId, connection.systemUserId());
+
+    const teamPolicyService = new TeamPolicyService(connection);
+    await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
+
+    const scopeIds = await getScopeIdsForPolicy(policyId);
+    expect(scopeIds).to.have.length(1);
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal(scopeIds);
+
+    const publishCountBeforeDeny = publisherStub.callCount;
+
+    const policyService = new PolicyService(connection);
+    await policyService.updatePolicy(policyId, { status: 'denied' });
+
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal([]);
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
+    expect(publisherStub.callCount).to.equal(publishCountBeforeDeny);
+  });
+
+  // ── I4: DataRequestService.createDataRequestForTicket stays grant-free ───
+
+  it('I4: creating a data-request (status=requested, DENY policy) creates no ALLOW scope or team grant rows; publisher silent', async () => {
     const ticketId = await ensureTicketId();
     const dataRequestService = new DataRequestService(connection);
 
@@ -338,13 +397,12 @@ describe('Policy status orchestration (integration)', function () {
     );
     expect(teamGrants.rows[0].count).to.equal(0);
 
-    // A security_scope row keyed by this policy's statement URN must not exist.
+    // No team grant can walk back through this requested policy's statement.
     const stmtScope = await connection.sql(
       SQL`
         SELECT count(*)::integer AS count
-        FROM security_scope ss
-        JOIN policy_statement_scope pss USING (security_scope_id)
-        JOIN policy_statement ps USING (policy_statement_id)
+        FROM team_security_scope tss
+        JOIN policy_statement ps USING (security_scope_id)
         WHERE ps.policy_id = ${policyId};
       `,
       CountRow
@@ -356,7 +414,7 @@ describe('Policy status orchestration (integration)', function () {
 
   // ── I5: data-request approval lifecycle end-to-end ───────────────────
 
-  it('I5: after a data-request is created, swapping in an ALLOW statement and flipping requested → reviewed → approved materializes the cache only on approval', async () => {
+  it('I5: after a data-request is created with an ALLOW statement, flipping requested → reviewed → approved materializes the cache only on approval', async () => {
     const ticketId = await ensureTicketId();
     const dataRequestService = new DataRequestService(connection);
     const policyService = new PolicyService(connection);
@@ -364,28 +422,19 @@ describe('Policy status orchestration (integration)', function () {
     const created = await dataRequestService.createDataRequestForTicket(ticketId, {
       requested_by: connection.systemUserId(),
       reason: 'I5 approval lifecycle',
-      system_user_ids: [connection.systemUserId()]
+      system_user_ids: [connection.systemUserId()],
+      featureTypes: ['dataset'],
+      expression: null
     });
     const policyId = created.policy_id;
 
-    // Pre-state: data-request flow leaves the cache empty (re-asserts I4 invariant).
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
-    expect(publisherStub.callCount).to.equal(0);
-
-    // Reviewer swaps the deny-all statement for an ALLOW grant. The Knex
-    // `update` call rejects empty payloads, so we pass `description` as a
-    // no-op metadata change to satisfy the layer below.
-    await policyService.updatePolicyWithStatements(policyId, { description: 'I5 review notes' }, [
-      { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:dataset:*' }
-    ]);
-
-    // Still requested → still no cache rows, still no publishes.
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    // Still requested → the statement has a scope, but there are still no team grants or publishes.
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(publisherStub.callCount).to.equal(0);
 
     // First lifecycle step: requested → reviewed.
     await policyService.updatePolicy(policyId, { status: 'reviewed' });
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(publisherStub.callCount).to.equal(0);
 
     // Second lifecycle step: reviewed → approved. Now the team_policy linked
@@ -411,17 +460,17 @@ describe('Policy status orchestration (integration)', function () {
 
   // ── I6: DownloadPolicyService stays compliant ────────────────────────
 
-  it('I6: createDownloadPolicy creates the policy + statements but no scope, mapping, or team grant rows; publisher silent', async () => {
+  it('I6: createDownloadPolicy creates the policy + statements but no team grant rows; publisher silent', async () => {
     const downloadPolicyService = new DownloadPolicyService(connection);
 
     const { policy_id } = await downloadPolicyService.createDownloadPolicy({
       name: 'I6 Download Policy',
-      description: 'audit: download policies stay scope-free',
+      description: 'audit: download policies stay grant-free',
       featureTypes: ['dataset'],
       expressionId: null
     });
 
-    expect(await countPolicyStatementScopes(policy_id)).to.equal(0);
+    expect(await countPolicyStatementScopes(policy_id)).to.equal(1);
 
     const teamGrants = await connection.sql(
       SQL`
@@ -463,13 +512,13 @@ describe('Policy status orchestration (integration)', function () {
     expect(await countTeamScopesForPolicy(teamA, policyId)).to.equal(0);
     expect(await countTeamScopesForPolicy(teamB, policyId)).to.equal(1);
 
-    // Shared scope + mapping rows survive — B still references them.
+    // Shared statement scope links survive — B still references them.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     const scopeIdsAfter = await getScopeIdsForPolicy(policyId);
     expect(scopeIdsAfter).to.deep.equal(scopeIdsBefore);
   });
 
-  // ── I8: updatePolicyWithStatements rederives scope for active consumers ───
+  // ── I8: statement updates rederive scope for active consumers ───────
 
   it('I8: replacing a policy’s statement on an approved policy with active team_policy links cleans up the old scope mapping, materializes the new scope, and switches the team grant', async () => {
     const policyId = await createPolicy(connection, 'I8-active-consumers');
@@ -487,20 +536,21 @@ describe('Policy status orchestration (integration)', function () {
 
     const callsAfterSetup = publisherStub.callCount;
 
-    const policyService = new PolicyService(connection);
-    await policyService.updatePolicyWithStatements(policyId, { description: 'I8 swapped statements' }, [
-      { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:sample_site:*' }
-    ]);
+    const policyStatementService = new PolicyStatementService(connection);
+    await policyStatementService.updatePolicyStatement(oldStmtId, {
+      effect: PolicyEffect.ALLOW,
+      submission_feature_urn: 'urn:*:sample_site:*'
+    });
 
-    // Old statement's mapping is gone; the urn1 security_scope row may stay
-    // around (other policies could share it) but it has no active reference
-    // from this policy any more.
-    expect(await hasSecurityScopeRowForStatement(oldStmtId)).to.equal(false);
+    // The statement id is preserved, but its old scope mapping no longer drives
+    // this policy.
+    expect(await hasSecurityScopeRowForStatement(oldStmtId)).to.equal(true);
 
     // New statement now drives the policy's only active mapping.
     const newScopeIds = await getScopeIdsForPolicy(policyId);
     expect(newScopeIds).to.have.length(1);
     expect(newScopeIds[0]).to.not.equal(oldScopeIds[0]);
+    expect(newScopeIds).to.not.include(oldScopeIds[0]);
 
     // The team's grant switches to the new scope.
     expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(1);
@@ -516,27 +566,86 @@ describe('Policy status orchestration (integration)', function () {
     expect(publishedScopeIds).to.include(newScopeIds[0]);
   });
 
+  // ── I8b: statement delete revokes team grants ───────────────────────
+
+  it('I8b: deleting the only ALLOW statement on an approved linked policy removes the team grant and publishes no anchor jobs', async () => {
+    const policyId = await createPolicy(connection, 'I8b-delete-only-statement');
+    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+
+    const teamId = await createTeam(connection, 'I8b Team');
+    await addTeamMember(connection, teamId, connection.systemUserId());
+
+    const teamPolicyService = new TeamPolicyService(connection);
+    await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
+
+    const scopeIds = await getScopeIdsForPolicy(policyId);
+    expect(scopeIds).to.have.length(1);
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal(scopeIds);
+
+    const publishCountBeforeDelete = publisherStub.callCount;
+
+    const policyStatementService = new PolicyStatementService(connection);
+    await policyStatementService.deletePolicyStatement(statementId);
+
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal([]);
+    expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(0);
+    expect(publisherStub.callCount).to.equal(publishCountBeforeDelete);
+  });
+
+  it('I8c: deleting one of two approved statements for the same scope keeps team access via the remaining policy', async () => {
+    const sharedUrn = 'urn:*:dataset:*';
+
+    const policyA = await createPolicy(connection, 'I8c-policy-A');
+    const statementA = await createPolicyStatement(connection, policyA, sharedUrn);
+
+    const policyB = await createPolicy(connection, 'I8c-policy-B');
+    await createPolicyStatement(connection, policyB, sharedUrn);
+
+    const teamId = await createTeam(connection, 'I8c Team');
+    await addTeamMember(connection, teamId, connection.systemUserId());
+
+    const teamPolicyService = new TeamPolicyService(connection);
+    await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyA });
+    await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyB });
+
+    const sharedScopeIds = await getScopeIdsForPolicy(policyA);
+    expect(sharedScopeIds).to.have.length(1);
+    expect(await getScopeIdsForPolicy(policyB)).to.deep.equal(sharedScopeIds);
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal(sharedScopeIds);
+
+    const publishCountBeforeDelete = publisherStub.callCount;
+
+    const policyStatementService = new PolicyStatementService(connection);
+    await policyStatementService.deletePolicyStatement(statementA);
+
+    expect(await getTeamSecurityScopeIds(teamId)).to.deep.equal(sharedScopeIds);
+    expect(await countLiveTeamScopesForPolicy(teamId, policyA)).to.equal(0);
+    expect(await countLiveTeamScopesForPolicy(teamId, policyB)).to.equal(1);
+    expect(publisherStub.callCount).to.equal(publishCountBeforeDelete);
+  });
+
   // ── I9: update-without-consumers stays lazy ─────────────────────────
 
-  it('I9: updatePolicyWithStatements on a policy with no team_policy links produces zero scope rows before and after; publisher silent', async () => {
+  it('I9: statement update on a policy with no team_policy links keeps statement scopes but no team grants; publisher silent', async () => {
     const policyId = await createPolicy(connection, 'I9-no-consumers');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
 
-    // Pre-state: no team_policy linkage → no cache rows yet.
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    // Pre-state: no team_policy linkage → no team grants yet.
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
 
-    const policyService = new PolicyService(connection);
-    await policyService.updatePolicyWithStatements(policyId, { description: 'I9 swapped statements' }, [
-      { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:sample_site:*' }
-    ]);
+    const policyStatementService = new PolicyStatementService(connection);
+    await policyStatementService.updatePolicyStatement(statementId, {
+      effect: PolicyEffect.ALLOW,
+      submission_feature_urn: 'urn:*:sample_site:*'
+    });
 
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(publisherStub.callCount).to.equal(0);
   });
 
   // ── I10: DENY-only approved policy still grants no scope rows ──────
 
-  it('I10: createTeamPolicy on an approved policy with only DENY statements produces no scope, mapping, or team grant rows; publisher silent', async () => {
+  it('I10: createTeamPolicy on an approved policy with only DENY statements produces no ALLOW scope or team grant rows; publisher silent', async () => {
     const policyId = await createPolicy(connection, 'I10-deny-only');
     await createPolicyStatement(connection, policyId, 'urn:*:dataset:*', PolicyEffect.DENY);
 
@@ -566,14 +675,14 @@ describe('Policy status orchestration (integration)', function () {
     const teamPolicyService = new TeamPolicyService(connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
 
-    expect(await countPolicyStatementScopes(policyId)).to.equal(0);
+    expect(await countPolicyStatementScopes(policyId)).to.equal(1);
     expect(await countTeamScopesForPolicy(teamId, policyId)).to.equal(0);
     expect(publisherStub.callCount).to.equal(0);
   });
 
   // ── I11: global invariant — no orphan cache rows after multi-scenario run ─
 
-  it('I11: after running I1 + I2 + I7 + I8 sequentially, every team_security_scope and policy_statement_scope row walks back to an approved policy with an ALLOW statement', async () => {
+  it('I11: after running I1 + I2 + I7 + I8 sequentially, every team_security_scope row walks back to an approved policy with an ALLOW statement', async () => {
     // -- I1: createTeamPolicy on an approved+ALLOW policy ---------------
     const i1PolicyId = await createPolicy(connection, 'I11-I1');
     await createPolicyStatement(connection, i1PolicyId, 'urn:*:dataset:*');
@@ -608,9 +717,12 @@ describe('Policy status orchestration (integration)', function () {
     const i8TeamId = await createTeam(connection, 'I11 Team I8');
     await addTeamMember(connection, i8TeamId, connection.systemUserId());
     await teamPolicyService.createTeamPolicy({ team_id: i8TeamId, policy_id: i8PolicyId });
-    await policyService.updatePolicyWithStatements(i8PolicyId, { description: 'I11 I8 step' }, [
-      { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:mortality:*' }
-    ]);
+    const policyStatementService = new PolicyStatementService(connection);
+    const [i8Statement] = await policyStatementService.getPolicyStatements(i8PolicyId);
+    await policyStatementService.updatePolicyStatement(i8Statement.policy_statement_id, {
+      effect: PolicyEffect.ALLOW,
+      submission_feature_urn: 'urn:*:mortality:*'
+    });
 
     // Walk every team_security_scope row this test produced back through the
     // policy chain. Any row that cannot reach `team_policy ⨝
@@ -619,8 +731,6 @@ describe('Policy status orchestration (integration)', function () {
     // been violated. The query scopes to the four (team, policy) pairs created
     // here so pre-existing seed-level orphans cannot mask a real regression.
     const testTeamIds = [i1TeamId, i2TeamId, i7TeamA, i7TeamB, i8TeamId];
-    const testPolicyIds = [i1PolicyId, i2PolicyId, i7PolicyId, i8PolicyId];
-
     const teamOrphans = await connection.sql(
       SQL`
         SELECT tss.team_id, tss.security_scope_id, NULL::uuid AS policy_statement_id
@@ -628,11 +738,7 @@ describe('Policy status orchestration (integration)', function () {
         WHERE tss.team_id = ANY(${testTeamIds}::uuid[])
           AND NOT EXISTS (
             SELECT 1
-            FROM policy_statement_scope pss
-            JOIN policy_statement ps
-              ON ps.policy_statement_id = pss.policy_statement_id
-              AND ps.effect = 'allow'
-              AND ps.record_end_date IS NULL
+            FROM policy_statement ps
             JOIN policy p
               ON p.policy_id = ps.policy_id
               AND p.status = 'approved'
@@ -641,33 +747,7 @@ describe('Policy status orchestration (integration)', function () {
               ON tp.policy_id = p.policy_id
               AND tp.team_id = tss.team_id
               AND tp.record_end_date IS NULL
-            WHERE pss.security_scope_id = tss.security_scope_id
-          );
-      `,
-      OrphanRow
-    );
-    expect(
-      teamOrphans.rowCount,
-      `unexpected team_security_scope orphans: ${JSON.stringify(teamOrphans.rows)}`
-    ).to.equal(0);
-
-    // Same walk for policy_statement_scope — only rows whose statement is ALLOW
-    // and whose policy is approved (both live) are allowed to exist. Scoped to
-    // the policies created in this test.
-    const statementOrphans = await connection.sql(
-      SQL`
-        SELECT NULL::uuid AS team_id, pss.security_scope_id, pss.policy_statement_id
-        FROM policy_statement_scope pss
-        JOIN policy_statement filter_ps ON filter_ps.policy_statement_id = pss.policy_statement_id
-        WHERE filter_ps.policy_id = ANY(${testPolicyIds}::uuid[])
-          AND NOT EXISTS (
-            SELECT 1
-            FROM policy_statement ps
-            JOIN policy p
-              ON p.policy_id = ps.policy_id
-              AND p.status = 'approved'
-              AND p.record_end_date IS NULL
-            WHERE ps.policy_statement_id = pss.policy_statement_id
+            WHERE ps.security_scope_id = tss.security_scope_id
               AND ps.effect = 'allow'
               AND ps.record_end_date IS NULL
           );
@@ -675,8 +755,8 @@ describe('Policy status orchestration (integration)', function () {
       OrphanRow
     );
     expect(
-      statementOrphans.rowCount,
-      `unexpected policy_statement_scope orphans: ${JSON.stringify(statementOrphans.rows)}`
+      teamOrphans.rowCount,
+      `unexpected team_security_scope orphans: ${JSON.stringify(teamOrphans.rows)}`
     ).to.equal(0);
 
     // Spot-check the scenarios actually produced live cache rows where
@@ -742,7 +822,7 @@ describe('Policy status orchestration (integration)', function () {
     const updated = await policyService.updatePolicy(policyId, { status: 'approved' });
 
     expect(updated.status).to.equal('approved');
-    expect(await getScopeIdsForPolicy(policyId)).to.have.lengthOf(0);
+    expect(await getScopeIdsForPolicy(policyId)).to.have.lengthOf(1);
     expect(publisherStub.callCount).to.equal(publishCountBeforeFlip);
   });
 

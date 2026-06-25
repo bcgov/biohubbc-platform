@@ -1,7 +1,7 @@
 // Integration test for DataRequestService — verifies that creating a data
 // request writes the expected ticket + team + policy + statement + expression
 // + team_policy rows against a real database for the search-driven flow, and
-// preserves the deny-all baseline for the administrative ticket-bound flow.
+// preserves the no-statement baseline for the administrative ticket-bound flow.
 //
 // Also verifies:
 //   - The service treats `system_user_ids` as the canonical team membership and
@@ -16,8 +16,8 @@
 // Uses a transaction that is ROLLED BACK after each test, so no data is
 // persisted. pg-boss is not running in the `make test-db` environment, so the
 // anchor-computation publisher invoked indirectly via
-// `SecurityScopeService.createScopeForPolicyStatement` is stubbed in
-// `beforeEach` — same pattern as `security-scope-search.integration.ts`.
+// The anchor-job publisher is stubbed in `beforeEach` — same pattern as
+// `security-scope-search.integration.ts`.
 //
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
@@ -119,11 +119,14 @@ describe('DataRequestService (integration)', function () {
    */
   async function activeStatements(policyId: string): Promise<{ urn: string; effect: string }[]> {
     const result = await connection.sql(SQL`
-      SELECT submission_feature_urn AS urn, effect
-      FROM policy_statement
-      WHERE policy_id = ${policyId}
-        AND record_end_date IS NULL
-      ORDER BY submission_feature_urn;
+      SELECT
+        concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS urn,
+        ps.effect
+      FROM policy_statement ps
+      JOIN security_scope ss ON ss.security_scope_id = ps.security_scope_id
+      WHERE ps.policy_id = ${policyId}
+        AND ps.record_end_date IS NULL
+      ORDER BY urn;
     `);
     return result.rows.map((r: any) => ({ urn: r.urn, effect: r.effect }));
   }
@@ -182,19 +185,13 @@ describe('DataRequestService (integration)', function () {
       const statements = await activeStatements(dataRequest.policy_id);
       expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
 
-      // Exactly one expression_statement link pointing at our expression row
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-
       const links = await connection.sql(SQL`
-        SELECT pse.expression_id
-        FROM policy_statement_expression pse
-        WHERE pse.policy_statement_id = ANY(${statementIds}::uuid[])
-          AND pse.record_end_date IS NULL;
+        SELECT pe.expression_id
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
+        WHERE ps.policy_id = ${dataRequest.policy_id}
+          AND ps.record_end_date IS NULL
+          AND pe.record_end_date IS NULL;
       `);
       expect(links.rowCount).to.equal(1);
 
@@ -241,11 +238,11 @@ describe('DataRequestService (integration)', function () {
       expect(statements.every((s) => s.effect === 'allow')).to.equal(true);
 
       const links = await connection.sql(SQL`
-        SELECT pse.expression_id, pse.policy_statement_id
-        FROM policy_statement_expression pse
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
+        SELECT pe.expression_id, ps.policy_statement_id
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
         WHERE ps.policy_id = ${dataRequest.policy_id}
-          AND pse.record_end_date IS NULL
+          AND pe.record_end_date IS NULL
           AND ps.record_end_date IS NULL;
       `);
       expect(links.rowCount).to.equal(2);
@@ -270,23 +267,19 @@ describe('DataRequestService (integration)', function () {
       const statements = await activeStatements(dataRequest.policy_id);
       expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
 
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-
       const links = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_expression
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]) AND record_end_date IS NULL;
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${dataRequest.policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(links.rows[0].n).to.equal(0);
     });
   });
 
   describe('createDataRequestForTicket (legacy ticket-bound flow)', () => {
-    it('I4: empty `featureTypes` preserves the deny-all baseline; the admin flow seeds both teams from the picker selection as-is (requester not auto-added)', async () => {
+    it('I4: empty `featureTypes` preserves the no-statement baseline; the admin flow seeds both teams from the picker selection as-is (requester not auto-added)', async () => {
       const requester = await createUser('I4-req');
       const collaborator = await createUser('I4-coll');
 
@@ -299,27 +292,24 @@ describe('DataRequestService (integration)', function () {
 
       const dataRequest = await service.createDataRequestForTicket(ticket.ticket_id, {
         requested_by: requester,
-        reason: 'I4 admin/legacy flow — deny-all baseline must be preserved',
+        reason: 'I4 admin/legacy flow — no-statement baseline must be preserved',
         // The admin ticket flow (`POST /api/tickets/{ticketId}/data-request`) passes the picker
         // selection through verbatim. To put the requester on the access list, the caller
         // includes them explicitly — see service docstring.
         system_user_ids: [requester, collaborator]
       });
 
-      // Single DENY statement covering all feature types.
+      // Empty featureTypes intentionally creates no policy statements.
       const statements = await activeStatements(dataRequest.policy_id);
-      expect(statements).to.deep.equal([{ urn: 'urn:*:*:*', effect: 'deny' }]);
+      expect(statements).to.deep.equal([]);
 
-      // No expression rows or links for the deny-all path.
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement
-          WHERE policy_id = ${dataRequest.policy_id} AND record_end_date IS NULL;
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
+      // No expression rows or links for the no-statement path.
       const links = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_expression
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]) AND record_end_date IS NULL;
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${dataRequest.policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(links.rows[0].n).to.equal(0);
 

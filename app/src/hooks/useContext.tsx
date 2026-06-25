@@ -2,6 +2,7 @@ import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
 import { IPolicyAutocompleteContext, PolicyAutocompleteContext } from 'contexts/policyAutocompleteContext';
+import { IPolicyContext, PolicyContext } from 'contexts/policyContext';
 import { ITicketContext, TicketContext } from 'contexts/ticketContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
@@ -51,6 +52,23 @@ export const useTicketContext = (): ITicketContext => {
   if (!context) {
     throw new Error(
       'TicketContext is undefined, please verify you are calling useTicketContext() as child of an <TicketContextProvider> component.'
+    );
+  }
+
+  return context;
+};
+
+/**
+ * Returns an instance of `IPolicyContext` from `PolicyContext`.
+ *
+ * @return {*}  {IPolicyContext}
+ */
+export const usePolicyContext = (): IPolicyContext => {
+  const context = useContext(PolicyContext);
+
+  if (!context) {
+    throw new Error(
+      'PolicyContext is undefined, please verify you are calling usePolicyContext() as child of an <PolicyContextProvider> component.'
     );
   }
 

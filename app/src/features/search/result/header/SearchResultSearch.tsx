@@ -1,4 +1,4 @@
-import { ExpressionBuilder } from 'components/expression-builder/ExpressionBuilder';
+import { SearchExpressionBuilder } from 'components/expression-builder/SearchExpressionBuilder';
 import useDebouncedValue from 'hooks/useDebouncedValue';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ interface SearchResultSearchProps {
  * Search result header controller that wires the expression builder popover.
  *
  * Keeps editable search text local while the user works in the popover, passes
- * that text to `ExpressionBuilder` for recommendations, and only notifies the
+ * that text to `SearchExpressionBuilder` for recommendations, and only notifies the
  * page when the user applies an expression tree.
  *
  * @param {SearchResultSearchProps} props
@@ -56,7 +56,7 @@ export const SearchResultSearch = (props: SearchResultSearchProps) => {
       onFilterPanelOpenChange={setIsFilterPanelOpen}
       onSearchTermChange={setValue}
       onClear={handleClear}>
-      <ExpressionBuilder
+      <SearchExpressionBuilder
         value={expressionTree ?? undefined}
         recommendedSearchTerm={recommendedSearchTerm}
         onApply={handleExpressionApply}

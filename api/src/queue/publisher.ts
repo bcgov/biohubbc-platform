@@ -578,9 +578,12 @@ export const publishIndexSubmissionFeaturesJob = async (
 
 /**
  * Options for compute scope anchors jobs.
- * Anchor computation is a single SQL INSERT ... SELECT — typically completes in seconds.
- * Retry with backoff handles transient lock contention on high-write tables.
+ * Anchor computation uses keyset-paginated scans and can be triggered many times
+ * during admin policy edits. Delay the job briefly so repeated changes to the
+ * same scope coalesce behind the per-scope singleton key.
  */
+const COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS = 20;
+
 const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
@@ -592,8 +595,9 @@ const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
  * Publish a compute scope anchors job to the queue.
  *
  * Queues async anchor computation for a security scope. Each scope gets its
- * own job — different scopes can compute concurrently. No singleton key is
- * needed because anchor computation is idempotent (ON CONFLICT DO NOTHING).
+ * own delayed singleton job. The short cooldown coalesces bursts of policy or
+ * security-rule edits for the same scope without dropping recomputes for other
+ * scopes.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IComputeScopeAnchorsJobData} data Job data containing securityScopeId
@@ -613,13 +617,12 @@ export const publishComputeScopeAnchorsJob = async (
 
     await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);
 
-    // Global singleton key — only one anchor computation job runs at a time.
-    // Anchor computation does keyset-paginated scans of submission_feature (100M+ rows).
-    // Without serialization, N concurrent jobs = N concurrent full-table scans.
-    // Queued jobs wait until the active one completes, then run in order.
+    const startAfter = mergedOptions.startAfter ?? new Date(Date.now() + COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS * 1000);
+
     const jobId = await boss.send(JobQueues.COMPUTE_SCOPE_ANCHORS, data, {
       ...mergedOptions,
-      singletonKey: 'scope-anchors',
+      startAfter,
+      singletonKey: `scope-anchors-${data.securityScopeId}`,
       db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
     });
 

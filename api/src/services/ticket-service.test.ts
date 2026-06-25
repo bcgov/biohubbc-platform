@@ -280,11 +280,45 @@ describe('TicketService', () => {
     it('soft deletes an active ticket', async () => {
       const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
       const getDataRequestsStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
+      const deleteDataRequestStub = sinon.stub(DataRequestService.prototype, 'deleteDataRequest').resolves();
 
       await service.deleteTicket(mockTicket.ticket_id);
 
       expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(deleteDataRequestStub).to.not.have.been.called;
       expect(deleteStub).to.have.been.calledWith(mockTicket.ticket_id);
+    });
+
+    it('deletes resolved data requests before soft deleting a ticket', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const approvedDataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'approved',
+        create_date: '2026-04-17T00:00:00.000Z'
+      };
+      const deniedDataRequest: DataRequest = {
+        ...approvedDataRequest,
+        data_request_id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        policy_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        status: 'denied'
+      };
+      sinon
+        .stub(DataRequestService.prototype, 'findDataRequestsByTicketId')
+        .resolves([approvedDataRequest, deniedDataRequest]);
+      const deleteDataRequestStub = sinon.stub(DataRequestService.prototype, 'deleteDataRequest').resolves();
+
+      await service.deleteTicket(mockTicket.ticket_id);
+
+      expect(deleteDataRequestStub).to.have.been.calledTwice;
+      expect(deleteDataRequestStub.firstCall).to.have.been.calledWith(approvedDataRequest.data_request_id);
+      expect(deleteDataRequestStub.secondCall).to.have.been.calledWith(deniedDataRequest.data_request_id);
+      expect(deleteDataRequestStub).to.have.been.calledBefore(deleteStub);
+      expect(deleteStub).to.have.been.calledOnceWith(mockTicket.ticket_id);
     });
 
     it('throws when deleting ticket with requested data requests', async () => {

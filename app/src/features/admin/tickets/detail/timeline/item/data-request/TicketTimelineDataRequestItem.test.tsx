@@ -48,15 +48,14 @@ describe('TicketTimelineDataRequestItem', () => {
     expect(screen.queryByRole('button', { name: 'Requested' })).not.toBeInTheDocument();
   });
 
-  it('initializes review flow with reviewed override from requested state', async () => {
+  it('calls onViewFinalizedPolicy when Review Policy is clicked from requested state', async () => {
     const user = userEvent.setup();
-    const { onViewPolicy } = renderComponent(PolicyStatus.REQUESTED);
+    const { onViewFinalizedPolicy, onViewPolicy } = renderComponent(PolicyStatus.REQUESTED);
 
     await user.click(screen.getByRole('button', { name: 'Review Policy' }));
 
-    expect(onViewPolicy).toHaveBeenCalledWith(baseDataRequest.data_request_id, baseDataRequest.policy_id, {
-      status: PolicyStatus.REVIEWED
-    });
+    expect(onViewFinalizedPolicy).toHaveBeenCalledWith(baseDataRequest.data_request_id, baseDataRequest.policy_id);
+    expect(onViewPolicy).not.toHaveBeenCalled();
   });
 
   it('shows View + Approve + Deny when status is not requested/finalized', () => {

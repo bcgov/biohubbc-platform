@@ -28,7 +28,8 @@ describe('TeamPolicyService', () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
@@ -61,7 +62,8 @@ describe('TeamPolicyService', () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
       sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
@@ -78,7 +80,10 @@ describe('TeamPolicyService', () => {
 
       expect(materializeStub).to.have.been.calledOnce;
       expect(grantStub).to.not.have.been.called;
-      expect(result).to.eql(mockTeamPolicy);
+      expect(result).to.eql({
+        ...mockTeamPolicy,
+        record_end_date: null
+      });
     });
 
     it('should return existing team policy and skip insert and scope grant when association already exists', async () => {
@@ -86,6 +91,7 @@ describe('TeamPolicyService', () => {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null,
         team_name: 'Team A',
         policy_name: 'Policy A'
       };
@@ -115,7 +121,8 @@ describe('TeamPolicyService', () => {
       expect(result).to.eql({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       });
     });
   });
@@ -125,7 +132,8 @@ describe('TeamPolicyService', () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
       const stub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
@@ -145,12 +153,14 @@ describe('TeamPolicyService', () => {
       insertStub.onCall(0).resolves({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       });
       insertStub.onCall(1).resolves({
         team_policy_id: '44444444-4444-4444-4444-444444444444',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '55555555-5555-5555-5555-555555555555'
+        policy_id: '55555555-5555-5555-5555-555555555555',
+        record_end_date: null
       });
 
       const materializeStub = sinon
@@ -184,12 +194,14 @@ describe('TeamPolicyService', () => {
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
-          policy_id: '33333333-3333-3333-3333-333333333333'
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null
         },
         {
           team_policy_id: '44444444-4444-4444-4444-444444444444',
           team_id: '22222222-2222-2222-2222-222222222222',
-          policy_id: '55555555-5555-5555-5555-555555555555'
+          policy_id: '55555555-5555-5555-5555-555555555555',
+          record_end_date: null
         }
       ]);
     });
@@ -200,6 +212,7 @@ describe('TeamPolicyService', () => {
           team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Team 1',
           policy_name: 'Policy A'
         }
@@ -208,7 +221,8 @@ describe('TeamPolicyService', () => {
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
         team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '55555555-5555-5555-5555-555555555555'
+        policy_id: '55555555-5555-5555-5555-555555555555',
+        record_end_date: null
       });
 
       const materializeStub = sinon
@@ -241,7 +255,8 @@ describe('TeamPolicyService', () => {
         {
           team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           team_id: '22222222-2222-2222-2222-222222222222',
-          policy_id: '55555555-5555-5555-5555-555555555555'
+          policy_id: '55555555-5555-5555-5555-555555555555',
+          record_end_date: null
         }
       ]);
     });
@@ -252,6 +267,7 @@ describe('TeamPolicyService', () => {
           team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Team 1',
           policy_name: 'Policy A'
         }
@@ -281,6 +297,7 @@ describe('TeamPolicyService', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Team 1',
           policy_name: 'Policy A'
         },
@@ -288,6 +305,7 @@ describe('TeamPolicyService', () => {
           team_policy_id: '44444444-4444-4444-4444-444444444444',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '55555555-5555-5555-5555-555555555555',
+          record_end_date: null,
           team_name: 'Team 1',
           policy_name: 'Policy B'
         }
@@ -309,6 +327,7 @@ describe('TeamPolicyService', () => {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '33333333-3333-3333-3333-333333333333',
+          record_end_date: null,
           team_name: 'Test Team',
           policy_name: 'Test Policy'
         }
@@ -337,14 +356,20 @@ describe('TeamPolicyService', () => {
   });
 
   describe('updateTeamPolicy', () => {
-    it('should call repository.updateTeamPolicy and return the updated record', async () => {
+    it('should rebuild team security scopes when the update deactivates an active team policy', async () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
-      const stub = sinon.stub(TeamPolicyRepository.prototype, 'updateTeamPolicy').resolves(mockTeamPolicy);
+      const getStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
+      const updateStub = sinon.stub(TeamPolicyRepository.prototype, 'updateTeamPolicy').resolves({
+        ...mockTeamPolicy,
+        record_end_date: '2025-12-31'
+      });
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
 
       const updateData: UpdateTeamPolicy = {
         record_end_date: '2025-12-31'
@@ -352,7 +377,89 @@ describe('TeamPolicyService', () => {
 
       const result = await service.updateTeamPolicy('11111111-1111-1111-1111-111111111111', updateData);
 
-      expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(getStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111');
+      expect(updateStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(rebuildStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(updateStub).to.have.been.calledBefore(rebuildStub);
+      expect(result).to.eql({
+        ...mockTeamPolicy,
+        record_end_date: '2025-12-31'
+      });
+    });
+
+    it('should rebuild team security scopes when the update reactivates an inactive team policy', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: '2025-12-31'
+      };
+
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
+      const updateStub = sinon.stub(TeamPolicyRepository.prototype, 'updateTeamPolicy').resolves({
+        ...mockTeamPolicy,
+        record_end_date: null
+      });
+      const materializeStub = sinon
+        .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
+        .resolves(true);
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      const updateData: UpdateTeamPolicy = {
+        record_end_date: null
+      };
+
+      const result = await service.updateTeamPolicy('11111111-1111-1111-1111-111111111111', updateData);
+
+      expect(updateStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(materializeStub).to.have.been.calledOnceWith('33333333-3333-3333-3333-333333333333');
+      expect(rebuildStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(materializeStub).to.have.been.calledBefore(rebuildStub);
+      expect(result).to.eql({
+        ...mockTeamPolicy,
+        record_end_date: null
+      });
+    });
+
+    it('should skip rebuilding team security scopes when the active state does not change', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: '2025-12-31'
+      };
+
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
+      const updateStub = sinon.stub(TeamPolicyRepository.prototype, 'updateTeamPolicy').resolves(mockTeamPolicy);
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      const updateData: UpdateTeamPolicy = {
+        record_end_date: '2026-01-01'
+      };
+
+      const result = await service.updateTeamPolicy('11111111-1111-1111-1111-111111111111', updateData);
+
+      expect(updateStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111', updateData);
+      expect(rebuildStub).to.not.have.been.called;
+      expect(result).to.eql(mockTeamPolicy);
+    });
+
+    it('should skip updating and rebuilding team security scopes when the update does not touch active state', async () => {
+      const mockTeamPolicy: TeamPolicy = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
+      };
+
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);
+      const updateStub = sinon.stub(TeamPolicyRepository.prototype, 'updateTeamPolicy').resolves(mockTeamPolicy);
+      const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
+      const result = await service.updateTeamPolicy('11111111-1111-1111-1111-111111111111', {});
+
+      expect(updateStub).to.not.have.been.called;
+      expect(rebuildStub).to.not.have.been.called;
       expect(result).to.eql(mockTeamPolicy);
     });
   });
@@ -362,7 +469,8 @@ describe('TeamPolicyService', () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       };
 
       const getStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves(mockTeamPolicy);

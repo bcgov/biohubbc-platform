@@ -18,6 +18,38 @@ export async function seed(knex: Knex): Promise<void> {
   const createUserRow = await knex('system_user').whereNull('record_end_date').select('system_user_id').first();
   const createUser = createUserRow?.system_user_id ?? 1;
 
+  /**
+   * Create or reuse the normalized reusable security scope for a policy statement URN.
+   *
+   * Policy statements are policy-specific, but their URN access envelopes are shared through
+   * `security_scope`. This mirrors the API write path: parse the incoming URN into indexed
+   * scope columns, hash the full URN for deduplication, and return the existing or inserted
+   * scope row so the statement can reference it by `security_scope_id`.
+   *
+   * @param urn Policy statement URN, formatted as `urn:<submission_id>:<feature_type>:<feature_id>`.
+   * @returns The existing or newly inserted `security_scope` row for the URN.
+   */
+  const ensureSecurityScope = async (urn: string) => {
+    const [, urnSubmissionId, urnFeatureType, urnFeatureId] = urn.split(':');
+    const scopeHashResult = await knex.raw(`SELECT encode(sha256(?::BYTEA), 'hex') as hash`, [urn]);
+    const scopeHash = scopeHashResult.rows[0].hash;
+
+    let scope = await knex('security_scope').where({ scope_hash: scopeHash }).first();
+    if (!scope) {
+      const [inserted] = await knex('security_scope')
+        .insert({
+          scope_hash: scopeHash,
+          urn_submission_id: urnSubmissionId,
+          urn_feature_type: urnFeatureType,
+          urn_feature_id: urnFeatureId
+        })
+        .returning('*');
+      scope = inserted;
+    }
+
+    return scope;
+  };
+
   /** ------------------------------------------------------------------
    * 1. TELEMETRY POLICY + TEAM
    * ------------------------------------------------------------------ */
@@ -64,11 +96,13 @@ export async function seed(knex: Knex): Promise<void> {
     });
   }
 
+  const telemetryScope = await ensureSecurityScope('urn:*:telemetry:*');
+
   let telemetryStatement = await knex('policy_statement')
     .where({
       policy_id: telemetryPolicy.policy_id,
       effect: 'allow',
-      submission_feature_urn: 'urn:*:telemetry:*'
+      security_scope_id: telemetryScope.security_scope_id
     })
     .whereNull('record_end_date')
     .first();
@@ -78,32 +112,11 @@ export async function seed(knex: Knex): Promise<void> {
       .insert({
         policy_id: telemetryPolicy.policy_id,
         effect: 'allow',
-        submission_feature_urn: 'urn:*:telemetry:*',
+        security_scope_id: telemetryScope.security_scope_id,
         create_user: createUser
       })
       .returning('*');
     telemetryStatement = inserted;
-  }
-
-  const telemetryConditionValue = JSON.stringify(new Date().toISOString());
-  const telemetryConditionExists = await knex('policy_statement_condition')
-    .where({
-      policy_statement_id: telemetryStatement.policy_statement_id,
-      operator: 'DateBefore',
-      key: 'start_date',
-      value: telemetryConditionValue
-    })
-    .whereNull('record_end_date')
-    .first();
-
-  if (!telemetryConditionExists) {
-    await knex('policy_statement_condition').insert({
-      policy_statement_id: telemetryStatement.policy_statement_id,
-      operator: 'DateBefore',
-      key: 'start_date',
-      value: telemetryConditionValue,
-      create_user: createUser
-    });
   }
 
   // Add all non-system users (IDIR/BCEID) to Telemetry Team (skip if already member)
@@ -174,11 +187,13 @@ export async function seed(knex: Knex): Promise<void> {
     });
   }
 
+  const adminScope = await ensureSecurityScope('urn:*:sample_site:*');
+
   const adminStatementExists = await knex('policy_statement')
     .where({
       policy_id: adminPolicy.policy_id,
       effect: 'allow',
-      submission_feature_urn: 'urn:*:sample_site:*'
+      security_scope_id: adminScope.security_scope_id
     })
     .whereNull('record_end_date')
     .first();
@@ -187,7 +202,7 @@ export async function seed(knex: Knex): Promise<void> {
     await knex('policy_statement').insert({
       policy_id: adminPolicy.policy_id,
       effect: 'allow',
-      submission_feature_urn: 'urn:*:sample_site:*',
+      security_scope_id: adminScope.security_scope_id,
       create_user: createUser
     });
   }
@@ -199,8 +214,8 @@ export async function seed(knex: Knex): Promise<void> {
    *
    * Mark some seeded dataset features as secured so the lock icon
    * appears in the search UI. Then wire the normalized scope tables
-   * (security_scope → policy_statement_scope → security_scope_anchor
-   * → team_security_scope) so that team members can access them.
+   * (security_scope → security_scope_anchor → team_security_scope)
+   * so that team members can access them.
    *
    * Pattern mirrors docs/SIMSBIOHUB-914/sql/scale-data-scopes.sql
    * ------------------------------------------------------------------ */
@@ -242,7 +257,7 @@ export async function seed(knex: Knex): Promise<void> {
     { statement: telemetryStatement, urn: 'urn:*:telemetry:*', team: telemetryTeam },
     {
       statement: await knex('policy_statement')
-        .where({ policy_id: adminPolicy.policy_id, submission_feature_urn: 'urn:*:sample_site:*' })
+        .where({ policy_id: adminPolicy.policy_id, security_scope_id: adminScope.security_scope_id })
         .whereNull('record_end_date')
         .first(),
       urn: 'urn:*:sample_site:*',
@@ -255,26 +270,12 @@ export async function seed(knex: Knex): Promise<void> {
       continue;
     }
 
-    // scope_hash = sha256 of the URN (matches API SecurityScopeRepository pattern)
-    const scopeHashResult = await knex.raw(`SELECT encode(sha256(?::BYTEA), 'hex') as hash`, [urn]);
-    const scopeHash = scopeHashResult.rows[0].hash;
+    const scope = await ensureSecurityScope(urn);
 
-    // Insert or find the security_scope
-    let scope = await knex('security_scope').where({ scope_hash: scopeHash }).first();
-    if (!scope) {
-      const [inserted] = await knex('security_scope').insert({ scope_hash: scopeHash }).returning('*');
-      scope = inserted;
-    }
-
-    // Link policy_statement → scope
-    const pssExists = await knex('policy_statement_scope')
-      .where({ policy_statement_id: statement.policy_statement_id })
-      .first();
-    if (!pssExists) {
-      await knex('policy_statement_scope').insert({
-        policy_statement_id: statement.policy_statement_id,
-        security_scope_id: scope.security_scope_id
-      });
+    if (statement.security_scope_id !== scope.security_scope_id) {
+      await knex('policy_statement')
+        .where({ policy_statement_id: statement.policy_statement_id })
+        .update({ security_scope_id: scope.security_scope_id });
     }
 
     // Anchor the scope to each secured dataset

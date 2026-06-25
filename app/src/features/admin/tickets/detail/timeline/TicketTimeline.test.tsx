@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketTimeline } from './TicketTimeline';
@@ -72,6 +73,13 @@ const makeTicket = (): ITicketExtended => ({
   ticket_system_users: []
 });
 
+const renderTicketTimeline = (ticket: ITicketExtended) =>
+  render(
+    <MemoryRouter>
+      <TicketTimeline ticket={ticket} isLoading={false} />
+    </MemoryRouter>
+  );
+
 describe('TicketTimeline', () => {
   const updateTicketComment = vi.fn();
   const deleteTicketComment = vi.fn();
@@ -125,7 +133,7 @@ describe('TicketTimeline', () => {
     };
     updateTicketComment.mockResolvedValue(updatedComment);
 
-    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+    renderTicketTimeline(ticket);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -172,7 +180,7 @@ describe('TicketTimeline', () => {
       comment: `[notes](/artifact/${ticketArtifact.ticket_artifact_id})`
     };
 
-    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+    renderTicketTimeline(ticket);
 
     expect(screen.getByRole('button', { name: 'notes' })).toBeVisible();
   });
@@ -191,7 +199,7 @@ describe('TicketTimeline', () => {
       })
     );
 
-    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+    renderTicketTimeline(ticket);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -221,7 +229,7 @@ describe('TicketTimeline', () => {
     const ticket = makeTicket();
     deleteTicketComment.mockResolvedValue(undefined);
 
-    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+    renderTicketTimeline(ticket);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
@@ -258,7 +266,7 @@ describe('TicketTimeline', () => {
       })
     );
 
-    render(<TicketTimeline ticket={makeTicket()} isLoading={false} />);
+    renderTicketTimeline(makeTicket());
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
@@ -278,7 +286,7 @@ describe('TicketTimeline', () => {
     const ticket = makeTicket();
     deleteTicketComment.mockRejectedValue(new Error('Delete failed'));
 
-    render(<TicketTimeline ticket={ticket} isLoading={false} />);
+    renderTicketTimeline(ticket);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));

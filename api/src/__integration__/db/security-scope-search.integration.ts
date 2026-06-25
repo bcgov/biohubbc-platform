@@ -1,8 +1,8 @@
 // Integration test for security scope pipeline — verifies scope creation, anchor computation,
-// team scope grants, orphan cleanup, and search access filtering against the real database.
+// team scope grants, anchor reuse, and search access filtering against the real database.
 //
 // Tests use repository methods directly for scope setup. Service methods that internally
-// publish pg-boss jobs (e.g. cleanupScopesForDeletedStatements → publishComputeScopeAnchorsJob)
+// publish pg-boss jobs (e.g. materializePolicyStatementScopes → publishComputeScopeAnchorsJob)
 // are called directly, but the publisher is stubbed in beforeEach because pg-boss is not
 // running in the make test-db environment. Anchor recomputation is simulated by calling
 // the phase methods (deleteStaleAnchorBatch / computeAnchorBatch) directly via
@@ -518,7 +518,7 @@ describe('Security scope search (integration)', function () {
   // ── Policy create → scope creation ───────────────────────────────────
 
   describe('Policy create → scope creation', () => {
-    it('should create security_scope and policy_statement_scope mapping', async () => {
+    it('should create security_scope and attach it to the policy statement', async () => {
       const policyId = await createPolicy(connection, 'scope-creation-test');
       const stmtId = await createPolicyStatement(connection, policyId, 'urn:1:dataset:*');
 
@@ -528,12 +528,14 @@ describe('Security scope search (integration)', function () {
       const scope = await scopeRepo.getSecurityScopeByScopeHash(computeScopeHash('urn:1:dataset:*'));
       expect(scope.security_scope_id).to.equal(scopeId);
 
-      // Verify policy_statement_scope mapping
-      const pssResult = await connection.sql(SQL`
-        SELECT count(*)::integer as count FROM policy_statement_scope
-        WHERE policy_statement_id = ${stmtId} AND security_scope_id = ${scopeId};
+      // Verify policy_statement.security_scope_id mapping
+      const statementScopeResult = await connection.sql(SQL`
+        SELECT count(*)::integer as count
+        FROM policy_statement
+        WHERE policy_statement_id = ${stmtId}
+          AND security_scope_id = ${scopeId};
       `);
-      expect(pssResult.rows[0].count).to.equal(1);
+      expect(statementScopeResult.rows[0].count).to.equal(1);
     });
 
     it('should reuse the same scope for two policies with the same URN (dedup)', async () => {
@@ -843,24 +845,25 @@ describe('Security scope search (integration)', function () {
       expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
 
       await softDeleteStatement(stmtId);
-      await scopeService.cleanupScopesForDeletedStatements([stmtId], [teamId]);
+      await scopeService.rebuildTeamSecurityScopesForTeams([teamId]);
 
       expect(await countTeamScopes(teamId)).to.equal(0);
     });
 
-    it('should delete orphaned security_scope_anchor rows when last reference is removed', async () => {
+    it('should preserve security_scope_anchor rows when last policy reference is removed', async () => {
       const { stmtId, scopeId } = await setupSecuredScope('Orphan Anchor', 'orphan-test');
 
       expect(await countAnchors(scopeId)).to.be.greaterThan(0);
+      const anchorsBefore = await countAnchors(scopeId);
 
-      // Soft-delete statement and cleanup — scope becomes orphaned
+      // Soft-delete statement and rebuild team grants — scope becomes unused,
+      // but anchors remain reusable cache rows.
       await softDeleteStatement(stmtId);
-      await scopeService.cleanupScopesForDeletedStatements([stmtId], []);
+      await scopeService.rebuildTeamSecurityScopesForTeams([]);
 
       await refreshAnchorsViaService(scopeId);
 
-      // Anchors deleted because scope has no remaining policy_statement_scope references
-      expect(await countAnchors(scopeId)).to.equal(0);
+      expect(await countAnchors(scopeId)).to.equal(anchorsBefore);
     });
 
     it('should preserve anchors for shared scopes when one policy is deleted', async () => {
@@ -885,7 +888,7 @@ describe('Security scope search (integration)', function () {
 
       // Delete policy A's statement — scope still referenced by policy B
       await softDeleteStatement(stmtA);
-      await scopeService.cleanupScopesForDeletedStatements([stmtA], []);
+      await scopeService.rebuildTeamSecurityScopesForTeams([]);
 
       // Anchors preserved — scope is NOT orphaned
       expect(await countAnchors(scopeId)).to.equal(anchorsBefore);
@@ -917,7 +920,7 @@ describe('Security scope search (integration)', function () {
       expect(before.map((r) => r.submission_feature_id)).to.include(securedFeature);
 
       await softDeleteStatement(stmtId);
-      await scopeService.cleanupScopesForDeletedStatements([stmtId], [teamId]);
+      await scopeService.rebuildTeamSecurityScopesForTeams([teamId]);
 
       // After: user can no longer see the secured feature
       const after = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -928,7 +931,7 @@ describe('Security scope search (integration)', function () {
   // ── Policy update → scope replacement ────────────────────────────────
 
   describe('Policy update → scope replacement', () => {
-    it('should replace scopes and clean up orphaned anchors when statements are updated', async () => {
+    it('should replace team access while preserving reusable anchors when statements are updated', async () => {
       // Two submissions, each with a secured feature under its own upload (closure rebuilt per upload)
       const { submissionId: sub1, featureId: feat1 } = await seedSecuredDataset();
       const { submissionId: sub2, featureId: feat2 } = await seedSecuredDataset();
@@ -954,12 +957,13 @@ describe('Security scope search (integration)', function () {
 
       // Simulate update: soft-delete old statement, cleanup, create new for sub2
       await softDeleteStatement(oldStmtId);
-      await scopeService.cleanupScopesForDeletedStatements([oldStmtId], [teamId]);
+      await scopeService.rebuildTeamSecurityScopesForTeams([teamId]);
 
+      const oldAnchorsBeforeRefresh = await countAnchors(oldScopeId);
       await refreshAnchorsViaService(oldScopeId);
 
-      // Old scope's anchors cleaned up (orphaned)
-      expect(await countAnchors(oldScopeId)).to.equal(0);
+      // Old scope's anchors are preserved for future reuse.
+      expect(await countAnchors(oldScopeId)).to.equal(oldAnchorsBeforeRefresh);
 
       // Create new statement and scope chain for sub2
       const newStmtId = await createPolicyStatement(connection, policyId, `urn:${sub2}:*:*`);
@@ -1710,18 +1714,15 @@ describe('Security scope search (integration)', function () {
     });
   });
 
-  // ── URN revert → orphaned scope reuse loses anchors ─────────────────
+  // ── URN revert → reusable scope anchors are retained ────────────────
 
-  describe('URN revert → orphaned scope reuse loses anchors', () => {
-    it('should have anchors after changing URN away and back to the original (BUG: anchors lost)', async () => {
+  describe('URN revert → reusable scope anchors are retained', () => {
+    it('should have anchors after changing URN away and back to the original', async () => {
       // Reproduces: policy starts as urn:{sub}:*:*, changed to urn:{sub}:*:{id},
       // then changed back to urn:{sub}:*:*. The revert finds the existing
-      // security_scope row (scope_hash match) but its anchors were deleted
-      // during the orphan cleanup from the first change.
-      //
-      // setupScopeChain mirrors materializeScopeForPolicyStatement: it checks
-      // insertSecurityScope (ON CONFLICT DO NOTHING) — if null, reuses the
-      // existing scope WITHOUT recomputing anchors.
+      // security_scope row (scope_hash match). Anchors should still be present
+      // because policy changes revoke access through team_security_scope, not by
+      // deleting reusable security_scope_anchor rows.
       //
       // Uses submission-scoped URNs to avoid collisions with seed data policies.
       const submissionId = await createTestSubmission(connection);
@@ -1749,12 +1750,13 @@ describe('Security scope search (integration)', function () {
 
       // ── Step 2: Change URN to urn:{sub}:*:{childId} (narrow) ──
       await softDeleteStatement(stmt1);
-      // Cleanup: remove old pss mapping, rebuild team scopes
-      await scopeService.cleanupScopesForDeletedStatements([stmt1], [teamId]);
+      // Cleanup: remove old direct scope grants and rebuild team scopes
+      await scopeService.rebuildTeamSecurityScopesForTeams([teamId]);
+      const broadAnchorsBeforePrune = await countAnchors(broadScopeId);
       await deleteStaleAnchorsViaService(broadScopeId);
 
-      // Broad scope anchors are now gone (orphaned — no pss references)
-      expect(await countAnchors(broadScopeId)).to.equal(0);
+      // Broad scope anchors remain cached while no active policy references them.
+      expect(await countAnchors(broadScopeId)).to.equal(broadAnchorsBeforePrune);
 
       // Create new narrow statement
       const narrowUrn = `urn:${submissionId}:*:${child}`;
@@ -1767,14 +1769,14 @@ describe('Security scope search (integration)', function () {
 
       // ── Step 3: Revert back to urn:{sub}:*:* (broad again) ──
       await softDeleteStatement(stmt2);
-      await scopeService.cleanupScopesForDeletedStatements([stmt2], [teamId]);
+      await scopeService.rebuildTeamSecurityScopesForTeams([teamId]);
       await deleteStaleAnchorsViaService(narrowScopeId);
 
       // Re-create the original broad statement
       const stmt3 = await createPolicyStatement(connection, policyId, broadUrn);
       // setupScopeChain mirrors the real service: insertSecurityScope returns null
       // (scope_hash already exists from Step 1), so it reuses the existing scope
-      // and recomputes anchors — verifying the fix for the reuse path.
+      // and reuses the cached anchors.
       const reusedScopeId = await setupScopeChain(scopeRepo, stmt3, broadUrn);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
@@ -1785,9 +1787,6 @@ describe('Security scope search (integration)', function () {
       // Team has the scope mapped
       expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
 
-      // BUG: anchors are 0 because orphan cleanup deleted them in Step 2 and
-      // the reuse path in Step 3 skipped recomputation.
-      // After fix, this should be greaterThan(0).
       const anchorCount = await countAnchors(reusedScopeId);
       expect(anchorCount).to.be.greaterThan(0);
     });
@@ -1796,7 +1795,7 @@ describe('Security scope search (integration)', function () {
   // ── findScopeIdsMatchingSubmission → URN pattern matching ───────────
 
   describe('findScopeIdsMatchingSubmission → URN pattern matching', () => {
-    // Seed data may include policy_statements with wildcard URNs (urn_submission_id = '*')
+    // Seed data may include security scopes with wildcard URNs (urn_submission_id = '*')
     // that match any submission. Tests use a baseline snapshot to isolate assertions
     // to scopes created within the test.
     //

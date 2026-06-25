@@ -283,7 +283,7 @@ describe('worker', () => {
       expect(workStub.getCall(11).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
     });
 
-    it('configures dead letter queue for compute-scope-anchors', async () => {
+    it('configures dead letter queue + policy:short for compute-scope-anchors', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
       const scheduleStub = sinon.stub().resolves();
@@ -302,6 +302,7 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
     });
 
     it('configures dead letter queue + policy:short for compute-submission-feature-closure', async () => {

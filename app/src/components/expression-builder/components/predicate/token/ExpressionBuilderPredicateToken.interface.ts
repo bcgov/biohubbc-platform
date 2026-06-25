@@ -33,6 +33,8 @@ export interface ExpressionBuilderPredicateTokenProps {
   draggedPredicateId: string | null;
   /** Removes this predicate by UI id. */
   onRemove: (predicateId: string) => unknown;
+  /** Renders this predicate as a non-editable policy/view surface. */
+  readOnly?: boolean;
 }
 
 export interface UseExpressionBuilderPredicatePropertyParams {

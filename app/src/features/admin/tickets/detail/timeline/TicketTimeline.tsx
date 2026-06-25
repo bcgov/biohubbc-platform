@@ -1,6 +1,5 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
-import { ViewPolicyDialog } from 'features/admin/policies/components/ViewPolicyDialog';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
 import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditForm.interface';
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
@@ -33,17 +32,14 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   const {
     updatingDataRequestId,
     isEditPolicyDialogOpen,
-    isViewPolicyDialogOpen,
     selectedPolicy,
-    viewPolicy,
     isLoadingPolicy,
     isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
     handleOpenPolicyDialog,
-    handleOpenViewPolicyDialog,
+    handleOpenPolicyDetailPage,
     handleClosePolicyDialog,
-    handleCloseViewPolicyDialog,
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
   const {
@@ -63,7 +59,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onEditComment={handleOpenEditCommentDialog}
         onDeleteComment={handleConfirmDeleteComment}
         onViewPolicy={handleOpenPolicyDialog}
-        onViewFinalizedPolicy={handleOpenViewPolicyDialog}
+        onViewFinalizedPolicy={handleOpenPolicyDetailPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
         onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
@@ -80,10 +76,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           onCancel={handleClosePolicyDialog}
           onSave={handleSavePolicy}
         />
-      )}
-
-      {viewPolicy && (
-        <ViewPolicyDialog open={isViewPolicyDialogOpen} policy={viewPolicy} onClose={handleCloseViewPolicyDialog} />
       )}
 
       {selectedComment && (

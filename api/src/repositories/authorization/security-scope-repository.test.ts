@@ -16,7 +16,10 @@ describe('SecurityScopeRepository', () => {
     it('returns the inserted SecurityScope when scope_hash is new', async () => {
       const mockRow = {
         security_scope_id: '11111111-1111-1111-1111-111111111111',
-        scope_hash: 'abc123hash'
+        scope_hash: 'abc123hash',
+        urn_submission_id: '*',
+        urn_feature_type: '*',
+        urn_feature_id: '*'
       };
 
       const mockDBConnection = getMockDBConnection({
@@ -45,7 +48,10 @@ describe('SecurityScopeRepository', () => {
     it('returns the SecurityScope when found', async () => {
       const mockRow = {
         security_scope_id: '11111111-1111-1111-1111-111111111111',
-        scope_hash: 'abc123hash'
+        scope_hash: 'abc123hash',
+        urn_submission_id: '*',
+        urn_feature_type: '*',
+        urn_feature_id: '*'
       };
 
       const mockDBConnection = getMockDBConnection({
@@ -74,25 +80,46 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('deletePolicyStatementScopes', () => {
-    it('deletes rows for the given policy statement IDs', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([], 2));
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+  describe('ensureSecurityScope', () => {
+    it('returns the inserted or existing SecurityScope from one SQL call', async () => {
+      const mockRow = {
+        security_scope_id: '11111111-1111-1111-1111-111111111111',
+        scope_hash: 'abc123hash',
+        urn_submission_id: '1',
+        urn_feature_type: 'dataset',
+        urn_feature_id: '*'
+      };
+      const sqlFake = sinon.fake.resolves(mockQueryResult([mockRow]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deletePolicyStatementScopes(['id-1', 'id-2']);
+      const result = await repository.ensureSecurityScope('abc123hash', {
+        urn_submission_id: '1',
+        urn_feature_type: 'dataset',
+        urn_feature_id: '*'
+      });
 
-      expect(knexFake).to.have.been.calledOnce;
+      expect(sqlFake).to.have.been.calledOnce;
+      expect(result).to.eql(mockRow);
     });
 
-    it('skips the query when given an empty array', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+    it('throws ApiExecuteSQLError when no row is returned', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResult([], 0)
+      });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deletePolicyStatementScopes([]);
 
-      expect(knexFake).not.to.have.been.called;
+      try {
+        await repository.ensureSecurityScope('missing-hash', {
+          urn_submission_id: '1',
+          urn_feature_type: 'dataset',
+          urn_feature_id: '*'
+        });
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Failed to ensure security scope');
+      }
     });
   });
 
@@ -292,39 +319,13 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('findScopeIdsForStatements', () => {
-    it('returns distinct scope IDs for the given policy statement IDs', async () => {
-      const knexFake = sinon.fake.resolves(
-        mockQueryResult([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }])
-      );
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
-
-      const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.findScopeIdsForStatements(['ps-1', 'ps-2']);
-
-      expect(result).to.eql([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
-      expect(knexFake).to.have.been.calledOnce;
-    });
-
-    it('returns empty array when given empty input', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
-
-      const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.findScopeIdsForStatements([]);
-
-      expect(result).to.eql([]);
-      expect(knexFake).not.to.have.been.called;
-    });
-  });
-
-  describe('findOrphanedScopeIds', () => {
-    it('returns scope IDs that have no remaining policy_statement_scope references', async () => {
+  describe('findScopeIdsWithoutActiveApprovedAllowStatements', () => {
+    it('returns scope IDs that have no remaining active approved ALLOW statement references', async () => {
       const knexFake = sinon.fake.resolves(mockQueryResult([{ security_scope_id: 'scope-2' }]));
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.findOrphanedScopeIds(['scope-1', 'scope-2']);
+      const result = await repository.findScopeIdsWithoutActiveApprovedAllowStatements(['scope-1', 'scope-2']);
 
       expect(knexFake).to.have.been.calledOnce;
       expect(result).to.eql([{ security_scope_id: 'scope-2' }]);
@@ -335,7 +336,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.findOrphanedScopeIds([]);
+      const result = await repository.findScopeIdsWithoutActiveApprovedAllowStatements([]);
 
       expect(knexFake).not.to.have.been.called;
       expect(result).to.eql([]);

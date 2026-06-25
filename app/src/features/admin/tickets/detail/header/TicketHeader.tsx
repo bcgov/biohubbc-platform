@@ -7,13 +7,11 @@ import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { TabGroup } from 'components/tabs/TabGroup';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useDialogContext } from 'hooks/useContext';
 import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
 import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
 import { useTicketEditDialog } from '../../hooks/useTicketEditDialog';
-import { TicketHeaderSubtitle } from './TicketHeaderSubtitle';
 
 interface ITicketHeaderProps {
   ticket: ITicketExtended;
@@ -32,7 +30,6 @@ export type TicketDetailTab = 'timeline' | 'artifacts';
 export const TicketHeader = (props: ITicketHeaderProps) => {
   const { ticket, activeTab, onTabChange } = props;
   const { biohubUserWrapper } = useAuthStateContext();
-  const dialogContext = useDialogContext();
   const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } = useTicketEditDialog({
     ticket
   });
@@ -42,17 +39,6 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
   const handleStatusActionClick = () => {
     const nextStatus: TicketStatus = ticket.status === 'open' ? 'closed' : 'open';
     requestStatusChange(nextStatus, biohubUserWrapper.userIdentifier);
-  };
-
-  // Open full ticket description in a dialog when "Read more" is clicked.
-  const handleReadMoreClick = () => {
-    dialogContext.setOkDialog({
-      open: true,
-      dialogTitle: 'Ticket Description',
-      dialogText: '',
-      dialogContent: <Typography>{ticket.description}</Typography>,
-      onClose: () => dialogContext.setOkDialog({ open: false })
-    });
   };
 
   const statusActionButtonLabel = ticket.status === 'open' ? 'Close Ticket' : 'Reopen Ticket';
@@ -91,20 +77,17 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           </Stack>
         }
         subheader={
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={1}>
-              <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
-              <Chip
-                label={ticket.status}
-                color={ticket.status === 'open' ? 'success' : 'default'}
-                sx={{ textTransform: 'capitalize' }}
-              />
-            </Stack>
-            {ticket.description ? (
-              <TicketHeaderSubtitle text={ticket.description} onReadMore={handleReadMoreClick} />
-            ) : null}
+          <Stack direction="row" spacing={1}>
+            <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
+            <Chip
+              label={ticket.status}
+              color={ticket.status === 'open' ? 'success' : 'default'}
+              sx={{ textTransform: 'capitalize' }}
+            />
           </Stack>
         }
+        description={ticket.description}
+        descriptionDialogTitle="Ticket Description"
         tabs={
           <TabGroup<TicketDetailTab>
             value={activeTab}

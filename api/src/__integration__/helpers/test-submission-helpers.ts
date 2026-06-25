@@ -37,6 +37,24 @@ export async function createTestSubmission(connection: IDBConnection): Promise<n
 }
 
 /**
+ * Return the active default blueprint ID used by integration-test upload fixtures.
+ *
+ * `submission_upload.blueprint_id` is required, and most integration helpers only
+ * need the seeded default blueprint rather than a custom per-test blueprint.
+ */
+export async function getActiveDefaultBlueprintId(connection: IDBConnection): Promise<number> {
+  const result = await connection.sql(SQL`
+    SELECT blueprint_id
+    FROM blueprint
+    WHERE is_default = true
+      AND record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  return result.rows[0].blueprint_id;
+}
+
+/**
  * Insert a submission_feature and return its ID.
  * Creates a temporary upload record for the FK constraint, then inserts the feature.
  * Looks up feature_type by name from the pre-seeded feature_type table.
@@ -59,13 +77,15 @@ export async function createTestFeature(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
     VALUES (
       ${submissionId},
       ${uploadId},
       ${ticket_id},
+      ${blueprintId},
       ${systemUserId}
     )
     RETURNING submission_upload_id;
@@ -131,10 +151,11 @@ export async function createTestFeaturesInBulk(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
@@ -200,10 +221,11 @@ export async function createTestUploadWithFeatures(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id as string;
