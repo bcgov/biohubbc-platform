@@ -15,11 +15,15 @@ import { Predicate, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../mod
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
+import { parseTimestamp } from '../utils/timestamp';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 import { ExpressionTreeService } from './expression-tree-service';
 
 const normalizePredicateForTest = (predicate: ExpressionTreePredicate): NormalizedExpressionTreePredicate => {
   if (['Before', 'After', 'OnDate', 'OnTime'].includes(predicate.operator)) {
+    const timestampValue =
+      typeof predicate.value === 'string' ? parseTimestamp(predicate.value) ?? undefined : undefined;
+
     return {
       ...predicate,
       feature_property_type_id: 4,
@@ -27,7 +31,7 @@ const normalizePredicateForTest = (predicate: ExpressionTreePredicate): Normaliz
       internal_predicate: {
         type: 'timestamp',
         operator: predicate.operator,
-        value: typeof predicate.value === 'string' ? predicate.value : undefined
+        value: timestampValue
       }
     };
   }
@@ -450,7 +454,7 @@ describe('ExpressionTreeService', () => {
       ]);
     });
 
-    it('hashes scalar timestamp predicate values through parsed date and time parts', async () => {
+    it('hashes timestamp predicates through normalized date and time parts', async () => {
       const service = new ExpressionTreeService(getMockDBConnection());
 
       const insertPredicateStub = sinon

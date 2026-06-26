@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { parseTimestamp } from '../utils/timestamp';
 import { buildBroadFeatureTypeSubquery, buildExpressionTreeFeatureIdsSubquery } from './expression-evaluation';
 
 const normalizedPredicate = (
@@ -17,6 +18,25 @@ const normalizedPredicate = (
   feature_property_type_name: internal_predicate.type === 'geometry' ? 'spatial' : internal_predicate.type,
   internal_predicate
 });
+
+const timestampPredicateSql = (operator: string, value?: string): string => {
+  const parsedTimestamp = value === undefined ? undefined : parseTimestamp(value) ?? undefined;
+  const expressionTree: NormalizedExpressionTreeExpression = {
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        ...normalizedPredicate(52, null, {
+          type: 'timestamp',
+          operator,
+          ...(parsedTimestamp !== undefined ? { value: parsedTimestamp } : {})
+        })
+      }
+    ]
+  };
+
+  return buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
+};
 
 describe('expression-evaluation', () => {
   afterEach(() => {
@@ -293,6 +313,52 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
       expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
       expect(sql).to.include('"p_not_equals"."value" = \'red\'');
+    });
+
+    it('should compile timestamp date predicates against date_value instead of the removed value column', () => {
+      const sql = timestampPredicateSql('OnDate', '2026-04-24');
+
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include("p.date_value = '2026-04-24'::date");
+      expect(sql).to.not.include('p"."value');
+      expect(sql).to.not.include('p.value');
+    });
+
+    it('should compile timestamp time predicates against time_value instead of the removed value column', () => {
+      const sql = timestampPredicateSql('OnTime', '12:30');
+
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include("p.time_value = '12:30'::time");
+      expect(sql).to.not.include('p"."value');
+      expect(sql).to.not.include('p.value');
+    });
+
+    it('should compile timestamp time-only comparisons against time_value irrespective of date_value', () => {
+      const sql = timestampPredicateSql('Before', '12:30');
+
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include("p.time_value < '12:30'::time");
+      expect(sql).to.not.include('p.date_value <');
+      expect(sql).to.not.include('p"."value');
+      expect(sql).to.not.include('p.value');
+    });
+
+    it('should compile timestamp datetime comparisons from split date_value and time_value columns', () => {
+      const sql = timestampPredicateSql('After', '2026-04-24T12:30');
+
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include("(p.date_value + p.time_value) > ('2026-04-24'::date + '12:30'::time)");
+      expect(sql).to.not.include('p"."value');
+      expect(sql).to.not.include('p.value');
+    });
+
+    it('should compile timestamp Exists predicates against either split timestamp column', () => {
+      const sql = timestampPredicateSql('Exists');
+
+      expect(sql).to.include('submission_feature_property_timestamp');
+      expect(sql).to.include('(p.date_value IS NOT NULL OR p.time_value IS NOT NULL)');
+      expect(sql).to.not.include('p"."value');
+      expect(sql).to.not.include('p.value');
     });
 
     it('should project predicate evidence to species_observation targets through the content walk and closure probes', () => {

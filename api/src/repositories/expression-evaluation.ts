@@ -2,13 +2,12 @@ import { Knex } from 'knex';
 import { MAX_SEARCH_GRAPH_DEPTH } from '../constants/expression';
 import { getKnex } from '../database/db';
 import { ApiBuildSQLError } from '../errors/api-error';
-import { InternalTypedPredicate } from '../models/expression-predicate';
+import { InternalTypedPredicate, TimestampInternalPredicate } from '../models/expression-predicate';
 import {
   NormalizedExpressionTreeClause,
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
-import { parseTimestamp } from '../utils/timestamp';
 import { buildSecurityFilter } from './sql-fragments';
 
 /**
@@ -107,6 +106,13 @@ export const dependencies = {
  * Every child query returns target feature IDs for the route feature type. Predicate clauses first find evidence
  * features that directly satisfy the predicate and then project those evidence features to related target
  * features. Expression clauses combine child target sets with INTERSECT for AND and UNION for OR.
+ *
+ * @param {string} anchorFeatureType - Feature type name that result IDs must belong to.
+ * @param {NormalizedExpressionTreeClause} clause - Normalized predicate or expression clause to compile.
+ * @param {Knex} knex - Knex instance used to build the subquery.
+ * @param {number | null} [systemUserId] - Security context (null = anonymous).
+ * @param {string} [aliasPrefix='expression_clause'] - Alias prefix for nested set-operation operands.
+ * @return {Knex.QueryBuilder} Unexecuted subquery returning target submission_feature_id rows.
  */
 function buildExpressionTargetIdsQuery(
   anchorFeatureType: string,
@@ -144,6 +150,11 @@ function buildExpressionTargetIdsQuery(
  *
  * Predicate clauses carry a `WITH RECURSIVE` CTE (the bounded content-edge walk). PostgreSQL accepts a WITH-bearing
  * query inside a derived table, but not directly as a parenthesized INTERSECT/UNION operand, so the wrap is required.
+ *
+ * @param {Knex.QueryBuilder} query - Target ID query to wrap as a derived table.
+ * @param {Knex} knex - Knex instance used to build the wrapper query.
+ * @param {string} alias - Derived table alias.
+ * @return {Knex.QueryBuilder} Wrapped query selecting submission_feature_id.
  */
 function wrapTargetIdsQuery(query: Knex.QueryBuilder, knex: Knex, alias: string): Knex.QueryBuilder {
   return knex.select('submission_feature_id').from(query.as(alias));
@@ -151,6 +162,12 @@ function wrapTargetIdsQuery(query: Knex.QueryBuilder, knex: Knex, alias: string)
 
 /**
  * Builds a target submission_feature_id query for one typed expression predicate.
+ *
+ * @param {string} anchorFeatureType - Feature type name that result IDs must belong to.
+ * @param {NormalizedExpressionTreePredicate} clause - Normalized predicate clause to compile.
+ * @param {Knex} knex - Knex instance used to build the subquery.
+ * @param {number | null} [systemUserId] - Security context (null = anonymous).
+ * @return {Knex.QueryBuilder} Unexecuted subquery returning target submission_feature_id rows.
  */
 function buildPredicateTargetIdsQuery(
   anchorFeatureType: string,
@@ -168,6 +185,11 @@ function buildPredicateTargetIdsQuery(
  * This query is intentionally target-feature agnostic. It only returns evidence features that directly carry a
  * matching property row. When a user security context is present, inaccessible evidence is removed before graph
  * projection so secured evidence cannot influence visible target results.
+ *
+ * @param {NormalizedExpressionTreePredicate} clause - Normalized predicate clause to compile.
+ * @param {Knex} knex - Knex instance used to build the evidence query.
+ * @param {number | null} [systemUserId] - Security context (null = anonymous).
+ * @return {Knex.QueryBuilder} Unexecuted query returning evidence submission_feature_id rows.
  */
 function buildPredicateEvidenceIdsQuery(
   clause: NormalizedExpressionTreePredicate,
@@ -244,6 +266,12 @@ function buildPredicateEvidenceIdsQuery(
  * secured target feature from unsecured evidence, which would leak the target id to any consumer that uses this
  * subquery directly (e.g. the download pipeline). Applying it here protects every consumer of this shared
  * subquery — search and download alike — with the same target-level security boundary.
+ *
+ * @param {string} anchorFeatureType - Feature type name that projected target IDs must belong to.
+ * @param {Knex.QueryBuilder} evidenceQuery - Query returning evidence submission_feature_id rows.
+ * @param {Knex} knex - Knex instance used to build the projection query.
+ * @param {number | null} [systemUserId] - Security context (null = anonymous).
+ * @return {Knex.QueryBuilder} Unexecuted subquery returning projected target submission_feature_id rows.
  */
 function projectEvidenceToTargetIdsQuery(
   anchorFeatureType: string,
@@ -324,6 +352,9 @@ function projectEvidenceToTargetIdsQuery(
  * `submission_feature_feature` stores direct content edges only and has no record_end_date column. Active-record
  * filtering is applied to the source and target submission_feature rows instead, because either endpoint may
  * reference a soft-deleted feature.
+ *
+ * @param {Knex} knex - Knex instance used to build the edge query.
+ * @return {Knex.QueryBuilder} Unexecuted query returning from_feature_id/to_feature_id content edges.
  */
 function buildContentEdgesQuery(knex: Knex): Knex.QueryBuilder {
   const forward = knex('submission_feature_feature as sff')
@@ -345,6 +376,9 @@ function buildContentEdgesQuery(knex: Knex): Knex.QueryBuilder {
 
 /**
  * Resolves the typed property table and value column for an expression predicate.
+ *
+ * @param {InternalTypedPredicate} predicate - Normalized predicate payload.
+ * @return {{ tableName: string; valueColumn: string }} Physical property table and value column configuration.
  */
 function getPredicateTableConfig(predicate: InternalTypedPredicate): { tableName: string; valueColumn: string } {
   switch (predicate.type) {
@@ -378,6 +412,13 @@ function getPredicateTableConfig(predicate: InternalTypedPredicate): { tableName
  * Row-level `p.value <> X` is incorrect for multi-value properties because a feature with
  * values [red, blue] would match `NotEquals red` through the blue row. This predicate means
  * the evidence feature has no row for the semantic property equal to the requested value.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {NormalizedExpressionTreePredicate} clause - Normalized NotEquals predicate clause.
+ * @param {string} tableName - Typed property table containing candidate value rows.
+ * @param {string} valueColumn - Candidate value column reference prefixed with the `p` alias.
+ * @param {Knex} knex - Knex instance used to build the anti-match subquery.
+ * @return {Knex.QueryBuilder} Evidence query with feature-level NotEquals semantics applied.
  */
 function applyExpressionPredicateNotEquals(
   query: Knex.QueryBuilder,
@@ -416,6 +457,9 @@ function applyExpressionPredicateNotEquals(
 
 /**
  * Get a scalar predicate value for SQL equality comparisons.
+ *
+ * @param {InternalTypedPredicate} predicate - Normalized predicate payload.
+ * @return {string | number | boolean | undefined} Scalar value suitable for single-column comparisons.
  */
 function getScalarPredicateValue(predicate: InternalTypedPredicate): string | number | boolean | undefined {
   if (!('value' in predicate)) {
@@ -439,6 +483,12 @@ function getScalarPredicateValue(predicate: InternalTypedPredicate): string | nu
 
 /**
  * Applies a typed expression predicate operator to a property value query.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {InternalTypedPredicate} predicate - Normalized predicate payload.
+ * @param {string} valueColumn - Typed property value column reference.
+ * @param {Knex} knex - Knex instance used by predicate helpers that need raw subqueries.
+ * @return {Knex.QueryBuilder} Evidence query with the predicate operator applied.
  */
 function applyExpressionPredicateOperator(
   query: Knex.QueryBuilder,
@@ -446,6 +496,10 @@ function applyExpressionPredicateOperator(
   valueColumn: string,
   knex: Knex
 ): Knex.QueryBuilder {
+  if (predicate.type === 'timestamp') {
+    return applyTimestampExpressionOperator(query, predicate);
+  }
+
   if (predicate.operator === 'Exists') {
     return query.whereNotNull(valueColumn);
   }
@@ -457,8 +511,6 @@ function applyExpressionPredicateOperator(
       return applyComparableExpressionOperator(query, valueColumn, predicate.operator, predicate.value);
     case 'boolean':
       return query.where(valueColumn, predicate.value);
-    case 'timestamp':
-      return applyTimestampExpressionOperator(query, valueColumn, predicate);
     case 'taxon':
       return applyTaxonExpressionOperator(query, valueColumn, predicate.operator, predicate.value, knex);
     case 'geometry':
@@ -477,6 +529,12 @@ function applyExpressionPredicateOperator(
 
 /**
  * Applies a string expression operator.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {string} column - String value column reference.
+ * @param {InternalTypedPredicate['operator']} operator - String predicate operator.
+ * @param {string | undefined} value - String comparison value.
+ * @return {Knex.QueryBuilder} Evidence query with the string operator applied.
  */
 function applyStringExpressionOperator(
   query: Knex.QueryBuilder,
@@ -505,6 +563,12 @@ function applyStringExpressionOperator(
 
 /**
  * Applies an equality/comparison expression operator.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {string} column - Comparable value column reference.
+ * @param {InternalTypedPredicate['operator']} operator - Comparable predicate operator.
+ * @param {string | number | boolean | undefined} value - Comparison value.
+ * @return {Knex.QueryBuilder} Evidence query with the comparable operator applied.
  */
 function applyComparableExpressionOperator(
   query: Knex.QueryBuilder,
@@ -532,51 +596,106 @@ function applyComparableExpressionOperator(
 
 /**
  * Applies a timestamp expression operator.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {TimestampInternalPredicate} predicate - Normalized timestamp predicate payload.
+ * @return {Knex.QueryBuilder} Evidence query with the timestamp operator applied.
  */
 function applyTimestampExpressionOperator(
   query: Knex.QueryBuilder,
-  column: string,
-  predicate: Extract<InternalTypedPredicate, { type: 'timestamp' }>
+  predicate: TimestampInternalPredicate
+): Knex.QueryBuilder {
+  const columns = { date: 'p.date_value', time: 'p.time_value' };
+
+  switch (predicate.operator) {
+    case 'Exists':
+      return query.whereRaw(`(${columns.date} IS NOT NULL OR ${columns.time} IS NOT NULL)`);
+    case 'OnDate':
+      if (!predicate.value?.date_value) {
+        throw new ApiBuildSQLError('OnDate timestamp predicate requires a date value', [
+          'expression-evaluation->applyTimestampExpressionOperator',
+          { predicate }
+        ]);
+      }
+
+      return query.whereRaw(`${columns.date} = ?::date`, [predicate.value.date_value]);
+    case 'OnTime':
+      if (!predicate.value?.time_value) {
+        throw new ApiBuildSQLError('OnTime timestamp predicate requires a time value', [
+          'expression-evaluation->applyTimestampExpressionOperator',
+          { predicate }
+        ]);
+      }
+
+      return query.whereRaw(`${columns.time} = ?::time`, [predicate.value.time_value]);
+    case 'Before':
+    case 'After':
+      return applyTimestampComparisonOperator(query, predicate, predicate.operator, columns);
+    default:
+      throw new ApiBuildSQLError('Unsupported timestamp predicate operator', [
+        'expression-evaluation->applyTimestampExpressionOperator',
+        { operator: predicate.operator }
+      ]);
+  }
+}
+
+/**
+ * Applies Before/After comparisons using the timestamp component(s) present in the predicate value.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {TimestampInternalPredicate} predicate - Normalized timestamp predicate payload.
+ * @param {'Before' | 'After'} operator - Timestamp comparison operator.
+ * @param {{ date: string; time: string }} columns - Timestamp date/time column references.
+ * @return {Knex.QueryBuilder} Evidence query with the timestamp comparison applied.
+ */
+function applyTimestampComparisonOperator(
+  query: Knex.QueryBuilder,
+  predicate: TimestampInternalPredicate,
+  operator: 'Before' | 'After',
+  columns: { date: string; time: string }
 ): Knex.QueryBuilder {
   if (!predicate.value) {
-    return query;
-  }
-
-  const value = parseTimestamp(predicate.value);
-
-  if (!value) {
-    throw new ApiBuildSQLError('Unsupported timestamp predicate value', [
-      'expression-evaluation->applyTimestampExpressionOperator',
-      { value: predicate.value }
+    throw new ApiBuildSQLError('Timestamp predicate requires a value', [
+      'expression-evaluation->applyTimestampComparisonOperator',
+      { predicate }
     ]);
   }
 
-  if (predicate.operator === 'OnDate') {
-    return query.whereRaw(`${column} >= ?::date AND ${column} < (?::date + interval '1 day')`, [
+  const value = predicate.value;
+  const comparator = operator === 'Before' ? '<' : '>';
+  const hasDate = Boolean(value.date_value);
+  const hasTime = Boolean(value.time_value);
+
+  if (hasDate && hasTime) {
+    return query.whereRaw(`(${columns.date} + ${columns.time}) ${comparator} (?::date + ?::time)`, [
       value.date_value,
-      value.date_value
+      value.time_value
     ]);
   }
 
-  if (predicate.operator === 'OnTime') {
-    return query.whereRaw(`${column}::time = ?::time`, [value.time_value]);
+  if (hasDate) {
+    return query.whereRaw(`${columns.date} ${comparator} ?::date`, [value.date_value]);
   }
 
-  const comparator = predicate.operator === 'Before' ? '<' : '>';
-
-  if (value.date_value && value.time_value) {
-    return query.whereRaw(`${column} ${comparator} (?::date + ?::time)`, [value.date_value, value.time_value]);
+  if (!hasTime) {
+    throw new ApiBuildSQLError('Timestamp comparison predicate requires a date or time value', [
+      'expression-evaluation->applyTimestampComparisonOperator',
+      { predicate }
+    ]);
   }
 
-  if (value.date_value) {
-    return query.whereRaw(`${column}::date ${comparator} ?::date`, [value.date_value]);
-  }
-
-  return query.whereRaw(`${column}::time ${comparator} ?::time`, [value.time_value]);
+  return query.whereRaw(`${columns.time} ${comparator} ?::time`, [value.time_value]);
 }
 
 /**
  * Applies a taxon expression operator.
+ *
+ * @param {Knex.QueryBuilder} query - Evidence query to constrain.
+ * @param {string} column - Taxon id column reference.
+ * @param {InternalTypedPredicate['operator']} operator - Taxon predicate operator.
+ * @param {number | undefined} value - Target taxon id.
+ * @param {Knex} knex - Knex instance used to build recursive taxon subqueries.
+ * @return {Knex.QueryBuilder} Evidence query with the taxon operator applied.
  */
 function applyTaxonExpressionOperator(
   query: Knex.QueryBuilder,
@@ -607,6 +726,12 @@ function applyTaxonExpressionOperator(
 
 /**
  * Builds a recursive query checking whether the candidate taxon is an ancestor of the target taxon.
+ *
+ * @param {Knex} knex - Knex instance used to build the raw recursive query.
+ * @param {number | undefined} targetTaxonId - Target taxon id supplied by the predicate.
+ * @param {string} candidateTaxonColumn - Candidate taxon column reference from the evidence row.
+ * @param {boolean} includeAllAncestors - Whether to include all ancestors instead of only the direct parent.
+ * @return {Knex.Raw} Raw EXISTS subquery for ancestor matching.
  */
 function buildTaxonAncestorExistsQuery(
   knex: Knex,
@@ -637,6 +762,11 @@ function buildTaxonAncestorExistsQuery(
 
 /**
  * Builds a recursive query checking whether the candidate taxon descends from the target taxon.
+ *
+ * @param {Knex} knex - Knex instance used to build the raw recursive query.
+ * @param {number | undefined} targetTaxonId - Target ancestor taxon id supplied by the predicate.
+ * @param {string} candidateTaxonColumn - Candidate taxon column reference from the evidence row.
+ * @return {Knex.Raw} Raw EXISTS subquery for descendant matching.
  */
 function buildTaxonDescendantExistsQuery(
   knex: Knex,
