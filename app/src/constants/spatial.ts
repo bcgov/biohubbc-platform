@@ -30,5 +30,5 @@ export enum SPATIAL_COMPONENT_TYPE {
 export enum LAYER_NAME {
   OCCURRENCES = 'Occurrences',
   BOUNDARIES = 'Boundaries',
-  DATASETS = 'Datasets'
+  SURVEYS = 'Surveys'
 }

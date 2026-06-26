@@ -133,7 +133,7 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
   // URNs use real feature_type names — `tr_policy_statement_urn_validation` rejects
   // unknown types. Tests use type-wildcard URNs (urn:*:<type>:*) so no real submission
   // is needed; transaction rollback handles isolation between tests.
-  const URN_A = 'urn:*:dataset:*';
+  const URN_A = 'urn:*:survey:*';
   const URN_B = 'urn:*:marking:*';
 
   // ── Tests ───────────────────────────────────────────────────────────

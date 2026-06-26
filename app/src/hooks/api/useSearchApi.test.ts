@@ -43,7 +43,7 @@ describe('useSearchApi', () => {
           submission_id: 10,
           uuid: '550e8400-e29b-41d4-a716-446655440001',
           feature_type_id: 1,
-          feature_type_name: 'dataset',
+          feature_type_name: 'survey',
           properties: {},
           submission_name: 'Wildlife Project',
           is_secured: false,
@@ -65,9 +65,9 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree);
+      const result = await useSearchApi(axios).searchFeatures('survey', expressionTree);
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
@@ -107,9 +107,9 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree, { page: 1, limit: 10 });
+      const result = await useSearchApi(axios).searchFeatures('survey', expressionTree, { page: 1, limit: 10 });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
@@ -160,9 +160,9 @@ describe('useSearchApi', () => {
         }
       };
 
-      mock.onPost('/api/search/feature/dataset').reply(200, mockResponse);
+      mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures('dataset', expressionTree);
+      const result = await useSearchApi(axios).searchFeatures('survey', expressionTree);
 
       expect(result.features).toEqual([]);
       expect(result.pagination.total).toEqual(0);
@@ -268,7 +268,7 @@ describe('useSearchApi', () => {
     it('should make GET request to /api/search with query params', async () => {
       const mockResponse: SearchResponse = {
         features: {
-          data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1, feature_type_name: 'dataset' }],
+          data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1, feature_type_name: 'survey' }],
           total: 5000
         },
         submissions: { data: [], total: 1 },
@@ -293,14 +293,14 @@ describe('useSearchApi', () => {
       mock.onGet('/api/search').reply(200, mockResponse);
 
       const result = await useSearchApi(axios).searchAll(
-        { keyword: 'moose', feature_type_name: 'dataset' },
+        { keyword: 'moose', feature_type_name: 'survey' },
         { page: 1, limit: 10 }
       );
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.get[0].params).toEqual({
         keyword: 'moose',
-        feature_type_name: 'dataset',
+        feature_type_name: 'survey',
         page: 1,
         limit: 10
       });
@@ -311,7 +311,7 @@ describe('useSearchApi', () => {
     it('should make GET request to /api/search/summary and return typed summary', async () => {
       const mockResponse: SearchSummaryResponse = {
         features: [
-          { feature_type_name: PRIORITY_FEATURE_TYPE.DATASET, total: 5 },
+          { feature_type_name: PRIORITY_FEATURE_TYPE.SURVEY, total: 5 },
           { feature_type_name: PRIORITY_FEATURE_TYPE.REPORT, total: 3 }
         ],
         submissions: { total: 2 },
@@ -328,7 +328,7 @@ describe('useSearchApi', () => {
 
     it('should return summary with feature_type_name filter', async () => {
       const mockResponse: SearchSummaryResponse = {
-        features: [{ feature_type_name: PRIORITY_FEATURE_TYPE.DATASET, total: 10 }],
+        features: [{ feature_type_name: PRIORITY_FEATURE_TYPE.SURVEY, total: 10 }],
         submissions: { total: 5 },
         taxonomy: { total: 8 }
       };
@@ -337,13 +337,13 @@ describe('useSearchApi', () => {
 
       const result = await useSearchApi(axios).searchSummary({
         keyword: 'wildlife',
-        feature_type_name: 'dataset'
+        feature_type_name: 'survey'
       });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.get[0].params).toEqual({
         keyword: 'wildlife',
-        feature_type_name: 'dataset'
+        feature_type_name: 'survey'
       });
     });
   });

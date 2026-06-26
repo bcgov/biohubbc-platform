@@ -332,7 +332,7 @@ export const ConfigureExportForm = (props: IConfigureExportFormProps) => {
                 variant="outlined"
                 onClick={() => {
                   // Default "Start with" to the most-recently-added type so deeper chains build
-                  // naturally (dataset → telemetry → animal); fall back to the root for the first step.
+                  // naturally (survey → telemetry → animal); fall back to the root for the first step.
                   const lastAddedType = values.merge_steps[values.merge_steps.length - 1]?.right_feature_type;
                   arrayHelpers.push(newMergeStep({ left_feature_type: lastAddedType || values.root_feature_type }));
                 }}

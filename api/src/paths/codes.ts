@@ -39,12 +39,12 @@ GET.apiDoc = {
                         name: {
                           type: 'string',
                           description: 'The feature type name.',
-                          example: 'dataset'
+                          example: 'survey'
                         },
                         display_name: {
                           type: 'string',
                           description: 'The feature type display name.',
-                          example: 'Dataset'
+                          example: 'Survey'
                         },
                         description: {
                           type: 'string',

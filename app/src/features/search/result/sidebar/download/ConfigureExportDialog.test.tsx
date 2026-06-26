@@ -202,16 +202,16 @@ describe('ConfigureExportDialog', () => {
 
     it('defaults a second step to link to the most-recently-added type, chaining deeper', async () => {
       // Verifies the chain default: once a type is added, the NEXT step links to it (not the root) by
-      // default — so dataset → telemetry → animal builds without re-picking the link target each time.
+      // default — so survey → telemetry → animal builds without re-picking the link target each time.
       const threeTypes: DownloadFeatureType[] = [
-        { feature_type: 'dataset', columns: ['uuid', 'parent_uuid', 'name'] },
+        { feature_type: 'survey', columns: ['uuid', 'parent_uuid', 'name'] },
         { feature_type: 'telemetry', columns: ['uuid', 'parent_uuid', 'vendor'] },
         { feature_type: 'animal', columns: ['uuid', 'parent_uuid', 'tag'] }
       ];
       const { getByRole, getByTestId } = renderDialog({ featureTypes: threeTypes });
 
-      // Root = dataset.
-      await selectRoot(getByRole, 'dataset');
+      // Root = survey.
+      await selectRoot(getByRole, 'survey');
 
       // Step 1: join telemetry (its "Start with" defaults to the root).
       fireEvent.click(getByTestId('add-merge-step'));

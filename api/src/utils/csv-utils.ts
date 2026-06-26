@@ -59,7 +59,7 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
  *
  * @param {CsvPropertyDefinition[] | null} parentProperties - Schema for parent feature type (null if no parent)
  * @param {CsvPropertyDefinition[]} childProperties - Schema for child feature type
- * @param {string[]} systemHeaders - System columns to prepend (e.g., ['dataset_name', 'dataset_id'])
+ * @param {string[]} systemHeaders - System columns to prepend (e.g., ['survey_name', 'survey_id'])
  * @returns {string[]} Combined header array
  */
 export function buildCombinedHeaders(

@@ -140,7 +140,7 @@ describe('Download version export state machine (integration)', function () {
    * to the version.
    */
   async function seedReadyDownloadWithVersionArtifact(
-    featureTypeNames: string[] = ['dataset']
+    featureTypeNames: string[] = ['survey']
   ): Promise<{ downloadId: string; downloadVersionId: string; systemUserId: number; artifactIds: string[] }> {
     const systemUserId = connection.systemUserId();
 
@@ -252,7 +252,7 @@ describe('Download version export state machine (integration)', function () {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
       const publishStub = stubPublish();
 
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
       const record = await exportService.createDownloadVersionExport(downloadId, systemUserId, config, connection);
 
       // Exactly one active group exists for the shape.
@@ -280,7 +280,7 @@ describe('Download version export state machine (integration)', function () {
       expect(group.mode).to.equal('per_feature_type');
       expect(group.config_hash).to.equal(hashForConfig(config));
       expect(group.config.mode).to.equal('per_feature_type');
-      expect(group.config.feature_types).to.eql(['dataset']);
+      expect(group.config.feature_types).to.eql(['survey']);
 
       // Raw read-back of the JSONB column confirms it was written (not null) and
       // matches the canonical hash the service keyed the group on.
@@ -305,14 +305,14 @@ describe('Download version export state machine (integration)', function () {
   describe('distinct config materializes a distinct group', () => {
     it('two configs with different config_hash get two separate active groups on the same version', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
-        'dataset',
+        'survey',
         'animal'
       ]);
 
       // Config A exports one type; config B exports both — different recipes, so
       // different canonical hashes.
-      const configA = validPerTypeConfig(downloadVersionId, ['dataset']);
-      const configB = validPerTypeConfig(downloadVersionId, ['dataset', 'animal']);
+      const configA = validPerTypeConfig(downloadVersionId, ['survey']);
+      const configB = validPerTypeConfig(downloadVersionId, ['survey', 'animal']);
       expect(hashForConfig(configA)).to.not.equal(hashForConfig(configB));
 
       const firstPublish = stubPublish();
@@ -342,11 +342,11 @@ describe('Download version export state machine (integration)', function () {
   describe('denormalized config', () => {
     it('materializes a group with mode=denormalized and attaches the export', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
-        'dataset',
+        'survey',
         'animal'
       ]);
 
-      // A valid denormalized recipe rooted at `dataset`, joining `animal` on the
+      // A valid denormalized recipe rooted at `survey`, joining `animal` on the
       // always-present structural keys (parent_uuid → uuid). No schema columns
       // referenced, so it passes validation regardless of each type's properties.
       const config: CreateDownloadVersionExportRequest = {
@@ -354,11 +354,11 @@ describe('Download version export state machine (integration)', function () {
         version: 1,
         export_type: 'csv',
         mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset', 'animal'],
+        root_feature_type: 'survey',
+        feature_types: ['survey', 'animal'],
         merge_steps: [
           {
-            left_feature_type: 'dataset',
+            left_feature_type: 'survey',
             left_column: 'uuid',
             right_feature_type: 'animal',
             right_column: 'parent_uuid',
@@ -366,7 +366,7 @@ describe('Download version export state machine (integration)', function () {
           }
         ],
         output_columns: [
-          { feature_type: 'dataset', column: 'uuid' },
+          { feature_type: 'survey', column: 'uuid' },
           { feature_type: 'animal', column: 'parent_uuid' }
         ]
       };
@@ -378,7 +378,7 @@ describe('Download version export state machine (integration)', function () {
       const group = await exportRepo.getExportArtifactGroupById(groupId);
       expect(group.mode).to.equal('denormalized');
       expect(group.config.mode).to.equal('denormalized');
-      expect(group.config.root_feature_type).to.equal('dataset');
+      expect(group.config.root_feature_type).to.equal('survey');
       expect(group.config_hash).to.equal(hashForConfig(config));
       expect(record.mode).to.equal('denormalized');
 
@@ -432,7 +432,7 @@ describe('Download version export state machine (integration)', function () {
 
   describe('invalid config validation (AC8)', () => {
     it('rejects a config referencing a non-materialized feature type with ApiValidationError', async () => {
-      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['dataset']);
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['survey']);
       const publishStub = stubPublish();
 
       // 'observation' was never materialized for this download.
@@ -445,18 +445,18 @@ describe('Download version export state machine (integration)', function () {
     });
 
     it('rejects a config referencing a non-existent column with ApiValidationError', async () => {
-      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['dataset']);
+      const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact(['survey']);
       const publishStub = stubPublish();
 
-      // 'dataset' is materialized but 'no_such_column' is neither structural nor a schema property.
+      // 'survey' is materialized but 'no_such_column' is neither structural nor a schema property.
       const config: CreateDownloadVersionExportRequest = {
         download_version_id: downloadVersionId,
         version: 1,
         export_type: 'csv',
         mode: 'per_feature_type',
-        feature_types: ['dataset'],
+        feature_types: ['survey'],
         merge_steps: [],
-        output_columns: [{ feature_type: 'dataset', column: 'no_such_column' }]
+        output_columns: [{ feature_type: 'survey', column: 'no_such_column' }]
       };
 
       await expectValidationRejection(downloadId, systemUserId, config);
@@ -467,13 +467,13 @@ describe('Download version export state machine (integration)', function () {
 
     it('rejects a config whose merge steps are unreachable from the root with ApiValidationError', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact([
-        'dataset',
+        'survey',
         'animal'
       ]);
       const publishStub = stubPublish();
 
-      // Root is `dataset`, but the only merge step joins FROM `animal` — which is
-      // never made reachable from the root (no step has `dataset` on its left). The
+      // Root is `survey`, but the only merge step joins FROM `animal` — which is
+      // never made reachable from the root (no step has `survey` on its left). The
       // step is orphaned, so orderMergeSteps throws the cycle/unreachable error
       // inside validateExportConfig (same throw a true cycle produces). All types
       // and structural columns referenced exist, so this is the only error.
@@ -482,13 +482,13 @@ describe('Download version export state machine (integration)', function () {
         version: 1,
         export_type: 'csv',
         mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset', 'animal'],
+        root_feature_type: 'survey',
+        feature_types: ['survey', 'animal'],
         merge_steps: [
           {
             left_feature_type: 'animal',
             left_column: 'uuid',
-            right_feature_type: 'dataset',
+            right_feature_type: 'survey',
             right_column: 'parent_uuid',
             merge_type: 'left'
           }
@@ -507,7 +507,7 @@ describe('Download version export state machine (integration)', function () {
   describe('reuse of a ready group', () => {
     it('attaches a second export to the same ready group and does not re-enqueue', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
       const configHash = hashForConfig(config);
 
       // First request materializes the group.
@@ -553,7 +553,7 @@ describe('Download version export state machine (integration)', function () {
   describe('reuse of an in-flight group', () => {
     it('attaches to a pending group without re-enqueuing, and resolves no parts yet', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
 
       // First request leaves the group `pending` (a run is in flight).
       const firstPublish = stubPublish();
@@ -592,7 +592,7 @@ describe('Download version export state machine (integration)', function () {
       // concurrency + the one-job singleton collapse are proven in the system test.
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
 
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
       const normalized = canonicalizeExportConfig(ExportConfig.parse(config));
       const configHash = computeConfigHash(normalized);
       const payload = {
@@ -647,7 +647,7 @@ describe('Download version export state machine (integration)', function () {
   describe('recovery from a failed group', () => {
     it('ends the failed group (preserving its error_message), creates a fresh group, and enqueues', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
 
       // First request materializes the group, then we drive it to `failed`.
       const firstPublish = stubPublish();
@@ -696,7 +696,7 @@ describe('Download version export state machine (integration)', function () {
   describe('exporter_version invalidation', () => {
     it('ignores a ready group at a stale exporter_version and builds a fresh group at the current version', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
       const normalized = canonicalizeExportConfig(ExportConfig.parse(config));
       const configHash = computeConfigHash(normalized);
 
@@ -745,7 +745,7 @@ describe('Download version export state machine (integration)', function () {
       const { download_id: downloadId } = await downloadService.createDownloadRequest({
         name: `version-link-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Version + parquet link test',
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null,
         requestedBy: systemUserId
       });
@@ -768,14 +768,14 @@ describe('Download version export state machine (integration)', function () {
       // download_version_artifact row keyed to the version.
       const { artifact_id } = await artifactService.insertArtifact({
         bucket: 'test-bucket',
-        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`,
+        object_key: `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`,
         byte_size: 2048,
         artifact_status: 'uploaded',
         checksum_sha256: 'b'.repeat(64),
         uploaded_at: new Date().toISOString(),
         format: 'parquet'
       });
-      await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'dataset');
+      await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'survey');
 
       const linkRows = await connection.sql(SQL`
         SELECT download_version_id, artifact_id, feature_type_name
@@ -785,7 +785,7 @@ describe('Download version export state machine (integration)', function () {
           AND record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
-      expect(linkRows.rows[0].feature_type_name).to.equal('dataset');
+      expect(linkRows.rows[0].feature_type_name).to.equal('survey');
     });
   });
 
@@ -800,7 +800,7 @@ describe('Download version export state machine (integration)', function () {
       const record = await exportService.createDownloadVersionExport(
         downloadId,
         systemUserId,
-        validPerTypeConfig(downloadVersionId, ['dataset']),
+        validPerTypeConfig(downloadVersionId, ['survey']),
         connection
       );
       publishStub.restore();
@@ -879,7 +879,7 @@ describe('Download version export state machine (integration)', function () {
   describe('list status derivation', () => {
     it('lists both exports of a ready group as ready with a JOINed part_count and no per-export status write', async () => {
       const { downloadId, downloadVersionId, systemUserId } = await seedReadyDownloadWithVersionArtifact();
-      const config = validPerTypeConfig(downloadVersionId, ['dataset']);
+      const config = validPerTypeConfig(downloadVersionId, ['survey']);
 
       // Two requests attach to one group.
       const firstPublish = stubPublish();

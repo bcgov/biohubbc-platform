@@ -115,14 +115,14 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Retrieves all artifacts belonging to the given dataset.
+   * Retrieves all artifacts belonging to the given survey.
    *
-   * @param {string} datasetId The ID of the dataset
-   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
+   * @param {string} surveyId The ID of the survey
+   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the survey
    * @memberof ArtifactRepository
    */
-  async getArtifactsByDatasetId(datasetId: string): Promise<Artifact[]> {
-    defaultLog.debug({ label: 'getArtifactsByDatasetId', datasetId });
+  async getArtifactsBySurveyId(surveyId: string): Promise<Artifact[]> {
+    defaultLog.debug({ label: 'getArtifactsBySurveyId', surveyId });
 
     const sqlStatement = SQL`
     SELECT
@@ -142,7 +142,7 @@ export class ArtifactRepository extends BaseRepository {
       AND
         sm.record_end_timestamp IS NULL
       AND
-        s.uuid = ${datasetId}
+        s.uuid = ${surveyId}
     );`;
 
     const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);

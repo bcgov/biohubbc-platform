@@ -645,13 +645,13 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get spatial component counts by dataset id
+   * Get spatial component counts by survey id
    *
-   * @param {string} datasetId
+   * @param {string} surveyId
    * @returns {Promise<ISpatialComponentCount[]>}
    * @memberof SubmissionRepository
    */
-  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
+  async getSpatialComponentCountBySurveyId(surveyId: string): Promise<ISpatialComponentCount[]> {
     const sqlStatement = SQL`
         SELECT
           features_array #> '{properties, type}' spatial_type,
@@ -661,7 +661,7 @@ export class SubmissionRepository extends BaseRepository {
           jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
           submission s,
           submission_observation so
-        WHERE s.uuid = ${datasetId}
+        WHERE s.uuid = ${surveyId}
         AND so.submission_id = s.submission_id
         AND ssc.submission_observation_id = so.submission_observation_id
         AND so.record_end_timestamp is null

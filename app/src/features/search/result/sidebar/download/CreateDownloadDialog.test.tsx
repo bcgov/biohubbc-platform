@@ -4,7 +4,7 @@ import { render } from 'test-helpers/test-utils';
 import { CreateDownloadDialog } from './CreateDownloadDialog';
 
 const defaultFeatureTypeOptions: ICustomMultiAutocompleteOption[] = [
-  { value: 'dataset', label: 'Dataset' },
+  { value: 'survey', label: 'Survey' },
   { value: 'observation', label: 'Observation' }
 ];
 
@@ -14,7 +14,7 @@ const renderDialog = (overrides: Partial<React.ComponentProps<typeof CreateDownl
       open={true}
       isSubmitting={false}
       defaultName="Animals download"
-      defaultFeatureType="dataset"
+      defaultFeatureType="survey"
       featureTypeOptions={defaultFeatureTypeOptions}
       onCancel={vi.fn()}
       onSave={vi.fn()}
@@ -69,7 +69,7 @@ describe('CreateDownloadDialog', () => {
         expect.objectContaining({
           name: 'Moose download',
           description: 'Skeena',
-          featureTypes: ['dataset']
+          featureTypes: ['survey']
         })
       );
     });

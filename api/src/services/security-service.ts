@@ -317,14 +317,14 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Returns true is any artifacts in the dataset are pending review
+   * Returns true is any artifacts in the survey are pending review
    *
-   * @param {string} datasetId
+   * @param {string} surveyId
    * @return {*}  {Promise<boolean>}
    * @memberof SecurityService
    */
-  async isDatasetPendingReview(datasetId: string): Promise<boolean> {
-    const artifactIds = (await this.artifactService.getArtifactsByDatasetId(datasetId)).map((item) => item.artifact_id);
+  async isSurveyPendingReview(surveyId: string): Promise<boolean> {
+    const artifactIds = (await this.artifactService.getArtifactsBySurveyId(surveyId)).map((item) => item.artifact_id);
 
     const artifactSecurityRules = await Promise.all(
       artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))

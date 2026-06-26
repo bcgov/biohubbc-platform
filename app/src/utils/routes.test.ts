@@ -5,16 +5,16 @@ describe('getSearchFeatureTypeRouteConfig', () => {
   const featureTypes = [
     {
       feature_type: {
-        name: 'dataset',
-        display_name: 'Dataset'
+        name: 'survey',
+        display_name: 'Survey'
       }
     }
   ];
 
   it('normalizes route casing before matching feature type metadata', () => {
-    expect(getSearchFeatureTypeRouteConfig(' DATASET ', featureTypes)).toEqual({
-      featureTypeName: 'dataset',
-      title: 'Datasets'
+    expect(getSearchFeatureTypeRouteConfig(' SURVEY ', featureTypes)).toEqual({
+      featureTypeName: 'survey',
+      title: 'Surveys'
     });
   });
 });

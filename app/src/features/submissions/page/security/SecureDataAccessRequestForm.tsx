@@ -6,7 +6,7 @@ import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact } from 'interfaces/useArtifactApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useEffect, useState } from 'react';
 import yup from 'utils/YupSchema';

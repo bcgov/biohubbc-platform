@@ -59,7 +59,7 @@ export async function seed(knex: Knex): Promise<void> {
 }
 
 /**
- * Insert a single submission record, a single dataset record, and related records.
+ * Insert a single submission record, a single survey record, and related records.
  *
  * @param {Knex} knex
  */
@@ -72,8 +72,8 @@ const insertRecord = async (knex: Knex) => {
   const upload_id = await insertUploadRecord(knex);
   const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
 
-  // Dataset
-  const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
+  // Survey
+  const parent_submission_feature_id1 = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
 
   // Sample Sites and their children
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
@@ -129,7 +129,7 @@ export const insertSubmissionRecord = async (
   return submission_id;
 };
 
-export const insertDatasetRecord = async (
+export const insertSurveyRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string }
 ): Promise<number> => {
@@ -141,7 +141,7 @@ export const insertDatasetRecord = async (
       submission_id: options.submission_id,
       submission_upload_id: options.submission_upload_id,
       parent_submission_feature_id: null,
-      feature_type: 'dataset',
+      feature_type: 'survey',
       data: {
         name,
         description,
@@ -468,7 +468,7 @@ export const insertSubmissionFeature = (options: {
   submission_id: number;
   submission_upload_id: string;
   parent_submission_feature_id: number | null;
-  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
+  feature_type: 'survey' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature

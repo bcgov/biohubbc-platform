@@ -194,7 +194,7 @@ function buildArchiverBundle(): {
  * only the always-present `uuid` structural column. Used as the default config
  * for `seedPendingExport` when a test doesn't supply its own recipe.
  */
-function defaultPerTypeConfig(featureType = 'dataset'): ExportConfig {
+function defaultPerTypeConfig(featureType = 'survey'): ExportConfig {
   return ExportConfig.parse({
     version: 1,
     export_type: 'csv',
@@ -205,20 +205,20 @@ function defaultPerTypeConfig(featureType = 'dataset'): ExportConfig {
   });
 }
 
-// Root `dataset` joined to dimension `animal` on dataset.uuid = animal.parent_uuid
-// (a real star-schema link — an animal's parent_uuid points at its dataset's
+// Root `survey` joined to dimension `animal` on survey.uuid = animal.parent_uuid
+// (a real star-schema link — an animal's parent_uuid points at its survey's
 // uuid). Output selects the root's `name` and the dimension's `animal_identifier`;
 // the dimension column is prefixed `animal_animal_identifier` for header uniqueness.
-function datasetAnimalConfig(): ExportConfig {
+function surveyAnimalConfig(): ExportConfig {
   return ExportConfig.parse({
     version: 1,
     export_type: 'csv',
     mode: 'denormalized',
-    root_feature_type: 'dataset',
-    feature_types: ['dataset', 'animal'],
+    root_feature_type: 'survey',
+    feature_types: ['survey', 'animal'],
     merge_steps: [
       {
-        left_feature_type: 'dataset',
+        left_feature_type: 'survey',
         left_column: 'uuid',
         right_feature_type: 'animal',
         right_column: 'parent_uuid',
@@ -226,8 +226,8 @@ function datasetAnimalConfig(): ExportConfig {
       }
     ],
     output_columns: [
-      { feature_type: 'dataset', column: 'uuid' },
-      { feature_type: 'dataset', column: 'name' },
+      { feature_type: 'survey', column: 'uuid' },
+      { feature_type: 'survey', column: 'name' },
       { feature_type: 'animal', column: 'animal_identifier' }
     ]
   });
@@ -392,7 +392,7 @@ describe('Download Export pipeline (integration)', function () {
 
   describe('DownloadVersionExportRepository.createDownloadVersionExport', () => {
     it('persists the expected row and returns the full record', async () => {
-      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
 
       const { groupId } = await seedPendingExport(downloadVersionId);
 
@@ -436,7 +436,7 @@ describe('Download Export pipeline (integration)', function () {
 
   describe('runExportGroup status transitions', () => {
     it('pending → processing → ready persists the expected timestamps', async () => {
-      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       const { groupId } = await seedPendingExport(downloadVersionId);
 
       // Stub the write-sink so the real archiver bytes drain into a no-op S3 upload.
@@ -466,7 +466,7 @@ describe('Download Export pipeline (integration)', function () {
     });
 
     it('illegal transition (ready → ready from [processing]) throws ApiConflictError', async () => {
-      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       const { groupId } = await seedPendingExport(downloadVersionId);
 
       // Force the group to READY so a PROCESSING-only transition is illegal.
@@ -486,12 +486,12 @@ describe('Download Export pipeline (integration)', function () {
 
   describe('writePartZip', () => {
     it('inserts one artifact + one download_version_export_artifact row with chunk_id = partIndex', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       const { groupId } = await seedPendingExport(downloadVersionId);
 
       const { archive, uploadPromise, hashCount } = buildArchiverBundle();
       // Append one tiny entry so the finalized zip has bytes.
-      archive.append('header\n', { name: 'dataset/chunk1.csv' });
+      archive.append('header\n', { name: 'survey/chunk1.csv' });
 
       const result = await pipelineService.writePartZip({
         groupId,
@@ -531,11 +531,11 @@ describe('Download Export pipeline (integration)', function () {
     });
 
     it('is idempotent on retry — two calls leave one artifact and one join row', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       const { groupId } = await seedPendingExport(downloadVersionId);
 
       const first = buildArchiverBundle();
-      first.archive.append('header\n', { name: 'dataset/chunk1.csv' });
+      first.archive.append('header\n', { name: 'survey/chunk1.csv' });
       const firstResult = await pipelineService.writePartZip({
         groupId,
         downloadId,
@@ -548,7 +548,7 @@ describe('Download Export pipeline (integration)', function () {
 
       // Second call uses a brand-new archiver — archiver can't be finalized twice.
       const second = buildArchiverBundle();
-      second.archive.append('header\n', { name: 'dataset/chunk1.csv' });
+      second.archive.append('header\n', { name: 'survey/chunk1.csv' });
       const secondResult = await pipelineService.writePartZip({
         groupId,
         downloadId,
@@ -581,7 +581,7 @@ describe('Download Export pipeline (integration)', function () {
 
   describe('runExportGroup zero-row feature type', () => {
     it('throws rather than writing an empty zip; leaves no part-zip artifact and status non-READY', async () => {
-      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       const { groupId } = await seedPendingExport(downloadVersionId);
 
       sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
@@ -624,12 +624,12 @@ describe('Download Export pipeline (integration)', function () {
   // so no `validateExportConfig` pass is needed here.
   describe('runExportGroup denormalized join', () => {
     it('single match: one CSV, prefixed dimension column in the header, one joined row per matched root row', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
-      const { groupId } = await seedPendingExport(downloadVersionId, datasetAnimalConfig());
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey', 'animal']);
+      const { groupId } = await seedPendingExport(downloadVersionId, surveyAnimalConfig());
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
-        dataset: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Dataset One' }],
+        survey: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Survey One' }],
         animal: [
           {
             submission_feature_id: 10,
@@ -659,21 +659,21 @@ describe('Download Export pipeline (integration)', function () {
       const { header, rows } = parseCsv(csvs[0].text);
 
       // Header carries the root columns raw and the dimension column prefixed.
-      expect(header).to.eql(['dataset_uuid', 'dataset_name', 'animal_animal_identifier']);
+      expect(header).to.eql(['survey_uuid', 'survey_name', 'animal_animal_identifier']);
 
       // Exactly one output row for the single matched root row, with the dimension populated.
       expect(rows.length).to.equal(1);
-      expect(rows[0]).to.eql(['ds-uuid-1', 'Dataset One', 'ANIMAL-1']);
+      expect(rows[0]).to.eql(['ds-uuid-1', 'Survey One', 'ANIMAL-1']);
     });
 
     it('left join keeps an unmatched root row (non-null key with no match) with empty right cells', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
-      const { groupId } = await seedPendingExport(downloadVersionId, datasetAnimalConfig());
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey', 'animal']);
+      const { groupId } = await seedPendingExport(downloadVersionId, surveyAnimalConfig());
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
         // Root row's uuid 'ds-uuid-orphan' has a non-null key but no animal points at it.
-        dataset: [{ submission_feature_id: 1, uuid: 'ds-uuid-orphan', parent_uuid: null, name: 'Lonely Dataset' }],
+        survey: [{ submission_feature_id: 1, uuid: 'ds-uuid-orphan', parent_uuid: null, name: 'Lonely Survey' }],
         // The animal's parent_uuid points elsewhere, so it never matches the root.
         animal: [
           {
@@ -689,26 +689,26 @@ describe('Download Export pipeline (integration)', function () {
 
       const partKey = part1Key(downloadId, downloadVersionId, groupId);
       const { header, rows } = parseCsv(upload.csvEntries(partKey)[0].text);
-      expect(header).to.eql(['dataset_uuid', 'dataset_name', 'animal_animal_identifier']);
+      expect(header).to.eql(['survey_uuid', 'survey_name', 'animal_animal_identifier']);
 
       // The unmatched root row is KEPT (left join) with an empty dimension cell.
       expect(rows.length).to.equal(1);
-      expect(rows[0]).to.eql(['ds-uuid-orphan', 'Lonely Dataset', '']);
+      expect(rows[0]).to.eql(['ds-uuid-orphan', 'Lonely Survey', '']);
     });
 
     it('null root join key never spuriously matches a null-keyed dimension row (NULL ≠ NULL)', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
-      // Join the root ON `parent_uuid` (which is null on a root dataset row) so the
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey', 'animal']);
+      // Join the root ON `parent_uuid` (which is null on a root survey row) so the
       // probe key is null. A null-keyed dimension row must NOT match it.
       const config = ExportConfig.parse({
         version: 1,
         export_type: 'csv',
         mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset', 'animal'],
+        root_feature_type: 'survey',
+        feature_types: ['survey', 'animal'],
         merge_steps: [
           {
-            left_feature_type: 'dataset',
+            left_feature_type: 'survey',
             left_column: 'parent_uuid',
             right_feature_type: 'animal',
             right_column: 'parent_uuid',
@@ -716,7 +716,7 @@ describe('Download Export pipeline (integration)', function () {
           }
         ],
         output_columns: [
-          { feature_type: 'dataset', column: 'uuid' },
+          { feature_type: 'survey', column: 'uuid' },
           { feature_type: 'animal', column: 'animal_identifier' }
         ]
       });
@@ -724,8 +724,8 @@ describe('Download Export pipeline (integration)', function () {
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
-        // Root dataset row with a NULL parent_uuid → null probe key.
-        dataset: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Root Dataset' }],
+        // Root survey row with a NULL parent_uuid → null probe key.
+        survey: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Root Survey' }],
         // A dimension row whose join key (parent_uuid) is ALSO null — it must be
         // skipped at build time (null keys never indexed), so the null root key
         // finds no match rather than spuriously joining null-to-null.
@@ -743,7 +743,7 @@ describe('Download Export pipeline (integration)', function () {
 
       const partKey = part1Key(downloadId, downloadVersionId, groupId);
       const { header, rows } = parseCsv(upload.csvEntries(partKey)[0].text);
-      expect(header).to.eql(['dataset_uuid', 'animal_animal_identifier']);
+      expect(header).to.eql(['survey_uuid', 'animal_animal_identifier']);
 
       // The root row is kept, but the null-keyed dimension did NOT match → empty cell.
       expect(rows.length).to.equal(1);
@@ -751,13 +751,13 @@ describe('Download Export pipeline (integration)', function () {
     });
 
     it('fan-out: a root row matching two dimension rows produces two output rows', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
-      const { groupId } = await seedPendingExport(downloadVersionId, datasetAnimalConfig());
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey', 'animal']);
+      const { groupId } = await seedPendingExport(downloadVersionId, surveyAnimalConfig());
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
-        dataset: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Dataset One' }],
-        // Two animals both point at the one dataset → fan-out to two output rows.
+        survey: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Survey One' }],
+        // Two animals both point at the one survey → fan-out to two output rows.
         animal: [
           { submission_feature_id: 10, uuid: 'an-uuid-1', parent_uuid: 'ds-uuid-1', animal_identifier: 'ANIMAL-1' },
           { submission_feature_id: 11, uuid: 'an-uuid-2', parent_uuid: 'ds-uuid-1', animal_identifier: 'ANIMAL-2' }
@@ -768,36 +768,36 @@ describe('Download Export pipeline (integration)', function () {
 
       const partKey = part1Key(downloadId, downloadVersionId, groupId);
       const { header, rows } = parseCsv(upload.csvEntries(partKey)[0].text);
-      expect(header).to.eql(['dataset_uuid', 'dataset_name', 'animal_animal_identifier']);
+      expect(header).to.eql(['survey_uuid', 'survey_name', 'animal_animal_identifier']);
 
       // One root row fanned out to exactly two output rows — one per matched animal.
       expect(rows.length).to.equal(2);
       expect(rows.map((row) => row[2]).sort((a, b) => a.localeCompare(b))).to.eql(['ANIMAL-1', 'ANIMAL-2']);
       // Both rows carry the SAME root columns (the root row broadcast across matches).
       for (const row of rows) {
-        expect([row[0], row[1]]).to.eql(['ds-uuid-1', 'Dataset One']);
+        expect([row[0], row[1]]).to.eql(['ds-uuid-1', 'Survey One']);
       }
     });
 
     it('degenerate single-type passthrough (merge_steps: []) emits one CSV of that type rows (Edge 6)', async () => {
-      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
+      const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey']);
       // Denormalized, one type, no merges, no output_columns → all columns of that
       // type, passed through (the "omitted output_columns ⇒ all columns" default).
       const config = ExportConfig.parse({
         version: 1,
         export_type: 'csv',
         mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset'],
+        root_feature_type: 'survey',
+        feature_types: ['survey'],
         merge_steps: []
       });
       const { groupId } = await seedPendingExport(downloadVersionId, config);
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
-        dataset: [
-          { submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Dataset One' },
-          { submission_feature_id: 2, uuid: 'ds-uuid-2', parent_uuid: null, name: 'Dataset Two' }
+        survey: [
+          { submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Survey One' },
+          { submission_feature_id: 2, uuid: 'ds-uuid-2', parent_uuid: null, name: 'Survey Two' }
         ]
       });
 
@@ -814,7 +814,7 @@ describe('Download Export pipeline (integration)', function () {
       expect(csvs.length, 'one CSV entry').to.equal(1);
       const { header, rows } = parseCsv(csvs[0].text);
 
-      // All of dataset's materialized columns are present (structural first), and the
+      // All of survey's materialized columns are present (structural first), and the
       // selected schema columns carry their raw root names (root columns unprefixed).
       expect(header).to.include.members(['submission_feature_id', 'uuid', 'parent_uuid', 'name']);
 
@@ -824,14 +824,14 @@ describe('Download Export pipeline (integration)', function () {
       const uuidIndex = header.indexOf('uuid');
       expect(rows.map((row) => row[uuidIndex]).sort((a, b) => a.localeCompare(b))).to.eql(['ds-uuid-1', 'ds-uuid-2']);
       expect(rows.map((row) => row[nameIndex]).sort((a, b) => a.localeCompare(b))).to.eql([
-        'Dataset One',
-        'Dataset Two'
+        'Survey One',
+        'Survey Two'
       ]);
     });
 
     it('fails fast on an over-budget dimension before buffering or uploading (Edge 4 getRowCount preflight)', async () => {
-      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['dataset', 'animal']);
-      const { groupId } = await seedPendingExport(downloadVersionId, datasetAnimalConfig());
+      const { downloadVersionId } = await seedReadyDownloadWithParquetArtifact(['survey', 'animal']);
+      const { groupId } = await seedPendingExport(downloadVersionId, surveyAnimalConfig());
 
       const upload = stubUploadCapture();
       // The dimension `animal` DECLARES one row over the in-memory join budget but
@@ -841,7 +841,7 @@ describe('Download Export pipeline (integration)', function () {
       // the guard buffered first, it would have seen zero rows and never thrown.
       stubParquetReadersByType(
         {
-          dataset: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Dataset One' }],
+          survey: [{ submission_feature_id: 1, uuid: 'ds-uuid-1', parent_uuid: null, name: 'Survey One' }],
           animal: []
         },
         { animal: DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS + 1 }
@@ -881,13 +881,13 @@ describe('Download Export pipeline (integration)', function () {
 
     it('chained two-step merge resolves the downstream join key through the prefixed middle type (Edge 5)', async () => {
       const { downloadId, downloadVersionId } = await seedReadyDownloadWithParquetArtifact([
-        'dataset',
+        'survey',
         'animal',
         'capture'
       ]);
 
-      // Two-hop downward star chain: dataset → animal → capture.
-      //   step 1  animal.parent_uuid = dataset.uuid   (root finds its animals)
+      // Two-hop downward star chain: survey → animal → capture.
+      //   step 1  animal.parent_uuid = survey.uuid   (root finds its animals)
       //   step 2  capture.parent_uuid = animal.uuid    (each animal finds its captures)
       // Step 2's LEFT key is `animal.uuid` — but after step 1, animal's columns live
       // on the joined row PREFIXED as `animal_uuid` (mergePrefixed). The engine must
@@ -901,11 +901,11 @@ describe('Download Export pipeline (integration)', function () {
         version: 1,
         export_type: 'csv',
         mode: 'denormalized',
-        root_feature_type: 'dataset',
-        feature_types: ['dataset', 'animal', 'capture'],
+        root_feature_type: 'survey',
+        feature_types: ['survey', 'animal', 'capture'],
         merge_steps: [
           {
-            left_feature_type: 'dataset',
+            left_feature_type: 'survey',
             left_column: 'uuid',
             right_feature_type: 'animal',
             right_column: 'parent_uuid',
@@ -920,7 +920,7 @@ describe('Download Export pipeline (integration)', function () {
           }
         ],
         output_columns: [
-          { feature_type: 'dataset', column: 'name' },
+          { feature_type: 'survey', column: 'name' },
           { feature_type: 'animal', column: 'animal_identifier' },
           { feature_type: 'capture', column: 'uuid' }
         ]
@@ -929,7 +929,7 @@ describe('Download Export pipeline (integration)', function () {
 
       const upload = stubUploadCapture();
       stubParquetReadersByType({
-        dataset: [{ submission_feature_id: 1, uuid: 'ds-1', parent_uuid: null, name: 'Dataset One' }],
+        survey: [{ submission_feature_id: 1, uuid: 'ds-1', parent_uuid: null, name: 'Survey One' }],
         animal: [
           // an-1 has a capture; an-2 has none (proves left-join keep at the FAR hop).
           { submission_feature_id: 10, uuid: 'an-1', parent_uuid: 'ds-1', animal_identifier: 'ANIMAL-1' },
@@ -948,15 +948,15 @@ describe('Download Export pipeline (integration)', function () {
 
       const partKey = part1Key(downloadId, downloadVersionId, groupId);
       const { header, rows } = parseCsv(upload.csvEntries(partKey)[0].text);
-      expect(header).to.eql(['dataset_name', 'animal_animal_identifier', 'capture_uuid']);
+      expect(header).to.eql(['survey_name', 'animal_animal_identifier', 'capture_uuid']);
 
-      // Hop 1 fanned the one dataset out to its two animals; hop 2 resolved cap-1
+      // Hop 1 fanned the one survey out to its two animals; hop 2 resolved cap-1
       // through the prefixed `animal_uuid` for an-1, and left-join-kept an-2 (no
       // capture) with an empty far-hop cell.
       const byAnimal = [...rows].sort((a, b) => a[1].localeCompare(b[1]));
       expect(byAnimal.length).to.equal(2);
-      expect(byAnimal[0]).to.eql(['Dataset One', 'ANIMAL-1', 'cap-1']);
-      expect(byAnimal[1]).to.eql(['Dataset One', 'ANIMAL-2', '']);
+      expect(byAnimal[0]).to.eql(['Survey One', 'ANIMAL-1', 'cap-1']);
+      expect(byAnimal[1]).to.eql(['Survey One', 'ANIMAL-2', '']);
     });
   });
 });

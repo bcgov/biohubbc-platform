@@ -23,7 +23,7 @@ export class SearchRepository extends BaseRepository {
    * feature types in {@link LANDING_PAGE_FEATURE_TYPES} are eligible. The displayed `label`
    * is the matched value itself, so the dropdown row always reflects *why* the feature
    * surfaced. For types that store a canonical `name` in both `sf.data` and a `_string`
-   * property (e.g. study_area, sample_site, dataset), a keyword that hits the name produces
+   * property (e.g. study_area, sample_site, survey), a keyword that hits the name produces
    * the name as the matched value — so the name-search UX is preserved.
    *
    * The code arm matches `c.label`, `c.key`, and `c.description`. Keys aren't necessarily

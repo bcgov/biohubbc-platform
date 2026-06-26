@@ -73,7 +73,7 @@ describe('Download services (integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: opts?.name ?? `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: opts?.description ?? null,
-      featureTypes: opts?.featureTypes ?? ['dataset'],
+      featureTypes: opts?.featureTypes ?? ['survey'],
       expressionId: null
     });
     const { download_id } = await downloadService.createDownload({
@@ -148,7 +148,7 @@ describe('Download services (integration)', function () {
       const { download_id } = await downloadService.createDownloadRequest({
         name: `Anon request ${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Anonymous download request',
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null,
         requestedBy: null
       });
@@ -184,7 +184,7 @@ describe('Download services (integration)', function () {
       const { download_id } = await downloadService.createDownloadRequest({
         name: `Auth request ${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Authenticated download request',
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null,
         requestedBy: systemUserId
       });

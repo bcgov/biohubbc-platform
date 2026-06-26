@@ -29,7 +29,7 @@ describe('PolicyStatementService', () => {
       security_scope_id: '55555555-5555-5555-5555-555555555555',
       scope_hash: 'scope-hash',
       urn_submission_id: '1',
-      urn_feature_type: 'dataset',
+      urn_feature_type: 'survey',
       urn_feature_id: '1'
     });
   });
@@ -44,7 +44,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: null
       };
       const stub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
@@ -53,7 +53,7 @@ describe('PolicyStatementService', () => {
       const input: CreatePolicyStatement = {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:1:dataset:1'
+        submission_feature_urn: 'urn:1:survey:1'
       };
 
       const result = await service.createPolicyStatement(input);
@@ -73,7 +73,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       const insertStub = sinon
@@ -91,7 +91,7 @@ describe('PolicyStatementService', () => {
       const input: CreatePolicyStatement = {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       const result = await service.createPolicyStatement(input);
@@ -113,14 +113,14 @@ describe('PolicyStatementService', () => {
           policy_statement_id: '11111111-1111-1111-1111-111111111111',
           policy_id: '22222222-2222-2222-2222-222222222222',
           effect: PolicyEffect.DENY,
-          submission_feature_urn: 'urn:1:dataset:1',
+          submission_feature_urn: 'urn:1:survey:1',
           policy_expression_id: null
         },
         {
           policy_statement_id: '33333333-3333-3333-3333-333333333333',
           policy_id: '22222222-2222-2222-2222-222222222222',
           effect: PolicyEffect.ALLOW,
-          submission_feature_urn: 'urn:1:dataset:3',
+          submission_feature_urn: 'urn:1:survey:3',
           policy_expression_id: null
         }
       ];
@@ -139,7 +139,7 @@ describe('PolicyStatementService', () => {
       const mockRows = [
         {
           policy_statement_id: '11111111-1111-1111-1111-111111111111',
-          urn_feature_type: 'dataset',
+          urn_feature_type: 'survey',
           expression_id: null
         },
         {
@@ -165,7 +165,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: null
       };
       const stub = sinon.stub(PolicyStatementRepository.prototype, 'updatePolicyStatement').resolves(mockStatement);
@@ -174,7 +174,7 @@ describe('PolicyStatementService', () => {
 
       const updateData: UpdatePolicyStatement = {
         effect: PolicyEffect.DENY,
-        submission_feature_urn: 'urn:1:dataset:1'
+        submission_feature_urn: 'urn:1:survey:1'
       };
 
       const result = await service.updatePolicyStatement('11111111-1111-1111-1111-111111111111', updateData);
@@ -196,7 +196,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
         security_scope_id: '55555555-5555-5555-5555-555555555555',
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: null
       };
       const linkedStatement: PolicyStatement = {
@@ -238,7 +238,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
         security_scope_id: '55555555-5555-5555-5555-555555555555',
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       const unlinkedStatement: PolicyStatement = { ...updatedStatement, policy_expression_id: null };
@@ -260,19 +260,19 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
         security_scope_id: '44444444-4444-4444-4444-444444444444',
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: null
       };
       const updatedStatement: PolicyStatement = {
         ...existingStatement,
-        submission_feature_urn: 'urn:1:dataset:2'
+        submission_feature_urn: 'urn:1:survey:2'
       };
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatement);
       sinon.stub(PolicyStatementRepository.prototype, 'updatePolicyStatement').resolves(updatedStatement);
       const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshAccessForPolicy').resolves();
 
       await service.updatePolicyStatement(existingStatement.policy_statement_id, {
-        submission_feature_urn: 'urn:1:dataset:2'
+        submission_feature_urn: 'urn:1:survey:2'
       });
 
       expect(refreshStub).to.have.been.calledOnceWith(existingStatement.policy_id);
@@ -283,7 +283,7 @@ describe('PolicyStatementService', () => {
         policy_statement_id: '11111111-1111-1111-1111-111111111111',
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatement);
@@ -314,7 +314,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
         security_scope_id: '55555555-5555-5555-5555-555555555555',
-        submission_feature_urn: 'urn:1:dataset:1',
+        submission_feature_urn: 'urn:1:survey:1',
         policy_expression_id: null
       };
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(mockStatement);

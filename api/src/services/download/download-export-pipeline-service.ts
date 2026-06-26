@@ -227,7 +227,7 @@ export class DownloadExportPipelineService extends DBService {
    *     → archiver.pipe(passThrough) → hashCount.transform → S3 multipart upload
    * The working set is one Parquet row group (≤ 128 MB on disk, typically
    * smaller in memory after decode) + archiver deflate buffer + AWS multipart
-   * part (64 MB) — bounded regardless of dataset size.
+   * part (64 MB) — bounded regardless of survey size.
    *
    * Back-pressure: if the PassThrough's internal buffer fills, `write()`
    * returns `false` and we `await once(pt, 'drain')` before feeding the next
@@ -386,7 +386,7 @@ export class DownloadExportPipelineService extends DBService {
         const flattened = flattenFeatureBySchema(next, properties, submissionFeatureId, `files${currentPart}`);
         flattened['submission_feature_id'] = String(submissionFeatureId);
         // `uuid` is NOT NULL in the Parquet schema; `parent_uuid` is nullable
-        // (root types like `dataset` have no parent) — emit empty string so
+        // (root types like `survey` have no parent) — emit empty string so
         // the column is still present. Narrow to `string | null` rather than
         // `String(unknown)` so we don't risk an `[object Object]` stringify.
         flattened['uuid'] = (next.uuid as string | null) ?? '';

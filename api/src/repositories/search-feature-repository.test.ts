@@ -50,10 +50,10 @@ describe('SearchFeatureRepository', () => {
         ]
       };
 
-      await repository.searchFeaturesByExpressionTree('dataset', expressionTree, undefined, 42);
+      await repository.searchFeaturesByExpressionTree('survey', expressionTree, undefined, 42);
 
       expect(subqueryStub.calledOnce).to.equal(true);
-      expect(subqueryStub.getCall(0).args).to.deep.equal(['dataset', expressionTree, 42]);
+      expect(subqueryStub.getCall(0).args).to.deep.equal(['survey', expressionTree, 42]);
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('"sf"."submission_feature_id" in');
@@ -83,7 +83,7 @@ describe('SearchFeatureRepository', () => {
         ]
       };
 
-      await repository.searchFeaturesByExpressionTree('dataset', expressionTree);
+      await repository.searchFeaturesByExpressionTree('survey', expressionTree);
 
       expect(subqueryStub.getCall(0).args[2]).to.equal(null);
     });
@@ -114,7 +114,7 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTree('dataset', undefined, undefined, null);
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.not.include('sf.data');
@@ -157,11 +157,11 @@ describe('SearchFeatureRepository', () => {
         ]
       };
 
-      const count = await repository.searchFeaturesByExpressionTreeCount('dataset', expressionTree, 42);
+      const count = await repository.searchFeaturesByExpressionTreeCount('survey', expressionTree, 42);
 
       expect(count).to.equal(7);
       expect(subqueryStub.calledOnce).to.equal(true);
-      expect(subqueryStub.getCall(0).args).to.deep.equal(['dataset', expressionTree, 42]);
+      expect(subqueryStub.getCall(0).args).to.deep.equal(['survey', expressionTree, 42]);
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('count(*)::integer as count');
@@ -176,7 +176,7 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTreeProperties('dataset', undefined, 42);
+      await repository.searchFeaturesByExpressionTreeProperties('survey', undefined, 42);
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include('with "matching_features" as');

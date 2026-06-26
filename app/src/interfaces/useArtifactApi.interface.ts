@@ -34,8 +34,8 @@ export interface IPersecutionAndHarmRule {
   persecution_or_harm_id: number;
 }
 
-export interface IRelatedDataset {
-  datasetId: string;
+export interface IRelatedSurvey {
+  surveyId: string;
   title: string;
   url: string;
   supplementaryData: {
@@ -43,14 +43,14 @@ export interface IRelatedDataset {
   };
 }
 
-export interface IListRelatedDatasetsResponse {
-  datasetsWithSupplementaryData: IRelatedDataset[];
+export interface IListRelatedSurveysResponse {
+  surveysWithSupplementaryData: IRelatedSurvey[];
 }
 
-export interface IDatasetForReview {
-  dataset_id: string; // UUID
+export interface ISurveyForReview {
+  survey_id: string; // UUID
   artifacts_to_review: number;
-  dataset_name: string;
+  survey_name: string;
   last_updated: string;
   keywords: string[];
 }
@@ -71,7 +71,7 @@ export interface IDatasetForReview {
 // export interface IGetSubmissionResponse {
 //   submission: ISubmission;
 //   features: {
-//     dataset: IFeature[];
+//     survey: IFeature[];
 //     sampleSites: IFeature[];
 //     animals: IFeature[];
 //     observations: IFeature[];

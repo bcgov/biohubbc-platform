@@ -9,7 +9,7 @@ import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact } from 'interfaces/useArtifactApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useRef, useState } from 'react';
 import SecureDataAccessRequestForm, {

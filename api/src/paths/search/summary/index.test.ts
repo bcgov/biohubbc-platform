@@ -12,7 +12,7 @@ chai.use(sinonChai);
 
 describe('searchSummary', () => {
   const mockSummary = {
-    features: [{ feature_type_name: 'dataset', total: 5 }],
+    features: [{ feature_type_name: 'survey', total: 5 }],
     submissions: { total: 3 },
     taxonomy: { total: 2, scientific_name: 'Some species' }
   };

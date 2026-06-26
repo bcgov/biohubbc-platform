@@ -44,12 +44,12 @@ describe('DownloadPolicyService (integration)', function () {
 
   /**
    * Helper: write an expression tree with one string predicate against
-   * dataset.name and return the persisted root id. Mirrors the route's call
+   * survey.name and return the persisted root id. Mirrors the route's call
    * sequence (`writeExpressionTree`) so the test exercises the same write
    * path as production.
    */
   async function writeNamePredicate(value: string): Promise<string> {
-    // dataset.name → feature_property_id=31, feature_type_property_id=70 (seed).
+    // survey.name → feature_property_id=31, feature_type_property_id=70 (seed).
     const tree: ExpressionTree = {
       type: 'expression',
       operator: 'AND',
@@ -72,7 +72,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Broad Path Test',
         description: 'two feature types, no expression',
-        featureTypes: ['dataset', 'sample_site'],
+        featureTypes: ['survey', 'sample_site'],
         expressionId: null
       });
 
@@ -94,9 +94,9 @@ describe('DownloadPolicyService (integration)', function () {
         ORDER BY ss.urn_feature_type;
       `);
       expect(statements.rowCount).to.equal(2);
-      expect(statements.rows[0].urn_feature_type).to.equal('dataset');
+      expect(statements.rows[0].urn_feature_type).to.equal('survey');
       expect(statements.rows[0].effect).to.equal('allow');
-      expect(statements.rows[0].submission_feature_urn).to.equal('urn:*:dataset:*');
+      expect(statements.rows[0].submission_feature_urn).to.equal('urn:*:survey:*');
       expect(statements.rows[1].urn_feature_type).to.equal('sample_site');
 
       // Broad path: no statement-level expression links.
@@ -118,7 +118,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Two FT Same Expression',
         description: null,
-        featureTypes: ['dataset', 'sample_site'],
+        featureTypes: ['survey', 'sample_site'],
         expressionId
       });
 
@@ -146,7 +146,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'No Scope Leak',
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: null
       });
 
@@ -194,7 +194,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Audit Chain',
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: rootExpressionId
       });
 
@@ -224,7 +224,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Unique Policy',
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: null
       });
 
@@ -256,7 +256,7 @@ describe('DownloadPolicyService (integration)', function () {
         await policyService.createDownloadPolicy({
           name: 'Should Reject',
           description: null,
-          featureTypes: ['dataset', 'definitely_not_a_real_feature_type'],
+          featureTypes: ['survey', 'definitely_not_a_real_feature_type'],
           expressionId: null
         });
         expect.fail('Expected HTTP400 for unknown feature type');
@@ -273,7 +273,7 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'FK Guard',
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: null
       });
       await downloadService.createDownload({
