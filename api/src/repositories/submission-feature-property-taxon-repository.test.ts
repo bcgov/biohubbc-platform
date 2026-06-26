@@ -14,7 +14,7 @@ describe('SubmissionFeaturePropertyTaxonRepository', () => {
   const mockRow: SubmissionFeaturePropertyTaxon = {
     submission_feature_property_taxon_id: 1,
     submission_feature_id: 10,
-    blueprint_feature_type_property_id: 20,
+    feature_type_property_id: 20,
     taxon_id: 1234
   };
 
@@ -25,7 +25,7 @@ describe('SubmissionFeaturePropertyTaxonRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyTaxon({
         submission_feature_id: 10,
-        blueprint_feature_type_property_id: 20,
+        feature_type_property_id: 20,
         taxon_id: 1234
       });
 
@@ -39,7 +39,7 @@ describe('SubmissionFeaturePropertyTaxonRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyTaxon({
           submission_feature_id: 10,
-          blueprint_feature_type_property_id: 20,
+          feature_type_property_id: 20,
           taxon_id: 1234
         });
         expect.fail();
@@ -90,10 +90,10 @@ describe('SubmissionFeaturePropertyTaxonRepository', () => {
       expect(result).to.eql([mockRow]);
     });
 
-    it('lists by blueprint_feature_type_property_id', async () => {
+    it('lists by feature_type_property_id', async () => {
       const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
       const repository = new SubmissionFeaturePropertyTaxonRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyTaxonByBlueprintFeatureTypePropertyId(20);
+      const result = await repository.getSubmissionFeaturePropertyTaxonByFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
   });

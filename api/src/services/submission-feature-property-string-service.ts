@@ -36,11 +36,11 @@ export class SubmissionFeaturePropertyStringService extends DBService {
     );
   }
 
-  getSubmissionFeaturePropertyStringByBlueprintFeatureTypePropertyId(
-    blueprintFeatureTypePropertyId: number
+  getSubmissionFeaturePropertyStringByFeatureTypePropertyId(
+    featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyString[]> {
-    return this.submissionFeaturePropertyStringRepository.getSubmissionFeaturePropertyStringByBlueprintFeatureTypePropertyId(
-      blueprintFeatureTypePropertyId
+    return this.submissionFeaturePropertyStringRepository.getSubmissionFeaturePropertyStringByFeatureTypePropertyId(
+      featureTypePropertyId
     );
   }
 }

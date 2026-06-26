@@ -201,20 +201,12 @@ function buildPredicateEvidenceIdsQuery(
   let query = knex(`${tableName} as p`)
     .distinct()
     .select('p.submission_feature_id')
-    // Bridge the Blueprint-assignment surrogate on the indexed row back to the canonical
-    // feature_type_property the predicate anchor is expressed against.
-    .join(
-      'blueprint_feature_type_property as bftp',
-      'bftp.blueprint_feature_type_property_id',
-      'p.blueprint_feature_type_property_id'
-    )
-    .join('feature_type_property as ftp', 'ftp.feature_type_property_id', 'bftp.feature_type_property_id')
+    .join('feature_type_property as ftp', 'ftp.feature_type_property_id', 'p.feature_type_property_id')
     .where('ftp.feature_property_id', clause.feature_property_id)
-    .whereNull('bftp.record_end_date')
     .whereNull('ftp.record_end_date');
 
   if (clause.feature_type_property_id !== null) {
-    query = query.where('bftp.feature_type_property_id', clause.feature_type_property_id);
+    query = query.where('p.feature_type_property_id', clause.feature_type_property_id);
   }
 
   if (predicate.type === 'taxon') {
@@ -440,14 +432,8 @@ function applyExpressionPredicateNotEquals(
     return query.whereNotExists(
       knex(`${tableName} as p_not_equals`)
         .select(knex.raw('1'))
-        .join(
-          'blueprint_feature_type_property as bftp_not_equals',
-          'bftp_not_equals.blueprint_feature_type_property_id',
-          'p_not_equals.blueprint_feature_type_property_id'
-        )
         .whereRaw('p_not_equals.submission_feature_id = p.submission_feature_id')
-        .where('bftp_not_equals.feature_type_property_id', clause.feature_type_property_id)
-        .whereNull('bftp_not_equals.record_end_date')
+        .where('p_not_equals.feature_type_property_id', clause.feature_type_property_id)
         .where(`p_not_equals.${columnName}`, value)
     );
   }
@@ -456,19 +442,13 @@ function applyExpressionPredicateNotEquals(
     knex(`${tableName} as p_not_equals`)
       .select(knex.raw('1'))
       .join(
-        'blueprint_feature_type_property as bftp_not_equals',
-        'bftp_not_equals.blueprint_feature_type_property_id',
-        'p_not_equals.blueprint_feature_type_property_id'
-      )
-      .join(
         'feature_type_property as ftp_not_equals',
         'ftp_not_equals.feature_type_property_id',
-        'bftp_not_equals.feature_type_property_id'
+        'p_not_equals.feature_type_property_id'
       )
       .whereRaw('p_not_equals.submission_feature_id = p.submission_feature_id')
       .where('ftp_not_equals.feature_property_id', clause.feature_property_id)
       .where(`p_not_equals.${columnName}`, value)
-      .whereNull('bftp_not_equals.record_end_date')
       .whereNull('ftp_not_equals.record_end_date')
   );
 }

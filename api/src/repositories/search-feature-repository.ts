@@ -6,7 +6,7 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isActive, isEffectivelySecured } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -116,7 +116,7 @@ export class SearchFeatureRepository extends BaseRepository {
     const typedPropertyRowsQuery = knex.unionAll(
       this.typedPropertyTableNames.map((tableName) =>
         knex(`${tableName} as p`)
-          .select('p.blueprint_feature_type_property_id')
+          .select('p.feature_type_property_id')
           .whereIn('p.submission_feature_id', knex('matching_features').select('submission_feature_id'))
       ),
       true
@@ -137,15 +137,9 @@ export class SearchFeatureRepository extends BaseRepository {
         'fp.calculated_value',
         'ftp.allow_multiple'
       )
-      .join(
-        'blueprint_feature_type_property as bftp',
-        'tpr.blueprint_feature_type_property_id',
-        'bftp.blueprint_feature_type_property_id'
-      )
-      .join('feature_type_property as ftp', 'bftp.feature_type_property_id', 'ftp.feature_type_property_id')
+      .join('feature_type_property as ftp', 'tpr.feature_type_property_id', 'ftp.feature_type_property_id')
       .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
       .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
-      .whereNull('bftp.record_end_date')
       .whereNull('ftp.record_end_date')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
@@ -283,25 +277,6 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Joins indexed property rows to Blueprint assignment and canonical property metadata.
-   *
-   * @param propertyTableAlias Alias for the typed `submission_feature_property_*` table
-   */
-  private blueprintIndexedPropertyMetadataJoins(propertyTableAlias = 'p'): string {
-    return `
-            JOIN blueprint_feature_type_property bftp
-              ON bftp.blueprint_feature_type_property_id = ${propertyTableAlias}.blueprint_feature_type_property_id
-             AND ${isActive('bftp')}
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = bftp.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ${isActive('ftp')}
-            JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
-             AND ${isActive('fp')}`;
-  }
-
-  /**
    * Builds a lateral join that hydrates the public `properties` JSON object from canonical
    * typed property tables. Multiple rows for the same property, or properties configured
    * as allow_multiple, are surfaced as JSON arrays.
@@ -329,7 +304,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_string_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_string p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -341,7 +322,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_number_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_number p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -353,7 +340,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_boolean_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_boolean p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -373,7 +366,13 @@ export class SearchFeatureRepository extends BaseRepository {
                 END
               ) AS value
             FROM submission_feature_property_timestamp p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -385,7 +384,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_code_id AS ordinal,
               to_jsonb(ccc.label) AS value
             FROM submission_feature_property_code p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
             WHERE p.submission_feature_id = sf.submission_feature_id
@@ -399,7 +404,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_taxon_id AS ordinal,
               to_jsonb(t.itis_scientific_name) AS value
             FROM submission_feature_property_taxon p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             JOIN taxon t
               ON t.taxon_id = p.taxon_id
             WHERE p.submission_feature_id = sf.submission_feature_id
@@ -413,7 +424,13 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_geometry_id AS ordinal,
               public.ST_AsGeoJSON(p.value)::jsonb AS value
             FROM submission_feature_property_geometry p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -425,10 +442,16 @@ export class SearchFeatureRepository extends BaseRepository {
               p.submission_feature_property_feature_id AS ordinal,
               to_jsonb(referenced_sf.urn) AS value
             FROM submission_feature_property_feature p
-            ${this.blueprintIndexedPropertyMetadataJoins('p')}
+            JOIN feature_type_property ftp
+              ON ftp.feature_type_property_id = p.feature_type_property_id
+             AND ftp.feature_type_id = sf.feature_type_id
+             AND ftp.record_end_date IS NULL
+            JOIN feature_property fp
+              ON fp.feature_property_id = ftp.feature_property_id
+             AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-             AND ${isActive('referenced_sf')}
+             AND referenced_sf.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
           ) AS property_values
           GROUP BY property_values.name

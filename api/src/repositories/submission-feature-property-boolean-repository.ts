@@ -24,7 +24,7 @@ export class SubmissionFeaturePropertyBooleanRepository extends BaseRepository {
       .returning([
         'submission_feature_property_boolean_id',
         'submission_feature_id',
-        'blueprint_feature_type_property_id',
+        'feature_type_property_id',
         'value'
       ]);
 
@@ -52,12 +52,7 @@ export class SubmissionFeaturePropertyBooleanRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyBoolean> {
     const knex = getKnex();
     const query = knex('submission_feature_property_boolean')
-      .select([
-        'submission_feature_property_boolean_id',
-        'submission_feature_id',
-        'blueprint_feature_type_property_id',
-        'value'
-      ])
+      .select(['submission_feature_property_boolean_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
       .where('submission_feature_property_boolean_id', submissionFeaturePropertyBooleanId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyBooleanSchema);
@@ -91,12 +86,7 @@ export class SubmissionFeaturePropertyBooleanRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyBoolean[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_boolean')
-      .select([
-        'submission_feature_property_boolean_id',
-        'submission_feature_id',
-        'blueprint_feature_type_property_id',
-        'value'
-      ])
+      .select(['submission_feature_property_boolean_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
       .where('submission_feature_id', submissionFeatureId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyBooleanSchema);
@@ -105,24 +95,19 @@ export class SubmissionFeaturePropertyBooleanRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_boolean rows by blueprint feature type property id.
+   * Get submission_feature_property_boolean rows by feature type property id.
    *
-   * @param {number} blueprintFeatureTypePropertyId
+   * @param {number} featureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyBoolean[]>}
    * @memberof SubmissionFeaturePropertyBooleanRepository
    */
-  async getSubmissionFeaturePropertyBooleanByBlueprintFeatureTypePropertyId(
-    blueprintFeatureTypePropertyId: number
+  async getSubmissionFeaturePropertyBooleanByFeatureTypePropertyId(
+    featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyBoolean[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_boolean')
-      .select([
-        'submission_feature_property_boolean_id',
-        'submission_feature_id',
-        'blueprint_feature_type_property_id',
-        'value'
-      ])
-      .where('blueprint_feature_type_property_id', blueprintFeatureTypePropertyId);
+      .select(['submission_feature_property_boolean_id', 'submission_feature_id', 'feature_type_property_id', 'value'])
+      .where('feature_type_property_id', featureTypePropertyId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyBooleanSchema);
 

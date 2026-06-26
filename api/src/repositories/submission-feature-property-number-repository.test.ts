@@ -14,7 +14,7 @@ describe('SubmissionFeaturePropertyNumberRepository', () => {
   const mockRow: SubmissionFeaturePropertyNumber = {
     submission_feature_property_number_id: 1,
     submission_feature_id: 10,
-    blueprint_feature_type_property_id: 20,
+    feature_type_property_id: 20,
     value: 12
   };
 
@@ -25,7 +25,7 @@ describe('SubmissionFeaturePropertyNumberRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyNumber({
         submission_feature_id: 10,
-        blueprint_feature_type_property_id: 20,
+        feature_type_property_id: 20,
         value: 12
       });
 
@@ -39,7 +39,7 @@ describe('SubmissionFeaturePropertyNumberRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyNumber({
           submission_feature_id: 10,
-          blueprint_feature_type_property_id: 20,
+          feature_type_property_id: 20,
           value: 12
         });
         expect.fail();
@@ -90,10 +90,10 @@ describe('SubmissionFeaturePropertyNumberRepository', () => {
       expect(result).to.eql([mockRow]);
     });
 
-    it('lists by blueprint_feature_type_property_id', async () => {
+    it('lists by feature_type_property_id', async () => {
       const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
       const repository = new SubmissionFeaturePropertyNumberRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyNumberByBlueprintFeatureTypePropertyId(20);
+      const result = await repository.getSubmissionFeaturePropertyNumberByFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
   });

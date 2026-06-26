@@ -19,7 +19,7 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
   const mockRow: SubmissionFeaturePropertyGeometry = {
     submission_feature_property_geometry_id: 1,
     submission_feature_id: 10,
-    blueprint_feature_type_property_id: 20,
+    feature_type_property_id: 20,
     value: {
       type: 'Point',
       coordinates: [-123.1, 49.2]
@@ -28,7 +28,7 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
 
   const createPayload: CreateSubmissionFeaturePropertyGeometry = {
     submission_feature_id: 10,
-    blueprint_feature_type_property_id: 20,
+    feature_type_property_id: 20,
     value: mockRow.value
   };
   it('delegates create', async () => {
@@ -64,15 +64,15 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     expect(result).to.eql([mockRow]);
   });
 
-  it('delegates getByBlueprintFeatureTypePropertyId', async () => {
+  it('delegates getByFeatureTypePropertyId', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());
     const stub = sinon
       .stub(
         SubmissionFeaturePropertyGeometryRepository.prototype,
-        'getSubmissionFeaturePropertyGeometryByBlueprintFeatureTypePropertyId'
+        'getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId'
       )
       .resolves([mockRow]);
-    const result = await service.getSubmissionFeaturePropertyGeometryByBlueprintFeatureTypePropertyId(20);
+    const result = await service.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(20);
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
   });

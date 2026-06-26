@@ -36,11 +36,11 @@ export class SubmissionFeaturePropertyTimestampService extends DBService {
     );
   }
 
-  getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId(
-    blueprintFeatureTypePropertyId: number
+  getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(
+    featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyTimestamp[]> {
-    return this.submissionFeaturePropertyTimestampRepository.getSubmissionFeaturePropertyTimestampByBlueprintFeatureTypePropertyId(
-      blueprintFeatureTypePropertyId
+    return this.submissionFeaturePropertyTimestampRepository.getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(
+      featureTypePropertyId
     );
   }
 }

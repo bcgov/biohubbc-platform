@@ -134,22 +134,22 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
 
   /**
    * Insert a property edge (submission_feature_property_feature) source -> referenced, using the
-   * supplied blueprint_feature_type_property_id (which must reference a real Blueprint assignment row).
+   * supplied feature_type_property_id (which must reference a real feature_type_property row).
    */
   async function insertPropertyEdge(
     sourceFeatureId: number,
     referencedFeatureId: number,
-    blueprintFeatureTypePropertyId: number
+    featureTypePropertyId: number
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
-        blueprint_feature_type_property_id,
+        feature_type_property_id,
         referenced_submission_feature_id,
         create_user
       )
-      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
+      VALUES (${sourceFeatureId}, ${featureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
     `);
   }
 
@@ -182,12 +182,8 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
 
   /** Mint a real feature_type_property id usable as a property-edge label (the value is irrelevant to closure). */
   async function createPropertyEdgeLabel(): Promise<number> {
-    const { blueprintFeatureTypePropertyId } = await createFeatureTypeProperty(
-      connection,
-      'mortality',
-      'observation_subcount'
-    );
-    return blueprintFeatureTypePropertyId;
+    const { featureTypePropertyId } = await createFeatureTypeProperty(connection, 'mortality', 'observation_subcount');
+    return featureTypePropertyId;
   }
 
   // --- scenarios -----------------------------------------------------------

@@ -64,17 +64,17 @@ export class SubmissionFeaturePropertyCodeService extends DBService {
   }
 
   /**
-   * Get submission_feature_property_code rows by blueprint feature type property id.
+   * Get submission_feature_property_code rows by feature type property id.
    *
-   * @param {number} blueprintFeatureTypePropertyId
+   * @param {number} featureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeService
    */
-  getSubmissionFeaturePropertyCodesByBlueprintFeatureTypePropertyId(
-    blueprintFeatureTypePropertyId: number
+  getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(
+    featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyCode[]> {
-    return this.submissionFeaturePropertyCodeRepository.getSubmissionFeaturePropertyCodesByBlueprintFeatureTypePropertyId(
-      blueprintFeatureTypePropertyId
+    return this.submissionFeaturePropertyCodeRepository.getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(
+      featureTypePropertyId
     );
   }
 
