@@ -124,7 +124,6 @@ export const CreateDownloadRequestBody = z
   .object({
     name: z.string().min(1).max(100),
     description: z.string().max(1000).nullable().optional(),
-    featureTypes: z.array(z.string()).min(1),
     expression: ExpressionTree.nullable()
   })
   .strict();

@@ -7,6 +7,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadVersionStatusRecord } from '../../__mocks__/download';
 import * as db from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -51,6 +52,7 @@ describe('process-download-job', () => {
 
   const createMockStatement = (urn_feature_type: string, expression_id: string | null = null) => ({
     policy_statement_id: `psid-${urn_feature_type}`,
+    effect: PolicyEffect.ALLOW,
     urn_feature_type,
     expression_id
   });

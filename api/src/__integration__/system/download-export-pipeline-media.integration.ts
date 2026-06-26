@@ -250,7 +250,6 @@ describe('Download Export pipeline — media (system)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `media-export-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['file'],
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({
@@ -532,7 +531,6 @@ describe('Download Export pipeline — media (system)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `media-oom-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['survey'],
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({

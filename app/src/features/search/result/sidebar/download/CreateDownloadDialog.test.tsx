@@ -1,12 +1,6 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
 import { render } from 'test-helpers/test-utils';
 import { CreateDownloadDialog } from './CreateDownloadDialog';
-
-const defaultFeatureTypeOptions: ICustomMultiAutocompleteOption[] = [
-  { value: 'survey', label: 'Survey' },
-  { value: 'observation', label: 'Observation' }
-];
 
 const renderDialog = (overrides: Partial<React.ComponentProps<typeof CreateDownloadDialog>> = {}) =>
   render(
@@ -14,8 +8,6 @@ const renderDialog = (overrides: Partial<React.ComponentProps<typeof CreateDownl
       open={true}
       isSubmitting={false}
       defaultName="Animals download"
-      defaultFeatureType="survey"
-      featureTypeOptions={defaultFeatureTypeOptions}
       onCancel={vi.fn()}
       onSave={vi.fn()}
       {...overrides}
@@ -36,10 +28,10 @@ describe('CreateDownloadDialog', () => {
     expect(getByLabelText(/Name/i)).toHaveValue('Moose download');
   });
 
-  it('pre-fills the Feature Types control with the supplied defaultFeatureType', () => {
-    const { getByText } = renderDialog({ defaultFeatureType: 'observation' });
+  it('does not render a Feature Types control', () => {
+    const { queryByLabelText } = renderDialog();
 
-    expect(getByText('Observation')).toBeVisible();
+    expect(queryByLabelText(/Feature Types/i)).not.toBeInTheDocument();
   });
 
   it('does not invoke onSave when the Name input is cleared', async () => {
@@ -68,8 +60,7 @@ describe('CreateDownloadDialog', () => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Moose download',
-          description: 'Skeena',
-          featureTypes: ['survey']
+          description: 'Skeena'
         })
       );
     });

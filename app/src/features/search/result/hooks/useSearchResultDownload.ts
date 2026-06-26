@@ -83,7 +83,7 @@ export const useSearchResultDownload = ({
    * can monitor status and obtain their export. Failure keeps the dialog open
    * and shows the API error. State updates are skipped after unmount.
    *
-   * @param {ICreateDownloadFormValues} values - User-provided download name, description, and feature types.
+   * @param {ICreateDownloadFormValues} values - User-provided download name and description.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
    */
   const handleCreateDownload = useCallback(
@@ -94,7 +94,6 @@ export const useSearchResultDownload = ({
           const response = await api.download.createDownload({
             name: values.name,
             description: values.description,
-            featureTypes: values.featureTypes,
             expression: expressionTree
           });
           if (!isMounted()) {

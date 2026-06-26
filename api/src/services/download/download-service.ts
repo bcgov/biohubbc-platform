@@ -26,7 +26,6 @@ import { DownloadPolicyService } from './download-policy-service';
 export interface CreateDownloadRequestPayload {
   name: string;
   description: string | null;
-  featureTypes: string[];
   expression: ExpressionTree | null;
   requestedBy: number | null;
 }
@@ -133,14 +132,13 @@ export class DownloadService extends DBService {
   async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<CreateDownloadRequestResult> {
     let expressionId: string | null = null;
     if (payload.expression !== null) {
-      const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
-      expressionId = result.expression_id;
+      const expression = await this.expressionTreeService.writeExpressionTree(payload.expression);
+      expressionId = expression.expression_id;
     }
 
     const { policy_id } = await this.downloadPolicyService.createDownloadPolicy({
       name: payload.name,
       description: payload.description,
-      featureTypes: payload.featureTypes,
       expressionId
     });
 

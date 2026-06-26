@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadVersionStatusRecord } from '../../__mocks__/download';
+import { getKnex } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { DownloadSource } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -12,6 +13,7 @@ import { ExpressionTree } from '../../models/expression-tree';
 import { NormalizedExpressionTreeExpression } from '../../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { PolicyEffect } from '../../models/policy-statement';
 import {
   ActivePolicyStatementWithExpression,
   PolicyStatementRepository
@@ -182,9 +184,11 @@ describe('DownloadPipelineService', () => {
 
   const stmt = (
     urn_feature_type: string,
-    expression_id: string | null = null
+    expression_id: string | null = null,
+    effect: PolicyEffect = PolicyEffect.ALLOW
   ): ActivePolicyStatementWithExpression => ({
     policy_statement_id: '22222222-2222-2222-2222-222222222222',
+    effect,
     urn_feature_type,
     expression_id
   });
@@ -261,6 +265,89 @@ describe('DownloadPipelineService', () => {
       const result = await service.resolveParquetSchema(TEST_SOURCE);
 
       expect(result.featureTypes).to.deep.equal(['a', 'b', 'c']);
+    });
+
+    it('expands wildcard statements into concrete sorted feature type statements', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([...mockCodes].reverse());
+      const wildcardStatement = stmt('*', '33333333-3333-3333-3333-333333333333');
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([wildcardStatement]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['observation', 'survey']);
+      expect(result.statements).to.deep.equal([
+        { ...wildcardStatement, urn_feature_type: 'observation' },
+        { ...wildcardStatement, urn_feature_type: 'survey' }
+      ]);
+    });
+
+    it('uses a broad allow wildcard instead of evaluating narrower statements', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      const wildcardStatement = stmt('*', null);
+      const concreteStatement = stmt('survey', '33333333-3333-3333-3333-333333333333');
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([wildcardStatement, concreteStatement]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['observation', 'survey']);
+      expect(result.statements).to.deep.equal([
+        { ...wildcardStatement, urn_feature_type: 'observation' },
+        { ...wildcardStatement, urn_feature_type: 'survey' }
+      ]);
+    });
+
+    it('combines filtered wildcard and concrete allow statements for the same feature type', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      const wildcardStatement = stmt('*', '33333333-3333-3333-3333-333333333333');
+      const observationStatement = stmt('observation', '44444444-4444-4444-4444-444444444444');
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([wildcardStatement, observationStatement]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['observation', 'survey']);
+      expect(result.statements).to.deep.equal([
+        {
+          ...wildcardStatement,
+          urn_feature_type: 'observation',
+          expression_ids: [
+            '33333333-3333-3333-3333-333333333333',
+            '44444444-4444-4444-4444-444444444444'
+          ]
+        },
+        { ...wildcardStatement, urn_feature_type: 'survey' }
+      ]);
+    });
+
+    it('ignores deny statements and lets broad concrete allow statements dominate filtered statements', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      const surveyAllow = stmt('survey');
+      const repeatedSurveyAllow = stmt('survey', '33333333-3333-3333-3333-333333333333');
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([stmt('observation', null, PolicyEffect.DENY), surveyAllow, repeatedSurveyAllow]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['survey']);
+      expect(result.statements).to.deep.equal([surveyAllow]);
     });
 
     it('returns empty featureTypes and statements for a policy with no active statements', async () => {
@@ -358,6 +445,49 @@ describe('DownloadPipelineService', () => {
         TEST_SOURCE.requested_by
       );
       expect(buildBroadStub).to.not.have.been.called;
+    });
+
+    it('unions multiple expression ids for one effective feature-type statement', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
+
+      const mockTree = { type: 'expression', operator: 'AND', clauses: [] } as unknown as ExpressionTree;
+      const normalizedTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: []
+      } as unknown as NormalizedExpressionTreeExpression;
+      const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(mockTree);
+      sinon.stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree').resolves(normalizedTree);
+
+      const knex = getKnex();
+      const buildExprSubqueryStub = sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
+      buildExprSubqueryStub.onCall(0).returns(knex.select(knex.raw('?::int as submission_feature_id', [1])));
+      buildExprSubqueryStub.onCall(1).returns(knex.select(knex.raw('?::int as submission_feature_id', [2])));
+      const buildBroadStub = sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery');
+      const streamStub = sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([]));
+
+      const expressionIds = [
+        '44444444-4444-4444-4444-444444444444',
+        '55555555-5555-5555-5555-555555555555'
+      ];
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: { ...stmt('observation', expressionIds[0]), expression_ids: expressionIds }
+      });
+
+      expect(readTreeStub.getCalls().map((call) => call.args[0])).to.deep.equal(expressionIds);
+      expect(buildExprSubqueryStub).to.have.been.calledTwice;
+      expect(buildBroadStub).to.not.have.been.called;
+      expect(streamStub.firstCall.args[1]).to.contain('union');
     });
 
     it('uses the broad path when statement.expression_id is null', async () => {

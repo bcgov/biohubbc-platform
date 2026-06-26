@@ -153,7 +153,6 @@ describe('Download version export state machine (integration)', function () {
     const { download_id: downloadId } = await downloadService.createDownloadRequest({
       name: `export-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: 'Version export integration test download',
-      featureTypes: featureTypeNames,
       expression: null,
       requestedBy: systemUserId
     });
@@ -745,7 +744,6 @@ describe('Download version export state machine (integration)', function () {
       const { download_id: downloadId } = await downloadService.createDownloadRequest({
         name: `version-link-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: 'Version + parquet link test',
-        featureTypes: ['survey'],
         expression: null,
         requestedBy: systemUserId
       });

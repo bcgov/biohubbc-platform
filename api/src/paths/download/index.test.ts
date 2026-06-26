@@ -28,7 +28,6 @@ const validExpression = {
 const validBody = (overrides: Record<string, unknown> = {}) => ({
   name: 'My download',
   description: 'A description',
-  featureTypes: ['observation'],
   expression: validExpression,
   ...overrides
 });
@@ -39,13 +38,13 @@ describe('paths/download/index', () => {
   });
 
   describe('createDownload', () => {
-    it('returns 400 when featureTypes is empty', async () => {
+    it('returns 400 when featureTypes is sent', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody({ featureTypes: [] });
+      mockReq.body = validBody({ featureTypes: ['observation'] });
 
       const requestHandler = createDownload();
 
@@ -58,14 +57,14 @@ describe('paths/download/index', () => {
       }
     });
 
-    it('returns 400 when featureTypes is omitted', async () => {
+    it('returns 400 when expression is omitted', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'valid-token';
       const body = validBody();
-      delete (body as { featureTypes?: unknown }).featureTypes;
+      delete (body as { expression?: unknown }).expression;
       mockReq.body = body;
 
       const requestHandler = createDownload();
@@ -76,6 +75,26 @@ describe('paths/download/index', () => {
       } catch (error) {
         expect((error as HTTPError).status).to.equal(400);
       }
+    });
+
+    it('passes through a null expression to the service', async () => {
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 20 });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      const createDownloadRequestStub = sinon
+        .stub(DownloadService.prototype, 'createDownloadRequest')
+        .resolves({ download_id: 'download-uuid-null-expression' });
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'valid-token';
+      mockReq.body = validBody({ expression: null });
+
+      const requestHandler = createDownload();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ expression: null });
+      expect(mockRes.statusValue).to.equal(201);
     });
 
     it('returns 400 on unknown body key', async () => {
@@ -141,7 +160,6 @@ describe('paths/download/index', () => {
       expect(createDownloadRequestStub.firstCall.args[0]).to.eql({
         name: 'My download',
         description: 'A description',
-        featureTypes: ['observation'],
         expression: validExpression,
         requestedBy: 42
       });
@@ -212,26 +230,6 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue.download_url).to.match(/\/api\/download\/download-uuid-anon$/);
       expect(mockRes.jsonValue).to.not.have.property('export_id');
       expect(mockRes.jsonValue).to.not.have.property('export_url');
-    });
-
-    it('passes through a null expression to the service', async () => {
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const createDownloadRequestStub = sinon
-        .stub(DownloadService.prototype, 'createDownloadRequest')
-        .resolves({ download_id: 'download-uuid-2' });
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'valid-token';
-      mockReq.body = validBody({ expression: null });
-
-      const requestHandler = createDownload();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(createDownloadRequestStub.firstCall.args[0]).to.include({ expression: null });
-      expect(mockRes.statusValue).to.equal(201);
     });
 
     it('rolls back, releases, and propagates when the service throws', async () => {

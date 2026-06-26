@@ -295,7 +295,6 @@ describe('Download Export pipeline (integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `export-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: featureTypeNames,
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({
