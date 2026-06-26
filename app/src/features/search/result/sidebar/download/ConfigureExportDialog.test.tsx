@@ -4,6 +4,11 @@ import { render } from 'test-helpers/test-utils';
 import { buildConfigureExportDialogYup } from './ConfigureExportDialogYup';
 import { ConfigureExportDialog } from './ConfigureExportDialog';
 
+// Interaction-heavy MUI Autocomplete + Formik suite: each select re-renders the whole form, so the
+// chained guided-merge interactions can exceed the default 5s ceiling on contended CI runners.
+const interactionTimeout = 20000;
+vi.setConfig({ testTimeout: interactionTimeout });
+
 // Two feature types, each with three exportable columns. Shared parent_uuid lets a merge step join them.
 const defaultFeatureTypes: DownloadFeatureType[] = [
   { feature_type: 'telemetry', columns: ['uuid', 'parent_uuid', 'vendor'] },
