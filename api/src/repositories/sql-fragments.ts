@@ -90,19 +90,38 @@ export function isAccessibleToUser(featureIdExpr: string): string {
       -- Branch 1: feature is NOT effectively secured
       NOT ${isEffectivelySecured(featureIdExpr)}
       -- Branch 2: user has a team scope grant via an ancestor that is a scope anchor
-      OR EXISTS (
-        SELECT 1
-        FROM submission_feature_closure c
-        JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
-        JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-        JOIN team t ON t.team_id = tss.team_id
-          AND t.record_end_date IS NULL
-        JOIN team_member tm ON tm.team_id = tss.team_id
-          AND tm.system_user_id = ?  -- bound by caller
-          AND tm.record_end_date IS NULL
-        WHERE c.source_submission_feature_id = ${featureIdExpr}
-          AND c.is_ancestor = true
-      )
+      OR ${hasTeamScopeAnchorGrant(featureIdExpr)}
+  )`;
+}
+
+/**
+ * Branch 2 of {@link isAccessibleToUser}, exposed on its own: the caller's team holds a scope anchored
+ * on this feature or one of its ancestors. Reads the precomputed `submission_feature_closure` ancestry
+ * subset (`is_ancestor = true`, which includes the feature's own self-loop) and joins through
+ * `security_scope_anchor` → `team_security_scope` → the caller's `team_member`.
+ *
+ * Callers that have already established the feature is effectively secured (e.g. the hidden-secured
+ * probe) can use this directly instead of {@link isAccessibleToUser} to avoid re-evaluating
+ * `isEffectivelySecured` — for a secured feature, accessibility reduces to this grant check.
+ *
+ * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
+ *
+ * @param featureIdExpr SQL expression for the starting submission_feature_id
+ *   (e.g. 'mf.submission_feature_id')
+ */
+export function hasTeamScopeAnchorGrant(featureIdExpr: string): string {
+  return `EXISTS (
+    SELECT 1
+    FROM submission_feature_closure c
+    JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
+    JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+    JOIN team t ON t.team_id = tss.team_id
+      AND t.record_end_date IS NULL
+    JOIN team_member tm ON tm.team_id = tss.team_id
+      AND tm.system_user_id = ?  -- bound by caller
+      AND tm.record_end_date IS NULL
+    WHERE c.source_submission_feature_id = ${featureIdExpr}
+      AND c.is_ancestor = true
   )`;
 }
 
@@ -124,10 +143,11 @@ export function isAccessibleToUser(featureIdExpr: string): string {
  * features secured by that dataset — during the anchor-recompute lag window (`isAccessibleToUser`
  * still false) that gap would raise a false-positive banner for data the caller can actually access.
  *
- * The self match (`sf_grant.submission_feature_id = ${featureIdExpr}`) is kept as an explicit branch
- * rather than relying solely on the closure self-loop, so a feature whose closure has not been built
- * yet (the fail-closed case `isEffectivelySecured` guards against) is still resolvable by a grant on
- * its own URN — otherwise a blanket-grant holder would see a false-positive banner for it.
+ * The candidate set is `the feature itself UNION its closure ancestors`. The explicit self
+ * (`SELECT ${featureIdExpr}`) is kept rather than relying solely on the closure self-loop, so a feature
+ * whose closure has not been built yet (the fail-closed case `isEffectivelySecured` guards against) is
+ * still resolvable by a grant on its own URN — otherwise a blanket-grant holder would see a
+ * false-positive banner for it.
  *
  * Mirrors the URN join semantics in `TeamAuthorizationRepository.findTeamPolicyBySubmissionFeature`,
  * extended over the closure ancestry.
@@ -152,14 +172,13 @@ export function isAccessibleViaDirectUrnScopeGrant(featureIdExpr: string): strin
       AND p.record_end_date IS NULL
       AND p.status = 'approved'
     JOIN submission_feature sf_grant
-      ON (
-        sf_grant.submission_feature_id = ${featureIdExpr}
-        OR sf_grant.submission_feature_id IN (
-          SELECT c.target_submission_feature_id
-          FROM submission_feature_closure c
-          WHERE c.source_submission_feature_id = ${featureIdExpr}
-            AND c.is_ancestor = true
-        )
+      ON sf_grant.submission_feature_id IN (
+        SELECT ${featureIdExpr}
+        UNION
+        SELECT c.target_submission_feature_id
+        FROM submission_feature_closure c
+        WHERE c.source_submission_feature_id = ${featureIdExpr}
+          AND c.is_ancestor = true
       )
     JOIN feature_type ft_grant ON ft_grant.feature_type_id = sf_grant.feature_type_id
     WHERE tm.system_user_id = ?

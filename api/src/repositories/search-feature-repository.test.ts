@@ -204,8 +204,10 @@ describe('SearchFeatureRepository', () => {
       expect(filteredStub.notCalled).to.equal(true);
 
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('"sf"."submission_feature_id" in');
+      // The unfiltered subquery is the candidate source directly (it already restricts to active
+      // anchor-type features), so it is selected FROM rather than re-wrapped/whereIn'd by feature type.
       expect(sql).to.include('unfiltered_table');
+      expect(sql).to.not.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('limit 1');
     });
 

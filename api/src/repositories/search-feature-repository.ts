@@ -8,7 +8,7 @@ import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
   buildSecurityFilter,
-  isAccessibleToUser,
+  hasTeamScopeAnchorGrant,
   isAccessibleViaDirectUrnScopeGrant,
   isEffectivelySecured
 } from './sql-fragments';
@@ -121,16 +121,12 @@ export class SearchFeatureRepository extends BaseRepository {
   ): Promise<boolean> {
     const knex = getKnex();
 
-    // Candidate anchor features matched by the expression, WITHOUT the caller access filter.
-    const expressionFeatureIds = expressionTree
+    // Candidate anchor features matched by the expression, WITHOUT the caller access filter. The
+    // expression subquery already restricts to active anchor-type features, so it is used directly;
+    // only the no-expression case needs the feature-type filter from buildExpressionTreeMatchingFeaturesQuery.
+    const matchingFeatures = expressionTree
       ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
-      : null;
-
-    const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(
-      knex,
-      anchorFeatureType,
-      expressionFeatureIds
-    );
+      : this.buildExpressionTreeMatchingFeaturesQuery(knex, anchorFeatureType, null);
 
     const existsQuery = knex
       .select(knex.raw('1'))
@@ -138,11 +134,13 @@ export class SearchFeatureRepository extends BaseRepository {
       .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
       .limit(1);
 
-    // Authenticated: a secured match is hidden when the caller cannot access it via anchors or a
-    // direct URN scope grant. Anonymous (null/undefined): every secured match is hidden.
+    // Authenticated: a secured match is hidden when the caller cannot access it via a scope anchor or a
+    // direct URN scope grant. The candidate is already effectively secured here, so the anchor branch
+    // (hasTeamScopeAnchorGrant) alone is equivalent to isAccessibleToUser, without re-checking security.
+    // Anonymous (null/undefined): every secured match is hidden.
     if (systemUserId) {
       existsQuery
-        .whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId])
+        .whereRaw(`NOT ${hasTeamScopeAnchorGrant('mf.submission_feature_id')}`, [systemUserId])
         .whereRaw(`NOT ${isAccessibleViaDirectUrnScopeGrant('mf.submission_feature_id')}`, [systemUserId]);
     }
 
