@@ -209,7 +209,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('limit 1');
     });
 
-    it('should check effectively-secured AND not-accessible for authenticated users', async () => {
+    it('should check effectively-secured, not-accessible, and no-direct-URN-grant for authenticated users', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ '?column?': 1 }] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -222,10 +222,13 @@ describe('SearchFeatureRepository', () => {
       // effectively-secured probe over the matched candidate set
       expect(sql).to.include('submission_feature_closure');
       expect(sql).to.include('submission_feature_security');
-      // authenticated accessibility probe, negated
+      // authenticated accessibility probe, negated (isAccessibleToUser → team_member bound to the caller)
       expect(sql).to.include('NOT EXISTS');
       expect(sql).to.include('team_member');
       expect(sql).to.include('security_scope_anchor');
+      // direct URN scope grant probe so blanket-grant holders (urn:*:*:*) do not see the flag during anchor lag
+      expect(sql).to.include('urn_submission_id');
+      expect(sql).to.include('team_security_scope');
     });
 
     it('should check only effectively-secured for anonymous users (no accessibility probe)', async () => {

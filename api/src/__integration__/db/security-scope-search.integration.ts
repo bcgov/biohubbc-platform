@@ -16,9 +16,10 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
-import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
+import { isAccessibleToUser, isAccessibleViaDirectUrnScopeGrant } from '../../repositories/sql-fragments';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { computeScopeHash } from '../../utils/scope-hash';
@@ -822,6 +823,143 @@ describe('Security scope search (integration)', function () {
 
       expect(featureIds).to.include(feat1);
       expect(featureIds).to.include(feat2);
+    });
+  });
+
+  // ── has_more_secured_features (hidden-secured-match signal) ───────────
+  //
+  // Drives the "Request Data" banner. True when the search matched secured features the caller
+  // cannot access. Wildcard-grant holders are excluded via direct URN scope matching so anchor
+  // recomputation lag does not raise a false positive.
+  describe('hasInaccessibleSecuredFeaturesByExpressionTree', () => {
+    it('is FALSE for a wildcard (urn:*:*:*) caller even when secured matches exist (AC3)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      await secureFeature(connection, feat1);
+      await secureFeature(connection, feat2);
+
+      await rebuildClosure(uploadId);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, userId);
+
+      // The caller can access every secured match via the wildcard grant — nothing left to request.
+      expect(hasHidden).to.be.false;
+    });
+
+    it('is FALSE for a wildcard caller when a secured match has no anchor yet (anchor lag) — bug repro', async () => {
+      // Reproduces the reported bug. A feature secured AFTER the wildcard scope's anchors were computed
+      // has no security_scope_anchor (recompute lag), so isAccessibleToUser reports it inaccessible to
+      // everyone — the wildcard caller included. Pre-fix this raised the flag (NOT isAccessibleToUser
+      // fires); the grantable-to-any-team guard keeps it false because no team can grant it.
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Lagged Secured' });
+      await rebuildClosureForSubmission(submissionId);
+
+      const wildcardUser = connection.systemUserId();
+      // Grant wildcard access BEFORE the feature is secured, so the anchor computation does not cover it.
+      await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', wildcardUser, 'Wildcard Team');
+
+      // Now secure it — effectively secured on the read path, but with no scope anchor.
+      await secureFeature(connection, feature);
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
+        'dataset',
+        undefined,
+        wildcardUser
+      );
+
+      expect(hasHidden).to.be.false;
+    });
+
+    it('is TRUE when a secured match is grantable to another team but not the caller (AC2)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Other Team Secured' });
+      await secureFeature(connection, feature);
+      await rebuildClosureForSubmission(submissionId);
+
+      // Grant access to a DIFFERENT user's team — the feature now has an anchor + standing grant,
+      // so it is requestable, just not by our caller.
+      const otherUser = await createOtherUser();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, otherUser, 'Other Team');
+
+      const caller = await createOtherUser(); // authenticated, but in no team
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+
+      expect(hasHidden).to.be.true;
+    });
+
+    it('is TRUE for an anonymous caller when secured matches exist (AC4)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const feature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      await secureFeature(connection, feature);
+      await rebuildClosure(uploadId);
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, null);
+
+      expect(hasHidden).to.be.true;
+    });
+
+    it('is TRUE for an authenticated caller with no covering policy (AC2 — banner shows)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Ungranted Secured' });
+      await secureFeature(connection, feature);
+      await rebuildClosureForSubmission(submissionId);
+
+      // Authenticated, but holds no team/policy/scope at all.
+      const caller = await createOtherUser();
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+
+      expect(hasHidden).to.be.true;
+    });
+
+    // Regression: a feature effectively secured via a secured ANCESTOR must be treated as accessible
+    // when the caller holds a grant covering that ancestor's URN — even during the anchor-recompute
+    // lag window (isAccessibleToUser still false). Asserted at the fragment level because the
+    // expression-less candidate set spans all features of the type (seed data pollutes the boolean).
+    it('resolves a descendant via an ancestor-typed grant during anchor lag (no false-positive)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const grandparent = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      const child = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'species_observation',
+        parentFeatureId: grandparent
+      });
+      await rebuildClosure(uploadId);
+
+      const userId = connection.systemUserId();
+      // Grant covers only the dataset ancestor's URN, and is computed BEFORE the feature is secured
+      // (so no anchor exists yet — recompute lag).
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:dataset:*`, userId, 'Dataset Team');
+      await secureFeature(connection, grandparent);
+
+      const knex = getKnex();
+      const access = await connection.knex(
+        knex.select(
+          knex.raw(`${isAccessibleToUser(String(child))} as anchor_access`, [userId]),
+          knex.raw(`${isAccessibleViaDirectUrnScopeGrant(String(child))} as urn_access`, [userId])
+        )
+      );
+
+      // Anchor not yet computed for the descendant...
+      expect(access.rows[0].anchor_access).to.be.false;
+      // ...but the ancestor-typed grant still resolves it, so the banner must NOT fire for this caller.
+      expect(access.rows[0].urn_access).to.be.true;
     });
   });
 

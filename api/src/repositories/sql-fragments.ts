@@ -107,6 +107,70 @@ export function isAccessibleToUser(featureIdExpr: string): string {
 }
 
 /**
+ * Direct URN-based scope grant check for the current caller, independent of
+ * `security_scope_anchor` rows.
+ *
+ * `isAccessibleToUser` resolves grants via precomputed anchors on the closure read path.
+ * A caller with a standing scope (e.g. `urn:*:*:*`) can match a secured feature by URN even
+ * when anchor recomputation has not yet run for that feature. The hidden-secured-match probe
+ * uses this to avoid raising `has_more_secured_features` for callers who already hold a policy
+ * grant covering the feature, without requiring another team to hold an anchor first.
+ *
+ * Like `isEffectivelySecured` (and the anchor read path), security and the grants that cover it
+ * cascade down the hierarchy: a grant that matches a feature's secured *ancestor* covers the feature
+ * too. This matches the caller's scope URNs against the feature ITSELF or any of its
+ * `submission_feature_closure` ancestors (`is_ancestor = true`). Checking only the feature's own URN
+ * would miss a caller who holds, say, `urn:{sub}:dataset:*` while searching the telemetry/observation
+ * features secured by that dataset — during the anchor-recompute lag window (`isAccessibleToUser`
+ * still false) that gap would raise a false-positive banner for data the caller can actually access.
+ *
+ * The self match (`sf_grant.submission_feature_id = ${featureIdExpr}`) is kept as an explicit branch
+ * rather than relying solely on the closure self-loop, so a feature whose closure has not been built
+ * yet (the fail-closed case `isEffectivelySecured` guards against) is still resolvable by a grant on
+ * its own URN — otherwise a blanket-grant holder would see a false-positive banner for it.
+ *
+ * Mirrors the URN join semantics in `TeamAuthorizationRepository.findTeamPolicyBySubmissionFeature`,
+ * extended over the closure ancestry.
+ *
+ * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
+ *
+ * @param featureIdExpr SQL expression for the starting submission_feature_id
+ *   (e.g. 'mf.submission_feature_id')
+ */
+export function isAccessibleViaDirectUrnScopeGrant(featureIdExpr: string): string {
+  return `EXISTS (
+    SELECT 1
+    FROM team_member tm
+    JOIN team t ON t.team_id = tm.team_id
+      AND t.record_end_date IS NULL
+    JOIN team_security_scope tss ON tss.team_id = t.team_id
+    JOIN security_scope ss ON ss.security_scope_id = tss.security_scope_id
+    JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
+      AND ps.effect = 'allow'
+      AND ps.record_end_date IS NULL
+    JOIN policy p ON p.policy_id = ps.policy_id
+      AND p.record_end_date IS NULL
+      AND p.status = 'approved'
+    JOIN submission_feature sf_grant
+      ON (
+        sf_grant.submission_feature_id = ${featureIdExpr}
+        OR sf_grant.submission_feature_id IN (
+          SELECT c.target_submission_feature_id
+          FROM submission_feature_closure c
+          WHERE c.source_submission_feature_id = ${featureIdExpr}
+            AND c.is_ancestor = true
+        )
+      )
+    JOIN feature_type ft_grant ON ft_grant.feature_type_id = sf_grant.feature_type_id
+    WHERE tm.system_user_id = ?
+      AND tm.record_end_date IS NULL
+      AND (ss.urn_submission_id = sf_grant.submission_id::text OR ss.urn_submission_id = '*')
+      AND (ss.urn_feature_type = ft_grant.name OR ss.urn_feature_type = '*')
+      AND (ss.urn_feature_id = sf_grant.submission_feature_id::text OR ss.urn_feature_id = '*')
+  )`;
+}
+
+/**
  * Builds a single security filter, applied per candidate feature, that checks:
  *   1. Unsecured — no ancestor has an active submission_feature_security row → visible
  *   2. Secured + granted — any ancestor is a scope anchor the user's team can reach → visible

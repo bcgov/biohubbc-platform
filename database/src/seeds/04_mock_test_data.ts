@@ -2,6 +2,7 @@ import { faker } from '@faker-js/faker';
 // @ts-ignore ignore error over missing geojson-random declaration (.d.ts) file
 import random from 'geojson-random';
 import { Knex } from 'knex';
+import { computeSubmissionFeatureClosureForUpload } from '../seed-utils';
 
 // Disable mock data seeding by default. Set `ENABLE_MOCK_FEATURE_DATA=true` to enable.
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
@@ -116,6 +117,10 @@ const insertRecord = async (knex: Knex) => {
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
+
+  // Build the derived reachability closure for this upload. Read-path security resolves against it and
+  // fails closed when absent, so without this every seeded feature reads as secured-and-inaccessible.
+  await computeSubmissionFeatureClosureForUpload(knex, submission_upload_id);
 };
 
 export const insertSubmissionRecord = async (

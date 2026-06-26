@@ -6,7 +6,12 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
+import {
+  buildSecurityFilter,
+  isAccessibleToUser,
+  isAccessibleViaDirectUrnScopeGrant,
+  isEffectivelySecured
+} from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -95,8 +100,11 @@ export class SearchFeatureRepository extends BaseRepository {
    * very features we want to detect would already be removed.
    *
    * Implemented as an `EXISTS`/`LIMIT 1` probe over the unhydrated candidate set:
-   * - For authenticated users: true when any matched feature is effectively secured AND not accessible
-   *   to the caller.
+   * - For authenticated users: true when any matched feature is effectively secured and NOT accessible
+   *   to the caller via the anchor-based read path (`isAccessibleToUser`) or a direct URN scope grant
+   *   (`isAccessibleViaDirectUrnScopeGrant`). The URN grant check prevents false positives for callers
+   *   who already hold a blanket grant (e.g. `urn:*:*:*`) when anchor recomputation has not yet run
+   *   for a newly secured feature.
    * - For anonymous users: true when any matched feature is effectively secured (none are accessible).
    *
    * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
@@ -118,8 +126,6 @@ export class SearchFeatureRepository extends BaseRepository {
       ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
       : null;
 
-    // Reuse the unhydrated matching-features builder, omitting systemUserId so it applies only the
-    // feature-type + expression filter and NO security filter.
     const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(
       knex,
       anchorFeatureType,
@@ -132,10 +138,12 @@ export class SearchFeatureRepository extends BaseRepository {
       .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
       .limit(1);
 
-    // Authenticated: a secured match is "hidden" only if the caller cannot access it.
-    // Anonymous (null/undefined): every secured match is hidden, so the secured check alone suffices.
+    // Authenticated: a secured match is hidden when the caller cannot access it via anchors or a
+    // direct URN scope grant. Anonymous (null/undefined): every secured match is hidden.
     if (systemUserId) {
-      existsQuery.whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId]);
+      existsQuery
+        .whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId])
+        .whereRaw(`NOT ${isAccessibleViaDirectUrnScopeGrant('mf.submission_feature_id')}`, [systemUserId]);
     }
 
     const response = await this.connection.knex(existsQuery);
