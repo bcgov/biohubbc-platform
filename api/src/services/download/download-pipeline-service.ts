@@ -255,7 +255,8 @@ export class DownloadPipelineService extends DBService {
     // returns the public API tree, so we re-normalize through the same semantic
     // validator the search path uses — keeping read-time SQL semantics identical
     // for the two consumers of the evaluator.
-    const expressionIds = statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
+    const expressionIds =
+      statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
 
     let subquery: Knex.QueryBuilder;
     if (statement.expression_id === null) {
@@ -273,7 +274,8 @@ export class DownloadPipelineService extends DBService {
           )
         );
       }
-      subquery = expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true);
+      subquery =
+        expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true);
     }
 
     const { sql, bindings } = subquery.toSQL().toNative();

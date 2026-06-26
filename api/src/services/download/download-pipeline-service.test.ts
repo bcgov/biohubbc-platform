@@ -324,10 +324,7 @@ describe('DownloadPipelineService', () => {
         {
           ...wildcardStatement,
           urn_feature_type: 'observation',
-          expression_ids: [
-            '33333333-3333-3333-3333-333333333333',
-            '44444444-4444-4444-4444-444444444444'
-          ]
+          expression_ids: ['33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444']
         },
         { ...wildcardStatement, urn_feature_type: 'survey' }
       ]);
@@ -470,10 +467,7 @@ describe('DownloadPipelineService', () => {
         .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
         .returns(mockBaseCursor([]));
 
-      const expressionIds = [
-        '44444444-4444-4444-4444-444444444444',
-        '55555555-5555-5555-5555-555555555555'
-      ];
+      const expressionIds = ['44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555'];
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,

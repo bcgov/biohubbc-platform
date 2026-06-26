@@ -192,9 +192,7 @@ describe('SearchResultPage', () => {
 
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
-    expect((getByLabelText(/Name/i) as HTMLInputElement).value).toMatch(
-      /^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
-    );
+    expect((getByLabelText(/Name/i) as HTMLInputElement).value).toMatch(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
