@@ -964,9 +964,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const artifact = artifactRows.rows[0];
       expect(artifact.format).to.equal('parquet');
       expect(artifact.artifact_status).to.equal('uploaded');
-      expect(artifact.object_key).to.equal(
-        `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`
-      );
+      expect(artifact.object_key).to.equal(`downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`);
       expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
       expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifact.byte_size)).to.be.at.least(0);

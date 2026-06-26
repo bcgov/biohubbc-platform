@@ -80,8 +80,7 @@ export class SearchRepository extends BaseRepository {
       .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .whereNull('sf.record_end_date')
-      .whereNull('ft.record_end_date')
-      .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES])
+      .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES, 'dataset'])
       .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name')
       .select(
         'sf.submission_feature_id',
@@ -241,7 +240,7 @@ export class SearchRepository extends BaseRepository {
    */
   async findFeatureSummary(params: SearchParams): Promise<SearchSummaryFeature[]> {
     const priorityTypes = Object.values(PRIORITY_FEATURE_TYPE);
-    const allowedTypes = [...LANDING_PAGE_FEATURE_TYPES];
+    const allowedTypes = [...LANDING_PAGE_FEATURE_TYPES, 'dataset'];
     const pattern = `%${params.keyword}%`;
 
     const query = SQL`
@@ -268,10 +267,9 @@ export class SearchRepository extends BaseRepository {
       matching_features AS (
         SELECT DISTINCT sf.submission_feature_id, sf.feature_type_id
           FROM matching_ids m
-          JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
-          JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+         JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
+         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
          WHERE sf.record_end_date IS NULL
-           AND ft.record_end_date IS NULL
            AND ft.name = ANY(${allowedTypes}::text[])
       ),
       priority_types AS (

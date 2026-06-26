@@ -186,8 +186,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .select('sf.submission_feature_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereNull('sf.record_end_date')
-      .whereNull('ft.record_end_date');
+      .whereNull('sf.record_end_date');
 
     if (expressionFeatureIds) {
       query.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -245,8 +244,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .joinRaw(this.buildTypedPropertiesLateralJoinSql())
       .where('ft.name', anchorFeatureType)
-      .whereNull('sf.record_end_date')
-      .whereNull('ft.record_end_date');
+      .whereNull('sf.record_end_date');
 
     if (expressionFeatureIds) {
       expressionResults.whereIn('sf.submission_feature_id', expressionFeatureIds);

@@ -79,8 +79,7 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
     .select('sf.submission_feature_id')
     .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
     .where('ft.name', featureTypeName)
-    .whereNull('sf.record_end_date')
-    .whereNull('ft.record_end_date');
+    .whereNull('sf.record_end_date');
 
   const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
   if (securityFilter) {
@@ -334,8 +333,7 @@ function projectEvidenceToTargetIdsQuery(
     .join('submission_feature as sf', 'sf.submission_feature_id', 'reachable.submission_feature_id')
     .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
     .where('ft.name', anchorFeatureType)
-    .whereNull('sf.record_end_date')
-    .whereNull('ft.record_end_date');
+    .whereNull('sf.record_end_date');
 
   const targetSecurityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
   if (targetSecurityFilter) {

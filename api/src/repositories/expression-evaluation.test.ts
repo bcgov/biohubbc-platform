@@ -404,7 +404,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
       expect(sql).to.include('"sf"."record_end_date" is null');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).to.not.include('"ft"."record_end_date" is null');
       // Authenticated path uses isAccessibleToUser → security_scope_anchor + bound user id
       expect(sql).to.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');

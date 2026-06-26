@@ -823,10 +823,7 @@ describe('Download Export pipeline (integration)', function () {
       const nameIndex = header.indexOf('name');
       const uuidIndex = header.indexOf('uuid');
       expect(rows.map((row) => row[uuidIndex]).sort((a, b) => a.localeCompare(b))).to.eql(['ds-uuid-1', 'ds-uuid-2']);
-      expect(rows.map((row) => row[nameIndex]).sort((a, b) => a.localeCompare(b))).to.eql([
-        'Survey One',
-        'Survey Two'
-      ]);
+      expect(rows.map((row) => row[nameIndex]).sort((a, b) => a.localeCompare(b))).to.eql(['Survey One', 'Survey Two']);
     });
 
     it('fails fast on an over-budget dimension before buffering or uploading (Edge 4 getRowCount preflight)', async () => {
