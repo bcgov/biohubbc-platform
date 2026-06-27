@@ -80,6 +80,33 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
+   * Get a single active team record by its exact name.
+   *
+   * The partial unique index `team_nuk1` guarantees at most one active team per name, so this
+   * returns either the matching team or `null`.
+   *
+   * @param {string} name - The exact team name to look up.
+   * @return {Promise<Team | null>} - The matching team, or `null` if none exists.
+   * @memberof TeamRepository
+   */
+  async getTeamByName(name: string): Promise<Team | null> {
+    const knex = getKnex();
+    const query = knex
+      .from('team as t')
+      .leftJoin('team_member as tm', function () {
+        this.on('t.team_id', '=', 'tm.team_id').andOnNull('tm.record_end_date');
+      })
+      .select(['t.team_id', 't.name', 't.description', knex.raw('COUNT(tm.team_member_id)::int as member_count')])
+      .whereNull('t.record_end_date')
+      .where('t.name', name)
+      .groupBy(['t.team_id', 't.name', 't.description']);
+
+    const response = await this.connection.knex(query, Team);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * Get teams with optional search and pagination, including active member count.
    *
    * @param {TeamFilters} [filters] - Optional filter set.

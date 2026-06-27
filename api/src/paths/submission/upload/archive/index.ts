@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { v4 } from 'uuid';
 import { getDBConnection } from '../../../../database/db';
+import { HTTP401 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   CreateSubmissionUploadRequestSchema,
@@ -10,6 +11,8 @@ import {
 import { ICreateSubmission } from '../../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
+import { UserService } from '../../../../services/user-service';
+import { getUserGuid, getUserIdentifier, getUserIdentitySource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/upload/archive');
@@ -60,14 +63,26 @@ export function startUpload(): RequestHandler {
     try {
       await connection.open();
 
-      const system_user_id = req.system_user!.system_user_id;
+      // Resolve the submitting user from the authenticated token, creating or reactivating
+      // their system_user record as needed. Reject if the token cannot be resolved to a user.
+      const userGuid = getUserGuid(token);
+      const userIdentifier = getUserIdentifier(token);
+
+      if (!userGuid || !userIdentifier) {
+        throw new HTTP401('Failed to identify submitting user from token');
+      }
+
+      const userService = new UserService(connection);
+      const submitter = await userService.ensureSystemUser(userGuid, userIdentifier, getUserIdentitySource(token));
+
+      const system_user_id = submitter.system_user_id;
       const contributorId = req.contributor_id!;
 
       const { bytes, blueprint_id, ...rest } = req.body;
       const submission = { ...rest, uuid: v4(), system_user_id, contributor_id: contributorId } as ICreateSubmission;
       const uploadIngestionService = new UploadIngestionService(connection);
 
-      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, blueprint_id);
+      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, system_user_id, blueprint_id);
 
       await connection.commit();
 

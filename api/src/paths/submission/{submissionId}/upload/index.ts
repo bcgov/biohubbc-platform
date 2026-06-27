@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
+import { HTTP401 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   CreateSubmissionUploadResponseSchema,
@@ -8,6 +9,8 @@ import {
 } from '../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
+import { UserService } from '../../../../services/user-service';
+import { getUserGuid, getUserIdentifier, getUserIdentitySource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/upload');
@@ -63,10 +66,24 @@ POST.apiDoc = {
  */
 export function createSubmissionUpload(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const token = req.keycloak_token!;
+
+    const connection = getDBConnection(token);
 
     try {
       await connection.open();
+
+      // Resolve the appending user from the authenticated token, creating or reactivating their
+      // system_user record as needed. Reject if the token cannot be resolved to a user.
+      const userGuid = getUserGuid(token);
+      const userIdentifier = getUserIdentifier(token);
+
+      if (!userGuid || !userIdentifier) {
+        throw new HTTP401('Failed to identify submitting user from token');
+      }
+
+      const userService = new UserService(connection);
+      const submitter = await userService.ensureSystemUser(userGuid, userIdentifier, getUserIdentitySource(token));
 
       const submissionUuid = req.params.submissionId as string;
       const { bytes, blueprint_id } = req.body;
@@ -75,6 +92,7 @@ export function createSubmissionUpload(): RequestHandler {
       const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(
         bytes,
         submissionUuid,
+        submitter.system_user_id,
         blueprint_id
       );
 

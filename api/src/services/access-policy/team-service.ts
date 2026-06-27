@@ -68,6 +68,16 @@ export class TeamService extends DBService {
   }
 
   /**
+   * Get a single active team by its exact name, or `null` if none exists.
+   *
+   * @param {string} name - Exact team name.
+   * @return {Promise<Team | null>} Matching team or `null`.
+   */
+  getTeamByName(name: string): Promise<Team | null> {
+    return this.teamRepository.getTeamByName(name);
+  }
+
+  /**
    * Get teams with optional search and optional pagination.
    *
    * @param {TeamFilters} [filters] - Optional filter set.
