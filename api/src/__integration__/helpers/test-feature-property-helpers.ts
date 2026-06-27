@@ -230,15 +230,25 @@ export async function insertSubmissionFeaturePropertyFeature(
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
       feature_type_property_id,
+      blueprint_feature_type_property_id,
       referenced_submission_feature_id,
       create_user
     )
-    VALUES (
+    SELECT
       ${sourceSubmissionFeatureId},
       ${featureTypePropertyId},
+      bftp.blueprint_feature_type_property_id,
       ${referencedSubmissionFeatureId},
       ${systemUserId}
-    );
+    FROM submission_feature sf
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft
+      ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp
+      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+     AND bftp.feature_type_property_id = ${featureTypePropertyId}
+     AND bftp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${sourceSubmissionFeatureId};
   `);
 }
 
