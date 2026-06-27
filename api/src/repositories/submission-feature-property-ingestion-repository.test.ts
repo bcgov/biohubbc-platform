@@ -21,6 +21,68 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('canonical property inserts', () => {
+    const cases: { name: string; method: keyof SubmissionFeaturePropertyIngestionRepository; stagedAlias: string }[] = [
+      {
+        name: 'timestamp',
+        method: 'insertTimestampPropertiesBySubmissionUploadId',
+        stagedAlias: 'p'
+      },
+      {
+        name: 'geometry',
+        method: 'insertGeometryPropertiesBySubmissionUploadId',
+        stagedAlias: 'p'
+      },
+      {
+        name: 'string',
+        method: 'insertStringPropertiesBySubmissionUploadId',
+        stagedAlias: 'v'
+      },
+      {
+        name: 'number',
+        method: 'insertNumberPropertiesBySubmissionUploadId',
+        stagedAlias: 'v'
+      },
+      {
+        name: 'boolean',
+        method: 'insertBooleanPropertiesBySubmissionUploadId',
+        stagedAlias: 'v'
+      },
+      {
+        name: 'code',
+        method: 'insertCodePropertiesBySubmissionUploadId',
+        stagedAlias: 'c'
+      },
+      {
+        name: 'feature',
+        method: 'insertFeaturePropertiesBySubmissionUploadId',
+        stagedAlias: 'c'
+      },
+      {
+        name: 'taxon',
+        method: 'insertTaxonPropertiesBySubmissionUploadId',
+        stagedAlias: 'c'
+      }
+    ];
+
+    for (const testCase of cases) {
+      it(`uses staged Blueprint provenance for ${testCase.name} properties`, async () => {
+        const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+        const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+        const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+        await (repository[testCase.method] as (uploadId: string) => Promise<void>).call(
+          repository,
+          '550e8400-e29b-41d4-a716-446655440000'
+        );
+
+        const sqlText = sqlStub.firstCall.args[0].text as string;
+        expect(sqlText).to.include(`${testCase.stagedAlias}.blueprint_feature_type_property_id`);
+        expect(sqlText).to.not.include('bftp_audit');
+      });
+    }
+  });
+
   describe('clearUploadPropertyWorkingSetStagingBySubmissionUploadId', () => {
     it('clears resolved and typed staging rows in one upload-scoped statement', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
@@ -48,6 +110,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'datetime'");
       expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
     });
@@ -98,6 +161,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_code_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'code'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
       expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
@@ -119,6 +183,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_taxon_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'taxon'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'number'");
       expect(sqlText).to.include("(v.logical_value #>> '{}')::integer AS tsn");
@@ -140,6 +205,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_feature_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'feature'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
       expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
@@ -161,9 +227,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('INSERT INTO submission_feature_property_code');
       expect(sqlText).to.include('submission_feature_id');
       expect(sqlText).to.include('feature_type_property_id');
-      // Provenance column + resolution join (which Blueprint assignment was used).
+      // Provenance column is carried from candidate staging.
       expect(sqlText).to.include('blueprint_feature_type_property_id');
-      expect(sqlText).to.include('blueprint_feature_type_property bftp_audit');
+      expect(sqlText).to.include('c.blueprint_feature_type_property_id');
+      expect(sqlText).to.not.include('bftp_audit');
       expect(sqlText).to.include('contributor_codeset_code_id');
       expect(sqlText).to.include('FROM submission_upload_staging_code_candidate c');
       expect(sqlText).to.include('AND c.is_format_valid');
@@ -184,9 +251,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('INSERT INTO submission_feature_property_taxon');
       expect(sqlText).to.include('submission_feature_id');
       expect(sqlText).to.include('feature_type_property_id');
-      // Provenance column + resolution join (which Blueprint assignment was used).
+      // Provenance column is carried from candidate staging.
       expect(sqlText).to.include('blueprint_feature_type_property_id');
-      expect(sqlText).to.include('blueprint_feature_type_property bftp_audit');
+      expect(sqlText).to.include('c.blueprint_feature_type_property_id');
+      expect(sqlText).to.not.include('bftp_audit');
       expect(sqlText).to.include('taxon_id');
       expect(sqlText).to.include('FROM submission_upload_staging_taxon_candidate c');
       expect(sqlText).to.include('AND c.taxon_id IS NOT NULL');
@@ -464,6 +532,23 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const normalizedSql = sqlText.replace(/\s+/g, ' ');
       expect(normalizedSql).to.include("'artifact_key', 'feature')");
       expect(normalizedSql).to.include("'taxon', 'feature'");
+    });
+  });
+
+  describe('recordUnresolvedParentErrorsBySubmissionUploadId', () => {
+    it('does not write a zero-count aggregate row when there are no unresolved parents', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordUnresolvedParentErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('WITH unresolved AS');
+      expect(sqlText).to.include('FROM unresolved');
+      expect(sqlText).to.include('GROUP BY unresolved.submission_upload_id');
+      expect(sqlText).to.include('UNRESOLVED_PARENT');
     });
   });
 
