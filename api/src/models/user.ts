@@ -29,3 +29,17 @@ export const SystemUserExtended = SystemUser.extend({
 });
 
 export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
+
+/**
+ * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set to now or in the
+ * past.
+ *
+ * This is the single source of truth for "is this user revoked"; both authorization and the login upsert flow rely on
+ * it so they agree on what counts as inactive.
+ *
+ * @param {Pick<SystemUser, 'record_end_date'>} systemUser
+ * @return {*}  {boolean}
+ */
+export const isSystemUserInactive = (systemUser: Pick<SystemUser, 'record_end_date'>): boolean => {
+  return Boolean(systemUser.record_end_date) && new Date(systemUser.record_end_date as string) <= new Date();
+};

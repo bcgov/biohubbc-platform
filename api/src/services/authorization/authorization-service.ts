@@ -1,5 +1,6 @@
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
+import { isSystemUserInactive } from '../../models/user';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getUserGuid } from '../../utils/keycloak-utils';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
@@ -188,8 +189,8 @@ export class AuthorizationService extends DBService {
     // Cache the _systemUser for future use, if needed
     this._systemUser = systemUserObject;
 
-    if (systemUserObject.record_end_date) {
-      //system user has an expired record
+    if (AuthorizationService.isSystemUserInactive(systemUserObject)) {
+      // system user has an expired (soft-deleted) record
       return false;
     }
 
@@ -322,7 +323,23 @@ export class AuthorizationService extends DBService {
       return null;
     }
 
+    if (AuthorizationService.isSystemUserInactive(systemUserWithRoles)) {
+      // Soft-deleted (revoked) users are treated as if they do not exist for all authorization rules
+      return null;
+    }
+
     return systemUserWithRoles;
+  }
+
+  /**
+   * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set to now or in the
+   * past.
+   *
+   * @param {SystemUserExtended} systemUser
+   * @return {*}  {boolean}
+   */
+  static isSystemUserInactive(systemUser: SystemUserExtended): boolean {
+    return isSystemUserInactive(systemUser);
   }
 
   /**

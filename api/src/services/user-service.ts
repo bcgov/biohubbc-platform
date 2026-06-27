@@ -2,6 +2,7 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP401 } from '../errors/http-error';
+import { isSystemUserInactive } from '../models/user';
 import {
   AvailableUser,
   IAddSystemUserParams,
@@ -330,8 +331,8 @@ export class UserService extends DBService {
       return { user: newUser, created: true };
     }
 
-    // User exists - check if expired
-    if (existingUser.record_end_date) {
+    // User exists - check if soft-deleted (inactive)
+    if (isSystemUserInactive(existingUser)) {
       throw new HTTP401('User account is expired or inactive');
     }
 

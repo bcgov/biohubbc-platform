@@ -122,6 +122,25 @@ describe('UserRepository', () => {
 
       expect(response).to.equal(mockResponse);
     });
+
+    it('should look up the user_guid case-insensitively', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      let capturedStatement: any;
+      const mockDBConnection = getMockDBConnection({
+        sql: async (statement: any) => {
+          capturedStatement = statement;
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      await userRepository.getUserByGuid('ABC-123-DEF');
+
+      expect(capturedStatement.text).to.contain('LOWER(su.user_guid)');
+      expect(capturedStatement.values).to.contain('abc-123-def');
+    });
   });
 
   describe('addSystemUser', () => {
@@ -175,6 +194,30 @@ describe('UserRepository', () => {
       });
 
       expect(response).to.equal(mockResponse[0]);
+    });
+
+    it('should store the user_guid lowercased', async () => {
+      const mockResponse = [{ system_user_id: 1 }];
+      const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
+
+      let capturedStatement: any;
+      const mockDBConnection = getMockDBConnection({
+        sql: async (statement: any) => {
+          capturedStatement = statement;
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      await userRepository.addSystemUser({
+        userGuid: 'ABC-123-DEF',
+        userIdentifier: 'user',
+        identitySource: 'idir'
+      });
+
+      expect(capturedStatement.values).to.contain('abc-123-def');
+      expect(capturedStatement.values).not.to.contain('ABC-123-DEF');
     });
   });
 
