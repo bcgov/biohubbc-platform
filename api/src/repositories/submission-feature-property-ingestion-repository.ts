@@ -141,7 +141,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * For each active `submission_feature` in the upload, this method extracts
    * entries from `data.properties` via `jsonb_each(...)` and writes them into
-   * `submission_upload_staging_raw_property`.
+   * `submission_upload_staging_raw_property`. The staged feature type is the raw
+   * tarball feature type so property alias lookup starts from the submitted schema,
+   * not from the active feature type resolved during feature ingestion.
    *
    * Rows are produced only when `data.properties` is a JSON object.
    *
@@ -160,7 +162,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       SELECT
         sf.submission_feature_id,
         sf.submission_upload_id,
-        sf.feature_type_id,
+        COALESCE(sf.raw_feature_type_id, sf.feature_type_id),
         props.key,
         props.value
       FROM submission_feature sf
@@ -220,8 +222,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * Target behavior is intentionally feature-type and Blueprint-scoped:
    *
-   * - The raw tarball key starts the alias chain at the matching feature-type property assignment
-   *   (`submission feature_type_id` + `feature_property.name`).
+   * - The raw tarball key starts the alias chain at the matching raw feature-type property assignment
+   *   (`submission raw_feature_type_id` + `feature_property.name`).
    * - Each retired feature-type property may point forward through
    *   `feature_type_property.target_feature_type_property_id`.
    * - The chain stops at the first feature-type property that the selected Blueprint assigns for the
@@ -351,7 +353,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       SELECT
         s.submission_feature_id,
         s.submission_upload_id,
-        s.feature_type_id,
+        sf.feature_type_id,
         s.property_name,
         s.value,
         -- Surrogate id only when the Blueprint includes the feature type and assigns the property;
@@ -365,11 +367,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         COALESCE(bp.required_value, false) AS required_value,
         bp.property_type_name
       FROM submission_upload_staging_raw_property s
+      JOIN submission_feature sf
+        ON sf.submission_feature_id = s.submission_feature_id
+       AND sf.submission_upload_id = s.submission_upload_id
+       AND sf.record_end_date IS NULL
       LEFT JOIN LATERAL (
         SELECT bp.*
         FROM property_resolution pr
         JOIN blueprint_properties bp
           ON bp.feature_type_property_id = pr.current_feature_type_property_id
+         AND bp.feature_type_id = sf.feature_type_id
         WHERE pr.feature_type_id = s.feature_type_id
           AND pr.property_name = s.property_name
         -- Choose the nearest match in the alias path. This is the core contract: aliases move forward

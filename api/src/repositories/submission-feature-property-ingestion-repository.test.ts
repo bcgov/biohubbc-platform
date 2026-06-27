@@ -102,6 +102,22 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('stageExpandedPropertiesBySubmissionUploadId', () => {
+    it('stages raw tarball feature type ids for property alias resolution', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.stageExpandedPropertiesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('INSERT INTO submission_upload_staging_raw_property');
+      expect(sqlText).to.include('COALESCE(sf.raw_feature_type_id, sf.feature_type_id)');
+      expect(sqlText).to.include("jsonb_each(sf.data -> 'properties')");
+    });
+  });
+
   describe('populateDatetimeCandidateStagingBySubmissionUploadId', () => {
     it('builds candidates directly from typed staging rows', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
@@ -429,6 +445,9 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('blueprint_properties AS');
       expect(sqlText).to.include('JOIN blueprint_properties bp');
       expect(sqlText).to.include('bp.feature_type_property_id = pr.current_feature_type_property_id');
+      expect(sqlText).to.include('JOIN submission_feature sf');
+      expect(sqlText).to.include('bp.feature_type_id = sf.feature_type_id');
+      expect(sqlText).to.include('pr.feature_type_id = s.feature_type_id');
       // Nearest match wins: the alias chain must stop at the first property assigned by the selected
       // Blueprint, not always continue to the final active target.
       expect(sqlText).to.include('ORDER BY pr.depth ASC');
