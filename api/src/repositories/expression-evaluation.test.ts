@@ -66,13 +66,13 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('inner join "feature_type_property" as "ftp"');
       expect(sql).to.include('"ftp"."feature_property_id"');
-      expect(sql).to.include('"ft"."name" = \'dataset\'');
+      expect(sql).to.include('"ft"."name" = \'survey\'');
       expect(sql).to.include('from (with recursive "evidence"');
       expect(sql).to.include('intersect');
       expect(sql).to.include('feature_property_id');
@@ -92,7 +92,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
       expect(sql).to.include('p"."submission_feature_id');
       expect(sql).to.not.include('security_scope_anchor');
@@ -112,7 +112,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
       expect(sql).to.include('p"."submission_feature_id');
       expect(sql).to.include('security_scope_anchor');
@@ -137,7 +137,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, 42).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
       // The target-side filter is keyed on `sf.submission_feature_id`, distinct from the
       // evidence-side filter on `p.submission_feature_id`.
@@ -160,7 +160,7 @@ describe('expression-evaluation', () => {
         ]
       };
 
-      const sql = buildExpressionTreeFeatureIdsSubquery('dataset', expressionTree, null).toString();
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
       expect(sql).to.include('"p"."feature_type_property_id" = 123');
@@ -209,9 +209,9 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
       expect(sql).to.include('"sf"."record_end_date" is null');
 
-      // The synthetic dataset↔same-submission membership edge has been removed — content edges only.
-      expect(sql).to.not.include('as "dataset_sf"');
-      expect(sql).to.not.include('"related_sf"."submission_id" = "dataset_sf"."submission_id"');
+      // The synthetic survey↔same-submission membership edge has been removed — content edges only.
+      expect(sql).to.not.include('as "survey_sf"');
+      expect(sql).to.not.include('"related_sf"."submission_id" = "survey_sf"."submission_id"');
 
       // The old graph-edge union machinery is gone (parent/child reach now comes from the closure).
       expect(sql).to.not.include('connected_features');
@@ -390,7 +390,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"content_reach"."depth" < 6');
       expect(sql).to.include(' union ');
       expect(sql).to.include('"ft"."name" = \'species_observation\'');
-      expect(sql).to.not.include('as "dataset_sf"');
+      expect(sql).to.not.include('as "survey_sf"');
       expect(sql).to.not.include('connected_features');
     });
   });
@@ -404,7 +404,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
       expect(sql).to.include('"sf"."record_end_date" is null');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).to.not.include('"ft"."record_end_date" is null');
       // Authenticated path uses isAccessibleToUser → security_scope_anchor + bound user id
       expect(sql).to.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');

@@ -164,7 +164,7 @@ describe('PolicyStatementRepository', () => {
       const mockRows = [
         {
           policy_statement_id: '11111111-1111-1111-1111-111111111111',
-          urn_feature_type: 'dataset',
+          urn_feature_type: 'survey',
           expression_id: null
         },
         {

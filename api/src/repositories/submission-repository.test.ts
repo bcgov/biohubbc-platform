@@ -39,8 +39,8 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const mockDatasetProperties = {
-        name: 'dataset name',
+      const mockSurveyProperties = {
+        name: 'survey name',
         start_date: '2023-12-22'
       };
 
@@ -51,7 +51,7 @@ describe('SubmissionRepository', () => {
           1,
           '123-456-799',
           'name',
-          mockDatasetProperties
+          mockSurveyProperties
         );
         expect.fail();
       } catch (actualError) {
@@ -68,8 +68,8 @@ describe('SubmissionRepository', () => {
         sql: () => mockQueryResponse
       });
 
-      const mockDatasetProperties = {
-        name: 'dataset name',
+      const mockSurveyProperties = {
+        name: 'survey name',
         start_date: '2023-12-22'
       };
 
@@ -81,7 +81,7 @@ describe('SubmissionRepository', () => {
         1,
         '123-456-799',
         'name',
-        mockDatasetProperties
+        mockSurveyProperties
       );
 
       expect(response.submission_feature_id).to.equal(5);
@@ -218,7 +218,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSpatialComponentCountByDatasetId', () => {
+  describe('getSpatialComponentCountBySurveyId', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -235,7 +235,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+      const response = await submissionRepository.getSpatialComponentCountBySurveyId('111-222-333');
 
       expect(response).to.eql(mockResponse);
     });
@@ -1130,7 +1130,7 @@ describe('SubmissionRepository', () => {
       const submissionFeatureRecord: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
-        urn: 'urn:3:dataset:2',
+        urn: 'urn:3:survey:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',
@@ -1249,7 +1249,7 @@ describe('SubmissionRepository', () => {
           submission_feature_id: 2,
           uuid: '234-456-234',
           submission_id: 3,
-          urn: 'urn:3:dataset:2',
+          urn: 'urn:3:survey:2',
           feature_type_id: 1,
           source_id: 'source-id',
           data: {},
@@ -1271,7 +1271,7 @@ describe('SubmissionRepository', () => {
       const criteria = {
         submissionId: 1,
         systemUserId: 2,
-        featureTypeNames: ['dataset', 'artifact']
+        featureTypeNames: ['survey', 'artifact']
       };
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);

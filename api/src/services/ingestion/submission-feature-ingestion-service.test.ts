@@ -18,15 +18,15 @@ describe('SubmissionFeatureIngestionService', () => {
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(2);
       const activeFeatureTypeMap = new Map<string, number>([
-        ['dataset', 1],
+        ['survey', 1],
         ['sample_site', 2]
       ]);
 
       const features: IFlattenedBlock[] = [
         {
           id: 'feature-1',
-          type: 'dataset',
-          properties: { name: 'Test Dataset' },
+          type: 'survey',
+          properties: { name: 'Test Survey' },
           content: ['feature-2'],
           parent: null
         },
@@ -60,8 +60,8 @@ describe('SubmissionFeatureIngestionService', () => {
       });
       expect(insertedRows[0].data).to.deep.equal({
         id: 'feature-1',
-        type: 'dataset',
-        properties: { name: 'Test Dataset' },
+        type: 'survey',
+        properties: { name: 'Test Survey' },
         content: ['feature-2'],
         parent: null
       });
@@ -74,7 +74,7 @@ describe('SubmissionFeatureIngestionService', () => {
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(0);
 
-      await service.ingestFeatureBatch(42, 'submission-upload-1', [], new Map([['dataset', 1]]));
+      await service.ingestFeatureBatch(42, 'submission-upload-1', [], new Map([['survey', 1]]));
 
       expect(insertStub.called).to.be.false;
     });
@@ -84,13 +84,13 @@ describe('SubmissionFeatureIngestionService', () => {
       const insertStub = sinon
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(1);
-      const activeFeatureTypeMap = new Map<string, number>([['dataset', 1]]);
+      const activeFeatureTypeMap = new Map<string, number>([['survey', 1]]);
 
       const features: IFlattenedBlock[] = [
         {
           id: 'feature-1',
-          type: 'dataset',
-          properties: { name: 'Test Dataset' },
+          type: 'survey',
+          properties: { name: 'Test Survey' },
           content: [],
           parent: null
         },

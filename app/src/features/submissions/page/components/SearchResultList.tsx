@@ -10,7 +10,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { pluralize as p } from 'utils/Utils';
 
 export interface ISearchResult {
@@ -22,33 +22,24 @@ export interface ISearchResult {
 
 export interface ISearchResultListProps {
   searchResults: ISearchResult[];
-  onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
+  onToggleDataVisibility: (visibility: IResultVisibility) => void;
   backToSearch: () => void;
 }
 
-export interface IDatasetVisibility {
+export interface IResultVisibility {
   [details: string]: boolean;
 }
 
 const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
-  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
   const { searchResults } = props;
 
-  useEffect(() => {
-    const visibility = datasetVisibility;
-    searchResults.forEach((item) => {
-      visibility[item.key] = item.visible;
-    });
-
-    setDatasetVisibility(visibility);
-  }, [searchResults, datasetVisibility]);
-
   const toggleVisibility = (key: string) => {
-    const updated = datasetVisibility;
-    const value = datasetVisibility[key];
-    updated[key] = !updated[key];
-    setDatasetVisibility({ ...datasetVisibility, [key]: !value });
-    props.onToggleDataVisibility(updated);
+    const visibility = searchResults.reduce<IResultVisibility>((accumulator, item) => {
+      accumulator[item.key] = item.key === key ? !item.visible : item.visible;
+      return accumulator;
+    }, {});
+
+    props.onToggleDataVisibility(visibility);
   };
 
   return (

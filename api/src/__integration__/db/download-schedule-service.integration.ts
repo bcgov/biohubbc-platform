@@ -77,7 +77,6 @@ describe('DownloadScheduleService (integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['dataset'],
       expressionId: null
     });
     const { download_id } = await downloadService.createDownload({
@@ -125,7 +124,6 @@ describe('DownloadScheduleService (integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `Test policy ${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['dataset'],
       expressionId: null
     });
     const { download_id } = await downloadService.createDownload({

@@ -12,9 +12,9 @@ chai.use(sinonChai);
 
 const mockFeatureType: FeatureType = {
   feature_type_id: 1,
-  name: 'dataset',
-  display_name: 'Dataset',
-  description: 'A dataset feature type'
+  name: 'survey',
+  display_name: 'Survey',
+  description: 'A survey feature type'
 };
 
 describe('getFeatureType', () => {
@@ -76,7 +76,7 @@ describe('updateFeatureType', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { featureTypeId: '1' };
-    mockReq.body = { display_name: 'Updated Dataset' };
+    mockReq.body = { display_name: 'Updated Survey' };
 
     const requestHandler = updateFeatureType();
 
@@ -89,7 +89,7 @@ describe('updateFeatureType', () => {
   });
 
   it('should return 200 with updated feature type', async () => {
-    const updatedMock: FeatureType = { ...mockFeatureType, display_name: 'Updated Dataset' };
+    const updatedMock: FeatureType = { ...mockFeatureType, display_name: 'Updated Survey' };
 
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
@@ -97,12 +97,12 @@ describe('updateFeatureType', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { featureTypeId: '1' };
-    mockReq.body = { display_name: 'Updated Dataset' };
+    mockReq.body = { display_name: 'Updated Survey' };
 
     const requestHandler = updateFeatureType();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(updateStub).to.have.been.calledWith(1, { display_name: 'Updated Dataset' });
+    expect(updateStub).to.have.been.calledWith(1, { display_name: 'Updated Survey' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(updatedMock);
   });

@@ -84,7 +84,6 @@ describe('GalleryDownloadRepository (integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: opts?.name ?? unique('Policy'),
       description: opts?.description ?? null,
-      featureTypes: ['dataset'],
       expressionId: null
     });
     const { download_id } = await downloadService.createDownload({

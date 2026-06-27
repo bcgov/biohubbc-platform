@@ -4,6 +4,7 @@ import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreatePolicyStatementRecord,
+  PolicyEffect,
   PolicyStatement,
   UpdatePolicyStatementRecord
 } from '../../models/policy-statement';
@@ -22,6 +23,7 @@ import { BaseRepository } from '../base-repository';
  */
 export const ActivePolicyStatementWithExpression = z.object({
   policy_statement_id: z.string().uuid(),
+  effect: z.nativeEnum(PolicyEffect),
   urn_feature_type: z.string(),
   expression_id: z.string().uuid().nullable()
 });
@@ -169,8 +171,8 @@ export class PolicyStatementRepository extends BaseRepository {
    * legitimate, distinct semantic state — not a missing-row error. Returns `[]`
    * for a policy with no active statements.
    *
-   * Ordered by `urn_feature_type` so the caller's downstream loop produces a
-   * stable, alphabetic sequence of Parquet files.
+   * Ordered by `urn_feature_type` and statement id so the caller's downstream
+   * loop produces a stable sequence of Parquet files.
    *
    * @param {string} policyId - The policy id whose active statements to fetch.
    * @return {Promise<ActivePolicyStatementWithExpression[]>} Active statements with optional expression ids.
@@ -182,6 +184,7 @@ export class PolicyStatementRepository extends BaseRepository {
       .table('policy_statement as ps')
       .select<ActivePolicyStatementWithExpression[]>(
         'ps.policy_statement_id',
+        'ps.effect',
         'ss.urn_feature_type',
         'pe.expression_id'
       )
@@ -193,7 +196,8 @@ export class PolicyStatementRepository extends BaseRepository {
       })
       .where('ps.policy_id', policyId)
       .whereNull('ps.record_end_date')
-      .orderBy('ss.urn_feature_type');
+      .orderBy('ss.urn_feature_type')
+      .orderBy('ps.policy_statement_id');
 
     const response = await this.connection.knex(query, ActivePolicyStatementWithExpression);
 

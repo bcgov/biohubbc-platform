@@ -91,7 +91,7 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders secured icon for secured rows', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
 
     const { getByTestId } = render(<SearchResultTableLayout results={[securedResult]} featureTypeProperties={[]} />);
 
@@ -112,7 +112,7 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders mixed secured and unsecured rows correctly', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
     const unsecuredResult = createMockSearchFeature(2, 'Observation', false);
 
     const { getByTestId } = render(
@@ -129,7 +129,7 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('calls onClick when a row is clicked', () => {
-    const result = createMockSearchFeature(1, 'Dataset', false);
+    const result = createMockSearchFeature(1, 'Survey', false);
     const onClick = vi.fn();
 
     const { getByTestId } = render(
@@ -143,7 +143,7 @@ describe('SearchResultTableLayout', () => {
 
   it('renders a column for each feature type property', () => {
     const result = {
-      ...createMockSearchFeature(1, 'Dataset', false),
+      ...createMockSearchFeature(1, 'Survey', false),
       properties: {
         scientific_name: 'Canis lupus',
         count: 12,
@@ -166,7 +166,7 @@ describe('SearchResultTableLayout', () => {
 
   it('does not configure internal data grid pagination', () => {
     const results = Array.from({ length: 25 }, (_value, index) =>
-      createMockSearchFeature(index + 1, `Dataset ${index + 1}`, false)
+      createMockSearchFeature(index + 1, `Survey ${index + 1}`, false)
     );
 
     const { getByTestId } = render(<SearchResultTableLayout results={results} featureTypeProperties={[]} />);

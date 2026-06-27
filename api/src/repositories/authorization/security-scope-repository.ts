@@ -290,7 +290,7 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * A feature is "effectively secured" if it or any ancestor has an active
    * security rule — security cascades down the hierarchy. For example,
-   * `urn:*:telemetry:*` anchors telemetry features whose parent dataset is
+   * `urn:*:telemetry:*` anchors telemetry features whose parent survey is
    * secured, even though the telemetry features themselves have no direct
    * security rule.
    *

@@ -1,6 +1,6 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { JsonValue } from 'types/json';
-import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from './useArtifactApi.interface';
 
 export type SubmissionRecord = {
   submission_id: number;

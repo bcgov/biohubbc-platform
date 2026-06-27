@@ -505,16 +505,16 @@ describe('SecurityService', () => {
     });
   });
 
-  describe('isDatasetPendingReview', () => {
+  describe('isSurveyPendingReview', () => {
     afterEach(() => {
       sinon.restore();
     });
 
-    it('should return true if the any artifact in the dataset is pending review', async () => {
+    it('should return true if the any artifact in the survey is pending review', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
-      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      const getArtifactsBySurveyIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsBySurveyId').resolves([
         {
           artifact_id: 1,
           key: 'secured-string-a',
@@ -534,17 +534,17 @@ describe('SecurityService', () => {
         .onSecondCall()
         .resolves(false);
 
-      const result = await securityService.isDatasetPendingReview('datasetId');
+      const result = await securityService.isSurveyPendingReview('surveyId');
 
-      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(getArtifactsBySurveyIdStub).to.be.calledWith('surveyId');
       expect(result).to.eql(true);
     });
 
-    it('should return false if the no artifact in the dataset is pending review', async () => {
+    it('should return false if the no artifact in the survey is pending review', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
-      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      const getArtifactsBySurveyIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsBySurveyId').resolves([
         {
           artifact_id: 1,
           key: 'secured-string-a',
@@ -564,9 +564,9 @@ describe('SecurityService', () => {
         .onSecondCall()
         .resolves(false);
 
-      const result = await securityService.isDatasetPendingReview('datasetId');
+      const result = await securityService.isSurveyPendingReview('surveyId');
 
-      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(getArtifactsBySurveyIdStub).to.be.calledWith('surveyId');
       expect(result).to.eql(false);
     });
   });

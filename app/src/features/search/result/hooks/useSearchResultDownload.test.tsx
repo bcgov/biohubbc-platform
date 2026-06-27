@@ -45,8 +45,7 @@ const pagination: ApiPaginationResponseParams = {
 
 const formValues: ICreateDownloadFormValues = {
   name: 'My download',
-  description: 'a description',
-  featureTypes: ['observation']
+  description: 'a description'
 };
 
 const setupAuth = (isAuthenticated: boolean) => {
@@ -102,6 +101,11 @@ describe('useSearchResultDownload', () => {
     );
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
     expect(mockSetOkDialog).not.toHaveBeenCalled();
+    expect(mockCreateDownload).toHaveBeenCalledWith({
+      name: 'My download',
+      description: 'a description',
+      expression: expressionTree
+    });
   });
 
   it('H2: anonymous success navigates to the public download page without dialog or snackbar', async () => {

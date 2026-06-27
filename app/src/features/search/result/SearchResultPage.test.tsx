@@ -7,8 +7,8 @@ import { Mock } from 'vitest';
 import { SearchResultPage } from './SearchResultPage';
 
 const mockNavigate = vi.fn();
-const mockUseParams = vi.fn(() => ({ featureType: 'dataset' }));
-const mockUseLocation = vi.fn(() => ({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' }));
+const mockUseParams = vi.fn(() => ({ featureType: 'survey' }));
+const mockUseLocation = vi.fn(() => ({ search: '', pathname: '/search/survey', hash: '', state: null, key: 'k' }));
 const mockSetSearchParams = vi.fn();
 const mockSearchParams = new URLSearchParams();
 
@@ -81,7 +81,7 @@ const mockSetResultSearchParams = vi.fn();
 
 const codesPayload = {
   feature_type_with_properties: [
-    { feature_type: { name: 'dataset', display_name: 'Dataset' }, properties: [] },
+    { feature_type: { name: 'survey', display_name: 'Survey' }, properties: [] },
     { feature_type: { name: 'telemetry', display_name: 'Telemetry' }, properties: [] }
   ]
 };
@@ -93,13 +93,13 @@ describe('SearchResultPage', () => {
     vi.clearAllMocks();
 
     // Reset location to default (no search params) before each test.
-    mockUseLocation.mockReturnValue({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' });
+    mockUseLocation.mockReturnValue({ search: '', pathname: '/search/survey', hash: '', state: null, key: 'k' });
 
     // Mirror navigate calls into useLocation so URL-derived state (e.g. the `expr` param)
     // is visible on subsequent renders, matching real router behaviour.
     mockNavigate.mockImplementation((to: unknown) => {
       if (to && typeof to === 'object' && 'search' in to) {
-        const { pathname = '/search/dataset', search = '' } = to as { pathname?: string; search?: string };
+        const { pathname = '/search/survey', search = '' } = to as { pathname?: string; search?: string };
         mockUseLocation.mockReturnValue({ search, pathname, hash: '', state: null, key: 'k' });
       }
     });
@@ -121,7 +121,7 @@ describe('SearchResultPage', () => {
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
     });
-    mockUseParams.mockReturnValue({ featureType: 'dataset' });
+    mockUseParams.mockReturnValue({ featureType: 'survey' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
       properties: [],
@@ -183,6 +183,18 @@ describe('SearchResultPage', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
+  it('defaults the download name to feature type plus current timestamp', async () => {
+    const { getByRole, getByLabelText, rerender } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    expect((getByLabelText(/Name/i) as HTMLInputElement).value).toMatch(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
     mockCreateDownload.mockResolvedValue({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
@@ -197,8 +209,7 @@ describe('SearchResultPage', () => {
     await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
     expect(mockCreateDownload).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: expect.stringMatching(/ download$/),
-        featureTypes: ['dataset'],
+        name: expect.stringMatching(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/),
         expression: null
       })
     );
@@ -219,8 +230,10 @@ describe('SearchResultPage', () => {
         })
     );
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -281,7 +294,7 @@ describe('SearchResultPage', () => {
 
     await waitFor(() => {
       expect(mockUseSearchResults).toHaveBeenLastCalledWith(
-        'dataset',
+        'survey',
         true,
         expect.objectContaining({
           type: 'expression',
@@ -316,15 +329,17 @@ describe('SearchResultPage', () => {
 
     await waitFor(() => {
       expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
-      expect(mockUseSearchResults).toHaveBeenLastCalledWith('dataset', true, null, expect.any(Number));
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null, expect.any(Number));
     });
   });
 
   it('surfaces the API error message in a snackbar when submit fails', async () => {
     mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -380,7 +395,7 @@ describe('SearchResultPage', () => {
 
   it('P3a: submits the canonical lowercase featureType when the route is mixed-case', async () => {
     mockCreateDataRequest.mockResolvedValue({});
-    mockUseParams.mockReturnValue({ featureType: 'DATASET' });
+    mockUseParams.mockReturnValue({ featureType: 'SURVEY' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
       properties: [],
@@ -401,7 +416,7 @@ describe('SearchResultPage', () => {
     await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
     expect(mockCreateDataRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        featureTypes: ['dataset']
+        featureTypes: ['survey']
       })
     );
   });

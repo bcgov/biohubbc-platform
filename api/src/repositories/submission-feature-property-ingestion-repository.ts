@@ -2567,12 +2567,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordUnresolvedParentErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      WITH grouped_errors AS (
+      WITH unresolved AS (
         SELECT
-          ${submissionUploadId}::uuid AS submission_upload_id,
-          'UNRESOLVED_PARENT'::text AS error_code,
-          'Failed to resolve parent feature source_id within upload'::text AS error_message,
-          COUNT(*)::integer AS count
+          child.submission_upload_id
         FROM submission_feature child
         LEFT JOIN submission_feature parent
           ON parent.submission_upload_id = child.submission_upload_id
@@ -2582,6 +2579,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND child.record_end_date IS NULL
           AND NULLIF(child.data ->> 'parent', '') IS NOT NULL
           AND parent.submission_feature_id IS NULL
+      ),
+      grouped_errors AS (
+        SELECT
+          unresolved.submission_upload_id,
+          'UNRESOLVED_PARENT'::text AS error_code,
+          'Failed to resolve parent feature source_id within upload'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM unresolved
+        GROUP BY unresolved.submission_upload_id
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,

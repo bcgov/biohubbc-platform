@@ -65,8 +65,19 @@ describe('useDownloadApi', () => {
       const mockRequest: CreateDownloadRequest = {
         name: 'Moose download',
         description: 'Moose observations in the Skeena',
-        featureTypes: ['dataset'],
-        expression: null
+        expression: {
+          type: 'expression',
+          operator: 'AND',
+          clauses: [
+            {
+              type: 'predicate',
+              feature_property_id: 1,
+              feature_type_property_id: null,
+              operator: 'Equals',
+              value: 'moose'
+            }
+          ]
+        }
       };
       const mockResponse: CreateDownloadResponse = {
         download_id: '550e8400-e29b-41d4-a716-446655440099',
@@ -84,8 +95,7 @@ describe('useDownloadApi', () => {
 
     it('should propagate rejection on server error', async () => {
       const mockRequest: CreateDownloadRequest = {
-        name: 'All datasets',
-        featureTypes: ['dataset'],
+        name: 'All surveys',
         expression: null
       };
 

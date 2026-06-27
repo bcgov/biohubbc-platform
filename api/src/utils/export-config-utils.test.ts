@@ -933,10 +933,10 @@ describe('export-config-utils', () => {
     it('leaves already-unique names untouched (default-named columns keep output_column undefined)', () => {
       const input = [
         { feature_type: 'telemetry', column: 'uuid' },
-        { feature_type: 'dataset', column: 'uuid' }
+        { feature_type: 'survey', column: 'uuid' }
       ];
 
-      // No collision (default names telemetry_uuid / dataset_uuid are distinct) → returned as-is.
+      // No collision (default names telemetry_uuid / survey_uuid are distinct) → returned as-is.
       expect(dedupeOutputColumnNames(input)).to.deep.equal(input);
     });
 
@@ -945,13 +945,13 @@ describe('export-config-utils', () => {
       // qualified with their feature type so the header is self-describing and no value is lost.
       const result = dedupeOutputColumnNames([
         { feature_type: 'telemetry', column: 'uuid', output_column: 'id' },
-        { feature_type: 'dataset', column: 'uuid', output_column: 'id' }
+        { feature_type: 'survey', column: 'uuid', output_column: 'id' }
       ]);
 
       // Source feature_type/column untouched; only the header name is qualified.
       expect(result).to.deep.equal([
         { feature_type: 'telemetry', column: 'uuid', output_column: 'telemetry_id' },
-        { feature_type: 'dataset', column: 'uuid', output_column: 'dataset_id' }
+        { feature_type: 'survey', column: 'uuid', output_column: 'survey_id' }
       ]);
     });
 
@@ -966,33 +966,33 @@ describe('export-config-utils', () => {
     });
 
     it('does not steal a column that was already unique; the qualified name yields to it', () => {
-      // "id" collides (telemetry/dataset) → telemetry's qualifies to "telemetry_id", but that name
+      // "id" collides (telemetry/survey) → telemetry's qualifies to "telemetry_id", but that name
       // is already taken by a third, non-colliding column — so the qualified one takes the suffix and
       // the un-collided column keeps its name.
       const result = dedupeOutputColumnNames([
         { feature_type: 'telemetry', column: 'uuid', output_column: 'id' },
-        { feature_type: 'dataset', column: 'uuid', output_column: 'id' },
+        { feature_type: 'survey', column: 'uuid', output_column: 'id' },
         { feature_type: 'x', column: 'y', output_column: 'telemetry_id' }
       ]);
 
       expect(result.map((column) => column.output_column)).to.deep.equal([
         'telemetry_id_2', // telemetry's "id" qualified, but "telemetry_id" was taken → suffixed
-        'dataset_id',
+        'survey_id',
         'telemetry_id' // pre-existing unique name preserved
       ]);
     });
 
     it('qualifies the explicit collider and leaves a colliding default name as the bare name', () => {
-      // An explicit "dataset_uuid" on telemetry collides with dataset.uuid's default "dataset_uuid".
+      // An explicit "survey_uuid" on telemetry collides with survey.uuid's default "survey_uuid".
       const result = dedupeOutputColumnNames([
-        { feature_type: 'telemetry', column: 'uuid', output_column: 'dataset_uuid' },
-        { feature_type: 'dataset', column: 'uuid' } // default resolves to dataset_uuid → collision
+        { feature_type: 'telemetry', column: 'uuid', output_column: 'survey_uuid' },
+        { feature_type: 'survey', column: 'uuid' } // default resolves to survey_uuid → collision
       ]);
 
       // The explicit collider is feature-qualified; the default column (already feature-qualified)
       // keeps the bare name with output_column undefined.
-      expect(result[0].output_column).to.equal('telemetry_dataset_uuid');
-      expect(result[1]).to.deep.equal({ feature_type: 'dataset', column: 'uuid' });
+      expect(result[0].output_column).to.equal('telemetry_survey_uuid');
+      expect(result[1]).to.deep.equal({ feature_type: 'survey', column: 'uuid' });
     });
   });
 
@@ -1025,20 +1025,20 @@ describe('export-config-utils', () => {
     });
 
     it('keeps an unmatched dimension column empty even when it collides with a root column name', () => {
-      // Root `dataset` carries the structural `uuid` unprefixed; the `capture`
+      // Root `survey` carries the structural `uuid` unprefixed; the `capture`
       // dimension had no match, so `capture_uuid` is absent on the joined row. It
       // must render empty — never fall back to the root's `uuid` (the bug the
       // chained-merge integration test surfaced).
       const record = buildOutputRecord(
-        { uuid: 'ds-1', name: 'Dataset One' },
+        { uuid: 'ds-1', name: 'Survey One' },
         [
-          { feature_type: 'dataset', column: 'name' },
+          { feature_type: 'survey', column: 'name' },
           { feature_type: 'capture', column: 'uuid' }
         ],
-        'dataset'
+        'survey'
       );
 
-      expect(record).to.deep.equal({ dataset_name: 'Dataset One', capture_uuid: '' });
+      expect(record).to.deep.equal({ survey_name: 'Survey One', capture_uuid: '' });
     });
 
     it('emits all columns when output_columns is omitted', () => {

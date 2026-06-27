@@ -200,7 +200,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I1: createTeamPolicy on approved policy + ALLOW statement materializes one statement scope, one team grant; publisher called once', async () => {
     const policyId = await createPolicy(connection, 'I1-approved-allow');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I1 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -228,7 +228,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I2: flipping a policy from reviewed → approved with linked team_policies materializes the cache for each linked team', async () => {
     const policyId = await createPolicy(connection, 'I2-reviewed', 'reviewed');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I2 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -258,7 +258,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I3: flipping a policy out of approved removes every linked team’s team_security_scope rows; shared statement scope links stay', async () => {
     const policyId = await createPolicy(connection, 'I3-approved');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamA = await createTeam(connection, 'I3 Team A');
     const teamB = await createTeam(connection, 'I3 Team B');
@@ -301,7 +301,7 @@ describe('Policy status orchestration (integration)', function () {
     // row, because the other policy still justifies it. This is the multi-policy
     // form of Edge Case #3 — the rebuild must walk the full live policy chain,
     // not just remove rows attributed to the downgraded policy.
-    const sharedUrn = 'urn:*:dataset:*';
+    const sharedUrn = 'urn:*:survey:*';
 
     const policyA = await createPolicy(connection, 'I3b-policy-A');
     const statementA = await createPolicyStatement(connection, policyA, sharedUrn);
@@ -346,7 +346,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I3c: flipping an approved policy to denied removes the team grant and publishes no anchor jobs', async () => {
     const policyId = await createPolicy(connection, 'I3c-approved-denied');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I3c Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -423,7 +423,7 @@ describe('Policy status orchestration (integration)', function () {
       requested_by: connection.systemUserId(),
       reason: 'I5 approval lifecycle',
       system_user_ids: [connection.systemUserId()],
-      featureTypes: ['dataset'],
+      featureTypes: ['survey'],
       expression: null
     });
     const policyId = created.policy_id;
@@ -466,7 +466,6 @@ describe('Policy status orchestration (integration)', function () {
     const { policy_id } = await downloadPolicyService.createDownloadPolicy({
       name: 'I6 Download Policy',
       description: 'audit: download policies stay grant-free',
-      featureTypes: ['dataset'],
       expressionId: null
     });
 
@@ -490,7 +489,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I7: deleting one team’s team_policy ungrants that team without disturbing other teams’ access or the shared scope rows', async () => {
     const policyId = await createPolicy(connection, 'I7-shared-approved');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamA = await createTeam(connection, 'I7 Team A');
     const teamB = await createTeam(connection, 'I7 Team B');
@@ -522,7 +521,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I8: replacing a policy’s statement on an approved policy with active team_policy links cleans up the old scope mapping, materializes the new scope, and switches the team grant', async () => {
     const policyId = await createPolicy(connection, 'I8-active-consumers');
-    const oldStmtId = await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    const oldStmtId = await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I8 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -570,7 +569,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I8b: deleting the only ALLOW statement on an approved linked policy removes the team grant and publishes no anchor jobs', async () => {
     const policyId = await createPolicy(connection, 'I8b-delete-only-statement');
-    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I8b Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -593,7 +592,7 @@ describe('Policy status orchestration (integration)', function () {
   });
 
   it('I8c: deleting one of two approved statements for the same scope keeps team access via the remaining policy', async () => {
-    const sharedUrn = 'urn:*:dataset:*';
+    const sharedUrn = 'urn:*:survey:*';
 
     const policyA = await createPolicy(connection, 'I8c-policy-A');
     const statementA = await createPolicyStatement(connection, policyA, sharedUrn);
@@ -628,7 +627,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I9: statement update on a policy with no team_policy links keeps statement scopes but no team grants; publisher silent', async () => {
     const policyId = await createPolicy(connection, 'I9-no-consumers');
-    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    const statementId = await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     // Pre-state: no team_policy linkage → no team grants yet.
     expect(await countPolicyStatementScopes(policyId)).to.equal(1);
@@ -647,7 +646,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I10: createTeamPolicy on an approved policy with only DENY statements produces no ALLOW scope or team grant rows; publisher silent', async () => {
     const policyId = await createPolicy(connection, 'I10-deny-only');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*', PolicyEffect.DENY);
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*', PolicyEffect.DENY);
 
     const teamId = await createTeam(connection, 'I10 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -667,7 +666,7 @@ describe('Policy status orchestration (integration)', function () {
     // access through the team_policy create path even if its statements
     // would otherwise qualify.
     const policyId = await createPolicy(connection, 'I10b-requested-allow', 'requested');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I10b Team');
     await addTeamMember(connection, teamId, connection.systemUserId());
@@ -685,7 +684,7 @@ describe('Policy status orchestration (integration)', function () {
   it('I11: after running I1 + I2 + I7 + I8 sequentially, every team_security_scope row walks back to an approved policy with an ALLOW statement', async () => {
     // -- I1: createTeamPolicy on an approved+ALLOW policy ---------------
     const i1PolicyId = await createPolicy(connection, 'I11-I1');
-    await createPolicyStatement(connection, i1PolicyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, i1PolicyId, 'urn:*:survey:*');
     const i1TeamId = await createTeam(connection, 'I11 Team I1');
     await addTeamMember(connection, i1TeamId, connection.systemUserId());
     const teamPolicyService = new TeamPolicyService(connection);
@@ -773,7 +772,7 @@ describe('Policy status orchestration (integration)', function () {
 
   it('I12: (a) a second team_policy on an approved policy publishes once; (b) metadata-only updatePolicy does not publish', async () => {
     const policyId = await createPolicy(connection, 'I12-approved');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamA = await createTeam(connection, 'I12 Team A');
     const teamB = await createTeam(connection, 'I12 Team B');
@@ -814,7 +813,7 @@ describe('Policy status orchestration (integration)', function () {
     // has nothing to fan out — no `team_security_scope` rows appear and the
     // publisher stays silent.
     const policyId = await createPolicy(connection, 'I12c-no-teams', 'reviewed');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const publishCountBeforeFlip = publisherStub.callCount;
 
@@ -836,7 +835,7 @@ describe('Policy status orchestration (integration)', function () {
     // … WHERE tp.record_end_date IS NULL` clause is the only thing
     // catching that case at the SQL layer.
     const policyId = await createPolicy(connection, 'I13-stale-caller');
-    await createPolicyStatement(connection, policyId, 'urn:*:dataset:*');
+    await createPolicyStatement(connection, policyId, 'urn:*:survey:*');
 
     const teamId = await createTeam(connection, 'I13 Team');
     await addTeamMember(connection, teamId, connection.systemUserId());

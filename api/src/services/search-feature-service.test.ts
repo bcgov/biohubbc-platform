@@ -22,7 +22,7 @@ describe('SearchFeatureService', () => {
       submission_id: 10,
       uuid: '11111111-1111-1111-1111-111111111111',
       feature_type_id: 1,
-      feature_type_name: 'dataset',
+      feature_type_name: 'survey',
       properties: {},
       submission_name: 'Submission A',
       is_secured: false,
@@ -70,10 +70,10 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree')
         .resolves(mockFeatures);
 
-      const result = await service.searchFeaturesByExpressionTree('dataset', undefined, undefined, 42);
+      const result = await service.searchFeaturesByExpressionTree('survey', undefined, undefined, 42);
 
       expect(repoStub).to.have.been.calledOnce;
-      expect(repoStub.firstCall.args).to.deep.equal(['dataset', undefined, undefined, 42]);
+      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42]);
       expect(result).to.equal(mockFeatures);
     });
   });
@@ -101,13 +101,13 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeProperties')
         .resolves(mockProperties);
 
-      const result = await service.searchFeaturesByExpressionTreeWithCount('dataset', tree);
+      const result = await service.searchFeaturesByExpressionTreeWithCount('survey', tree);
 
       expect(validateStub).to.have.been.calledOnceWith(tree);
       expect(searchStub).to.have.been.calledOnce;
-      expect(searchStub.firstCall.args).to.deep.equal(['dataset', normalized, undefined, undefined]);
-      expect(propertiesStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
-      expect(countStub).to.have.been.calledOnceWith('dataset', normalized, undefined);
+      expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+      expect(propertiesStub).to.have.been.calledOnceWith('survey', normalized, undefined);
+      expect(countStub).to.have.been.calledOnceWith('survey', normalized, undefined);
       expect(result).to.deep.equal({ features: mockFeatures, properties: mockProperties, count: 123 });
     });
   });
@@ -121,10 +121,10 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeCount')
         .resolves(5);
 
-      const result = await service.getSearchFeaturesCountByExpressionTree('dataset', undefined);
+      const result = await service.getSearchFeaturesCountByExpressionTree('survey', undefined);
 
       expect(countStub).to.have.been.calledOnce;
-      expect(countStub.firstCall.args).to.deep.equal(['dataset', undefined, undefined]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, undefined]);
       expect(result).to.equal(5);
     });
   });

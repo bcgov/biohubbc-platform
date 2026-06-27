@@ -46,15 +46,15 @@ describe('ValidationService', () => {
   });
 
   describe('validateSubmissionFeatures', () => {
-    it('should return false if the dataset is invalid', async () => {
+    it('should return false if the survey is invalid', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const validateSubmissionFeatureStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeature')
         .throws(new Error('validation error'));
 
-      const mockDatasetProperties = {
-        name: 'dataset name',
+      const mockSurveyProperties = {
+        name: 'survey name',
         start_date: '2023-12-22'
       };
 
@@ -106,32 +106,32 @@ describe('ValidationService', () => {
         child_features: []
       };
 
-      const mockDatasetSubmissionFeature = {
+      const mockSurveySubmissionFeature = {
         id: '123',
-        type: 'dataset',
-        properties: mockDatasetProperties,
+        type: 'survey',
+        properties: mockSurveyProperties,
         child_features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
       };
 
-      const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
+      const mockSubmissionFeatures: ISubmissionFeature[] = [mockSurveySubmissionFeature];
 
       const validationService = new ValidationService(mockDBConnection);
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockSurveySubmissionFeature);
       expect(response).to.be.false;
     });
 
-    it('should return true if the dataset is valid', async () => {
+    it('should return true if the survey is valid', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const validateSubmissionFeatureStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeature')
         .resolves(true);
 
-      const mockDatasetProperties = {
-        name: 'dataset name',
+      const mockSurveyProperties = {
+        name: 'survey name',
         start_date: '2023-12-22'
       };
 
@@ -183,20 +183,20 @@ describe('ValidationService', () => {
         child_features: []
       };
 
-      const mockDatasetSubmissionFeature = {
+      const mockSurveySubmissionFeature = {
         id: '123',
-        type: 'dataset',
-        properties: mockDatasetProperties,
+        type: 'survey',
+        properties: mockSurveyProperties,
         child_features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
       };
 
-      const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
+      const mockSubmissionFeatures: ISubmissionFeature[] = [mockSurveySubmissionFeature];
 
       const validationService = new ValidationService(mockDBConnection);
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockSurveySubmissionFeature);
       expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature1);
       expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature2);
       expect(response).to.be.true;
@@ -1263,7 +1263,7 @@ describe('ValidationService', () => {
         .stub(ValidationRepository.prototype, 'getFeatureValidationProperties')
         .resolves(mockValidationProperties);
 
-      const featureType = 'dataset';
+      const featureType = 'survey';
 
       const validationService = new ValidationService(mockDBConnection);
 
@@ -1303,7 +1303,7 @@ describe('ValidationService', () => {
         .stub(ValidationRepository.prototype, 'getFeatureValidationProperties')
         .resolves(mockValidationProperties);
 
-      const featureType = 'dataset';
+      const featureType = 'survey';
 
       const validationService = new ValidationService(mockDBConnection);
 
@@ -1357,7 +1357,7 @@ describe('ValidationService', () => {
         .stub(ValidationRepository.prototype, 'getFeatureValidationProperties')
         .rejects(new Error('test error'));
 
-      const featureType = 'dataset';
+      const featureType = 'survey';
 
       const validationService = new ValidationService(mockDBConnection);
 

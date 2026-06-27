@@ -210,7 +210,7 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  *
  * Different feature types have different column schemas — each Parquet file contains
  * one feature type only. Every file includes a nullable `parent_uuid` column for
- * star-schema joins between files. Root types (e.g., dataset) will have null values;
+ * star-schema joins between files. Root types (e.g., survey) will have null values;
  * child types will have the parent feature's UUID.
  *
  * Spatial properties each get their own BYTE_ARRAY column (WKB-encoded) using the
@@ -228,7 +228,7 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
   // Every Parquet file includes the feature UUID for cross-file joins
   fields['uuid'] = { type: 'UTF8', optional: false };
 
-  // Every file includes parent_uuid for star-schema joins. Root types (dataset)
+  // Every file includes parent_uuid for star-schema joins. Root types (survey)
   // will have null values; child types link back to the parent feature type's file.
   // Always present so consumers don't need to know which types are roots.
   fields['parent_uuid'] = { type: 'UTF8', optional: true };

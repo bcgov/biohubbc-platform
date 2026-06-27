@@ -14,7 +14,7 @@ import { buildSchemaHeaders, CsvPropertyDefinition } from './csv-utils';
  * schema), so they are always valid join/output *targets* even though they are
  * not feature properties — referencing them passes existence validation. But
  * `parent_uuid` is **nullable**: ingestion does not require a feature to have a
- * parent, so its value may be absent on any row (root types such as `dataset`
+ * parent, so its value may be absent on any row (root types such as `survey`
  * have none). A join on `parent_uuid → uuid` therefore legitimately finds no
  * match for a parentless root row, which is kept with empty right-side columns
  * under left-join semantics.
