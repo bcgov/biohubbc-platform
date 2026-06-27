@@ -669,7 +669,7 @@ describe('DownloadRepository', () => {
       const sqlText = String(queryStub.getCall(0).args[0]);
       expect(sqlText).to.include('submission_feature_artifact sfa');
       expect(sqlText).to.include('artifact_ftp.feature_type_id = sf.feature_type_id');
-      expect(sqlText).to.include('fpt.name = \'artifact_key\'');
+      expect(sqlText).to.include("fpt.name = 'artifact_key'");
       expect(sqlText).to.include('HAVING COUNT(*) = 1');
     });
 

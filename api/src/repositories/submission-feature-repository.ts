@@ -210,5 +210,4 @@ export class SubmissionFeatureRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
     return response.rows;
   }
-
 }

@@ -103,7 +103,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
       property: 'property',
       value: 'value'
     };
-    const resolvedSort = pagination.sort ? (sortColumnMap[pagination.sort] ?? 'property') : 'property';
+    const resolvedSort = pagination.sort ? sortColumnMap[pagination.sort] ?? 'property' : 'property';
     const resolvedOrder = pagination.order === 'desc' ? 'desc' : 'asc';
     const limit = pagination.limit ?? 25;
     const page = pagination.page ?? 1;
