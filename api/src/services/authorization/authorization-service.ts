@@ -223,11 +223,19 @@ export class AuthorizationService extends DBService {
     }
 
     const user = await this.getCachedSystemUser();
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
+
+    // submission_feature supports anonymous access to unsecured features, so allow anonymous
+    // requests to reach the closure-based check with a null system user id.
+    if (authorizeRule.entity === 'submission_feature') {
+      return teamAuthorizationService.isUserAuthorizedForTeamEntity(user?.system_user_id ?? null, authorizeRule);
+    }
+
+    // All other team-scoped entities require an authenticated user.
     if (!user) {
       return false;
     }
 
-    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
     return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
   }
 

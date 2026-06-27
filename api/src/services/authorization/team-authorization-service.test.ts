@@ -105,7 +105,7 @@ describe('TeamAuthorizationService', () => {
     });
 
     describe('entity: submission_feature', () => {
-      it('returns true when the feature is accessible to the user, passing through the entity ids', async () => {
+      it('returns true when the closure-based check grants access, passing through the entity ids', async () => {
         const mockConnection = getMockDBConnection();
         const accessibleStub = sinon
           .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
@@ -122,7 +122,7 @@ describe('TeamAuthorizationService', () => {
         expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
       });
 
-      it('returns false when the feature is not accessible to the user', async () => {
+      it('returns false when the closure-based check denies access', async () => {
         const mockConnection = getMockDBConnection();
         sinon.stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
 
@@ -134,6 +134,53 @@ describe('TeamAuthorizationService', () => {
         });
 
         expect(result).to.be.false;
+      });
+
+      it('passes a null system user id through for anonymous users', async () => {
+        const mockConnection = getMockDBConnection();
+        const accessibleStub = sinon
+          .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
+          .resolves(true);
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(null, {
+          entity: 'submission_feature',
+          submissionFeatureId: 2,
+          submissionId: 3
+        });
+
+        expect(result).to.be.true;
+        expect(accessibleStub).to.have.been.calledOnceWith(null, 2, 3);
+      });
+    });
+
+    describe('anonymous (null system user id)', () => {
+      it('returns false for ticket entities', async () => {
+        const mockConnection = getMockDBConnection();
+        const ticketStub = sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByTicket');
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(null, {
+          entity: 'ticket',
+          ticketId: '11111111-1111-1111-1111-111111111111'
+        });
+
+        expect(result).to.be.false;
+        expect(ticketStub).to.not.have.been.called;
+      });
+
+      it('returns false for data_request entities', async () => {
+        const mockConnection = getMockDBConnection();
+        const dataRequestStub = sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByDataRequest');
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(null, {
+          entity: 'data_request',
+          dataRequestId: 'dr-1'
+        });
+
+        expect(result).to.be.false;
+        expect(dataRequestStub).to.not.have.been.called;
       });
     });
   });

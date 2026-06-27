@@ -526,6 +526,29 @@ describe('authorizeByTeam', function () {
 
     expect(result).to.be.false;
   });
+
+  it('allows anonymous users to reach the submission_feature check with a null system user id', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const teamStub = sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(true);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      submissionFeatureId: 1,
+      submissionId: 1
+    });
+
+    expect(result).to.be.true;
+    expect(teamStub).to.have.been.calledOnceWith(null, {
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      submissionFeatureId: 1,
+      submissionId: 1
+    });
+  });
 });
 
 describe('hasAtLeastOneValidValue', () => {

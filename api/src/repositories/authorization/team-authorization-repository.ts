@@ -1,7 +1,7 @@
 import { getKnex } from '../../database/db';
 import { DataRequestRecord, TicketRecord } from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
-import { isAccessibleToUser, isSubmissionFeatureActive } from '../sql-fragments';
+import { buildSecurityFilter, isSubmissionFeatureActive } from '../sql-fragments';
 
 /**
  * A repository class for team-scoped authorization queries.
@@ -70,19 +70,24 @@ export class TeamAuthorizationRepository extends BaseRepository {
 
   /**
    * Determine whether a submission feature is accessible to a user, using the same
-   * ancestry-aware, closure-based check as the search/download read paths
-   * (`isAccessibleToUser`): a feature is accessible when it is not effectively secured,
-   * or the user's team holds a security scope anchored on the feature or any of its
-   * ancestors. Only active features that belong to the given submission are considered.
+   * ancestry-aware, closure-based check as the search/download read paths: a feature is
+   * accessible when it is live (past its effective date and not ended) AND either it is not
+   * effectively secured (open to authenticated and anonymous users), or the user's team holds
+   * a security scope anchored on the feature or one of its ancestors.
    *
-   * @param {number} systemUserId
+   * Reuses `buildSecurityFilter` so feature-detail authorization matches search results exactly:
+   * a secured descendant of an accessible ancestor is granted, a secured feature under a parent
+   * the user cannot reach is denied, and (for `systemUserId === null`) anonymous users may still
+   * read unsecured features. Only features that belong to the given submission are considered.
+   *
+   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
    * @param {number} submissionFeatureId
    * @param {number} submissionId The submission the feature must belong to.
-   * @return {Promise<boolean>}
+   * @return {Promise<boolean>} `true` if the feature is accessible to the user.
    * @memberof TeamAuthorizationRepository
    */
   async isSubmissionFeatureAccessibleToUser(
-    systemUserId: number,
+    systemUserId: number | null,
     submissionFeatureId: number,
     submissionId: number
   ): Promise<boolean> {
@@ -93,9 +98,15 @@ export class TeamAuthorizationRepository extends BaseRepository {
       .from('submission_feature as sf')
       .where('sf.submission_feature_id', submissionFeatureId)
       .where('sf.submission_id', submissionId)
+      // not-yet-effective / ended → forbidden
       .whereRaw(isSubmissionFeatureActive('sf'))
-      .whereRaw(isAccessibleToUser('sf.submission_feature_id'), [systemUserId])
       .limit(1);
+
+    // Pass `null` (not `undefined`) for anonymous so the unsecured-only filter is applied.
+    const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
+    if (securityFilter) {
+      query.whereRaw(securityFilter);
+    }
 
     const response = await this.connection.knex(query);
     return response.rowCount === 1;

@@ -24,16 +24,31 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
-   * - `submission_feature`: the feature is not effectively secured, or the user's team
-   *   holds a security scope anchored on the feature or one of its ancestors (the same
-   *   ancestry-aware check the search/download read paths apply).
+   * - `submission_feature`: ancestry-aware, closure-based access shared with the search/download
+   *   read paths — the feature is unsecured, or the user's team holds a security scope anchored
+   *   on the feature or one of its ancestors. `systemUserId` may be `null` for anonymous users
+   *   (who can still access unsecured features).
    *
-   * @param {number} systemUserId
+   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
    * @param {TeamAuthorizationEntity} entity
    * @return {Promise<boolean>}
    * @memberof TeamAuthorizationService
    */
-  async isUserAuthorizedForTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
+  async isUserAuthorizedForTeamEntity(systemUserId: number | null, entity: TeamAuthorizationEntity): Promise<boolean> {
+    // submission_feature uses closure-based access and supports anonymous (unsecured) access.
+    if (entity.entity === 'submission_feature') {
+      return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
+        systemUserId,
+        entity.submissionFeatureId,
+        entity.submissionId
+      );
+    }
+
+    // ticket / data_request require an authenticated user.
+    if (systemUserId === null) {
+      return false;
+    }
+
     let record: { record_end_date: string | null } | null;
 
     switch (entity.entity) {
@@ -47,16 +62,6 @@ export class TeamAuthorizationService extends DBService {
           entity.dataRequestId
         );
         break;
-
-      case 'submission_feature':
-        // Ancestry-aware access check shared with the search/download read paths: unsecured
-        // features are open; secured features require the user's team to hold a scope anchored
-        // on the feature or one of its ancestors.
-        return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
-          systemUserId,
-          entity.submissionFeatureId,
-          entity.submissionId
-        );
 
       default:
         return false;
