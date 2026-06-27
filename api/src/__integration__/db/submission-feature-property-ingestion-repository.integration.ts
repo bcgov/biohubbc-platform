@@ -217,11 +217,12 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     await repo.populateResolvedPropertyStagingBySubmissionUploadId(uploadId, await getUploadBlueprintId(uploadId));
   }
 
-  /** Create a retired feature_property row that points to another feature_property. */
-  async function createRetiredPropertyAlias(
-    targetFeaturePropertyId: number | null,
+  /** Create a retired feature_type_property row that points to another assignment for the same feature type. */
+  async function createRetiredFeatureTypePropertyAlias(
+    targetFeatureTypePropertyId: number | null,
+    featureTypeName = 'sample_period',
     propertyTypeName = 'string'
-  ): Promise<{ featurePropertyId: number; propertyName: string }> {
+  ): Promise<{ featurePropertyId: number; featureTypePropertyId: number; propertyName: string }> {
     const systemUserId = connection.systemUserId();
     const propertyName = `test_retired_${Math.floor(Math.random() * 1_000_000_000)}`;
     const propertyTypeResult = await connection.sql(SQL`
@@ -237,24 +238,174 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         feature_property_type_id,
         name,
         display_name,
-        target_feature_property_id,
         record_effective_date,
-        record_end_date,
         create_user
       )
       VALUES (
         ${propertyTypeResult.rows[0].feature_property_type_id},
         ${propertyName},
         ${'Retired Test ' + propertyName},
-        ${targetFeaturePropertyId},
-        now(),
         now(),
         ${systemUserId}
       )
       RETURNING feature_property_id;
     `);
+    const featurePropertyId = result.rows[0].feature_property_id;
 
-    return { featurePropertyId: result.rows[0].feature_property_id, propertyName };
+    const featureTypePropertyResult = await connection.sql(SQL`
+      INSERT INTO feature_type_property (
+        feature_type_id,
+        feature_property_id,
+        target_feature_type_property_id,
+        record_effective_date,
+        record_end_date,
+        create_user
+      )
+      VALUES (
+        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
+        ${featurePropertyId},
+        ${targetFeatureTypePropertyId},
+        now(),
+        now(),
+        ${systemUserId}
+      )
+      RETURNING feature_type_property_id;
+    `);
+
+    return {
+      featurePropertyId,
+      featureTypePropertyId: featureTypePropertyResult.rows[0].feature_type_property_id,
+      propertyName
+    };
+  }
+
+  /** Retire one feature_type_property and point it to another assignment for the same feature type. */
+  async function retireFeatureTypePropertyAlias(
+    sourceFeatureTypePropertyId: number,
+    targetFeatureTypePropertyId: number
+  ): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE feature_type_property
+      SET
+        target_feature_type_property_id = ${targetFeatureTypePropertyId},
+        record_end_date = now()
+      WHERE feature_type_property_id = ${sourceFeatureTypePropertyId};
+    `);
+  }
+
+  /** Create one shared feature_property and attach it to multiple feature types in the default Blueprint. */
+  async function createSharedScalarFeatureTypeProperties(
+    featureTypeNames: string[],
+    propertyTypeName = 'string'
+  ): Promise<{
+    featurePropertyId: number;
+    propertyName: string;
+    assignments: Record<string, { featureTypePropertyId: number; blueprintFeatureTypePropertyId: number }>;
+  }> {
+    const systemUserId = connection.systemUserId();
+    const uniqueSuffix = Math.floor(Math.random() * 1_000_000_000);
+    const propertyName = `test_shared_${uniqueSuffix}`;
+    const propertyTypeResult = await connection.sql(SQL`
+      SELECT feature_property_type_id
+      FROM feature_property_type
+      WHERE name = ${propertyTypeName}
+        AND record_end_date IS NULL
+      LIMIT 1;
+    `);
+
+    const featurePropertyResult = await connection.sql(SQL`
+      INSERT INTO feature_property (
+        feature_property_type_id,
+        name,
+        display_name,
+        record_effective_date,
+        create_user
+      )
+      VALUES (
+        ${propertyTypeResult.rows[0].feature_property_type_id},
+        ${propertyName},
+        ${'Shared Test ' + uniqueSuffix},
+        now(),
+        ${systemUserId}
+      )
+      RETURNING feature_property_id;
+    `);
+    const featurePropertyId = featurePropertyResult.rows[0].feature_property_id;
+    const assignments: Record<string, { featureTypePropertyId: number; blueprintFeatureTypePropertyId: number }> = {};
+
+    for (const featureTypeName of featureTypeNames) {
+      const featureTypePropertyResult = await connection.sql(SQL`
+        INSERT INTO feature_type_property (
+          feature_type_id,
+          feature_property_id,
+          record_effective_date,
+          create_user
+        )
+        VALUES (
+          (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
+          ${featurePropertyId},
+          now(),
+          ${systemUserId}
+        )
+        RETURNING feature_type_property_id;
+      `);
+      const featureTypePropertyId = featureTypePropertyResult.rows[0].feature_type_property_id;
+
+      const blueprintFeatureTypeResult = await connection.sql(SQL`
+        WITH inserted AS (
+          INSERT INTO blueprint_feature_type (
+            blueprint_id,
+            feature_type_id,
+            create_user
+          )
+          VALUES (
+            (SELECT blueprint_id FROM blueprint WHERE is_default = true AND record_end_date IS NULL LIMIT 1),
+            (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
+            ${systemUserId}
+          )
+          ON CONFLICT (blueprint_id, feature_type_id)
+          WHERE record_end_date IS NULL
+          DO NOTHING
+          RETURNING blueprint_feature_type_id
+        )
+        SELECT blueprint_feature_type_id FROM inserted
+        UNION ALL
+        SELECT bft.blueprint_feature_type_id
+        FROM blueprint_feature_type bft
+        JOIN blueprint b USING (blueprint_id)
+        JOIN feature_type ft USING (feature_type_id)
+        WHERE b.is_default = true
+          AND b.record_end_date IS NULL
+          AND bft.record_end_date IS NULL
+          AND ft.name = ${featureTypeName}
+        LIMIT 1;
+      `);
+
+      const blueprintFeatureTypePropertyResult = await connection.sql(SQL`
+        INSERT INTO blueprint_feature_type_property (
+          blueprint_feature_type_id,
+          feature_type_property_id,
+          required_value,
+          allow_multiple,
+          create_user
+        )
+        VALUES (
+          ${blueprintFeatureTypeResult.rows[0].blueprint_feature_type_id},
+          ${featureTypePropertyId},
+          false,
+          false,
+          ${systemUserId}
+        )
+        RETURNING blueprint_feature_type_property_id;
+      `);
+
+      assignments[featureTypeName] = {
+        featureTypePropertyId,
+        blueprintFeatureTypePropertyId: blueprintFeatureTypePropertyResult.rows[0].blueprint_feature_type_property_id
+      };
+    }
+
+    return { featurePropertyId, propertyName, assignments };
   }
 
   /** Create a non-default Blueprint containing one feature type and one property assignment. */
@@ -363,21 +514,21 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
     return result.rows;
   }
 
-  // --- feature_property target compatibility -------------------------------
+  // --- feature_type_property target compatibility --------------------------
 
-  describe('feature_property target compatibility', () => {
-    it('enforces that only retired feature properties can point at a target', async () => {
-      const { featurePropertyId } = await createScalarFeatureTypeProperty(connection, 'sample_period');
+  describe('feature_type_property target compatibility', () => {
+    it('enforces that only retired feature type properties can point at a target', async () => {
+      const { featureTypePropertyId } = await createScalarFeatureTypeProperty(connection, 'sample_period');
       const active = await createScalarFeatureTypeProperty(connection, 'sample_period');
 
       await connection.sql(SQL`SAVEPOINT before_invalid_target;`);
       try {
         await connection.sql(SQL`
-          UPDATE feature_property
-          SET target_feature_property_id = ${featurePropertyId}
-          WHERE feature_property_id = ${active.featurePropertyId};
+          UPDATE feature_type_property
+          SET target_feature_type_property_id = ${featureTypePropertyId}
+          WHERE feature_type_property_id = ${active.featureTypePropertyId};
         `);
-        expect.fail('Expected active feature_property target update to fail');
+        expect.fail('Expected active feature_type_property target update to fail');
       } catch (error) {
         expect((error as Error).message).to.include('Failed to execute SQL');
       } finally {
@@ -387,11 +538,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('indexes a retired property name under the active target property', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featurePropertyId, featureTypePropertyId } = await createScalarFeatureTypeProperty(
-        connection,
-        'sample_period'
-      );
-      const retired = await createRetiredPropertyAlias(featurePropertyId);
+      const { featureTypePropertyId } = await createScalarFeatureTypeProperty(connection, 'sample_period');
+      const retired = await createRetiredFeatureTypePropertyAlias(featureTypePropertyId);
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
           source_id: 'period-1',
@@ -423,11 +571,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('indexes an old tarball property key under the target property when the selected Blueprint assigns only the target', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featurePropertyId, featureTypePropertyId } = await createScalarFeatureTypeProperty(
-        connection,
-        'sample_period'
-      );
-      const retired = await createRetiredPropertyAlias(featurePropertyId);
+      const { featureTypePropertyId } = await createScalarFeatureTypeProperty(connection, 'sample_period');
+      const retired = await createRetiredFeatureTypePropertyAlias(featureTypePropertyId);
       const { blueprintId, blueprintFeatureTypePropertyId } = await createSinglePropertyBlueprint(
         'sample_period',
         featureTypePropertyId
@@ -458,6 +603,80 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       expect(rows.rows[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
     });
 
+    it('forwards a shared raw property name only for the feature type whose assignment is retired', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const shared = await createSharedScalarFeatureTypeProperties(['sample_period', 'survey']);
+      const targetProperty = await createScalarFeatureTypeProperty(connection, 'sample_period');
+      await retireFeatureTypePropertyAlias(
+        shared.assignments.sample_period.featureTypePropertyId,
+        targetProperty.featureTypePropertyId
+      );
+      await connection.sql(SQL`
+        UPDATE blueprint_feature_type_property
+        SET record_end_date = now()
+        WHERE feature_type_property_id = ${shared.assignments.sample_period.featureTypePropertyId}
+          AND record_end_date IS NULL;
+      `);
+
+      const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
+        {
+          source_id: 'period-1',
+          data: { properties: { [shared.propertyName]: 'sample value' } }
+        }
+      ]);
+      await connection.sql(SQL`
+        INSERT INTO submission_feature (
+          submission_id,
+          submission_upload_id,
+          feature_type_id,
+          source_id,
+          record_effective_date,
+          data,
+          create_user
+        )
+        VALUES (
+          ${submissionId},
+          ${uploadId}::uuid,
+          (SELECT feature_type_id FROM feature_type WHERE name = 'survey' LIMIT 1),
+          'survey-1',
+          now(),
+          ${JSON.stringify({ properties: { [shared.propertyName]: 'survey value' } })}::jsonb,
+          ${connection.systemUserId()}
+        );
+      `);
+
+      await populateResolvedProperties(uploadId);
+      await repo.populateTypedPropertyValueStagingBySubmissionUploadId(uploadId);
+      await repo.insertStringPropertiesBySubmissionUploadId(uploadId);
+
+      const rows = await connection.sql(SQL`
+        SELECT sf.source_id, sfps.value, sfps.feature_type_property_id, sfps.blueprint_feature_type_property_id
+        FROM submission_feature_property_string sfps
+        JOIN submission_feature sf
+          ON sf.submission_feature_id = sfps.submission_feature_id
+        WHERE sf.submission_upload_id = ${uploadId}::uuid
+        ORDER BY sf.source_id;
+      `);
+
+      expect(rows.rows).to.deep.equal([
+        {
+          source_id: 'period-1',
+          value: 'sample value',
+          feature_type_property_id: targetProperty.featureTypePropertyId,
+          blueprint_feature_type_property_id: await getBlueprintFeatureTypePropertyId(
+            await getUploadBlueprintId(uploadId),
+            targetProperty.featureTypePropertyId
+          )
+        },
+        {
+          source_id: 'survey-1',
+          value: 'survey value',
+          feature_type_property_id: shared.assignments.survey.featureTypePropertyId,
+          blueprint_feature_type_property_id: shared.assignments.survey.blueprintFeatureTypePropertyId
+        }
+      ]);
+    });
+
     it('indexes an old tarball property key under the retired property when the selected Blueprint still assigns it', async () => {
       const submissionId = await createTestSubmission(connection);
       const oldProperty = await createScalarFeatureTypeProperty(connection, 'sample_period');
@@ -467,13 +686,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         oldProperty.featureTypePropertyId
       );
 
-      await connection.sql(SQL`
-        UPDATE feature_property
-        SET
-          target_feature_property_id = ${newProperty.featurePropertyId},
-          record_end_date = now()
-        WHERE feature_property_id = ${oldProperty.featurePropertyId};
-      `);
+      await retireFeatureTypePropertyAlias(oldProperty.featureTypePropertyId, newProperty.featureTypePropertyId);
 
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
@@ -510,14 +723,8 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
         oldProperty.featureTypePropertyId
       );
 
-      await connection.sql(SQL`
-        UPDATE feature_property
-        SET
-          target_feature_property_id = ${newProperty.featurePropertyId},
-          record_end_date = now()
-        WHERE feature_property_id = ${oldProperty.featurePropertyId};
-      `);
-      const legacy = await createRetiredPropertyAlias(oldProperty.featurePropertyId);
+      await retireFeatureTypePropertyAlias(oldProperty.featureTypePropertyId, newProperty.featureTypePropertyId);
+      const legacy = await createRetiredFeatureTypePropertyAlias(oldProperty.featureTypePropertyId);
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
           source_id: 'period-1',
@@ -546,12 +753,9 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('resolves a chain of retired property names to the first property in the chain assigned by the selected Blueprint', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featurePropertyId, featureTypePropertyId } = await createScalarFeatureTypeProperty(
-        connection,
-        'sample_period'
-      );
-      const intermediate = await createRetiredPropertyAlias(featurePropertyId);
-      const legacy = await createRetiredPropertyAlias(intermediate.featurePropertyId);
+      const { featureTypePropertyId } = await createScalarFeatureTypeProperty(connection, 'sample_period');
+      const intermediate = await createRetiredFeatureTypePropertyAlias(featureTypePropertyId);
+      const legacy = await createRetiredFeatureTypePropertyAlias(intermediate.featureTypePropertyId);
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
           source_id: 'period-1',
@@ -578,7 +782,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records a validation error for a retired known property without an active target', async () => {
       const submissionId = await createTestSubmission(connection);
-      const retired = await createRetiredPropertyAlias(null);
+      const retired = await createRetiredFeatureTypePropertyAlias(null);
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
           source_id: 'period-1',
@@ -610,13 +814,13 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('allows a required active property to be satisfied by a retired alias', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featurePropertyId, featureTypePropertyId } = await createScalarFeatureTypeProperty(
+      const { featureTypePropertyId } = await createScalarFeatureTypeProperty(
         connection,
         'sample_period',
         'string',
         true
       );
-      const retired = await createRetiredPropertyAlias(featurePropertyId);
+      const retired = await createRetiredFeatureTypePropertyAlias(featureTypePropertyId);
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {
           source_id: 'period-1',
@@ -645,13 +849,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
       const oldProperty = await createScalarFeatureTypeProperty(connection, 'sample_period', 'string', true);
       const newProperty = await createScalarFeatureTypeProperty(connection, 'sample_period');
 
-      await connection.sql(SQL`
-        UPDATE feature_property
-        SET
-          target_feature_property_id = ${newProperty.featurePropertyId},
-          record_end_date = now()
-        WHERE feature_property_id = ${oldProperty.featurePropertyId};
-      `);
+      await retireFeatureTypePropertyAlias(oldProperty.featureTypePropertyId, newProperty.featureTypePropertyId);
 
       const uploadId = await createTestUploadWithFeatures(connection, submissionId, 'sample_period', [
         {

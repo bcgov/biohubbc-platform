@@ -218,19 +218,21 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
    * properties are kept with a null id for later reporting.
    *
-   * Target behavior is intentionally Blueprint-scoped:
+   * Target behavior is intentionally feature-type and Blueprint-scoped:
    *
-   * - The raw tarball key starts the alias chain at the matching `feature_property.name`.
-   * - Each retired property may point forward through `feature_property.target_feature_property_id`.
-   * - The chain stops at the first property that the selected Blueprint assigns for the raw feature's
-   *   feature type.
+   * - The raw tarball key starts the alias chain at the matching feature-type property assignment
+   *   (`submission feature_type_id` + `feature_property.name`).
+   * - Each retired feature-type property may point forward through
+   *   `feature_type_property.target_feature_type_property_id`.
+   * - The chain stops at the first feature-type property that the selected Blueprint assigns for the
+   *   raw feature's feature type.
    * - The inserted typed row uses that Blueprint-assigned `feature_type_property_id` exactly.
    *
    * This means aliases let old tarballs succeed against newer Blueprints, but they do not silently
    * upgrade a submission beyond the selected Blueprint contract. If an old Blueprint still assigns a
-   * retired property, ingestion indexes that retired property. If a new Blueprint assigns the
-   * successor property, the same raw tarball key can index the successor. Truly unknown names remain
-   * unresolved and non-fatal, matching the raw-JSON preservation behavior.
+   * retired feature-type property, ingestion indexes that retired assignment. If a new Blueprint
+   * assigns the successor assignment, the same raw tarball key can index the successor. Truly unknown
+   * names remain unresolved and non-fatal, matching the raw-JSON preservation behavior.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
@@ -241,67 +243,75 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     blueprintId: number
   ): Promise<void> {
     const sql = SQL`
-      WITH RECURSIVE selected_blueprint AS (
-        SELECT ${blueprintId}::integer AS blueprint_id
-      ),
-      raw_property_names AS (
+      WITH RECURSIVE raw_property_names AS (
         -- Scope alias resolution to property keys that actually appear in this upload. This keeps
-        -- pgboss ingestion set-based without walking the entire global feature_property catalog.
-        SELECT DISTINCT property_name
+        -- pgboss ingestion set-based without walking the entire feature_type_property catalog.
+        SELECT DISTINCT feature_type_id, property_name
         FROM submission_upload_staging_raw_property
         WHERE submission_upload_id = ${submissionUploadId}::uuid
       ),
       property_seed AS (
-        SELECT DISTINCT ON (rpn.property_name)
+        SELECT DISTINCT ON (rpn.feature_type_id, rpn.property_name)
+          rpn.feature_type_id,
           rpn.property_name,
-          fp.feature_property_id AS source_feature_property_id,
-          fp.feature_property_id AS current_feature_property_id,
-          fp.target_feature_property_id,
-          fp.record_end_date,
-          ARRAY[fp.feature_property_id] AS path
+          ftp.feature_type_property_id AS source_feature_type_property_id,
+          ftp.feature_type_property_id AS current_feature_type_property_id,
+          ftp.target_feature_type_property_id,
+          ftp.record_end_date,
+          ARRAY[ftp.feature_type_property_id] AS path
         FROM raw_property_names rpn
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_id = rpn.feature_type_id
         JOIN feature_property fp
-          ON fp.name = rpn.property_name
+          ON fp.feature_property_id = ftp.feature_property_id
+         AND fp.name = rpn.property_name
         ORDER BY
+          rpn.feature_type_id,
           rpn.property_name,
-          -- Prefer an active property if one exists for the raw key; otherwise use the most recently
-          -- retired row as the start of the backwards-compatibility chain.
-          CASE WHEN fp.record_end_date IS NULL THEN 0 ELSE 1 END,
-          fp.record_end_date DESC NULLS FIRST,
-          fp.feature_property_id DESC
+          -- Prefer an active feature-type property if one exists for the raw key; otherwise use the
+          -- most recently retired assignment as the start of the backwards-compatibility chain.
+          CASE WHEN ftp.record_end_date IS NULL THEN 0 ELSE 1 END,
+          ftp.record_end_date DESC NULLS FIRST,
+          ftp.feature_type_property_id DESC
       ),
       property_resolution AS (
         SELECT
+          ps.feature_type_id,
           ps.property_name,
-          ps.source_feature_property_id,
-          ps.current_feature_property_id,
-          ps.target_feature_property_id,
+          ps.source_feature_type_property_id,
+          ps.current_feature_type_property_id,
+          ps.target_feature_type_property_id,
           ps.record_end_date,
           0 AS depth,
           ps.path
         FROM property_seed ps
         UNION ALL
         SELECT
+          pr.feature_type_id,
           pr.property_name,
-          pr.source_feature_property_id,
-          fp_next.feature_property_id AS current_feature_property_id,
-          fp_next.target_feature_property_id,
-          fp_next.record_end_date,
+          pr.source_feature_type_property_id,
+          ftp_next.feature_type_property_id AS current_feature_type_property_id,
+          ftp_next.target_feature_type_property_id,
+          ftp_next.record_end_date,
           pr.depth + 1 AS depth,
-          pr.path || fp_next.feature_property_id AS path
+          pr.path || ftp_next.feature_type_property_id AS path
         FROM property_resolution pr
-        JOIN feature_property fp_next
-          ON fp_next.feature_property_id = pr.target_feature_property_id
-        WHERE pr.target_feature_property_id IS NOT NULL
+        JOIN feature_type_property ftp_next
+          ON ftp_next.feature_type_property_id = pr.target_feature_type_property_id
+         AND ftp_next.feature_type_id = pr.feature_type_id
+        WHERE pr.target_feature_type_property_id IS NOT NULL
           -- Defensive cycle guard. The migration prevents direct self-targeting, but this protects
           -- ingestion from longer accidental cycles.
-          AND NOT fp_next.feature_property_id = ANY(pr.path)
+          AND NOT ftp_next.feature_type_property_id = ANY(pr.path)
           AND pr.depth < 25
+      ),
+      selected_blueprint AS (
+        SELECT ${blueprintId}::integer AS blueprint_id
       ),
       blueprint_properties AS (
         -- The selected Blueprint is the canonical indexing contract. This deliberately includes
-        -- retired feature_property rows when the Blueprint still assigns them; older Blueprints must
-        -- keep indexing exactly what they declare.
+        -- retired feature-type-property rows when the Blueprint still assigns them; older Blueprints
+        -- must keep indexing exactly what they declare.
         SELECT
           bft.feature_type_id,
           ftp.feature_type_property_id,
@@ -320,7 +330,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = bftp.feature_type_property_id
          AND ftp.feature_type_id = bft.feature_type_id
-         AND ftp.record_end_date IS NULL
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
         JOIN feature_property_type fpt
@@ -360,9 +369,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         SELECT bp.*
         FROM property_resolution pr
         JOIN blueprint_properties bp
-          ON bp.feature_type_id = s.feature_type_id
-         AND bp.feature_property_id = pr.current_feature_property_id
-        WHERE pr.property_name = s.property_name
+          ON bp.feature_type_property_id = pr.current_feature_type_property_id
+        WHERE pr.feature_type_id = s.feature_type_id
+          AND pr.property_name = s.property_name
         -- Choose the nearest match in the alias path. This is the core contract: aliases move forward
         -- only until the selected Blueprint can validate/index the property.
         ORDER BY pr.depth ASC
@@ -374,8 +383,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Record retired-property errors for raw property names that are known but cannot resolve to an
-   * active successor through `feature_property.target_feature_property_id`.
+   * Record retired-property errors for raw property names that are known for the raw feature type but
+   * cannot resolve to an active successor through `feature_type_property.target_feature_type_property_id`.
    *
    * This validation is intentionally independent of the selected Blueprint. Unknown property names
    * are ignored so the existing non-fatal raw JSONB preservation behavior remains unchanged, but a
@@ -386,67 +395,82 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @returns {Promise<void>}
    */
   async recordRetiredFeaturePropertyErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
+    const deleteSql = SQL`
+      DELETE FROM submission_feature_error
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND error_code = 'RETIRED_FEATURE_PROPERTY';
+    `;
+
+    const insertSql = SQL`
       WITH RECURSIVE raw_property_names AS (
         -- Only inspect keys present in this upload. Unknown names are ignored because they will not
-        -- produce a feature_property seed row.
-        SELECT DISTINCT property_name
+        -- produce a feature_type_property seed row for the raw feature type.
+        SELECT DISTINCT feature_type_id, property_name
         FROM submission_upload_staging_raw_property
         WHERE submission_upload_id = ${submissionUploadId}::uuid
       ),
       property_seed AS (
-        SELECT DISTINCT ON (rpn.property_name)
+        SELECT DISTINCT ON (rpn.feature_type_id, rpn.property_name)
+          rpn.feature_type_id,
           rpn.property_name,
-          fp.feature_property_id AS source_feature_property_id,
-          fp.feature_property_id AS current_feature_property_id,
-          fp.target_feature_property_id,
-          fp.record_end_date,
-          ARRAY[fp.feature_property_id] AS path
+          ftp.feature_type_property_id AS source_feature_type_property_id,
+          ftp.feature_type_property_id AS current_feature_type_property_id,
+          ftp.target_feature_type_property_id,
+          ftp.record_end_date,
+          ARRAY[ftp.feature_type_property_id] AS path
         FROM raw_property_names rpn
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_id = rpn.feature_type_id
         JOIN feature_property fp
-          ON fp.name = rpn.property_name
+          ON fp.feature_property_id = ftp.feature_property_id
+         AND fp.name = rpn.property_name
         ORDER BY
+          rpn.feature_type_id,
           rpn.property_name,
-          CASE WHEN fp.record_end_date IS NULL THEN 0 ELSE 1 END,
-          fp.record_end_date DESC NULLS FIRST,
-          fp.feature_property_id DESC
+          CASE WHEN ftp.record_end_date IS NULL THEN 0 ELSE 1 END,
+          ftp.record_end_date DESC NULLS FIRST,
+          ftp.feature_type_property_id DESC
       ),
       property_resolution AS (
         SELECT
+          ps.feature_type_id,
           ps.property_name,
-          ps.source_feature_property_id,
-          ps.current_feature_property_id,
-          ps.target_feature_property_id,
+          ps.source_feature_type_property_id,
+          ps.current_feature_type_property_id,
+          ps.target_feature_type_property_id,
           ps.record_end_date,
           0 AS depth,
           ps.path
         FROM property_seed ps
         UNION ALL
         SELECT
+          pr.feature_type_id,
           pr.property_name,
-          pr.source_feature_property_id,
-          fp_next.feature_property_id AS current_feature_property_id,
-          fp_next.target_feature_property_id,
-          fp_next.record_end_date,
+          pr.source_feature_type_property_id,
+          ftp_next.feature_type_property_id AS current_feature_type_property_id,
+          ftp_next.target_feature_type_property_id,
+          ftp_next.record_end_date,
           pr.depth + 1 AS depth,
-          pr.path || fp_next.feature_property_id AS path
+          pr.path || ftp_next.feature_type_property_id AS path
         FROM property_resolution pr
-        JOIN feature_property fp_next
-          ON fp_next.feature_property_id = pr.target_feature_property_id
-        WHERE pr.target_feature_property_id IS NOT NULL
-          AND NOT fp_next.feature_property_id = ANY(pr.path)
+        JOIN feature_type_property ftp_next
+          ON ftp_next.feature_type_property_id = pr.target_feature_type_property_id
+         AND ftp_next.feature_type_id = pr.feature_type_id
+        WHERE pr.target_feature_type_property_id IS NOT NULL
+          AND NOT ftp_next.feature_type_property_id = ANY(pr.path)
           AND pr.depth < 25
       ),
       property_name_resolution AS (
         SELECT
+          ps.feature_type_id,
           ps.property_name,
-          ps.source_feature_property_id,
-          resolved.current_feature_property_id AS resolved_feature_property_id
+          ps.source_feature_type_property_id,
+          resolved.current_feature_type_property_id AS resolved_feature_type_property_id
         FROM property_seed ps
         LEFT JOIN LATERAL (
-          SELECT pr.current_feature_property_id
+          SELECT pr.current_feature_type_property_id
           FROM property_resolution pr
-          WHERE pr.source_feature_property_id = ps.source_feature_property_id
+          WHERE pr.source_feature_type_property_id = ps.source_feature_type_property_id
             AND pr.record_end_date IS NULL
           ORDER BY pr.depth DESC
           LIMIT 1
@@ -462,9 +486,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           COUNT(*)::integer AS count
         FROM submission_upload_staging_raw_property s
         JOIN property_name_resolution pnr
-          ON pnr.property_name = s.property_name
+          ON pnr.feature_type_id = s.feature_type_id
+         AND pnr.property_name = s.property_name
         WHERE s.submission_upload_id = ${submissionUploadId}::uuid
-          AND pnr.resolved_feature_property_id IS NULL
+          AND pnr.resolved_feature_type_property_id IS NULL
         GROUP BY s.submission_upload_id, s.property_name
       )
       INSERT INTO submission_feature_error (
@@ -484,20 +509,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         error_message,
         count,
         NULL::jsonb
-      FROM grouped_errors
-      ON CONFLICT (
-        submission_upload_id,
-        error_code,
-        feature_type_property_id,
-        property_name
-      )
-      DO UPDATE SET
-        count = submission_feature_error.count + EXCLUDED.count,
-        error_message = EXCLUDED.error_message,
-        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+      FROM grouped_errors;
     `;
 
-    await this.connection.sql(sql);
+    await this.connection.sql(deleteSql);
+    await this.connection.sql(insertSql);
   }
 
   /**
@@ -1273,7 +1289,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = bftp.feature_type_property_id
          AND ftp.feature_type_id = bft.feature_type_id
-         AND ftp.record_end_date IS NULL
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
         JOIN upload_feature_types uft

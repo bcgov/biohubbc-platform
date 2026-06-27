@@ -421,14 +421,14 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('bp.blueprint_feature_type_property_id');
       expect(sqlText).to.include('WITH RECURSIVE');
       expect(sqlText).to.include('raw_property_names AS');
-      expect(sqlText).to.include('SELECT DISTINCT property_name');
+      expect(sqlText).to.include('SELECT DISTINCT feature_type_id, property_name');
       expect(sqlText).to.include('FROM submission_upload_staging_raw_property');
       expect(sqlText).to.include('property_seed AS');
       expect(sqlText).to.include('property_resolution AS');
-      expect(sqlText).to.include('target_feature_property_id');
+      expect(sqlText).to.include('target_feature_type_property_id');
       expect(sqlText).to.include('blueprint_properties AS');
       expect(sqlText).to.include('JOIN blueprint_properties bp');
-      expect(sqlText).to.include('bp.feature_property_id = pr.current_feature_property_id');
+      expect(sqlText).to.include('bp.feature_type_property_id = pr.current_feature_type_property_id');
       // Nearest match wins: the alias chain must stop at the first property assigned by the selected
       // Blueprint, not always continue to the final active target.
       expect(sqlText).to.include('ORDER BY pr.depth ASC');
@@ -475,17 +475,20 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
       await repository.recordRetiredFeaturePropertyErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
-      expect(sqlStub.calledOnce).to.equal(true);
-      const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('WITH RECURSIVE raw_property_names AS');
-      expect(sqlText).to.include('SELECT DISTINCT property_name');
-      expect(sqlText).to.include('property_seed AS');
-      expect(sqlText).to.include('property_resolution AS');
-      expect(sqlText).to.include('target_feature_property_id');
-      expect(sqlText).to.include('JOIN property_name_resolution pnr');
-      expect(sqlText).to.include('pnr.resolved_feature_property_id IS NULL');
-      expect(sqlText).to.include("'RETIRED_FEATURE_PROPERTY'");
-      expect(sqlText).to.include('ON CONFLICT');
+      expect(sqlStub.calledTwice).to.equal(true);
+      const deleteSqlText = sqlStub.firstCall.args[0].text as string;
+      const insertSqlText = sqlStub.secondCall.args[0].text as string;
+      expect(deleteSqlText).to.include('DELETE FROM submission_feature_error');
+      expect(deleteSqlText).to.include("error_code = 'RETIRED_FEATURE_PROPERTY'");
+      expect(insertSqlText).to.include('WITH RECURSIVE raw_property_names AS');
+      expect(insertSqlText).to.include('SELECT DISTINCT feature_type_id, property_name');
+      expect(insertSqlText).to.include('property_seed AS');
+      expect(insertSqlText).to.include('property_resolution AS');
+      expect(insertSqlText).to.include('target_feature_type_property_id');
+      expect(insertSqlText).to.include('JOIN property_name_resolution pnr');
+      expect(insertSqlText).to.include('pnr.resolved_feature_type_property_id IS NULL');
+      expect(insertSqlText).to.include("'RETIRED_FEATURE_PROPERTY'");
+      expect(insertSqlText).to.not.include('ON CONFLICT');
     });
   });
 

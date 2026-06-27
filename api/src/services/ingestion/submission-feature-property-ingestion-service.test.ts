@@ -79,6 +79,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         'recordMissingRequiredPropertyErrorsBySubmissionUploadId'
       )
       .resolves();
+    const retiredPropertyStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordRetiredFeaturePropertyErrorsBySubmissionUploadId'
+      )
+      .resolves();
     const primitiveStub = sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
@@ -186,6 +192,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       stageStub,
       deleteErrorsStub,
       requiredStub,
+      retiredPropertyStub,
       primitiveStub,
       codeErrorsStub,
       taxonErrorsStub,
@@ -264,6 +271,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
         'recordMissingRequiredPropertyErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordRetiredFeaturePropertyErrorsBySubmissionUploadId'
       )
       .resolves();
     sinon
