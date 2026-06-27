@@ -1,10 +1,10 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
 import {
-  insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionRecord,
   insertSubmissionUploadRecord,
+  insertSurveyRecord,
   insertTelemetryRecord,
   insertUploadRecord
 } from './04_mock_test_data';
@@ -133,7 +133,7 @@ const createSubmissionWithUploads = async (
   const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
 
   // --- 3. Create features (requires submission_upload_id for FK) ---
-  const parent_feature_id = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
+  const parent_feature_id = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
   const sampleSiteIds = await Promise.all([
     insertSampleSiteRecord(knex, {
       submission_id,

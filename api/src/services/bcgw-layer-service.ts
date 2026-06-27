@@ -79,7 +79,7 @@ export class BcgwLayerService {
    *
    * @param {string} geometry a WKT geometry string. Must already be in the SRID that matches the ENV layer.
    * @return {*}  {Promise<string[]>}
-   * @memberof DatasetRegionService
+   * @memberof BcgwRegionService
    */
   async getEnvRegionNames(geometry: string): Promise<string[]> {
     const responseXml = await this.webFeatureService.getPropertyValue({
@@ -101,7 +101,7 @@ export class BcgwLayerService {
    *
    * @param {string} geometry a WKT geometry string. Must already be in the SRID that matches the NRM layer.
    * @return {*}  {Promise<string[]>}
-   * @memberof DatasetRegionService
+   * @memberof BcgwRegionService
    */
   async getNrmRegionNames(geometry: string): Promise<string[]> {
     const responseXml = await this.webFeatureService.getPropertyValue({

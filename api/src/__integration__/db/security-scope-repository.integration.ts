@@ -54,14 +54,14 @@ describe('SecurityScopeRepository (integration)', function () {
     });
 
     it('should return null on duplicate scope_hash (ON CONFLICT DO NOTHING)', async () => {
-      const scopeHash = computeScopeHash('urn:10:dataset:*');
+      const scopeHash = computeScopeHash('urn:10:survey:*');
 
       // First insert succeeds
-      const first = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:dataset:*'));
+      const first = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:survey:*'));
       expect(first).to.not.be.null;
 
       // Second insert with same hash returns null
-      const second = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:dataset:*'));
+      const second = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:survey:*'));
       expect(second).to.be.null;
     });
   });

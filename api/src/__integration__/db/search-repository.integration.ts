@@ -241,8 +241,8 @@ describe('SearchRepository (integration)', function () {
     it('matches string-property values (baseline corpus)', async () => {
       const keyword = `${TOKEN}_stringbase`;
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset alpha' });
-      await addStringProperty(featureId, 'dataset', 'description', `moose habitat near ${keyword}`);
+      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Survey alpha' });
+      await addStringProperty(featureId, 'survey', 'description', `moose habitat near ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -418,20 +418,20 @@ describe('SearchRepository (integration)', function () {
     });
 
     it('counts a code-arm match (records/summary parity)', async () => {
-      // Summary only counts priority types (dataset, species_observation, telemetry, report).
-      // Verify the code corpus widening reaches the summary by seeding a `dataset` feature that
+      // Summary only counts priority types (survey, species_observation, telemetry, report).
+      // Verify the code corpus widening reaches the summary by seeding a `survey` feature that
       // matches only via the code arm.
       const keyword = `${TOKEN}_summary_code`;
       const codeId = await createCodesetCode('summarycode', `${keyword} Agency`, null);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Summary dataset' });
-      await addCodeProperty(featureId, 'dataset', 'description', codeId);
+      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
+      await addCodeProperty(featureId, 'survey', 'description', codeId);
 
       const summary = await repo.findFeatureSummary({ keyword });
       const records = await findFeatures(keyword);
 
-      const dataset = summary.find((s) => s.feature_type_name === 'dataset');
-      expect(dataset?.total).to.equal(1);
+      const survey = summary.find((s) => s.feature_type_name === 'survey');
+      expect(survey?.total).to.equal(1);
       expect(records.total).to.equal(1);
       expect(records.data[0].submission_feature_id).to.equal(featureId);
     });

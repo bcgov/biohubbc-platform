@@ -212,7 +212,7 @@ export async function seed(knex: Knex): Promise<void> {
   /** ------------------------------------------------------------------
    * 3. SECURE FEATURES + WIRE SCOPE TABLES
    *
-   * Mark some seeded dataset features as secured so the lock icon
+   * Mark some seeded survey features as secured so the lock icon
    * appears in the search UI. Then wire the normalized scope tables
    * (security_scope → security_scope_anchor → team_security_scope)
    * so that team members can access them.
@@ -220,17 +220,17 @@ export async function seed(knex: Knex): Promise<void> {
    * Pattern mirrors docs/SIMSBIOHUB-914/sql/scale-data-scopes.sql
    * ------------------------------------------------------------------ */
 
-  // 3a. Mark the first 3 dataset features as secured.
+  // 3a. Mark the first 3 survey features as secured.
   //     Resolve IDs dynamically instead of hardcoding (IDs are not stable across environments).
-  const securedDatasetRows = await knex('submission_feature as sf')
+  const securedSurveyRows = await knex('submission_feature as sf')
     .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-    .where('ft.name', 'dataset')
+    .where('ft.name', 'survey')
     .whereNull('sf.record_end_date')
     .orderBy('sf.submission_feature_id', 'asc')
     .select('sf.submission_feature_id')
     .limit(3);
 
-  const securedDatasetIds = securedDatasetRows.map((row) => row.submission_feature_id);
+  const securedSurveyIds = securedSurveyRows.map((row) => row.submission_feature_id);
 
   // Use first security rule available
   const firstRule = await knex('security_rule').whereNull('record_end_date').select('security_rule_id').first();
@@ -238,7 +238,7 @@ export async function seed(knex: Knex): Promise<void> {
     return; // no security rules seeded — skip scope wiring
   }
 
-  for (const featureId of securedDatasetIds) {
+  for (const featureId of securedSurveyIds) {
     const exists = await knex('submission_feature_security')
       .where({ submission_feature_id: featureId, security_rule_id: firstRule.security_rule_id })
       .first();
@@ -278,8 +278,8 @@ export async function seed(knex: Knex): Promise<void> {
         .update({ security_scope_id: scope.security_scope_id });
     }
 
-    // Anchor the scope to each secured dataset
-    for (const featureId of securedDatasetIds) {
+    // Anchor the scope to each secured survey
+    for (const featureId of securedSurveyIds) {
       const anchorExists = await knex('security_scope_anchor')
         .where({ security_scope_id: scope.security_scope_id, anchor_submission_feature_id: featureId })
         .first();

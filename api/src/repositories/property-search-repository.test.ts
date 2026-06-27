@@ -87,12 +87,12 @@ describe('PropertySearchRepository', () => {
 
       const repo = new PropertySearchRepository(mockDBConnection);
 
-      await repo.searchProperties({ keyword: 'name', feature_types: ['dataset'] });
+      await repo.searchProperties({ keyword: 'name', feature_types: ['survey'] });
 
       expect(sql).to.include('distinct');
       expect(sql).to.include('"feature_type_property" as "ftp"');
       expect(sql).to.include('"feature_type" as "ft"');
-      expect(sql).to.include('"ft"."name" in (\'dataset\')');
+      expect(sql).to.include('"ft"."name" in (\'survey\')');
       expect(sql).to.include('"ftp"."record_end_date" is null');
       expect(sql).to.include('"ft"."record_end_date" is null');
     });

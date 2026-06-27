@@ -7,7 +7,7 @@ import DashboardPage from './DashboardPage';
 vi.mock('../../../hooks/useApi');
 
 const mockUseApi = {
-  dataset: {
+  submissions: {
     getUnreviewedSubmissionsForAdmins: vi.fn()
   }
 };
@@ -32,7 +32,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders a page with no security reviews', async () => {
-    mockUseApi.dataset.getUnreviewedSubmissionsForAdmins.mockResolvedValue([]);
+    mockUseApi.submissions.getUnreviewedSubmissionsForAdmins.mockResolvedValue([]);
 
     const { getByTestId } = renderContainer();
 
@@ -42,11 +42,11 @@ describe('DashboardPage', () => {
   });
 
   it.skip('renders a page with a table of security reviews', async () => {
-    mockUseApi.dataset.getUnreviewedSubmissionsForAdmins.mockResolvedValue([
+    mockUseApi.submissions.getUnreviewedSubmissionsForAdmins.mockResolvedValue([
       {
-        dataset_id: 'UUID-1',
+        survey_id: 'UUID-1',
         artifacts_to_review: 6,
-        dataset_name: 'A Real Project',
+        survey_name: 'A Real Project',
         last_updated: '2023-05-25',
         keywords: ['PROJECT']
       }

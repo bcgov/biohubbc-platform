@@ -14,7 +14,7 @@ describe('search', () => {
   const mockPaginationTotal = 1;
   const mockSubmissionRow = { name: 'name', submission_id: 1, description: null };
   const mockFeatureRows = [
-    { feature_type_id: 1, feature_type_name: 'dataset', label: 'label', submission_feature_id: 1 },
+    { feature_type_id: 1, feature_type_name: 'survey', label: 'label', submission_feature_id: 1 },
     { feature_type_id: 2, feature_type_name: 'observation', label: 'label2', submission_feature_id: 2 }
   ];
 
@@ -72,7 +72,7 @@ describe('search', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { keyword: 'moose', feature_type_name: 'dataset', page: '1', limit: '2' };
+    mockReq.query = { keyword: 'moose', feature_type_name: 'survey', page: '1', limit: '2' };
 
     const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResultsWithData);
 
@@ -80,7 +80,7 @@ describe('search', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockSearch).to.have.been.calledOnceWith(
-      { keyword: 'moose', feature_type_name: 'dataset' },
+      { keyword: 'moose', feature_type_name: 'survey' },
       defaultPaginationNumbers
     );
 

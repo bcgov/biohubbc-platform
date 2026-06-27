@@ -430,7 +430,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   /**
    * Helper: consume a base-feature-row stream and hydrate each batch with typed property values.
-   * Collects the result into a flat array — fine for test-sized datasets.
+   * Collects the result into a flat array — fine for test-sized data sets.
    */
   async function hydrateFromStream(
     stream: AsyncGenerator<BaseFeatureRow[]>,
@@ -786,7 +786,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
     it('populates parent_uuid for child features', async () => {
       const submissionId = await createTestSubmission(connection);
-      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Parent DS' });
+      const parentFeatureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Parent DS' });
       // Returned id intentionally discarded — the test asserts on the parent_uuid
       // field of the hydrated capture row, not on its own id.
       await createTestFeature(connection, submissionId, 'capture', { comment: 'child' }, parentFeatureId);
@@ -830,7 +830,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
     it('falls back to JSONB for array properties', async () => {
       const submissionId = await createTestSubmission(connection);
-      const datasetFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
+      const surveyFeatureId = await createTestFeature(connection, submissionId, 'survey', {
         name: 'Array Test',
         properties: { focal_species: ['bear', 'elk'] }
       });
@@ -839,11 +839,11 @@ describe('Download Parquet pipeline (integration)', function () {
         { feature_property_name: 'focal_species', feature_property_type_name: 'array' }
       ];
 
-      const rows = await streamAndHydrateBySubmission(submissionId, 'dataset', properties, 'pq-array');
+      const rows = await streamAndHydrateBySubmission(submissionId, 'survey', properties, 'pq-array');
       expect(rows).to.have.length(1);
       expect(rows[0].data.focal_species).to.deep.equal(['bear', 'elk']);
       // Suppress unused-variable warning — the feature id keeps the helper output traceable in failures.
-      expect(datasetFeatureId).to.be.a('number');
+      expect(surveyFeatureId).to.be.a('number');
     });
 
     it('hydrates multiple features in same batch without cross-contamination', async () => {
@@ -872,7 +872,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
-      const downloadId = await createPolicyDownload(['dataset']);
+      const downloadId = await createPolicyDownload(['survey']);
       // Status lives on the version, so the download needs one to be findable, and
       // the transition keys off the version id.
       const downloadVersionId = await createDownloadVersionFor(downloadId);
@@ -937,8 +937,8 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
-      const downloadId = await createPolicyDownload(['dataset']);
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Happy path survey' });
+      const downloadId = await createPolicyDownload(['survey']);
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -947,8 +947,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -964,9 +964,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const artifact = artifactRows.rows[0];
       expect(artifact.format).to.equal('parquet');
       expect(artifact.artifact_status).to.equal('uploaded');
-      expect(artifact.object_key).to.equal(
-        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
-      );
+      expect(artifact.object_key).to.equal(`downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`);
       expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
       expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifact.byte_size)).to.be.at.least(0);
@@ -983,7 +981,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(linkRows.rowCount).to.equal(1);
       expect(linkRows.rows[0].artifact_id).to.equal(artifact.artifact_id);
       expect(linkRows.rows[0].download_version_id).to.equal(downloadVersionId);
-      expect(linkRows.rows[0].feature_type_name).to.equal('dataset');
+      expect(linkRows.rows[0].feature_type_name).to.equal('survey');
 
       // download status untouched — writeFeatureTypeParquet does not transition status
       const download = await downloadService.findDownloadById(downloadId);
@@ -994,8 +992,8 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
-      const downloadId = await createPolicyDownload(['dataset']);
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Retry survey' });
+      const downloadId = await createPolicyDownload(['survey']);
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -1005,8 +1003,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const afterFirst = await connection.sql(SQL`
@@ -1027,8 +1025,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const afterSecond = await connection.sql(SQL`
@@ -1049,9 +1047,9 @@ describe('Download Parquet pipeline (integration)', function () {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Multi DS' });
       await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
-      const downloadId = await createPolicyDownload(['dataset', 'capture']);
+      const downloadId = await createPolicyDownload(['survey', 'capture']);
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -1060,8 +1058,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
@@ -1084,7 +1082,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const objectKeys = artifactRows.rows.map((r: any) => r.object_key);
       expect(objectKeys).to.deep.equal([
         `downloads/${downloadId}/versions/${downloadVersionId}/capture/data.parquet`,
-        `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`
+        `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`
       ]);
       // Both rows link to the same materialized version
       for (const row of artifactRows.rows) {
@@ -1127,12 +1125,12 @@ describe('Download Parquet pipeline (integration)', function () {
       const unsecuredId = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       const securedId = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       await secureFeature(connection, securedId);
 
@@ -1141,7 +1139,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: `pq-sec-anon-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: null
       });
       const { download_id } = await downloadService.createDownload({
@@ -1152,7 +1150,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const source = await downloadRepo.getDownloadSource(download_id);
       expect(source.requested_by).to.be.null;
 
-      const ids = await selectedFeatureIds('dataset', source.requested_by);
+      const ids = await selectedFeatureIds('survey', source.requested_by);
       expect(ids.has(unsecuredId)).to.equal(true);
       expect(ids.has(securedId)).to.equal(false);
     });
@@ -1171,12 +1169,12 @@ describe('Download Parquet pipeline (integration)', function () {
       const unsecuredId = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       const securedId = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       await secureFeature(connection, securedId);
 
@@ -1188,7 +1186,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: `pq-sec-auth-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: null,
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expressionId: null
       });
       const { download_id } = await downloadService.createDownload({
@@ -1199,7 +1197,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const source = await downloadRepo.getDownloadSource(download_id);
       expect(source.requested_by).to.equal(userId);
 
-      const ids = await selectedFeatureIds('dataset', source.requested_by);
+      const ids = await selectedFeatureIds('survey', source.requested_by);
       expect(ids.has(unsecuredId)).to.equal(true);
       expect(ids.has(securedId)).to.equal(true);
     });

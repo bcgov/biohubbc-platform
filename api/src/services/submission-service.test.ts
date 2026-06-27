@@ -107,9 +107,9 @@ describe('SubmissionService', () => {
       const submissionFeatures: ISubmissionFeature[] = [
         {
           id: '1-1',
-          type: 'dataset',
+          type: 'survey',
           properties: {
-            name: 'Dataset1'
+            name: 'Survey1'
           },
           child_features: [
             {
@@ -210,9 +210,9 @@ describe('SubmissionService', () => {
         submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId: null,
         featureSourceId: '1-1',
-        featureTypeName: 'dataset',
+        featureTypeName: 'survey',
         featureProperties: {
-          name: 'Dataset1'
+          name: 'Survey1'
         },
         dataByteSizeBytes: 0
       });
@@ -433,7 +433,7 @@ describe('SubmissionService', () => {
           update_user: null,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         },
         {
@@ -450,7 +450,7 @@ describe('SubmissionService', () => {
           update_user: 1,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         }
       ];
@@ -487,7 +487,7 @@ describe('SubmissionService', () => {
           update_user: null,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         },
         {
@@ -504,7 +504,7 @@ describe('SubmissionService', () => {
           update_user: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         }
       ];
@@ -541,7 +541,7 @@ describe('SubmissionService', () => {
           update_user: null,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         },
         {
@@ -558,7 +558,7 @@ describe('SubmissionService', () => {
           update_user: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         }
       ];
@@ -595,7 +595,7 @@ describe('SubmissionService', () => {
           update_user: null,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset',
+          root_feature_type_name: 'survey',
           regions: []
         }
       ];
@@ -746,7 +746,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 1,
           uuid: '111-234-345',
           submission_id: submissionId,
-          urn: `urn:${submissionId}:dataset:1`,
+          urn: `urn:${submissionId}:survey:1`,
           feature_type_id: 2,
           source_id: 'source-id-1',
           data: {},
@@ -758,15 +758,15 @@ describe('SubmissionService', () => {
           update_date: null,
           update_user: null,
           revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
+          feature_type_name: 'survey',
+          feature_type_display_name: 'Survey',
           submission_feature_security_ids: []
         },
         {
           submission_feature_id: 2,
           uuid: '222-234-345',
           submission_id: submissionId,
-          urn: `urn:${submissionId}:dataset:2`,
+          urn: `urn:${submissionId}:survey:2`,
           feature_type_id: 2,
           source_id: 'source-id-2',
           data: {},
@@ -786,7 +786,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 3,
           uuid: '333-234-345',
           submission_id: submissionId,
-          urn: `urn:${submissionId}:dataset:3`,
+          urn: `urn:${submissionId}:survey:3`,
           feature_type_id: 2,
           source_id: 'source-id-3',
           data: {},
@@ -806,7 +806,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 4,
           uuid: '444-234-345',
           submission_id: submissionId,
-          urn: `urn:${submissionId}:dataset:4`,
+          urn: `urn:${submissionId}:survey:4`,
           feature_type_id: 3,
           source_id: 'source-id-4',
           data: {},
@@ -835,8 +835,8 @@ describe('SubmissionService', () => {
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnceWith(submissionId);
       expect(response).to.be.eql([
         {
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
+          feature_type_name: 'survey',
+          feature_type_display_name: 'Survey',
           features: [{ ...mockSubmissionRecords[0] }]
         },
         {
@@ -955,7 +955,7 @@ describe('SubmissionService', () => {
       const submissionFeature: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
-        urn: 'urn:3:dataset:2',
+        urn: 'urn:3:survey:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',
@@ -996,7 +996,7 @@ describe('SubmissionService', () => {
 
       const criteria = {
         submissionId: 1,
-        featureTypeNames: ['dataset', 'artifact']
+        featureTypeNames: ['survey', 'artifact']
       };
 
       const response = await submissionService.findSubmissionFeatures(criteria);

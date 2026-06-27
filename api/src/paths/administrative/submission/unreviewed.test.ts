@@ -62,7 +62,7 @@ describe('getUnreviewedSubmissionsForAdmins', () => {
         update_user: null,
         security: SECURITY_APPLIED_STATUS.PENDING,
         root_feature_type_id: 1,
-        root_feature_type_name: 'dataset',
+        root_feature_type_name: 'survey',
         regions: []
       },
       {
@@ -79,7 +79,7 @@ describe('getUnreviewedSubmissionsForAdmins', () => {
         update_user: 1,
         security: SECURITY_APPLIED_STATUS.PENDING,
         root_feature_type_id: 1,
-        root_feature_type_name: 'dataset',
+        root_feature_type_name: 'survey',
         regions: []
       }
     ];

@@ -63,16 +63,16 @@ import { createTestFeature, createTestSubmission } from '../helpers/test-submiss
 // Verified seed ids (checked against the live DB):
 //   feature_property name           = 31
 //   sample_site.name ftp            = 45
-//   dataset.name ftp                = 70
+//   survey.name ftp                = 70
 const FEATURE_PROPERTY_NAME_ID = 31;
 const SAMPLE_SITE_NAME_FTP_ID = 45;
-const DATASET_NAME_FTP_ID = 70;
+const SURVEY_NAME_FTP_ID = 70;
 
 /**
  * Build a normalized predicate clause that targets a string `name` property.
  *
  * `feature_property_id` stays 31 (the shared `name` feature_property); `featureTypePropertyId` selects
- * the typed slot to filter on (45 = sample_site.name, 70 = dataset.name). The predicate is intentionally
+ * the typed slot to filter on (45 = sample_site.name, 70 = survey.name). The predicate is intentionally
  * target-feature agnostic — it only identifies EVIDENCE features that carry the matching string row; the
  * evaluator then projects that evidence to the anchor type through the closure + content walk.
  */
@@ -188,7 +188,7 @@ describe('expression-evaluation (integration)', function () {
    *
    * The evaluator JOINs feature_type_property and reads from submission_feature_property_string; both must
    * agree on the typed slot. `featureTypePropertyId` defaults to sample_site.name (45); pass 70 for
-   * dataset.name. The slot here MUST match the one in the matching `namePredicate(...)`.
+   * survey.name. The slot here MUST match the one in the matching `namePredicate(...)`.
    */
   async function indexNameProperty(
     submissionFeatureId: number,
@@ -316,16 +316,16 @@ describe('expression-evaluation (integration)', function () {
   }
 
   /**
-   * Seed a `dataset → animal → capture` parent chain under ONE upload, index `name` on the dataset, and
+   * Seed a `survey → animal → capture` parent chain under ONE upload, index `name` on the survey, and
    * rebuild the closure. The common fixture for closure descendant/ancestor reach tests anchored on the
-   * dataset name.
+   * survey name.
    */
-  async function seedDatasetAnimalCaptureChain(
+  async function seedSurveyAnimalCaptureChain(
     name: string
   ): Promise<{ submissionId: number; uploadId: string; d: number; a: number; c: number }> {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
-    const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+    const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
     const a = await insertFeatureRow({
       submissionId,
       submissionUploadId: uploadId,
@@ -338,7 +338,7 @@ describe('expression-evaluation (integration)', function () {
       featureTypeName: 'capture',
       parentFeatureId: a
     });
-    await indexNameProperty(d, name, DATASET_NAME_FTP_ID);
+    await indexNameProperty(d, name, SURVEY_NAME_FTP_ID);
     await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
     return { submissionId, uploadId, d, a, c };
   }
@@ -533,18 +533,18 @@ describe('expression-evaluation (integration)', function () {
 
   describe('buildExpressionTreeFeatureIdsSubquery — closure + content-walk reachability', () => {
     /**
-     * Descendant reach (load-bearing reverse closure probe). D(dataset) ← A(animal) ← C(capture) under one
-     * upload; evidence = D (dataset.name). content_reach = {D}; closureReverse(D) = D's descendants = {A, C}.
+     * Descendant reach (load-bearing reverse closure probe). D(survey) ← A(animal) ← C(capture) under one
+     * upload; evidence = D (survey.name). content_reach = {D}; closureReverse(D) = D's descendants = {A, C}.
      * Anchor=capture isolates C. A FORWARD-ONLY probe would return EMPTY here — descendant reach exists only
      * because the closure is probed in BOTH directions.
      */
     it('1: descendant reach — anchor below evidence is recovered via closureReverse', async () => {
-      const { c } = await seedDatasetAnimalCaptureChain('Caribou Study');
+      const { c } = await seedSurveyAnimalCaptureChain('Caribou Study');
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('Caribou Study', DATASET_NAME_FTP_ID)]
+        clauses: [namePredicate('Caribou Study', SURVEY_NAME_FTP_ID)]
       };
       const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('capture', tree, connection.systemUserId()));
 
@@ -552,14 +552,14 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Ancestor reach (forward closure probe). D(dataset) ← S(sample_site) under one upload; evidence = S.
-     * content_reach = {S}; closureForward(S) = S's ancestors = {D}. Anchor=dataset isolates D.
+     * Ancestor reach (forward closure probe). D(survey) ← S(sample_site) under one upload; evidence = S.
+     * content_reach = {S}; closureForward(S) = S's ancestors = {D}. Anchor=survey isolates D.
      */
     it('2: ancestor reach — anchor above evidence is recovered via closureForward', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
 
-      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
       const s = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
@@ -575,7 +575,7 @@ describe('expression-evaluation (integration)', function () {
         operator: 'AND',
         clauses: [namePredicate('leaf', SAMPLE_SITE_NAME_FTP_ID)]
       };
-      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('dataset', tree, connection.systemUserId()));
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('survey', tree, connection.systemUserId()));
 
       expect(ids.has(d)).to.equal(true);
     });
@@ -758,16 +758,16 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Dataset membership fan-out has been removed. D(dataset) with a real descendant Y(animal, parent=D) and an
+     * Survey membership fan-out has been removed. D(survey) with a real descendant Y(animal, parent=D) and an
      * UNCONNECTED same-submission X(animal, no parent). Evidence=D reaches Y via closureReverse (Y is D's
-     * descendant) but no longer reaches X — the synthetic dataset→every-feature-in-submission membership edge is
-     * gone, so an unconnected same-submission feature is unreachable from dataset evidence.
+     * descendant) but no longer reaches X — the synthetic survey→every-feature-in-submission membership edge is
+     * gone, so an unconnected same-submission feature is unreachable from survey evidence.
      */
-    it('8: dataset evidence reaches descendants via closure but not unconnected same-submission features', async () => {
+    it('8: survey evidence reaches descendants via closure but not unconnected same-submission features', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
 
-      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
       const y = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
@@ -775,14 +775,14 @@ describe('expression-evaluation (integration)', function () {
         parentFeatureId: d
       });
       const x = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'animal' });
-      await indexNameProperty(d, 'ds', DATASET_NAME_FTP_ID);
+      await indexNameProperty(d, 'ds', SURVEY_NAME_FTP_ID);
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('ds', DATASET_NAME_FTP_ID)]
+        clauses: [namePredicate('ds', SURVEY_NAME_FTP_ID)]
       };
       const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId()));
 
@@ -850,9 +850,9 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * AND/OR compose over closure-related features. Two datasets in separate submissions each have a child
+     * AND/OR compose over closure-related features. Two surveys in separate submissions each have a child
      * sample_site: D1 ← S1, D2 ← S2. An OR of [D1.name, D2.name] anchored at sample_site UNIONs the two
-     * descendant reaches (S1 and S2). An AND INTERSECTs them — no sample_site is a descendant of both datasets,
+     * descendant reaches (S1 and S2). An AND INTERSECTs them — no sample_site is a descendant of both surveys,
      * so the intersection is empty. The raw combinator is already pinned by the self-match AND/OR tests; this
      * guards that it composes correctly when leaves resolve THROUGH closure relatedness.
      */
@@ -862,7 +862,7 @@ describe('expression-evaluation (integration)', function () {
       const d1 = await insertFeatureRow({
         submissionId: submissionOne,
         submissionUploadId: uploadOne,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       const s1 = await insertFeatureRow({
         submissionId: submissionOne,
@@ -870,14 +870,14 @@ describe('expression-evaluation (integration)', function () {
         featureTypeName: 'sample_site',
         parentFeatureId: d1
       });
-      await indexNameProperty(d1, 'compose-d1', DATASET_NAME_FTP_ID);
+      await indexNameProperty(d1, 'compose-d1', SURVEY_NAME_FTP_ID);
 
       const submissionTwo = await createTestSubmission(connection);
       const uploadTwo = await createTestUpload(connection, submissionTwo);
       const d2 = await insertFeatureRow({
         submissionId: submissionTwo,
         submissionUploadId: uploadTwo,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       const s2 = await insertFeatureRow({
         submissionId: submissionTwo,
@@ -885,7 +885,7 @@ describe('expression-evaluation (integration)', function () {
         featureTypeName: 'sample_site',
         parentFeatureId: d2
       });
-      await indexNameProperty(d2, 'compose-d2', DATASET_NAME_FTP_ID);
+      await indexNameProperty(d2, 'compose-d2', SURVEY_NAME_FTP_ID);
 
       const closure = new SubmissionFeatureClosureService(connection);
       await closure.computeClosureForUpload(uploadOne);
@@ -894,7 +894,7 @@ describe('expression-evaluation (integration)', function () {
       const orTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'OR',
-        clauses: [namePredicate('compose-d1', DATASET_NAME_FTP_ID), namePredicate('compose-d2', DATASET_NAME_FTP_ID)]
+        clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
       };
       const orIds = await runSubquery(
         buildExpressionTreeFeatureIdsSubquery('sample_site', orTree, connection.systemUserId())
@@ -905,28 +905,28 @@ describe('expression-evaluation (integration)', function () {
       const andTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('compose-d1', DATASET_NAME_FTP_ID), namePredicate('compose-d2', DATASET_NAME_FTP_ID)]
+        clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
       };
       const andIds = await runSubquery(
         buildExpressionTreeFeatureIdsSubquery('sample_site', andTree, connection.systemUserId())
       );
-      // No sample_site descends from BOTH datasets, so the intersection of the two reaches is empty.
+      // No sample_site descends from BOTH surveys, so the intersection of the two reaches is empty.
       expect(andIds.has(s1)).to.equal(false);
       expect(andIds.has(s2)).to.equal(false);
     });
 
     /**
-     * Cross-type anchor filter. D(dataset) ← A(animal) ← C(capture) under one upload; evidence=D reaches
+     * Cross-type anchor filter. D(survey) ← A(animal) ← C(capture) under one upload; evidence=D reaches
      * {A, C} via closureReverse plus D itself. Anchor=animal returns ONLY A — not C (capture), not D
-     * (dataset). The anchor type is the sole result filter over the reachable set.
+     * (survey). The anchor type is the sole result filter over the reachable set.
      */
     it('11: anchor type filters the reachable set to one type', async () => {
-      const { d, a, c } = await seedDatasetAnimalCaptureChain('cross-type');
+      const { d, a, c } = await seedSurveyAnimalCaptureChain('cross-type');
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('cross-type', DATASET_NAME_FTP_ID)]
+        clauses: [namePredicate('cross-type', SURVEY_NAME_FTP_ID)]
       };
       const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId()));
 

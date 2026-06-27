@@ -361,7 +361,7 @@ describe('Download Worker', function () {
    */
   async function seedFileFeatureWithArtifact(
     submissionId: number,
-    datasetFeatureId: number,
+    surveyFeatureId: number,
     opts: { keyPrefix: string; bufferContent: string; filename: string }
   ): Promise<{ fileFeatureId: number; artifactSourceKey: string }> {
     const artifactSourceKey = `${TEST_PREFIX}/${opts.keyPrefix}-${Date.now()}.bin`;
@@ -394,7 +394,7 @@ describe('Download Worker', function () {
       submissionId,
       'file',
       { properties: { artifact_key: artifactSourceKey, filename: opts.filename } },
-      datasetFeatureId
+      surveyFeatureId
     );
 
     return { fileFeatureId, artifactSourceKey };
@@ -402,13 +402,13 @@ describe('Download Worker', function () {
 
   it('should process a parquet download job and upload per-type files to S3', async () => {
     // 1. Create test data covering all three axes:
-    //    - dataset: spatial (has geometry)
+    //    - survey: spatial (has geometry)
     //    - sample_site: spatial (has geometry)
     //    - file: non-spatial, artifact_key-bearing
     const submissionId = await createTestSubmission();
 
-    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
-      name: 'Parquet Integration Test Dataset',
+    const surveyFeatureId = await createTestFeature(submissionId, 'survey', {
+      name: 'Parquet Integration Test Survey',
       start_date: '2024-01-01T00:00:00.000Z',
       end_date: '2024-12-31T00:00:00.000Z',
       geometry: { type: 'Point', coordinates: [-124.856, 54.321] }
@@ -422,12 +422,12 @@ describe('Download Worker', function () {
         description: 'Integration test sample site',
         geometry: { type: 'Point', coordinates: [-130.849, 56.207] }
       },
-      datasetFeatureId
+      surveyFeatureId
     );
 
     // Seed an S3-backed artifact + `file` feature so the Parquet file includes an
     // artifact_key column with a real round-trippable value.
-    const { fileFeatureId, artifactSourceKey } = await seedFileFeatureWithArtifact(submissionId, datasetFeatureId, {
+    const { fileFeatureId, artifactSourceKey } = await seedFileFeatureWithArtifact(submissionId, surveyFeatureId, {
       keyPrefix: 'parquet-test-file',
       bufferContent: 'source-file-content-for-parquet-round-trip',
       filename: 'parquet-test.bin'
@@ -435,12 +435,12 @@ describe('Download Worker', function () {
 
     // Fetch the uuid for each feature for row-level assertions below
     const featureUuidRows = await db('biohub.submission_feature')
-      .whereIn('submission_feature_id', [datasetFeatureId, sampleSiteFeatureId, fileFeatureId])
+      .whereIn('submission_feature_id', [surveyFeatureId, sampleSiteFeatureId, fileFeatureId])
       .select('submission_feature_id', 'uuid');
     const uuidBySubmissionFeatureId = new Map<number, string>(
       featureUuidRows.map((r: any) => [r.submission_feature_id, r.uuid])
     );
-    const datasetUuid = uuidBySubmissionFeatureId.get(datasetFeatureId)!;
+    const surveyUuid = uuidBySubmissionFeatureId.get(surveyFeatureId)!;
     const sampleSiteUuid = uuidBySubmissionFeatureId.get(sampleSiteFeatureId)!;
     const fileUuid = uuidBySubmissionFeatureId.get(fileFeatureId)!;
 
@@ -448,11 +448,11 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['survey', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
-    expect(datasetFeatureId).to.be.a('number');
+    expect(surveyFeatureId).to.be.a('number');
     expect(sampleSiteFeatureId).to.be.a('number');
     expect(fileFeatureId).to.be.a('number');
 
@@ -475,16 +475,16 @@ describe('Download Worker', function () {
     expect(finalDownload.completed_at).to.not.be.null;
 
     // 4. List S3 keys under downloads/{downloadId}/ and assert the exact key set
-    const datasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const surveyKey = `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`;
     const sampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
     const fileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     // Track all per-type parquet keys for cleanup (belt + suspenders alongside
     // the download_id-JOIN cleanup path in after()).
-    createdS3Keys.push(datasetKey, sampleSiteKey, fileKey);
+    createdS3Keys.push(surveyKey, sampleSiteKey, fileKey);
 
     const s3List = await storageService.listFiles(BucketType.MAIN, `downloads/${downloadId}/`);
     const s3Keys = new Set((s3List.Contents ?? []).map((o) => o.Key!));
-    expect(s3Keys).to.deep.equal(new Set([datasetKey, sampleSiteKey, fileKey]));
+    expect(s3Keys).to.deep.equal(new Set([surveyKey, sampleSiteKey, fileKey]));
 
     // 5. Row counts: exactly 3 artifact + 3 download_version_artifact rows for this download's version
     const artifactRows = await db('biohub.artifact')
@@ -527,7 +527,7 @@ describe('Download Worker', function () {
     );
 
     // 6. Per-file round-trip: byte_size + checksum + ParquetReader schema + rows + geo metadata
-    for (const s3Key of [datasetKey, sampleSiteKey, fileKey]) {
+    for (const s3Key of [surveyKey, sampleSiteKey, fileKey]) {
       const row = artifactByKey.get(s3Key);
       expect(row, `artifact row for ${s3Key}`).to.not.be.undefined;
 
@@ -589,14 +589,14 @@ describe('Download Worker', function () {
         };
 
         // Per seed data: sample_site.geometry is feature_property_type_name='spatial',
-        // dataset has no spatial-typed property. The `geo` footer key follows the producer's
+        // survey has no spatial-typed property. The `geo` footer key follows the producer's
         // spatial-column detection, so only sample_site carries it.
         if (s3Key === sampleSiteKey) {
           findRow(sampleSiteUuid);
           expectGeoShape();
-        } else if (s3Key === datasetKey) {
-          findRow(datasetUuid);
-          expect(geoEntry, 'dataset has no spatial-typed property, must NOT carry geo metadata').to.be.undefined;
+        } else if (s3Key === surveyKey) {
+          findRow(surveyUuid);
+          expect(geoEntry, 'survey has no spatial-typed property, must NOT carry geo metadata').to.be.undefined;
         } else {
           // file (non-spatial + artifact_key) — must NOT carry geo metadata.
           const fileRow = findRow(fileUuid);
@@ -613,11 +613,11 @@ describe('Download Worker', function () {
   });
 
   it('should be idempotent on retry — re-running the pipeline does not create duplicate rows or S3 objects', async () => {
-    // Same fixture shape as the extended parquet test: dataset + sample_site + file (artifact_key).
+    // Same fixture shape as the extended parquet test: survey + sample_site + file (artifact_key).
     const submissionId = await createTestSubmission();
 
-    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
-      name: 'Parquet Retry Test Dataset',
+    const surveyFeatureId = await createTestFeature(submissionId, 'survey', {
+      name: 'Parquet Retry Test Survey',
       start_date: '2024-01-01T00:00:00.000Z',
       end_date: '2024-12-31T00:00:00.000Z',
       geometry: { type: 'Point', coordinates: [-124.856, 54.321] }
@@ -630,10 +630,10 @@ describe('Download Worker', function () {
         description: 'Retry test sample site',
         geometry: { type: 'Point', coordinates: [-130.849, 56.207] }
       },
-      datasetFeatureId
+      surveyFeatureId
     );
 
-    const { fileFeatureId } = await seedFileFeatureWithArtifact(submissionId, datasetFeatureId, {
+    const { fileFeatureId } = await seedFileFeatureWithArtifact(submissionId, surveyFeatureId, {
       keyPrefix: 'parquet-retry-file',
       bufferContent: 'retry-test-source-file-content',
       filename: 'retry.bin'
@@ -643,19 +643,19 @@ describe('Download Worker', function () {
     // The policy projects every active feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
-    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['dataset', 'sample_site', 'file'], {
+    const { downloadId, downloadVersionId } = await createDownloadAndProcess(['survey', 'sample_site', 'file'], {
       format: 'parquet'
     });
     // featureIds remain useful breadcrumbs in failure messages.
-    expect(datasetFeatureId).to.be.a('number');
+    expect(surveyFeatureId).to.be.a('number');
     expect(sampleSiteFeatureId).to.be.a('number');
     expect(fileFeatureId).to.be.a('number');
 
     // Track per-type S3 keys for cleanup (same set expected after both runs)
-    const run1DatasetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const run1SurveyKey = `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`;
     const run1SampleSiteKey = `downloads/${downloadId}/versions/${downloadVersionId}/sample_site/data.parquet`;
     const run1FileKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
-    createdS3Keys.push(run1DatasetKey, run1SampleSiteKey, run1FileKey);
+    createdS3Keys.push(run1SurveyKey, run1SampleSiteKey, run1FileKey);
 
     // Capture state after run 1
     const afterRun1 = await db('biohub.artifact')

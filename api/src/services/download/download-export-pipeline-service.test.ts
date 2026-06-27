@@ -215,7 +215,7 @@ describe('DownloadExportPipelineService', () => {
       sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/dataset/data.parquet`
+          object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/survey/data.parquet`
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
@@ -225,7 +225,7 @@ describe('DownloadExportPipelineService', () => {
 
       const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
-      expect(result).to.have.members(['dataset', 'observation']);
+      expect(result).to.have.members(['survey', 'observation']);
       expect(result).to.have.lengthOf(2);
     });
 
@@ -265,7 +265,7 @@ describe('DownloadExportPipelineService', () => {
         },
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000002',
-          object_key: `downloads/${otherDownloadId}/versions/${DOWNLOAD_VERSION_ID}/dataset/data.parquet`
+          object_key: `downloads/${otherDownloadId}/versions/${DOWNLOAD_VERSION_ID}/survey/data.parquet`
         }
       ]);
 

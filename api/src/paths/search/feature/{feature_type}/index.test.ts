@@ -40,7 +40,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -48,7 +48,7 @@ describe('searchFeatures', () => {
         submission_id: 10,
         uuid: '550e8400-e29b-41d4-a716-446655440001',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
+        feature_type_name: 'survey',
         properties: {},
         submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
@@ -73,7 +73,7 @@ describe('searchFeatures', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[1]).to.eql(expressionTree);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
@@ -99,7 +99,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: '  DATASET  ' };
+    mockReq.params = { feature_type: '  SURVEY  ' };
     mockReq.body = {
       expression: expressionTree,
       pagination: {
@@ -115,7 +115,7 @@ describe('searchFeatures', () => {
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(mockRes.statusValue).to.equal(200);
   });
 
@@ -129,7 +129,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -137,7 +137,7 @@ describe('searchFeatures', () => {
         submission_id: 11,
         uuid: '550e8400-e29b-41d4-a716-446655440002',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
+        feature_type_name: 'survey',
         properties: {},
         submission_name: 'Species Census 2024',
         is_secured: true,
@@ -186,7 +186,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -194,7 +194,7 @@ describe('searchFeatures', () => {
         submission_id: 12,
         uuid: '550e8400-e29b-41d4-a716-446655440003',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
+        feature_type_name: 'survey',
         properties: {},
         submission_name: 'Submission 1',
         is_secured: false,
@@ -245,7 +245,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -287,7 +287,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -322,7 +322,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: {
         type: 'expression'
@@ -401,7 +401,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -409,7 +409,7 @@ describe('searchFeatures', () => {
         submission_id: 13,
         uuid: '550e8400-e29b-41d4-a716-446655440004',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
+        feature_type_name: 'survey',
         properties: {},
         submission_name: 'Submission',
         is_secured: false,
@@ -454,7 +454,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -468,7 +468,7 @@ describe('searchFeatures', () => {
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(null);
   });
 
@@ -485,7 +485,7 @@ describe('searchFeatures', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = 'some-valid-token';
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: expressionTree,
       pagination: { page: '1', limit: '10' }
@@ -498,7 +498,7 @@ describe('searchFeatures', () => {
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(123);
   });
 });

@@ -202,18 +202,18 @@ describe('csv-utils', () => {
   describe('groupFeaturesByType', () => {
     it('should group features by feature_type_name', () => {
       const features = [
-        { feature_type_name: 'dataset', id: 1 },
+        { feature_type_name: 'survey', id: 1 },
         { feature_type_name: 'observation', id: 2 },
-        { feature_type_name: 'dataset', id: 3 },
+        { feature_type_name: 'survey', id: 3 },
         { feature_type_name: 'observation', id: 4 }
       ];
 
       const result = groupFeaturesByType(features);
 
-      expect(result.get('dataset')).to.have.length(2);
+      expect(result.get('survey')).to.have.length(2);
       expect(result.get('observation')).to.have.length(2);
-      expect(result.get('dataset')![0].id).to.equal(1);
-      expect(result.get('dataset')![1].id).to.equal(3);
+      expect(result.get('survey')![0].id).to.equal(1);
+      expect(result.get('survey')![1].id).to.equal(3);
     });
   });
 
@@ -223,7 +223,7 @@ describe('csv-utils', () => {
     });
 
     it('should return feature_type.csv for other types', () => {
-      expect(getOutputFilename('dataset')).to.equal('dataset.csv');
+      expect(getOutputFilename('survey')).to.equal('survey.csv');
       expect(getOutputFilename('species_observation')).to.equal('species_observation.csv');
     });
   });
@@ -303,12 +303,12 @@ describe('csv-utils', () => {
         { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
-      const result = buildCombinedHeaders(parentProperties, childProperties, ['dataset_name', 'dataset_id']);
+      const result = buildCombinedHeaders(parentProperties, childProperties, ['survey_name', 'survey_id']);
 
       // datetime expands into two suffixed columns; the bare `timestamp` is gone.
       expect(result).to.deep.equal([
-        'dataset_name',
-        'dataset_id',
+        'survey_name',
+        'survey_id',
         'device_key',
         'animal_identifier',
         'timestamp_date',
@@ -322,9 +322,9 @@ describe('csv-utils', () => {
         { feature_property_name: 'name', feature_property_type_name: 'string' }
       ];
 
-      const result = buildCombinedHeaders(null, childProperties, ['dataset_name']);
+      const result = buildCombinedHeaders(null, childProperties, ['survey_name']);
 
-      expect(result).to.deep.equal(['dataset_name', 'name']);
+      expect(result).to.deep.equal(['survey_name', 'name']);
     });
 
     it('should work without system headers', () => {
@@ -380,11 +380,11 @@ describe('csv-utils', () => {
       const childProperties: CsvPropertyDefinition[] = [
         { feature_property_name: 'name', feature_property_type_name: 'string' }
       ];
-      const childData = { name: 'Test Dataset' };
+      const childData = { name: 'Test Survey' };
 
       const result = flattenFeatureWithParent(childData, childProperties, null, null, 100);
 
-      expect(result).to.deep.equal({ name: 'Test Dataset' });
+      expect(result).to.deep.equal({ name: 'Test Survey' });
     });
 
     it('should let child values overwrite parent values on collision', () => {

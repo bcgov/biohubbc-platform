@@ -285,8 +285,8 @@ describe('Ingest → Download → Export (system integration)', function () {
     expect(col('submission_feature_id')).to.equal(String(featureId));
     // uuid is generated server-side; we don't pin the exact value, just assert it's a non-empty UUID-looking string.
     expect(col('uuid')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-    // Telemetry's parent (the dataset) is set inside createTestFeature → empty for root-level test feature.
-    // Real telemetry has a dataset parent; the column at minimum must be present (not crash).
+    // Telemetry's parent (the survey) is set inside createTestFeature → empty for root-level test feature.
+    // Real telemetry has a survey parent; the column at minimum must be present (not crash).
     expect(header).to.include('parent_uuid');
 
     expect(col('dop'), 'dop should round-trip the ingested number').to.equal('4.2');

@@ -9,7 +9,7 @@ describe('SearchResultCard', () => {
   });
 
   it('renders lock icon when result is secured', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
 
     const { getByTestId } = render(<SearchResultCard result={securedResult} onClick={vi.fn()} />);
 
@@ -17,7 +17,7 @@ describe('SearchResultCard', () => {
   });
 
   it('does not render lock icon when result is not secured', () => {
-    const unsecuredResult = createMockSearchFeature(2, 'Dataset', false);
+    const unsecuredResult = createMockSearchFeature(2, 'Survey', false);
 
     const { queryByTestId } = render(<SearchResultCard result={unsecuredResult} onClick={vi.fn()} />);
 

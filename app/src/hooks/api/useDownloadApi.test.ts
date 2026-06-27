@@ -65,7 +65,7 @@ describe('useDownloadApi', () => {
       const mockRequest: CreateDownloadRequest = {
         name: 'Moose download',
         description: 'Moose observations in the Skeena',
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null
       };
       const mockResponse: CreateDownloadResponse = {
@@ -84,8 +84,8 @@ describe('useDownloadApi', () => {
 
     it('should propagate rejection on server error', async () => {
       const mockRequest: CreateDownloadRequest = {
-        name: 'All datasets',
-        featureTypes: ['dataset'],
+        name: 'All surveys',
+        featureTypes: ['survey'],
         expression: null
       };
 

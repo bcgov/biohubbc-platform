@@ -520,19 +520,19 @@ describe('Download Export pipeline — media (system)', function () {
     // (default ~4k rows per group), small enough to write in a minute or two.
     const fixtureTargetBytes = 96 * 1024 * 1024;
 
-    // Seed a download with one feature of type 'dataset'. The export pipeline
+    // Seed a download with one feature of type 'survey'. The export pipeline
     // reads properties via `getFeatureTypePropertyCodes`, so the feature type
-    // must exist in seed data — 'dataset' is a root type already used by the
+    // must exist in seed data — 'survey' is a root type already used by the
     // sibling integration tests.
     const submissionId = await createTestSubmission(connection);
-    await createTestFeature(connection, submissionId, 'dataset', {
+    await createTestFeature(connection, submissionId, 'survey', {
       name: 'oom-seed'
     });
 
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `media-oom-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['dataset'],
+      featureTypes: ['survey'],
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({
@@ -554,7 +554,7 @@ describe('Download Export pipeline — media (system)', function () {
     });
 
     // Write the fat Parquet fixture at the canonical per-feature-type key.
-    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/dataset/data.parquet`;
+    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`;
     const uploadedBytes = await writeFatParquetToMinIO(storageService, parquetKey, fixtureTargetBytes);
     s3KeysToCleanup.push(parquetKey);
 
@@ -571,9 +571,9 @@ describe('Download Export pipeline — media (system)', function () {
       uploaded_at: new Date().toISOString(),
       format: 'parquet'
     });
-    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'dataset');
+    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'survey');
 
-    const { groupId } = await seedPendingExport(downloadVersionId, 'dataset');
+    const { groupId } = await seedPendingExport(downloadVersionId, 'survey');
 
     // Baseline: sample heap after writing the fixture but before the export
     // runs. Using `heapUsed` directly — we're watching for large deltas, not

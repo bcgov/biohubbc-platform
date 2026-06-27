@@ -103,7 +103,7 @@ describe('ArtifactRepository', () => {
     });
   });
 
-  describe('getArtifactsByDatasetId', () => {
+  describe('getArtifactsBySurveyId', () => {
     it('should succeed with valid data', async () => {
       const mockQueryResponse = {
         rowCount: 2,
@@ -116,7 +116,7 @@ describe('ArtifactRepository', () => {
 
       const artifactRepository = new ArtifactRepository(mockDBConnection);
 
-      const response = await artifactRepository.getArtifactsByDatasetId('abcd');
+      const response = await artifactRepository.getArtifactsBySurveyId('abcd');
 
       expect(response[0].artifact_id).to.equal(1);
       expect(response[1].artifact_id).to.equal(2);

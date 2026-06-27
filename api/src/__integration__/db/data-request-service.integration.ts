@@ -36,7 +36,7 @@ import { TicketService } from '../../services/ticket-service';
 
 /**
  * Helper: build a minimal one-predicate expression tree against
- * `dataset.name`. The predicate ids (31/70) match the seed; the literal
+ * `survey.name`. The predicate ids (31/70) match the seed; the literal
  * `value` is randomised so two calls produce distinct hashes and never
  * collapse onto the same `expression` row via the `expression_hash`
  * unique index.
@@ -156,7 +156,7 @@ describe('DataRequestService (integration)', function () {
         requested_by: requester,
         reason: 'I1 search-driven happy path covering the full row shape',
         system_user_ids: [requester, collaborator],
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression
       });
 
@@ -181,9 +181,9 @@ describe('DataRequestService (integration)', function () {
       expect(policyRows.rowCount).to.equal(1);
       expect(policyRows.rows[0].status).to.equal('requested');
 
-      // Exactly one ALLOW statement, dataset-scoped URN
+      // Exactly one ALLOW statement, survey-scoped URN
       const statements = await activeStatements(dataRequest.policy_id);
-      expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
+      expect(statements).to.deep.equal([{ urn: 'urn:*:survey:*', effect: 'allow' }]);
 
       const links = await connection.sql(SQL`
         SELECT pe.expression_id
@@ -229,12 +229,12 @@ describe('DataRequestService (integration)', function () {
         requested_by: requester,
         reason: 'I2 multi-featureType single-tree fanout',
         system_user_ids: [],
-        featureTypes: ['dataset', 'telemetry'],
+        featureTypes: ['survey', 'telemetry'],
         expression
       });
 
       const statements = await activeStatements(dataRequest.policy_id);
-      expect(statements.map((s) => s.urn)).to.deep.equal(['urn:*:dataset:*', 'urn:*:telemetry:*']);
+      expect(statements.map((s) => s.urn)).to.deep.equal(['urn:*:survey:*', 'urn:*:telemetry:*']);
       expect(statements.every((s) => s.effect === 'allow')).to.equal(true);
 
       const links = await connection.sql(SQL`
@@ -260,12 +260,12 @@ describe('DataRequestService (integration)', function () {
         requested_by: requester,
         reason: 'I3 null-expression branch',
         system_user_ids: [],
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null
       });
 
       const statements = await activeStatements(dataRequest.policy_id);
-      expect(statements).to.deep.equal([{ urn: 'urn:*:dataset:*', effect: 'allow' }]);
+      expect(statements).to.deep.equal([{ urn: 'urn:*:survey:*', effect: 'allow' }]);
 
       const links = await connection.sql(SQL`
         SELECT count(*)::int AS n
@@ -343,7 +343,7 @@ describe('DataRequestService (integration)', function () {
         requested_by: requester,
         reason: 'I5 empty picker — admin flow does not auto-union the requester',
         system_user_ids: [],
-        featureTypes: ['dataset'],
+        featureTypes: ['survey'],
         expression: null
       });
 
@@ -432,7 +432,7 @@ describe('DataRequestService (integration)', function () {
           requested_by: requester,
           reason: 'I7 mid-flow rollback — team_policy failure must roll back the chain',
           system_user_ids: [],
-          featureTypes: ['dataset'],
+          featureTypes: ['survey'],
           expression: buildExpression('I7-tree')
         });
         expect.fail('Expected mid-flow failure to surface as a rejection');

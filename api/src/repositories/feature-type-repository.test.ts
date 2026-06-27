@@ -12,8 +12,8 @@ chai.use(sinonChai);
 
 const mockFeatureType: FeatureType = {
   feature_type_id: 1,
-  name: 'dataset',
-  display_name: 'Dataset',
+  name: 'survey',
+  display_name: 'Survey',
   description: null
 };
 
@@ -29,8 +29,8 @@ describe('FeatureTypeRepository', () => {
       const repository = new FeatureTypeRepository(mockConnection);
 
       const result = await repository.insertFeatureType({
-        name: 'dataset',
-        display_name: 'Dataset'
+        name: 'survey',
+        display_name: 'Survey'
       });
 
       expect(result).to.eql(mockFeatureType);
@@ -42,7 +42,7 @@ describe('FeatureTypeRepository', () => {
       const repository = new FeatureTypeRepository(mockConnection);
 
       try {
-        await repository.insertFeatureType({ name: 'dataset', display_name: 'Dataset' });
+        await repository.insertFeatureType({ name: 'survey', display_name: 'Survey' });
         expect.fail();
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert feature type');

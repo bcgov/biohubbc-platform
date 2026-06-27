@@ -192,7 +192,7 @@ describe('DownloadPipelineService', () => {
   describe('resolveParquetSchema', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
       {
-        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset', description: null },
+        feature_type: { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
         properties: [
           {
             feature_type_property_id: 1,
@@ -233,16 +233,16 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
-      const statements = [stmt('dataset'), stmt('observation', '33333333-3333-3333-3333-333333333333')];
+      const statements = [stmt('survey'), stmt('observation', '33333333-3333-3333-3333-333333333333')];
       sinon
         .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
         .resolves(statements);
 
       const result = await service.resolveParquetSchema(TEST_SOURCE);
 
-      expect(result.featureTypes).to.deep.equal(['dataset', 'observation']);
+      expect(result.featureTypes).to.deep.equal(['survey', 'observation']);
       expect(result.statements).to.deep.equal(statements);
-      expect(result.schemaLookup.has('dataset')).to.be.true;
+      expect(result.schemaLookup.has('survey')).to.be.true;
       expect(result.schemaLookup.has('observation')).to.be.true;
     });
 

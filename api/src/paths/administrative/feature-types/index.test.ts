@@ -12,9 +12,9 @@ chai.use(sinonChai);
 
 const mockFeatureType: FeatureType = {
   feature_type_id: 1,
-  name: 'dataset',
-  display_name: 'Dataset',
-  description: 'A dataset feature type'
+  name: 'survey',
+  display_name: 'Survey',
+  description: 'A survey feature type'
 };
 
 describe('getFeatureTypes', () => {
@@ -73,13 +73,13 @@ describe('getFeatureTypes', () => {
     const getFeatureTypesCountStub = sinon.stub(FeatureTypeService.prototype, 'getFeatureTypesCount').resolves(0);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '1', limit: '50', search: 'dataset' };
+    mockReq.query = { page: '1', limit: '50', search: 'survey' };
 
     const requestHandler = getFeatureTypes();
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(getFeatureTypesStub).to.have.been.calledWith(
-      { search: 'dataset' },
+      { search: 'survey' },
       {
         page: 1,
         limit: 50,
@@ -87,7 +87,7 @@ describe('getFeatureTypes', () => {
         order: undefined
       }
     );
-    expect(getFeatureTypesCountStub).to.have.been.calledWith({ search: 'dataset' });
+    expect(getFeatureTypesCountStub).to.have.been.calledWith({ search: 'survey' });
   });
 });
 
@@ -106,7 +106,7 @@ describe('createFeatureType', () => {
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { name: 'dataset', display_name: 'Dataset' };
+    mockReq.body = { name: 'survey', display_name: 'Survey' };
 
     const requestHandler = createFeatureType();
 
@@ -124,15 +124,15 @@ describe('createFeatureType', () => {
     const createStub = sinon.stub(FeatureTypeService.prototype, 'createFeatureType').resolves(mockFeatureType);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { name: 'dataset', display_name: 'Dataset', description: 'A dataset feature type' };
+    mockReq.body = { name: 'survey', display_name: 'Survey', description: 'A survey feature type' };
 
     const requestHandler = createFeatureType();
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(createStub).to.have.been.calledWith({
-      name: 'dataset',
-      display_name: 'Dataset',
-      description: 'A dataset feature type'
+      name: 'survey',
+      display_name: 'Survey',
+      description: 'A survey feature type'
     });
     expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.eql(mockFeatureType);

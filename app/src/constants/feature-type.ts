@@ -4,7 +4,7 @@ import { mdiDatabase, mdiFileOutline, mdiMapMarker, mdiTerrain, mdiWifiMarker } 
  * Significant feature types that are preferentially displayed in search results
  */
 export enum PRIORITY_FEATURE_TYPE {
-  DATASET = 'dataset',
+  SURVEY = 'survey',
   SPECIES_OBSERVATION = 'species_observation',
   TELEMETRY = 'telemetry',
   REPORT = 'report',
@@ -15,8 +15,8 @@ export enum PRIORITY_FEATURE_TYPE {
  * Display labels and icons for feature types
  */
 export const FEATURE_TYPE_CONFIG: Record<PRIORITY_FEATURE_TYPE, { label: string; icon: string }> = {
-  dataset: {
-    label: 'Datasets',
+  survey: {
+    label: 'Surveys',
     icon: mdiDatabase
   },
   species_observation: {

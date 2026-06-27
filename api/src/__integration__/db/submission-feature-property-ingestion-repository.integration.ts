@@ -854,7 +854,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
   describe('recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId', () => {
     it('records one error row with count=3 when three active rows share one source_id', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [
         { source_id: 'A' },
         { source_id: 'A' },
         { source_id: 'A' }
@@ -872,7 +872,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records one row per distinct duplicated source_id with correct counts', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [
         { source_id: 'A' },
         { source_id: 'A' },
         { source_id: 'B' },
@@ -898,7 +898,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records zero rows when every source_id is unique', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [
         { source_id: 'A' },
         { source_id: 'B' },
         { source_id: 'C' }
@@ -912,7 +912,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('treats NULL source_ids as non-duplicates and records no error rows', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [
         { source_id: null },
         { source_id: null }
       ]);
@@ -925,7 +925,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('ignores soft-deleted rows when checking for duplicates', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', [
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [
         { source_id: 'A' },
         { source_id: 'A', record_end_date: '2026-01-01' }
       ]);
@@ -938,7 +938,7 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records zero rows and does not throw for an empty upload', async () => {
       const submissionId = await createTestSubmission(connection);
-      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'dataset', []);
+      const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', []);
 
       await repo.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId);
 

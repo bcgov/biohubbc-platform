@@ -4,7 +4,7 @@ import { CreateDownloadDialogYup } from './CreateDownloadDialogYup';
 const validValues = {
   name: 'Moose download',
   description: 'Moose observations in the Skeena',
-  featureTypes: ['dataset']
+  featureTypes: ['survey']
 };
 
 describe('CreateDownloadDialogYup', () => {

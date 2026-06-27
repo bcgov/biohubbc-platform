@@ -6,7 +6,7 @@ import {
   _getS3Client,
   bulkDeleteFilesFromS3,
   deleteFileFromS3,
-  generateDatasetS3FileKey,
+  generateSurveyS3FileKey,
   getObjectStoreBucketName,
   getObjectStoreUrl,
   getS3HostUrl,
@@ -191,13 +191,13 @@ describe('getS3KeyPrefix', () => {
   });
 });
 
-describe('generateDatasetS3FileKey', () => {
+describe('generateSurveyS3FileKey', () => {
   it('returns an s3 key with a prefix', async () => {
-    const result = generateDatasetS3FileKey({
-      datasetUUID: '123-456-789',
+    const result = generateSurveyS3FileKey({
+      surveyUUID: '123-456-789',
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal(`${getS3KeyPrefix()}/datasets/123-456-789/dwca/testFileName`);
+    expect(result).to.equal(`${getS3KeyPrefix()}/surveys/123-456-789/dwca/testFileName`);
   });
 });

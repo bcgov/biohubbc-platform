@@ -86,7 +86,7 @@ describe('SecurityScopeRepository', () => {
         security_scope_id: '11111111-1111-1111-1111-111111111111',
         scope_hash: 'abc123hash',
         urn_submission_id: '1',
-        urn_feature_type: 'dataset',
+        urn_feature_type: 'survey',
         urn_feature_id: '*'
       };
       const sqlFake = sinon.fake.resolves(mockQueryResult([mockRow]));
@@ -95,7 +95,7 @@ describe('SecurityScopeRepository', () => {
       const repository = new SecurityScopeRepository(mockDBConnection);
       const result = await repository.ensureSecurityScope('abc123hash', {
         urn_submission_id: '1',
-        urn_feature_type: 'dataset',
+        urn_feature_type: 'survey',
         urn_feature_id: '*'
       });
 
@@ -113,7 +113,7 @@ describe('SecurityScopeRepository', () => {
       try {
         await repository.ensureSecurityScope('missing-hash', {
           urn_submission_id: '1',
-          urn_feature_type: 'dataset',
+          urn_feature_type: 'survey',
           urn_feature_id: '*'
         });
         expect.fail();
