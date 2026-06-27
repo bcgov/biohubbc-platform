@@ -65,7 +65,7 @@ export function isEffectivelySecured(featureIdExpr: string): string {
         AND sfs.status = 'active'
         AND ${isSubmissionFeatureActive('sf_sec')}
     )
-    -- Fail closed: the reflexive self-loop (F, F) is written for every active feature when its upload's
+    -- Fail closed: the reflexive self-loop (F, F) is written for every non-deleted feature when its upload's
     -- closure is built, so its absence means the closure is not built (recompute not yet run, or failed).
     -- We then cannot prove the feature is unsecured — treat it as secured rather than leak it. This is a
     -- direct primary-key probe ((source, target) is the PK).
