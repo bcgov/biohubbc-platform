@@ -164,7 +164,7 @@ export class UserRepository extends BaseRepository {
       ON
         uis.user_identity_source_id = su.user_identity_source_id
       WHERE
-        su.user_guid = ${userGuid}
+        LOWER(su.user_guid) = ${userGuid.toLowerCase()}
       GROUP BY
         su.system_user_id,
         su.user_identity_source_id,
@@ -276,7 +276,7 @@ export class UserRepository extends BaseRepository {
         agency
       )
       VALUES (
-        ${params.userGuid},
+        ${params.userGuid.toLowerCase()},
         (
           SELECT
             user_identity_source_id

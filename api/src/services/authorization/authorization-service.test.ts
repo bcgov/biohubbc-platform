@@ -768,6 +768,47 @@ describe('getSystemUserObject', function () {
 
     expect(systemUserObject).to.equal(mockSystemUserWithRolesResponse);
   });
+
+  it('returns null if the system user is soft-deleted (record_end_date in the past)', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const mockSystemUserWithRolesResponse = {
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserWithRoles').resolves(mockSystemUserWithRolesResponse);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const systemUserObject = await authorizationService.getSystemUserObject();
+
+    expect(systemUserObject).to.be.null;
+  });
+});
+
+describe('isSystemUserInactive', function () {
+  it('returns false if `record_end_date` is null', function () {
+    const result = AuthorizationService.isSystemUserInactive({
+      record_end_date: null
+    } as unknown as SystemUserExtended);
+
+    expect(result).to.be.false;
+  });
+
+  it('returns true if `record_end_date` is in the past', function () {
+    const result = AuthorizationService.isSystemUserInactive({
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended);
+
+    expect(result).to.be.true;
+  });
+
+  it('returns false if `record_end_date` is in the future', function () {
+    const result = AuthorizationService.isSystemUserInactive({
+      record_end_date: '2999-01-01'
+    } as unknown as SystemUserExtended);
+
+    expect(result).to.be.false;
+  });
 });
 
 describe('getSystemUserWithRoles', function () {
