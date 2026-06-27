@@ -198,8 +198,22 @@ describe('expression-evaluation (integration)', function () {
     const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_string
-        (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value}, ${systemUserId});
+        (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+      SELECT
+        ${submissionFeatureId},
+        ${featureTypePropertyId},
+        bftp.blueprint_feature_type_property_id,
+        ${value},
+        ${systemUserId}
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId};
     `);
   }
 
@@ -235,10 +249,25 @@ describe('expression-evaluation (integration)', function () {
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         referenced_submission_feature_id,
         create_user
       )
-      VALUES (${sourceFeatureId}, ${featureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
+      SELECT
+        ${sourceFeatureId},
+        ${featureTypePropertyId},
+        bftp.blueprint_feature_type_property_id,
+        ${referencedFeatureId},
+        ${systemUserId}
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${sourceFeatureId};
     `);
   }
 

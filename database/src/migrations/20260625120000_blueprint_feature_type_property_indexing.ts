@@ -35,22 +35,12 @@ export async function up(knex: Knex): Promise<void> {
         'submission_feature_property_feature'
       ]
       LOOP
-        -- Nullable provenance column + FK to the Blueprint assignment + lookup index.
+        -- 1) Add the provenance column (nullable transiently, so existing rows can be backfilled first).
         EXECUTE format('ALTER TABLE %I ADD COLUMN blueprint_feature_type_property_id integer', tbl);
 
-        EXECUTE format(
-          'ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY (blueprint_feature_type_property_id) REFERENCES blueprint_feature_type_property(blueprint_feature_type_property_id)',
-          tbl, tbl || '_bftp_fk'
-        );
-
-        EXECUTE format('CREATE INDEX %I ON %I (blueprint_feature_type_property_id)', tbl || '_bftp_idx', tbl);
-
-        EXECUTE format(
-          $c$COMMENT ON COLUMN %I.blueprint_feature_type_property_id IS 'Foreign key to blueprint_feature_type_property: the Blueprint assignment used to validate/index this property. Nullable provenance metadata; feature_type_property_id remains the primary property reference.'$c$,
-          tbl
-        );
-
-        -- Best-effort backfill of existing rows via the feature's pinned Blueprint; unresolved rows stay null.
+        -- 2) Backfill existing rows via the feature's pinned Blueprint. Every indexed row corresponds to a
+        --    Blueprint-assigned property (the indexing pipeline only indexes assigned properties) and
+        --    assignments are never soft-deleted, so this resolves for every row.
         EXECUTE format($q$
           UPDATE %I p
           SET blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
@@ -67,6 +57,23 @@ export async function up(knex: Knex): Promise<void> {
             AND bftp.feature_type_property_id = p.feature_type_property_id
             AND bftp.record_end_date IS NULL
         $q$, tbl);
+
+        -- 3) Enforce NOT NULL. Doubles as a safety assertion: any unmapped row (not expected, per the
+        --    invariant above) fails the migration loudly rather than indexing a value with no provenance.
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN blueprint_feature_type_property_id SET NOT NULL', tbl);
+
+        -- 4) FK to the Blueprint assignment + lookup index + column comment.
+        EXECUTE format(
+          'ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY (blueprint_feature_type_property_id) REFERENCES blueprint_feature_type_property(blueprint_feature_type_property_id)',
+          tbl, tbl || '_bftp_fk'
+        );
+
+        EXECUTE format('CREATE INDEX %I ON %I (blueprint_feature_type_property_id)', tbl || '_bftp_idx', tbl);
+
+        EXECUTE format(
+          $c$COMMENT ON COLUMN %I.blueprint_feature_type_property_id IS 'Foreign key to blueprint_feature_type_property: the Blueprint assignment used to validate/index this property. feature_type_property_id remains the primary property reference used by search and data access.'$c$,
+          tbl
+        );
       END LOOP;
     END
     $do$;
