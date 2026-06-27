@@ -18,6 +18,9 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       await repository.insertTimestampPropertiesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
+      expect(sqlText).to.include('p.blueprint_feature_type_property_id');
     });
   });
 
@@ -48,6 +51,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'datetime'");
       expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
     });
@@ -98,6 +102,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_code_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'code'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
       expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
@@ -119,6 +124,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_taxon_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'taxon'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'number'");
       expect(sqlText).to.include("(v.logical_value #>> '{}')::integer AS tsn");
@@ -140,6 +146,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_feature_candidate');
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('v.blueprint_feature_type_property_id');
       expect(sqlText).to.include("WHERE v.property_type_name = 'feature'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
       expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
@@ -161,6 +168,8 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('INSERT INTO submission_feature_property_code');
       expect(sqlText).to.include('submission_feature_id');
       expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
+      expect(sqlText).to.include('c.blueprint_feature_type_property_id');
       expect(sqlText).to.include('contributor_codeset_code_id');
       expect(sqlText).to.include('FROM submission_upload_staging_code_candidate c');
       expect(sqlText).to.include('AND c.is_format_valid');
@@ -181,6 +190,8 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('INSERT INTO submission_feature_property_taxon');
       expect(sqlText).to.include('submission_feature_id');
       expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
+      expect(sqlText).to.include('c.blueprint_feature_type_property_id');
       expect(sqlText).to.include('taxon_id');
       expect(sqlText).to.include('FROM submission_upload_staging_taxon_candidate c');
       expect(sqlText).to.include('AND c.taxon_id IS NOT NULL');
@@ -340,6 +351,21 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
 
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_resolved_property');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
+      expect(sqlText).to.include('bp.blueprint_feature_type_property_id');
+      expect(sqlText).to.include('WITH RECURSIVE');
+      expect(sqlText).to.include('raw_property_names AS');
+      expect(sqlText).to.include('SELECT DISTINCT property_name');
+      expect(sqlText).to.include('FROM submission_upload_staging_raw_property');
+      expect(sqlText).to.include('property_seed AS');
+      expect(sqlText).to.include('property_resolution AS');
+      expect(sqlText).to.include('target_feature_property_id');
+      expect(sqlText).to.include('blueprint_properties AS');
+      expect(sqlText).to.include('JOIN blueprint_properties bp');
+      expect(sqlText).to.include('bp.feature_property_id = pr.current_feature_property_id');
+      // Nearest match wins: the alias chain must stop at the first property assigned by the selected
+      // Blueprint, not always continue to the final active target.
+      expect(sqlText).to.include('ORDER BY pr.depth ASC');
 
       // Selected Blueprint is the one pinned to the upload, passed in by the caller — not re-selected
       // here. The default Blueprint is no longer chosen inside the SQL.
@@ -354,7 +380,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       // The Blueprint assignment is joined through its new foreign keys: blueprint_feature_type_id
       // (to the included feature type) and feature_type_property_id (to the pool entry).
       expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
-      expect(sqlText).to.include('bftp.feature_type_property_id = ftp.feature_type_property_id');
+      expect(sqlText).to.include('ftp.feature_type_property_id = bftp.feature_type_property_id');
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
       expect(sqlText).to.not.include('bftp.blueprint_id');
@@ -362,8 +388,8 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.not.include('bftp.feature_property_id');
 
       // Requiredness and multiplicity are sourced from the Blueprint assignment.
-      expect(sqlText).to.include('COALESCE(bftp.allow_multiple, false)');
-      expect(sqlText).to.include('COALESCE(bftp.required_value, false)');
+      expect(sqlText).to.include('COALESCE(bp.allow_multiple, false)');
+      expect(sqlText).to.include('COALESCE(bp.required_value, false)');
 
       // Primitive property type still read from feature_property_type.
       expect(sqlText).to.include('feature_property_type fpt');
@@ -372,6 +398,28 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       // feature_type_property is not the source of requiredness or multiplicity.
       expect(sqlText).to.not.include('COALESCE(ftp.allow_multiple');
       expect(sqlText).to.not.include('COALESCE(ftp.required_value');
+    });
+  });
+
+  describe('recordRetiredFeaturePropertyErrorsBySubmissionUploadId', () => {
+    it('records only known retired properties that cannot resolve to an active target', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordRetiredFeaturePropertyErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('WITH RECURSIVE raw_property_names AS');
+      expect(sqlText).to.include('SELECT DISTINCT property_name');
+      expect(sqlText).to.include('property_seed AS');
+      expect(sqlText).to.include('property_resolution AS');
+      expect(sqlText).to.include('target_feature_property_id');
+      expect(sqlText).to.include('JOIN property_name_resolution pnr');
+      expect(sqlText).to.include('pnr.resolved_feature_property_id IS NULL');
+      expect(sqlText).to.include("'RETIRED_FEATURE_PROPERTY'");
+      expect(sqlText).to.include('ON CONFLICT');
     });
   });
 
@@ -411,9 +459,13 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
       // Requiredness no longer derived from feature_type_property.
       expect(sqlText).to.not.include('COALESCE(ftp.required_value, false) = TRUE');
+
+      // Required Blueprint properties can be retired; aliasing should not force this check to active
+      // feature_property rows only.
+      expect(sqlText).to.not.include('fp.record_end_date IS NULL');
     });
 
-    it('uses an indexable raw-property anti-lookup for present required properties', async () => {
+    it('uses resolved staging for present required properties', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
@@ -427,13 +479,12 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('NOT EXISTS');
       expect(sqlText).to.include('FROM submission_feature');
-      expect(sqlText).to.include('FROM submission_upload_staging_raw_property raw');
-      expect(sqlText).to.include('raw.submission_upload_id');
-      expect(sqlText).to.include('raw.submission_feature_id = sf.submission_feature_id');
-      expect(sqlText).to.include('raw.property_name = rp.property_name');
+      expect(sqlText).to.include('FROM submission_upload_staging_resolved_property resolved');
+      expect(sqlText).to.include('resolved.submission_upload_id');
+      expect(sqlText).to.include('resolved.submission_feature_id = sf.submission_feature_id');
+      expect(sqlText).to.include('resolved.feature_type_property_id = rp.feature_type_property_id');
       expect(sqlText).to.not.include('present_properties AS');
       expect(sqlText).to.not.include('FROM submission_upload_staging_raw_property\n        WHERE submission_upload_id');
-      expect(sqlText).to.not.include('FROM submission_upload_staging_resolved_property rsp');
       expect(sqlText).to.not.include('SELECT DISTINCT\n          rsp.submission_feature_id');
     });
   });

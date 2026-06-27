@@ -140,6 +140,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         blueprintId
       );
+      await this.submissionFeaturePropertyIngestionRepository.recordRetiredFeaturePropertyErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
       await this.submissionFeaturePropertyIngestionRepository.recordPrimitiveValidationErrorsBySubmissionUploadId(
         submissionUploadId
       );

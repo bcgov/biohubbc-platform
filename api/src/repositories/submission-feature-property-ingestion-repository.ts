@@ -218,6 +218,20 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
    * properties are kept with a null id for later reporting.
    *
+   * Target behavior is intentionally Blueprint-scoped:
+   *
+   * - The raw tarball key starts the alias chain at the matching `feature_property.name`.
+   * - Each retired property may point forward through `feature_property.target_feature_property_id`.
+   * - The chain stops at the first property that the selected Blueprint assigns for the raw feature's
+   *   feature type.
+   * - The inserted typed row uses that Blueprint-assigned `feature_type_property_id` exactly.
+   *
+   * This means aliases let old tarballs succeed against newer Blueprints, but they do not silently
+   * upgrade a submission beyond the selected Blueprint contract. If an old Blueprint still assigns a
+   * retired property, ingestion indexes that retired property. If a new Blueprint assigns the
+   * successor property, the same raw tarball key can index the successor. Truly unknown names remain
+   * unresolved and non-fatal, matching the raw-JSON preservation behavior.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
@@ -227,8 +241,91 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     blueprintId: number
   ): Promise<void> {
     const sql = SQL`
-      WITH selected_blueprint AS (
+      WITH RECURSIVE selected_blueprint AS (
         SELECT ${blueprintId}::integer AS blueprint_id
+      ),
+      raw_property_names AS (
+        -- Scope alias resolution to property keys that actually appear in this upload. This keeps
+        -- pgboss ingestion set-based without walking the entire global feature_property catalog.
+        SELECT DISTINCT property_name
+        FROM submission_upload_staging_raw_property
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+      ),
+      property_seed AS (
+        SELECT DISTINCT ON (rpn.property_name)
+          rpn.property_name,
+          fp.feature_property_id AS source_feature_property_id,
+          fp.feature_property_id AS current_feature_property_id,
+          fp.target_feature_property_id,
+          fp.record_end_date,
+          ARRAY[fp.feature_property_id] AS path
+        FROM raw_property_names rpn
+        JOIN feature_property fp
+          ON fp.name = rpn.property_name
+        ORDER BY
+          rpn.property_name,
+          -- Prefer an active property if one exists for the raw key; otherwise use the most recently
+          -- retired row as the start of the backwards-compatibility chain.
+          CASE WHEN fp.record_end_date IS NULL THEN 0 ELSE 1 END,
+          fp.record_end_date DESC NULLS FIRST,
+          fp.feature_property_id DESC
+      ),
+      property_resolution AS (
+        SELECT
+          ps.property_name,
+          ps.source_feature_property_id,
+          ps.current_feature_property_id,
+          ps.target_feature_property_id,
+          ps.record_end_date,
+          0 AS depth,
+          ps.path
+        FROM property_seed ps
+        UNION ALL
+        SELECT
+          pr.property_name,
+          pr.source_feature_property_id,
+          fp_next.feature_property_id AS current_feature_property_id,
+          fp_next.target_feature_property_id,
+          fp_next.record_end_date,
+          pr.depth + 1 AS depth,
+          pr.path || fp_next.feature_property_id AS path
+        FROM property_resolution pr
+        JOIN feature_property fp_next
+          ON fp_next.feature_property_id = pr.target_feature_property_id
+        WHERE pr.target_feature_property_id IS NOT NULL
+          -- Defensive cycle guard. The migration prevents direct self-targeting, but this protects
+          -- ingestion from longer accidental cycles.
+          AND NOT fp_next.feature_property_id = ANY(pr.path)
+          AND pr.depth < 25
+      ),
+      blueprint_properties AS (
+        -- The selected Blueprint is the canonical indexing contract. This deliberately includes
+        -- retired feature_property rows when the Blueprint still assigns them; older Blueprints must
+        -- keep indexing exactly what they declare.
+        SELECT
+          bft.feature_type_id,
+          ftp.feature_type_property_id,
+          ftp.feature_property_id,
+          bftp.blueprint_feature_type_property_id,
+          bftp.allow_multiple,
+          bftp.required_value,
+          fpt.name AS property_type_name
+        FROM selected_blueprint sb
+        JOIN blueprint_feature_type bft
+          ON bft.blueprint_id = sb.blueprint_id
+         AND bft.record_end_date IS NULL
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+         AND bftp.record_end_date IS NULL
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_property_id = bftp.feature_type_property_id
+         AND ftp.feature_type_id = bft.feature_type_id
+         AND ftp.record_end_date IS NULL
+        JOIN feature_property fp
+          ON fp.feature_property_id = ftp.feature_property_id
+        JOIN feature_property_type fpt
+          ON fpt.feature_property_type_id = fp.feature_property_type_id
+         AND fpt.record_end_date IS NULL
       )
       INSERT INTO submission_upload_staging_resolved_property (
         submission_feature_id,
@@ -237,6 +334,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         property_name,
         value,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         allow_multiple,
         required_value,
         property_type_name
@@ -250,39 +348,155 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         -- Surrogate id only when the Blueprint includes the feature type and assigns the property;
         -- this gates downstream parsing.
         CASE
-          WHEN bft.blueprint_feature_type_id IS NOT NULL
-           AND bftp.blueprint_feature_type_property_id IS NOT NULL
-          THEN ftp.feature_type_property_id
+          WHEN bp.blueprint_feature_type_property_id IS NOT NULL
+          THEN bp.feature_type_property_id
         END AS feature_type_property_id,
-        COALESCE(bftp.allow_multiple, false) AS allow_multiple,
-        COALESCE(bftp.required_value, false) AS required_value,
-        fpt.name AS property_type_name
+        bp.blueprint_feature_type_property_id,
+        COALESCE(bp.allow_multiple, false) AS allow_multiple,
+        COALESCE(bp.required_value, false) AS required_value,
+        bp.property_type_name
       FROM submission_upload_staging_raw_property s
-      LEFT JOIN feature_property fp
-        ON fp.name = s.property_name
-       AND fp.record_end_date IS NULL
-      LEFT JOIN feature_property_type fpt
-        ON fpt.feature_property_type_id = fp.feature_property_type_id
-       AND fpt.record_end_date IS NULL
-      LEFT JOIN selected_blueprint sb ON TRUE
-      -- Feature type included in the Blueprint.
-      LEFT JOIN blueprint_feature_type bft
-        ON bft.blueprint_id = sb.blueprint_id
-       AND bft.feature_type_id = s.feature_type_id
-       AND bft.record_end_date IS NULL
-      -- Canonical feature-type/property pool entry; supplies the surrogate id and bridges to the
-      -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
-      LEFT JOIN feature_type_property ftp
-        ON ftp.feature_type_id = s.feature_type_id
-       AND ftp.feature_property_id = fp.feature_property_id
-       AND ftp.record_end_date IS NULL
-      -- Property assigned to the Blueprint feature type; source of requiredness and multiplicity.
-      LEFT JOIN blueprint_feature_type_property bftp
-        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-       AND bftp.feature_type_property_id = ftp.feature_type_property_id
-       AND bftp.record_end_date IS NULL
+      LEFT JOIN LATERAL (
+        SELECT bp.*
+        FROM property_resolution pr
+        JOIN blueprint_properties bp
+          ON bp.feature_type_id = s.feature_type_id
+         AND bp.feature_property_id = pr.current_feature_property_id
+        WHERE pr.property_name = s.property_name
+        -- Choose the nearest match in the alias path. This is the core contract: aliases move forward
+        -- only until the selected Blueprint can validate/index the property.
+        ORDER BY pr.depth ASC
+        LIMIT 1
+      ) bp ON TRUE
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Record retired-property errors for raw property names that are known but cannot resolve to an
+   * active successor through `feature_property.target_feature_property_id`.
+   *
+   * This validation is intentionally independent of the selected Blueprint. Unknown property names
+   * are ignored so the existing non-fatal raw JSONB preservation behavior remains unchanged, but a
+   * known retired property with no active endpoint indicates a broken compatibility mapping and is
+   * recorded as `RETIRED_FEATURE_PROPERTY`.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async recordRetiredFeaturePropertyErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH RECURSIVE raw_property_names AS (
+        -- Only inspect keys present in this upload. Unknown names are ignored because they will not
+        -- produce a feature_property seed row.
+        SELECT DISTINCT property_name
+        FROM submission_upload_staging_raw_property
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+      ),
+      property_seed AS (
+        SELECT DISTINCT ON (rpn.property_name)
+          rpn.property_name,
+          fp.feature_property_id AS source_feature_property_id,
+          fp.feature_property_id AS current_feature_property_id,
+          fp.target_feature_property_id,
+          fp.record_end_date,
+          ARRAY[fp.feature_property_id] AS path
+        FROM raw_property_names rpn
+        JOIN feature_property fp
+          ON fp.name = rpn.property_name
+        ORDER BY
+          rpn.property_name,
+          CASE WHEN fp.record_end_date IS NULL THEN 0 ELSE 1 END,
+          fp.record_end_date DESC NULLS FIRST,
+          fp.feature_property_id DESC
+      ),
+      property_resolution AS (
+        SELECT
+          ps.property_name,
+          ps.source_feature_property_id,
+          ps.current_feature_property_id,
+          ps.target_feature_property_id,
+          ps.record_end_date,
+          0 AS depth,
+          ps.path
+        FROM property_seed ps
+        UNION ALL
+        SELECT
+          pr.property_name,
+          pr.source_feature_property_id,
+          fp_next.feature_property_id AS current_feature_property_id,
+          fp_next.target_feature_property_id,
+          fp_next.record_end_date,
+          pr.depth + 1 AS depth,
+          pr.path || fp_next.feature_property_id AS path
+        FROM property_resolution pr
+        JOIN feature_property fp_next
+          ON fp_next.feature_property_id = pr.target_feature_property_id
+        WHERE pr.target_feature_property_id IS NOT NULL
+          AND NOT fp_next.feature_property_id = ANY(pr.path)
+          AND pr.depth < 25
+      ),
+      property_name_resolution AS (
+        SELECT
+          ps.property_name,
+          ps.source_feature_property_id,
+          resolved.current_feature_property_id AS resolved_feature_property_id
+        FROM property_seed ps
+        LEFT JOIN LATERAL (
+          SELECT pr.current_feature_property_id
+          FROM property_resolution pr
+          WHERE pr.source_feature_property_id = ps.source_feature_property_id
+            AND pr.record_end_date IS NULL
+          ORDER BY pr.depth DESC
+          LIMIT 1
+        ) resolved ON TRUE
+      ),
+      grouped_errors AS (
+        SELECT
+          s.submission_upload_id,
+          s.property_name,
+          NULL::integer AS feature_type_property_id,
+          'RETIRED_FEATURE_PROPERTY'::text AS error_code,
+          'Retired feature property has no active successor'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_upload_staging_raw_property s
+        JOIN property_name_resolution pnr
+          ON pnr.property_name = s.property_name
+        WHERE s.submission_upload_id = ${submissionUploadId}::uuid
+          AND pnr.resolved_feature_property_id IS NULL
+        GROUP BY s.submission_upload_id, s.property_name
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
     await this.connection.sql(sql);
   }
 
@@ -309,6 +523,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_upload_id,
         feature_type_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         property_name,
         property_type_name,
         allow_multiple,
@@ -319,12 +534,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         rsp.submission_upload_id,
         rsp.feature_type_id,
         rsp.feature_type_property_id,
+        rsp.blueprint_feature_type_property_id,
         rsp.property_name,
         rsp.property_type_name,
         rsp.allow_multiple,
         rsp.value AS logical_value
       FROM submission_upload_staging_resolved_property rsp
       WHERE rsp.feature_type_property_id IS NOT NULL
+        AND rsp.blueprint_feature_type_property_id IS NOT NULL
         AND rsp.submission_upload_id = ${submissionUploadId}::uuid
         AND jsonb_typeof(rsp.value) <> 'array'
         AND rsp.value IS NOT NULL
@@ -335,6 +552,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         rsp.submission_upload_id,
         rsp.feature_type_id,
         rsp.feature_type_property_id,
+        rsp.blueprint_feature_type_property_id,
         rsp.property_name,
         rsp.property_type_name,
         rsp.allow_multiple,
@@ -342,6 +560,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_resolved_property rsp
       CROSS JOIN LATERAL jsonb_array_elements(rsp.value) AS arr(value)
       WHERE rsp.feature_type_property_id IS NOT NULL
+        AND rsp.blueprint_feature_type_property_id IS NOT NULL
         AND rsp.submission_upload_id = ${submissionUploadId}::uuid
         AND jsonb_typeof(rsp.value) = 'array'
         AND rsp.allow_multiple = TRUE
@@ -548,6 +767,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_id,
         property_name,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value_text,
         raw_value,
         date_value,
@@ -559,6 +779,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.property_type_name,
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
@@ -570,6 +791,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           btrim(v.logical_value #>> '{}') AS value_text,
           v.logical_value AS raw_value
         FROM valid_property_values v
@@ -620,6 +842,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_id,
         property_name,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         logical_value,
         geometry_json,
         parsed_geom,
@@ -632,6 +855,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.property_type_name,
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
@@ -643,6 +867,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.logical_value
         FROM valid_property_values v
         WHERE v.property_type_name = 'spatial'
@@ -688,6 +913,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         p.submission_feature_id,
         p.property_name,
         p.feature_type_property_id,
+        p.blueprint_feature_type_property_id,
         p.logical_value,
         p.geometry_json,
         p.parsed_geom,
@@ -728,6 +954,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_id,
         property_name,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         raw_value,
         is_format_valid,
         normalized_slug,
@@ -739,6 +966,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.property_type_name,
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
@@ -750,6 +978,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.logical_value AS raw_value,
           regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
         FROM valid_property_values v
@@ -773,6 +1002,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         n.submission_feature_id,
         n.property_name,
         n.feature_type_property_id,
+        n.blueprint_feature_type_property_id,
         n.raw_value,
         n.is_format_valid,
         n.normalized_slug,
@@ -808,6 +1038,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_id,
         property_name,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         raw_value,
         tsn,
         taxon_id
@@ -818,6 +1049,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.property_type_name,
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
@@ -828,6 +1060,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.submission_feature_id,
         v.property_name,
         v.feature_type_property_id,
+        v.blueprint_feature_type_property_id,
         v.logical_value AS raw_value,
         (v.logical_value #>> '{}')::integer AS tsn,
         t.taxon_id
@@ -864,6 +1097,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_id,
         property_name,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         raw_value,
         normalized_reference,
         artifact_id
@@ -880,6 +1114,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.property_type_name,
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
@@ -891,6 +1126,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
+          v.blueprint_feature_type_property_id,
           v.logical_value AS raw_value
         FROM valid_property_values v
         WHERE v.property_type_name = 'artifact_key'
@@ -907,6 +1143,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         n.submission_feature_id,
         n.property_name,
         n.feature_type_property_id,
+        n.blueprint_feature_type_property_id,
         n.raw_value,
         n.normalized_reference,
         ua.artifact_id
@@ -941,18 +1178,20 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     const sql = SQL`
       INSERT INTO submission_upload_staging_feature_candidate (
         submission_upload_id, submission_feature_id, property_name, feature_type_property_id,
+        blueprint_feature_type_property_id,
         raw_value, is_format_valid, parsed_source_id,
         referenced_submission_feature_id, referenced_feature_type_id
       )
       WITH valid_property_values AS (
         SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
-               v.feature_type_property_id, v.property_type_name, v.logical_value
+               v.feature_type_property_id, v.blueprint_feature_type_property_id,
+               v.property_type_name, v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
       ),
       candidates AS (
         SELECT v.submission_upload_id, v.submission_feature_id, v.property_name,
-               v.feature_type_property_id,
+               v.feature_type_property_id, v.blueprint_feature_type_property_id,
                v.logical_value AS raw_value,
                regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
         FROM valid_property_values v
@@ -968,6 +1207,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       )
       SELECT
         p.submission_upload_id, p.submission_feature_id, p.property_name, p.feature_type_property_id,
+        p.blueprint_feature_type_property_id,
         p.raw_value, p.is_format_valid, p.parsed_source_id,
         target.submission_feature_id AS referenced_submission_feature_id,
         target.feature_type_id        AS referenced_feature_type_id
@@ -988,6 +1228,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * (`submission_upload.blueprint_id`), passed in by the caller: a property is required when its
    * `blueprint_feature_type_property.required_value` is true. A required property is considered
    * present only when staging has a non-null value and, for arrays, at least one element.
+   *
+   * Presence is checked against `submission_upload_staging_resolved_property.feature_type_property_id`,
+   * not the raw property name. This is what allows a retired raw key to satisfy the required property
+   * that the selected Blueprint actually assigns, while still preserving old Blueprints that assign
+   * retired properties directly.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
@@ -1031,7 +1276,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
          AND ftp.record_end_date IS NULL
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
-         AND fp.record_end_date IS NULL
         JOIN upload_feature_types uft
           ON uft.feature_type_id = bft.feature_type_id
       ),
@@ -1050,13 +1294,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND sf.record_end_date IS NULL
           AND NOT EXISTS (
             SELECT 1
-            FROM submission_upload_staging_raw_property raw
-            WHERE raw.submission_upload_id = ${submissionUploadId}::uuid
-              AND raw.submission_feature_id = sf.submission_feature_id
-              AND raw.property_name = rp.property_name
-              AND raw.value IS NOT NULL
-              AND raw.value <> 'null'::jsonb
-              AND NOT (jsonb_typeof(raw.value) = 'array' AND jsonb_array_length(raw.value) = 0)
+            FROM submission_upload_staging_resolved_property resolved
+            WHERE resolved.submission_upload_id = ${submissionUploadId}::uuid
+              AND resolved.submission_feature_id = sf.submission_feature_id
+              AND resolved.feature_type_property_id = rp.feature_type_property_id
+              AND resolved.value IS NOT NULL
+              AND resolved.value <> 'null'::jsonb
+              AND NOT (jsonb_typeof(resolved.value) = 'array' AND jsonb_array_length(resolved.value) = 0)
           )
         GROUP BY sf.submission_upload_id, rp.feature_type_property_id, rp.property_name
       )
@@ -1800,12 +2044,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_timestamp (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         date_value,
         time_value
       )
       SELECT
         p.submission_feature_id,
         p.feature_type_property_id,
+        p.blueprint_feature_type_property_id,
         p.date_value,
         p.time_value
       FROM submission_upload_staging_datetime_candidate p
@@ -1894,11 +2140,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_geometry (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       )
       SELECT
         p.submission_feature_id,
         p.feature_type_property_id,
+        p.blueprint_feature_type_property_id,
         public.ST_Force2D(p.parsed_geom)
       FROM submission_upload_staging_spatial_candidate p
       WHERE p.submission_upload_id = ${submissionUploadId}::uuid
@@ -1923,11 +2171,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_string (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       )
       SELECT
         v.submission_feature_id,
         v.feature_type_property_id,
+        v.blueprint_feature_type_property_id,
         v.logical_value #>> '{}'
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
@@ -1952,11 +2202,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_number (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       )
       SELECT
         v.submission_feature_id,
         v.feature_type_property_id,
+        v.blueprint_feature_type_property_id,
         (v.logical_value #>> '{}')::numeric
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
@@ -1981,11 +2233,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_boolean (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       )
       SELECT
         v.submission_feature_id,
         v.feature_type_property_id,
+        v.blueprint_feature_type_property_id,
         (v.logical_value #>> '{}')::boolean
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
@@ -2010,11 +2264,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_code (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         contributor_codeset_code_id
       )
       SELECT
         c.submission_feature_id,
         c.feature_type_property_id,
+        c.blueprint_feature_type_property_id,
         c.contributor_codeset_code_id
       FROM submission_upload_staging_code_candidate c
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
@@ -2056,11 +2312,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         referenced_submission_feature_id
       )
       SELECT
         c.submission_feature_id,
         c.feature_type_property_id,
+        c.blueprint_feature_type_property_id,
         c.referenced_submission_feature_id
       FROM submission_upload_staging_feature_candidate c
       JOIN feature_type_property ftp
@@ -2107,11 +2365,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO submission_feature_property_taxon (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         taxon_id
       )
       SELECT
         c.submission_feature_id,
         c.feature_type_property_id,
+        c.blueprint_feature_type_property_id,
         c.taxon_id
       FROM submission_upload_staging_taxon_candidate c
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
