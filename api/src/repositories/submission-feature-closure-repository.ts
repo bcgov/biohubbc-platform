@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { BaseRepository } from './base-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 /**
  * Repository class for the derived submission feature closure table.
@@ -60,14 +61,18 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
     // Compute TWO closures and store every evidence edge: the ancestry closure (parent-only,
     // transitive) is the authorization reach; the evidence closure (parent + property, transitive) is
     // the search reach and a superset. is_ancestor is true iff the edge is also in the ancestry closure.
-    const response = await this.connection.sql(SQL`
+    const sqlStatement = SQL``;
+
+    sqlStatement.append(`
       WITH RECURSIVE
       -- Active features in the upload (the universe for self-loops and the join filter).
       active_features AS (
         SELECT submission_feature_id
         FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
+        WHERE submission_upload_id = `);
+    sqlStatement.append(SQL`${submissionUploadId}`);
+    sqlStatement.append(`::uuid
+          AND ${isSubmissionFeatureActive('submission_feature')}
       ),
       -- Reflexive self-loops (every active feature reaches itself) — the reflexive edges that seed the closure.
       self_loops AS (
@@ -125,6 +130,8 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
       LEFT JOIN ancestry_closure anc
         ON anc.source = cl.source AND anc.target = cl.target;
     `);
+
+    const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount ?? 0;
   }

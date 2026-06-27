@@ -15,6 +15,7 @@ import {
 } from '../../models/download';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+import { isSubmissionFeatureActive } from '../sql-fragments';
 
 /**
  * Row shape for the typed-cursor base query.
@@ -408,7 +409,7 @@ export class DownloadRepository extends BaseRepository {
         SELECT
           sf.submission_feature_id,
           sf.uuid,
-          sf.data,
+          '{}'::jsonb AS data,
           ft.name AS feature_type_name,
           parent_sf.uuid AS parent_uuid
         FROM submission_feature sf
@@ -552,8 +553,8 @@ export class DownloadRepository extends BaseRepository {
        *   matching the same-file `spatial` precedent's use of `::jsonb`.
        * - `ORDER BY sf.submission_feature_id` is mandatory: export reruns must be byte-identical
        *   for the same data so downstream hash-based diff tooling stays valid.
-       * - The `sf.record_end_date IS NULL` filter is defense-in-depth — ingestion already excludes
-       *   inactive features, but soft-delete-on-read is the codebase convention.
+       * - The `sf` active-window filter is defense-in-depth — ingestion already excludes
+       *   inactive referenced features, but read paths must never surface pending/end-dated rows.
        * - `submission_feature_property_feature` has no soft-delete column, so no `p`-side filter is needed.
        */
       feature: `SELECT
@@ -565,9 +566,39 @@ export class DownloadRepository extends BaseRepository {
       INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
       INNER JOIN submission_feature sf
         ON sf.submission_feature_id = p.referenced_submission_feature_id
-        AND sf.record_end_date IS NULL
+        AND ${isSubmissionFeatureActive('sf')}
       WHERE p.submission_feature_id = ANY($1)
-      GROUP BY p.submission_feature_id, fp.name`
+      GROUP BY p.submission_feature_id, fp.name`,
+      artifact_key: `SELECT
+        sfa.submission_feature_id,
+        fp.name,
+        jsonb_agg(a.object_key ORDER BY a.object_key) AS value
+      FROM submission_feature_artifact sfa
+      INNER JOIN submission_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
+      INNER JOIN artifact a ON a.artifact_id = sfa.artifact_id
+      INNER JOIN (
+        SELECT
+          ftp.feature_type_id,
+          MIN(ftp.feature_type_property_id) AS feature_type_property_id
+        FROM feature_type_property ftp
+        INNER JOIN feature_property fp
+          ON fp.feature_property_id = ftp.feature_property_id
+          AND fp.record_end_date IS NULL
+        INNER JOIN feature_property_type fpt
+          ON fpt.feature_property_type_id = fp.feature_property_type_id
+          AND fpt.name = 'artifact_key'
+          AND fpt.record_end_date IS NULL
+        WHERE ftp.record_end_date IS NULL
+        GROUP BY ftp.feature_type_id
+        HAVING COUNT(*) = 1
+      ) artifact_ftp
+        ON artifact_ftp.feature_type_id = sf.feature_type_id
+      INNER JOIN feature_type_property ftp
+        ON ftp.feature_type_property_id = artifact_ftp.feature_type_property_id
+      INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      WHERE sfa.submission_feature_id = ANY($1)
+        AND ${isSubmissionFeatureActive('sf')}
+      GROUP BY sfa.submission_feature_id, fp.name`
     };
 
     // Query only the typed tables for property types present in this batch

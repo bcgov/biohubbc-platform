@@ -9,6 +9,21 @@
 import { Knex } from 'knex';
 
 /**
+ * Active-window predicate for submission_feature rows that may surface on read
+ * paths or participate in access evaluation.
+ *
+ * A feature is active only after approval/publication sets record_effective_date
+ * and before any end date. NULL record_effective_date rows are drafts/pending
+ * review and must not be searchable, downloadable, or security anchors.
+ *
+ * @param alias SQL alias for submission_feature.
+ * @returns SQL predicate with zero placeholders.
+ */
+export function isSubmissionFeatureActive(alias: string): string {
+  return `${alias}.record_effective_date <= now() AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date)`;
+}
+
+/**
  * Closure-based "effectively secured" check used on every security-resolving path —
  * the hot read paths (search / download) and the scope-anchor recompute write
  * path: a feature is effectively secured when it or an ancestor has an active security
@@ -48,7 +63,7 @@ export function isEffectivelySecured(featureIdExpr: string): string {
         AND c.is_ancestor = true
         AND sfs.record_end_date IS NULL
         AND sfs.status = 'active'
-        AND sf_sec.record_effective_date <= now()
+        AND ${isSubmissionFeatureActive('sf_sec')}
     )
     -- Fail closed: the reflexive self-loop (F, F) is written for every active feature when its upload's
     -- closure is built, so its absence means the closure is not built (recompute not yet run, or failed).

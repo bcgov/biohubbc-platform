@@ -1,8 +1,17 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 
 describe('sql-fragments', () => {
+  describe('isSubmissionFeatureActive', () => {
+    it('requires an effective record that has not ended', () => {
+      const sql = isSubmissionFeatureActive('sf');
+
+      expect(sql).to.include('sf.record_effective_date <= now()');
+      expect(sql).to.include('(sf.record_end_date IS NULL OR now() < sf.record_end_date)');
+    });
+  });
+
   describe('isEffectivelySecured', () => {
     it('reads the precomputed closure ancestry instead of a recursive parent walk', () => {
       // Verifies: the closure-based fragment probes submission_feature_closure on the
@@ -20,6 +29,7 @@ describe('sql-fragments', () => {
       // Step 3: Verify the security join is on the closure target id and gated by effective date
       expect(sql).to.include('sfs.submission_feature_id = c.target_submission_feature_id');
       expect(sql).to.include('record_effective_date <= now()');
+      expect(sql).to.include('record_end_date is null or now() <');
 
       // Step 4: Verify it does NOT fall back to the recursive parent walk
       expect(sql).to.not.include('with recursive');

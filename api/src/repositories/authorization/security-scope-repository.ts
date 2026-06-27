@@ -6,7 +6,7 @@ import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
-import { isEffectivelySecured } from '../sql-fragments';
+import { isEffectivelySecured, isSubmissionFeatureActive } from '../sql-fragments';
 
 /**
  * Repository for security scope tables — the normalized access model that replaces
@@ -197,12 +197,11 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ps.effect = '${PolicyEffect.ALLOW}'
            AND p.record_end_date IS NULL
            AND p.status = 'approved'
-           AND anchor_sf.record_end_date IS NULL
+           AND ${isSubmissionFeatureActive('anchor_sf')}
            AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
            AND (ss.urn_feature_type = ft.name                       OR ss.urn_feature_type = '*')
            AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
            AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
-           AND anchor_sf.record_effective_date <= now()
        )`,
       [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
     );
@@ -342,13 +341,12 @@ export class SecurityScopeRepository extends BaseRepository {
                 candidate.parent_submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE candidate.record_end_date IS NULL
+         WHERE ${isSubmissionFeatureActive('candidate')}
            AND candidate.submission_feature_id > $1
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
            AND ${isEffectivelySecured('candidate.submission_feature_id')}
-           AND candidate.record_effective_date <= now()
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ),
@@ -366,7 +364,7 @@ export class SecurityScopeRepository extends BaseRepository {
          FROM ancestor_walk aw
          JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
          WHERE sf.parent_submission_feature_id IS NOT NULL
-           AND sf.record_end_date IS NULL
+           AND ${isSubmissionFeatureActive('sf')}
        ),
 
        -- Re-evaluate candidate criteria per ancestor via index lookups.
@@ -376,12 +374,11 @@ export class SecurityScopeRepository extends BaseRepository {
          FROM ancestor_walk aw
          JOIN submission_feature ancestor ON ancestor.submission_feature_id = aw.ancestor_id
          JOIN feature_type ft ON ft.feature_type_id = ancestor.feature_type_id
-         WHERE ancestor.record_end_date IS NULL
+         WHERE ${isSubmissionFeatureActive('ancestor')}
            AND ($2 = ancestor.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                      OR $3 = '*')
            AND ($4 = ancestor.submission_feature_id::text OR $4 = '*')
            AND ${isEffectivelySecured('ancestor.submission_feature_id')}
-           AND ancestor.record_effective_date <= now()
        )
 
        -- Prune to topmost candidates only (anchors). A candidate with a candidate
@@ -421,13 +418,12 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE candidate.record_end_date IS NULL
+         WHERE ${isSubmissionFeatureActive('candidate')}
            AND candidate.submission_feature_id > $1
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
            AND ${isEffectivelySecured('candidate.submission_feature_id')}
-           AND candidate.record_effective_date <= now()
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ) candidate`,

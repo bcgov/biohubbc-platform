@@ -8,6 +8,7 @@ import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -1122,6 +1123,9 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security.status = 'active'
       WHERE
         submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')}`);
+    sqlStatement.append(`
       GROUP BY
         submission_feature.submission_feature_id,
         feature_type.name,
@@ -1129,7 +1133,7 @@ export class SubmissionRepository extends BaseRepository {
         feature_type.sort
       ORDER BY
         feature_type.sort ASC;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);
     return response.rows;
@@ -1689,8 +1693,9 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission_id = ${submissionId}
       and
-        parent_submission_feature_id is null;
+        parent_submission_feature_id is null
     `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -1735,6 +1740,9 @@ export class SubmissionRepository extends BaseRepository {
         parent_submission_feature_id IS null
       AND
         s.submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
 
       UNION ALL
 
@@ -1757,6 +1765,9 @@ export class SubmissionRepository extends BaseRepository {
       ft.feature_type_id = sf.feature_type_id
       where
         sf.submission_id = ${submissionId}
+    `);
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
     )
     SELECT
       w_submission_feature.submission_feature_id,
@@ -1775,7 +1786,7 @@ export class SubmissionRepository extends BaseRepository {
     ORDER BY
       level,
       submission_feature_id;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
 
@@ -1826,6 +1837,9 @@ export class SubmissionRepository extends BaseRepository {
         parent_submission_feature_id IS null
       AND
         s.submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
       AND sfs.submission_feature_security_id IS NULL
 
       UNION ALL
@@ -1855,6 +1869,9 @@ export class SubmissionRepository extends BaseRepository {
         sfs.status = 'active'
       WHERE
         sf.submission_id = ${submissionId}
+    `);
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
       AND sfs.submission_feature_security_id IS NULL
     )
     SELECT
@@ -1874,7 +1891,7 @@ export class SubmissionRepository extends BaseRepository {
     ORDER BY
       level,
       submission_feature_id;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
 
@@ -1913,7 +1930,8 @@ export class SubmissionRepository extends BaseRepository {
       `)
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-      .where('submission_feature.submission_id', submissionId);
+      .where('submission_feature.submission_id', submissionId)
+      .whereRaw(isSubmissionFeatureActive('submission_feature'));
 
     const normalizedSearch = filters?.search?.trim().toLowerCase();
     if (normalizedSearch) {

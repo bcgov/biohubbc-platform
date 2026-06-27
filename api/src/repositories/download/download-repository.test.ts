@@ -641,7 +641,7 @@ describe('DownloadRepository', () => {
       expect(result[0].value).to.deep.equal(['urn:1:obs:42', 'urn:1:obs:43']);
     });
 
-    it('includes the sf.record_end_date IS NULL filter', async () => {
+    it('includes the referenced feature active-window filter', async () => {
       const queryStub = sinon.stub();
       queryStub.resolves({ rows: [] });
 
@@ -651,8 +651,26 @@ describe('DownloadRepository', () => {
       await repo.fetchTypedPropertyRows([100], ['feature']);
 
       const sqlText = String(queryStub.getCall(0).args[0]);
+      expect(sqlText).to.include('sf.record_effective_date <= now()');
       expect(sqlText).to.include('sf.record_end_date IS NULL');
+      expect(sqlText).to.include('now() < sf.record_end_date');
       expect(sqlText).to.include('referenced_submission_feature_id');
+    });
+
+    it('hydrates artifact_key rows only when the feature type has one artifact_key property', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      await repo.fetchTypedPropertyRows([100], ['artifact_key']);
+
+      const sqlText = String(queryStub.getCall(0).args[0]);
+      expect(sqlText).to.include('submission_feature_artifact sfa');
+      expect(sqlText).to.include('artifact_ftp.feature_type_id = sf.feature_type_id');
+      expect(sqlText).to.include('fpt.name = \'artifact_key\'');
+      expect(sqlText).to.include('HAVING COUNT(*) = 1');
     });
 
     it('skips unknown property type names', async () => {

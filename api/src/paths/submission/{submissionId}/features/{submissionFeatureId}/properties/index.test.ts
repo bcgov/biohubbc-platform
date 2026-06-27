@@ -6,7 +6,7 @@ import * as index from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import * as db from '../../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../../errors/http-error';
-import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
+import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
 
 chai.use(sinonChai);
 
@@ -21,7 +21,7 @@ describe('properties index', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeaturePropertiesStub = sinon
-        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureProperties')
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
         .throws(new HTTP400('Error', ['Error']));
 
       const requestHandler = index.getSubmissionFeatureProperties();
@@ -48,7 +48,7 @@ describe('properties index', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeaturePropertiesStub = sinon
-        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureProperties')
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
         .resolves({
           properties: [
             { id: 'species_name', property: 'species name', value: 'Wolf' },
