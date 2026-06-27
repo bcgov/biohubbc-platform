@@ -24,6 +24,7 @@ import { ApiConflictError } from '../../errors/api-error';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
@@ -156,11 +157,10 @@ describe('Download Parquet pipeline (integration)', function () {
    * download id. The returned download is the standard broad-path policy used
    * by the writeFeatureTypeParquet tests below.
    */
-  async function createPolicyDownload(featureTypes: string[]): Promise<string> {
+  async function createPolicyDownload(): Promise<string> {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `pq-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes,
       expressionId: null
     });
     const { download_id } = await downloadService.createDownload({
@@ -872,7 +872,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
-      const downloadId = await createPolicyDownload(['survey']);
+      const downloadId = await createPolicyDownload();
       // Status lives on the version, so the download needs one to be findable, and
       // the transition keys off the version id.
       const downloadVersionId = await createDownloadVersionFor(downloadId);
@@ -929,6 +929,7 @@ describe('Download Parquet pipeline (integration)', function () {
      */
     const broadStatement = (urn_feature_type: string): ActivePolicyStatementWithExpression => ({
       policy_statement_id: '00000000-0000-0000-0000-000000000001',
+      effect: PolicyEffect.ALLOW,
       urn_feature_type,
       expression_id: null
     });
@@ -938,7 +939,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'survey', { name: 'Happy path survey' });
-      const downloadId = await createPolicyDownload(['survey']);
+      const downloadId = await createPolicyDownload();
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -993,7 +994,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'survey', { name: 'Retry survey' });
-      const downloadId = await createPolicyDownload(['survey']);
+      const downloadId = await createPolicyDownload();
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -1049,7 +1050,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       await createTestFeature(connection, submissionId, 'survey', { name: 'Multi DS' });
       await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
-      const downloadId = await createPolicyDownload(['survey', 'capture']);
+      const downloadId = await createPolicyDownload();
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
@@ -1139,7 +1140,6 @@ describe('Download Parquet pipeline (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: `pq-sec-anon-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: null,
-        featureTypes: ['survey'],
         expressionId: null
       });
       const { download_id } = await downloadService.createDownload({
@@ -1186,7 +1186,6 @@ describe('Download Parquet pipeline (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: `pq-sec-auth-${Date.now()}-${randomUUID().slice(0, 8)}`,
         description: null,
-        featureTypes: ['survey'],
         expressionId: null
       });
       const { download_id } = await downloadService.createDownload({

@@ -466,7 +466,6 @@ describe('Policy status orchestration (integration)', function () {
     const { policy_id } = await downloadPolicyService.createDownloadPolicy({
       name: 'I6 Download Policy',
       description: 'audit: download policies stay grant-free',
-      featureTypes: ['survey'],
       expressionId: null
     });
 

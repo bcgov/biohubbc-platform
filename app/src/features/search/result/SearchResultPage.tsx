@@ -1,6 +1,7 @@
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
+import dayjs from 'dayjs';
 import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
 import { useCodesContext } from 'hooks/useContext';
 import { useMemo, useState } from 'react';
@@ -38,14 +39,6 @@ export const SearchResultPage = () => {
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
   const featureTypeLinks = useMemo(
     () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
-    [codesDataLoader.data?.feature_type_with_properties]
-  );
-  const featureTypeOptions = useMemo(
-    () =>
-      (codesDataLoader.data?.feature_type_with_properties ?? []).map((type) => ({
-        label: type.feature_type.name,
-        value: type.feature_type.name
-      })),
     [codesDataLoader.data?.feature_type_with_properties]
   );
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
@@ -115,9 +108,7 @@ export const SearchResultPage = () => {
           <CreateDownloadDialog
             open={isCreateDownloadDialogOpen}
             isSubmitting={isSubmittingDownload}
-            defaultName={`${routeConfig.title} download`}
-            defaultFeatureType={routeConfig.featureTypeName}
-            featureTypeOptions={featureTypeOptions}
+            defaultName={`${routeConfig.featureTypeName} - ${dayjs().format('YYYY-MM-DD HH:mm')}`}
             onCancel={handleCancelCreateDownload}
             onSave={handleCreateDownload}
           />

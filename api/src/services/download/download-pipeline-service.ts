@@ -1,12 +1,13 @@
 import { ParquetWriter } from '@dsnp/parquetjs';
 import { Knex } from 'knex';
 import { PassThrough } from 'node:stream';
-import { IDBConnection } from '../../database/db';
+import { getKnex, IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
@@ -37,8 +38,17 @@ export interface WriteFeatureTypeParquetPayload {
   source: DownloadSource;
   properties: CsvPropertyDefinition[];
   featureTypeName: string;
-  statement: ActivePolicyStatementWithExpression;
+  statement: EffectiveDownloadStatement;
 }
+
+/**
+ * A policy statement after resolving wildcard and overlapping ALLOW rules for a
+ * concrete feature type.
+ */
+export type EffectiveDownloadStatement = ActivePolicyStatementWithExpression & {
+  /** Multiple filtered ALLOW expressions for the same feature type are UNIONed. */
+  expression_ids?: string[];
+};
 
 /**
  * Background processing pipeline for downloads.
@@ -175,8 +185,9 @@ export class DownloadPipelineService extends DBService {
   }> {
     const schemaLookup = await this.buildSchemaLookup();
     const statements = await this.policyStatementService.getActiveStatementsWithExpressionByPolicyId(source.policy_id);
-    const featureTypes = statements.map((statement) => statement.urn_feature_type);
-    return { schemaLookup, featureTypes, statements };
+    const expandedStatements = resolveEffectiveDownloadStatements(statements, Array.from(schemaLookup.keys()));
+    const featureTypes = expandedStatements.map((statement) => statement.urn_feature_type);
+    return { schemaLookup, featureTypes, statements: expandedStatements };
   }
 
   /**
@@ -220,7 +231,7 @@ export class DownloadPipelineService extends DBService {
    * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
-   * @param {ActivePolicyStatementWithExpression} payload.statement - The active policy statement for this feature type.
+   * @param {EffectiveDownloadStatement} payload.statement - The effective policy statement for this feature type.
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
@@ -244,17 +255,27 @@ export class DownloadPipelineService extends DBService {
     // returns the public API tree, so we re-normalize through the same semantic
     // validator the search path uses — keeping read-time SQL semantics identical
     // for the two consumers of the evaluator.
+    const expressionIds =
+      statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
+
     let subquery: Knex.QueryBuilder;
     if (statement.expression_id === null) {
       subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by);
     } else {
-      const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
-      const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
-      subquery = expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-        featureTypeName,
-        normalizedTree,
-        source.requested_by
-      );
+      const expressionSubqueries = [];
+      for (const expressionId of expressionIds) {
+        const tree = await this.expressionTreeService.readExpressionTree(expressionId);
+        const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
+        expressionSubqueries.push(
+          expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+            featureTypeName,
+            normalizedTree,
+            source.requested_by
+          )
+        );
+      }
+      subquery =
+        expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true);
     }
 
     const { sql, bindings } = subquery.toSQL().toNative();
@@ -465,4 +486,104 @@ export class DownloadPipelineService extends DBService {
     }
     return lookup;
   }
+}
+
+/**
+ * Resolve the effective download-driving statements for a policy.
+ *
+ * Download materialization only exports ALLOW scopes. An unfiltered broad
+ * `urn:*:*:*` ALLOW statement dominates narrower ALLOW statements because it
+ * already covers every materialized feature type. A filtered wildcard ALLOW
+ * does not dominate: for example, `*:*:* WHERE species = moose` must still be
+ * combined with `*:telemetry:* WHERE description contains cow`, because the
+ * two statements describe different result sets. Overlapping filtered
+ * statements for a feature type are collapsed into one effective statement so
+ * the writer can UNION the expression subqueries into one Parquet file.
+ *
+ * @param {ActivePolicyStatementWithExpression[]} statements - Active policy statements with optional expression ids.
+ * @param {string[]} featureTypes - Materialized feature type names available for wildcard expansion.
+ * @return {ActivePolicyStatementWithExpression[]} Effective statements, one per exported feature type.
+ */
+export function resolveEffectiveDownloadStatements(
+  statements: ActivePolicyStatementWithExpression[],
+  featureTypes: string[]
+): EffectiveDownloadStatement[] {
+  const allowStatements = statements.filter((statement) => statement.effect === PolicyEffect.ALLOW);
+  const sortedFeatureTypes = [...featureTypes].sort((a, b) => a.localeCompare(b));
+  const broadWildcardAllow = allowStatements.find(
+    (statement) => statement.urn_feature_type === '*' && statement.expression_id === null
+  );
+
+  // This is the only global short-circuit: an unfiltered ALLOW over `*:*:*`
+  // already grants every materialized feature type in full, so no narrower
+  // statement can add rows to the download.
+  if (broadWildcardAllow !== undefined) {
+    return sortedFeatureTypes.map((featureType) => ({
+      ...broadWildcardAllow,
+      urn_feature_type: featureType
+    }));
+  }
+
+  const statementsByFeatureType = new Map<string, ActivePolicyStatementWithExpression[]>();
+  for (const statement of allowStatements) {
+    if (statement.urn_feature_type !== '*') {
+      // Concrete statements target one feature type. Keep all of them for now:
+      // buildEffectiveDownloadStatement decides whether a broad concrete ALLOW
+      // dominates filtered statements, or whether filtered expressions must be
+      // UNIONed.
+      const featureStatements = statementsByFeatureType.get(statement.urn_feature_type) ?? [];
+      featureStatements.push(statement);
+      statementsByFeatureType.set(statement.urn_feature_type, featureStatements);
+      continue;
+    }
+
+    // A wildcard ALLOW with an expression is not a short-circuit. It is a
+    // filtered rule that must be evaluated for each materialized feature type
+    // and combined with any concrete statements for that same feature type.
+    for (const featureType of sortedFeatureTypes) {
+      const featureStatements = statementsByFeatureType.get(featureType) ?? [];
+      featureStatements.push({ ...statement, urn_feature_type: featureType });
+      statementsByFeatureType.set(featureType, featureStatements);
+    }
+  }
+
+  // Each feature type must produce at most one Parquet file. Collapse overlapping
+  // ALLOW statements per feature type before the writer runs.
+  return Array.from(statementsByFeatureType.entries()).map(([, featureStatements]) =>
+    buildEffectiveDownloadStatement(featureStatements)
+  );
+}
+
+/**
+ * Collapse all ALLOW statements that target one concrete feature type into one
+ * effective statement.
+ *
+ * A broad concrete ALLOW (`expression_id === null`) covers every row for that
+ * feature type, so narrower filtered statements do not add anything. Otherwise,
+ * all expression ids are retained so `writeFeatureTypeParquet` can UNION them.
+ *
+ * @param {ActivePolicyStatementWithExpression[]} featureStatements - ALLOW statements for a single concrete feature type.
+ * @return {EffectiveDownloadStatement} One effective statement for the feature type.
+ */
+function buildEffectiveDownloadStatement(
+  featureStatements: ActivePolicyStatementWithExpression[]
+): EffectiveDownloadStatement {
+  const broadFeatureAllow = featureStatements.find((statement) => statement.expression_id === null);
+  if (broadFeatureAllow !== undefined) {
+    // Within a single concrete feature type, an unfiltered ALLOW covers all rows
+    // for that type, so filtered statements cannot add anything.
+    return broadFeatureAllow;
+  }
+
+  const [firstStatement] = featureStatements;
+  if (featureStatements.length === 1) {
+    return firstStatement;
+  }
+
+  return {
+    ...firstStatement,
+    // Multiple filtered ALLOW statements for the same feature type are additive:
+    // export rows matching any expression by UNIONing their subqueries.
+    expression_ids: featureStatements.map((statement) => statement.expression_id as string)
+  };
 }

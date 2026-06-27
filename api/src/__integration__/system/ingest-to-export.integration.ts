@@ -170,7 +170,6 @@ describe('Ingest → Download → Export (system integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: 'ingest-to-export integration test',
       description: null,
-      featureTypes: ['telemetry'],
       expressionId: null
     });
 

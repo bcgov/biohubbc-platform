@@ -58,13 +58,11 @@ export interface DownloadListResponse {
 /**
  * Body for POST /api/download.
  *
- * `expression` is sent as a literal `null` when no filter expression is applied. The backend
- * schema marks the key `.nullable()` (not `.optional()`), so omitting it yields a 400.
+ * `expression` is nullable. `null` means materialize the full visible graph.
  */
 export interface CreateDownloadRequest {
   name: string;
   description?: string | null;
-  featureTypes: string[];
   expression: ExpressionTreeExpression | null;
 }
 

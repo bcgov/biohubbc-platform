@@ -175,7 +175,7 @@ export const POST: Operation = [createDownload()];
 
 POST.apiDoc = {
   description:
-    'Create a download request from a name, target feature types, and an optional expression tree. Returns a download id and a URL the caller can poll for status.',
+    'Create a download request from a name and expression tree. Returns a download id and a URL the caller can poll for status.',
   tags: ['download'],
   security: [
     {
@@ -189,11 +189,10 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           additionalProperties: false,
-          required: ['name', 'featureTypes', 'expression'],
+          required: ['name', 'expression'],
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 100 },
             description: { type: 'string', maxLength: 1000, nullable: true },
-            featureTypes: { type: 'array', items: { type: 'string' }, minItems: 1 },
             expression: { ...featureSearchExpressionTreeSchema, nullable: true }
           }
         }
@@ -241,7 +240,7 @@ POST.apiDoc = {
  * authenticated caller drives the explicit two-call export flow (create export, then poll it)
  * from the Downloads UI.
  *
- * Delegates the business orchestration (expression tree → policy → download → team link →
+ * Delegates the business orchestration (optional expression tree → policy → download → team link →
  * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing, the
  * connection choice, the transaction boundary, and response shaping.
  *
@@ -257,7 +256,7 @@ export function createDownload(): RequestHandler {
     if (!parseResult.success) {
       throw new HTTP400('Invalid request body', parseResult.error.issues);
     }
-    const { name, description, featureTypes, expression } = parseResult.data;
+    const { name, description, expression } = parseResult.data;
 
     const isAuthenticated = !!req.keycloak_token;
     const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
@@ -272,7 +271,6 @@ export function createDownload(): RequestHandler {
       const { download_id } = await downloadService.createDownloadRequest({
         name,
         description: description ?? null,
-        featureTypes,
         expression,
         requestedBy
       });

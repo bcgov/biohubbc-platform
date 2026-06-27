@@ -202,7 +202,6 @@ describe('DownloadService', () => {
     const basePayload = (overrides: Partial<Parameters<DownloadService['createDownloadRequest']>[0]> = {}) => ({
       name: 'My download',
       description: 'A description',
-      featureTypes: ['observation'],
       expression: validExpression,
       requestedBy: 42,
       ...overrides
@@ -246,7 +245,6 @@ describe('DownloadService', () => {
       expect(createDownloadPolicyStub).to.have.been.calledOnceWith({
         name: 'My download',
         description: 'A description',
-        featureTypes: ['observation'],
         expressionId: 'expr-uuid-1'
       });
       expect(createDownloadStub).to.have.been.calledOnceWith({
@@ -349,7 +347,7 @@ describe('DownloadService', () => {
       expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadVersionId: 'ver-1' });
     });
 
-    it('skips writeExpressionTree and passes expressionId=null when expression is null', async () => {
+    it('skips writeExpressionTree and creates a broad wildcard policy when expression is null', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 

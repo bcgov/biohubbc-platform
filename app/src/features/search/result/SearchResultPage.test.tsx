@@ -183,6 +183,18 @@ describe('SearchResultPage', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
+  it('defaults the download name to feature type plus current timestamp', async () => {
+    const { getByRole, getByLabelText, rerender } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    expect((getByLabelText(/Name/i) as HTMLInputElement).value).toMatch(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
     mockCreateDownload.mockResolvedValue({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
@@ -197,8 +209,7 @@ describe('SearchResultPage', () => {
     await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
     expect(mockCreateDownload).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: expect.stringMatching(/ download$/),
-        featureTypes: ['survey'],
+        name: expect.stringMatching(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/),
         expression: null
       })
     );
@@ -219,8 +230,10 @@ describe('SearchResultPage', () => {
         })
     );
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -323,8 +336,10 @@ describe('SearchResultPage', () => {
   it('surfaces the API error message in a snackbar when submit fails', async () => {
     mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
