@@ -8,7 +8,7 @@ import {
   paginationResponseSchema
 } from '../../../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
-import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
+import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
 import { getLogger } from '../../../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../../utils/pagination';
 
@@ -118,8 +118,8 @@ export function getSubmissionFeatureProperties(): RequestHandler {
     try {
       await connection.open();
 
-      const submissionFeatureService = new SubmissionFeatureService(connection);
-      const result = await submissionFeatureService.getSubmissionFeatureProperties(
+      const submissionFeaturePropertyService = new SubmissionFeaturePropertyService(connection);
+      const result = await submissionFeaturePropertyService.getSubmissionFeatureProperties(
         submissionFeatureId,
         pagination,
         filters

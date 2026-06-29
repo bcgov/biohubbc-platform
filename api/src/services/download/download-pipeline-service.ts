@@ -389,9 +389,9 @@ export class DownloadPipelineService extends DBService {
    * Fetches values from typed `submission_feature_property_*` tables via the
    * repository, then assembles them into `ParquetFeatureData` records.
    *
-   * Properties without typed tables (array, object, artifact_key) fall back to
-   * `submission_feature.data.properties` — these types have dynamic internal
-   * structure that can't be represented as a single typed value.
+   * Properties without indexed storage are emitted as null. The hydrator must
+   * not read `submission_feature.data`; that JSONB is pre-indexing input and
+   * can differ from the canonical indexed values.
    *
    * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
    * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
@@ -402,12 +402,11 @@ export class DownloadPipelineService extends DBService {
     baseBatch: BaseFeatureRow[],
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
-    // Types that live in the JSONB blob rather than typed tables
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+    const unsupportedPropertyTypes = new Set(['array', 'object']);
 
     // Determine which typed tables need querying
     const typedPropertyTypes = [
-      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
+      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !unsupportedPropertyTypes.has(t)))
     ];
 
     const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
@@ -435,9 +434,8 @@ export class DownloadPipelineService extends DBService {
       for (const prop of properties) {
         const propName = prop.feature_property_name;
 
-        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
-          // Array/object/artifact_key: fall back to JSONB data.properties
-          data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        if (unsupportedPropertyTypes.has(prop.feature_property_type_name)) {
+          data[propName] = null;
         } else if (prop.feature_property_type_name === 'datetime') {
           // `datetime` properties are projected as two synthetic rows by
           // `fetchTypedPropertyRows` with suffixed `name` values

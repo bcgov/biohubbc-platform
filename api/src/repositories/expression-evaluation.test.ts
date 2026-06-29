@@ -191,8 +191,10 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"content_edges"');
       expect(sql).to.include('"content_reach"');
       expect(sql).to.include('from "submission_feature_feature" as "sff"');
-      expect(sql).to.include('"source_sf"."record_end_date" is null');
-      expect(sql).to.include('"target_sf"."record_end_date" is null');
+      expect(sql).to.include('source_sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < source_sf.record_end_date');
+      expect(sql).to.include('target_sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < target_sf.record_end_date');
       // Depth bound and cycle guard on the recursive term.
       expect(sql).to.include('"content_reach"."depth" < 6');
       expect(sql).to.include('= ANY(content_reach.path)');
@@ -207,7 +209,8 @@ describe('expression-evaluation', () => {
       // The reachable selects are UNION-combined (dedup), and the anchor type is applied to the resolved targets.
       expect(sql).to.include(' union ');
       expect(sql).to.include('"ft"."name" = \'telemetry\'');
-      expect(sql).to.include('"sf"."record_end_date" is null');
+      expect(sql).to.include('sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < sf.record_end_date');
 
       // The synthetic survey↔same-submission membership edge has been removed — content edges only.
       expect(sql).to.not.include('as "survey_sf"');
@@ -403,7 +406,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('from "submission_feature" as "sf"');
       expect(sql).to.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('"sf"."record_end_date" is null');
+      expect(sql).to.include('sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < sf.record_end_date');
       expect(sql).to.not.include('"ft"."record_end_date" is null');
       // Authenticated path uses isAccessibleToUser → security_scope_anchor + bound user id
       expect(sql).to.include('security_scope_anchor');

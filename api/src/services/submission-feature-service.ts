@@ -1,13 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { SubmissionFeatureProperty } from '../models/feature-property';
-import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { SubmissionFeatureRepository } from '../repositories/submission-feature-repository';
 import {
   RelatedSubmissionFeature,
   SubmissionFeature,
   SubmissionFeatureRecord
 } from '../repositories/submission-repository';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -89,27 +86,5 @@ export class SubmissionFeatureService extends DBService {
    */
   async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
     return this.submissionFeatureRepository.getRelatedSubmissionFeatures(submissionFeatureId);
-  }
-
-  /**
-   * Get paginated, searchable feature properties for a single submission feature.
-   *
-   * @param {number} submissionFeatureId
-   * @param {ApiPaginationOptions} pagination
-   * @param {SubmissionFeaturePropertyFilters} [filters]
-   * @returns {Promise<{ properties: SubmissionFeatureProperty[]; total: number }>}
-   * @memberof SubmissionFeatureService
-   */
-  async getSubmissionFeatureProperties(
-    submissionFeatureId: number,
-    pagination: ApiPaginationOptions,
-    filters?: SubmissionFeaturePropertyFilters
-  ): Promise<{ properties: SubmissionFeatureProperty[]; total: number }> {
-    const [properties, total] = await Promise.all([
-      this.submissionFeatureRepository.getSubmissionFeatureProperties(submissionFeatureId, pagination, filters),
-      this.submissionFeatureRepository.getSubmissionFeaturePropertiesCount(submissionFeatureId, filters)
-    ]);
-
-    return { properties, total };
   }
 }

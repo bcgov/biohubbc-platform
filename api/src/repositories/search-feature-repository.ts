@@ -6,7 +6,7 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isEffectivelySecured } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -186,7 +186,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .select('sf.submission_feature_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereNull('sf.record_end_date');
+      .whereRaw(isSubmissionFeatureActive('sf'));
 
     if (expressionFeatureIds) {
       query.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -244,7 +244,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .joinRaw(this.buildTypedPropertiesLateralJoinSql())
       .where('ft.name', anchorFeatureType)
-      .whereNull('sf.record_end_date');
+      .whereRaw(isSubmissionFeatureActive('sf'));
 
     if (expressionFeatureIds) {
       expressionResults.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -451,7 +451,7 @@ export class SearchFeatureRepository extends BaseRepository {
              AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-             AND referenced_sf.record_end_date IS NULL
+             AND ${isSubmissionFeatureActive('referenced_sf')}
             WHERE p.submission_feature_id = sf.submission_feature_id
           ) AS property_values
           GROUP BY property_values.name

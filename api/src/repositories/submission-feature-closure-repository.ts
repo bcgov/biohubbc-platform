@@ -13,9 +13,9 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * Delete the closure rows for a single upload.
    *
    * Scoped by source: every closure row has BOTH endpoints in one upload (the edge CTEs in
-   * {@link computeClosureForUpload} join af_src AND af_tgt to the upload's active features), so matching
+   * {@link computeClosureForUpload} join af_src AND af_tgt to the upload's non-deleted features), so matching
    * by source already identifies all of the upload's rows — and it matches on the primary key, so no
-   * reverse index is needed. submission_feature is upload-wide (not active-only), so a deactivated
+   * reverse index is needed. submission_feature is upload-wide (not non-deleted-only), so a deleted
    * feature's stale rows are swept too.
    *
    * The service pairs this with {@link computeClosureForUpload} in one transaction (delete then insert);
@@ -49,7 +49,7 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * Insert only — the service deletes the upload's prior rows first (see {@link deleteClosureForUpload}),
    * so this runs against an empty slice for the upload and never accumulates duplicates.
    *
-   * Returns the number of closure rows written. An upload whose features are all inactive legitimately
+   * Returns the number of closure rows written. An upload whose features are all deleted legitimately
    * writes zero rows, so a count of 0 is a valid result, not a failure.
    *
    * @param {string} submissionUploadId The submission upload scope.
@@ -60,33 +60,35 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
     // Compute TWO closures and store every evidence edge: the ancestry closure (parent-only,
     // transitive) is the authorization reach; the evidence closure (parent + property, transitive) is
     // the search reach and a superset. is_ancestor is true iff the edge is also in the ancestry closure.
-    const response = await this.connection.sql(SQL`
+    const sqlStatement = SQL`
       WITH RECURSIVE
-      -- Active features in the upload (the universe for self-loops and the join filter).
-      active_features AS (
+      -- Non-ended features in the upload (the universe for self-loops and the join filter).
+      -- Closure is a derived graph for the upload and must be available before publication sets
+      -- record_effective_date, so drafts/pending rows are included here.
+      non_deleted_features AS (
         SELECT submission_feature_id
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid
           AND record_end_date IS NULL
       ),
-      -- Reflexive self-loops (every active feature reaches itself) — the reflexive edges that seed the closure.
+      -- Reflexive self-loops (every non-ended feature reaches itself) — the reflexive edges that seed the closure.
       self_loops AS (
-        SELECT submission_feature_id AS source, submission_feature_id AS target FROM active_features
+        SELECT submission_feature_id AS source, submission_feature_id AS target FROM non_deleted_features
       ),
       -- Direct edges — parent (child -> parent, "up") / property (feature reference) — each filtered so
-      -- BOTH endpoints are intra-upload active features. Content edges are intentionally NOT included.
+      -- BOTH endpoints are intra-upload non-ended features. Content edges are intentionally NOT included.
       parent_edges AS (
         SELECT child.submission_feature_id AS source, child.parent_submission_feature_id AS target
         FROM submission_feature child
-        JOIN active_features af_src ON af_src.submission_feature_id = child.submission_feature_id
-        JOIN active_features af_tgt ON af_tgt.submission_feature_id = child.parent_submission_feature_id
+        JOIN non_deleted_features af_src ON af_src.submission_feature_id = child.submission_feature_id
+        JOIN non_deleted_features af_tgt ON af_tgt.submission_feature_id = child.parent_submission_feature_id
         WHERE child.parent_submission_feature_id IS NOT NULL
       ),
       property_edges AS (
         SELECT pf.submission_feature_id AS source, pf.referenced_submission_feature_id AS target
         FROM submission_feature_property_feature pf
-        JOIN active_features af_src ON af_src.submission_feature_id = pf.submission_feature_id
-        JOIN active_features af_tgt ON af_tgt.submission_feature_id = pf.referenced_submission_feature_id
+        JOIN non_deleted_features af_src ON af_src.submission_feature_id = pf.submission_feature_id
+        JOIN non_deleted_features af_tgt ON af_tgt.submission_feature_id = pf.referenced_submission_feature_id
       ),
       -- Ancestry base: self + parent only (the authorization reach, before transitive closure).
       ancestry_edges AS (
@@ -124,7 +126,9 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
       FROM closure cl
       LEFT JOIN ancestry_closure anc
         ON anc.source = cl.source AND anc.target = cl.target;
-    `);
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount ?? 0;
   }

@@ -13,6 +13,7 @@ import {
 import { SearchParams, WithCount } from '../services/search-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 export class SearchRepository extends BaseRepository {
   /**
@@ -79,7 +80,7 @@ export class SearchRepository extends BaseRepository {
       .from(matches.as('matches'))
       .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .whereNull('sf.record_end_date')
+      .whereRaw(isSubmissionFeatureActive('sf'))
       .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES, 'dataset'])
       .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name')
       .select(
@@ -101,7 +102,7 @@ export class SearchRepository extends BaseRepository {
     const knex = getKnex();
     return knex('submission as s')
       .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOnNull('sf.record_end_date');
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
       })
       .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
       .whereNull('s.record_end_date')
@@ -269,7 +270,9 @@ export class SearchRepository extends BaseRepository {
           FROM matching_ids m
          JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-         WHERE sf.record_end_date IS NULL
+    `;
+    query.append(` WHERE ${isSubmissionFeatureActive('sf')}`);
+    query.append(SQL`
            AND ft.name = ANY(${allowedTypes}::text[])
       ),
       priority_types AS (
@@ -285,7 +288,7 @@ export class SearchRepository extends BaseRepository {
       GROUP BY pt.name, pt.feature_type_id
       HAVING COUNT(mf.submission_feature_id) > 0
       ORDER BY total DESC
-    `;
+    `);
 
     const result = await this.connection.sql(query, SearchSummaryFeature);
 

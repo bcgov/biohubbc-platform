@@ -8,7 +8,7 @@ import {
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
-import { buildSecurityFilter } from './sql-fragments';
+import { buildSecurityFilter, isSubmissionFeatureActive } from './sql-fragments';
 
 /**
  * Pure SQL builders that compile a normalized expression tree into Knex
@@ -79,7 +79,7 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
     .select('sf.submission_feature_id')
     .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
     .where('ft.name', featureTypeName)
-    .whereNull('sf.record_end_date');
+    .whereRaw(isSubmissionFeatureActive('sf'));
 
   const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
   if (securityFilter) {
@@ -201,8 +201,10 @@ function buildPredicateEvidenceIdsQuery(
   let query = knex(`${tableName} as p`)
     .distinct()
     .select('p.submission_feature_id')
+    .join('submission_feature as sf', 'sf.submission_feature_id', 'p.submission_feature_id')
     .join('feature_type_property as ftp', 'ftp.feature_type_property_id', 'p.feature_type_property_id')
     .where('ftp.feature_property_id', clause.feature_property_id)
+    .whereRaw(isSubmissionFeatureActive('sf'))
     .whereNull('ftp.record_end_date');
 
   if (clause.feature_type_property_id !== null) {
@@ -333,7 +335,7 @@ function projectEvidenceToTargetIdsQuery(
     .join('submission_feature as sf', 'sf.submission_feature_id', 'reachable.submission_feature_id')
     .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
     .where('ft.name', anchorFeatureType)
-    .whereNull('sf.record_end_date');
+    .whereRaw(isSubmissionFeatureActive('sf'));
 
   const targetSecurityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
   if (targetSecurityFilter) {
@@ -359,15 +361,15 @@ function buildContentEdgesQuery(knex: Knex): Knex.QueryBuilder {
     .select('sff.source_feature_id as from_feature_id', 'sff.target_feature_id as to_feature_id')
     .join('submission_feature as source_sf', 'source_sf.submission_feature_id', 'sff.source_feature_id')
     .join('submission_feature as target_sf', 'target_sf.submission_feature_id', 'sff.target_feature_id')
-    .whereNull('source_sf.record_end_date')
-    .whereNull('target_sf.record_end_date');
+    .whereRaw(isSubmissionFeatureActive('source_sf'))
+    .whereRaw(isSubmissionFeatureActive('target_sf'));
 
   const reverse = knex('submission_feature_feature as sff')
     .select('sff.target_feature_id as from_feature_id', 'sff.source_feature_id as to_feature_id')
     .join('submission_feature as source_sf', 'source_sf.submission_feature_id', 'sff.source_feature_id')
     .join('submission_feature as target_sf', 'target_sf.submission_feature_id', 'sff.target_feature_id')
-    .whereNull('source_sf.record_end_date')
-    .whereNull('target_sf.record_end_date');
+    .whereRaw(isSubmissionFeatureActive('source_sf'))
+    .whereRaw(isSubmissionFeatureActive('target_sf'));
 
   return forward.unionAll([reverse]);
 }
