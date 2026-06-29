@@ -139,7 +139,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertTaxonPropertiesBySubmissionUploadId')
       .resolves();
     const insertArtifactStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactLinksBySubmissionUploadId')
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactPropertiesBySubmissionUploadId')
       .resolves();
 
     const insertReferencesStub = sinon
@@ -324,7 +324,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertTaxonPropertiesBySubmissionUploadId')
       .resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactLinksBySubmissionUploadId')
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactPropertiesBySubmissionUploadId')
       .resolves();
     const insertRelationshipsStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertFeatureRelationshipsBySubmissionUploadId')

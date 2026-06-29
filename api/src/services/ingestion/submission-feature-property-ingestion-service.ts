@@ -306,7 +306,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
         submissionUploadId
       );
-      await this.submissionFeaturePropertyIngestionRepository.insertArtifactLinksBySubmissionUploadId(
+      await this.submissionFeaturePropertyIngestionRepository.insertArtifactPropertiesBySubmissionUploadId(
         submissionUploadId
       );
 
