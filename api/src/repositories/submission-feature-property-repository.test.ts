@@ -23,7 +23,7 @@ describe('SubmissionFeaturePropertyRepository', () => {
 
       await submissionFeaturePropertyRepository.getSubmissionFeatureProperties(
         10,
-        { page: 1, limit: 25, sort: 'property', order: 'asc' },
+        { page: 1, limit: 25, order: 'asc' },
         { search: 'wolf' }
       );
 
@@ -33,6 +33,9 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.include('submission_feature_property_timestamp');
       expect(sqlText).to.include('submission_feature_artifact');
       expect(sqlText).to.include('HAVING COUNT(*) = 1');
+      expect(sqlText).to.include('SELECT id, property, value');
+      expect(sqlText).to.include('ORDER BY sort asc NULLS LAST, property ASC, value ASC, id ASC');
+      expect(sqlText).to.include("a.artifact_status = 'uploaded'");
       expect(sqlText).to.not.include('sf.data');
       expect(sqlText).to.not.include('jsonb_each');
     });

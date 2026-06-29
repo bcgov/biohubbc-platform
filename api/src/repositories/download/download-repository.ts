@@ -575,7 +575,9 @@ export class DownloadRepository extends BaseRepository {
         jsonb_agg(a.object_key ORDER BY a.object_key) AS value
       FROM submission_feature_artifact sfa
       INNER JOIN submission_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
-      INNER JOIN artifact a ON a.artifact_id = sfa.artifact_id
+      INNER JOIN artifact a
+        ON a.artifact_id = sfa.artifact_id
+        AND a.artifact_status = 'uploaded'
       INNER JOIN (
         SELECT
           ftp.feature_type_id,

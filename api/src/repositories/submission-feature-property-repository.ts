@@ -85,6 +85,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
    * Build the paginated list query for `getSubmissionFeatureProperties`.
    *
    * Sort columns are constrained to the projected read-model fields before being appended as raw SQL.
+   * When no public sort is requested, the feature-type-property `sort` column drives the default order.
    * Limit and offset remain parameterized.
    *
    * @param {number} submissionFeatureId The submission feature whose indexed properties are being listed.
@@ -98,29 +99,43 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
     normalizedSearch: string | undefined,
     pagination: ApiPaginationOptions
   ): SQLStatement {
-    const sortColumnMap: Record<string, 'id' | 'property' | 'value'> = {
-      id: 'id',
-      property: 'property',
-      value: 'value'
-    };
-    const resolvedSort = pagination.sort ? sortColumnMap[pagination.sort] ?? 'property' : 'property';
-    const resolvedOrder = pagination.order === 'desc' ? 'desc' : 'asc';
-    const limit = pagination.limit ?? 25;
-    const page = pagination.page ?? 1;
-    const offset = (page - 1) * limit;
-
     const sqlStatement = this._getSubmissionFeaturePropertiesBaseQuery(submissionFeatureId, normalizedSearch);
     sqlStatement.append(`
       SELECT id, property, value
       FROM filtered_property_rows
-      ORDER BY ${resolvedSort} ${resolvedOrder}, id ASC
-      LIMIT `);
+    `);
+    this.applySortingAndPagination(sqlStatement, pagination);
+
+    return sqlStatement;
+  }
+
+  /**
+   * Append sorting and pagination to the submission-feature property list query.
+   *
+   * Public sort requests may only target returned fields. The internal `sort`
+   * column from `feature_type_property` is reserved for the default display order.
+   *
+   * @param {SQLStatement} sqlStatement Query being built.
+   * @param {ApiPaginationOptions} pagination Pagination and sort options from the request.
+   */
+  private applySortingAndPagination(sqlStatement: SQLStatement, pagination: ApiPaginationOptions): void {
+    const publicSortColumn =
+      pagination.sort === 'id' || pagination.sort === 'property' || pagination.sort === 'value'
+        ? pagination.sort
+        : undefined;
+    const resolvedOrder = pagination.order === 'desc' ? 'desc' : 'asc';
+    const limit = pagination.limit ?? 25;
+    const page = pagination.page ?? 1;
+    const offset = (page - 1) * limit;
+    const primaryOrderBy = publicSortColumn
+      ? `${publicSortColumn} ${resolvedOrder}`
+      : `sort ${resolvedOrder} NULLS LAST`;
+
+    sqlStatement.append(`ORDER BY ${primaryOrderBy}, property ASC, value ASC, id ASC LIMIT `);
     sqlStatement.append(SQL`${limit}`);
     sqlStatement.append(` OFFSET `);
     sqlStatement.append(SQL`${offset}`);
     sqlStatement.append(`;`);
-
-    return sqlStatement;
   }
 
   /**
@@ -311,7 +326,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ftp.sort
         FROM submission_feature_artifact sfa
         JOIN active_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
-        JOIN artifact a ON a.artifact_id = sfa.artifact_id
+        JOIN artifact a
+          ON a.artifact_id = sfa.artifact_id
+         AND a.artifact_status = 'uploaded'
         JOIN (
           SELECT
             ftp.feature_type_id,
