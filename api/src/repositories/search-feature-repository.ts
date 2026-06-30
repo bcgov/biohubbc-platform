@@ -6,7 +6,12 @@ import { SearchFeatureResultWithRelevancy } from '../services/search-feature-ser
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import {
+  buildSecurityFilter,
+  isAccessibleToUser,
+  isEffectivelySecured,
+  isSubmissionFeatureActive
+} from './sql-fragments';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
@@ -84,6 +89,63 @@ export class SearchFeatureRepository extends BaseRepository {
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Checks whether the expression matched secured features that are not visible to the caller.
+   *
+   * This is the source of the `has_more_secured_features` flag. It is a sibling of the visible search
+   * query that reuses the same expression criteria and feature-type filter, but deliberately does NOT
+   * apply the caller access filter before checking for inaccessible secured matches — otherwise the
+   * very features we want to detect would already be removed.
+   *
+   * Implemented as an `EXISTS`/`LIMIT 1` probe over the unhydrated candidate set:
+   * - For authenticated users: true when any matched feature is effectively secured and NOT accessible
+   *   to the caller via the anchor-based read path (`isAccessibleToUser`). A caller holding a blanket
+   *   grant (e.g. `urn:*:*:*`) over a feature secured before anchor recomputation ran may see a
+   *   transient false-positive banner until anchors catch up (a short window, ~10s); this is accepted
+   *   so the probe stays consistent with the visible-results access filter (also anchor-only).
+   * - For anonymous users: true when any matched feature is effectively secured (none are accessible).
+   *
+   * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
+   * @param {number | null} [systemUserId] - Security context (null = anonymous)
+   * @return {Promise<boolean>} True if matching secured features exist that the caller cannot access
+   */
+  async hasInaccessibleSecuredFeaturesByExpressionTree(
+    anchorFeatureType: string,
+    expressionTree: NormalizedExpressionTreeExpression | undefined,
+    systemUserId?: number | null
+  ): Promise<boolean> {
+    const knex = getKnex();
+
+    // Candidate anchor features matched by the expression, WITHOUT the caller access filter. The
+    // expression subquery already restricts to active anchor-type features, so it is used directly;
+    // only the no-expression case needs the feature-type filter from buildExpressionTreeMatchingFeaturesQuery.
+    const matchingFeatures = expressionTree
+      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
+      : this.buildExpressionTreeMatchingFeaturesQuery(knex, anchorFeatureType, null);
+
+    const existsQuery = knex
+      .select(knex.raw('1'))
+      .from(matchingFeatures.as('mf'))
+      .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
+      .limit(1);
+
+    // Authenticated: a secured match is hidden when the caller cannot access it. Reuses the canonical
+    // isAccessibleToUser check (anchor-based, identical to the visible-results access filter) so the
+    // banner stays consistent with which rows are actually shown. The candidate is already effectively
+    // secured here, so isAccessibleToUser short-circuits to its team-scope-anchor branch.
+    // Anonymous (null/undefined): every secured match is hidden.
+    if (systemUserId) {
+      existsQuery.whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId]);
+    }
+
+    const response = await this.connection.knex(existsQuery);
+
+    return response.rows.length > 0;
   }
 
   /**

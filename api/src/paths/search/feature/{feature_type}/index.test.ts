@@ -67,7 +67,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -85,7 +85,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -110,7 +111,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -156,12 +157,13 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
+    // A visible secured row the caller CAN see must not, by itself, set has_more_secured_features.
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],
@@ -172,8 +174,38 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
+  });
+
+  it('should expose has_more_secured_features when secured matches are hidden from the caller', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { feature_type: 'dataset' };
+    mockReq.body = {
+      expression: expressionTree,
+      pagination: { page: '1', limit: '10' }
+    };
+
+    sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: true });
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue.has_more_secured_features).to.equal(true);
+    // No hidden secured rows are leaked alongside the flag.
+    expect(mockRes.jsonValue.features).to.eql([]);
   });
 
   it('should handle pagination with multiple pages', async () => {
@@ -215,7 +247,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: 25 });
+      .resolves({ features: mockResults, properties: [], count: 25, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -231,7 +263,8 @@ describe('searchFeatures', () => {
         last_page: 5,
         sort: 'feature_type_name',
         order: 'asc'
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -257,7 +290,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -273,7 +306,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -373,7 +407,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: 37 });
+      .resolves({ features: mockResults, properties: [], count: 37, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -424,7 +458,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -440,7 +474,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -463,7 +498,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -493,7 +528,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);

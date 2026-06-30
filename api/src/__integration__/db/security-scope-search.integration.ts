@@ -825,6 +825,105 @@ describe('Security scope search (integration)', function () {
     });
   });
 
+  // ── has_more_secured_features (hidden-secured-match signal) ───────────
+  //
+  // Drives the "Request Data" banner. True when the search matched secured features the caller
+  // cannot access. Wildcard-grant holders are excluded via direct URN scope matching so anchor
+  // recomputation lag does not raise a false positive.
+  describe('hasInaccessibleSecuredFeaturesByExpressionTree', () => {
+    it('is FALSE for a wildcard (urn:*:*:*) caller even when secured matches exist (AC3)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      await secureFeature(connection, feat1);
+      await secureFeature(connection, feat2);
+
+      await rebuildClosure(uploadId);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, userId);
+
+      // The caller can access every secured match via the wildcard grant — nothing left to request.
+      expect(hasHidden).to.be.false;
+    });
+
+    it('is TRUE for a wildcard caller when a secured match has no anchor yet (anchor lag — banner shows transiently)', async () => {
+      // A feature secured AFTER the wildcard scope's anchors were computed has no security_scope_anchor
+      // (recompute lag), so isAccessibleToUser reports it inaccessible to everyone — the wildcard caller
+      // included. The banner probe is anchor-only (kept consistent with the visible-results access
+      // filter), so it raises the flag during this short (~10s) recompute window until anchors catch up.
+      // Accepted tradeoff: a brief false-positive banner rather than a more permissive probe that would
+      // hide the banner while the rows themselves stay filtered out.
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Lagged Secured' });
+      await rebuildClosureForSubmission(submissionId);
+
+      const wildcardUser = connection.systemUserId();
+      // Grant wildcard access BEFORE the feature is secured, so the anchor computation does not cover it.
+      await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', wildcardUser, 'Wildcard Team');
+
+      // Now secure it — effectively secured on the read path, but with no scope anchor.
+      await secureFeature(connection, feature);
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
+        'dataset',
+        undefined,
+        wildcardUser
+      );
+
+      expect(hasHidden).to.be.true;
+    });
+
+    it('is TRUE when a secured match is grantable to another team but not the caller (AC2)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Other Team Secured' });
+      await secureFeature(connection, feature);
+      await rebuildClosureForSubmission(submissionId);
+
+      // Grant access to a DIFFERENT user's team — the feature now has an anchor + standing grant,
+      // so it is requestable, just not by our caller.
+      const otherUser = await createOtherUser();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, otherUser, 'Other Team');
+
+      const caller = await createOtherUser(); // authenticated, but in no team
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+
+      expect(hasHidden).to.be.true;
+    });
+
+    it('is TRUE for an anonymous caller when secured matches exist (AC4)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const feature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'dataset'
+      });
+      await secureFeature(connection, feature);
+      await rebuildClosure(uploadId);
+
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, null);
+
+      expect(hasHidden).to.be.true;
+    });
+
+    it('is TRUE for an authenticated caller with no covering policy (AC2 — banner shows)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Ungranted Secured' });
+      await secureFeature(connection, feature);
+      await rebuildClosureForSubmission(submissionId);
+
+      // Authenticated, but holds no team/policy/scope at all.
+      const caller = await createOtherUser();
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+
+      expect(hasHidden).to.be.true;
+    });
+  });
+
   // ── Policy deletion → scope cleanup ──────────────────────────────────
 
   describe('Policy deletion → scope cleanup', () => {

@@ -1,5 +1,6 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
@@ -22,6 +23,7 @@ interface UseSearchResultDataRequestProps {
  */
 export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseSearchResultDataRequestProps) => {
   const api = useApi();
+  const { auth } = useAuthStateContext();
   const dialogContext = useDialogContext();
   const isMounted = useIsMounted();
   const { runSerialized } = useSerializedAsync();
@@ -34,11 +36,23 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
   }, [featureType]);
 
   /**
-   * Opens the create-data-request dialog.
+   * Opens the create-data-request dialog for authenticated users.
+   *
+   * The data-request flow requires an authenticated BioHub user. When the caller
+   * is unauthenticated they are redirected to the Keycloak login page. The current
+   * search location (path + query string, which includes the encoded `expr` search
+   * expression) is carried through the OIDC `state` param — not a dynamic
+   * `redirect_uri`, which prod SSO rejects as a wildcard URI — so the post-login
+   * callback can restore the search results.
    */
   const handleOpenCreateDataRequest = useCallback(() => {
+    if (!auth.isAuthenticated) {
+      const returnTo = `${globalThis.location.pathname}${globalThis.location.search}`;
+      auth.signinRedirect({ state: { returnTo } });
+      return;
+    }
     setIsCreateDataRequestDialogOpen(true);
-  }, []);
+  }, [auth]);
 
   /**
    * Submits the create-data-request form for the current expression search.

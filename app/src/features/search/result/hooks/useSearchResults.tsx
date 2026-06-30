@@ -44,7 +44,8 @@ const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureR
     last_page: 1,
     sort: pagination.sort,
     order: pagination.order
-  }
+  },
+  has_more_secured_features: false
 });
 
 const isAbortError = (error: unknown) => {
@@ -272,7 +273,7 @@ export const useSearchResults = (
   return {
     rows: data?.features ?? [],
     properties: data?.properties ?? [],
-
+    hasMoreSecuredFeatures: data?.has_more_secured_features ?? false,
     isLoading: isLoading || !hasSettled,
     searchParams,
     setSearchParams,

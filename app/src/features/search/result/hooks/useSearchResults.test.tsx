@@ -27,7 +27,8 @@ describe('useSearchResults', () => {
       last_page: 1,
       sort: 'create_date',
       order: 'asc'
-    }
+    },
+    has_more_secured_features: false
   };
   const expressionTree: ExpressionTreeExpression = {
     type: 'expression',

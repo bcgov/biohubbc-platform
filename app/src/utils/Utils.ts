@@ -287,6 +287,46 @@ export const buildUrl = (...urlParts: (string | undefined)[]): string => {
     .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
 
+/** OIDC authorization-response query params appended by Keycloak to the return URL after login. */
+const OIDC_RESPONSE_PARAMS = ['code', 'state', 'session_state', 'iss', 'error', 'error_description'];
+
+/**
+ * Strips the OIDC authorization-response params from a return URL while preserving any original
+ * application query params (e.g. the encoded `expr` search expression). Used by the post-login
+ * `onSigninCallback` so the user lands back on the same search results after authenticating.
+ *
+ * @param {string} href The full return URL (e.g. `window.location.href`).
+ * @returns The path + remaining query string, with the OIDC response params removed.
+ */
+export const stripOidcParams = (href: string): string => {
+  const url = new URL(href);
+  OIDC_RESPONSE_PARAMS.forEach((param) => url.searchParams.delete(param));
+  return `${url.pathname}${url.search}`;
+};
+
+/**
+ * Reads the post-login return location carried through the OIDC `state` param (set by callers such as
+ * the "Request Access" flow that redirect unauthenticated users to login). Used by `onSigninCallback` to
+ * navigate back to the originating search after authenticating, since the registered `redirect_uri` is a
+ * fixed origin and login otherwise lands on `/`.
+ *
+ * Only a safe same-origin relative path is returned (must start with a single `/`); anything else —
+ * absent state, an absolute URL, or a protocol-relative `//host` — yields `undefined`, guarding against
+ * open redirects.
+ *
+ * @param {unknown} user The OIDC user passed to `onSigninCallback` (its `state` holds the value set at signin).
+ * @returns The relative return path, or `undefined` when none/unsafe.
+ */
+export const getPostLoginReturnTo = (user: unknown): string | undefined => {
+  const returnTo = (user as { state?: { returnTo?: unknown } } | null | undefined)?.state?.returnTo;
+
+  if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+    return returnTo;
+  }
+
+  return undefined;
+};
+
 /**
  * Generates the <title> tag text for a React route
  * @param pageName The name of the page, e.g. 'Projects'

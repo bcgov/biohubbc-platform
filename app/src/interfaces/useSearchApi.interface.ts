@@ -28,6 +28,8 @@ export interface SearchFeatureResponse {
   features: SearchFeatureResultWithRelevancy[];
   properties: FeatureTypeProperty[];
   pagination: ApiPaginationResponseParams;
+  /** True when the search matched secured features hidden from the caller by access filtering. */
+  has_more_secured_features: boolean;
 }
 
 /** Search result representing a matched feature with relevancy */
