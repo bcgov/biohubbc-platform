@@ -7,7 +7,7 @@ import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
 import { BrowserRouter } from 'react-router-dom';
 import appTheme from 'themes/appTheme';
-import { buildUrl, stripOidcParams } from 'utils/Utils';
+import { buildUrl, getPostLoginReturnTo, stripOidcParams } from 'utils/Utils';
 
 const App = () => {
   return (
@@ -34,9 +34,18 @@ const App = () => {
               // Automatically load additional user profile information
               loadUserInfo: true,
               userStore: new WebStorageStateStore({ store: window.localStorage }),
-              onSigninCallback: (_): void => {
+              onSigninCallback: (user): void => {
                 // See https://github.com/authts/react-oidc-context#getting-started
-                // Strip only the OIDC response params so any original search params on the
+                // When a caller carried a return location via the OIDC `state` param (e.g. the
+                // unauthenticated "Request Access" flow), navigate to it — the registered redirect_uri is a
+                // fixed origin, so login otherwise lands on `/`. A full navigation lets React Router render
+                // the search route fresh; the captured returnTo carries no OIDC params, so it won't re-trigger.
+                const returnTo = getPostLoginReturnTo(user);
+                if (returnTo) {
+                  globalThis.location.replace(returnTo);
+                  return;
+                }
+                // Otherwise strip only the OIDC response params so any original search params on the
                 // return URL (e.g. the encoded `expr` search expression) are preserved.
                 globalThis.history.replaceState({}, document.title, stripOidcParams(globalThis.location.href));
               }

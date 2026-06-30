@@ -13,6 +13,7 @@ import {
   isObject,
   jsonParseObjectProperties,
   jsonStringifyObjectProperties,
+  getPostLoginReturnTo,
   pluralize,
   safeJSONParse,
   safeJSONStringify,
@@ -50,6 +51,28 @@ describe('stripOidcParams', () => {
     const href = 'https://biohub.example/search/dataset?state_code=BC&code=abc';
 
     expect(stripOidcParams(href)).toEqual('/search/dataset?state_code=BC');
+  });
+});
+
+describe('getPostLoginReturnTo', () => {
+  it('returns the relative returnTo carried on the OIDC state', () => {
+    const user = { state: { returnTo: '/search/species_observation?expr=eyJhYmMiOjF9&page=2' } };
+
+    expect(getPostLoginReturnTo(user)).toEqual('/search/species_observation?expr=eyJhYmMiOjF9&page=2');
+  });
+
+  it('returns undefined when there is no state or returnTo', () => {
+    expect(getPostLoginReturnTo(undefined)).toBeUndefined();
+    expect(getPostLoginReturnTo(null)).toBeUndefined();
+    expect(getPostLoginReturnTo({})).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: {} })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: 42 } })).toBeUndefined();
+  });
+
+  it('rejects unsafe (non-relative) return targets to guard against open redirects', () => {
+    expect(getPostLoginReturnTo({ state: { returnTo: 'https://evil.example/phish' } })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: '//evil.example/phish' } })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: 'search/dataset' } })).toBeUndefined();
   });
 });
 

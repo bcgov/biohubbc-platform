@@ -230,6 +230,9 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('security_scope_anchor');
       // anchor-only: no direct URN scope grant probe is emitted (consistent with the visible-results filter)
       expect(sql).to.not.include('urn_submission_id');
+      // "unfiltered" drops only the access/security filter, never validity: the candidate set still
+      // requires active features (isSubmissionFeatureActive → record_effective_date / record_end_date).
+      expect(sql).to.include('record_effective_date');
     });
 
     it('should check only effectively-secured for anonymous users (no accessibility probe)', async () => {

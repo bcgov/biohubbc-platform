@@ -305,6 +305,29 @@ export const stripOidcParams = (href: string): string => {
 };
 
 /**
+ * Reads the post-login return location carried through the OIDC `state` param (set by callers such as
+ * the "Request Access" flow that redirect unauthenticated users to login). Used by `onSigninCallback` to
+ * navigate back to the originating search after authenticating, since the registered `redirect_uri` is a
+ * fixed origin and login otherwise lands on `/`.
+ *
+ * Only a safe same-origin relative path is returned (must start with a single `/`); anything else —
+ * absent state, an absolute URL, or a protocol-relative `//host` — yields `undefined`, guarding against
+ * open redirects.
+ *
+ * @param {unknown} user The OIDC user passed to `onSigninCallback` (its `state` holds the value set at signin).
+ * @returns The relative return path, or `undefined` when none/unsafe.
+ */
+export const getPostLoginReturnTo = (user: unknown): string | undefined => {
+  const returnTo = (user as { state?: { returnTo?: unknown } } | null | undefined)?.state?.returnTo;
+
+  if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+    return returnTo;
+  }
+
+  return undefined;
+};
+
+/**
  * Generates the <title> tag text for a React route
  * @param pageName The name of the page, e.g. 'Projects'
  * @returns The content to be rendered in the <title> tag

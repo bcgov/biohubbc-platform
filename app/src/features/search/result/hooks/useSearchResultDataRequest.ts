@@ -39,15 +39,16 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
    * Opens the create-data-request dialog for authenticated users.
    *
    * The data-request flow requires an authenticated BioHub user. When the caller
-   * is unauthenticated they are redirected to the Keycloak login page, preserving
-   * the current search location (path + query string, which includes the encoded
-   * `expr` search expression) as the return URL so the search results are
-   * restored after login.
+   * is unauthenticated they are redirected to the Keycloak login page. The current
+   * search location (path + query string, which includes the encoded `expr` search
+   * expression) is carried through the OIDC `state` param — not a dynamic
+   * `redirect_uri`, which prod SSO rejects as a wildcard URI — so the post-login
+   * callback can restore the search results.
    */
   const handleOpenCreateDataRequest = useCallback(() => {
     if (!auth.isAuthenticated) {
-      const redirectUri = `${globalThis.location.origin}${globalThis.location.pathname}${globalThis.location.search}`;
-      auth.signinRedirect({ redirect_uri: redirectUri });
+      const returnTo = `${globalThis.location.pathname}${globalThis.location.search}`;
+      auth.signinRedirect({ state: { returnTo } });
       return;
     }
     setIsCreateDataRequestDialogOpen(true);

@@ -101,8 +101,10 @@ describe('useSearchResultDataRequest', () => {
       expect(result.current.isCreateDataRequestDialogOpen).toBe(false);
       expect(mockCreateDataRequest).not.toHaveBeenCalled();
       expect(mockSigninRedirect).toHaveBeenCalledTimes(1);
+      // The return location travels via the OIDC `state` param (a relative path), not a dynamic
+      // redirect_uri — prod SSO rejects wildcard redirect URIs.
       expect(mockSigninRedirect).toHaveBeenCalledWith({
-        redirect_uri: 'https://biohub.example/search/species_observation?expr=eyJhYmMiOjF9&page=2'
+        state: { returnTo: '/search/species_observation?expr=eyJhYmMiOjF9&page=2' }
       });
     } finally {
       Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });

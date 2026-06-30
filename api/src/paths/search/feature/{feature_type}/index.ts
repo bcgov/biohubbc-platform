@@ -81,8 +81,6 @@ export function searchFeatures(): RequestHandler {
 
       await connection.commit();
 
-      res.setHeader('Cache-Control', 'public, max-age=90');
-
       return res.status(200).json({
         features,
         properties,
