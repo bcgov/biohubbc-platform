@@ -43,7 +43,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Delete previously derived canonical property rows for one upload.
    *
-   * This keeps reruns idempotent by removing all typed-property and artifact-link rows that
+   * This keeps reruns idempotent by removing all typed-property rows that
    * were derived from `submission_feature.data.properties` for the upload.
    *
    * @param {string} submissionUploadId Upload scope.
@@ -58,9 +58,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND record_end_date IS NULL
       ),
       delete_artifact AS (
-        DELETE FROM submission_feature_artifact sfa
+        DELETE FROM submission_feature_property_artifact sfpa
         USING upload_features uf
-        WHERE sfa.submission_feature_id = uf.submission_feature_id
+        WHERE sfpa.submission_feature_id = uf.submission_feature_id
         RETURNING 1
       ),
       delete_string AS (
@@ -2163,29 +2163,39 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Insert valid artifact links into `submission_feature_artifact`.
+   * Insert valid resolved artifact values into `submission_feature_property_artifact`.
    *
-   * Inserts distinct `(submission_feature_id, artifact_id)` pairs from artifact
-   * candidate staging where normalized reference is non-empty and resolution
-   * succeeded. Uses conflict-ignore semantics for idempotent reruns.
+   * Inserts distinct `(submission_feature_id, feature_type_property_id, artifact_id)` rows from artifact
+   * candidate staging where normalized reference is non-empty and resolution succeeded. This substitutes
+   * the submitted artifact key string (for example, `files/photo.jpg`) with the resolved `artifact_id`,
+   * preserving both the feature property and Blueprint assignment that produced the value.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async insertArtifactLinksBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async insertArtifactPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO submission_feature_artifact (
+      INSERT INTO submission_feature_property_artifact (
         submission_feature_id,
+        feature_type_property_id,
+        blueprint_feature_type_property_id,
         artifact_id
       )
       SELECT DISTINCT
         n.submission_feature_id,
+        n.feature_type_property_id,
+        n.blueprint_feature_type_property_id,
         n.artifact_id
       FROM submission_upload_staging_artifact_candidate n
       WHERE n.submission_upload_id = ${submissionUploadId}::uuid
         AND COALESCE(n.normalized_reference, '') <> ''
         AND n.artifact_id IS NOT NULL
-      ON CONFLICT (submission_feature_id, artifact_id) DO NOTHING;
+      ON CONFLICT (
+        submission_feature_id,
+        feature_type_property_id,
+        artifact_id
+      )
+      DO NOTHING;
     `;
 
     await this.connection.sql(sql);

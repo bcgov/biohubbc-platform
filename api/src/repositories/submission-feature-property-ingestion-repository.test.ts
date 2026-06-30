@@ -62,6 +62,11 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
         name: 'taxon',
         method: 'insertTaxonPropertiesBySubmissionUploadId',
         stagedAlias: 'c'
+      },
+      {
+        name: 'artifact',
+        method: 'insertArtifactPropertiesBySubmissionUploadId',
+        stagedAlias: 'n'
       }
     ];
 
@@ -96,6 +101,21 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('DELETE FROM submission_upload_staging_typed_property_value');
       expect(sqlText).to.include('DELETE FROM submission_upload_staging_resolved_property');
       expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
+    });
+  });
+
+  describe('deletePropertyRecordsBySubmissionUploadId', () => {
+    it('deletes typed artifact property rows instead of feature-level artifact links', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.deletePropertyRecordsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('DELETE FROM submission_feature_property_artifact');
+      expect(sqlText).to.not.include('DELETE FROM submission_feature_artifact');
     });
   });
 
@@ -261,24 +281,29 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
-  describe('insertArtifactLinksBySubmissionUploadId', () => {
-    it('inserts resolved artifact_key candidates into submission_feature_artifact', async () => {
+  describe('insertArtifactPropertiesBySubmissionUploadId', () => {
+    it('inserts resolved artifact_key candidates into submission_feature_property_artifact', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.insertArtifactLinksBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.insertArtifactPropertiesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('INSERT INTO submission_feature_artifact');
+      expect(sqlText).to.include('INSERT INTO submission_feature_property_artifact');
       expect(sqlText).to.include('SELECT DISTINCT');
       expect(sqlText).to.include('n.submission_feature_id');
+      expect(sqlText).to.include('n.feature_type_property_id');
+      expect(sqlText).to.include('n.blueprint_feature_type_property_id');
       expect(sqlText).to.include('n.artifact_id');
       expect(sqlText).to.include('FROM submission_upload_staging_artifact_candidate n');
       expect(sqlText).to.include("AND COALESCE(n.normalized_reference, '') <> ''");
       expect(sqlText).to.include('AND n.artifact_id IS NOT NULL');
-      expect(sqlText).to.include('ON CONFLICT (submission_feature_id, artifact_id) DO NOTHING');
+      expect(sqlText).to.match(
+        /ON CONFLICT \(\s*submission_feature_id,\s*feature_type_property_id,\s*artifact_id\s*\)/
+      );
+      expect(sqlText).to.not.include('INSERT INTO submission_feature_artifact');
     });
   });
 
