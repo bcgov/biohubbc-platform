@@ -431,63 +431,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission feature record.
-   * Features belong to a submission (submission_id) but are produced by a specific
-   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
-   * (append, replace).
-   *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @returns {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties']
-  ): Promise<{ submission_feature_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        record_effective_date
-      ) VALUES (
-        ${submissionId},
-        ${submissionUploadId},
-        ${parentSubmissionFeatureId},
-        ${featureSourceId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
-        ${featureProperties},
-        now()
-      )
-      RETURNING
-        submission_feature_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'SubmissionRepository->insertSubmissionFeatureRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * Delete all feature relationships for one upload attempt.
    *
    * @param {string} submissionUploadId

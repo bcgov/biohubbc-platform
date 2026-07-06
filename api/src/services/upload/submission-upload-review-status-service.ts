@@ -5,8 +5,10 @@ import {
   SubmissionUploadReviewStatus,
   UpdateSubmissionUploadReviewStatus
 } from '../../models/submission-upload-review-status';
+import { ReconciliationOutcomeCounts } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { DBService } from '../db-service';
+import { SubmissionFeatureReconciliationService } from '../reconciliation/submission-feature-reconciliation-service';
 import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
@@ -23,11 +25,13 @@ export interface SubmissionHistoryResponse {
 export class SubmissionUploadReviewStatusService extends DBService {
   submissionUploadReviewStatusRepository: SubmissionUploadReviewStatusRepository;
   submissionFeatureService: SubmissionFeatureService;
+  submissionFeatureReconciliationService: SubmissionFeatureReconciliationService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadReviewStatusRepository = new SubmissionUploadReviewStatusRepository(connection);
     this.submissionFeatureService = new SubmissionFeatureService(connection);
+    this.submissionFeatureReconciliationService = new SubmissionFeatureReconciliationService(connection);
   }
 
   /**
@@ -57,31 +61,41 @@ export class SubmissionUploadReviewStatusService extends DBService {
    * Record a new review status decision for a submission upload.
    * Only callable by system administrators.
    *
+   * `approved` reconciles the upload's pending features against the submission's
+   * published state and activates them (see
+   * {@link SubmissionFeatureReconciliationService.reconcileAndActivateSubmissionUpload});
+   * the per-outcome reconciliation counts are returned alongside the status row.
+   * `denied` and `submitted` un-publish the upload's live rows back to pending; rows
+   * ended by reconciliation are never resurrected, so a later re-approval re-classifies
+   * against whatever is published at that time.
+   *
    * @param {string} submissionUploadId
    * @param {UpdateSubmissionUploadReviewStatus} data
-   * @returns {Promise<SubmissionUploadReviewStatus>}
+   * @returns {Promise<SubmissionUploadReviewStatus & { reconciliation?: ReconciliationOutcomeCounts }>}
    */
   async updateSubmissionUploadReviewStatus(
     submissionUploadId: string,
     data: UpdateSubmissionUploadReviewStatus
-  ): Promise<SubmissionUploadReviewStatus> {
+  ): Promise<SubmissionUploadReviewStatus & { reconciliation?: ReconciliationOutcomeCounts }> {
+    let reconciliation: ReconciliationOutcomeCounts | undefined;
+
     if (data.status === 'approved') {
       await this.assertSubmissionUploadCanBeApproved(submissionUploadId);
-      await this.submissionFeatureService.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
+      reconciliation = await this.submissionFeatureReconciliationService.reconcileAndActivateSubmissionUpload(
+        submissionUploadId
+      );
     }
 
-    if (data.status === 'denied') {
-      await this.submissionFeatureService.setRecordEndDateBySubmissionUploadId(submissionUploadId);
+    if (data.status === 'denied' || data.status === 'submitted') {
+      await this.submissionFeatureService.unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
     }
 
-    if (data.status === 'submitted') {
-      await this.submissionFeatureService.unsetRecordDatesBySubmissionUploadId(submissionUploadId);
-    }
-
-    return this.submissionUploadReviewStatusRepository.insertSubmissionUploadReviewStatus({
+    const reviewStatus = await this.submissionUploadReviewStatusRepository.insertSubmissionUploadReviewStatus({
       submission_upload_id: submissionUploadId,
       status: data.status
     });
+
+    return reconciliation ? { ...reviewStatus, reconciliation } : reviewStatus;
   }
 
   /**

@@ -158,6 +158,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       });
       await this.populateComplexPropertyCandidateStagingBySubmissionUploadId(
         submissionUploadId,
+        submissionId,
         contributor.contributor_id
       );
 
@@ -212,10 +213,12 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
-        submissionUploadId
+        submissionUploadId,
+        submissionId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(
-        submissionUploadId
+        submissionUploadId,
+        submissionId
       );
 
       // Phase 8: SQL-native datetime/spatial normalization diagnostics.
@@ -295,7 +298,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
+      await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(
+        submissionUploadId,
+        submissionId
+      );
       await Promise.all([
         this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(
           submissionUploadId
@@ -336,7 +342,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         phase: currentPhase
       });
       await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
-        submissionUploadId
+        submissionUploadId,
+        submissionId
       );
 
       await this.submissionUploadReviewService.requestDefaultReviewsForUpload(
@@ -414,11 +421,13 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * parsing/normalization work for datetime, spatial, code, taxon, and artifact values.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} submissionId The submission the upload belongs to (for feature-reference resolution).
    * @param {number} contributorId Contributor scope for contributor-owned code resolution.
    * @returns {Promise<void>}
    */
   private async populateComplexPropertyCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,
+    submissionId: number,
     contributorId: number
   ): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearComplexPropertyCandidateStagingBySubmissionUploadId(
@@ -441,7 +450,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
     await this.submissionFeaturePropertyIngestionRepository.populateFeatureCandidateStagingBySubmissionUploadId(
-      submissionUploadId
+      submissionUploadId,
+      submissionId
     );
   }
 

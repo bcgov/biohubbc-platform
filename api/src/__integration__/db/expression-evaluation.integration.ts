@@ -910,21 +910,23 @@ describe('expression-evaluation (integration)', function () {
      * (a) uploadA gets NO closure: A(sample_site) <- E(sample_site), evidence=E, anchor=sample_site -> A
      *     ABSENT. With no ancestry rows the parent A is unreachable from E, and (post fail-closed) E itself
      *     reads as secured and is stripped — either way A does not appear.
-     * (b) uploadB's closure is rebuilt to self-loops only (no e2->m ancestor edge). E2(sample_site)
-     *     -content-> M(animal), evidence=E2, anchor=animal remains ABSENT because content edges are not walked.
+     * (b) submission B's closure is rebuilt to self-loops only (no e2→m ancestor edge). M is reachable
+     *     from E2 only through the content edge, and expression evaluation no longer walks content
+     *     reachability (SIMSBIOHUB-1085), so M stays ABSENT: E2(sample_site) ─content→ M(animal),
+     *     evidence=E2, anchor=animal → M ABSENT. Distinct SUBMISSIONS keep the halves clean: the closure
+     *     recompute is submission-scoped, so rebuilding B's closure must not create rows for A's features.
      */
     it('9: empty closure — closure ancestor reach absent, content reach absent', async () => {
-      const submissionId = await createTestSubmission(connection);
-
       // (a) closure ancestor reach needs the closure — do NOT rebuild it.
-      const uploadA = await createTestUpload(connection, submissionId);
+      const submissionA = await createTestSubmission(connection);
+      const uploadA = await createTestUpload(connection, submissionA);
       const ancestorSite = await insertFeatureRow({
-        submissionId,
+        submissionId: submissionA,
         submissionUploadId: uploadA,
         featureTypeName: 'sample_site'
       });
       const e = await insertFeatureRow({
-        submissionId,
+        submissionId: submissionA,
         submissionUploadId: uploadA,
         featureTypeName: 'sample_site',
         parentFeatureId: ancestorSite
@@ -941,11 +943,22 @@ describe('expression-evaluation (integration)', function () {
       );
       expect(ancestorIds.has(ancestorSite)).to.equal(false);
 
-      // (b) Rebuild uploadB's closure to give e2 and m their self-loops. m is NOT e2's child, so no e2->m
-      // ancestor edge is created. The content edge alone must not reach m.
-      const uploadB = await createTestUpload(connection, submissionId);
-      const e2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'sample_site' });
-      const m = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'animal' });
+      // (b) m is reachable from e2 ONLY via the content edge, and expression evaluation no longer walks
+      // content reachability (SIMSBIOHUB-1085), so m must NOT appear. Rebuild submission B's closure to give
+      // e2 and m their self-loops (the security filter fails closed on features with no closure rows). m is
+      // NOT e2's child, so no e2→m ancestor edge is created — nothing reaches m.
+      const submissionB = await createTestSubmission(connection);
+      const uploadB = await createTestUpload(connection, submissionB);
+      const e2 = await insertFeatureRow({
+        submissionId: submissionB,
+        submissionUploadId: uploadB,
+        featureTypeName: 'sample_site'
+      });
+      const m = await insertFeatureRow({
+        submissionId: submissionB,
+        submissionUploadId: uploadB,
+        featureTypeName: 'animal'
+      });
       await insertContentEdge(e2, m);
       await indexNameProperty(e2, 'no-closure-content', SAMPLE_SITE_NAME_FTP_ID);
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadB);

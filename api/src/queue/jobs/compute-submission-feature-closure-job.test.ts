@@ -30,7 +30,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       data
     } as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>);
 
-  it('should recompute the closure for the upload, publish screening job, and commit', async () => {
+  it('should recompute the closure for the submission, publish screening job, and commit', async () => {
     const mockDBConnection = getMockDBConnection();
     mockDBConnection.open = sinon.stub().resolves();
     mockDBConnection.commit = sinon.stub().resolves();
@@ -40,7 +40,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const recomputeStub = sinon
-      .stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload')
+      .stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission')
       .resolves({ insertedCount: 42 });
 
     const publishStub = sinon
@@ -51,7 +51,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       createMockJob({ submissionId: 1, submissionUploadId: 'upload-uuid-1' })
     ]);
 
-    expect(recomputeStub).to.have.been.calledOnceWith('upload-uuid-1');
+    expect(recomputeStub).to.have.been.calledOnceWith(1);
     expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, {
       submissionId: 1,
       submissionUploadId: 'upload-uuid-1'
@@ -74,7 +74,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       .resolves({ status: 'published', jobId: 'j1' });
 
     const testError = new Error('Closure recompute failed');
-    sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload').rejects(testError);
+    sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission').rejects(testError);
 
     try {
       await computeSubmissionFeatureClosureJobHandler([
@@ -95,7 +95,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
   });
 
   it('logs failure without transitioning the upload or recomputing the closure', async () => {
-    const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload');
+    const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission');
 
     const job = {
       id: 'job-1',
@@ -112,7 +112,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
   });
 
   it('logs the default message when output is null without recomputing the closure', async () => {
-    const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForUpload');
+    const recomputeStub = sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission');
 
     const job = {
       id: 'job-2',

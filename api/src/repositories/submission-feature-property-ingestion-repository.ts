@@ -1010,18 +1010,30 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * never contain `::`, so any other shape (`feature::`, `features::x`, `feature::a::b`)
    * is malformed and rejected.
    *
-   * Feature references resolve only against active features in the same upload, matching
-   * by `source_id`; cross-upload references are intentionally not resolved even though the
-   * foreign key permits them. The resolved target feature and its type are captured so later
-   * phases can validate the allowed target type and insert canonical rows.
+   * Feature references resolve against live features by `source_id`, preferring a match
+   * in the same upload and falling back to the submission's published live rows: a
+   * reconciled upload only carries new/changed features, so a referenced feature may be
+   * an unchanged feature owned by an earlier upload. Among published candidates, rows
+   * whose feature type is allowed for the property win (two published features of
+   * different types can legitimately share a `source_id` across uploads — without this
+   * preference the resolver could pick the wrong-type row and fail validation even
+   * though a right-type row exists); remaining ties resolve to the newest row for
+   * determinism. Within one upload bare `source_id` is unique (duplicate check), so a
+   * same-upload match is always the submitter's current intent and wins outright. The
+   * resolved target feature and its type are captured so later phases can validate the
+   * allowed target type and insert canonical rows.
    *
    * Rows remain in candidate staging even when unresolved so later phases can emit
    * aggregated resolution errors.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} submissionId The submission the upload belongs to.
    * @returns {Promise<void>}
    */
-  async populateFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async populateFeatureCandidateStagingBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_feature_candidate (
         submission_upload_id, submission_feature_id, property_name, feature_type_property_id, blueprint_feature_type_property_id,
@@ -1056,11 +1068,29 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         target.submission_feature_id AS referenced_submission_feature_id,
         target.feature_type_id        AS referenced_feature_type_id
       FROM parsed p
-      LEFT JOIN submission_feature target
-        ON p.is_format_valid
-       AND target.submission_upload_id = ${submissionUploadId}::uuid
-       AND target.record_end_date IS NULL
-       AND target.source_id = p.parsed_source_id;
+      LEFT JOIN LATERAL (
+        SELECT candidate.submission_feature_id, candidate.feature_type_id
+        FROM submission_feature candidate
+        WHERE p.is_format_valid
+          AND candidate.submission_id = ${submissionId}
+          AND candidate.source_id = p.parsed_source_id
+          AND candidate.record_end_date IS NULL
+          AND (
+            candidate.submission_upload_id = ${submissionUploadId}::uuid
+            OR candidate.record_effective_date IS NOT NULL
+          )
+        ORDER BY
+          (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+          EXISTS (
+            SELECT 1
+            FROM feature_type_property_feature ftpf
+            WHERE ftpf.feature_type_property_id = p.feature_type_property_id
+              AND ftpf.target_feature_type_id = candidate.feature_type_id
+              AND ftpf.record_end_date IS NULL
+          ) DESC,
+          candidate.submission_feature_id DESC
+        LIMIT 1
+      ) target ON true;
     `;
     await this.connection.sql(sql);
   }
@@ -2263,13 +2293,21 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert resolved feature-to-feature relationships for one upload.
    *
-   * Relationships are extracted from `submission_feature.data.content` string references, resolved
-   * within the same upload by `source_id`, filtered to exclude self-links, and inserted idempotently.
+   * Relationships are extracted from `submission_feature.data.content` string references,
+   * resolved by `source_id` — preferring a live match in the same upload and falling back
+   * to the submission's published live rows (a reconciled upload only carries new/changed
+   * features, so a referenced feature may be an unchanged feature owned by an earlier
+   * upload). Exactly one target is picked per reference (ties resolve to the newest row),
+   * self-links are excluded, and rows are inserted idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} submissionId The submission the upload belongs to.
    * @returns {Promise<void>}
    */
-  async insertFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async insertFeatureRelationshipsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       WITH expanded AS (
         SELECT
@@ -2295,10 +2333,21 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           e.source_feature_id,
           target.submission_feature_id AS target_feature_id
         FROM expanded e
-        JOIN submission_feature target
-          ON target.submission_upload_id = ${submissionUploadId}::uuid
-         AND target.record_end_date IS NULL
-         AND target.source_id = e.reference_source_id
+        CROSS JOIN LATERAL (
+          SELECT candidate.submission_feature_id
+          FROM submission_feature candidate
+          WHERE candidate.submission_id = ${submissionId}
+            AND candidate.source_id = e.reference_source_id
+            AND candidate.record_end_date IS NULL
+            AND (
+              candidate.submission_upload_id = ${submissionUploadId}::uuid
+              OR candidate.record_effective_date IS NOT NULL
+            )
+          ORDER BY
+            (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+            candidate.submission_feature_id DESC
+          LIMIT 1
+        ) AS target
         WHERE target.submission_feature_id <> e.source_feature_id
       )
       INSERT INTO submission_feature_feature (
@@ -2319,13 +2368,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Record unresolved or invalid feature-reference errors from `data.content`.
    *
    * This phase captures:
-   * - unresolved target source-id references within the upload
+   * - unresolved target source-id references (no live match in the upload or in the
+   *   submission's published live rows)
    * - self-reference violations
    *
+   * Resolution mirrors {@link insertFeatureRelationshipsBySubmissionUploadId}: one target
+   * per reference, preferring a live match in the same upload and falling back to the
+   * submission's published live rows.
+   *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} submissionId The submission the upload belongs to.
    * @returns {Promise<void>}
    */
-  async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string, submissionId: number): Promise<void> {
     const sql = SQL`
       WITH expanded AS (
         SELECT
@@ -2353,14 +2408,25 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             ELSE 'INVALID_SELF_REFERENCE'
           END AS error_code,
           CASE
-            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload'
+            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload or published submission state'
             ELSE 'Feature reference cannot point to itself'
           END AS error_message
         FROM expanded e
-        LEFT JOIN submission_feature target
-          ON target.submission_upload_id = ${submissionUploadId}::uuid
-         AND target.record_end_date IS NULL
-         AND target.source_id = e.reference_source_id
+        LEFT JOIN LATERAL (
+          SELECT candidate.submission_feature_id
+          FROM submission_feature candidate
+          WHERE candidate.submission_id = ${submissionId}
+            AND candidate.source_id = e.reference_source_id
+            AND candidate.record_end_date IS NULL
+            AND (
+              candidate.submission_upload_id = ${submissionUploadId}::uuid
+              OR candidate.record_effective_date IS NOT NULL
+            )
+          ORDER BY
+            (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+            candidate.submission_feature_id DESC
+          LIMIT 1
+        ) target ON true
         WHERE target.submission_feature_id IS NULL
            OR target.submission_feature_id = e.source_feature_id
       ),
@@ -2409,21 +2475,31 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record unresolved parent source-id references for the upload.
    *
-   * A parent error is recorded when `child.data.parent` is non-empty but no active
-   * feature in the same upload has a matching `source_id`.
+   * A parent error is recorded when `child.data.parent` is non-empty but no live
+   * feature in the same upload — and no published live feature of the submission —
+   * has a matching `source_id`. This mirrors the resolution scope used by
+   * `FeatureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId`.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} submissionId The submission the upload belongs to.
    * @returns {Promise<void>}
    */
-  async recordUnresolvedParentErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async recordUnresolvedParentErrorsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       WITH unresolved AS (
         SELECT
           child.submission_upload_id
         FROM submission_feature child
         LEFT JOIN submission_feature parent
-          ON parent.submission_upload_id = child.submission_upload_id
+          ON parent.submission_id = ${submissionId}
          AND parent.record_end_date IS NULL
+         AND (
+           parent.submission_upload_id = child.submission_upload_id
+           OR parent.record_effective_date IS NOT NULL
+         )
          AND parent.source_id = NULLIF(child.data ->> 'parent', '')
         WHERE child.submission_upload_id = ${submissionUploadId}::uuid
           AND child.record_end_date IS NULL
@@ -2434,7 +2510,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         SELECT
           unresolved.submission_upload_id,
           'UNRESOLVED_PARENT'::text AS error_code,
-          'Failed to resolve parent feature source_id within upload'::text AS error_message,
+          'Failed to resolve parent feature source_id within upload or published submission state'::text AS error_message,
           COUNT(*)::integer AS count
         FROM unresolved
         GROUP BY unresolved.submission_upload_id

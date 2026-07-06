@@ -17,7 +17,6 @@ import { SubmissionIngestionService } from '../services/ingestion/submission-ing
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { SecurityService } from '../services/security-service';
 import { SubmissionFeatureClosureService } from '../services/submission-feature-closure-service';
-import { SubmissionFeatureService } from '../services/submission-feature-service';
 import { getLogger } from '../utils/logger';
 
 const defaultLog = getLogger('seed-data-generator/generate');
@@ -212,14 +211,21 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
   );
   defaultLog.info({ label: 'generateSnapshot', message: 'closure complete', submissionId: chain.submissionId });
 
-  // Step 7: Transition the ingested features to "effective" — the real pipeline does this when an
-  // upload's review is approved. Until record_effective_date is set, a feature is excluded by every
-  // `record_effective_date <= now()` filter: it is invisible to search AND cannot be effectively
-  // secured, so no scope anchors are computed for it. The generator approves the upload outright
-  // because the snapshot is trusted seed data. This runs after the closure exists and before
-  // securing, so the secured features are already effective when securing evaluates them.
+  // Step 7: Publish the ingested features by setting record_effective_date — the real pipeline does this
+  // when an upload's review is approved (feature reconciliation). Until record_effective_date is set, a
+  // feature is excluded by every `record_effective_date <= now()` filter: it is invisible to search AND
+  // cannot be effectively secured, so no scope anchors are computed for it. The snapshot is a single
+  // trusted upload per submission, so its features are published directly here. This runs after the
+  // closure exists and before securing, so the secured features are already effective when securing
+  // evaluates them.
   await withConnection((connection) =>
-    new SubmissionFeatureService(connection).setRecordEffectiveDateBySubmissionUploadId(chain.submissionUploadId)
+    connection.sql(SQL`
+      UPDATE submission_feature
+      SET record_effective_date = now()
+      WHERE submission_upload_id = ${chain.submissionUploadId}::uuid
+        AND record_effective_date IS NULL
+        AND record_end_date IS NULL;
+    `)
   );
   defaultLog.info({ label: 'generateSnapshot', message: 'features effective', submissionId: chain.submissionId });
 
