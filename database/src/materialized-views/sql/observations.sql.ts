@@ -109,10 +109,13 @@ submissions AS (
   SELECT
     su.submission_upload_id,
     su.submission_id,
-    s.name AS submission_name
+    s.name AS submission_name,
+    LOWER(c.client_id) AS contributor_client_id
   FROM biohub.submission_upload su
   JOIN biohub.submission s ON su.submission_id = s.submission_id
+  JOIN biohub.contributor c ON s.contributor_id = c.contributor_id
   WHERE su.record_end_date IS NULL
+    AND c.record_end_date IS NULL
 )
 SELECT
     {columns}

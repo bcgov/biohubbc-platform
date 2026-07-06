@@ -20,7 +20,8 @@ export const TELEMETRY_COMMENTS: MaterializedViewCommentMap = {
 };
 
 export const OBSERVATIONS_COMMENTS: MaterializedViewCommentMap = {
-  group_id: 'Contributor-provided observation identifier shared by species observations collected together',
+  group_id:
+    'Contributor-scoped observation identifier shared by species observations collected together, formatted as contributor_client_id::observation_id',
   Feature_ID: 'System generated surrogate primary key identifier for the species observation feature',
   date: 'The date portion of the observation timestamp',
   time: 'The time portion of the observation timestamp',
