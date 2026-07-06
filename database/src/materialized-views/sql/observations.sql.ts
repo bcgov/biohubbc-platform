@@ -62,6 +62,22 @@ sample_site_locations AS (
     AND site_location.location_point IS NOT NULL
   ORDER BY c.source_submission_feature_id, c.is_ancestor DESC, sf_site.submission_feature_id
 ),
+sample_period_start_timestamps AS (
+  SELECT DISTINCT ON (c.source_submission_feature_id)
+    c.source_submission_feature_id AS submission_feature_id,
+    NULLIF(sf_sample_period.data->>'start_date', '')::timestamptz AS start_timestamp
+  FROM biohub.submission_feature_closure c
+  JOIN biohub.submission_feature sf_sample_period
+    ON sf_sample_period.submission_feature_id = c.target_submission_feature_id
+  JOIN biohub.feature_type ft_sample_period
+    ON sf_sample_period.feature_type_id = ft_sample_period.feature_type_id
+  WHERE ft_sample_period.name = 'sample_period'
+    AND sf_sample_period.record_end_date IS NULL
+    AND sf_sample_period.record_effective_date IS NOT NULL
+    AND sf_sample_period.record_effective_date <= NOW()::date
+    AND NULLIF(sf_sample_period.data->>'start_date', '') IS NOT NULL
+  ORDER BY c.source_submission_feature_id, c.is_ancestor DESC, sf_sample_period.submission_feature_id
+),
 observation_locations AS (
   SELECT
     sf_obs.submission_feature_id,
@@ -130,6 +146,8 @@ JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN observation_locations ol
   ON ol.submission_feature_id = sf.submission_feature_id
+LEFT JOIN sample_period_start_timestamps spst
+  ON spst.submission_feature_id = sf.submission_feature_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (COALESCE(sf_subcount.data->>'taxon_id', sf.data->>'taxon_id'))::int
 LEFT JOIN biohub.contributor_codeset_code ccc_sex

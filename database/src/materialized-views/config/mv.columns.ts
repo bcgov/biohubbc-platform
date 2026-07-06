@@ -32,9 +32,21 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'observation_id', expression: 'COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id)' },
   { alias: 'observation_subcount_id', expression: 'parent_obs.subcount_id' },
   { alias: 'Feature_ID', expression: 'COALESCE(sf_subcount.submission_feature_id, sf.submission_feature_id)' },
-  { alias: 'date', expression: "((sf.data->>'timestamp')::timestamptz)::date" },
-  { alias: 'time', expression: "((sf.data->>'timestamp')::timestamptz)::time" },
-  { alias: 'YEAR', expression: "(EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int" },
+  {
+    alias: 'date',
+    expression:
+      "(CASE WHEN NULLIF(sf.data->>'timestamp', '') IS NULL THEN spst.start_timestamp ELSE (sf.data->>'timestamp')::timestamptz END)::date"
+  },
+  {
+    alias: 'time',
+    expression:
+      "(CASE WHEN NULLIF(sf.data->>'timestamp', '') IS NULL THEN spst.start_timestamp ELSE (sf.data->>'timestamp')::timestamptz END)::time"
+  },
+  {
+    alias: 'YEAR',
+    expression:
+      "EXTRACT(YEAR FROM (CASE WHEN NULLIF(sf.data->>'timestamp', '') IS NULL THEN spst.start_timestamp ELSE (sf.data->>'timestamp')::timestamptz END))::int"
+  },
   { alias: 'Latitude', expression: 'public.ST_Y(ol.location_point)' },
   { alias: 'Longitude', expression: 'public.ST_X(ol.location_point)' },
   { alias: 'sign', expression: "(sf.data->>'sign')::text" },
