@@ -82,6 +82,7 @@ interface SeededFkChain {
   uploadId: string;
   submissionUploadId: string;
   ticketId: string;
+  blueprintId: number;
 }
 
 /**
@@ -175,7 +176,8 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
     submission_id: chain.submissionId,
     upload_id: chain.uploadId,
     status: 'uploaded',
-    ticket_id: chain.ticketId
+    ticket_id: chain.ticketId,
+    blueprint_id: chain.blueprintId
   });
   defaultLog.info({ label: 'generateSnapshot', message: 'ingest complete', submissionId: chain.submissionId });
 
@@ -337,6 +339,7 @@ interface SeedFkChainPayload {
  */
 async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayload): Promise<SeededFkChain> {
   const { contributorId, systemUserId } = await resolveContributorContext(connection);
+  const blueprintId = await resolveActiveBlueprintId(connection);
   const recordEndDate = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const bucket = process.env.OBJECT_STORE_BUCKET_NAME ?? null;
 
@@ -377,8 +380,8 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
   const ticketId = await createSnapshotTicket(connection, submissionId, uploadId, systemUserId);
 
   const submissionUploadResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId: string = submissionUploadResult.rows[0].submission_upload_id;
@@ -397,7 +400,32 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
       (${submissionUploadId}, 'security', 'pending', ${systemUserId}, ${systemUserId});
   `);
 
-  return { submissionId, uploadId, submissionUploadId, ticketId };
+  return { submissionId, uploadId, submissionUploadId, ticketId, blueprintId };
+}
+
+/**
+ * Resolve the active blueprint the submission_upload must reference.
+ *
+ * submission_upload gained a required blueprint_id; the seed generator binds to the first active
+ * blueprint (there is a single "Initial Blueprint" seeded today) rather than hardcoding an id.
+ *
+ * @param {IDBConnection} connection Transaction-scoped connection.
+ * @returns {Promise<number>} The active blueprint id.
+ */
+async function resolveActiveBlueprintId(connection: IDBConnection): Promise<number> {
+  const response = await connection.sql(SQL`
+    SELECT blueprint_id
+    FROM blueprint
+    WHERE record_end_date IS NULL
+    ORDER BY blueprint_id
+    LIMIT 1;
+  `);
+
+  if (response.rowCount === 0) {
+    throw new Error('resolveActiveBlueprintId: no active blueprint was found');
+  }
+
+  return response.rows[0].blueprint_id;
 }
 
 /** Contributor + system-user ids resolved from the seeded rows. */
