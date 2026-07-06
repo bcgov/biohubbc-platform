@@ -12,20 +12,14 @@
             "type": "Feature",
             "geometry": {
               "type": "Point",
-              "coordinates": [
-                -122.1875939,
-                58.6467094
-              ]
+              "coordinates": [-122.1875939, 58.6467094]
             },
             "properties": {}
           }
         ]
       }
     },
-    "content": [
-      "4befc0b1-4183-4264-8532-916b562c9a59",
-      "b79f63cf-e580-49ca-bf6d-cecc15206e8c"
-    ],
+    "content": ["4befc0b1-4183-4264-8532-916b562c9a59", "b79f63cf-e580-49ca-bf6d-cecc15206e8c"],
     "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
   }
 ]

@@ -1,0 +1,896 @@
+{
+  "submission": {
+    "name": "__seed-snapshot__ Feature Type Sampler",
+    "description": "__seed-snapshot__",
+    "comment": "__seed-snapshot__"
+  },
+  "features": [
+    {
+      "uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "feature_type_name": "animal",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+      "urn": "urn:469:animal:59731",
+      "data": {
+        "id": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+        "type": "animal",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [
+          "8cd8cc9f-6422-4b5a-acde-cb3a9944b82b",
+          "26cde575-7367-4b33-a832-dfdb0b86f264",
+          "ad6dc187-8734-41f3-8c95-8c2dda898df2"
+        ],
+        "properties": {
+          "sex": "female",
+          "taxon_id": 180703,
+          "description": "Sampler animal carrying marking, measurement, and mortality children.",
+          "animal_identifier": "SAMPLER-001"
+        }
+      },
+      "data_byte_size": "406"
+    },
+    {
+      "uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_name": "dataset",
+      "parent_uuid": null,
+      "source_id": "cc07359b-dd25-4965-98d0-d8b89558432c",
+      "urn": "urn:469:dataset:59733",
+      "data": {
+        "id": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "type": "dataset",
+        "parent": null,
+        "content": [
+          "7c47959e-39c5-4a7d-a648-a066b17b9366",
+          "c21e3c06-054c-4c03-943b-29d71c7398b6",
+          "3b8edf80-c065-43d1-85af-d93f3719d057",
+          "4b8506fc-c1e4-491d-a624-40123ee49867",
+          "cbb9ec4c-1874-47fa-942c-7be0f1db15d9",
+          "a2b7d902-6c92-4136-a9c6-3310aad67125",
+          "091551fc-2149-4efe-acb7-d9eaff01b4b9",
+          "3e263a19-b717-49d6-b6f5-7b99d2a4732b"
+        ],
+        "properties": {
+          "name": "Feature Type Sampler",
+          "end_date": "2020-12-31",
+          "objectives": "One valid feature per feature type for pipeline coverage.",
+          "start_date": "2020-01-01",
+          "focal_species": [
+            180702
+          ]
+        }
+      },
+      "data_byte_size": "593"
+    },
+    {
+      "uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "feature_type_name": "block",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "3b8edf80-c065-43d1-85af-d93f3719d057",
+      "urn": "urn:469:block:59732",
+      "data": {
+        "id": "3b8edf80-c065-43d1-85af-d93f3719d057",
+        "type": "block",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "name": "Sampler Block 1",
+          "description": "Sampler survey block."
+        }
+      },
+      "data_byte_size": "199"
+    },
+    {
+      "uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "feature_type_name": "ecological_unit",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "4b8506fc-c1e4-491d-a624-40123ee49867",
+      "urn": "urn:469:ecological_unit:59734",
+      "data": {
+        "id": "4b8506fc-c1e4-491d-a624-40123ee49867",
+        "type": "ecological_unit",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "ecological_unit_type": "Biogeoclimatic Zone",
+          "ecological_unit_value": "Boreal White and Black Spruce"
+        }
+      },
+      "data_byte_size": "247"
+    },
+    {
+      "uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "feature_type_name": "sample_period",
+      "parent_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "source_id": "4befc0b1-4183-4264-8532-916b562c9a59",
+      "urn": "urn:469:sample_period:59740",
+      "data": {
+        "id": "4befc0b1-4183-4264-8532-916b562c9a59",
+        "type": "sample_period",
+        "parent": "7c47959e-39c5-4a7d-a648-a066b17b9366",
+        "content": [],
+        "properties": {
+          "end_date": "2020-06-30",
+          "start_date": "2020-06-01",
+          "site_identifier": "Sampler Site 1",
+          "sample_technique": "Sampler Technique 1"
+        }
+      },
+      "data_byte_size": "270"
+    },
+    {
+      "uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_name": "report",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "a2b7d902-6c92-4136-a9c6-3310aad67125",
+      "urn": "urn:469:report:59739",
+      "data": {
+        "id": "a2b7d902-6c92-4136-a9c6-3310aad67125",
+        "type": "report",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "name": "Sampler Report",
+          "year": 2020,
+          "author": "Sampler",
+          "filename": "report.pdf",
+          "file_size": 193,
+          "file_type": "Report",
+          "description": "Sampler report artifact.",
+          "artifact_key": "files/report.pdf"
+        }
+      },
+      "data_byte_size": "328"
+    },
+    {
+      "uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "feature_type_name": "habitat_feature",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "cbb9ec4c-1874-47fa-942c-7be0f1db15d9",
+      "urn": "urn:469:habitat_feature:59735",
+      "data": {
+        "id": "cbb9ec4c-1874-47fa-942c-7be0f1db15d9",
+        "type": "habitat_feature",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "name": "Sampler Habitat Feature 1",
+          "count": 3,
+          "geometry": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "geometry": {
+                  "type": "Point",
+                  "coordinates": [
+                    -122.1875939,
+                    58.6467094
+                  ]
+                },
+                "properties": {}
+              }
+            ]
+          },
+          "timestamp": "2020-07-15 12:00:00+00"
+        }
+      },
+      "data_byte_size": "384"
+    },
+    {
+      "uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "feature_type_name": "stratum",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "091551fc-2149-4efe-acb7-d9eaff01b4b9",
+      "urn": "urn:469:stratum:59743",
+      "data": {
+        "id": "091551fc-2149-4efe-acb7-d9eaff01b4b9",
+        "type": "stratum",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "name": "Sampler Stratum 1",
+          "description": "Sampler survey stratum."
+        }
+      },
+      "data_byte_size": "205"
+    },
+    {
+      "uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_name": "marking",
+      "parent_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "source_id": "8cd8cc9f-6422-4b5a-acde-cb3a9944b82b",
+      "urn": "urn:469:marking:59736",
+      "data": {
+        "id": "8cd8cc9f-6422-4b5a-acde-cb3a9944b82b",
+        "type": "marking",
+        "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+        "content": [],
+        "properties": {
+          "comment": "Sampler marking.",
+          "identifier": "TAG-001",
+          "marking_type": "Ear Tag",
+          "body_position": "Left Ear",
+          "primary_colour": "Yellow"
+        }
+      },
+      "data_byte_size": "268"
+    },
+    {
+      "uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "feature_type_name": "measurement",
+      "parent_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "source_id": "26cde575-7367-4b33-a832-dfdb0b86f264",
+      "urn": "urn:469:measurement:59737",
+      "data": {
+        "id": "26cde575-7367-4b33-a832-dfdb0b86f264",
+        "type": "measurement",
+        "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+        "content": [],
+        "properties": {
+          "description": "Sampler measurement.",
+          "measurement_type": "Body Mass",
+          "measurement_value": 412.5
+        }
+      },
+      "data_byte_size": "236"
+    },
+    {
+      "uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "feature_type_name": "mortality",
+      "parent_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "source_id": "ad6dc187-8734-41f3-8c95-8c2dda898df2",
+      "urn": "urn:469:mortality:59738",
+      "data": {
+        "id": "ad6dc187-8734-41f3-8c95-8c2dda898df2",
+        "type": "mortality",
+        "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+        "content": [],
+        "properties": {
+          "comment": "Sampler mortality.",
+          "geometry": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "geometry": {
+                  "type": "Point",
+                  "coordinates": [
+                    -122.1875939,
+                    58.6467094
+                  ]
+                },
+                "properties": {}
+              }
+            ]
+          },
+          "timestamp": "2020-09-01 08:30:00+00",
+          "cause_of_death": "Predation"
+        }
+      },
+      "data_byte_size": "393"
+    },
+    {
+      "uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "feature_type_name": "sample_site",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "7c47959e-39c5-4a7d-a648-a066b17b9366",
+      "urn": "urn:469:sample_site:59741",
+      "data": {
+        "id": "7c47959e-39c5-4a7d-a648-a066b17b9366",
+        "type": "sample_site",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [
+          "4befc0b1-4183-4264-8532-916b562c9a59",
+          "b79f63cf-e580-49ca-bf6d-cecc15206e8c"
+        ],
+        "properties": {
+          "name": "Sampler Site 1",
+          "geometry": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "geometry": {
+                  "type": "Point",
+                  "coordinates": [
+                    -122.1875939,
+                    58.6467094
+                  ]
+                },
+                "properties": {}
+              }
+            ]
+          },
+          "description": "Sampler sampling site carrying a period and a technique."
+        }
+      },
+      "data_byte_size": "472"
+    },
+    {
+      "uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_name": "sample_technique",
+      "parent_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "source_id": "b79f63cf-e580-49ca-bf6d-cecc15206e8c",
+      "urn": "urn:469:sample_technique:59742",
+      "data": {
+        "id": "b79f63cf-e580-49ca-bf6d-cecc15206e8c",
+        "type": "sample_technique",
+        "parent": "7c47959e-39c5-4a7d-a648-a066b17b9366",
+        "content": [],
+        "properties": {
+          "name": "Sampler Technique 1",
+          "description": "Sampler sampling technique.",
+          "method_name": "Camera Trap",
+          "detect_distance": 25,
+          "response_metric": "Count"
+        }
+      },
+      "data_byte_size": "295"
+    },
+    {
+      "uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "feature_type_name": "telemetry_frequency",
+      "parent_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "source_id": "3e263a19-b717-49d6-b6f5-7b99d2a4732b",
+      "urn": "urn:469:telemetry_frequency:59744",
+      "data": {
+        "id": "3e263a19-b717-49d6-b6f5-7b99d2a4732b",
+        "type": "telemetry_frequency",
+        "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
+        "content": [],
+        "properties": {
+          "frequency": 150.125,
+          "frequency_unit": "MHz"
+        }
+      },
+      "data_byte_size": "193"
+    }
+  ],
+  "property_string": [
+    {
+      "feature_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "feature_type_property_id": 53,
+      "value": "SAMPLER-001"
+    },
+    {
+      "feature_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "feature_type_property_id": 92,
+      "value": "Sampler animal carrying marking, measurement, and mortality children."
+    },
+    {
+      "feature_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "feature_type_property_id": 1,
+      "value": "female"
+    },
+    {
+      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_property_id": 70,
+      "value": "Feature Type Sampler"
+    },
+    {
+      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_property_id": 28,
+      "value": "One valid feature per feature type for pipeline coverage."
+    },
+    {
+      "feature_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "feature_type_property_id": 18,
+      "value": "Sampler survey block."
+    },
+    {
+      "feature_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "feature_type_property_id": 30,
+      "value": "Sampler Block 1"
+    },
+    {
+      "feature_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "feature_type_property_id": 59,
+      "value": "Biogeoclimatic Zone"
+    },
+    {
+      "feature_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "feature_type_property_id": 26,
+      "value": "Boreal White and Black Spruce"
+    },
+    {
+      "feature_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "feature_type_property_id": 33,
+      "value": "Sampler Site 1"
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 65,
+      "value": "Sampler"
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 83,
+      "value": "Sampler report artifact."
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 103,
+      "value": "report.pdf"
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 105,
+      "value": "Report"
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 72,
+      "value": "Sampler Report"
+    },
+    {
+      "feature_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "feature_type_property_id": 79,
+      "value": "Sampler Habitat Feature 1"
+    },
+    {
+      "feature_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "feature_type_property_id": 87,
+      "value": "Sampler survey stratum."
+    },
+    {
+      "feature_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "feature_type_property_id": 48,
+      "value": "Sampler Stratum 1"
+    },
+    {
+      "feature_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_property_id": 74,
+      "value": "Left Ear"
+    },
+    {
+      "feature_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_property_id": 42,
+      "value": "Sampler marking."
+    },
+    {
+      "feature_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_property_id": 77,
+      "value": "TAG-001"
+    },
+    {
+      "feature_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_property_id": 89,
+      "value": "Ear Tag"
+    },
+    {
+      "feature_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "feature_type_property_id": 66,
+      "value": "Yellow"
+    },
+    {
+      "feature_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "feature_type_property_id": 107,
+      "value": "Sampler measurement."
+    },
+    {
+      "feature_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "feature_type_property_id": 76,
+      "value": "Body Mass"
+    },
+    {
+      "feature_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "feature_type_property_id": 57,
+      "value": "Predation"
+    },
+    {
+      "feature_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "feature_type_property_id": 2,
+      "value": "Sampler mortality."
+    },
+    {
+      "feature_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "feature_type_property_id": 9,
+      "value": "Sampler sampling site carrying a period and a technique."
+    },
+    {
+      "feature_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "feature_type_property_id": 45,
+      "value": "Sampler Site 1"
+    },
+    {
+      "feature_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_property_id": 13,
+      "value": "Sampler sampling technique."
+    },
+    {
+      "feature_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_property_id": 49,
+      "value": "Camera Trap"
+    },
+    {
+      "feature_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_property_id": 24,
+      "value": "Sampler Technique 1"
+    },
+    {
+      "feature_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_property_id": 17,
+      "value": "Count"
+    },
+    {
+      "feature_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "feature_type_property_id": 99,
+      "value": "MHz"
+    }
+  ],
+  "property_number": [
+    {
+      "feature_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "feature_type_property_id": 78,
+      "value": 180703
+    },
+    {
+      "feature_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "feature_type_property_id": 8,
+      "value": 3
+    },
+    {
+      "feature_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "feature_type_property_id": 29,
+      "value": 412.5
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 104,
+      "value": 193
+    },
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "feature_type_property_id": 21,
+      "value": 2020
+    },
+    {
+      "feature_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "feature_type_property_id": 90,
+      "value": 25
+    },
+    {
+      "feature_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "feature_type_property_id": 3,
+      "value": 150.125
+    }
+  ],
+  "property_boolean": [],
+  "property_timestamp": [
+    {
+      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_property_id": 25,
+      "date_value": "2020-01-01",
+      "time_value": null
+    },
+    {
+      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_property_id": 85,
+      "date_value": "2020-12-31",
+      "time_value": null
+    },
+    {
+      "feature_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "feature_type_property_id": 37,
+      "date_value": "2020-06-01",
+      "time_value": null
+    },
+    {
+      "feature_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "feature_type_property_id": 93,
+      "date_value": "2020-06-30",
+      "time_value": null
+    },
+    {
+      "feature_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "feature_type_property_id": 69,
+      "date_value": "2020-07-15",
+      "time_value": "12:00:00"
+    },
+    {
+      "feature_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "feature_type_property_id": 15,
+      "date_value": "2020-09-01",
+      "time_value": "08:30:00"
+    }
+  ],
+  "property_code": [],
+  "property_taxon": [
+    {
+      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "feature_type_property_id": 20,
+      "taxon_id": 20
+    }
+  ],
+  "property_geometry": [
+    {
+      "feature_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "feature_type_property_id": 60,
+      "geojson": {
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "Point",
+            "coordinates": [
+              -122.1875939,
+              58.6467094
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "feature_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "feature_type_property_id": 19,
+      "geojson": {
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "Point",
+            "coordinates": [
+              -122.1875939,
+              58.6467094
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "feature_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "feature_type_property_id": 4,
+      "geojson": {
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "Point",
+            "coordinates": [
+              -122.1875939,
+              58.6467094
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "property_feature": [],
+  "closure": [
+    {
+      "source_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "target_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "target_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "target_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "target_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "787fe534-e613-4545-a2b6-b7b73805474f",
+      "target_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "target_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "target_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "target_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "target_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "target_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "target_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "target_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "target_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "target_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "target_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "target_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "target_uuid": "80715254-c097-4812-a05b-39a9cf74d610",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "target_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "is_ancestor": true
+    },
+    {
+      "source_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "target_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075",
+      "is_ancestor": true
+    }
+  ],
+  "feature_feature": [
+    {
+      "source_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "target_uuid": "166aa2ce-a635-4c2c-bed0-3028b5a93496"
+    },
+    {
+      "source_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "target_uuid": "751e6add-ffbd-4e1a-9f12-1d638d35a2a8"
+    },
+    {
+      "source_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb",
+      "target_uuid": "89359ee7-4734-47e1-a2ea-bdb148c94b00"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "ef69b7f5-958a-4db8-bac7-4b58714d51bb"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "69a6f053-cbcb-439a-ad94-f64683fe5072"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "3879e1eb-dc08-4276-a95c-7fbf11560671"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "b19ed179-31be-4c30-b12f-3a6e69720264"
+    },
+    {
+      "source_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
+      "target_uuid": "f7798e39-c4c2-41ac-9227-d3caa5a9a075"
+    },
+    {
+      "source_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "target_uuid": "787fe534-e613-4545-a2b6-b7b73805474f"
+    },
+    {
+      "source_uuid": "d001a699-c0e0-4d6d-a109-c9a7451fb97b",
+      "target_uuid": "80715254-c097-4812-a05b-39a9cf74d610"
+    }
+  ],
+  "artifact": [
+    {
+      "feature_uuid": "2fa92063-f13f-437b-a3a3-c5a6849acd09",
+      "object_key": "submissions/469/uploads/38d60eef-45b6-4070-a453-5112d5a94512/media/files/report.pdf"
+    }
+  ],
+  "security": [],
+  "anchors": [],
+  "counts": {
+    "features": 14,
+    "property_string": 34,
+    "property_number": 7,
+    "property_boolean": 0,
+    "property_timestamp": 6,
+    "property_code": 0,
+    "property_taxon": 1,
+    "property_geometry": 3,
+    "property_feature": 0,
+    "closure": 32,
+    "feature_feature": 13,
+    "artifact": 1,
+    "security": 0,
+    "anchors": 0
+  }
+}

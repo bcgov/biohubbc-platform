@@ -17,6 +17,7 @@ import { SubmissionIngestionService } from '../services/ingestion/submission-ing
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { SecurityService } from '../services/security-service';
 import { SubmissionFeatureClosureService } from '../services/submission-feature-closure-service';
+import { SubmissionFeatureService } from '../services/submission-feature-service';
 import { getLogger } from '../utils/logger';
 
 const defaultLog = getLogger('seed-data-generator/generate');
@@ -154,8 +155,8 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
   await new ObjectStorageService().uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
   defaultLog.info({ label: 'generateSnapshot', message: 'staged tar to MinIO', objectKey, byteSize: tarBuffer.length });
 
-  // Step 2: Remove any prior snapshot submission for this name so re-runs do not duplicate it.
-  await withConnection((connection) => deletePriorSnapshotSubmission(connection, submissionName));
+  // Step 2: Remove any prior snapshot submission and artifact for this name so re-runs do not duplicate it.
+  await withConnection((connection) => deletePriorSnapshot(connection, submissionName, objectKey));
 
   // Step 3: Seed the FK chain the ingestion pipeline expects.
   const chain = await withConnection((connection) =>
@@ -193,7 +194,18 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
   );
   defaultLog.info({ label: 'generateSnapshot', message: 'closure complete', submissionId: chain.submissionId });
 
-  // Step 7: Secure the demo deployment subset, then compute anchors synchronously.
+  // Step 7: Transition the ingested features to "effective" — the real pipeline does this when an
+  // upload's review is approved. Until record_effective_date is set, a feature is excluded by every
+  // `record_effective_date <= now()` filter: it is invisible to search AND cannot be effectively
+  // secured, so no scope anchors are computed for it. The generator approves the upload outright
+  // because the snapshot is trusted seed data. This runs after the closure exists and before
+  // securing, so the secured features are already effective when securing evaluates them.
+  await withConnection((connection) =>
+    new SubmissionFeatureService(connection).setRecordEffectiveDateBySubmissionUploadId(chain.submissionUploadId)
+  );
+  defaultLog.info({ label: 'generateSnapshot', message: 'features effective', submissionId: chain.submissionId });
+
+  // Step 8: Secure the demo deployment subset, then compute anchors synchronously.
   // Securing only happens when the caller asks for it (the sampler run omits it); the Moose run
   // passes the default identifiers, or its own override.
   if (options.secureDeploymentIdentifiers !== undefined) {
@@ -255,18 +267,49 @@ function packDirectoryToTarBuffer(sourceDir: string): Promise<Buffer> {
 }
 
 /**
- * Soft-delete the prior snapshot submission for this name so a re-run does not duplicate the dataset.
+ * Clear the prior snapshot for this name so a re-run does not duplicate the dataset or collide on keys.
+ *
+ * Soft-deletes the prior submission, then hard-deletes the prior artifact and its two bridge rows. The
+ * artifact carries a UNIQUE (bucket, object_key) constraint and the staged object_key is deterministic
+ * per name, so without this removal a second run fails on a duplicate-key violation when re-staging the
+ * tar. The bridge rows are deleted in FK order (upload_artifact -> upload_archive -> artifact) because
+ * upload_artifact references upload_archive, which in turn references artifact.
  *
  * @param {IDBConnection} connection Transaction-scoped connection.
  * @param {string} submissionName The snapshot submission name to clear.
+ * @param {string} objectKey The deterministic staged-tar object_key whose artifact is removed.
  * @returns {Promise<void>}
  */
-async function deletePriorSnapshotSubmission(connection: IDBConnection, submissionName: string): Promise<void> {
+async function deletePriorSnapshot(
+  connection: IDBConnection,
+  submissionName: string,
+  objectKey: string
+): Promise<void> {
   await connection.sql(SQL`
     UPDATE submission
     SET record_end_date = now()
     WHERE name = ${snapshotSubmissionName(submissionName)}
       AND record_end_date IS NULL;
+  `);
+
+  // The pipeline also creates an upload_artifact row that points at the staged archive (via
+  // upload_archive_id) but carries a different, derived artifact_id, so both linkages are cleared.
+  await connection.sql(SQL`
+    DELETE FROM upload_artifact
+    WHERE artifact_id IN (SELECT artifact_id FROM artifact WHERE object_key = ${objectKey})
+       OR upload_archive_id IN (
+         SELECT upload_archive_id FROM upload_archive
+         WHERE artifact_id IN (SELECT artifact_id FROM artifact WHERE object_key = ${objectKey})
+       );
+  `);
+
+  await connection.sql(SQL`
+    DELETE FROM upload_archive
+    WHERE artifact_id IN (SELECT artifact_id FROM artifact WHERE object_key = ${objectKey});
+  `);
+
+  await connection.sql(SQL`
+    DELETE FROM artifact WHERE object_key = ${objectKey};
   `);
 }
 

@@ -7,11 +7,7 @@
       "start_date": "2020-01-01",
       "end_date": "2020-12-31",
       "objectives": "One valid feature per feature type for pipeline coverage.",
-      "focal_species": [
-        {
-          "taxon_id": 180703
-        }
-      ]
+      "focal_species": [180702]
     },
     "content": [
       "7c47959e-39c5-4a7d-a648-a066b17b9366",

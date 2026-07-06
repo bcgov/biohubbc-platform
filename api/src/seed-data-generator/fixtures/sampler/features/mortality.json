@@ -13,10 +13,7 @@
             "type": "Feature",
             "geometry": {
               "type": "Point",
-              "coordinates": [
-                -122.1875939,
-                58.6467094
-              ]
+              "coordinates": [-122.1875939, 58.6467094]
             },
             "properties": {}
           }
