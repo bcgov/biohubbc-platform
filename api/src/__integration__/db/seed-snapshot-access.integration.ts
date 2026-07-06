@@ -62,7 +62,7 @@ describe('Seed snapshot access (integration)', function () {
     const result = await connection.sql(SQL`
       SELECT submission_id
       FROM submission
-      WHERE name = '__seed-snapshot__ Boreal Moose'
+      WHERE name = 'Boreal Moose'
         AND record_end_date IS NULL
       LIMIT 1;
     `);

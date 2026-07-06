@@ -23,11 +23,14 @@ import { getLogger } from '../utils/logger';
 const defaultLog = getLogger('seed-data-generator/generate');
 
 /**
- * Object-key prefix that namespaces every artifact and submission this generator creates.
+ * Marker tagging every artifact and submission this generator creates as generator-owned.
  *
- * Re-runs delete the prior submission sharing this prefix + name before re-ingesting, so the
- * namespace is the natural key that makes the generator idempotent (the prototype it is based on
- * had no cleanup and accumulated duplicate submissions on every run).
+ * It is written to the submission's `comment`/`description` and the artifact object-key namespace —
+ * deliberately NOT the submission `name`, which stays the clean human dataset title because that field
+ * is user-visible in search results and on feature detail pages. Re-runs delete the prior submission
+ * matching (clean name + this marker) before re-ingesting, so the marker is the natural key that makes
+ * the generator idempotent without ever touching a real user submission that happens to share the name
+ * (the prototype had no cleanup and stacked duplicate submissions on every run).
  */
 const SEED_SNAPSHOT_PREFIX = '__seed-snapshot__';
 
@@ -41,14 +44,27 @@ const SEED_SNAPSHOT_PREFIX = '__seed-snapshot__';
 const DEMO_SECURITY_RULE_NAME = 'Moose';
 
 /**
+ * The security rule applied to the demo's secured study_area.
+ *
+ * Distinct from the telemetry rule so the two lock demos read as different reasons in the security UI,
+ * and resolved by name for the same id-stability reason. A study_area is a sensitive spatial site, so a
+ * location-secrecy rule fits. Securing it activates the otherwise-dormant Sampling Sites policy in the
+ * seed config, giving a second, top-level lock demo alongside the telemetry partial-secure.
+ */
+const STUDY_AREA_SECURITY_RULE_NAME = 'Mineral Lick Locations';
+
+/**
  * Default animal identifiers for the three deployments secured in the demo.
  *
- * A clean alternating subset of the six Boreal Moose deployments — securing roughly half makes the
- * partial-secure ("lock icon on some, not all") demo visible. Securing all six, or the dataset root,
- * would lock everything and defeat the demo. The Moose run passes these as
- * `secureDeploymentIdentifiers`; the sampler run omits the option and is left fully unsecured.
+ * Deliberately the three deployments whose telemetry are ingested FIRST (the lowest
+ * submission_feature_id block). The search results table sorts by submission_feature_id ascending, so
+ * securing the leading blocks makes the lock icons visible on page one instead of buried hundreds of
+ * pages behind the unsecured deployments. Securing three of six keeps the partial-secure ("lock icon on
+ * some, not all") demo; securing all six, or the dataset root, would lock everything and defeat it. The
+ * Moose run passes these as `secureDeploymentIdentifiers`; the sampler run omits the option and is left
+ * fully unsecured.
  */
-export const DEFAULT_SECURE_DEPLOYMENT_IDENTIFIERS = ['15-5592', '15-5594', '15-5596'];
+export const DEFAULT_SECURE_DEPLOYMENT_IDENTIFIERS = ['15-5595', '15-5593', '15-5592'];
 
 export interface GenerateSnapshotOptions {
   /** Path to an external dataset tar file, OR the committed sampler source directory. */
@@ -287,10 +303,13 @@ async function deletePriorSnapshot(
   submissionName: string,
   objectKey: string
 ): Promise<void> {
+  // Match on the clean name AND the generator marker so a real user submission that happens to share
+  // the dataset name is never soft-deleted — only this generator's own prior run is cleared.
   await connection.sql(SQL`
     UPDATE submission
     SET record_end_date = now()
-    WHERE name = ${snapshotSubmissionName(submissionName)}
+    WHERE name = ${submissionName}
+      AND comment = ${SEED_SNAPSHOT_PREFIX}
       AND record_end_date IS NULL;
   `);
 
@@ -313,11 +332,6 @@ async function deletePriorSnapshot(
   await connection.sql(SQL`
     DELETE FROM artifact WHERE object_key = ${objectKey};
   `);
-}
-
-/** Deterministic submission name carrying the snapshot prefix, used as the idempotency key. */
-function snapshotSubmissionName(submissionName: string): string {
-  return `${SEED_SNAPSHOT_PREFIX} ${submissionName}`;
 }
 
 interface SeedFkChainPayload {
@@ -349,7 +363,7 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
       gen_random_uuid(),
       ${systemUserId},
       ${contributorId},
-      ${snapshotSubmissionName(payload.submissionName)},
+      ${payload.submissionName},
       ${SEED_SNAPSHOT_PREFIX},
       ${SEED_SNAPSHOT_PREFIX},
       ${systemUserId}
@@ -547,7 +561,7 @@ async function createSnapshotTicket(
  */
 async function secureDeploymentsAndComputeAnchors(submissionId: number, identifiers: string[]): Promise<void> {
   await withConnection(async (connection) => {
-    const ruleId = await getDemoSecurityRuleId(connection);
+    const ruleId = await getSecurityRuleIdByName(connection, DEMO_SECURITY_RULE_NAME);
     const deployments = await getTelemetryDeployments(connection, submissionId);
     const deploymentFeatureIds = selectDeploymentsToSecure(deployments, identifiers);
 
@@ -563,25 +577,62 @@ async function secureDeploymentsAndComputeAnchors(submissionId: number, identifi
       []
     );
 
+    // Also secure the study_area, which activates the seed's otherwise-dormant Sampling Sites policy as a
+    // second, top-level lock demo. The study_area has no descendants, so this locks exactly one feature
+    // (no cascade); the anchor computation below binds it under the urn:*:study_area:* scope automatically.
+    const studyAreaRuleId = await getSecurityRuleIdByName(connection, STUDY_AREA_SECURITY_RULE_NAME);
+    const studyAreaFeatureIds = await getStudyAreaFeatureIds(connection, submissionId);
+    if (studyAreaFeatureIds.length > 0) {
+      await new SecurityService(connection).patchSecurityRulesOnSubmissionFeatures(
+        submissionId,
+        studyAreaFeatureIds,
+        [studyAreaRuleId],
+        []
+      );
+    }
+
     await computeAnchorsForSubmission(connection, submissionId);
   });
 }
 
 /**
- * Resolve the demo security rule id by name from the active rules.
+ * Resolve a security rule id by name from the active rules.
  *
  * @param {IDBConnection} connection Transaction-scoped connection.
+ * @param {string} ruleName The security_rule name to resolve.
  * @returns {Promise<number>} The matching security_rule_id.
  */
-async function getDemoSecurityRuleId(connection: IDBConnection): Promise<number> {
+async function getSecurityRuleIdByName(connection: IDBConnection, ruleName: string): Promise<number> {
   const response = await connection.sql(SQL`
     SELECT security_rule_id
     FROM security_rule
-    WHERE name = ${DEMO_SECURITY_RULE_NAME}
+    WHERE name = ${ruleName}
       AND record_end_date IS NULL;
   `);
 
-  return assertRuleRow(response.rows, DEMO_SECURITY_RULE_NAME);
+  return assertRuleRow(response.rows, ruleName);
+}
+
+/**
+ * Read the study_area feature ids for a submission.
+ *
+ * Returned as an array (rather than a single id) so the caller stays agnostic to how many study_area
+ * features a dataset has; the Boreal Moose snapshot has exactly one.
+ *
+ * @param {IDBConnection} connection Transaction-scoped connection.
+ * @param {number} submissionId The submission scope.
+ * @returns {Promise<number[]>} The active study_area feature ids.
+ */
+async function getStudyAreaFeatureIds(connection: IDBConnection, submissionId: number): Promise<number[]> {
+  const response = await connection.sql(SQL`
+    SELECT sf.submission_feature_id
+    FROM submission_feature sf
+    JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id AND ft.name = 'study_area'
+    WHERE sf.submission_id = ${submissionId}
+      AND sf.record_end_date IS NULL;
+  `);
+
+  return response.rows.map((row) => row.submission_feature_id);
 }
 
 /**

@@ -207,7 +207,25 @@ export async function seed(knex: Knex): Promise<void> {
     });
   }
 
-  // Do not add users to the sampling sites policy team, for confirming that only team members can access features covered by the policy
+  // Add all non-system users (IDIR/BCEID) to the Sampling Sites Team so any logged-in dev can exercise
+  // the study_area lock demo the snapshot secures under this team's scope (skip if already a member).
+  await knex.raw(
+    `
+    INSERT INTO team_member (system_user_id, team_id, create_user)
+    SELECT su.system_user_id, ?, (SELECT system_user_id FROM "system_user" WHERE record_end_date IS NULL LIMIT 1)
+    FROM "system_user" su
+    WHERE su.user_identity_source_id IN (
+      SELECT user_identity_source_id
+      FROM user_identity_source
+      WHERE LOWER(name) NOT IN ('system', 'database')
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM team_member tm
+      WHERE tm.system_user_id = su.system_user_id AND tm.team_id = ?
+    );
+  `,
+    [adminTeam.team_id, adminTeam.team_id]
+  );
 
   /** ------------------------------------------------------------------
    * 3. WIRE SCOPE TABLES FOR EACH POLICY STATEMENT
