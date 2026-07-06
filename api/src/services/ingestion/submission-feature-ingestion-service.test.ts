@@ -49,6 +49,7 @@ describe('SubmissionFeatureIngestionService', () => {
         featureTypeId: number;
         data: IFlattenedBlock;
         dataByteSize: number;
+        contentHash: string;
       }>;
       expect(insertedRows).to.have.length(2);
 
@@ -66,6 +67,9 @@ describe('SubmissionFeatureIngestionService', () => {
         parent: null
       });
       expect(insertedRows[0].dataByteSize).to.be.a('number').and.greaterThan(0);
+      expect(insertedRows[0].contentHash).to.match(/^[0-9a-f]{64}$/);
+      expect(insertedRows[1].contentHash).to.match(/^[0-9a-f]{64}$/);
+      expect(insertedRows[0].contentHash).to.not.equal(insertedRows[1].contentHash);
     });
 
     it('returns early when batch is empty', async () => {

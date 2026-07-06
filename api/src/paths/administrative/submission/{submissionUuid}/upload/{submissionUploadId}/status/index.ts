@@ -63,7 +63,8 @@ PATCH.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Submission upload review status updated successfully.',
+      description:
+        'Submission upload review status updated successfully. When the status is approved, the response includes the per-outcome reconciliation counts describing how the upload changed the submission state.',
       content: {
         'application/json': {
           schema: SubmissionUploadReviewStatusResponseSchema
@@ -71,9 +72,17 @@ PATCH.apiDoc = {
       }
     },
     ...defaultErrorResponses,
+    400: {
+      description:
+        'Approval preconditions not met: automated validation has not completed, or the upload has not reached the indexed status.'
+    },
     404: {
       description:
         'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
+    },
+    409: {
+      description:
+        'The upload contains multiple pending features sharing the same feature type and source id, so it cannot be safely activated.'
     }
   }
 };
