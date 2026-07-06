@@ -177,14 +177,26 @@ const insertRecord = async (knex: Knex) => {
     })
   );
 
+  const ecologicalUnits = [
+    { type: 'population_unit', value: 'telkwa' },
+    { type: 'population_unit', value: 'tweedsmuir' },
+    { type: 'population_unit', value: 'calendar' },
+    { type: 'population_unit', value: 'maxhamish' },
+    { type: 'population_unit', value: 'rainbows' },
+    { type: 'population_unit', value: 'muskwa' },
+    { type: 'population_unit', value: 'gataga' },
+    { type: 'management_unit', value: 'region-7a' },
+    { type: 'management_unit', value: 'region-7b' }
+  ];
+
   // Create ecological units with no parent feature.
-  const ecologicalUnitPromises = Array.from({ length: 7 }).map((_, i) =>
+  const ecologicalUnitPromises = ecologicalUnits.map((ecologicalUnit) =>
     insertEcologicalUnitRecord(knex, {
       submission_id,
       submission_upload_id,
       parent_submission_feature_id: null,
-      values: ['telkwa', 'tweedsmuir', 'calendar', 'maxhamish', 'rainbows', 'muskwa', 'gataga'],
-      valueIndex: i
+      type: ecologicalUnit.type,
+      value: ecologicalUnit.value
     })
   );
 
@@ -269,13 +281,16 @@ const insertRecord = async (knex: Knex) => {
     }
   }
 
-  // Link ecological units to animals
-  for (const ecologicalUnitId of ecologicalUnitIds) {
+  // Link ecological units to animals. Attach the first two to the first animal so
+  // the telemetry view has deterministic multi-value eco_unit seed coverage.
+  for (let i = 0; i < ecologicalUnitIds.length; i++) {
     if (animalIds.length > 0) {
-      const randomAnimalId = animalIds[Math.floor(Math.random() * animalIds.length)];
+      const ecologicalUnitId = ecologicalUnitIds[i];
+      const animalId = i < 2 ? animalIds[0] : animalIds[Math.floor(Math.random() * animalIds.length)];
+
       await knex.raw(`
         INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-        VALUES (${ecologicalUnitId}, ${randomAnimalId})
+        VALUES (${ecologicalUnitId}, ${animalId})
       `);
     }
   }
@@ -623,12 +638,10 @@ export const insertEcologicalUnitRecord = async (
     submission_id: number;
     submission_upload_id: string;
     parent_submission_feature_id: number | null;
-    values: string[];
-    valueIndex: number;
+    type: string;
+    value: string;
   }
 ): Promise<number> => {
-  const ecologicalUnitValue = options.values[options.valueIndex];
-
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -636,8 +649,8 @@ export const insertEcologicalUnitRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'ecological_unit',
       data: {
-        ecological_unit_type: 'population_unit',
-        ecological_unit_value: ecologicalUnitValue
+        ecological_unit_type: options.type,
+        ecological_unit_value: options.value
       }
     })}`
   );
@@ -645,13 +658,13 @@ export const insertEcologicalUnitRecord = async (
 
   // Add search indices for the ecological unit properties
   await knex.raw(
-    `${insertSearchString({ submission_feature_id, property_name: 'ecological_unit_type', value: 'population_unit' })}`
+    `${insertSearchString({ submission_feature_id, property_name: 'ecological_unit_type', value: options.type })}`
   );
   await knex.raw(
     `${insertSearchString({
       submission_feature_id,
       property_name: 'ecological_unit_value',
-      value: ecologicalUnitValue
+      value: options.value
     })}`
   );
 

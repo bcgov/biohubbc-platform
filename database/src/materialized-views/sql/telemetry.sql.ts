@@ -81,12 +81,12 @@ submissions AS (
 related_ecological_units AS (
     SELECT
         deployment_id,
-        string_agg(DISTINCT ecological_unit_value, ';' ORDER BY ecological_unit_value) AS ecological_unit_value
+        string_agg(DISTINCT ecological_unit, ';' ORDER BY ecological_unit) AS ecological_unit
     FROM (
         -- Ecological units linked to animals via submission_feature_feature
         SELECT
             ra.deployment_id,
-            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+            (sf_eu.data->>'ecological_unit_type') || '::' || (sf_eu.data->>'ecological_unit_value') AS ecological_unit
         FROM related_animals ra
         JOIN biohub.submission_feature_feature sff
           ON (sff.source_feature_id = ra.animal_feature_id AND sff.target_feature_id != ra.animal_feature_id)
@@ -105,7 +105,7 @@ related_ecological_units AS (
         -- Ecological units with animal as parent
         SELECT
             ra.deployment_id,
-            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+            (sf_eu.data->>'ecological_unit_type') || '::' || (sf_eu.data->>'ecological_unit_value') AS ecological_unit
         FROM related_animals ra
         JOIN biohub.submission_feature sf_eu
           ON sf_eu.parent_submission_feature_id = ra.animal_feature_id

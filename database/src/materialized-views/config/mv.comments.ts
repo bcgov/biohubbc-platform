@@ -14,7 +14,8 @@ export const TELEMETRY_COMMENTS: MaterializedViewCommentMap = {
   animal_id: 'The identifier of the animal wearing the telemetry device',
   scientific_name: 'Scientific name from taxon table linked via ITIS TSN',
   common_name: 'Common English name from taxon table linked via ITIS TSN',
-  pop_unit: 'Ecological unit value linked to the animal',
+  eco_unit:
+    'Ecological unit type and value linked to the animal, formatted as type::value and concatenated with semicolons when multiple values exist',
   SECURED: 'The indicator of whether the feature is secured (Y) or not (N)',
   source: 'A hyperlink to the source feature in the Biodiversity Hub portal'
 };

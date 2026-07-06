@@ -6,7 +6,7 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'scientific_name', expression: 't.itis_scientific_name' },
   { alias: 'animal_id', expression: 'd.animal_id' },
   { alias: 'sex', expression: 'ra.sex' },
-  { alias: 'pop_unit', expression: 'reu.ecological_unit_value' },
+  { alias: 'eco_unit', expression: 'reu.ecological_unit' },
   { alias: 'device_key', expression: 'd.device_key' },
   { alias: 'date', expression: "((sf.data->>'timestamp')::timestamptz)::date" },
   { alias: 'time', expression: "((sf.data->>'timestamp')::timestamptz)::time" },
