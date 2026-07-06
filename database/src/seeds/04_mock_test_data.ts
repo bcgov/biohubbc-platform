@@ -117,7 +117,7 @@ const insertRecord = async (knex: Knex) => {
       })
     );
 
-    // Observations - some will be parent observations with subcounts
+    // Observations - some additional species_observation rows will share a contributor observation_id.
     const observationPromises = Array.from({ length: 20 }).map(() =>
       insertObservationRecord(knex, {
         submission_id,
@@ -130,27 +130,20 @@ const insertRecord = async (knex: Knex) => {
     const animalResults = await Promise.all(animalPromises);
     const observationResults = await Promise.all(observationPromises);
 
-    // For some observations, create subcounts (children linked via submission_feature_feature)
+    // For some observations, create grouped species_observation rows with subcount fields.
     for (let i = 0; i < observationResults.length; i++) {
-      // ~40% of observations get subcounts
+      // ~40% of observations get grouped subcount-style records.
       if (Math.random() < 0.4) {
-        const parentObservationId = observationResults[i];
         const numSubcounts = faker.number.int({ min: 1, max: 3 });
-        const groupedObservationId = numSubcounts > 1 ? parentObservationId : undefined;
+        const groupedObservationId = faker.string.uuid();
 
         for (let j = 0; j < numSubcounts; j++) {
-          const subcountId = await insertSubcountRecord(knex, {
+          await insertSubcountRecord(knex, {
             submission_id,
             submission_upload_id,
-            parent_submission_feature_id: null, // subcounts have no direct parent, just linked via junction table
-            parentObservationId,
+            parent_submission_feature_id: parent_submission_feature_id2,
             observation_id: groupedObservationId
           });
-          // Link subcount to parent observation
-          await knex.raw(`
-            INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-            VALUES (${parentObservationId}, ${subcountId})
-          `);
         }
       }
     }
@@ -202,27 +195,20 @@ const insertRecord = async (knex: Knex) => {
   const incidentalObservationIds = await Promise.all(incidentalObservationPromises);
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
 
-  // For some incidental observations, create subcounts
+  // For some incidental observations, create grouped species_observation rows with subcount fields.
   for (let i = 0; i < incidentalObservationIds.length; i++) {
-    // ~40% of incidental observations get subcounts
+    // ~40% of incidental observations get grouped subcount-style records.
     if (Math.random() < 0.4) {
-      const parentObservationId = incidentalObservationIds[i];
       const numSubcounts = faker.number.int({ min: 1, max: 4 });
-      const groupedObservationId = numSubcounts > 1 ? parentObservationId : undefined;
+      const groupedObservationId = faker.string.uuid();
 
       for (let j = 0; j < numSubcounts; j++) {
-        const subcountId = await insertSubcountRecord(knex, {
+        await insertSubcountRecord(knex, {
           submission_id,
           submission_upload_id,
           parent_submission_feature_id: null,
-          parentObservationId,
           observation_id: groupedObservationId
         });
-        // Link subcount to parent observation
-        await knex.raw(`
-          INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-          VALUES (${parentObservationId}, ${subcountId})
-        `);
       }
     }
   }
@@ -505,9 +491,15 @@ export const insertSampleSiteRecord = async (
 
 export const insertObservationRecord = async (
   knex: Knex,
-  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number | null }
+  options: {
+    submission_id: number;
+    submission_upload_id: string;
+    parent_submission_feature_id: number | null;
+    observation_id?: string | number | null;
+  }
 ): Promise<number> => {
   const taxonTsn = await getRandomActiveTaxonTsn(knex);
+  const observationId = options.observation_id ?? faker.string.uuid();
 
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -516,6 +508,7 @@ export const insertObservationRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'species_observation',
       data: {
+        observation_id: observationId,
         taxon_id: taxonTsn,
         // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
@@ -566,41 +559,30 @@ export const insertSubcountRecord = async (
     submission_id: number;
     submission_upload_id: string;
     parent_submission_feature_id: number | null;
-    parentObservationId: number;
-    observation_id?: number | null;
+    observation_id?: string | number | null;
   }
 ): Promise<number> => {
   const taxonTsn = await getRandomActiveTaxonTsn(knex);
-  // Get the taxon_id and timestamp from parent observation
-  const parentObs = await knex.raw(`
-    SELECT data->>'taxon_id' as taxon_id, data->>'timestamp' as timestamp, data->>'geometry' as geometry
-    FROM submission_feature
-    WHERE submission_feature_id = ${options.parentObservationId}
-  `);
-
-  const parentData = parentObs.rows[0];
-  const subcountTaxonId = parentData?.taxon_id ? parseInt(parentData.taxon_id) : taxonTsn;
-  const parentTimestamp =
-    parentData?.timestamp ||
-    faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString();
+  const subcountTaxonId = taxonTsn;
+  const timestamp = faker.date
+    .between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() })
+    .toISOString();
 
   const sign = faker.helpers.arrayElement(['tracks', 'scat', 'sighting', 'other']);
   const subcount_comment = faker.helpers.maybe(() => faker.lorem.words(3), { probability: 0.3 }) || null;
 
   const subcountData: { [key: string]: any } = {
     taxon_id: subcountTaxonId,
-    geometry: parentData?.geometry
-      ? JSON.parse(parentData.geometry)
-      : random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])['features'][0]['geometry'],
+    geometry: random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])['features'][0]['geometry'],
     subcount_count: faker.number.int({ min: 1, max: 20 }),
     subcount_comment,
-    timestamp: parentTimestamp,
+    timestamp,
     sign,
     life_stage: faker.number.int({ min: 1, max: 6 }),
     sex: faker.number.int({ min: 7, max: 9 })
   };
 
-  if (typeof options.observation_id === 'number') {
+  if (typeof options.observation_id === 'number' || typeof options.observation_id === 'string') {
     subcountData.observation_id = options.observation_id;
   }
 

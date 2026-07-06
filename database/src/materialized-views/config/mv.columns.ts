@@ -29,9 +29,8 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
 ];
 
 export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
-  { alias: 'observation_id', expression: 'COALESCE(parent_obs.parent_observation_id, sf.submission_feature_id)' },
-  { alias: 'observation_subcount_id', expression: 'parent_obs.subcount_id' },
-  { alias: 'Feature_ID', expression: 'COALESCE(sf_subcount.submission_feature_id, sf.submission_feature_id)' },
+  { alias: 'group_id', expression: "sf.data->>'observation_id'" },
+  { alias: 'Feature_ID', expression: 'sf.submission_feature_id' },
   {
     alias: 'date',
     expression:
@@ -50,17 +49,16 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'Latitude', expression: 'public.ST_Y(ol.location_point)' },
   { alias: 'Longitude', expression: 'public.ST_X(ol.location_point)' },
   { alias: 'sign', expression: "(sf.data->>'sign')::text" },
-  { alias: 'count', expression: "COALESCE((sf_subcount.data->>'subcount_count')::int, (sf.data->>'count')::int)" },
+  { alias: 'count', expression: "COALESCE((sf.data->>'subcount_count')::int, (sf.data->>'count')::int)" },
   { alias: 'taxon_id', expression: "(sf.data->>'taxon_id')::int" },
   { alias: 'scientific_name', expression: 't.itis_scientific_name' },
   { alias: 'common_name', expression: 't.common_name' },
   { alias: 'submission_id', expression: 'sub.submission_id' },
   { alias: 'submission_name', expression: 'sub.submission_name' },
-  { alias: 'sex', expression: "COALESCE(ccc_sex.label, (COALESCE(sf_subcount.data->>'sex', sf.data->>'sex'))::text)" },
+  { alias: 'sex', expression: "COALESCE(ccc_sex.label, (sf.data->>'sex')::text)" },
   {
     alias: 'life_stage',
-    expression:
-      "COALESCE(ccc_life_stage.label, (COALESCE(sf_subcount.data->>'life_stage', sf.data->>'life_stage'))::text)"
+    expression: "COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text)"
   },
   {
     alias: 'SECURED',

@@ -20,9 +20,8 @@ export const TELEMETRY_COMMENTS: MaterializedViewCommentMap = {
 };
 
 export const OBSERVATIONS_COMMENTS: MaterializedViewCommentMap = {
-  observation_id: 'Parent observation feature_id; multiple rows if observation has subcounts',
-  observation_subcount_id: 'Subcount observation_feature_id; NULL if observation has no subcounts',
-  Feature_ID: 'System generated surrogate primary key identifier (subcount or observation feature_id)',
+  group_id: 'Contributor-provided observation identifier shared by species observations collected together',
+  Feature_ID: 'System generated surrogate primary key identifier for the species observation feature',
   date: 'The date portion of the observation timestamp',
   time: 'The time portion of the observation timestamp',
   YEAR: 'The year of the observation',
