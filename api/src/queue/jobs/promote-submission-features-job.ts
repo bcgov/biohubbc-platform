@@ -3,9 +3,14 @@ import { PROMOTE_START_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
+import { publishIndexSubmissionFeaturesJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/promote-submission-features-job');
+
+export const promoteSubmissionFeaturesJobDependencies = {
+  publishIndexSubmissionFeaturesJob
+};
 
 export interface IPromoteSubmissionFeaturesJobData {
   submissionUploadId: string;
@@ -33,6 +38,9 @@ export const promoteSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IPromoteSub
       await uploadService.transitionSubmissionUploadToPromoting(submissionUploadId);
       await reconciliationService.promoteSubmissionUploadFeatures(submissionUploadId);
       await uploadService.transitionSubmissionUploadToPromoted(submissionUploadId);
+      await promoteSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+        submissionUploadId
+      });
     });
   }
 };

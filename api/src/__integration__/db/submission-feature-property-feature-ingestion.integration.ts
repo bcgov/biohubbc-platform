@@ -2,18 +2,18 @@
 //
 // Drives the FULL pipeline end-to-end via
 // SubmissionFeaturePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId, then
-// asserts on the canonical table (submission_feature_property_feature) and the error accumulator
+// asserts on the stored property table (submission_feature_property_feature) and the error accumulator
 // (submission_feature_error). Unlike the repository-level suite (which hand-inserts staging
 // candidates to observe each branch in isolation), these tests set up real submission_feature rows
 // whose data.properties carry `feature::<source_id>` values, so the populate/parse/resolve phases
-// run for real and the Phase 9 fail-fast gate is exercised: any error zeroes ALL canonical writes
+// run for real and the Phase 9 fail-fast gate is exercised: any error prevents ALL property writes
 // for the whole upload.
 //
 // Scope C — no production catalog is touched. Each test mints a SYNTHETIC `feature`-typed
 // feature_property + feature_type_property (with allowed targets in feature_type_property_feature)
 // and uses pre-seeded feature types for the source/target features. The chosen types (mortality,
 // observation_subcount, species_observation) carry NO required catalog properties, so the full
-// pipeline reaches the canonical-insert phase without unrelated MISSING_REQUIRED_PROPERTY errors
+// pipeline reaches the property-insert phase without unrelated MISSING_REQUIRED_PROPERTY errors
 // from the seeded type's other required fields.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
@@ -67,9 +67,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   // --- local fixture helpers -----------------------------------------------
 
   /**
-   * Insert one active submission_feature under a specific upload with an explicit source_id and data
+   * Insert one pending submission_feature under a specific upload with an explicit source_id and data
    * JSON. Resolution joins on source_id, which createTestFeature does not set and which mints its own
-   * upload — so this ticket inserts source + target features into ONE upload directly.
+   * upload — so this ticket inserts source + target features into ONE upload directly. Pending state
+   * mirrors the production indexing stage, which runs before upload activation.
+   * IDs are preallocated so both sides of the staging/feature link can be inserted in one statement.
    *
    * @returns The new submission_feature_id.
    */
@@ -82,29 +84,73 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   }): Promise<number> {
     const systemUserId = connection.systemUserId();
     const dataJson = JSON.stringify(params.data);
-
     const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        feature_type_id,
-        source_id,
-        data,
-        data_byte_size,
-        record_effective_date,
-        create_user
+      WITH fixture AS (
+        SELECT
+          nextval(pg_get_serial_sequence('submission_feature', 'submission_feature_id'))::integer
+            AS submission_feature_id,
+          public.gen_random_uuid() AS submission_upload_feature_id,
+          feature_type_id
+        FROM feature_type
+        WHERE name = ${params.featureTypeName}
+        LIMIT 1
+      ),
+      inserted_staged AS (
+        INSERT INTO submission_upload_feature (
+          submission_upload_feature_id,
+          submission_upload_id,
+          submission_feature_id,
+          source_id,
+          feature_type_id,
+          data,
+          data_byte_size,
+          content_hash,
+          reconciliation
+        )
+        SELECT
+          fixture.submission_upload_feature_id,
+          ${params.submissionUploadId}::uuid,
+          fixture.submission_feature_id,
+          ${params.sourceId},
+          fixture.feature_type_id,
+          ${dataJson}::jsonb,
+          octet_length(${dataJson}::jsonb::text) + 500,
+          encode(sha256(convert_to(${dataJson}, 'UTF8')), 'hex'),
+          'new'
+        FROM fixture
+        RETURNING submission_upload_feature_id
+      ),
+      inserted_feature AS (
+        INSERT INTO submission_feature (
+          submission_feature_id,
+          submission_id,
+          submission_upload_id,
+          feature_type_id,
+          source_id,
+          data,
+          data_byte_size,
+          content_hash,
+          submission_upload_feature_id,
+          create_user
+        )
+        OVERRIDING SYSTEM VALUE
+        SELECT
+          fixture.submission_feature_id,
+          ${params.submissionId},
+          ${params.submissionUploadId}::uuid,
+          fixture.feature_type_id,
+          ${params.sourceId},
+          ${dataJson}::jsonb,
+          octet_length(${dataJson}::jsonb::text) + 500,
+          encode(sha256(convert_to(${dataJson}, 'UTF8')), 'hex'),
+          inserted_staged.submission_upload_feature_id,
+          ${systemUserId}
+        FROM fixture
+        CROSS JOIN inserted_staged
+        RETURNING submission_feature_id
       )
-      VALUES (
-        ${params.submissionId},
-        ${params.submissionUploadId}::uuid,
-        (SELECT feature_type_id FROM feature_type WHERE name = ${params.featureTypeName} LIMIT 1),
-        ${params.sourceId},
-        ${dataJson}::jsonb,
-        octet_length(${dataJson}::jsonb::text) + 500,
-        now(),
-        ${systemUserId}
-      )
-      RETURNING submission_feature_id;
+      SELECT submission_feature_id
+      FROM inserted_feature;
     `);
 
     return result.rows[0].submission_feature_id;
@@ -154,14 +200,14 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     return getSubmissionFeatureErrors(connection, uploadId, true);
   }
 
-  /** Canonical property-feature rows for a source feature. */
+  /** Stored property-feature rows for a source feature. */
   function getPropertyFeatureRows(
     sourceFeatureId: number
   ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
 
-  /** Count all canonical property-feature rows written for an upload's features. */
+  /** Count all property-feature rows written for an upload's features. */
   async function countPropertyFeatureRowsForUpload(uploadId: string): Promise<number> {
     const result = await connection.sql(SQL`
       SELECT COUNT(*)::integer AS count
@@ -174,7 +220,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
 
   // --- scenarios -----------------------------------------------------------
 
-  it('1: happy path — one canonical row, no errors', async () => {
+  it('1: happy path — one stored row, no errors', async () => {
     const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
@@ -192,7 +238,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(rows[0].feature_type_property_id).to.equal(featureTypePropertyId);
   });
 
-  it('2: idempotent rerun — identical canonical row set, no duplicates/orphans', async () => {
+  it('2: idempotent rerun — identical stored row set, no duplicates/orphans', async () => {
     const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
@@ -212,7 +258,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(secondRun[0].feature_type_property_id).to.equal(featureTypePropertyId);
   });
 
-  it('3: unresolved reference (feature::nope) — one UNRESOLVED_FEATURE_REFERENCE, zero canonical rows', async () => {
+  it('3: unresolved reference (feature::nope) — one UNRESOLVED_FEATURE_REFERENCE, zero stored rows', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
     await insertFeature('observation_subcount', 'area1');
@@ -227,7 +273,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(await countPropertyFeatureRowsForUpload(uploadId)).to.equal(0);
   });
 
-  it('4: malformed reference (features::area1) — one INVALID_FEATURE_REFERENCE_FORMAT, zero canonical rows', async () => {
+  it('4: malformed reference (features::area1) — one INVALID_FEATURE_REFERENCE_FORMAT, zero stored rows', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
     await insertFeature('observation_subcount', 'area1');
@@ -242,7 +288,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(await countPropertyFeatureRowsForUpload(uploadId)).to.equal(0);
   });
 
-  it('5: wrong-type resolution — one INVALID_FEATURE_REFERENCE_TYPE, zero canonical rows', async () => {
+  it('5: wrong-type resolution — one INVALID_FEATURE_REFERENCE_TYPE, zero stored rows', async () => {
     // Config allows observation_subcount, but the reference resolves to a species_observation sibling.
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
@@ -258,7 +304,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(await countPropertyFeatureRowsForUpload(uploadId)).to.equal(0);
   });
 
-  it('6: two valid + one invalid in the same upload — zero canonical rows for the WHOLE upload (Phase 9 gate)', async () => {
+  it('6: two valid + one invalid in the same upload — zero stored rows for the WHOLE upload (Phase 9 gate)', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
     await insertFeature('observation_subcount', 'area1');
@@ -278,7 +324,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(await countPropertyFeatureRowsForUpload(uploadId)).to.equal(0);
   });
 
-  it('7: multi-valued ["feature::s1","feature::s2"] both resolve & allowed — two canonical rows', async () => {
+  it('7: multi-valued ["feature::s1","feature::s2"] both resolve & allowed — two stored rows', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: true });
 
     const targetA = await insertFeature('observation_subcount', 's1');
@@ -298,7 +344,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     );
   });
 
-  it('8: multi-valued ["feature::s1","feature::s1"] exact duplicate — one canonical row (ON CONFLICT dedup)', async () => {
+  it('8: multi-valued ["feature::s1","feature::s1"] exact duplicate — one stored row (ON CONFLICT dedup)', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: true });
 
     const targetA = await insertFeature('observation_subcount', 's1');
@@ -315,7 +361,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(rows[0].referenced_submission_feature_id).to.equal(targetA);
   });
 
-  it('9: single-valued prop given ["feature::s1"] array — MULTIPLE_VALUES_NOT_ALLOWED, zero canonical rows', async () => {
+  it('9: single-valued prop given ["feature::s1"] array — MULTIPLE_VALUES_NOT_ALLOWED, zero stored rows', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({ allowMultiple: false });
 
     await insertFeature('observation_subcount', 's1');
@@ -329,7 +375,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(await countPropertyFeatureRowsForUpload(uploadId)).to.equal(0);
   });
 
-  it('10: self-reference — INVALID_FEATURE_REFERENCE_SELF, zero canonical rows (upload blocked)', async () => {
+  it('10: self-reference — INVALID_FEATURE_REFERENCE_SELF, zero stored rows (upload blocked)', async () => {
     // Source is an observation_subcount; config allows observation_subcount; the property points at its own source_id.
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario({
       sourceFeatureTypeName: 'observation_subcount',
@@ -385,7 +431,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(sffResult.rows.some((r) => r.target_feature_id === propTargetId)).to.equal(false);
   });
 
-  it('12: whitespace (feature:: area1) — resolves to area1, one canonical row', async () => {
+  it('12: whitespace (feature:: area1) — resolves to area1, one stored row', async () => {
     const { submissionId, uploadId, propertyName, insertFeature } = await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
@@ -402,7 +448,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(rows[0].referenced_submission_feature_id).to.equal(targetFeatureId);
   });
 
-  it('13: circular reference (A.prop -> B, B.prop -> A) — CIRCULAR_FEATURE_REFERENCE, zero canonical rows', async () => {
+  it('13: circular reference (A.prop -> B, B.prop -> A) — CIRCULAR_FEATURE_REFERENCE, zero stored rows', async () => {
     // A (mortality) -> B (observation_subcount); B (observation_subcount) -> A (mortality). Both types allowed.
     const { submissionId, uploadId, propertyName: propAtoB, insertFeature } = await seedFeatureScenario();
     const { propertyName: propBtoA } = await createFeatureTypeProperty(connection, 'observation_subcount', 'mortality');

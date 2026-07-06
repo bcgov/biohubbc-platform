@@ -48,6 +48,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         submission_upload_feature_id,
         submission_upload_id,
         source_id,
+        submission_feature_id,
         feature_type_id,
         data,
         data_byte_size,
@@ -82,6 +83,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         submission_upload_feature_id,
         submission_upload_id,
         source_id,
+        submission_feature_id,
         feature_type_id,
         data,
         data_byte_size,
@@ -126,6 +128,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         submission_upload_feature_id,
         submission_upload_id,
         source_id,
+        submission_feature_id,
         feature_type_id,
         data,
         data_byte_size,
@@ -163,6 +166,10 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
       updateData.reconciliation = data.reconciliation;
     }
 
+    if (data.submission_feature_id !== undefined) {
+      updateData.submission_feature_id = data.submission_feature_id;
+    }
+
     if (data.metadata !== undefined) {
       updateData.metadata = data.metadata;
     }
@@ -181,6 +188,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         'submission_upload_feature_id',
         'submission_upload_id',
         'source_id',
+        'submission_feature_id',
         'feature_type_id',
         'data',
         'data_byte_size',
@@ -231,7 +239,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
             staged.feature_type_id,
             staged.source_id,
             staged.content_hash,
-            COUNT(*) OVER (PARTITION BY staged.feature_type_id, staged.source_id) AS incoming_count
+            COUNT(*) OVER (PARTITION BY staged.source_id) AS incoming_source_count
           FROM submission_upload_feature staged
           WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
         ),
@@ -241,11 +249,18 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
             feature.feature_type_id,
             feature.source_id,
             feature.content_hash
-          FROM submission_feature feature
+          FROM (
+            SELECT DISTINCT feature_type_id, source_id
+            FROM incoming
+            WHERE source_id IS NOT NULL
+              AND incoming_source_count = 1
+          ) incoming_key
+          JOIN submission_feature feature
+            ON feature.feature_type_id = incoming_key.feature_type_id
+           AND feature.source_id = incoming_key.source_id
           WHERE feature.submission_id = ${submissionId}
             AND feature.record_effective_date <= now()
             AND (feature.record_end_date IS NULL OR now() < feature.record_end_date)
-            AND feature.source_id IS NOT NULL
           ORDER BY
             feature.feature_type_id,
             feature.source_id,
@@ -257,15 +272,24 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
           SELECT
             incoming.submission_upload_feature_id,
             CASE
+              WHEN baseline.submission_feature_id IS NOT NULL
+                AND incoming.source_id IS NOT NULL
+                AND incoming.incoming_source_count = 1
+                AND baseline.content_hash IS NOT NULL
+                AND baseline.content_hash = incoming.content_hash
+                THEN baseline.submission_feature_id
+              ELSE NULL
+            END AS submission_feature_id,
+            CASE
               WHEN incoming.source_id IS NULL THEN 'conflict'
-              WHEN incoming.incoming_count > 1 THEN 'conflict'
+              WHEN incoming.incoming_source_count > 1 THEN 'conflict'
               WHEN baseline.submission_feature_id IS NULL THEN 'new'
               WHEN baseline.content_hash IS NOT NULL AND baseline.content_hash = incoming.content_hash THEN 'unchanged'
               ELSE 'superseded'
             END AS reconciliation,
             CASE
               WHEN incoming.source_id IS NULL THEN jsonb_build_object('reason', 'missing_source_id')
-              WHEN incoming.incoming_count > 1 THEN jsonb_build_object('reason', 'duplicate_reconciliation_key')
+              WHEN incoming.incoming_source_count > 1 THEN jsonb_build_object('reason', 'duplicate_source_id')
               ELSE NULL
             END AS metadata
           FROM incoming
@@ -276,6 +300,7 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         updated AS (
           UPDATE submission_upload_feature staged
           SET reconciliation = classified.reconciliation::submission_feature_reconciliation_type,
+              submission_feature_id = classified.submission_feature_id,
               metadata = classified.metadata
           FROM classified
           WHERE staged.submission_upload_feature_id = classified.submission_upload_feature_id
@@ -321,12 +346,11 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
   /**
    * Return whether an upload's prepared `unchanged` classification is stale.
    *
-   * An `unchanged` row is valid only while the active feature for its reconciliation
-   * key `(submission_id, feature_type_id, source_id)` still has the content hash
-   * observed during reconciliation. The result is stale when that active feature is
-   * now absent or has a different hash, which can happen when another upload is
-   * activated between this upload's reconciliation and activation. The caller holds
-   * the submission active-state lock so this comparison cannot change mid-check.
+   * An `unchanged` row is valid only while its recorded target feature remains active
+   * with the same content hash observed during reconciliation. The result is stale
+   * when that exact feature is now absent, ended, or replaced by another upload. The
+   * caller holds the submission active-state lock so this comparison cannot change
+   * mid-check.
    *
    * @param {string} submissionUploadId Submission upload identifier.
    * @returns {Promise<SubmissionUploadFeaturesStaleResult>} SQL result containing the stale flag.
@@ -337,20 +361,15 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
         SELECT EXISTS (
           SELECT 1
           FROM submission_upload_feature staged
-          JOIN submission_upload upload USING (submission_upload_id)
-          LEFT JOIN submission_feature active_feature
-            ON active_feature.submission_id = upload.submission_id
-           AND active_feature.feature_type_id = staged.feature_type_id
-           AND active_feature.source_id = staged.source_id
-           AND active_feature.record_effective_date <= now()
-           AND (active_feature.record_end_date IS NULL OR now() < active_feature.record_end_date)
           WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
             AND staged.reconciliation = 'unchanged'
-            AND (
-              -- The baseline feature was removed, or another upload replaced it with
-              -- different content after this row was classified as unchanged.
-              active_feature.submission_feature_id IS NULL
-              OR active_feature.content_hash IS DISTINCT FROM staged.content_hash
+            AND NOT EXISTS (
+              SELECT 1
+              FROM submission_feature active_feature
+              WHERE active_feature.submission_feature_id = staged.submission_feature_id
+                AND active_feature.record_effective_date <= now()
+                AND (active_feature.record_end_date IS NULL OR now() < active_feature.record_end_date)
+                AND active_feature.content_hash = staged.content_hash
             )
         ) AS stale;
       `,
@@ -358,5 +377,24 @@ export class SubmissionUploadFeatureRepository extends BaseRepository {
     );
 
     return response.rows[0];
+  }
+
+  /**
+   * Link changed retained upload features to the pending submission features created from them.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>}
+   */
+  async updateSubmissionFeatureIdsForPromotedFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.connection.sql(SQL`
+      UPDATE submission_upload_feature staged
+      SET submission_feature_id = feature.submission_feature_id
+      FROM submission_feature feature
+      WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+        AND staged.reconciliation IN ('new', 'superseded')
+        AND feature.submission_upload_feature_id = staged.submission_upload_feature_id
+        AND feature.record_effective_date IS NULL
+        AND feature.record_end_date IS NULL;
+    `);
   }
 }

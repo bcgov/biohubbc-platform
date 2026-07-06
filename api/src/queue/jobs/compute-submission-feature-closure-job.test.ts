@@ -6,6 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
   IComputeSubmissionFeatureClosureJobData,
   computeSubmissionFeatureClosureFailedHandler,
@@ -16,6 +17,17 @@ import {
 chai.use(sinonChai);
 
 describe('computeSubmissionFeatureClosureJobHandler', () => {
+  beforeEach(() => {
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+      submission_upload_id: 'upload-uuid-1',
+      submission_id: 1,
+      upload_id: '11111111-1111-4111-8111-111111111111',
+      status: 'indexed',
+      ticket_id: '22222222-2222-4222-8222-222222222222',
+      blueprint_id: 1
+    });
+  });
+
   afterEach(() => {
     sinon.restore();
   });
@@ -47,9 +59,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       .stub(computeSubmissionFeatureClosureJobDependencies, 'publishSubmissionUploadSecurityJob')
       .resolves({ status: 'published', jobId: 'screen-job-1' });
 
-    await computeSubmissionFeatureClosureJobHandler([
-      createMockJob({ submissionId: 1, submissionUploadId: 'upload-uuid-1' })
-    ]);
+    await computeSubmissionFeatureClosureJobHandler([createMockJob({ submissionUploadId: 'upload-uuid-1' })]);
 
     expect(recomputeStub).to.have.been.calledOnceWith(1);
     expect(mockDBConnection.query).to.have.been.calledOnceWith(
@@ -81,9 +91,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission').rejects(testError);
 
     try {
-      await computeSubmissionFeatureClosureJobHandler([
-        createMockJob({ submissionId: 1, submissionUploadId: 'upload-uuid-1' })
-      ]);
+      await computeSubmissionFeatureClosureJobHandler([createMockJob({ submissionUploadId: 'upload-uuid-1' })]);
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect((error as Error).message).to.equal('Closure recompute failed');
@@ -104,7 +112,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
     const job = {
       id: 'job-1',
       name: 'compute-submission-feature-closure-failed',
-      data: { submissionId: 1, submissionUploadId: 'upload-uuid-1' },
+      data: { submissionUploadId: 'upload-uuid-1' },
       output: { message: 'Closure recompute failed after retries' }
     } as unknown as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>;
 
@@ -121,7 +129,7 @@ describe('computeSubmissionFeatureClosureFailedHandler', () => {
     const job = {
       id: 'job-2',
       name: 'compute-submission-feature-closure-failed',
-      data: { submissionId: 2, submissionUploadId: 'upload-uuid-2' },
+      data: { submissionUploadId: 'upload-uuid-2' },
       output: null
     } as unknown as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>;
 

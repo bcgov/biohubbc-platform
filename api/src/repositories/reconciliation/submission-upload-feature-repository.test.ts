@@ -13,6 +13,7 @@ const FEATURE = {
   submission_upload_feature_id: SUBMISSION_UPLOAD_FEATURE_ID,
   submission_upload_id: SUBMISSION_UPLOAD_ID,
   source_id: 'feature-1',
+  submission_feature_id: null,
   feature_type_id: 3,
   data: { id: 'feature-1' },
   data_byte_size: 100,
@@ -38,7 +39,10 @@ describe('SubmissionUploadFeatureRepository', () => {
     expect(text).to.include("COALESCE(MAX(persisted.count) FILTER (WHERE persisted.reconciliation = 'conflict'), 0)");
     expect(text).to.include('SELECT DISTINCT ON (feature.feature_type_id, feature.source_id)');
     expect(text).to.include('(feature.content_hash IS NOT NULL) DESC');
-    expect(text).to.include("incoming.incoming_count > 1 THEN 'conflict'");
+    expect(text).to.include('COUNT(*) OVER (PARTITION BY staged.source_id) AS incoming_source_count');
+    expect(text).to.include("incoming.incoming_source_count > 1 THEN 'conflict'");
+    expect(text).to.include("'duplicate_source_id'");
+    expect(text).to.include('submission_feature_id = classified.submission_feature_id');
     expect(text).to.include('baseline.content_hash IS NOT NULL');
   });
 
@@ -49,10 +53,12 @@ describe('SubmissionUploadFeatureRepository', () => {
     expect(await repository.isSubmissionUploadFeaturesStale(SUBMISSION_UPLOAD_ID)).to.eql({ stale: true });
     const text = sql.firstCall.args[0].text as string;
     expect(text).to.include("staged.reconciliation = 'unchanged'");
-    expect(text).to.include('JOIN submission_upload upload');
+    expect(text).to.not.include('staged.submission_feature_id IS NULL');
+    expect(text).to.include('AND NOT EXISTS');
+    expect(text).to.include('active_feature.submission_feature_id = staged.submission_feature_id');
     expect(text).to.include('active_feature.record_effective_date <= now()');
     expect(text).to.include('(active_feature.record_end_date IS NULL OR now() < active_feature.record_end_date)');
-    expect(text).to.include('active_feature.content_hash IS DISTINCT FROM staged.content_hash');
+    expect(text).to.include('active_feature.content_hash = staged.content_hash');
   });
 
   it('gets one submission upload staging feature by id', async () => {
@@ -101,5 +107,18 @@ describe('SubmissionUploadFeatureRepository', () => {
     expect(query.sql).to.include('update "submission_upload_feature"');
     expect(query.sql).to.include('"reconciliation" = ?');
     expect(query.sql).not.to.include('"metadata" = ?');
+  });
+
+  it('links promoted upload features to copied pending submission features', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([], 0));
+    const repository = new SubmissionUploadFeatureRepository(getMockDBConnection({ sql }));
+
+    await repository.updateSubmissionFeatureIdsForPromotedFeaturesBySubmissionUploadId(SUBMISSION_UPLOAD_ID);
+
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.include('UPDATE submission_upload_feature staged');
+    expect(text).to.include('SET submission_feature_id = feature.submission_feature_id');
+    expect(text).to.include("staged.reconciliation IN ('new', 'superseded')");
+    expect(text).to.include('feature.submission_upload_feature_id = staged.submission_upload_feature_id');
   });
 });

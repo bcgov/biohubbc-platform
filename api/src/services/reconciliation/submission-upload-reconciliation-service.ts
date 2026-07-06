@@ -82,7 +82,6 @@ export class SubmissionUploadReconciliationService extends DBService {
       );
 
     // Conflict details also remain in the standard feature-error table because they make the upload invalid.
-    await this.submissionFeatureErrorRepository.deleteSubmissionFeatureErrorsForSubmissionUploadId(submissionUploadId);
     await this.submissionFeatureErrorRepository.insertSubmissionFeatureErrorForSubmissionUploadId(submissionUploadId);
 
     return counts;
@@ -107,9 +106,12 @@ export class SubmissionUploadReconciliationService extends DBService {
       throw new HTTP409('Submission upload contains reconciliation conflicts and cannot be promoted');
     }
 
-    // Copy only new and superseded rows. Unchanged rows stay upload-scoped and continue to
-    // resolve to the previously published feature from the original upload.
+    // Copy only new and superseded rows, then link each retained changed row to
+    // the pending feature produced from it. Unchanged rows were linked during reconciliation.
     await this.submissionFeatureRepository.insertPendingSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
+    await this.submissionUploadFeatureRepository.updateSubmissionFeatureIdsForPromotedFeaturesBySubmissionUploadId(
+      submissionUploadId
+    );
 
     // Verify the prepared natural-key rows converged. This also
     // makes a retried promotion safe when the pending rows already exist.
@@ -141,10 +143,10 @@ export class SubmissionUploadReconciliationService extends DBService {
     // Stage 2: serialize activation with reconciliation and other feature-state writers.
     await this.submissionRepository.lockSubmissionFeatureStateForSubmissionId(upload.submission_id);
 
-    // Stage 3: an `unchanged` classification describes the active row that existed when
-    // reconciliation ran. Another upload may since have removed that row or published a
-    // different hash for the same reconciliation key. Rejecting that stale snapshot avoids
-    // activating changed rows while silently accepting an outdated unchanged baseline.
+    // Stage 3: an `unchanged` classification points to the active row that existed when
+    // reconciliation ran. Another upload may since have ended or replaced that exact row.
+    // Rejecting that stale snapshot avoids activating changed rows while silently accepting
+    // an outdated unchanged baseline.
     const { stale } = await this.submissionUploadFeatureRepository.isSubmissionUploadFeaturesStale(submissionUploadId);
     if (stale) {
       throw new HTTP409('Submission upload reconciliation is stale; submit a new upload');

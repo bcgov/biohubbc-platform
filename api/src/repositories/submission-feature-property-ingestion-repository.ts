@@ -7,6 +7,7 @@ import {
   IngestionErrorSummaryRow
 } from '../models/submission-feature-property-ingestion';
 import { BaseRepository } from './base-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
@@ -15,7 +16,7 @@ import { BaseRepository } from './base-repository';
  * 1) expands raw JSON properties from `submission_feature.data`
  * 2) resolves metadata and candidate values into upload-scoped staging tables
  * 3) records aggregated validation/resolution errors
- * 4) inserts valid canonical values into typed property tables
+ * 4) inserts valid values into typed property tables
  *
  * Working tables used here are durable (not temporary table definitions), and are
  * partitioned logically by `submission_upload_id`. Callers are expected to clear
@@ -41,10 +42,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Delete previously derived canonical property rows for one upload.
+   * Delete previously derived property rows for the upload's staged features.
    *
-   * This keeps reruns idempotent by removing all typed-property rows that
-   * were derived from `submission_feature.data.properties` for the upload.
+   * This keeps reruns idempotent by removing all typed-property rows for the
+   * `submission_feature_id`s linked from this upload's retained staging rows.
+   * The staged scope includes unchanged features from earlier uploads, which must
+   * be re-indexed against the current upload's requested Blueprint.
+   *
+   * TODO: Replace this hard-delete/reinsert model with lifecycle-dated property rows.
+   * Search, feature-property reads, closure computation, and download Parquet hydration
+   * read these property tables directly; re-indexing active unchanged features can
+   * otherwise change what concurrent readers see. Property rows should eventually be
+   * inserted as pending, then activated/end-dated atomically with upload approval.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -52,10 +61,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       WITH upload_features AS (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
+        SELECT DISTINCT staged.submission_feature_id
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+          AND (
+            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+            OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+          )
       ),
       delete_artifact AS (
         DELETE FROM submission_feature_property_artifact sfpa
@@ -112,7 +129,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         RETURNING 1
       )
       SELECT 1;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -139,9 +156,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Expand raw JSON properties into one staging row per key/value pair.
    *
-   * For each active `submission_feature` in the upload, this method extracts
-   * entries from `data.properties` via `jsonb_each(...)` and writes them into
-   * `submission_upload_staging_raw_property`.
+   * Reconciliation/promotion stores the target `submission_feature_id` on each
+   * indexable upload feature. Those target features are staged under the current
+   * `submission_upload_id` so validation and review are scoped to this upload's
+   * pinned Blueprint.
    *
    * Rows are produced only when `data.properties` is a JSON object.
    *
@@ -158,16 +176,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         value
       )
       SELECT
-        sf.submission_feature_id,
-        sf.submission_upload_id,
-        sf.feature_type_id,
+        scoped.submission_feature_id,
+        ${submissionUploadId}::uuid,
+        scoped.feature_type_id,
         props.key,
         props.value
-      FROM submission_feature sf
-      CROSS JOIN LATERAL jsonb_each(sf.data -> 'properties') AS props
-      WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-        AND sf.record_end_date IS NULL
-        AND jsonb_typeof(sf.data -> 'properties') = 'object';
+      FROM (
+        SELECT
+          feature.submission_feature_id,
+          feature.feature_type_id,
+          feature.data
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+      ) scoped
+      CROSS JOIN LATERAL jsonb_each(scoped.data -> 'properties') AS props
+      WHERE jsonb_typeof(scoped.data -> 'properties') = 'object';
     `;
 
     await this.connection.sql(sql);
@@ -214,7 +240,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * The selected Blueprint is the one pinned to the upload (`submission_upload.blueprint_id`), passed
    * in by the caller — it is not re-selected here. Property assignment, requiredness, and multiplicity
    * come from the Blueprint; the logical type is still read from `feature_property_type`.
-   * `feature_type_property` supplies only the canonical `feature_type_property_id` surrogate, and only
+   * `feature_type_property` supplies only the shared `feature_type_property_id` surrogate, and only
    * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
    * properties are kept with a null id for later reporting.
    *
@@ -272,7 +298,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         ON bft.blueprint_id = sb.blueprint_id
        AND bft.feature_type_id = s.feature_type_id
        AND bft.record_end_date IS NULL
-      -- Canonical feature-type/property pool entry; supplies the surrogate id and bridges to the
+      -- Shared feature-type/property pool entry; supplies the surrogate id and bridges to the
       -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
       LEFT JOIN feature_type_property ftp
         ON ftp.feature_type_id = s.feature_type_id
@@ -1021,7 +1047,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * determinism. Within one upload bare `source_id` is unique (duplicate check), so a
    * same-upload match is always the submitter's current intent and wins outright. The
    * resolved target feature and its type are captured so later phases can validate the
-   * allowed target type and insert canonical rows.
+   * allowed target type and insert property rows.
    *
    * Rows remain in candidate staging even when unresolved so later phases can emit
    * aggregated resolution errors.
@@ -1074,10 +1100,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         WHERE p.is_format_valid
           AND candidate.submission_id = ${submissionId}
           AND candidate.source_id = p.parsed_source_id
-          AND candidate.record_end_date IS NULL
           AND (
-            candidate.submission_upload_id = ${submissionUploadId}::uuid
-            OR candidate.record_effective_date IS NOT NULL
+            (
+              candidate.submission_upload_id = ${submissionUploadId}::uuid
+              AND candidate.record_effective_date IS NULL
+              AND candidate.record_end_date IS NULL
+            )
+            OR (`;
+    sql.append(isSubmissionFeatureActive('candidate'));
+    sql.append(SQL`)
           )
         ORDER BY
           (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
@@ -1091,7 +1122,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           candidate.submission_feature_id DESC
         LIMIT 1
       ) target ON true;
-    `;
+    `);
     await this.connection.sql(sql);
   }
 
@@ -1115,11 +1146,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WITH selected_blueprint AS (
         SELECT ${blueprintId}::integer AS blueprint_id
       ),
+      feature_scope AS (
+        SELECT
+          feature.submission_feature_id,
+          feature.feature_type_id
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+      ),
       upload_feature_types AS (
         SELECT DISTINCT feature_type_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
+        FROM feature_scope
       ),
       required_properties AS (
         SELECT
@@ -1136,7 +1175,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
          AND bftp.record_end_date IS NULL
          AND bftp.required_value = TRUE
-        -- Canonical pool entry; bridges the assignment to its feature type / property and surrogate id.
+        -- Shared pool entry; bridges the assignment to its feature type / property and surrogate id.
         -- Constrain to the Blueprint feature type: the FK on bftp.feature_type_property_id only proves
         -- the property exists in the global pool, not that it belongs to bft.feature_type_id.
         JOIN feature_type_property ftp
@@ -1151,28 +1190,26 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       ),
       grouped_errors AS (
         SELECT
-          sf.submission_upload_id,
+          ${submissionUploadId}::uuid AS submission_upload_id,
           rp.property_name,
           rp.feature_type_property_id,
           'MISSING_REQUIRED_PROPERTY'::text AS error_code,
           'Missing required property value'::text AS error_message,
           COUNT(*)::integer AS count
-        FROM submission_feature sf
+        FROM feature_scope staged_feature
         JOIN required_properties rp
-          ON rp.feature_type_id = sf.feature_type_id
-        WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-          AND sf.record_end_date IS NULL
-          AND NOT EXISTS (
+          ON rp.feature_type_id = staged_feature.feature_type_id
+        WHERE NOT EXISTS (
             SELECT 1
             FROM submission_upload_staging_raw_property raw
             WHERE raw.submission_upload_id = ${submissionUploadId}::uuid
-              AND raw.submission_feature_id = sf.submission_feature_id
+              AND raw.submission_feature_id = staged_feature.submission_feature_id
               AND raw.property_name = rp.property_name
               AND raw.value IS NOT NULL
               AND raw.value <> 'null'::jsonb
               AND NOT (jsonb_typeof(raw.value) = 'array' AND jsonb_array_length(raw.value) = 0)
           )
-        GROUP BY sf.submission_upload_id, rp.feature_type_property_id, rp.property_name
+        GROUP BY rp.feature_type_property_id, rp.property_name
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
@@ -1925,12 +1962,26 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         p.date_value,
         p.time_value
       FROM submission_upload_staging_datetime_candidate p
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = p.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = p.submission_feature_id
+        )
         AND (
           p.date_value IS NOT NULL
          OR p.time_value IS NOT NULL
         );
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2019,10 +2070,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         p.blueprint_feature_type_property_id,
         public.ST_Force2D(p.parsed_geom)
       FROM submission_upload_staging_spatial_candidate p
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = p.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = p.submission_feature_id
+        )
         AND p.parsed_geom IS NOT NULL
         AND public.ST_IsValid(p.parsed_geom);
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2050,10 +2115,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.blueprint_feature_type_property_id,
         v.logical_value #>> '{}'
       FROM submission_upload_staging_typed_property_value v
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = v.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = v.submission_feature_id
+        )
         AND v.property_type_name = 'string'
         AND jsonb_typeof(v.logical_value) = 'string';
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2062,7 +2141,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Insert valid numeric properties into `submission_feature_property_number`.
    *
    * Values are sourced from typed staging where logical and transport types are
-   * numeric, then cast into canonical numeric column storage.
+   * numeric, then cast into the stored numeric column type.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -2081,10 +2160,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.blueprint_feature_type_property_id,
         (v.logical_value #>> '{}')::numeric
       FROM submission_upload_staging_typed_property_value v
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = v.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = v.submission_feature_id
+        )
         AND v.property_type_name = 'number'
         AND jsonb_typeof(v.logical_value) = 'number';
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2093,7 +2186,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Insert valid boolean properties into `submission_feature_property_boolean`.
    *
    * Values are sourced from typed staging where logical and transport types are
-   * boolean, then cast into canonical boolean column storage.
+   * boolean, then cast into the stored boolean column type.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -2112,10 +2205,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.blueprint_feature_type_property_id,
         (v.logical_value #>> '{}')::boolean
       FROM submission_upload_staging_typed_property_value v
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = v.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = v.submission_feature_id
+        )
         AND v.property_type_name = 'boolean'
         AND jsonb_typeof(v.logical_value) = 'boolean';
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2143,10 +2250,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.blueprint_feature_type_property_id,
         c.contributor_codeset_code_id
       FROM submission_upload_staging_code_candidate c
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = c.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = c.submission_feature_id
+        )
         AND c.is_format_valid
         AND c.contributor_codeset_code_id IS NOT NULL;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2162,7 +2283,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * never cross-write into each other's table.
    *
    * A multi-valued property may submit the same reference more than once; the unique constraint plus
-   * `ON CONFLICT DO NOTHING` keeps exactly one canonical row per `(source feature, property, referenced
+   * `ON CONFLICT DO NOTHING` keeps exactly one stored row per `(source feature, property, referenced
    * feature)` so downstream traversal does not double-count.
    *
    * Self-references are also rejected upstream with an error so the upload is blocked, but they remain
@@ -2170,9 +2291,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * self-loop — which would corrupt downstream closure traversal — can never be written.
    *
    * Resolution happens once at staging time; this insert runs later in the job. As a staleness guard
-   * it rejoins `submission_feature` for both endpoints with `record_end_date IS NULL`, so if a source
-   * or target feature is soft-deleted between staging and insert, no canonical row pointing at (or
-   * from) an inactive feature can land.
+   * it rejoins `submission_feature` for both endpoints and permits only pending or currently active
+   * rows, so if a source or target feature is soft-deleted between staging and insert, no stored
+   * row pointing at (or from) an inactive feature can land.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -2196,11 +2317,27 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND ftp.record_end_date IS NULL
       JOIN submission_feature src
         ON src.submission_feature_id = c.submission_feature_id
-       AND src.record_end_date IS NULL
+       AND (
+         (src.record_effective_date IS NULL AND src.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('src'));
+    sql.append(SQL`)
+       )
       JOIN submission_feature tgt
         ON tgt.submission_feature_id = c.referenced_submission_feature_id
-       AND tgt.record_end_date IS NULL
+       AND (
+         (tgt.record_effective_date IS NULL AND tgt.record_end_date IS NULL)
+         OR (`);
+    sql.append(isSubmissionFeatureActive('tgt'));
+    sql.append(SQL`)
+       )
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = c.submission_feature_id
+        )
         AND c.is_format_valid
         AND c.referenced_submission_feature_id IS NOT NULL
         AND c.referenced_submission_feature_id <> c.submission_feature_id
@@ -2217,7 +2354,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         referenced_submission_feature_id
       )
       DO NOTHING;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2244,9 +2381,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.blueprint_feature_type_property_id,
         c.taxon_id
       FROM submission_upload_staging_taxon_candidate c
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = c.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = c.submission_feature_id
+        )
         AND c.taxon_id IS NOT NULL;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2276,7 +2427,21 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         n.blueprint_feature_type_property_id,
         n.artifact_id
       FROM submission_upload_staging_artifact_candidate n
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = n.submission_feature_id
+       AND (
+         (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+         OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+       )
       WHERE n.submission_upload_id = ${submissionUploadId}::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM submission_upload_feature staged
+          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+            AND staged.submission_feature_id = n.submission_feature_id
+        )
         AND COALESCE(n.normalized_reference, '') <> ''
         AND n.artifact_id IS NOT NULL
       ON CONFLICT (
@@ -2285,7 +2450,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         artifact_id
       )
       DO NOTHING;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2293,12 +2458,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert resolved feature-to-feature relationships for one upload.
    *
-   * Relationships are extracted from `submission_feature.data.content` string references,
-   * resolved by `source_id` — preferring a live match in the same upload and falling back
-   * to the submission's published live rows (a reconciled upload only carries new/changed
-   * features, so a referenced feature may be an unchanged feature owned by an earlier
-   * upload). Exactly one target is picked per reference (ties resolve to the newest row),
-   * self-links are excluded, and rows are inserted idempotently.
+   * Relationships are extracted from the staged feature scope's `data.content` string
+   * references, resolved by `source_id` — preferring a pending match in the same upload
+   * and falling back to the submission's published live rows. The source scope includes
+   * unchanged features owned by earlier uploads so their links can be repointed when a
+   * target is superseded. Exactly one target is picked per reference (ties resolve to the
+   * newest row), self-links are excluded, and rows are inserted idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} submissionId The submission the upload belongs to.
@@ -2311,21 +2476,29 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     const sql = SQL`
       WITH expanded AS (
         SELECT
-          sf.submission_feature_id AS source_feature_id,
+          feature.submission_feature_id AS source_feature_id,
           btrim(content_item.reference_source_id) AS reference_source_id
-        FROM submission_feature sf
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
         CROSS JOIN LATERAL (
           SELECT content_value #>> '{}' AS reference_source_id
           FROM jsonb_array_elements(
             CASE
-              WHEN jsonb_typeof(sf.data -> 'content') = 'array' THEN sf.data -> 'content'
+              WHEN jsonb_typeof(feature.data -> 'content') = 'array' THEN feature.data -> 'content'
               ELSE '[]'::jsonb
             END
           ) AS content_value
           WHERE jsonb_typeof(content_value) = 'string'
         ) AS content_item
-        WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-          AND sf.record_end_date IS NULL
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+          AND (
+            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+            OR (`;
+    sql.append(isSubmissionFeatureActive('feature'));
+    sql.append(SQL`)
+          )
           AND btrim(content_item.reference_source_id) <> ''
       ),
       resolved AS (
@@ -2338,10 +2511,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           FROM submission_feature candidate
           WHERE candidate.submission_id = ${submissionId}
             AND candidate.source_id = e.reference_source_id
-            AND candidate.record_end_date IS NULL
             AND (
-              candidate.submission_upload_id = ${submissionUploadId}::uuid
-              OR candidate.record_effective_date IS NOT NULL
+              (
+                candidate.submission_upload_id = ${submissionUploadId}::uuid
+                AND candidate.record_effective_date IS NULL
+                AND candidate.record_end_date IS NULL
+              )
+              OR (
+                `);
+    sql.append(isSubmissionFeatureActive('candidate'));
+    sql.append(SQL`
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM submission_feature upload_candidate
+                  WHERE upload_candidate.submission_upload_id = ${submissionUploadId}::uuid
+                    AND upload_candidate.source_id = e.reference_source_id
+                    AND upload_candidate.record_end_date IS NULL
+                )
+              )
             )
           ORDER BY
             (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
@@ -2359,22 +2546,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         target_feature_id
       FROM resolved
       ON CONFLICT DO NOTHING;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
 
   /**
-   * Record unresolved or invalid feature-reference errors from `data.content`.
+   * Record unresolved, ambiguous, or invalid feature-reference errors from `data.content`.
    *
    * This phase captures:
    * - unresolved target source-id references (no live match in the upload or in the
    *   submission's published live rows)
+   * - ambiguous target source-id references (more than one live match across feature types)
    * - self-reference violations
    *
-   * Resolution mirrors {@link insertFeatureRelationshipsBySubmissionUploadId}: one target
-   * per reference, preferring a live match in the same upload and falling back to the
-   * submission's published live rows.
+   * Resolution prefers live matches in the same upload and falls back to the submission's
+   * published live rows only when the upload has no live match for the source id. A reference
+   * is valid only when that scope contains exactly one target.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} submissionId The submission the upload belongs to.
@@ -2382,52 +2570,74 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string, submissionId: number): Promise<void> {
     const sql = SQL`
-      WITH expanded AS (
+      WITH feature_scope AS (
         SELECT
-          sf.submission_feature_id AS source_feature_id,
+          feature.submission_feature_id,
+          feature.data
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+      ),
+      expanded AS (
+        SELECT
+          scoped.submission_feature_id AS source_feature_id,
           btrim(content_item.reference_source_id) AS reference_source_id
-        FROM submission_feature sf
+        FROM feature_scope scoped
         CROSS JOIN LATERAL (
           SELECT content_value #>> '{}' AS reference_source_id
           FROM jsonb_array_elements(
             CASE
-              WHEN jsonb_typeof(sf.data -> 'content') = 'array' THEN sf.data -> 'content'
+              WHEN jsonb_typeof(scoped.data -> 'content') = 'array' THEN scoped.data -> 'content'
               ELSE '[]'::jsonb
             END
           ) AS content_value
           WHERE jsonb_typeof(content_value) = 'string'
         ) AS content_item
-        WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-          AND sf.record_end_date IS NULL
-          AND btrim(content_item.reference_source_id) <> ''
+        WHERE btrim(content_item.reference_source_id) <> ''
       ),
       error_rows AS (
         SELECT
           CASE
-            WHEN target.submission_feature_id IS NULL THEN 'UNRESOLVED_REFERENCE'
+            WHEN target.candidate_count = 0 THEN 'UNRESOLVED_REFERENCE'
+            WHEN target.candidate_count > 1 THEN 'AMBIGUOUS_REFERENCE'
             ELSE 'INVALID_SELF_REFERENCE'
           END AS error_code,
           CASE
-            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload or published submission state'
+            WHEN target.candidate_count = 0 THEN 'Failed to resolve feature reference source_id within upload or published submission state'
+            WHEN target.candidate_count > 1 THEN 'Feature reference source_id resolves to multiple feature types and is ambiguous'
             ELSE 'Feature reference cannot point to itself'
           END AS error_message
         FROM expanded e
-        LEFT JOIN LATERAL (
-          SELECT candidate.submission_feature_id
+        CROSS JOIN LATERAL (
+          SELECT
+            COUNT(*)::integer AS candidate_count,
+            MIN(candidate.submission_feature_id) AS submission_feature_id
           FROM submission_feature candidate
           WHERE candidate.submission_id = ${submissionId}
             AND candidate.source_id = e.reference_source_id
-            AND candidate.record_end_date IS NULL
             AND (
-              candidate.submission_upload_id = ${submissionUploadId}::uuid
-              OR candidate.record_effective_date IS NOT NULL
+              (
+                candidate.submission_upload_id = ${submissionUploadId}::uuid
+                AND candidate.record_effective_date IS NULL
+                AND candidate.record_end_date IS NULL
+              )
+              OR (
+                `;
+    sql.append(isSubmissionFeatureActive('candidate'));
+    sql.append(SQL`
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM submission_feature upload_candidate
+                  WHERE upload_candidate.submission_upload_id = ${submissionUploadId}::uuid
+                    AND upload_candidate.source_id = e.reference_source_id
+                    AND upload_candidate.record_end_date IS NULL
+                )
+              )
             )
-          ORDER BY
-            (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
-            candidate.submission_feature_id DESC
-          LIMIT 1
-        ) target ON true
-        WHERE target.submission_feature_id IS NULL
+        ) target
+        WHERE target.candidate_count <> 1
            OR target.submission_feature_id = e.source_feature_id
       ),
       grouped_errors AS (
@@ -2467,17 +2677,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         count = submission_feature_error.count + EXCLUDED.count,
         error_message = EXCLUDED.error_message,
         details = COALESCE(EXCLUDED.details, submission_feature_error.details);
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
 
   /**
-   * Record unresolved parent source-id references for the upload.
+   * Record unresolved or ambiguous parent source-id references for the upload.
    *
-   * A parent error is recorded when `child.data.parent` is non-empty but no live
-   * feature in the same upload — and no published live feature of the submission —
-   * has a matching `source_id`. This mirrors the resolution scope used by
+   * A parent error is recorded when `child.data.parent` is non-empty and its source id
+   * resolves to either zero or multiple live features. Resolution prefers the same upload
+   * and falls back to the submission's published live rows only when the upload has no live
+   * match. This mirrors the resolution scope used by
    * `FeatureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId`.
    *
    * @param {string} submissionUploadId Upload scope.
@@ -2489,31 +2700,66 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     submissionId: number
   ): Promise<void> {
     const sql = SQL`
-      WITH unresolved AS (
+      WITH feature_scope AS (
         SELECT
-          child.submission_upload_id
-        FROM submission_feature child
-        LEFT JOIN submission_feature parent
-          ON parent.submission_id = ${submissionId}
-         AND parent.record_end_date IS NULL
-         AND (
-           parent.submission_upload_id = child.submission_upload_id
-           OR parent.record_effective_date IS NOT NULL
-         )
-         AND parent.source_id = NULLIF(child.data ->> 'parent', '')
-        WHERE child.submission_upload_id = ${submissionUploadId}::uuid
-          AND child.record_end_date IS NULL
-          AND NULLIF(child.data ->> 'parent', '') IS NOT NULL
-          AND parent.submission_feature_id IS NULL
+          ${submissionUploadId}::uuid AS submission_upload_id,
+          feature.data
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+      ),
+      invalid_parent AS (
+        SELECT
+          child.submission_upload_id,
+          CASE
+            WHEN resolution.candidate_count = 0 THEN 'UNRESOLVED_PARENT'
+            ELSE 'AMBIGUOUS_PARENT'
+          END AS error_code,
+          CASE
+            WHEN resolution.candidate_count = 0
+              THEN 'Failed to resolve parent feature source_id within upload or published submission state'
+            ELSE 'Parent source_id resolves to multiple feature types; the reference is ambiguous'
+          END AS error_message
+        FROM feature_scope child
+        CROSS JOIN LATERAL (
+          SELECT COUNT(*)::integer AS candidate_count
+          FROM submission_feature parent
+          WHERE parent.submission_id = ${submissionId}
+            AND (
+              (
+                parent.submission_upload_id = ${submissionUploadId}::uuid
+                AND parent.record_effective_date IS NULL
+                AND parent.record_end_date IS NULL
+              )
+              OR (
+                `;
+    sql.append(isSubmissionFeatureActive('parent'));
+    sql.append(SQL`
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM submission_feature upload_parent
+                  WHERE upload_parent.submission_upload_id = ${submissionUploadId}::uuid
+                    AND upload_parent.source_id = NULLIF(child.data ->> 'parent', '')
+                    AND upload_parent.record_effective_date IS NULL
+                    AND upload_parent.record_end_date IS NULL
+                )
+              )
+            )
+            AND parent.source_id = NULLIF(child.data ->> 'parent', '')
+        ) resolution
+        WHERE NULLIF(child.data ->> 'parent', '') IS NOT NULL
+          AND resolution.candidate_count <> 1
       ),
       grouped_errors AS (
         SELECT
-          unresolved.submission_upload_id,
-          'UNRESOLVED_PARENT'::text AS error_code,
-          'Failed to resolve parent feature source_id within upload or published submission state'::text AS error_message,
+          invalid_parent.submission_upload_id,
+          invalid_parent.error_code,
+          invalid_parent.error_message,
           COUNT(*)::integer AS count
-        FROM unresolved
-        GROUP BY unresolved.submission_upload_id
+        FROM invalid_parent
+        GROUP BY invalid_parent.submission_upload_id, invalid_parent.error_code, invalid_parent.error_message
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
@@ -2543,7 +2789,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         count = submission_feature_error.count + EXCLUDED.count,
         error_message = EXCLUDED.error_message,
         details = COALESCE(EXCLUDED.details, submission_feature_error.details);
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -2551,14 +2797,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record duplicate `source_id` errors for the upload.
    *
-   * A duplicate-source-id error is recorded once per `source_id` value that appears in
-   * two or more active rows of `submission_feature` within the same upload. NULL
+   * A duplicate-source-id error is recorded once per `source_id` value that appears
+   * in two or more retained rows within the same upload. Source IDs are tarball-wide
+   * identifiers and must be unique regardless of feature type. NULL
    * `source_id` rows are excluded — Postgres NULL semantics make them non-equal, and
    * the downstream `feature::<source_id>` resolver cannot match NULLs either, so they
    * cannot produce the resolution ambiguity this check prevents.
    *
-   * One row per distinct duplicated `source_id` is written so that the colliding
-   * identifier is recoverable from `details->>'source_id'`. `count` is the literal
+   * One row per distinct duplicated `source_id` is written so the colliding
+   * identifier is recoverable from `details`. `count` is the literal
    * duplicate-row count (e.g., three colliding rows → `count = 3`).
    *
    * @param {string} submissionUploadId Upload scope.
@@ -2572,9 +2819,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           submission_upload_id,
           source_id,
           COUNT(*)::integer AS count
-        FROM submission_feature
+        FROM submission_upload_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
           -- Load-bearing, not defensive: GROUP BY collapses all NULL source_id rows into a
           -- single group, so omitting this would make HAVING COUNT(*) > 1 report distinct
           -- NULL-source_id features as a false duplicate collision.
@@ -2596,7 +2842,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         NULL::text,
         NULL::integer,
         'DUPLICATE_FEATURE_SOURCE_ID',
-        'Multiple active submission_feature rows share the same source_id within this upload',
+        'Multiple retained upload feature rows share the same source_id within this upload',
         count,
         jsonb_build_object('source_id', source_id)
       FROM grouped_errors

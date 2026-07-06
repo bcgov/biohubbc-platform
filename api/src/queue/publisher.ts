@@ -628,7 +628,7 @@ export const publishPromoteSubmissionFeaturesJob = async (
  * the same transaction — if the caller rolls back, the job is never visible.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IIndexSubmissionFeaturesJobData} data Upload scope.
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
@@ -658,7 +658,6 @@ export const publishIndexSubmissionFeaturesJob = async (
         label: 'publishIndexSubmissionFeaturesJob',
         message: 'Index submission features job published',
         jobId,
-        submissionId: data.submissionId,
         submissionUploadId: data.submissionUploadId
       });
 
@@ -668,7 +667,6 @@ export const publishIndexSubmissionFeaturesJob = async (
     defaultLog.warn({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Job not published (duplicate or throttled)',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId
     });
 
@@ -677,7 +675,6 @@ export const publishIndexSubmissionFeaturesJob = async (
     defaultLog.error({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
       error
     });
@@ -785,7 +782,7 @@ const COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
  * the same transaction — if the caller rolls back, the job is never visible.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IComputeSubmissionFeatureClosureJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IComputeSubmissionFeatureClosureJobData} data Upload scope.
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
@@ -816,7 +813,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
         label: 'publishComputeSubmissionFeatureClosureJob',
         message: 'Compute submission feature closure job published',
         jobId,
-        submissionId: data.submissionId,
         submissionUploadId: data.submissionUploadId
       });
 
@@ -826,7 +822,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
     defaultLog.warn({
       label: 'publishComputeSubmissionFeatureClosureJob',
       message: 'Job not published (duplicate or throttled)',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId
     });
 
@@ -835,7 +830,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
     defaultLog.error({
       label: 'publishComputeSubmissionFeatureClosureJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
       error
     });

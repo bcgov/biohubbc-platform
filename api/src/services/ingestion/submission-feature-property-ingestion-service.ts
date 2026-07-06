@@ -12,6 +12,13 @@ import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
 
+/**
+ * Orchestrates reconciliation-aware property indexing for a submission upload.
+ *
+ * @export
+ * @class SubmissionFeaturePropertyIngestionService
+ * @extends {DBService}
+ */
 export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
   submissionRepository: SubmissionRepository;
@@ -21,6 +28,12 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionUploadService: SubmissionUploadService;
   taxonomyService: TaxonomyService;
 
+  /**
+   * Creates an instance of SubmissionFeaturePropertyIngestionService.
+   *
+   * @param {IDBConnection} connection The active database connection.
+   * @memberof SubmissionFeaturePropertyIngestionService
+   */
   constructor(connection: IDBConnection) {
     super(connection);
 
@@ -42,6 +55,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * @param {number} submissionId Submission scope for the features being indexed.
    * @param {string} submissionUploadId Upload scope for the staged feature rows.
    * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Indexing outcome with validation diagnostics when invalid.
+   * @memberof SubmissionFeaturePropertyIngestionService
    */
   async indexSubmissionPropertiesBySubmissionUploadId(
     submissionId: number,
@@ -78,8 +92,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         blueprintId
       });
-      // Cleanup for idempotency.
-      currentPhase = 'cleanup existing property records and relationships';
+      // Cleanup upload-scoped derived rows for idempotency. Stored property rows
+      // are deleted later, after validation passes, because unchanged features may
+      // still be live production rows until the upload is approved.
+      currentPhase = 'cleanup upload-scoped derived rows';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -87,10 +103,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await Promise.all([
-        this.submissionFeaturePropertyIngestionRepository.deletePropertyRecordsBySubmissionUploadId(submissionUploadId),
-        this.submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId)
-      ]);
+      await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
 
       // Phase 1: initialize upload-scoped working rows.
       currentPhase = 'initialize raw property staging';
@@ -126,9 +141,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         phase: currentPhase
       });
       await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId, blueprintId);
-      await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
-        submissionUploadId
-      );
 
       // Phase 4: requiredness and primitive/cardinality validation.
       currentPhase = 'record required and primitive validation errors';
@@ -237,17 +249,17 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId
       );
 
-      // Phase 9: fail-fast boundary before canonical writes.
+      // Phase 9: fail-fast boundary before property writes.
       //
       // Phases 4-8 accumulate a full deep-validation snapshot directly in
       // `submission_feature_error`. If any errors exist, we must:
       // 1. read aggregate diagnostics for logs/debugging
-      // 2. stop before canonical writes
+      // 2. stop before property writes
       //
       // Important:
       // - this is expected invalid-data flow (not a system exception)
       // - durable persistence already happened during validation phases
-      // - canonical parent/property/relationship writes must not run when invalid
+      // - parent/property/relationship writes must not run when invalid
       currentPhase = 'validation fail-fast boundary';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
@@ -289,8 +301,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         };
       }
 
-      // Phase 10: canonical parent updates and property inserts.
-      currentPhase = 'insert canonical property records';
+      // Phase 10: parent updates and property inserts.
+      currentPhase = 'insert property records';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -298,6 +310,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
+      await this.submissionFeaturePropertyIngestionRepository.deletePropertyRecordsBySubmissionUploadId(
+        submissionUploadId
+      );
       await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(
         submissionUploadId,
         submissionId
@@ -341,6 +356,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
+      await this.submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId);
       await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
         submissionUploadId,
         submissionId
@@ -379,6 +395,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async initializePropertyIngestionStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearRawPropertyStagingBySubmissionUploadId(
@@ -395,6 +412,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async populateUploadPropertyWorkingSetBySubmissionUploadId(
     submissionUploadId: string,
@@ -424,6 +442,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * @param {number} submissionId The submission the upload belongs to (for feature-reference resolution).
    * @param {number} contributorId Contributor scope for contributor-owned code resolution.
    * @returns {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async populateComplexPropertyCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,

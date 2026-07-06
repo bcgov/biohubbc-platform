@@ -254,7 +254,8 @@ export const registerWorkers = async (): Promise<void> => {
     deadLetter: JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
     retryLimit: 3,
     retryDelay: 60,
-    retryBackoff: true
+    retryBackoff: true,
+    policy: 'short'
   });
 
   // Register index submission features job handler

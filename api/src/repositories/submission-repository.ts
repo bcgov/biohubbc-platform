@@ -464,10 +464,11 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Delete feature relationships owned by one upload attempt.
+   * Delete feature relationships for the upload's staged feature scope.
    *
-   * Relationship ownership follows the source feature. Inbound edges from features
-   * belonging to other uploads must survive a re-index of their target.
+   * Relationship ownership follows the source feature. The staged scope includes
+   * unchanged source features owned by earlier uploads so their logical references
+   * can be repointed when a target is superseded.
    *
    * @param {string} submissionUploadId
    * @return {Promise<void>}
@@ -477,11 +478,19 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       DELETE FROM submission_feature_feature
       WHERE source_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `;
+        SELECT staged.submission_feature_id
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+          AND (
+            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+            OR (`;
+    sqlStatement.append(isSubmissionFeatureActive('feature'));
+    sqlStatement.append(`)
+          )
+      );`);
 
     await this.connection.sql(sqlStatement);
   }

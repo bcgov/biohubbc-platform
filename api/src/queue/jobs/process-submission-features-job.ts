@@ -9,18 +9,18 @@ import { SubmissionValidationService } from '../../services/submission-validatio
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { getLogger } from '../../utils/logger';
-import { publishIndexSubmissionFeaturesJob } from '../publisher';
+import { publishReconcileSubmissionFeaturesJob } from '../publisher';
 import { withConnection } from '../with-connection';
 import { ProcessSubmissionFeatureOutcome } from './process-submission-features-job.interface';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
 export interface ProcessSubmissionFeaturesJobDependencies {
-  publishIndexSubmissionFeaturesJob: typeof publishIndexSubmissionFeaturesJob;
+  publishReconcileSubmissionFeaturesJob: typeof publishReconcileSubmissionFeaturesJob;
 }
 
 export const processSubmissionFeaturesJobDependencies: ProcessSubmissionFeaturesJobDependencies = {
-  publishIndexSubmissionFeaturesJob
+  publishReconcileSubmissionFeaturesJob
 };
 
 /**
@@ -230,8 +230,8 @@ async function executeProcessSubmissionFeaturesIngestion(
  *   - Transition upload to `ingested`.
  *   - Mark upload archive process status as `COMPLETED`.
  *
- * Downstream indexing is published after these status/archive updates commit so enqueue
- * failures do not trigger a retry of already-completed ingestion work.
+ * Downstream reconciliation is enqueued in the same transaction as the `ingested`
+ * transition, so an upload cannot become ingested without a durable next-stage job.
  *
  * @param {SubmissionUpload} submissionUpload Submission upload payload.
  * @param {string} jobId Job identifier.
@@ -279,57 +279,9 @@ async function finalizeProcessSubmissionFeaturesStage(
     await uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
       archive_status: ProcessStatusStatusEnum.COMPLETED
     });
-  });
-}
-
-/**
- * Publish downstream index work, warn-and-commit on failure.
- *
- * Indexing is best-effort: the just-completed ingestion/validation status updates are durable
- * work and finalize regardless of whether the downstream indexing job enqueues. Throwing here
- * would unwind real completed work and trigger pg-boss retry of the whole ingestion stage,
- * which is undesirable. On enqueue failure we log a warning and let the orchestrator continue
- * to its finalize phase.
- *
- * @param {number} submissionId Submission scope.
- * @param {string} submissionUploadId Submission upload scope.
- * @param {string} jobId Job identifier.
- * @returns {Promise<void>}
- */
-async function executeIndexSubmissionFeaturesPublish(
-  submissionId: number,
-  submissionUploadId: string,
-  jobId: string
-): Promise<void> {
-  await withConnection(async (connection) => {
-    const publishStart = Date.now();
-
-    try {
-      const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
-        submissionId,
-        submissionUploadId
-      });
-
-      defaultLog.info({
-        label: 'executeIndexSubmissionFeaturesPublish',
-        message: 'Index submission publish completed',
-        jobId,
-        submissionUploadId,
-        submissionId,
-        elapsedMs: Date.now() - publishStart,
-        indexResult
-      });
-    } catch (error) {
-      defaultLog.warn({
-        label: 'executeIndexSubmissionFeaturesPublish',
-        message: 'Index submission publish failed; finalizing ingestion status anyway',
-        jobId,
-        submissionUploadId,
-        submissionId,
-        elapsedMs: Date.now() - publishStart,
-        error: toErrorMetadata(error)
-      });
-    }
+    await processSubmissionFeaturesJobDependencies.publishReconcileSubmissionFeaturesJob(connection, {
+      submissionUploadId: submissionUpload.submission_upload_id
+    });
   });
 }
 
@@ -403,10 +355,6 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
   });
   await finalizeProcessSubmissionFeaturesStage(submissionUpload, job.id, outcome);
 
-  if (outcome.status === 'ok') {
-    await executeIndexSubmissionFeaturesPublish(submissionId, submissionUploadId, job.id);
-  }
-
   defaultLog.info({
     label: 'runProcessSubmissionFeaturesStage',
     message: 'Process submission features job completed successfully',
@@ -419,25 +367,42 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
 /**
  * Best-effort cleanup for partial feature rows after a process-stage failure.
  *
- * Cleanup is scoped to the current submission upload and only affects rows that
- * are still pending approval (record_effective_date IS NULL in repository SQL).
+ * Cleanup is scoped to the current submission upload and only runs before any
+ * retained row has produced a submission feature.
  *
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
  * @returns {Promise<void>}
  */
 async function cleanupFailedProcessSubmissionFeatures(submissionUploadId: string, jobId: string): Promise<void> {
-  await withConnection(async (connection) => {
+  const cleanedUp = await withConnection(async (connection) => {
     const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
-    await submissionFeatureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+    const hasPromotedFeatures = await submissionFeatureIngestionService.hasSubmissionFeaturesForSubmissionUploadId(
+      submissionUploadId
+    );
+
+    if (hasPromotedFeatures) {
+      defaultLog.info({
+        label: 'cleanupFailedProcessSubmissionFeatures',
+        message: 'Skipped raw upload feature cleanup because promoted submission features exist',
+        jobId,
+        submissionUploadId
+      });
+      return false;
+    }
+
+    await submissionFeatureIngestionService.deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId);
+    return true;
   });
 
-  defaultLog.info({
-    label: 'cleanupFailedProcessSubmissionFeatures',
-    message: 'Cleaned up pending submission features after process-stage failure',
-    jobId,
-    submissionUploadId
-  });
+  if (cleanedUp) {
+    defaultLog.info({
+      label: 'cleanupFailedProcessSubmissionFeatures',
+      message: 'Cleaned up raw upload features after process-stage failure',
+      jobId,
+      submissionUploadId
+    });
+  }
 }
 
 /**

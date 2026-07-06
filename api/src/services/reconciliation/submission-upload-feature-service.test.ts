@@ -12,6 +12,7 @@ const FEATURE = {
   submission_upload_feature_id: SUBMISSION_UPLOAD_FEATURE_ID,
   submission_upload_id: SUBMISSION_UPLOAD_ID,
   source_id: 'feature-1',
+  submission_feature_id: null,
   feature_type_id: 3,
   data: { id: 'feature-1' },
   data_byte_size: 100,

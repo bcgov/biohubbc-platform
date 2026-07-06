@@ -4,6 +4,7 @@ import {
   SUBMISSION_ACTIVE_STATE_LOCK_SEED
 } from '../../constants/database-lock-keys';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
@@ -27,13 +28,10 @@ const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job'
 /**
  * Compute submission feature closure job data interface.
  *
- * The `submissionId` scopes the recompute (closure spans the submission's live rows across all
- * uploads); `submissionUploadId` identifies the upload that triggered it and is forwarded to the
- * downstream security screening job.
+ * `submissionUploadId` identifies the upload that triggered the work. The handler resolves the
+ * authoritative submission ID from that upload before recomputing submission-wide closure.
  */
 export interface IComputeSubmissionFeatureClosureJobData {
-  /** The submission ID whose closure rows should be recomputed */
-  submissionId: number;
   /** The submission upload ID that triggered the recompute (forwarded to screening) */
   submissionUploadId: string;
 }
@@ -50,11 +48,11 @@ export interface IComputeSubmissionFeatureClosureJobData {
  * the `(source, target)` primary key serves the forward probe (what an evidence feature reaches), and
  * the secondary `(target, source)` index serves search's reverse "who reaches Y" down-probe.
  *
- * Each submission's recompute takes the shared blocking active-state lock. This serializes closure
- * with feature activation and guarantees that a queued recompute is not silently skipped while
- * another writer holds the lock. On failure the handler logs and rethrows so pg-boss applies its
- * retry policy — the recompute is idempotent (it deletes the submission's prior closure rows before
- * reinserting), so a retry is safe.
+ * Each submission's recompute takes the shared blocking active-state lock. A job waits for an
+ * overlapping recompute or upload activation instead of being acknowledged without publishing its
+ * upload-specific security-screening job. On failure the handler logs and rethrows so pg-boss
+ * applies its retry policy — the recompute is idempotent (it deletes the submission's prior closure
+ * rows before reinserting), so a retry is safe.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -63,27 +61,30 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
   IComputeSubmissionFeatureClosureJobData
 > = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId, submissionUploadId } = job.data;
+    const { submissionUploadId } = job.data;
 
     defaultLog.info({
       label: 'computeSubmissionFeatureClosureJobHandler',
       message: 'Processing compute submission feature closure job',
       jobId: job.id,
-      submissionId,
       submissionUploadId
     });
 
     try {
       await withConnection(async (conn) => {
+        const submissionUploadService = new SubmissionUploadService(conn);
+        const upload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+        const submissionId = upload.submission_id;
         // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
-        // feature-state writer on this submission so this durable job always observes a complete state.
+        // feature-state writer; every upload must reach the downstream security job.
         await conn.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
           SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
           submissionId,
           SUBMISSION_ACTIVE_STATE_LOCK_SEED
         ]);
 
-        const result = await new SubmissionFeatureClosureService(conn).computeClosureForSubmission(submissionId);
+        const submissionFeatureClosureService = new SubmissionFeatureClosureService(conn);
+        const result = await submissionFeatureClosureService.computeClosureForSubmission(submissionId);
 
         defaultLog.info({
           label: 'computeSubmissionFeatureClosureJobHandler',
@@ -107,7 +108,6 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
         label: 'computeSubmissionFeatureClosureJobHandler',
         message: 'Compute submission feature closure job failed',
         jobId: job.id,
-        submissionId,
         submissionUploadId,
         error
       });
@@ -133,7 +133,7 @@ export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
   IComputeSubmissionFeatureClosureJobData
 > = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId, submissionUploadId } = job.data;
+    const { submissionUploadId } = job.data;
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IComputeSubmissionFeatureClosureJobData>).output;
@@ -142,7 +142,6 @@ export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
       label: 'computeSubmissionFeatureClosureFailedHandler',
       message: 'Compute submission feature closure job failed after all retries',
       jobId: job.id,
-      submissionId,
       submissionUploadId,
       output: jobOutput ?? 'Job failed after all retries'
     });

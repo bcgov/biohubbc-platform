@@ -35,7 +35,8 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       };
 
       const stub = sinon
@@ -68,7 +69,8 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
 
       const result = await service.getSubmissionUploadWithLock('artifact-1');
@@ -80,7 +82,8 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
     });
 
@@ -106,7 +109,8 @@ describe('SubmissionUploadService', () => {
           upload_id: 'upload-1',
           team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
-          ticket_id: '11111111-1111-1111-1111-111111111111'
+          ticket_id: '11111111-1111-1111-1111-111111111111',
+          blueprint_id: 1
         },
         {
           submission_upload_id: 'artifact-2',
@@ -114,7 +118,8 @@ describe('SubmissionUploadService', () => {
           upload_id: 'upload-2',
           team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           status: 'uploaded',
-          ticket_id: '22222222-2222-2222-2222-222222222222'
+          ticket_id: '22222222-2222-2222-2222-222222222222',
+          blueprint_id: 1
         }
       ];
 
@@ -382,7 +387,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -399,7 +405,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
 
       try {
@@ -418,7 +425,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'ingesting',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -434,7 +442,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
 
       try {
@@ -447,13 +456,14 @@ describe('SubmissionUploadService', () => {
   });
 
   describe('transitionSubmissionUploadToIndexing', () => {
-    it('updates status from ingested to indexing', async () => {
+    it('updates status from promoted to indexing', async () => {
       sinon.stub(service, 'getSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
-        status: 'ingested',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        status: 'promoted',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -469,7 +479,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexing',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -485,7 +496,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
 
       try {
@@ -504,7 +516,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexing',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -520,7 +533,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
       const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
@@ -536,7 +550,8 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'ingested',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       });
 
       try {

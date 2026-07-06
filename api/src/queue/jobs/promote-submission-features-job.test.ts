@@ -9,6 +9,7 @@ import { SubmissionUploadService } from '../../services/upload/submission-upload
 import {
   IPromoteSubmissionFeaturesJobData,
   promoteSubmissionFeaturesFailedHandler,
+  promoteSubmissionFeaturesJobDependencies,
   promoteSubmissionFeaturesJobHandler
 } from './promote-submission-features-job';
 
@@ -56,12 +57,17 @@ describe('promote-submission-features-job', () => {
     const promote = sinon
       .stub(SubmissionUploadReconciliationService.prototype, 'promoteSubmissionUploadFeatures')
       .resolves(3);
+    const publish = sinon
+      .stub(promoteSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+      .resolves({ status: 'published', jobId: 'index-1' });
+
     await promoteSubmissionFeaturesJobHandler([createJob()]);
 
     expect(promote).to.have.been.calledOnceWith('upload-1');
     expect(SubmissionUploadService.prototype.transitionSubmissionUploadToPromoted).to.have.been.calledOnceWith(
       'upload-1'
     );
+    expect(publish.firstCall.args[1]).to.eql(JOB_DATA);
   });
 
   it('skips uploads outside the promotion start states', async () => {
@@ -72,6 +78,23 @@ describe('promote-submission-features-job', () => {
     await promoteSubmissionFeaturesJobHandler([createJob()]);
 
     expect(promote).not.to.have.been.called;
+  });
+
+  it('rolls back and retries when indexing enqueue fails', async () => {
+    const connection = stubConnection();
+    stubUpload();
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'promoteSubmissionUploadFeatures').resolves(1);
+    sinon
+      .stub(promoteSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+      .rejects(new Error('queue unavailable'));
+
+    try {
+      await promoteSubmissionFeaturesJobHandler([createJob()]);
+      expect.fail('Expected enqueue failure');
+    } catch (error) {
+      expect((error as Error).message).to.equal('queue unavailable');
+    }
+    expect(connection.rollback).to.have.been.calledOnce;
   });
 
   it('marks exhausted promotion work failed from resumable states', async () => {
