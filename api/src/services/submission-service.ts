@@ -1,10 +1,7 @@
-import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
-import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
   ICreateSubmission,
-  ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
@@ -18,23 +15,18 @@ import {
   SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository
 } from '../repositories/submission-repository';
-import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 
-const defaultLog = getLogger('submission-service');
-
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
-  ingestionRepository: FeatureIngestionRepository;
   teamService: TeamService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-    this.ingestionRepository = new FeatureIngestionRepository(connection);
     this.teamService = new TeamService(connection);
   }
 
@@ -110,74 +102,6 @@ export class SubmissionService extends DBService {
       contributorId,
       team.team_id
     );
-  }
-
-  /**
-   * Insert submission features.
-   *
-   * @param {number} submissionId
-   * @param {string} submissionUploadId - The submission_upload_id that produced these features.
-   * @param {ISubmissionFeature[]} submissionFeatures
-   * @returns {Promise<void>}
-   * @memberof SubmissionService
-   */
-  async insertSubmissionFeatureRecords(
-    submissionId: number,
-    submissionUploadId: string,
-    submissionFeatures: ISubmissionFeature[]
-  ): Promise<void> {
-    try {
-      // Generate paths to all non-null nodes which contain a 'child_features' property
-      const submissionFeatureJsonPaths: string[] = JSONPath({
-        path: '$..[?(@ && @.child_features)]',
-        flatten: true,
-        resultType: 'path',
-        json: submissionFeatures
-      });
-
-      // Store a mapping of jsonPath to submission_feature_id
-      const parentSubmissionFeatureIdMap: Map<string, number> = new Map();
-
-      // Match the last path segment of a jsonPath that ends with 'child_features[<index>]'
-      const matchLastJsonPathSegment = /\['child_features'\]\[\d+\]$/;
-
-      for (const jsonPath of submissionFeatureJsonPaths) {
-        // Fetch a submissionFeature object
-        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
-
-        if (!node?.length) {
-          continue;
-        }
-
-        // We expect the 'path' to resolve an array of 1 item
-        const featureNode = node[0];
-
-        // Get the parent jsonPath by stripping the last path segment from the current jsonPath
-        const parentJsonPath = jsonPath.replace(matchLastJsonPathSegment, '');
-
-        // Get the submission_feature_id of the parent submissionFeature object, or null if the current node is the root
-        const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
-
-        // Validate the submissionFeature object
-        const response = await this.ingestionRepository.insertSubmissionFeatureRecord({
-          submissionId,
-          submissionUploadId,
-          parentSubmissionFeatureId,
-          featureSourceId: featureNode.id,
-          featureTypeName: featureNode.type,
-          featureProperties: featureNode.properties,
-          dataByteSizeBytes: 0 // Legacy tree path — byte size not computed
-        });
-
-        // Cache the submission_feature_id for the current jsonPath
-        parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);
-      }
-
-      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success' });
-    } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
-      throw error;
-    }
   }
 
   /**

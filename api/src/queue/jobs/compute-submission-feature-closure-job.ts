@@ -1,4 +1,8 @@
 import PgBoss from 'pg-boss';
+import {
+  SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+  SUBMISSION_ACTIVE_STATE_LOCK_SEED
+} from '../../constants/database-lock-keys';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { getLogger } from '../../utils/logger';
 import { publishSubmissionUploadSecurityJob } from '../publisher';
@@ -23,31 +27,36 @@ const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job'
 /**
  * Compute submission feature closure job data interface.
  *
- * The `submissionUploadId` scopes the recompute; `submissionId` is carried for log context only.
+ * The `submissionId` scopes the recompute (closure spans the submission's live rows across all
+ * uploads); `submissionUploadId` identifies the upload that triggered it and is forwarded to the
+ * downstream security screening job.
  */
 export interface IComputeSubmissionFeatureClosureJobData {
-  /** The submission ID whose upload's closure is being recomputed (log context) */
+  /** The submission ID whose closure rows should be recomputed */
   submissionId: number;
-  /** The submission upload ID whose closure rows should be recomputed */
+  /** The submission upload ID that triggered the recompute (forwarded to screening) */
   submissionUploadId: string;
 }
 
 /**
  * Compute submission feature closure job handler.
  *
- * The closure is the precomputed directed reachability over the union of an upload's parent and
- * property (feature-reference) edges. It is recomputed wholesale for one upload so search can replace
- * recursive edge traversal with indexed probes against a flat `(source, target)` table. Content edges
- * are intentionally excluded (parent + content is O(N^2)). Reachability is stored as directed
- * `(source, target)` rows probed in both directions: the `(source, target)` primary key serves the
- * forward probe (what an evidence feature reaches), and the secondary `(target, source)` index serves
- * search's reverse "who reaches Y" down-probe.
+ * The closure is the precomputed directed reachability over the union of the submission's parent and
+ * property (feature-reference) edges, spanning the submission's live rows across ALL uploads
+ * (reconciled uploads only carry new/changed features, so cross-upload edges are part of the reach).
+ * It is recomputed wholesale so search can replace recursive edge traversal with indexed probes
+ * against a flat `(source, target)` table. Content edges are intentionally excluded (parent + content
+ * is O(N^2)). Reachability is stored as directed `(source, target)` rows probed in both directions:
+ * the `(source, target)` primary key serves the forward probe (what an evidence feature reaches), and
+ * the secondary `(target, source)` index serves search's reverse "who reaches Y" down-probe.
  *
- * Each upload's recompute is single-flight: a `pg_try_advisory_xact_lock` keyed on the upload id guards
- * the DELETE-all + recursive-CTE INSERT, so an expiry-retry that overlaps its own still-running original
- * skips rather than contending. On failure the handler logs and rethrows so pg-boss applies its retry
- * policy — the recompute is idempotent (it deletes the upload's prior closure rows before reinserting),
- * so a retry is safe.
+ * Each submission's recompute is single-flight: a `pg_try_advisory_xact_lock` on the shared
+ * per-submission active-state key guards the DELETE-all + recursive-CTE INSERT, so an expiry-retry
+ * that overlaps its own still-running original skips rather than contending. Upload activation
+ * (reconciliation at approval) takes the blocking form of the same lock and recomputes the closure
+ * itself, so skipping while an activation holds the lock is also correct. On failure the handler logs
+ * and rethrows so pg-boss applies its retry policy — the recompute is idempotent (it deletes the
+ * submission's prior closure rows before reinserting), so a retry is safe.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -68,16 +77,18 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 
     try {
       await withConnection(async (conn) => {
-        // Single-flight per upload — the recompute is DELETE-all + recursive-CTE INSERT in one
+        // Single-flight per submission — the recompute is DELETE-all + recursive-CTE INSERT in one
         // transaction. An expiry-retry overlapping its own still-running original would contend/corrupt.
-        // xact-scoped advisory lock (distinct seed from indexing); skip if another recompute holds it.
-        const lock = await conn.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1::text, 1)) AS locked', [
-          submissionUploadId
-        ]);
+        // xact-scoped advisory lock on the shared per-submission active-state key; skip if another
+        // recompute (or an upload activation, which recomputes the closure itself) holds it.
+        const lock = await conn.query(
+          "SELECT pg_try_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3)) AS locked",
+          [SUBMISSION_ACTIVE_STATE_LOCK_PREFIX, submissionId, SUBMISSION_ACTIVE_STATE_LOCK_SEED]
+        );
         if (!lock.rows[0].locked) {
           defaultLog.warn({
             label: 'computeSubmissionFeatureClosureJobHandler',
-            message: 'another closure recompute holds the advisory lock for this upload; skipping',
+            message: 'another writer holds the active-state advisory lock for this submission; skipping',
             jobId: job.id,
             submissionId,
             submissionUploadId
@@ -85,7 +96,7 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
           return;
         }
 
-        const result = await new SubmissionFeatureClosureService(conn).computeClosureForUpload(submissionUploadId);
+        const result = await new SubmissionFeatureClosureService(conn).computeClosureForSubmission(submissionId);
 
         defaultLog.info({
           label: 'computeSubmissionFeatureClosureJobHandler',

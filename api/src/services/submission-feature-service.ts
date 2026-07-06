@@ -19,36 +19,18 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
-   * Publish active features from a submission upload by setting record_effective_date.
+   * Un-publish the upload's live features by clearing record_effective_date.
+   *
+   * Used when an upload is denied or returned to the submitted state. Rows ended by
+   * reconciliation are never resurrected. A no-op (zero rows) for uploads whose rows are
+   * already pending.
    *
    * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<number>} Number of rows un-published.
    * @memberof SubmissionFeatureService
    */
-  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
-  }
-
-  /**
-   * Reject active features from a submission upload by setting record_end_date.
-   *
-   * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeatureService
-   */
-  async setRecordEndDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.setRecordEndDateBySubmissionUploadId(submissionUploadId);
-  }
-
-  /**
-   * Reset publication/rejection dates for features from a submitted upload.
-   *
-   * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeatureService
-   */
-  async unsetRecordDatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId(submissionUploadId);
+  async unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<number> {
+    return this.submissionFeatureRepository.unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
   }
 
   /**

@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
+import { computeSubmissionFeatureContentHash } from '../../utils/feature-content-hash';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 
@@ -66,7 +67,8 @@ export class SubmissionFeatureIngestionService extends DBService {
         sourceId: feature.id,
         featureTypeId,
         data: feature,
-        dataByteSize: Buffer.byteLength(JSON.stringify(feature))
+        dataByteSize: Buffer.byteLength(JSON.stringify(feature)),
+        contentHash: computeSubmissionFeatureContentHash(feature)
       };
     });
 

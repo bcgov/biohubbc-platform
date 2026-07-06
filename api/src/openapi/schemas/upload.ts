@@ -200,6 +200,31 @@ export const SubmissionUploadReviewStatusResponseSchema: OpenAPIV3.SchemaObject 
       type: 'string',
       enum: ['submitted', 'approved', 'denied', 'deleted'],
       description: 'The review status of the submission upload.'
+    },
+    reconciliation: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['new', 'unchanged', 'superseded', 'conflict'],
+      description:
+        'Per-outcome feature counts from reconciling the upload against the submission state. Present only when status is approved.',
+      properties: {
+        new: {
+          type: 'integer',
+          description: 'Features with no published counterpart; published as new active rows.'
+        },
+        unchanged: {
+          type: 'integer',
+          description: 'Features identical to their published counterpart; the existing row remains active.'
+        },
+        superseded: {
+          type: 'integer',
+          description: 'Features whose content changed; the previous row was soft-ended and replaced.'
+        },
+        conflict: {
+          type: 'integer',
+          description: 'Features that could not be safely reconciled; not published.'
+        }
+      }
     }
   }
 };
