@@ -54,14 +54,18 @@ describe('SecurityScopeRepository (integration)', function () {
     });
 
     it('should return null on duplicate scope_hash (ON CONFLICT DO NOTHING)', async () => {
-      const scopeHash = computeScopeHash('urn:10:survey:*');
+      // Use a wildcard submission URN: the security_scope URN-validation trigger requires a
+      // concrete submission_id to reference a real submission, and no default seed creates one
+      // with a stable, known id. '*' skips that existence check, so the test stays independent
+      // of seed volume while still exercising the ON CONFLICT (scope_hash) path.
+      const scopeHash = computeScopeHash('urn:*:survey:*');
 
       // First insert succeeds
-      const first = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:survey:*'));
+      const first = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:*:survey:*'));
       expect(first).to.not.be.null;
 
       // Second insert with same hash returns null
-      const second = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:10:survey:*'));
+      const second = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:*:survey:*'));
       expect(second).to.be.null;
     });
   });

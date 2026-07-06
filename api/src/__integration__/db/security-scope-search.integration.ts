@@ -1528,15 +1528,16 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
-    // Read-path security reads the closure. The closure's active universe is record_end_date IS NULL only
-    // (it does NOT filter on record_effective_date), so the self-loop / ancestry rows exist regardless of
-    // approval; the effective-date predicate lives in isEffectivelySecured (sf_sec.record_effective_date
-    // <= now()). Each fixture seeds under a SHARED upload and rebuilds the closure before searching.
+    // Search excludes inactive features via isSubmissionFeatureActive: a feature whose
+    // record_effective_date is NULL (draft/pending) or in the future is not yet published and is
+    // filtered out of results entirely — not merely reported as unsecured — regardless of any
+    // security rule or the caller's identity. Each fixture seeds under a SHARED upload and rebuilds
+    // the closure before searching.
     for (const { label, markFn } of [
       { label: 'NULL', markFn: markFeatureUnapproved },
       { label: 'in the future', markFn: markFeatureFutureDate }
     ] as const) {
-      it(`should NOT hide feature from anonymous when security rule exists but record_effective_date is ${label}`, async () => {
+      it(`should hide inactive feature from anonymous when record_effective_date is ${label} (security rule notwithstanding)`, async () => {
         const submissionId = await createTestSubmission(connection);
         const uploadId = await createTestUpload(connection, submissionId);
         const featureId = await insertFeatureRow({
@@ -1552,9 +1553,8 @@ describe('Security scope search (integration)', function () {
         const results = await searchInSubmission(submissionId, ['survey'], null);
         const featureIds = results.map((r) => r.submission_feature_id);
 
-        expect(featureIds).to.include(featureId);
-        const feature = results.find((r) => r.submission_feature_id === featureId);
-        expect(feature?.is_secured).to.be.false;
+        // Inactive → filtered out of search entirely, not returned as an unsecured row.
+        expect(featureIds).to.not.include(featureId);
       });
     }
 
@@ -1578,9 +1578,10 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(featureId);
     });
 
-    it('should NOT hide child from anonymous when parent is secured but unapproved (NULL date)', async () => {
-      // Parent has a security rule but NULL record_effective_date. The parent is
-      // NOT effectively secured, so its child should remain visible.
+    it('should hide inactive parent but keep active child visible when parent is secured-but-unapproved (NULL date)', async () => {
+      // Parent has a security rule but NULL record_effective_date, so it is inactive: filtered from
+      // search, and NOT effectively secured (so it cannot hide its descendants). The active child
+      // therefore stays visible.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
@@ -1598,7 +1599,8 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(parent);
+      // Inactive parent is filtered from search; the active child remains visible.
+      expect(featureIds).to.not.include(parent);
       expect(featureIds).to.include(child);
     });
 
@@ -1625,9 +1627,9 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(child);
     });
 
-    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is NULL', async () => {
-      // Authenticated user without scope grants sees the same as anonymous for the
-      // "not secured" branch. Unapproved security rule → feature is visible.
+    it('should hide inactive feature from authenticated user (no scope) when record_effective_date is NULL', async () => {
+      // The inactive-feature filter applies regardless of caller identity: an authenticated user
+      // without scope grants sees the same absence as anonymous. Unapproved (NULL date) → filtered out.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const featureId = await insertFeatureRow({
@@ -1644,10 +1646,10 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(featureId);
+      expect(featureIds).to.not.include(featureId);
     });
 
-    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
+    it('should hide inactive feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const featureId = await insertFeatureRow({
@@ -1664,7 +1666,7 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(featureId);
+      expect(featureIds).to.not.include(featureId);
     });
 
     it('should hide feature from authenticated user (no scope) when record_effective_date is approved', async () => {
