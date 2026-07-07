@@ -34,7 +34,9 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * Delete any reconciliation outcome records previously written for the upload.
    *
    * Called before re-classification so re-activation of the same upload is idempotent.
-   * The journal trigger preserves the deleted rows' history.
+   * The journal trigger preserves the deleted rows' history. Append-only
+   * submission_feature_log rows are intentionally NOT deleted here: they are the durable
+   * lifecycle record, precisely because these outcome rows are not.
    *
    * @param {string} submissionUploadId The submission upload scope.
    * @returns {Promise<void>}

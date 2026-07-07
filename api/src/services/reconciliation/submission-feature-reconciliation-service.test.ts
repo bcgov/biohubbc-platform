@@ -3,9 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
-import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { HTTP400, HTTP409, HTTP500 } from '../../errors/http-error';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeatureDerivedStateRepository } from '../../repositories/reconciliation/submission-feature-derived-state-repository';
+import { SubmissionFeatureLogRepository } from '../../repositories/reconciliation/submission-feature-log-repository';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
@@ -57,6 +58,9 @@ describe('SubmissionFeatureReconciliationService', () => {
         .stub(SubmissionFeatureReconciliationRepository.prototype, 'endConflictIncomingRows')
         .resolves(0),
       publish: sinon.stub(SubmissionFeatureReconciliationRepository.prototype, 'publishIncomingRows').resolves(3),
+      logSuperseded: sinon
+        .stub(SubmissionFeatureLogRepository.prototype, 'insertSupersededLogRecordsFromReconciliation')
+        .resolves(1),
       repointParents: sinon
         .stub(SubmissionFeatureDerivedStateRepository.prototype, 'repointParentLinksToActiveRows')
         .resolves(0),
@@ -112,11 +116,37 @@ describe('SubmissionFeatureReconciliationService', () => {
       expect(stubs.endUnchanged).to.have.been.calledBefore(stubs.publish);
       expect(stubs.endConflict).to.have.been.calledOnceWith(UPLOAD_ID);
       expect(stubs.endConflict).to.have.been.calledBefore(stubs.publish);
+      // The superseded log records completed transitions: after publish, before healing,
+      // so a chain-conflict unique violation aborts the approval before any healing work.
+      expect(stubs.logSuperseded).to.have.been.calledOnceWith(UPLOAD_ID);
+      expect(stubs.publish).to.have.been.calledBefore(stubs.logSuperseded);
+      expect(stubs.logSuperseded).to.have.been.calledBefore(stubs.repointParents);
       // Derived healing and closure run after publication, closure last.
       expect(stubs.publish).to.have.been.calledBefore(stubs.repointParents);
       expect(stubs.carryForward).to.have.been.calledOnceWith(UPLOAD_ID);
       expect(stubs.closure).to.have.been.calledOnceWith(42);
       expect(stubs.repointAnchors).to.have.been.calledBefore(stubs.closure);
+    });
+
+    it('throws HTTP500 and stops before healing when the superseded tallies diverge', async () => {
+      const stubs = stubHappyPath();
+      // Classification reports 1 superseded, but the soft-end pass claims 2 rows ended.
+      stubs.endSuperseded.resolves(2);
+      const service = new SubmissionFeatureReconciliationService(
+        getMockDBConnection({ sql: sinon.stub().resolves(mockQueryResult([], 1)) })
+      );
+
+      try {
+        await service.reconcileAndActivateSubmissionUpload(UPLOAD_ID);
+        expect.fail('Expected HTTP500');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP500);
+        expect((error as HTTP500).message).to.equal('Superseded feature lifecycle records diverged during approval');
+      }
+
+      expect(stubs.logSuperseded).to.have.been.calledOnce;
+      expect(stubs.repointParents).not.to.have.been.called;
+      expect(stubs.closure).not.to.have.been.called;
     });
 
     it('throws HTTP400 before any writes when the upload is not indexed', async () => {
@@ -137,6 +167,7 @@ describe('SubmissionFeatureReconciliationService', () => {
       expect(stubs.deleteRecords).not.to.have.been.called;
       expect(stubs.classify).not.to.have.been.called;
       expect(stubs.publish).not.to.have.been.called;
+      expect(stubs.logSuperseded).not.to.have.been.called;
     });
 
     it('throws HTTP409 before any writes when pending rows share a reconciliation key', async () => {
@@ -160,6 +191,7 @@ describe('SubmissionFeatureReconciliationService', () => {
       expect(stubs.classify).not.to.have.been.called;
       expect(stubs.endSuperseded).not.to.have.been.called;
       expect(stubs.publish).not.to.have.been.called;
+      expect(stubs.logSuperseded).not.to.have.been.called;
       expect(stubs.closure).not.to.have.been.called;
     });
   });

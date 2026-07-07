@@ -4,8 +4,9 @@ import {
   SUBMISSION_ACTIVE_STATE_LOCK_SEED
 } from '../../constants/database-lock-keys';
 import { IDBConnection } from '../../database/db';
-import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { HTTP400, HTTP409, HTTP500 } from '../../errors/http-error';
 import { SubmissionFeatureDerivedStateRepository } from '../../repositories/reconciliation/submission-feature-derived-state-repository';
+import { SubmissionFeatureLogRepository } from '../../repositories/reconciliation/submission-feature-log-repository';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
@@ -40,6 +41,7 @@ export interface ReconciliationOutcomeCounts {
 export class SubmissionFeatureReconciliationService extends DBService {
   reconciliationRepository: SubmissionFeatureReconciliationRepository;
   derivedStateRepository: SubmissionFeatureDerivedStateRepository;
+  submissionFeatureLogRepository: SubmissionFeatureLogRepository;
   submissionUploadService: SubmissionUploadService;
   submissionFeatureClosureService: SubmissionFeatureClosureService;
 
@@ -53,6 +55,7 @@ export class SubmissionFeatureReconciliationService extends DBService {
     super(connection);
     this.reconciliationRepository = new SubmissionFeatureReconciliationRepository(connection);
     this.derivedStateRepository = new SubmissionFeatureDerivedStateRepository(connection);
+    this.submissionFeatureLogRepository = new SubmissionFeatureLogRepository(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
     this.submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
   }
@@ -70,10 +73,15 @@ export class SubmissionFeatureReconciliationService extends DBService {
    * 4. Soft-end superseded predecessors, soft-end unchanged and conflicted pending
    *    duplicates, then publish the new/superseded rows — in that order, so the
    *    one-published-row-per-key unique index holds at every statement boundary.
-   * 5. Heal derived state that referenced superseded rows (parent links, feature
+   * 5. Record append-only `superseded` rows in submission_feature_log, linking each ended
+   *    predecessor to its published replacement. Runs after publication so every log row
+   *    describes a completed transition; a unique-index violation (conflicting replacement
+   *    chain) or a classified/ended/logged tally mismatch aborts the approval before any
+   *    derived-state healing.
+   * 6. Heal derived state that referenced superseded rows (parent links, feature
    *    references, content relationships, security scope anchors) and carry active
    *    security rules forward onto replacement rows.
-   * 6. Recompute the submission's closure so search and authorization reach reflect the
+   * 7. Recompute the submission's closure so search and authorization reach reflect the
    *    new active state within the same transaction.
    *
    * Re-approving an already-activated upload is a no-op: classification only considers
@@ -83,6 +91,7 @@ export class SubmissionFeatureReconciliationService extends DBService {
    * @returns {Promise<ReconciliationOutcomeCounts>} Per-outcome feature counts for the upload.
    * @throws {HTTP400} If the upload has not reached the `indexed` status.
    * @throws {HTTP409} If the upload's pending rows contain duplicate reconciliation keys.
+   * @throws {HTTP500} If the classified, soft-ended, and logged superseded tallies diverge.
    * @memberof SubmissionFeatureReconciliationService
    */
   async reconcileAndActivateSubmissionUpload(submissionUploadId: string): Promise<ReconciliationOutcomeCounts> {
@@ -127,6 +136,18 @@ export class SubmissionFeatureReconciliationService extends DBService {
     const conflictEndedCount = await this.reconciliationRepository.endConflictIncomingRows(submissionUploadId);
     const publishedCount = await this.reconciliationRepository.publishIncomingRows(submissionUploadId);
 
+    const supersededLogCount = await this.submissionFeatureLogRepository.insertSupersededLogRecordsFromReconciliation(
+      submissionUploadId
+    );
+
+    // These three tallies derive from the same outcome rows; divergence would permanently
+    // record transitions that never happened (log rows are never deleted), so abort on drift.
+    if (supersededCount !== counts.superseded || supersededLogCount !== counts.superseded) {
+      throw new HTTP500('Superseded feature lifecycle records diverged during approval', [
+        `classified=${counts.superseded}, ended=${supersededCount}, logged=${supersededLogCount}`
+      ]);
+    }
+
     const parentRepointCount = await this.derivedStateRepository.repointParentLinksToActiveRows(submissionId);
     const referenceRepointCount = await this.derivedStateRepository.repointFeaturePropertyReferencesToActiveRows(
       submissionId
@@ -152,6 +173,7 @@ export class SubmissionFeatureReconciliationService extends DBService {
       unchangedEndedCount,
       conflictEndedCount,
       publishedCount,
+      supersededLogCount,
       parentRepointCount,
       referenceRepointCount,
       relationshipRepointCount,
