@@ -6,7 +6,7 @@ the Boreal Moose telemetry deployments, and serializing the resulting live DB ro
 fixture.
 
 The **fixture is the seed's source of truth** — not the generator and not the source tar. The replay seed
-(`database/src/seeds/09_*`) reads the fixture and rebuilds each submission with fresh ids. The generator
+(`database/src/seeds/10_snapshot_features.ts`) reads the fixture and rebuilds each submission with fresh ids. The generator
 is only needed to regenerate the fixture (a new dataset, a pipeline-logic change, or a derived-schema
 change). It is intentionally NOT wired into any build or request flow.
 

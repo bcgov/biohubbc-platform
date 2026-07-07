@@ -1,6 +1,6 @@
 // Run-once api-context tool that serializes the live DB rows of a generated snapshot submission into a
 // committed, replay-ready fixture. The fixture — not the generator or the source tar — is the seed's
-// source of truth; the `09_*` replay seed reads it to rebuild the submission with fresh ids.
+// source of truth; the `10_*` replay seed reads it to rebuild the submission with fresh ids.
 //
 // Every row is keyed by a stable natural key (uuid, object_key, scope_hash, or a resolved name), never
 // by an identity/serial column, because those are regenerated on every replay and differ across
