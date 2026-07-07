@@ -18,8 +18,12 @@ describe('computeSubmissionFeatureContentHash', () => {
     expect(hash).to.match(/^[0-9a-f]{64}$/);
   });
 
-  it('is deterministic for the same input', () => {
-    expect(computeSubmissionFeatureContentHash(baseFeature)).to.equal(computeSubmissionFeatureContentHash(baseFeature));
+  it('is deterministic across distinct instances of equivalent input', () => {
+    const equivalentFeature: IFlattenedBlock = { ...baseFeature };
+
+    expect(computeSubmissionFeatureContentHash(baseFeature)).to.equal(
+      computeSubmissionFeatureContentHash(equivalentFeature)
+    );
   });
 
   it('excludes the feature id (source id) from the hash', () => {
