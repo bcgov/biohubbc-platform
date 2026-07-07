@@ -23,11 +23,7 @@ change). It is intentionally NOT wired into any build or request flow.
 
 - **Feature Type Sampler** — committed under `fixtures/sampler/`. One valid feature per feature type the
   Boreal Moose export does not cover, so the snapshot exercises every feature type.
-- **Boreal Moose** — an external `.tar` (~7.5 MB), **not committed**. It lives at the solution root under
-  `data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar`. **It is double-wrapped**: the outer tar contains a
-  single inner `.tar`, which is the real SIMS dataset (`<datasetId>/features/*.json` + `.dataset-id`).
-  Unwrap one layer before staging it (see the rerun loop). The committed fixture, not the tar, is the
-  source of truth — the tar is only needed to regenerate.
+- **Boreal Moose** — an external `.tar` (~7.5 MB), `1c342e48-d96b-47b2-996c-8e6aa35ef873.tar` **not committed**. The committed fixture, not the tar, is the source of truth — the tar is only needed to regenerate.
 
 ## Environment prerequisites
 
