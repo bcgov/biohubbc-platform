@@ -54,9 +54,7 @@
           "end_date": "2020-12-31",
           "objectives": "One valid feature per feature type for pipeline coverage.",
           "start_date": "2020-01-01",
-          "focal_species": [
-            180702
-          ]
+          "focal_species": [180702]
         }
       },
       "data_byte_size": "593"
@@ -162,10 +160,7 @@
                 "type": "Feature",
                 "geometry": {
                   "type": "Point",
-                  "coordinates": [
-                    -122.1875939,
-                    58.6467094
-                  ]
+                  "coordinates": [-122.1875939, 58.6467094]
                 },
                 "properties": {}
               }
@@ -254,10 +249,7 @@
                 "type": "Feature",
                 "geometry": {
                   "type": "Point",
-                  "coordinates": [
-                    -122.1875939,
-                    58.6467094
-                  ]
+                  "coordinates": [-122.1875939, 58.6467094]
                 },
                 "properties": {}
               }
@@ -279,10 +271,7 @@
         "id": "7c47959e-39c5-4a7d-a648-a066b17b9366",
         "type": "sample_site",
         "parent": "cc07359b-dd25-4965-98d0-d8b89558432c",
-        "content": [
-          "4befc0b1-4183-4264-8532-916b562c9a59",
-          "b79f63cf-e580-49ca-bf6d-cecc15206e8c"
-        ],
+        "content": ["4befc0b1-4183-4264-8532-916b562c9a59", "b79f63cf-e580-49ca-bf6d-cecc15206e8c"],
         "properties": {
           "name": "Sampler Site 1",
           "geometry": {
@@ -292,10 +281,7 @@
                 "type": "Feature",
                 "geometry": {
                   "type": "Point",
-                  "coordinates": [
-                    -122.1875939,
-                    58.6467094
-                  ]
+                  "coordinates": [-122.1875939, 58.6467094]
                 },
                 "properties": {}
               }
@@ -605,10 +591,7 @@
         "geometries": [
           {
             "type": "Point",
-            "coordinates": [
-              -122.1875939,
-              58.6467094
-            ]
+            "coordinates": [-122.1875939, 58.6467094]
           }
         ]
       }
@@ -621,10 +604,7 @@
         "geometries": [
           {
             "type": "Point",
-            "coordinates": [
-              -122.1875939,
-              58.6467094
-            ]
+            "coordinates": [-122.1875939, 58.6467094]
           }
         ]
       }
@@ -637,10 +617,7 @@
         "geometries": [
           {
             "type": "Point",
-            "coordinates": [
-              -122.1875939,
-              58.6467094
-            ]
+            "coordinates": [-122.1875939, 58.6467094]
           }
         ]
       }

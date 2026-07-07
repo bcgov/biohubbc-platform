@@ -1,6 +1,3 @@
 {
-  "fixtures": [
-    "boreal-moose.json",
-    "sampler.json"
-  ]
+  "fixtures": ["boreal-moose.json", "sampler.json"]
 }
