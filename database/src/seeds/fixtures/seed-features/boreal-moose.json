@@ -263320,6 +263320,7 @@
         ],
         "properties": {
           "name": "Boreal Moose",
+          "description": "GPS-collar telemetry study monitoring boreal moose movement, survival, and habitat use in the boreal region of northeastern British Columbia (2015-2017).",
           "end_date": "2017-12-31",
           "survey_id": 160,
           "objectives": "Collaring Moose ",
@@ -263467,6 +263468,11 @@
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
       "feature_type_property_id": 122,
       "value": "Boreal Moose"
+    },
+    {
+      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
+      "feature_type_property_id": 124,
+      "value": "GPS-collar telemetry study monitoring boreal moose movement, survival, and habitat use in the boreal region of northeastern British Columbia (2015-2017)."
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
@@ -600992,7 +600998,7 @@
   ],
   "counts": {
     "features": 7750,
-    "property_string": 56,
+    "property_string": 57,
     "property_number": 13,
     "property_boolean": 0,
     "property_timestamp": 7737,
