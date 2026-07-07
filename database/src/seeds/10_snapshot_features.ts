@@ -482,20 +482,13 @@ async function remapFeatureParents(knex: Knex, fixture: SnapshotFixture, idMap: 
 /**
  * Insert all typed property tables, remapping the owning (and referenced) feature uuids to new ids.
  *
- * Two property tables are intentionally NOT replayed because the dump stored their FK as an
- * environment-specific surrogate id rather than a stable natural key, so a pure replay has nothing to
- * rebind them to:
- * - `property_code` -> `contributor_codeset_code_id`, a per-upload codeset row the ingestion pipeline
- *   creates and the fixture never captured (5 rows).
- * - `property_taxon` -> `taxon_id`, the ITIS taxon surrogate PK (not the stable `itis_tsn`); the taxon
- *   table is empty on a clean setup and populates on-demand during real ingestion, which the replay
- *   never runs (1 row).
- *
- * All six dropped rows sit on the dataset root and carry only descriptive metadata (focal-species link +
- * minor codes); every value-bearing table — geometry, timestamp, closure, security, anchors across all
- * ~7,716 telemetry features — is replayed. The count assertion excludes both dropped tables. A future
- * fixture regenerated from a dump that captures `itis_tsn` and the codeset natural keys would restore
- * them.
+ * `property_code` and `property_taxon` are not replayed: their FKs are per-upload surrogate ids
+ * (`contributor_codeset_code_id`; and the ITIS taxon surrogate PK, not the stable `itis_tsn`), not stable
+ * natural keys, so a pure replay has nothing to rebind them to. The dump therefore emits them empty, the
+ * fixture carries no such rows, and assertReplayedCounts asserts both at 0 as a guard. Every value-bearing
+ * table — geometry, timestamp, closure, security, anchors across all ~7,716 telemetry features — is
+ * replayed. Restoring code/taxon would need a dump that captures the natural keys (`itis_tsn`, codeset
+ * name) plus the referenced taxa seeded into `taxon` first.
  */
 async function insertProperties(
   knex: Knex,
@@ -739,12 +732,13 @@ export function remapAnchorRows(
  * The Group-A tables whose replayed row counts are asserted, mapped to the SQL that counts them.
  *
  * Every table is counted through its join back to `submission_feature` so the count is scoped to the
- * one replayed submission. `property_code` and `property_taxon` are excluded — they are intentionally
- * not replayed (see insertProperties) — so asserting their fixture counts would always fail.
+ * one replayed submission. `property_code` and `property_taxon` are included too: they are not replayed
+ * (their per-upload surrogate FKs are not stable natural keys), so the fixture carries them empty and this
+ * asserts both at 0 — a guard that fails loudly if a future dump ever reintroduces un-replayable rows.
  */
 const COUNT_QUERIES: { table: keyof SnapshotCounts; sql: string }[] = [
   { table: 'features', sql: 'SELECT count(*)::int AS count FROM submission_feature WHERE submission_id = ?' },
-  ...(['string', 'number', 'boolean', 'timestamp', 'geometry', 'feature'] as const).map((suffix) => ({
+  ...(['string', 'number', 'boolean', 'timestamp', 'code', 'taxon', 'geometry', 'feature'] as const).map((suffix) => ({
     table: `property_${suffix}` as keyof SnapshotCounts,
     sql: `SELECT count(*)::int AS count FROM submission_feature_property_${suffix} p
           JOIN submission_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -786,9 +780,8 @@ const COUNT_QUERIES: { table: keyof SnapshotCounts; sql: string }[] = [
  * Fail loudly when any replayed table's live row count does not equal the fixture's recorded count.
  *
  * A dump or remap that silently drops rows ships data that looks present but is unsearchable or
- * unsecured; this exact per-table check turns that into a hard stop. `property_code` and `property_taxon`
- * are excluded because they are deliberately not replayed (their per-upload surrogate FKs are not stable
- * natural keys — see insertProperties).
+ * unsecured; this exact per-table check turns that into a hard stop. It covers every table, including
+ * `property_code`/`property_taxon`, which are asserted at 0 (see COUNT_QUERIES).
  */
 async function assertReplayedCounts(knex: Knex, fixture: SnapshotFixture, submissionId: number): Promise<void> {
   for (const { table, sql } of COUNT_QUERIES) {

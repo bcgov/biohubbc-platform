@@ -595,13 +595,7 @@
     }
   ],
   "property_code": [],
-  "property_taxon": [
-    {
-      "feature_uuid": "6f6d16cd-71de-43c2-9fee-7d87ad239040",
-      "feature_type_property_id": 20,
-      "taxon_id": 20
-    }
-  ],
+  "property_taxon": [],
   "property_geometry": [
     {
       "feature_uuid": "4a415518-488a-4fc8-ade9-2aa4969d50cd",
@@ -884,7 +878,7 @@
     "property_boolean": 0,
     "property_timestamp": 6,
     "property_code": 0,
-    "property_taxon": 1,
+    "property_taxon": 0,
     "property_geometry": 3,
     "property_feature": 0,
     "closure": 32,

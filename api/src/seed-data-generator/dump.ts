@@ -199,8 +199,12 @@ export async function dumpSubmission(connection: IDBConnection, submissionId: nu
   const propertyNumber = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_number');
   const propertyBoolean = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_boolean');
   const propertyTimestamp = await dumpTimestampProperty(connection, submissionId);
-  const propertyCode = await dumpCodeProperty(connection, submissionId);
-  const propertyTaxon = await dumpTaxonProperty(connection, submissionId);
+  // property_code and property_taxon are intentionally NOT dumped: their FKs (contributor_codeset_code_id
+  // and the taxon surrogate PK) are per-upload surrogate ids, not stable natural keys, so the pure-knex
+  // replay seed cannot rebuild them. Emitting them empty keeps the fixture honest — it holds only rows the
+  // seed actually replays, and the replay seed asserts both counts at 0.
+  const propertyCode: SnapshotCodeProperty[] = [];
+  const propertyTaxon: SnapshotTaxonProperty[] = [];
   const propertyGeometry = await dumpGeometryProperty(connection, submissionId);
   const propertyFeature = await dumpFeatureProperty(connection, submissionId);
 
@@ -354,48 +358,6 @@ async function dumpTimestampProperty(
       prop.date_value,
       prop.time_value
     FROM submission_feature_property_timestamp prop
-    JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
-    WHERE sf.submission_id = ${submissionId};
-  `);
-
-  return response.rows;
-}
-
-/**
- * Read the code property table, capturing the contributor_codeset_code_id (the real FK column).
- *
- * @param {IDBConnection} connection Transaction-scoped connection.
- * @param {number} submissionId The submission scope.
- * @returns {Promise<SnapshotCodeProperty[]>} One row per code property.
- */
-async function dumpCodeProperty(connection: IDBConnection, submissionId: number): Promise<SnapshotCodeProperty[]> {
-  const response = await connection.sql<SnapshotCodeProperty>(SQL`
-    SELECT
-      sf.uuid AS feature_uuid,
-      prop.feature_type_property_id,
-      prop.contributor_codeset_code_id
-    FROM submission_feature_property_code prop
-    JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
-    WHERE sf.submission_id = ${submissionId};
-  `);
-
-  return response.rows;
-}
-
-/**
- * Read the taxon property table.
- *
- * @param {IDBConnection} connection Transaction-scoped connection.
- * @param {number} submissionId The submission scope.
- * @returns {Promise<SnapshotTaxonProperty[]>} One row per taxon property.
- */
-async function dumpTaxonProperty(connection: IDBConnection, submissionId: number): Promise<SnapshotTaxonProperty[]> {
-  const response = await connection.sql<SnapshotTaxonProperty>(SQL`
-    SELECT
-      sf.uuid AS feature_uuid,
-      prop.feature_type_property_id,
-      prop.taxon_id
-    FROM submission_feature_property_taxon prop
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
     WHERE sf.submission_id = ${submissionId};
   `);

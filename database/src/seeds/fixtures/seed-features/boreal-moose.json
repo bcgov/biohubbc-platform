@@ -310116,40 +310116,8 @@
       "time_value": null
     }
   ],
-  "property_code": [
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 119,
-      "contributor_codeset_code_id": 1697
-    },
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 119,
-      "contributor_codeset_code_id": 1698
-    },
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 119,
-      "contributor_codeset_code_id": 1699
-    },
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 119,
-      "contributor_codeset_code_id": 1700
-    },
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 125,
-      "contributor_codeset_code_id": 1577
-    }
-  ],
-  "property_taxon": [
-    {
-      "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 120,
-      "taxon_id": 20
-    }
-  ],
+  "property_code": [],
+  "property_taxon": [],
   "property_geometry": [
     {
       "feature_uuid": "683fc486-759d-4f72-bf41-a70fa3fe27de",
@@ -601028,8 +600996,8 @@
     "property_number": 13,
     "property_boolean": 0,
     "property_timestamp": 7737,
-    "property_code": 5,
-    "property_taxon": 1,
+    "property_code": 0,
+    "property_taxon": 0,
     "property_geometry": 7730,
     "property_feature": 0,
     "closure": 23231,
