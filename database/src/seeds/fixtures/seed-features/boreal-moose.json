@@ -263286,13 +263286,13 @@
     },
     {
       "uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_name": "dataset",
+      "feature_type_name": "survey",
       "parent_uuid": null,
       "source_id": "1c342e48-d96b-47b2-996c-8e6aa35ef873",
-      "urn": "urn:468:dataset:59730",
+      "urn": "urn:468:survey:59730",
       "data": {
         "id": "1c342e48-d96b-47b2-996c-8e6aa35ef873",
-        "type": "dataset",
+        "type": "survey",
         "parent": null,
         "content": [
           "76ae14eb-2fcc-4e06-9d43-45a0ccdb2c4d",
@@ -263465,12 +263465,12 @@
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 70,
+      "feature_type_property_id": 122,
       "value": "Boreal Moose"
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 28,
+      "feature_type_property_id": 126,
       "value": "Collaring Moose "
     },
     {
@@ -263695,7 +263695,7 @@
   "property_timestamp": [
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 25,
+      "feature_type_property_id": 128,
       "date_value": "2015-01-01",
       "time_value": null
     },
@@ -310063,7 +310063,7 @@
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 85,
+      "feature_type_property_id": 121,
       "date_value": "2017-12-31",
       "time_value": null
     },
@@ -310119,34 +310119,34 @@
   "property_code": [
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 56,
+      "feature_type_property_id": 119,
       "contributor_codeset_code_id": 1697
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 56,
+      "feature_type_property_id": 119,
       "contributor_codeset_code_id": 1698
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 56,
+      "feature_type_property_id": 119,
       "contributor_codeset_code_id": 1699
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 56,
+      "feature_type_property_id": 119,
       "contributor_codeset_code_id": 1700
     },
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 35,
+      "feature_type_property_id": 125,
       "contributor_codeset_code_id": 1577
     }
   ],
   "property_taxon": [
     {
       "feature_uuid": "c702f391-3944-4537-aad0-76fb48a0d9c4",
-      "feature_type_property_id": 20,
+      "feature_type_property_id": 120,
       "taxon_id": 20
     }
   ],

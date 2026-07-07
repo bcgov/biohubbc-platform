@@ -223,11 +223,10 @@ async function isAlreadySeeded(knex: Knex, submission: SnapshotSubmission): Prom
  * Resolve the ids the replay binds new rows to: a seeded contributor + linked system user, the active
  * blueprint, and a feature-type-name -> id map.
  *
- * Feature types are resolved retired-tolerant (`record_end_date IS NULL DESC` first): the `dataset`
- * root type was retired in favour of `survey` for new uploads, but its row is intentionally retained so
- * pre-existing datasets like this snapshot still resolve. Preferring the active row for every other type
- * while falling back to the retained `dataset` row keeps the fixture's property FKs internally
- * consistent without rewriting the root feature's type.
+ * Feature types are resolved preferring the active row (`record_end_date IS NULL DESC` first). The
+ * snapshot's root feature type is `survey` — the canonical root type since `dataset` was retired in the
+ * `add_survey_feature_type` migration — so it resolves to the active `survey` row. The ordering also
+ * stays retired-tolerant, falling back to a retained row should any fixture ever reference a retired type.
  */
 async function resolveSeedContext(knex: Knex, fixture: SnapshotFixture): Promise<SeedContext> {
   const contributor = await knex('contributor as c')
