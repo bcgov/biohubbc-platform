@@ -155,11 +155,16 @@ export async function seed(knex: Knex): Promise<void> {
   for (const fixtureName of loadFixtureIndex()) {
     const fixture = loadFixture(fixtureName);
 
-    if (await isAlreadySeeded(knex, fixture.submission.name)) {
+    if (await isAlreadySeeded(knex, fixture.submission)) {
       continue;
     }
 
     await knex.transaction(async (trx) => {
+      // Re-assert the search path on the transaction's own connection: SET SEARCH_PATH is
+      // session-scoped and the transaction may be handed a different pooled connection than the
+      // one the outer SET ran on, so every unqualified table name below depends on this.
+      await trx.raw(`SET SCHEMA 'biohub'; SET SEARCH_PATH = 'biohub','public';`);
+
       const context = await resolveSeedContext(trx, fixture);
       const chain = await createFkChain(trx, fixture, context);
       const idMap = await insertFeatures(trx, fixture, chain, context);
@@ -192,16 +197,18 @@ function loadFixture(fixtureName: string): SnapshotFixture {
 }
 
 /**
- * True when a snapshot submission of this name is already present and active.
+ * True when this snapshot submission is already present and active.
  *
- * The full seed set runs on every environment setup; keying idempotency on the submission's natural
- * name makes re-running a no-op instead of duplicating the whole dataset (the generator prototype this
- * derives from had no cleanup and stacked duplicate submissions on every run).
+ * The full seed set runs on every environment setup; keying idempotency on the submission's name makes
+ * re-running a no-op instead of duplicating the whole dataset (the generator prototype this derives from
+ * had no cleanup and stacked duplicate submissions on every run). The `__seed-snapshot__` marker
+ * (carried in `description`) is required as well so a coincidentally same-named real submission is not
+ * mistaken for the seed and does not suppress the replay.
  */
-async function isAlreadySeeded(knex: Knex, submissionName: string): Promise<boolean> {
+async function isAlreadySeeded(knex: Knex, submission: SnapshotSubmission): Promise<boolean> {
   const existing = await knex('submission')
     .select('submission_id')
-    .where({ name: submissionName })
+    .where({ name: submission.name, description: submission.description ?? '' })
     .whereNull('record_end_date')
     .first();
 
@@ -780,8 +787,9 @@ const COUNT_QUERIES: { table: keyof SnapshotCounts; sql: string }[] = [
  * Fail loudly when any replayed table's live row count does not equal the fixture's recorded count.
  *
  * A dump or remap that silently drops rows ships data that looks present but is unsearchable or
- * unsecured; this exact per-table check turns that into a hard stop. `property_code` is excluded because
- * it is deliberately not replayed (its codeset FKs are not in the fixture).
+ * unsecured; this exact per-table check turns that into a hard stop. `property_code` and `property_taxon`
+ * are excluded because they are deliberately not replayed (their per-upload surrogate FKs are not stable
+ * natural keys — see insertProperties).
  */
 async function assertReplayedCounts(knex: Knex, fixture: SnapshotFixture, submissionId: number): Promise<void> {
   for (const { table, sql } of COUNT_QUERIES) {
