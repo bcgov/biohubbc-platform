@@ -2,6 +2,33 @@ import { createHash } from 'node:crypto';
 import { IFlattenedBlock } from '../models/submission-feature';
 
 /**
+ * Compare two strings by UTF-16 code-unit order — deterministic and independent of
+ * locale/runtime.
+ *
+ * `String.prototype.localeCompare` is intentionally NOT used: its ordering is
+ * locale/ICU-dependent, which would make the content hash differ across environments
+ * (breaking the unchanged-vs-superseded classification the hash exists to drive) and
+ * change it versus the default `Array.prototype.sort` these calls previously relied on.
+ * Code-unit order (the `<`/`>` operators) is stable everywhere and reproduces that prior
+ * default ordering exactly, so stored hashes stay byte-identical.
+ *
+ * @param {string} a The first string.
+ * @param {string} b The second string.
+ * @return {*} {number} -1 if a < b, 1 if a > b, 0 if equal.
+ */
+function compareByCodeUnit(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+
+  if (a > b) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * Compute the deterministic content hash of a submitted feature.
  *
  * The hash identifies whether the meaningful submitted content of a feature changed
@@ -38,7 +65,7 @@ import { IFlattenedBlock } from '../models/submission-feature';
  */
 export function computeSubmissionFeatureContentHash(feature: IFlattenedBlock): string {
   const canonical = {
-    content: [...(feature.content ?? [])].sort(),
+    content: [...(feature.content ?? [])].sort(compareByCodeUnit),
     parent: feature.parent ?? null,
     properties: normalizeTopLevelPropertyArrays(feature.properties ?? {}),
     type: feature.type
@@ -63,7 +90,7 @@ function normalizeTopLevelPropertyArrays(properties: Record<string, unknown>): R
     normalized[key] = Array.isArray(value)
       ? value
           .map((item) => ({ item, serialized: serializeCanonicalJson(item) }))
-          .sort((a, b) => (a.serialized < b.serialized ? -1 : a.serialized > b.serialized ? 1 : 0))
+          .sort((a, b) => compareByCodeUnit(a.serialized, b.serialized))
           .map(({ item }) => item)
       : value;
   }
@@ -90,7 +117,7 @@ function serializeCanonicalJson(value: unknown): string {
 
   if (typeof value === 'object') {
     const entries = Object.keys(value as Record<string, unknown>)
-      .sort()
+      .sort(compareByCodeUnit)
       .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
       .map((key) => `${JSON.stringify(key)}:${serializeCanonicalJson((value as Record<string, unknown>)[key])}`);
 
