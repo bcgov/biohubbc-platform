@@ -46,7 +46,6 @@
 
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
-import { MAX_SEARCH_GRAPH_DEPTH } from '../../constants/expression';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import {
   NormalizedExpressionTreeExpression,
@@ -1072,51 +1071,6 @@ describe('expression-evaluation (integration)', function () {
       );
 
       expect(ids.has(q)).to.equal(false);
-    });
-
-    /**
-     * Depth cap = MAX_SEARCH_GRAPH_DEPTH (6). A linear content chain n1→…→n8 (7 edges). n1 is depth 0; the
-     * deepest reachable node is 6 edges from the seed (depth 6 included, depth 7 excluded). n7 (animal) sits
-     * at depth 6 and is reachable; n8 (telemetry) sits at depth 7 and is truncated. n1..n6 are sample_site so
-     * the animal/telemetry anchors isolate n7 and n8.
-     */
-    it('15: depth cap — node at depth 6 reachable, node at depth 7 truncated', async () => {
-      expect(MAX_SEARCH_GRAPH_DEPTH).to.equal(6);
-
-      const submissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, submissionId);
-
-      // Chain of 8 nodes: indices 0-5 sample_site, 6 animal, 7 telemetry — the animal/telemetry anchors
-      // isolate the node at depth 6 (reachable) from the node at depth 7 (truncated).
-      const nodeTypes = [...Array.from({ length: 6 }, () => 'sample_site'), 'animal', 'telemetry'];
-      const nodes: number[] = [];
-      for (const featureTypeName of nodeTypes) {
-        nodes.push(await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName }));
-      }
-      for (let i = 0; i < nodes.length - 1; i++) {
-        await insertContentEdge(nodes[i], nodes[i + 1]);
-      }
-      await indexNameProperty(nodes[0], 'depth', SAMPLE_SITE_NAME_FTP_ID);
-
-      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
-
-      const tree: NormalizedExpressionTreeExpression = {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [namePredicate('depth', SAMPLE_SITE_NAME_FTP_ID)]
-      };
-
-      // n7 (index 6) is depth 6 — exactly at the cap — so it is reachable.
-      const animalIds = await runSubquery(
-        buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId())
-      );
-      expect(animalIds.has(nodes[6])).to.equal(true);
-
-      // n8 (index 7) is depth 7 — one past the cap — so it is truncated.
-      const telemetryIds = await runSubquery(
-        buildExpressionTreeFeatureIdsSubquery('telemetry', tree, connection.systemUserId())
-      );
-      expect(telemetryIds.has(nodes[7])).to.equal(false);
     });
   });
 });
