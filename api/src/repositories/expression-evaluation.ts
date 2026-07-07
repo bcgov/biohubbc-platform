@@ -14,11 +14,11 @@ import { buildSecurityFilter, isSubmissionFeatureActive } from './sql-fragments'
  * subqueries returning matching submission_feature_id values for an anchor
  * feature type.
  *
- * Each predicate compiles into a bounded recursive content walk plus closure
- * probes: a `WITH RECURSIVE` CTE walks the `submission_feature_feature` content
- * (`data.content`) edges the closure deliberately omits, and the precomputed
- * `submission_feature_closure` table is probed from every content-reached node
- * to resolve parent-ancestry and property-reference reach with indexed joins.
+ * Each predicate first resolves direct evidence features from typed property
+ * rows, then projects candidate anchor features against that evidence. Same-type
+ * evidence must be the anchor row itself; different-type evidence may be
+ * connected through the precomputed `submission_feature_closure` table in either
+ * direction. The projection does not recursively walk content edges.
  *
  * Read-time evaluator shared by the search wrapper (POST /api/search/feature)
  * and the download pipeline (POST /api/download). Both paths consume the same
@@ -173,7 +173,7 @@ function buildExpressionTargetIdsQuery(
 /**
  * Wraps target ID queries before set operations.
  *
- * Predicate clauses carry a `WITH RECURSIVE` CTE (the bounded content-edge walk). PostgreSQL accepts a WITH-bearing
+ * Predicate clauses carry a WITH-bearing evidence CTE. PostgreSQL accepts a WITH-bearing
  * query inside a derived table, but not directly as a parenthesized INTERSECT/UNION operand, so the wrap is required.
  *
  * @param {Knex.QueryBuilder} query - Target ID query to wrap as a derived table.
@@ -207,7 +207,7 @@ function wrapTargetIdsQuery(query: Knex.QueryBuilder, knex: Knex, alias: string)
  * @param {NormalizedExpressionTreePredicate} clause - Normalized predicate clause to compile.
  * @param {Knex} knex - Knex instance used to build the SQL query.
  * @param {number | null} [systemUserId] - Security context. `null` represents anonymous access.
- * @return {Knex.QueryBuilder} Unexecuted query returning distinct matching anchor `submission_feature_id` rows.
+ * @return {Knex.QueryBuilder} Unexecuted query returning matching anchor `submission_feature_id` rows.
  */
 function buildPredicateTargetIdsQuery(
   anchorFeatureType: string,
@@ -310,7 +310,7 @@ function buildPredicateEvidenceIdsQuery(
  * @param {Knex.QueryBuilder} evidenceQuery - Query returning direct predicate evidence `submission_feature_id` rows.
  * @param {Knex} knex - Knex instance used to build the SQL query.
  * @param {number | null} [systemUserId] - Security context. `null` represents anonymous access.
- * @return {Knex.QueryBuilder} Unexecuted query returning distinct matching anchor `submission_feature_id` rows.
+ * @return {Knex.QueryBuilder} Unexecuted query returning matching anchor `submission_feature_id` rows.
  */
 function projectEvidenceToTargetIdsQuery(
   anchorFeatureType: string,
@@ -321,7 +321,6 @@ function projectEvidenceToTargetIdsQuery(
   const query = knex
     .queryBuilder()
     .with('evidence', evidenceQuery.clone())
-    .distinct()
     .select('anchor_sf.submission_feature_id')
     .from('submission_feature as anchor_sf')
     .join('feature_type as anchor_ft', 'anchor_ft.feature_type_id', 'anchor_sf.feature_type_id')
