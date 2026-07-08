@@ -23,7 +23,11 @@ change). It is intentionally NOT wired into any build or request flow.
 
 - **Feature Type Sampler** — committed under `fixtures/sampler/`. One valid feature per feature type the
   Boreal Moose export does not cover, so the snapshot exercises every feature type.
-- **Boreal Moose** — an external `.tar` (~7.5 MB), `1c342e48-d96b-47b2-996c-8e6aa35ef873.tar` **not committed**. The committed fixture, not the tar, is the source of truth — the tar is only needed to regenerate.
+- **Boreal Moose** — an external single `.tar` (~13 MB), **not committed**, at the solution root:
+  `data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar`. The dataset sits at the tar root
+  (`<datasetId>/features|codes|files` + `.dataset-id`), which the parser ingests directly — no
+  unwrapping. The committed fixture, not the tar, is the source of truth; the tar is only needed to
+  regenerate.
 
 ## Environment prerequisites
 
@@ -58,9 +62,9 @@ is staged into the api tree and the produced fixtures are copied back out to the
 ```bash
 # 1. Stack up (db + minio + queue) and seed the required ITIS taxa (see prerequisites above).
 
-# 2. Unwrap the double-wrapped Moose tar and stage it into the bind-mounted api tree.
-tar -xOf data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar > /tmp/moose.tar     # one layer off
-cp /tmp/moose.tar biohubbc-platform/api/src/seed-data-generator/moose.tar
+# 2. Stage the Moose tar into the bind-mounted api tree. Its dataset sits at the tar root
+#    (<datasetId>/features|codes|files), which the parser ingests directly — no unwrapping.
+cp data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar biohubbc-platform/api/src/seed-data-generator/moose.tar
 
 # 3. Generate + dump both tiers (writes to api/src/seed-data-generator/output/).
 cd biohubbc-platform
@@ -69,7 +73,7 @@ docker compose exec api npx tsx src/seed-data-generator/run.ts
 # 4. Copy the refreshed fixtures to the committed location.
 cp api/src/seed-data-generator/output/*.json database/src/seeds/fixtures/seed-features/
 
-# 5. Remove the staged tar + output dir (never commit the tar — 7.5 MB binary).
+# 5. Remove the staged tar + output dir (never commit the tar — ~13 MB binary).
 rm -f api/src/seed-data-generator/moose.tar
 rm -rf api/src/seed-data-generator/output
 
