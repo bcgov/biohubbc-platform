@@ -94,5 +94,30 @@ describe('index', () => {
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({ feature: mockFeature, relatedFeatures: mockRelatedFeatures });
     });
+
+    it('uses the API user connection for anonymous (no token) requests', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const getAPIUserDBConnectionStub = sinon
+        .stub(db.dbDependencies, 'getAPIUserDBConnection')
+        .returns(dbConnectionObj);
+      const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      sinon.stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById').resolves({} as SubmissionFeature);
+      sinon.stub(SubmissionFeatureService.prototype, 'getRelatedSubmissionFeatures').resolves([]);
+
+      const requestHandler = index.getSubmissionFeatureById();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      // No keycloak_token on the request => anonymous caller reading an unsecured feature.
+      mockReq.params = {
+        submissionFeatureId: '1'
+      };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
+      expect(getDBConnectionStub).to.not.have.been.called;
+      expect(mockRes.statusValue).to.eql(200);
+    });
   });
 });
