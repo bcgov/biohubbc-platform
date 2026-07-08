@@ -28,7 +28,7 @@ export async function up(knex: Knex): Promise<void> {
     BEGIN
       SELECT count(*) INTO duplicate_count FROM (
         SELECT LOWER(user_guid)
-        FROM system_user
+        FROM "system_user"
         GROUP BY LOWER(user_guid)
         HAVING count(*) > 1
       ) duplicates;
