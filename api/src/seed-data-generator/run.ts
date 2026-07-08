@@ -120,9 +120,10 @@ async function run(): Promise<void> {
   }
 }
 
-run()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    defaultLog.error({ label: 'run', message: 'seed-data-generator run failed', error });
-    process.exit(1);
-  });
+try {
+  await run();
+  process.exit(0);
+} catch (error) {
+  defaultLog.error({ label: 'run', message: 'seed-data-generator run failed', error });
+  process.exit(1);
+}
