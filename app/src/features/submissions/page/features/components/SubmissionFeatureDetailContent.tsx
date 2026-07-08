@@ -1,5 +1,6 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
+import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Chip from '@mui/material/Chip';
@@ -10,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
+import { AlertBanner } from 'components/notifications/AlertBanner';
 import { PageSection } from 'components/section/PageSection';
 import { IRelatedSubmissionFeature, ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
@@ -85,6 +87,19 @@ export const SubmissionFeatureDetailContent = ({
         }
       />
       <Container maxWidth="xl">
+        {feature?.secured && (
+          <AlertBanner
+            variant="standard"
+            icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}
+            sx={{ mb: 3 }}>
+            <AlertTitle sx={{ mb: 0 }}>This feature is secured</AlertTitle>
+            {feature.security_reasons.length > 0 && (
+              <Typography fontSize="0.8rem">
+                This feature is restricted for the following reasons: {feature.security_reasons.join(', ')}.
+              </Typography>
+            )}
+          </AlertBanner>
+        )}
         <Stack spacing={3} py={4}>
           <PageSection id="submission-feature-properties" label="Properties">
             <SubmissionFeatureProperties data={feature?.data ?? {}} />
