@@ -79,7 +79,3 @@ rm -rf api/src/seed-data-generator/output
 
 # 6. Commit the refreshed fixtures under database/src/seeds/fixtures/seed-features/.
 ```
-
-The Moose tar path can also be passed as the first argument:
-`docker compose exec api npx tsx src/seed-data-generator/run.ts <mooseTarPath>`. The output directory can
-be overridden with the `SEED_FIXTURE_OUTPUT_DIR` env var.

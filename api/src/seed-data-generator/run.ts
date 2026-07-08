@@ -3,7 +3,7 @@
 // dump.ts are pure library code with no entrypoint of their own.
 //
 // Execute it inside the api container (which carries the DB + MinIO env and the source bind mount):
-//   docker compose exec api npx tsx src/seed-data-generator/run.ts [mooseTarPath]
+//   docker compose exec api npx tsx src/seed-data-generator/run.ts
 //
 // It writes the fixtures to a directory inside the mounted api tree (only `./api` is bind-mounted into
 // the container — `database/` is not), so the produced JSON is copied to
@@ -24,12 +24,13 @@ const defaultLog = getLogger('seed-data-generator/run');
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Default path to the external Boreal Moose tar, staged into the api bind mount before the run.
+ * Path to the external Boreal Moose tar, staged into the api bind mount before the run.
  *
- * The 7.5 MB tar is not committed; it must be unwrapped (it is double-wrapped — a tar containing the
- * real inner tar) and copied into the api tree before this runs. The README documents the staging step.
+ * The tar is not committed; it is single-wrapped (the dataset sits at the tar root, so the parser
+ * ingests it directly — no unwrapping) and is copied into the api tree as `moose.tar` before this runs.
+ * The README documents the staging step.
  */
-const DEFAULT_MOOSE_TAR_PATH = path.join(moduleDir, 'moose.tar');
+const MOOSE_TAR_PATH = path.join(moduleDir, 'moose.tar');
 
 /** The committed sampler source directory; the generator packs it into a tar buffer at runtime. */
 const SAMPLER_SOURCE_DIR = path.join(moduleDir, 'fixtures', 'sampler');
@@ -37,11 +38,11 @@ const SAMPLER_SOURCE_DIR = path.join(moduleDir, 'fixtures', 'sampler');
 /**
  * Output directory for the produced fixtures.
  *
- * Defaults to a folder inside the api bind mount because the container cannot reach the `database/`
- * tree; the committed home is `database/src/seeds/fixtures/seed-features/`, which the rerun loop copies
- * into from here.
+ * A folder inside the api bind mount because the container cannot reach the `database/` tree; the
+ * committed home is `database/src/seeds/fixtures/seed-features/`, which the rerun loop copies into from
+ * here.
  */
-const OUTPUT_DIR = process.env.SEED_FIXTURE_OUTPUT_DIR ?? path.join(moduleDir, 'output');
+const OUTPUT_DIR = path.join(moduleDir, 'output');
 
 /** One snapshot tier: the human name, its fixture file name, and the generated submission to dump. */
 interface DumpedTier {
@@ -100,8 +101,6 @@ function writeFixtures(tiers: DumpedTier[]): void {
  * @returns {Promise<void>}
  */
 async function run(): Promise<void> {
-  const mooseTarPath = process.argv[2] ?? DEFAULT_MOOSE_TAR_PATH;
-
   initDBPool(getDefaultPoolConfig());
   await initPgBoss();
 
@@ -109,7 +108,7 @@ async function run(): Promise<void> {
     const moose = await generateAndDumpTier(
       'Boreal Moose',
       'boreal-moose.json',
-      mooseTarPath,
+      MOOSE_TAR_PATH,
       DEFAULT_SECURE_DEPLOYMENT_IDENTIFIERS
     );
     const sampler = await generateAndDumpTier('Feature Type Sampler', 'sampler.json', SAMPLER_SOURCE_DIR, undefined);
