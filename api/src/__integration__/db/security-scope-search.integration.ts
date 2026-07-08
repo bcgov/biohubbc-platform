@@ -1538,28 +1538,37 @@ describe('Security scope search (integration)', function () {
     // (isSubmissionFeatureActive: record_effective_date <= now() AND not end-dated). A draft (NULL) or
     // not-yet-effective (future) feature is therefore never a search result, regardless of any security
     // rule on it — the effective-date exclusion applies before security is even considered.
-    for (const { label, markFn } of [
-      { label: 'NULL', markFn: markFeatureUnapproved },
-      { label: 'in the future', markFn: markFeatureFutureDate }
-    ] as const) {
-      it(`excludes an inactive feature (record_effective_date ${label}) from search, even with a security rule`, async () => {
-        const submissionId = await createTestSubmission(connection);
-        const uploadId = await createTestUpload(connection, submissionId);
-        const featureId = await insertFeatureRow({
-          submissionId,
-          submissionUploadId: uploadId,
-          featureTypeName: 'survey'
+    // Matrix: an inactive feature (draft NULL date, or not-yet-effective future date) is never a search
+    // result, for anonymous and authenticated-without-scope callers alike — the active-feature filter
+    // applies before security is even considered.
+    const inactiveCallers: { caller: string; getUserId: () => Promise<number | null> }[] = [
+      { caller: 'anonymous', getUserId: async () => null },
+      { caller: 'an authenticated user without scope', getUserId: () => createOtherUser() }
+    ];
+    for (const { caller, getUserId } of inactiveCallers) {
+      for (const { label, markFn } of [
+        { label: 'NULL', markFn: markFeatureUnapproved },
+        { label: 'in the future', markFn: markFeatureFutureDate }
+      ] as const) {
+        it(`excludes an inactive feature (record_effective_date ${label}) from search for ${caller}, even with a security rule`, async () => {
+          const submissionId = await createTestSubmission(connection);
+          const uploadId = await createTestUpload(connection, submissionId);
+          const featureId = await insertFeatureRow({
+            submissionId,
+            submissionUploadId: uploadId,
+            featureTypeName: 'survey'
+          });
+          await secureFeature(connection, featureId);
+          await markFn(featureId);
+
+          await rebuildClosure(uploadId);
+
+          const results = await searchInSubmission(submissionId, ['survey'], await getUserId());
+          const featureIds = results.map((r) => r.submission_feature_id);
+
+          expect(featureIds).to.not.include(featureId);
         });
-        await secureFeature(connection, featureId);
-        await markFn(featureId);
-
-        await rebuildClosure(uploadId);
-
-        const results = await searchInSubmission(submissionId, ['survey'], null);
-        const featureIds = results.map((r) => r.submission_feature_id);
-
-        expect(featureIds).to.not.include(featureId);
-      });
+      }
     }
 
     it('should hide feature from anonymous when security rule exists and record_effective_date is approved', async () => {
@@ -1628,48 +1637,6 @@ describe('Security scope search (integration)', function () {
 
       expect(featureIds).to.not.include(parent);
       expect(featureIds).to.not.include(child);
-    });
-
-    it('excludes an inactive feature (NULL record_effective_date) from search for an authenticated user without scope', async () => {
-      // The active-feature filter applies regardless of authentication: a draft feature is never a
-      // search result, even for an authenticated user.
-      const submissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, submissionId);
-      const featureId = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'survey'
-      });
-      await secureFeature(connection, featureId);
-      await markFeatureUnapproved(featureId);
-
-      await rebuildClosure(uploadId);
-
-      const userId = await createOtherUser();
-      const results = await searchInSubmission(submissionId, ['survey'], userId);
-      const featureIds = results.map((r) => r.submission_feature_id);
-
-      expect(featureIds).to.not.include(featureId);
-    });
-
-    it('excludes an inactive feature (future record_effective_date) from search for an authenticated user without scope', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, submissionId);
-      const featureId = await insertFeatureRow({
-        submissionId,
-        submissionUploadId: uploadId,
-        featureTypeName: 'survey'
-      });
-      await secureFeature(connection, featureId);
-      await markFeatureFutureDate(featureId);
-
-      await rebuildClosure(uploadId);
-
-      const userId = await createOtherUser();
-      const results = await searchInSubmission(submissionId, ['survey'], userId);
-      const featureIds = results.map((r) => r.submission_feature_id);
-
-      expect(featureIds).to.not.include(featureId);
     });
 
     it('should hide feature from authenticated user (no scope) when record_effective_date is approved', async () => {

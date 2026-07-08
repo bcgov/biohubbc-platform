@@ -126,9 +126,8 @@ describe('SubmissionFeatureRepository (integration)', function () {
     await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
   }
 
-  // ── Scenarios ────────────────────────────────────────────────────────
-
-  it('1. direct active security → secured, security_reasons = [rule]', async () => {
+  /** Create a single `dataset` feature under its own upload. */
+  async function createFeature(): Promise<{ uploadId: string; featureId: number }> {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
     const featureId = await insertFeatureRow({
@@ -136,6 +135,27 @@ describe('SubmissionFeatureRepository (integration)', function () {
       submissionUploadId: uploadId,
       featureTypeName: 'dataset'
     });
+    return { uploadId, featureId };
+  }
+
+  /** Create a parent + child `dataset` feature co-located under one upload (child inherits via the closure). */
+  async function createParentChild(): Promise<{ uploadId: string; parentId: number; childId: number }> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const parentId = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+    const childId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'dataset',
+      parentFeatureId: parentId
+    });
+    return { uploadId, parentId, childId };
+  }
+
+  // ── Scenarios ────────────────────────────────────────────────────────
+
+  it('1. direct active security → secured, security_reasons = [rule]', async () => {
+    const { uploadId, featureId } = await createFeature();
     await insertSecurity(featureId, 'Moose');
     await buildClosure(uploadId);
 
@@ -146,15 +166,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('2. security inherited from parent → child is secured with parent reason', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const parentId = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-    const childId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset',
-      parentFeatureId: parentId
-    });
+    const { uploadId, parentId, childId } = await createParentChild();
     await insertSecurity(parentId, 'Mineral Lick Locations');
     await buildClosure(uploadId);
 
@@ -165,15 +177,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('3. parent + child with no security → child is not secured, no reasons', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const parentId = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-    const childId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset',
-      parentFeatureId: parentId
-    });
+    const { uploadId, childId } = await createParentChild();
     await buildClosure(uploadId);
 
     const result = await repo.getSubmissionFeatureById(childId);
@@ -213,13 +217,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('5a. draft security → not secured, no reasons', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const featureId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset'
-    });
+    const { uploadId, featureId } = await createFeature();
     await insertSecurity(featureId, 'Moose', { status: 'draft' });
     await buildClosure(uploadId);
 
@@ -230,13 +228,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('5b. end-dated security → not secured, no reasons', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const featureId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset'
-    });
+    const { uploadId, featureId } = await createFeature();
     await insertSecurity(featureId, 'Moose', { recordEndDate: '2020-01-01' });
     await buildClosure(uploadId);
 
@@ -247,13 +239,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('6. two active security rules → secured, reasons sorted alphabetically', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const featureId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset'
-    });
+    const { uploadId, featureId } = await createFeature();
     await insertSecurity(featureId, 'Moose');
     await insertSecurity(featureId, 'Spotted Owl');
     await buildClosure(uploadId);
@@ -265,13 +251,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
   });
 
   it('7. no closure rows → fail-closed secured with no resolvable reasons', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createTestUpload(connection, submissionId);
-    const featureId = await insertFeatureRow({
-      submissionId,
-      submissionUploadId: uploadId,
-      featureTypeName: 'dataset'
-    });
+    const { featureId } = await createFeature();
     // Intentionally skip buildClosure — the feature has zero closure rows (not even its self-loop),
     // so isEffectivelySecured hits the fail-closed OR NOT EXISTS branch.
 
