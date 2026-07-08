@@ -18,6 +18,7 @@ import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
+import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
@@ -1532,11 +1533,16 @@ describe('Security scope search (integration)', function () {
     // (it does NOT filter on record_effective_date), so the self-loop / ancestry rows exist regardless of
     // approval; the effective-date predicate lives in isEffectivelySecured (sf_sec.record_effective_date
     // <= now()). Each fixture seeds under a SHARED upload and rebuilds the closure before searching.
+    //
+    // Per SIMSBIOHUB-1080 (#499), search results are filtered to active features
+    // (isSubmissionFeatureActive: record_effective_date <= now() AND not end-dated). A draft (NULL) or
+    // not-yet-effective (future) feature is therefore never a search result, regardless of any security
+    // rule on it — the effective-date exclusion applies before security is even considered.
     for (const { label, markFn } of [
       { label: 'NULL', markFn: markFeatureUnapproved },
       { label: 'in the future', markFn: markFeatureFutureDate }
     ] as const) {
-      it(`should NOT hide feature from anonymous when security rule exists but record_effective_date is ${label}`, async () => {
+      it(`excludes an inactive feature (record_effective_date ${label}) from search, even with a security rule`, async () => {
         const submissionId = await createTestSubmission(connection);
         const uploadId = await createTestUpload(connection, submissionId);
         const featureId = await insertFeatureRow({
@@ -1552,9 +1558,7 @@ describe('Security scope search (integration)', function () {
         const results = await searchInSubmission(submissionId, ['survey'], null);
         const featureIds = results.map((r) => r.submission_feature_id);
 
-        expect(featureIds).to.include(featureId);
-        const feature = results.find((r) => r.submission_feature_id === featureId);
-        expect(feature?.is_secured).to.be.false;
+        expect(featureIds).to.not.include(featureId);
       });
     }
 
@@ -1578,9 +1582,10 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(featureId);
     });
 
-    it('should NOT hide child from anonymous when parent is secured but unapproved (NULL date)', async () => {
-      // Parent has a security rule but NULL record_effective_date. The parent is
-      // NOT effectively secured, so its child should remain visible.
+    it('does not hide an active child when its parent is secured but inactive (NULL date)', async () => {
+      // Parent has a security rule but NULL record_effective_date, so it is inactive: it is not a
+      // search result itself (SIMSBIOHUB-1080), and — because isEffectivelySecured only counts security
+      // from an active ancestor — it does not secure its child. The active, unsecured child stays visible.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
@@ -1598,8 +1603,8 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(parent);
-      expect(featureIds).to.include(child);
+      expect(featureIds).to.not.include(parent); // inactive → not a search result
+      expect(featureIds).to.include(child); // active + not effectively secured → visible
     });
 
     it('should hide child from anonymous when parent is secured and approved', async () => {
@@ -1625,9 +1630,9 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(child);
     });
 
-    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is NULL', async () => {
-      // Authenticated user without scope grants sees the same as anonymous for the
-      // "not secured" branch. Unapproved security rule → feature is visible.
+    it('excludes an inactive feature (NULL record_effective_date) from search for an authenticated user without scope', async () => {
+      // The active-feature filter applies regardless of authentication: a draft feature is never a
+      // search result, even for an authenticated user.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const featureId = await insertFeatureRow({
@@ -1644,10 +1649,10 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(featureId);
+      expect(featureIds).to.not.include(featureId);
     });
 
-    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
+    it('excludes an inactive feature (future record_effective_date) from search for an authenticated user without scope', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const featureId = await insertFeatureRow({
@@ -1664,7 +1669,7 @@ describe('Security scope search (integration)', function () {
       const results = await searchInSubmission(submissionId, ['survey'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(featureId);
+      expect(featureIds).to.not.include(featureId);
     });
 
     it('should hide feature from authenticated user (no scope) when record_effective_date is approved', async () => {
@@ -2276,6 +2281,64 @@ describe('Security scope search (integration)', function () {
         WHERE security_scope_id = ${scopeId};
       `);
       expect(anchors.rows[0].anchor_submission_feature_id).to.equal(root);
+    });
+  });
+
+  // ── Detail/properties route gate (TeamAuthorizationRepository) ────────
+  //
+  // The feature detail + properties routes authorize via isSubmissionFeatureAccessibleToUser,
+  // which reuses the same ancestry-aware isAccessibleToUser fragment as the search read path.
+  // These cases prove the gate agrees with search — in particular that a descendant secured
+  // only via an ancestor is now accessible (the old own-URN gate denied it).
+  describe('isSubmissionFeatureAccessibleToUser', () => {
+    it('grants a team member access to a descendant secured only via an ancestor', async () => {
+      // survey(secured) → sample_site → species_observation, one upload. Scope matches ONLY the
+      // survey's own type, so the descendants are reachable solely through the closure ancestry —
+      // exactly the case the previous own-URN gate denied.
+      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:survey:*`, userId, 'Ancestry Gate Team');
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child, submissionId)).to.be.true;
+    });
+
+    it('denies a user with no matching scope access to the secured subtree', async () => {
+      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
+      const userId = await createOtherUser();
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child, submissionId)).to.be.false;
+    });
+
+    it('grants any user access to an unsecured feature', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const openFeature = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      await rebuildClosure(uploadId);
+      const userId = await createOtherUser();
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, openFeature, submissionId)).to.be.true;
+    });
+
+    it('denies when the feature does not belong to the given submission', async () => {
+      const { submissionId, grandparent } = await seedSecuredGrandparentHierarchy();
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:survey:*`, userId, 'Ancestry Gate Team 2');
+
+      const repo = new TeamAuthorizationRepository(connection);
+      // Accessible under its real submission, but the submission-integrity guard denies a mismatched id.
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId + 100000)).to.be.false;
     });
   });
 });
