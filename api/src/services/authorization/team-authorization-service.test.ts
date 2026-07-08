@@ -118,7 +118,8 @@ describe('TeamAuthorizationService', () => {
         feature_type_name: 'Feature',
         feature_type_display_name: 'Feature',
         submission_name: 'Test Submission',
-        secured: true
+        secured: true,
+        security_reasons: []
       };
 
       it('returns true immediately if the feature is not secured', async () => {
