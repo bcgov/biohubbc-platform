@@ -93,7 +93,7 @@ export const SubmissionFeatureDetailContent = ({
             icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}
             sx={{ mb: 3 }}>
             <AlertTitle sx={{ mb: 0 }}>This feature is secured</AlertTitle>
-            {feature.security_reasons.length > 0 && (
+            {(feature.security_reasons ?? []).length > 0 && (
               <Typography fontSize="0.8rem">
                 This feature is restricted for the following reasons: {feature.security_reasons.join(', ')}.
               </Typography>
