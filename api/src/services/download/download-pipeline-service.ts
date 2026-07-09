@@ -119,7 +119,9 @@ export class DownloadPipelineService extends DBService {
    * @param {string} downloadVersionId - The download version ID.
    * @param {DownloadStatusEnum} nextStatus - Target status.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
-   * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
+   * @param {{ error?: string; featureCount?: number }} [metadata] - Optional transition metadata: `error`
+   *   is used for FAILED transitions; `featureCount` (the total features materialized into the version's
+   *   artifacts) is only ever passed on the READY transition.
    * @return {Promise<void>}
    * @throws {ApiNotFoundError} if the download version does not exist.
    * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
@@ -129,7 +131,7 @@ export class DownloadPipelineService extends DBService {
     downloadVersionId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
-    errorMetadata?: { error?: string }
+    metadata?: { error?: string; featureCount?: number }
   ): Promise<void> {
     const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
 
@@ -141,23 +143,33 @@ export class DownloadPipelineService extends DBService {
     );
 
     const now = new Date().toISOString();
-    const metadata: { started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string } =
-      {};
+    const updateFields: {
+      started_at?: string;
+      completed_at?: string;
+      materialized_at?: string;
+      error_message?: string;
+      feature_count?: number;
+    } = {};
     if (nextStatus === DownloadStatusEnum.PROCESSING) {
-      metadata.started_at = now;
+      updateFields.started_at = now;
     }
     if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
-      metadata.completed_at = now;
+      updateFields.completed_at = now;
     }
     // materialized_at is the data watermark — when this version's snapshot was captured.
     if (nextStatus === DownloadStatusEnum.READY) {
-      metadata.materialized_at = now;
+      updateFields.materialized_at = now;
     }
-    if (errorMetadata?.error !== undefined) {
-      metadata.error_message = errorMetadata.error;
+    if (metadata?.error !== undefined) {
+      updateFields.error_message = metadata.error;
+    }
+    // Strict undefined check — a legitimate count of 0 (empty policy scope) must
+    // still be persisted; a truthiness guard would silently drop it.
+    if (metadata?.featureCount !== undefined) {
+      updateFields.feature_count = metadata.featureCount;
     }
 
-    await this.downloadVersionRepository.updateDownloadVersionStatus(downloadVersionId, nextStatus, metadata);
+    await this.downloadVersionRepository.updateDownloadVersionStatus(downloadVersionId, nextStatus, updateFields);
   }
 
   /**
@@ -232,10 +244,13 @@ export class DownloadPipelineService extends DBService {
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
    * @param {EffectiveDownloadStatement} payload.statement - The effective policy statement for this feature type.
-   * @return {Promise<void>}
+   * @return {Promise<number>} The number of hydrated feature rows written to the Parquet file. Counted
+   *   during the streaming write so the caller can store the version's total feature count at
+   *   materialization time — computing it live per landing view would put a large COUNT over the policy
+   *   scope on a public request path.
    * @memberof DownloadPipelineService
    */
-  async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<void> {
+  async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<number> {
     const { downloadId, downloadVersionId, source, properties, featureTypeName, statement } = payload;
 
     const spatialColumns = properties
@@ -308,6 +323,7 @@ export class DownloadPipelineService extends DBService {
       s3Key
     );
 
+    let rowCount = 0;
     let streamingSucceeded = false;
     try {
       // PassThrough implements write()/end() but @dsnp/parquetjs types expect
@@ -326,8 +342,10 @@ export class DownloadPipelineService extends DBService {
       }
 
       // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
+      // Count hydrated rows (what actually lands in the file), not base cursor rows.
       for await (const baseBatch of cursor) {
         const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
+        rowCount += hydrated.length;
         for (const feature of hydrated) {
           await writer.appendRow(featureToRow(feature, properties));
         }
@@ -381,6 +399,8 @@ export class DownloadPipelineService extends DBService {
     });
 
     await this.downloadVersionRepository.createDownloadVersionArtifact(downloadVersionId, artifact_id, featureTypeName);
+
+    return rowCount;
   }
 
   /**

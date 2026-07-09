@@ -114,11 +114,16 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       // and the artifact + download_artifact inserts use ON CONFLICT DO NOTHING. The
       // statement is threaded in so the per-type evaluator (expression vs broad) is
       // resolved up front and not re-queried per type.
+      //
+      // The per-run accumulator sums the rows each write reports; a mid-job retry
+      // re-runs the whole loop, so the total is always re-accumulated from scratch
+      // (S3/DB idempotence makes the re-writes converge to the same state).
+      let totalFeatureCount = 0;
       for (const statement of statements) {
         await withConnection(async (connection) => {
           const featureTypeName = statement.urn_feature_type;
           const properties = schemaLookup.get(featureTypeName) ?? [];
-          await new DownloadPipelineService(connection).writeFeatureTypeParquet({
+          totalFeatureCount += await new DownloadPipelineService(connection).writeFeatureTypeParquet({
             downloadId,
             downloadVersionId,
             source,
@@ -133,7 +138,8 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         await new DownloadPipelineService(connection).transitionDownloadVersionStatus(
           downloadVersionId,
           DownloadStatusEnum.READY,
-          [DownloadStatusEnum.PROCESSING]
+          [DownloadStatusEnum.PROCESSING],
+          { featureCount: totalFeatureCount }
         );
       });
 

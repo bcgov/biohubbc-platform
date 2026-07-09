@@ -134,6 +134,54 @@ describe('DownloadVersionRepository', () => {
       expect(sqlValues).to.include(VERSION_ID);
     });
 
+    it('includes feature_count = COALESCE and binds the provided count', async () => {
+      // Verifies: the materialized feature count is written through the same set-once-
+      // preserve-later COALESCE pattern as the timestamps, and the provided value is bound.
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      await repo.updateDownloadVersionStatus(VERSION_ID, DownloadStatusEnum.READY, {
+        completed_at: '2026-01-01T00:01:00.000Z',
+        materialized_at: '2026-01-01T00:01:00.000Z',
+        feature_count: 42
+      });
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('feature_count = COALESCE');
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(42);
+    });
+
+    it('binds null for feature_count when absent so COALESCE preserves the stored value', async () => {
+      // Verifies: a transition that doesn't own the count (here: FAILED) binds null into
+      // feature_count's COALESCE, so an already-materialized count is never cleared.
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      // Every sibling metadata field carries a real value so the ONLY null bind left is
+      // feature_count's — a bare `.include(null)` would be satisfied by any sibling COALESCE.
+      await repo.updateDownloadVersionStatus(VERSION_ID, DownloadStatusEnum.FAILED, {
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        materialized_at: '2026-01-01T00:01:00.000Z',
+        error_message: 'boom'
+      });
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      const nullBinds = sqlValues.filter((value: unknown) => value === null);
+      expect(nullBinds).to.have.length(1);
+      // Bind order mirrors the SET list: status, started_at, completed_at, materialized_at,
+      // error_message, feature_count, download_version_id.
+      expect(sqlValues[5]).to.equal(null);
+    });
+
     it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
       // Verifies: an UPDATE that matched no version row is surfaced as an error
 
