@@ -21,8 +21,10 @@ change). It is intentionally NOT wired into any build or request flow.
 
 ## Source tarballs
 
-- **Feature Type Sampler** — committed under `fixtures/sampler/`. One valid feature per feature type the
-  Boreal Moose export does not cover, so the snapshot exercises every feature type.
+- **Feature Type Sampler** — committed under `fixtures/sampler/`. Exactly one valid feature per feature
+  type, so every type is proven ingestable. It is a *type* smoke check, not a search fixture: one row per
+  type means no predicate can discriminate (nothing to *not* match). Expression-search coverage is the
+  Boreal Moose tier's job, which carries multiple rows per type with differing values.
 - **Boreal Moose** — an external single `.tar` (~8.5 MB), **not committed**, at the solution root:
   `data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar`. The dataset sits at the tar root
   (`<datasetId>/features|codes|files` + `.dataset-id`), which the parser ingests directly — no
@@ -83,9 +85,42 @@ docker compose exec api npx tsx src/seed-data-generator/run.ts
 # 4. Copy the refreshed fixtures to the committed location.
 cp api/src/seed-data-generator/output/*.json database/src/seeds/fixtures/seed-features/
 
-# 5. Remove the staged tar + output dir (never commit the tar — ~13 MB binary).
+# 5. Remove the staged tar + output dir (never commit the tar — ~8.5 MB binary).
 rm -f api/src/seed-data-generator/moose.tar
 rm -rf api/src/seed-data-generator/output
 
 # 6. Commit the refreshed fixtures under database/src/seeds/fixtures/seed-features/.
 ```
+
+Verify a regenerated fixture by replaying it with `make db-setup` (migrations + seeding).
+`10_snapshot_features.ts` asserts every per-table row count and fails loudly on a shortfall, so a clean
+seed run is the real gate. The replay is a no-op when the snapshot submission is already present, so
+retire the prior one first:
+
+```sql
+SET search_path TO biohub, public;
+UPDATE submission SET record_end_date = now()
+WHERE description = '__seed-snapshot__' AND record_end_date IS NULL;
+```
+
+**Expect a large diff on every regeneration, even with an unchanged tar.** `submission_feature.uuid` is
+minted by `gen_random_uuid()` at ingest rather than derived from the source `id`, so all uuids rotate on
+each run and cascade into `parent_uuid`, the closure edges, and every property row. The stable field to
+diff on is `source_id`; a big diff does not imply a big change. Only the `counts` block and the
+`source_id` set are worth reviewing by eye.
+
+## Known gaps
+
+Each of these is a real limitation of the current dump/replay contract, not a bug in a specific run. They
+are listed with what a fix would require, so a regeneration that reports a surprising `0` is not mistaken
+for a broken run.
+
+| Gap | Symptom | What a fix needs |
+|-----|---------|------------------|
+| **Artifact links are not replayed.** Since `20260629120000_submission_feature_property_artifact`, the pipeline writes feature→file links to `submission_feature_property_artifact`. `dump.ts` and the replay seed only know the older `submission_feature_artifact` table. | The dumped `artifact` count is `0` for both tiers (it was `1` before that migration). The `report.pdf` and `Moose_Walklines.zip` links are absent from seeded data. | A `property_artifact` section in `SnapshotFixture`, keyed by the artifact's `object_key` (its stable natural key), plus the matching insert + count assertion in `10_snapshot_features.ts`. |
+| **`taxon` properties are not replayed.** The `taxon` FK is the `taxon` table's surrogate PK, which is not stable across environments. | `property_taxon` is dumped empty; the replay asserts it at `0`. The taxon-typed properties (`survey.focal_species`, `habitat_feature.associated_species`) cannot be exercised by expression predicates from seed data. Note that `animal.taxon_id` and `species_observation.taxon_id` are `number`-typed, not `taxon`-typed, so those *are* replayed. | Dump `itis_tsn` (the stable natural key) instead of `taxon_id`, and seed the referenced taxa into `taxon` before the replay resolves them back. |
+| **`code` properties are not replayed.** `contributor_codeset_code_id` is a per-upload surrogate id. | `property_code` is dumped empty; the replay asserts it at `0`. `code`-typed predicates (`survey.collected_data`, `sample_technique.attractant`, `sample_period.method_technique`) cannot be exercised. | Dump the codeset name + code value as a composite natural key, and re-resolve it against the replayed contributor's codeset. |
+| **`feature`-reference properties are unexercised.** No source dataset uses one. | `property_feature` is always `0`. The dump and replay both support it; there is simply nothing to dump. | A source feature carrying a feature-reference property. |
+
+The `0` counts above are asserted by the replay seed on purpose: they are a guard that fails loudly if a
+future dump reintroduces rows the seed cannot rebuild.
