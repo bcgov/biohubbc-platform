@@ -111,6 +111,10 @@ describe('Download Worker', function () {
 
       // 2. Submission features — closure rows FK to submission_feature on both ends, so drop them first.
       if (createdSubmissionFeatureIds.length > 0) {
+        // submission_feature_artifact FKs to both submission_feature and artifact — drop it before either.
+        await db('biohub.submission_feature_artifact')
+          .whereIn('submission_feature_id', createdSubmissionFeatureIds)
+          .del();
         await db('biohub.submission_feature_closure')
           .whereIn('source_submission_feature_id', createdSubmissionFeatureIds)
           .orWhereIn('target_submission_feature_id', createdSubmissionFeatureIds)
@@ -242,11 +246,18 @@ describe('Download Worker', function () {
 
     const ticketId = await getOrCreateTestTicketId(db, submissionId, upload.upload_id, SYSTEM_USER_ID);
 
+    // submission_upload.blueprint_id is NOT NULL; bind the seeded default blueprint.
+    const blueprint = await db('biohub.blueprint')
+      .where({ is_default: true })
+      .whereNull('record_end_date')
+      .first('blueprint_id');
+
     const [bridge] = await db('biohub.submission_upload')
       .insert({
         submission_id: submissionId,
         upload_id: upload.upload_id,
         ticket_id: ticketId,
+        blueprint_id: blueprint.blueprint_id,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_upload_id');
@@ -260,6 +271,10 @@ describe('Download Worker', function () {
         data: dataJson,
         data_byte_size: db.raw(`octet_length(?::jsonb::text) + 500`, [dataJson]),
         submission_upload_id: bridge.submission_upload_id,
+        // The download broad-path only projects effective (published) features
+        // (isSubmissionFeatureActive: record_effective_date <= now()); without this the feature
+        // is treated as an unpublished draft and never appears in the export.
+        record_effective_date: db.fn.now(),
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_feature_id');
@@ -310,13 +325,31 @@ describe('Download Worker', function () {
 
     // One ALLOW statement per feature type — the broad-path projection at write-time
     // picks every active submission_feature of the type for the policy creator's
-    // visibility scope.
+    // visibility scope. A statement's URN is normalized into a reusable security_scope
+    // (deduped by hash), which the statement references by security_scope_id — mirroring
+    // the API write path (see 07_access_policy seed's ensureSecurityScope).
     for (const featureTypeName of featureTypeNames) {
+      const urn = `urn:*:${featureTypeName}:*`;
+      const { rows } = await db.raw(`SELECT encode(sha256(?::BYTEA), 'hex') AS hash`, [urn]);
+      const scopeHash = rows[0].hash;
+
+      let scope = await db('biohub.security_scope').where({ scope_hash: scopeHash }).first();
+      if (!scope) {
+        [scope] = await db('biohub.security_scope')
+          .insert({
+            scope_hash: scopeHash,
+            urn_submission_id: '*',
+            urn_feature_type: featureTypeName,
+            urn_feature_id: '*'
+          })
+          .returning('*');
+      }
+
       const [statement] = await db('biohub.policy_statement')
         .insert({
           policy_id: policy.policy_id,
           effect: 'allow',
-          submission_feature_urn: `urn:*:${featureTypeName}:*`,
+          security_scope_id: scope.security_scope_id,
           create_user: SYSTEM_USER_ID
         })
         .returning('policy_statement_id');
@@ -388,14 +421,21 @@ describe('Download Worker', function () {
       .returning('artifact_id');
     createdArtifactIds.push(sourceArtifact.artifact_id);
 
-    // For Parquet, hydrateFeatureBatch reads artifact_key from `data.properties.artifact_key`
-    // (see download-pipeline-service.ts:512). Seed in that shape.
+    // The download hydrator resolves artifact_key from the submission_feature_artifact link
+    // (joined to artifact.object_key), not from submission_feature.data — so the feature must be
+    // linked to the uploaded artifact. The data.properties are kept for completeness but not read.
     const fileFeatureId = await createTestFeature(
       submissionId,
       'file',
       { properties: { artifact_key: artifactSourceKey, filename: opts.filename } },
       surveyFeatureId
     );
+
+    await db('biohub.submission_feature_artifact').insert({
+      submission_feature_id: fileFeatureId,
+      artifact_id: sourceArtifact.artifact_id,
+      create_user: SYSTEM_USER_ID
+    });
 
     return { fileFeatureId, artifactSourceKey };
   }

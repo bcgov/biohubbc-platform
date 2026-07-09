@@ -1,0 +1,18 @@
+[
+  {
+    "id": "a2b7d902-6c92-4136-a9c6-3310aad67125",
+    "type": "report",
+    "properties": {
+      "name": "Sampler Report",
+      "artifact_key": "files/report.pdf",
+      "filename": "report.pdf",
+      "file_type": "Report",
+      "file_size": 193,
+      "year": 2020,
+      "author": "Sampler",
+      "description": "Sampler report artifact."
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

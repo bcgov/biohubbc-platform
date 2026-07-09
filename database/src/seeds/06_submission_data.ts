@@ -36,13 +36,14 @@ export async function seed(knex: Knex): Promise<void> {
       SET SEARCH_PATH = 'biohub','public';
     `);
 
-    // Create realistic test scenarios
+    // The real feature data comes from the committed snapshot seed (10_snapshot_features.ts), which is
+    // injected post-malware-scan and so can only represent a clean/scanned state. These tiny synthetic
+    // submissions exist solely to cover the artifact scan-status axis the snapshot cannot express — one
+    // per scan state: SECURE→clean, PARTIALLY_SECURE→pending, UNSECURE→infected (see getSecurityConfig).
     const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
       { level: 'SECURE', reviewed: true, withArchive: true },
-      { level: 'SECURE', reviewed: true, withArchive: true },
       { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
-      { level: 'UNSECURE', reviewed: true, withArchive: false },
-      { level: 'UNSECURE', reviewed: false, withArchive: false }
+      { level: 'UNSECURE', reviewed: true, withArchive: false }
     ];
 
     const seedContexts: SeedContext[] = [];
