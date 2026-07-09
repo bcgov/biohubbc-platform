@@ -5,8 +5,9 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadRecord } from '../../__mocks__/download';
 import { createMockGalleryRecord } from '../../__mocks__/gallery';
+import { createMockGalleryDownloadTileRecord } from '../../__mocks__/gallery-download';
 import { ApiNotFoundError } from '../../errors/api-error';
-import { HTTP409 } from '../../errors/http-error';
+import { HTTP404, HTTP409 } from '../../errors/http-error';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { GalleryDownloadRepository } from '../../repositories/gallery/gallery-download-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
@@ -257,6 +258,92 @@ describe('GalleryDownloadService', () => {
 
       // Step 4: The member order is preserved
       expect(result.downloads.map((member) => member.download_id)).to.eql(['first', 'second']);
+    });
+  });
+
+  describe('getPublicGalleryDownloadsBySlug', () => {
+    it('throws HTTP404 and fetches nothing when no active gallery matches the slug', async () => {
+      // The slug guard runs first: a missing gallery short-circuits before any
+      // eligible-download work.
+
+      // Step 1: Stub the slug lookup to find nothing
+      const findStub = sinon.stub(GalleryRepository.prototype, 'findActiveGalleryBySlug').resolves(null);
+      const downloadsStub = sinon.stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloads');
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloadsCount');
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryDownloadService(mockDBConnection);
+
+      // Step 3: Attempt to read a nonexistent gallery
+      try {
+        await service.getPublicGalleryDownloadsBySlug('nonexistent');
+        expect.fail('expected HTTP404');
+      } catch (error) {
+        // Step 4: The 404 propagates and no further work runs
+        expect(error).to.be.instanceOf(HTTP404);
+        expect((error as HTTP404).message).to.equal('Gallery not found');
+        expect(findStub).to.have.been.calledOnceWith('nonexistent');
+        expect(downloadsStub).to.not.have.been.called;
+        expect(countStub).to.not.have.been.called;
+      }
+    });
+
+    it('throws the identical HTTP404 for a private gallery (indistinguishable from missing)', async () => {
+      // Anti-disclosure: the private and missing paths must not drift into an
+      // oracle — same error type, same exact message, same no-fetch behavior.
+
+      // Step 1: Stub the slug lookup to find a private gallery
+      sinon
+        .stub(GalleryRepository.prototype, 'findActiveGalleryBySlug')
+        .resolves(createMockGalleryRecord({ visibility: 'private' }));
+      const downloadsStub = sinon.stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloads');
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloadsCount');
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryDownloadService(mockDBConnection);
+
+      // Step 3: Attempt to read the private gallery
+      try {
+        await service.getPublicGalleryDownloadsBySlug('test-gallery');
+        expect.fail('expected HTTP404');
+      } catch (error) {
+        // Step 4: Byte-identical to the missing-gallery response; fetchers never run
+        expect(error).to.be.instanceOf(HTTP404);
+        expect((error as HTTP404).message).to.equal('Gallery not found');
+        expect(downloadsStub).to.not.have.been.called;
+        expect(countStub).to.not.have.been.called;
+      }
+    });
+
+    it('resolves the slug to the gallery id and returns eligible downloads with the count', async () => {
+      // Step 1: Stub the slug lookup to a public gallery and the eligible reads
+      sinon
+        .stub(GalleryRepository.prototype, 'findActiveGalleryBySlug')
+        .resolves(createMockGalleryRecord({ gallery_id: 7 }));
+      const downloads = [
+        createMockGalleryDownloadTileRecord({ download_id: 'first' }),
+        createMockGalleryDownloadTileRecord({ download_id: 'second', feature_count: null })
+      ];
+      const downloadsStub = sinon
+        .stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloads')
+        .resolves(downloads);
+      const countStub = sinon.stub(GalleryDownloadRepository.prototype, 'getEligibleGalleryDownloadsCount').resolves(9);
+
+      // Step 2: Create the service
+      const mockDBConnection = getMockDBConnection();
+      const service = new GalleryDownloadService(mockDBConnection);
+      const pagination = { page: 2, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      // Step 3: Read the public gallery by slug
+      const result = await service.getPublicGalleryDownloadsBySlug('test-gallery', pagination);
+
+      // Step 4: Both eligible reads receive the resolved gallery id; rows (including
+      // a NULL feature_count) pass through untouched
+      expect(result).to.eql({ downloads, count: 9 });
+      expect(downloadsStub).to.have.been.calledOnceWith(7, pagination);
+      expect(countStub).to.have.been.calledOnceWith(7);
     });
   });
 });

@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
-import { HTTP409 } from '../../errors/http-error';
+import { HTTP404, HTTP409 } from '../../errors/http-error';
 import { DownloadDetailRecord } from '../../models/download';
+import { GalleryDownloadTileRecord } from '../../models/gallery-download';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { GalleryDownloadRepository } from '../../repositories/gallery/gallery-download-repository';
 import { GalleryRepository } from '../../repositories/gallery/gallery-repository';
@@ -105,6 +106,46 @@ export class GalleryDownloadService extends DBService {
     const [downloads, count] = await Promise.all([
       this.galleryDownloadRepository.getGalleryDownloads(galleryId, pagination),
       this.galleryDownloadRepository.getGalleryDownloadsCount(galleryId)
+    ]);
+
+    return { downloads, count };
+  }
+
+  /**
+   * List the publicly advertisable download tiles for a slug-addressed gallery.
+   *
+   * The visibility gate lives here, not in the repository: whether a gallery may
+   * be shown to the anonymous public is a business rule, and the repository's
+   * slug lookup stays a plain active-row read. Private and missing galleries
+   * throw from the single guard below with an identical 404 — a private gallery
+   * must be indistinguishable from a missing one, since a distinct response
+   * would disclose that a hidden gallery exists.
+   *
+   * An existing public gallery with zero eligible downloads is the empty list
+   * (a valid state, distinct from not-found). Eligibility (latest active version
+   * ready/downloaded, public-scope exports only) is enforced by the repository
+   * reads.
+   *
+   * @param {string} slug - The gallery slug.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<{ downloads: GalleryDownloadTileRecord[]; count: number }>}
+   * @throws {HTTP404} when no active gallery matches the slug, or the matching
+   * gallery is not public.
+   * @memberof GalleryDownloadService
+   */
+  async getPublicGalleryDownloadsBySlug(
+    slug: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<{ downloads: GalleryDownloadTileRecord[]; count: number }> {
+    const gallery = await this.galleryRepository.findActiveGalleryBySlug(slug);
+
+    if (!gallery || gallery.visibility !== 'public') {
+      throw new HTTP404('Gallery not found');
+    }
+
+    const [downloads, count] = await Promise.all([
+      this.galleryDownloadRepository.getEligibleGalleryDownloads(gallery.gallery_id, pagination),
+      this.galleryDownloadRepository.getEligibleGalleryDownloadsCount(gallery.gallery_id)
     ]);
 
     return { downloads, count };
