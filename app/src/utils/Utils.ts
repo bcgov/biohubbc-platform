@@ -185,12 +185,12 @@ export const formatFeatureCount = (count: number | null): string | null => {
     return `${count} ${pluralize(count, 'feature')}`;
   }
 
-  const thousands = parseFloat((count / 1000).toFixed(1));
+  const thousands = Number.parseFloat((count / 1000).toFixed(1));
   if (thousands < 1000) {
     return `${thousands}k features`;
   }
 
-  return `${parseFloat((count / 1000000).toFixed(1))}M features`;
+  return `${Number.parseFloat((count / 1000000).toFixed(1))}M features`;
 };
 
 /**

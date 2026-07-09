@@ -212,7 +212,7 @@ describe('getFormattedFileSize', () => {
 
 describe('formatFeatureCount', () => {
   it('returns null when count is null so the caller omits the line', () => {
-    expect(formatFeatureCount(null)).toEqual(null);
+    expect(formatFeatureCount(null)).toBeNull();
   });
 
   it('returns `0 features` when count is 0', () => {

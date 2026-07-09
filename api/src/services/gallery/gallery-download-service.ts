@@ -139,7 +139,7 @@ export class GalleryDownloadService extends DBService {
   ): Promise<{ downloads: GalleryDownloadTileRecord[]; count: number }> {
     const gallery = await this.galleryRepository.findActiveGalleryBySlug(slug);
 
-    if (!gallery || gallery.visibility !== 'public') {
+    if (gallery?.visibility !== 'public') {
       throw new HTTP404('Gallery not found');
     }
 
