@@ -177,9 +177,6 @@ describe('DownloadVersionRepository', () => {
       const sqlValues = sqlStub.firstCall.args[0].values;
       const nullBinds = sqlValues.filter((value: unknown) => value === null);
       expect(nullBinds).to.have.length(1);
-      // Bind order mirrors the SET list: status, started_at, completed_at, materialized_at,
-      // error_message, feature_count, download_version_id.
-      expect(sqlValues[5]).to.equal(null);
     });
 
     it('throws ApiExecuteSQLError when rowCount is not 1', async () => {

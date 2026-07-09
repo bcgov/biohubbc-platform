@@ -1,4 +1,4 @@
-import { Knex } from 'knex';
+import type { Knex } from 'knex';
 
 /**
  * Adds `download_version.feature_count` — the total number of features materialized into the

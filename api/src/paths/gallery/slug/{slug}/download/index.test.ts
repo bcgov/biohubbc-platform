@@ -39,11 +39,13 @@ describe('paths/gallery/slug/{slug}/download/index', () => {
       expect(apiUserStub).to.have.been.calledOnce;
       expect(dbConnStub).to.not.have.been.called;
       // Slug is forwarded as the raw string — never Number()-coerced like id params.
+      // Client sort/order are stripped: the landing order is a product invariant, and
+      // the pagination response must not echo a sort the read didn't honor.
       expect(getBySlugStub).to.have.been.calledOnceWith('home', {
         page: 2,
         limit: 10,
-        sort: 'create_date',
-        order: 'desc'
+        sort: undefined,
+        order: undefined
       });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue.downloads).to.eql(tiles);
@@ -52,8 +54,8 @@ describe('paths/gallery/slug/{slug}/download/index', () => {
         per_page: 10,
         current_page: 2,
         last_page: 1,
-        sort: 'create_date',
-        order: 'desc'
+        sort: undefined,
+        order: undefined
       });
       // Tile shape fence: the landing rows carry the stored feature count.
       expect(mockRes.jsonValue.downloads[0]).to.have.property('feature_count');

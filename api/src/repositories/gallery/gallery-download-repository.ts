@@ -1,15 +1,13 @@
+import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import { DownloadDetailRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { GalleryDownloadTileRecord } from '../../models/gallery-download';
+import { GalleryDownloadExists, GalleryDownloadTileRecord } from '../../models/gallery-download';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-
-const GalleryDownloadExists = z.object({ exists: z.boolean() });
 
 /**
  * A repository class for accessing the gallery↔download join (`gallery_download`).
@@ -231,9 +229,7 @@ export class GalleryDownloadRepository extends BaseRepository {
     galleryId: number,
     pagination?: ApiPaginationOptions
   ): Promise<GalleryDownloadTileRecord[]> {
-    const knex = getKnex();
-
-    const query = knex
+    const query = this._buildEligibleGalleryDownloadsQuery(galleryId)
       .select([
         'd.download_id',
         'dv.download_version_id',
@@ -248,23 +244,7 @@ export class GalleryDownloadRepository extends BaseRepository {
         'p.name',
         'p.description'
       ])
-      .from('gallery_download as gd')
-      .innerJoin('download as d', 'd.download_id', 'gd.download_id')
-      .joinRaw(
-        `INNER JOIN LATERAL (
-          SELECT download_version_id, status, started_at, completed_at, feature_count
-          FROM download_version
-          WHERE download_id = d.download_id AND record_end_date IS NULL
-          ORDER BY create_date DESC, download_version_id DESC
-          LIMIT 1
-        ) dv ON true`
-      )
-      .leftJoin('policy as p', 'p.policy_id', 'd.policy_id')
-      .where('gd.gallery_id', galleryId)
-      .whereNull('gd.record_end_date')
-      .whereNull('d.record_end_date')
-      .whereNull('d.requested_by')
-      .whereIn('dv.status', [DownloadStatusEnum.READY, DownloadStatusEnum.DOWNLOADED]);
+      .leftJoin('policy as p', 'p.policy_id', 'd.policy_id');
 
     if (pagination) {
       // Landing order is a product invariant — apply limit/offset only, never client sort.
@@ -286,11 +266,10 @@ export class GalleryDownloadRepository extends BaseRepository {
   /**
    * Count active gallery download records eligible for public landing-page display.
    *
-   * Must apply the same eligibility filters as `getEligibleGalleryDownloads` — the
-   * same latest-active-version `LATERAL`, not the any-active-version `whereExists`
-   * check used by `getGalleryDownloadsCount`, plus the same public-scope filter
-   * (`requested_by IS NULL`) — so a filtered-out download never inflates the
-   * pagination total.
+   * Applies the same eligibility filters as `getEligibleGalleryDownloads` — both
+   * are built from `_buildEligibleGalleryDownloadsQuery`, so a filtered-out
+   * download never inflates the pagination total. Deliberately NOT the
+   * any-active-version `whereExists` shape used by `getGalleryDownloadsCount`.
    *
    * @param {number} galleryId - The gallery ID.
    * @return {Promise<number>}
@@ -299,12 +278,35 @@ export class GalleryDownloadRepository extends BaseRepository {
   async getEligibleGalleryDownloadsCount(galleryId: number): Promise<number> {
     const knex = getKnex();
 
-    const query = knex
+    const query = this._buildEligibleGalleryDownloadsQuery(galleryId)
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .first();
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
+  }
+
+  /**
+   * Build the shared advertisability scaffolding for the public landing read:
+   * the membership + download joins, the latest-active-version `LATERAL`, and
+   * the eligibility filters. The list and count queries are both built from this
+   * one base so their filter parity is structural — a download filtered out of
+   * the list can never inflate the pagination total.
+   *
+   * @param {number} galleryId - The gallery ID.
+   * @return {Knex.QueryBuilder}
+   * @memberof GalleryDownloadRepository
+   */
+  private _buildEligibleGalleryDownloadsQuery(galleryId: number): Knex.QueryBuilder {
+    const knex = getKnex();
+
+    return knex
       .from('gallery_download as gd')
       .innerJoin('download as d', 'd.download_id', 'gd.download_id')
       .joinRaw(
         `INNER JOIN LATERAL (
-          SELECT status
+          SELECT download_version_id, status, started_at, completed_at, feature_count
           FROM download_version
           WHERE download_id = d.download_id AND record_end_date IS NULL
           ORDER BY create_date DESC, download_version_id DESC
@@ -315,12 +317,6 @@ export class GalleryDownloadRepository extends BaseRepository {
       .whereNull('gd.record_end_date')
       .whereNull('d.record_end_date')
       .whereNull('d.requested_by')
-      .whereIn('dv.status', [DownloadStatusEnum.READY, DownloadStatusEnum.DOWNLOADED])
-      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
-      .first();
-
-    const response = await this.connection.knex(query, CountResult);
-
-    return response.rows[0].count;
+      .whereIn('dv.status', [DownloadStatusEnum.READY, DownloadStatusEnum.DOWNLOADED]);
   }
 }

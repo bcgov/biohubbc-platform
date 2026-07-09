@@ -41,7 +41,11 @@ export async function seed(knex: Knex): Promise<void> {
     }
 
     // Resolve create_user for inserts (audit trigger may set it; fallback for environments where it does not)
-    const createUserRow = await trx('system_user').whereNull('record_end_date').select('system_user_id').first();
+    const createUserRow = await trx('system_user')
+      .whereNull('record_end_date')
+      .orderBy('system_user_id')
+      .select('system_user_id')
+      .first();
     const createUser = createUserRow?.system_user_id ?? 1;
 
     /**

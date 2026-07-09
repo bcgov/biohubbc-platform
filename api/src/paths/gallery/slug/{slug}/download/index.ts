@@ -13,7 +13,8 @@ const defaultLog = getLogger('paths/gallery/slug/{slug}/download');
 export const GET: Operation = [getPublicGalleryDownloadsBySlug()];
 
 GET.apiDoc = {
-  description: 'Get the publicly advertisable download tiles for a slug-addressed gallery.',
+  description:
+    'Get the publicly advertisable download tiles for a slug-addressed gallery. The landing order (curator pins first, then newest memberships) is a product invariant — client `sort`/`order` params are ignored.',
   tags: ['gallery'],
   security: [{ OptionalBearer: [] }],
   parameters: [
@@ -21,7 +22,7 @@ GET.apiDoc = {
       in: 'path',
       name: 'slug',
       required: true,
-      schema: { type: 'string' },
+      schema: { type: 'string', maxLength: 100 },
       description: 'Gallery slug.'
     },
     ...paginationRequestQueryParamSchema
@@ -66,10 +67,15 @@ export function getPublicGalleryDownloadsBySlug(): RequestHandler {
       await connection.open();
 
       const galleryDownloadService = new GalleryDownloadService(connection);
-      const pagination = makePaginationOptionsFromRequest(req);
+      // Landing order is a product invariant (curator pins + newest memberships), so a
+      // client `sort`/`order` is never applied — strip it here so the pagination
+      // response doesn't echo a sort the read didn't honor.
+      const pagination = { ...makePaginationOptionsFromRequest(req), sort: undefined, order: undefined };
       const { downloads, count } = await galleryDownloadService.getPublicGalleryDownloadsBySlug(slug, pagination);
 
       await connection.commit();
+
+      res.setHeader('Cache-Control', 'public, max-age=90');
 
       return res.status(200).json({ downloads, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {

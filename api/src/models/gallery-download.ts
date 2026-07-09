@@ -25,6 +25,12 @@ export interface AddGalleryDownloadRequestBody {
  * must not fail the whole list parse.
  */
 export const GalleryDownloadTileRecord = DownloadDetailRecord.extend({
-  feature_count: z.number().nullable()
+  feature_count: z.number().int().nullable()
 });
 export type GalleryDownloadTileRecord = z.infer<typeof GalleryDownloadTileRecord>;
+
+/**
+ * Read shape for the `SELECT EXISTS (...)` membership check.
+ */
+export const GalleryDownloadExists = z.object({ exists: z.boolean() });
+export type GalleryDownloadExists = z.infer<typeof GalleryDownloadExists>;
