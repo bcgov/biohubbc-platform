@@ -6,7 +6,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
-import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../repositories/user-repository';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { UserService } from '../user-service';
 import {
@@ -152,6 +152,21 @@ describe('authorizeSystemAdministrator', function () {
     const isAuthorized = await authorizationService.authorizeSystemAdministrator();
 
     expect(isAuthorized).to.equal(true);
+  });
+
+  it('returns false if the injected system user is soft-deleted, even with the admin role', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const softDeletedAdmin = {
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedAdmin });
+
+    const isAuthorized = await authorizationService.authorizeSystemAdministrator();
+
+    expect(isAuthorized).to.be.false;
   });
 });
 
@@ -301,6 +316,18 @@ describe('authorizeBySystemUser', function () {
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemUser();
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+  });
+
+  it('returns false if the injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: { record_end_date: '2020-01-01' } as unknown as SystemUserExtended
+    });
+
+    const isAuthorizedBySystemUser = await authorizationService.authorizeBySystemUser();
+
+    expect(isAuthorizedBySystemUser).to.be.false;
   });
 });
 
@@ -459,6 +486,21 @@ describe('getCachedSystemUser', function () {
     expect(result).to.be.null;
     expect(authorizationService['_systemUser']).to.be.undefined;
   });
+
+  it('returns null if the cached/injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const softDeletedUser = {
+      system_user_id: 1,
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    // Simulate a constructor-injected (e.g. via req.system_user) soft-deleted user
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedUser });
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+  });
 });
 
 describe('authorizeByTeam', function () {
@@ -466,9 +508,12 @@ describe('authorizeByTeam', function () {
     sinon.restore();
   });
 
-  const systemUser: SystemUser = {
+  const systemUser: SystemUserExtended = {
     system_user_id: 1,
     user_identity_source_id: 2,
+    identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_ids: [],
+    role_names: [],
     user_identifier: 'test-user',
     user_guid: 'guid-123',
     record_effective_date: '',
@@ -782,32 +827,6 @@ describe('getSystemUserObject', function () {
     const systemUserObject = await authorizationService.getSystemUserObject();
 
     expect(systemUserObject).to.be.null;
-  });
-});
-
-describe('isSystemUserInactive', function () {
-  it('returns false if `record_end_date` is null', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: null
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.false;
-  });
-
-  it('returns true if `record_end_date` is in the past', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: '2020-01-01'
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.true;
-  });
-
-  it('returns false if `record_end_date` is in the future', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: '2999-01-01'
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.false;
   });
 });
 
