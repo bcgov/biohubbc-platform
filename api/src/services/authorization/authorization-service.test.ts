@@ -93,6 +93,11 @@ describe('executeAuthorizeConfig', function () {
       },
       {
         discriminator: 'Contributor'
+      },
+      {
+        discriminator: 'Policy',
+        submissionFeatureId: 1,
+        submissionId: 2
       }
     ];
     const mockDBConnection = getMockDBConnection();
@@ -100,12 +105,13 @@ describe('executeAuthorizeConfig', function () {
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByPolicy').resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const authorizeResults = await authorizationService.executeAuthorizeConfig(mockAuthorizeRules);
 
-    expect(authorizeResults).to.eql([false, true, true]);
+    expect(authorizeResults).to.eql([false, true, true, true]);
   });
 });
 
@@ -526,28 +532,85 @@ describe('authorizeByTeam', function () {
 
     expect(result).to.be.false;
   });
+});
 
-  it('allows anonymous users to reach the submission_feature check with a null system user id', async function () {
+describe('authorizeByPolicy', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  const systemUser: SystemUser = {
+    system_user_id: 1,
+    user_identity_source_id: 2,
+    user_identifier: 'test-user',
+    user_guid: 'guid-123',
+    record_effective_date: '',
+    record_end_date: '',
+    create_date: '2023-01-01',
+    create_user: 1,
+    update_date: null,
+    update_user: null,
+    revision_count: 0,
+    display_name: null,
+    given_name: null,
+    family_name: null,
+    email: null,
+    agency: null,
+    notes: null
+  };
+
+  it('returns true when the feature is accessible, passing the authenticated user id and entity ids', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
-    const teamStub = sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByTeam({
-      discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
     });
 
     expect(result).to.be.true;
-    expect(teamStub).to.have.been.calledOnceWith(null, {
-      discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
+    expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
+  });
+
+  it('returns false when the feature is not accessible to the user', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    sinon.stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
     });
+
+    expect(result).to.be.false;
+  });
+
+  it('passes a null system user id through for anonymous requests', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
+    });
+
+    expect(result).to.be.true;
+    expect(accessibleStub).to.have.been.calledOnceWith(null, 2, 3);
   });
 });
 

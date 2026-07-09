@@ -24,31 +24,13 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
-   * - `submission_feature`: ancestry-aware, closure-based access shared with the search/download
-   *   read paths — the feature is unsecured, or the user's team holds a security scope anchored
-   *   on the feature or one of its ancestors. `systemUserId` may be `null` for anonymous users
-   *   (who can still access unsecured features).
    *
-   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
+   * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
    * @return {Promise<boolean>}
    * @memberof TeamAuthorizationService
    */
-  async isUserAuthorizedForTeamEntity(systemUserId: number | null, entity: TeamAuthorizationEntity): Promise<boolean> {
-    // submission_feature uses closure-based access and supports anonymous (unsecured) access.
-    if (entity.entity === 'submission_feature') {
-      return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
-        systemUserId,
-        entity.submissionFeatureId,
-        entity.submissionId
-      );
-    }
-
-    // ticket / data_request require an authenticated user.
-    if (systemUserId === null) {
-      return false;
-    }
-
+  async isUserAuthorizedForTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
     let record: { record_end_date: string | null } | null;
 
     switch (entity.entity) {
@@ -77,5 +59,31 @@ export class TeamAuthorizationService extends DBService {
     }
 
     return true;
+  }
+
+  /**
+   * Determine whether a submission feature is accessible to a user, using the ancestry-aware,
+   * closure-based security check shared with the search/download read paths: the feature is
+   * unsecured, or the user's team holds a security scope anchored on the feature or one of its
+   * ancestors.
+   *
+   * `systemUserId` may be `null` for anonymous users, who can still access unsecured features.
+   *
+   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
+   * @param {number} submissionFeatureId
+   * @param {number} submissionId The submission the feature must belong to.
+   * @return {Promise<boolean>}
+   * @memberof TeamAuthorizationService
+   */
+  async isSubmissionFeatureAccessibleToUser(
+    systemUserId: number | null,
+    submissionFeatureId: number,
+    submissionId: number
+  ): Promise<boolean> {
+    return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
+      systemUserId,
+      submissionFeatureId,
+      submissionId
+    );
   }
 }
