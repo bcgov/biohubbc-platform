@@ -23,16 +23,26 @@ change). It is intentionally NOT wired into any build or request flow.
 
 - **Feature Type Sampler** — committed under `fixtures/sampler/`. One valid feature per feature type the
   Boreal Moose export does not cover, so the snapshot exercises every feature type.
-- **Boreal Moose** — an external single `.tar` (~13 MB), **not committed**, at the solution root:
+- **Boreal Moose** — an external single `.tar` (~8.5 MB), **not committed**, at the solution root:
   `data/1c342e48-d96b-47b2-996c-8e6aa35ef873.tar`. The dataset sits at the tar root
   (`<datasetId>/features|codes|files` + `.dataset-id`), which the parser ingests directly — no
   unwrapping. The committed fixture, not the tar, is the source of truth; the tar is only needed to
   regenerate.
 
+  The tar is **not the raw export**: `docs/scripts/reduce-moose-tar.py` reduces it (telemetry sampled
+  to 6 per deployment) and enriches it (fills sparse properties, synthesizes the 11 feature types the
+  export omits, sets the two boolean properties) so the snapshot exercises expression search. The raw
+  export is kept beside it as `*.orig.tar`, and the script always rebuilds from that backup — so it is
+  idempotent and the reduction is never applied twice.
+
 ## Environment prerequisites
 
 - The full stack must be up: **DB + MinIO + queue** (the queue is only used to enqueue an inert
   anchor-compute job; the generator computes anchors synchronously itself).
+- **Migrations must be current.** The Moose dataset carries `mortality.is_confirmed` and
+  `capture.is_recapture`, defined by `20260709130000_boolean_feature_properties`. Without that
+  migration the indexer resolves no Blueprint assignment for them and silently drops both values,
+  producing a fixture whose `property_boolean` count is `0`.
 - **ITIS taxa must be present.** The indexer resolves each `taxon_id` against the `taxon` table and
   fail-fasts the whole submission's property indexing if any TSN is unresolved. A clean local DB has an
   empty `taxon` table (no ITIS sync has run), so the taxa the datasets reference must be seeded first,
