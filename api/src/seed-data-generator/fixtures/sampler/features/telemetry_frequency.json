@@ -1,0 +1,12 @@
+[
+  {
+    "id": "3e263a19-b717-49d6-b6f5-7b99d2a4732b",
+    "type": "telemetry_frequency",
+    "properties": {
+      "frequency": 150.125,
+      "frequency_unit": "MHz"
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

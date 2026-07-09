@@ -899,7 +899,11 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(rows[0].data.imaginary_bool).to.be.null;
     });
 
-    it('falls back to JSONB for array properties', async () => {
+    it('emits null for unsupported array properties (does not read submission_feature.data)', async () => {
+      // The hydrator reads only the typed submission_feature_property_* tables; it must NOT fall
+      // back to submission_feature.data (pre-indexing JSONB that can diverge from indexed values).
+      // 'array' (and 'object') are unsupported property types, so they are emitted as null even
+      // when the raw JSONB holds a value.
       const submissionId = await createTestSubmission(connection);
       const surveyFeatureId = await createTestFeature(connection, submissionId, 'survey', {
         name: 'Array Test',
@@ -912,7 +916,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
       const rows = await streamAndHydrateBySubmission(submissionId, 'survey', properties, 'pq-array');
       expect(rows).to.have.length(1);
-      expect(rows[0].data.focal_species).to.deep.equal(['bear', 'elk']);
+      expect(rows[0].data.focal_species).to.be.null;
       // Suppress unused-variable warning — the feature id keeps the helper output traceable in failures.
       expect(surveyFeatureId).to.be.a('number');
     });

@@ -150,8 +150,8 @@ export const insertSurveyRecord = async (
       data: {
         name,
         description,
-        start_date: faker.date.past().toISOString(),
-        end_date: faker.date.future().toISOString(),
+        start_date: faker.date.past().toISOString().split('T')[0],
+        end_date: faker.date.future().toISOString().split('T')[0],
         // Full FeatureCollection matches the ingest contract (see
         // `feature-validation-service.ts:266` — `spatial` is `GeoJSONFeatureCollectionZodSchema`).
         geometry: random.point(
@@ -396,8 +396,8 @@ const insertAnimalRecord = async (
       data: {
         species,
         count: faker.number.int({ min: 0, max: 100 }),
-        start_date: faker.date.past().toISOString(),
-        end_date: faker.date.future().toISOString()
+        start_date: faker.date.past().toISOString().split('T')[0],
+        end_date: faker.date.future().toISOString().split('T')[0]
       }
     })}`
   );
@@ -593,7 +593,7 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number; ta
 `;
 
 const insertSearchStartDatetime = (options: { submission_feature_id: number }) => {
-  const timestamp = faker.date.past().toISOString();
+  const date = faker.date.past().toISOString().split('T')[0];
 
   return `
     INSERT INTO submission_feature_property_timestamp
@@ -609,8 +609,8 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
         sf.submission_feature_id,
         ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
-        $$${timestamp}$$::timestamptz::date,
-        $$${timestamp}$$::timestamptz::time,
+        $$${date}$$::date,
+        NULL::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
@@ -626,7 +626,7 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
 };
 
 const insertSearchEndDatetime = (options: { submission_feature_id: number }) => {
-  const timestamp = faker.date.future().toISOString();
+  const date = faker.date.future().toISOString().split('T')[0];
 
   return `
     INSERT INTO submission_feature_property_timestamp
@@ -642,8 +642,8 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
         sf.submission_feature_id,
         ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
-        $$${timestamp}$$::timestamptz::date,
-        $$${timestamp}$$::timestamptz::time,
+        $$${date}$$::date,
+        NULL::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL

@@ -56,22 +56,10 @@ const systemUsers: SystemUserSeed[] = [
     user_guid: '473C7CDAC46D402AA79AE980DDDB85C3'
   },
   {
-    identifier: 'abushara',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '9266B99E3E9C42339D9F951CBB6E3494'
-  },
-  {
     identifier: 'dahogan',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '6936047233B94EA0B8C0698F6349E027'
-  },
-  {
-    identifier: 'jpilon',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'A8ADEA1A0F3147C09CBA91D6CE2AE07B'
   }
 ];
 
