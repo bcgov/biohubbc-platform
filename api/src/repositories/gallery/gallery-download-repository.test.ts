@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { DownloadStatusEnum } from '../../models/download-status';
 import { GalleryDownloadRepository } from './gallery-download-repository';
 
 chai.use(sinonChai);
@@ -179,6 +180,93 @@ describe('GalleryDownloadRepository', () => {
       expect(sqlText).to.match(/exists/i);
       expect(sqlText).to.include('"dv"."record_end_date" is null');
       expect(sqlText).to.include('count(*)');
+    });
+  });
+
+  describe('getEligibleGalleryDownloads', () => {
+    it('binds the gallery id, filters to ready/downloaded, selects feature_count, and applies the fixed landing order', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new GalleryDownloadRepository(mockDBConnection);
+
+      await repo.getEligibleGalleryDownloads(42);
+
+      expect(knexStub).to.have.been.calledOnce;
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('"gd"."gallery_id" = 42');
+      expect(sqlText).to.include(`'${DownloadStatusEnum.READY}'`);
+      expect(sqlText).to.include(`'${DownloadStatusEnum.DOWNLOADED}'`);
+      // Public-scope security filter — user-scoped exports (requested_by set) reflect that
+      // user's privileged visibility and must never be advertised on the public landing page.
+      expect(sqlText).to.include('"d"."requested_by" is null');
+      const lateralSql = sqlText.slice(sqlText.indexOf('INNER JOIN LATERAL'), sqlText.indexOf(') dv ON true'));
+      expect(lateralSql).to.include('feature_count');
+      // The landing order is unconditional — applied even with no pagination in play
+      expect(sqlText).to.include('gd.sort ASC NULLS LAST, gd.create_date DESC, gd.gallery_download_id DESC');
+    });
+
+    it('ignores caller-provided sort/order — the landing order is a product invariant', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new GalleryDownloadRepository(mockDBConnection);
+
+      await repo.getEligibleGalleryDownloads(42, { page: 1, limit: 9, sort: 'create_date', order: 'asc' });
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('gd.sort ASC NULLS LAST, gd.create_date DESC, gd.gallery_download_id DESC');
+      expect(sqlText).to.not.include('order by "create_date" asc');
+    });
+
+    it('honors pagination limit/offset while still applying the fixed landing order', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new GalleryDownloadRepository(mockDBConnection);
+
+      await repo.getEligibleGalleryDownloads(42, { page: 2, limit: 10 });
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('limit 10');
+      expect(sqlText).to.include('offset 10');
+      expect(sqlText).to.include('gd.sort ASC NULLS LAST, gd.create_date DESC, gd.gallery_download_id DESC');
+    });
+
+    it('keeps the status filter outside the LATERAL so the latest version is resolved first, then judged', async () => {
+      // A status filter pushed down into the LATERAL would resurrect an older ready
+      // version when the latest one is failed — the filter must judge the resolved row.
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new GalleryDownloadRepository(mockDBConnection);
+
+      await repo.getEligibleGalleryDownloads(42);
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      const lateralSql = sqlText.slice(sqlText.indexOf('INNER JOIN LATERAL'), sqlText.indexOf(') dv ON true'));
+      expect(lateralSql.toLowerCase()).to.not.include('status in');
+      expect(sqlText).to.include('"dv"."status" in');
+    });
+  });
+
+  describe('getEligibleGalleryDownloadsCount', () => {
+    it('returns the eligible count using the same latest-version LATERAL as the list read', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 7 }], 1));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const repo = new GalleryDownloadRepository(mockDBConnection);
+
+      const result = await repo.getEligibleGalleryDownloadsCount(42);
+
+      expect(result).to.equal(7);
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('"gd"."gallery_id" = 42');
+      expect(sqlText).to.include('ORDER BY create_date DESC');
+      expect(sqlText).to.include('LIMIT 1');
+      expect(sqlText).to.include(`'${DownloadStatusEnum.READY}'`);
+      expect(sqlText).to.include(`'${DownloadStatusEnum.DOWNLOADED}'`);
+      // Parity with the list read's public-scope filter — the count must not include
+      // user-scoped rows the list excludes.
+      expect(sqlText).to.include('"d"."requested_by" is null');
+      // Must not use the sibling's whereExists any-active-version shape — that would
+      // count downloads the list read filters out.
+      expect(sqlText.toLowerCase()).to.not.include('exists');
     });
   });
 });
