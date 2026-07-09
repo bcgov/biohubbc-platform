@@ -59,7 +59,8 @@ describe('index', () => {
         feature_type_name: 'sample_site',
         feature_type_display_name: 'Sample Site',
         submission_name: 'Test Submission',
-        secured: true
+        secured: true,
+        security_reasons: ['Moose']
       };
 
       const mockRelatedFeatures: RelatedSubmissionFeature[] = [

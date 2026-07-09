@@ -4,8 +4,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
-import { SubmissionFeature } from '../../repositories/submission-repository';
-import { SubmissionFeatureService } from '../submission-feature-service';
 import { TeamAuthorizationService } from './team-authorization-service';
 
 chai.use(sinonChai);
@@ -107,94 +105,32 @@ describe('TeamAuthorizationService', () => {
     });
 
     describe('entity: submission_feature', () => {
-      const fakeFeature: SubmissionFeature = {
-        submission_feature_id: 1,
-        uuid: 'uuid-1',
-        urn: 'urn:1:Feature:1',
-        submission_id: 1,
-        feature_type_id: 10,
-        source_id: null,
-        data: {},
-        feature_type_name: 'Feature',
-        feature_type_display_name: 'Feature',
-        submission_name: 'Test Submission',
-        secured: true
-      };
-
-      it('returns true immediately if the feature is not secured', async () => {
+      it('returns true when the feature is accessible to the user, passing through the entity ids', async () => {
         const mockConnection = getMockDBConnection();
-        sinon
-          .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById')
-          .resolves({ ...fakeFeature, secured: false });
+        const accessibleStub = sinon
+          .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
+          .resolves(true);
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
           entity: 'submission_feature',
-          submissionFeatureId: 1,
-          submissionId: 1
+          submissionFeatureId: 2,
+          submissionId: 3
         });
 
         expect(result).to.be.true;
+        expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
       });
 
-      it('returns false if the submission ID does not match', async () => {
+      it('returns false when the feature is not accessible to the user', async () => {
         const mockConnection = getMockDBConnection();
-        sinon.stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+        sinon.stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
           entity: 'submission_feature',
-          submissionFeatureId: 1,
-          submissionId: 999
-        });
-
-        expect(result).to.be.false;
-      });
-
-      it('returns true when the user has active team policy access to the submission feature', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-        sinon
-          .stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature')
-          .resolves({ team_policy_id: 'tp-1', record_end_date: null });
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, {
-          entity: 'submission_feature',
-          submissionFeatureId: 1,
-          submissionId: 1
-        });
-
-        expect(result).to.be.true;
-      });
-
-      it('returns false when the user does not have team policy access to the submission feature', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature').resolves(null);
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, {
-          entity: 'submission_feature',
-          submissionFeatureId: 1,
-          submissionId: 1
-        });
-
-        expect(result).to.be.false;
-      });
-
-      it('returns false when the team membership has expired', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-        sinon
-          .stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature')
-          .resolves({ team_policy_id: 'tp-1', record_end_date: '2025-01-01' });
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, {
-          entity: 'submission_feature',
-          submissionFeatureId: 1,
-          submissionId: 1
+          submissionFeatureId: 2,
+          submissionId: 3
         });
 
         expect(result).to.be.false;

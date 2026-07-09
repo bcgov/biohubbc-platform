@@ -1,7 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { DBService } from '../db-service';
-import { SubmissionFeatureService } from '../submission-feature-service';
 import { TeamAuthorizationEntity } from './authorization-service';
 
 /**
@@ -25,8 +24,9 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
-   * - `submission_feature`: membership in a policy recipient team linked through
-   *   team_policy for an ALLOWing policy statement chain.
+   * - `submission_feature`: the feature is not effectively secured, or the user's team
+   *   holds a security scope anchored on the feature or one of its ancestors (the same
+   *   ancestry-aware check the search/download read paths apply).
    *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
@@ -48,28 +48,15 @@ export class TeamAuthorizationService extends DBService {
         );
         break;
 
-      case 'submission_feature': {
-        const submissionFeatureService = new SubmissionFeatureService(this.connection);
-        const feature = await submissionFeatureService.getSubmissionFeatureById(entity.submissionFeatureId);
-
-        if (!feature.secured) {
-          return true;
-        }
-
-        if (
-          entity.submissionId !== undefined &&
-          entity.submissionId !== null &&
-          feature.submission_id !== entity.submissionId
-        ) {
-          return false;
-        }
-
-        record = await this.teamAuthorizationRepository.findTeamPolicyBySubmissionFeature(
+      case 'submission_feature':
+        // Ancestry-aware access check shared with the search/download read paths: unsecured
+        // features are open; secured features require the user's team to hold a scope anchored
+        // on the feature or one of its ancestors.
+        return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
           systemUserId,
-          entity.submissionFeatureId
+          entity.submissionFeatureId,
+          entity.submissionId
         );
-        break;
-      }
 
       default:
         return false;

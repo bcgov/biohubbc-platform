@@ -86,40 +86,48 @@ describe('TeamAuthorizationRepository', () => {
     });
   });
 
-  describe('findTeamPolicyBySubmissionFeature', () => {
-    it('returns a record when the user has team policy access to the submission feature', async () => {
-      const mockRow = { team_policy_id: 'tp-1', record_end_date: null };
-      const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as QueryResult<any>;
-      const mockConnection = getMockDBConnection({ sql: async () => mockResponse });
+  describe('isSubmissionFeatureAccessibleToUser', () => {
+    it('returns true when an accessible matching feature row exists', async () => {
+      const mockResponse = { rowCount: 1, rows: [{ '1': 1 }] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.findTeamPolicyBySubmissionFeature(1, 100);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
 
-      expect(result).to.eql(mockRow);
+      expect(result).to.be.true;
     });
 
-    it('returns null when the user does not have team policy access to the submission feature', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
-      const mockConnection = getMockDBConnection({ sql: async () => mockResponse });
+    it('returns false when no accessible matching feature row exists', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.findTeamPolicyBySubmissionFeature(1, 100);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
 
-      expect(result).to.be.null;
+      expect(result).to.be.false;
     });
 
-    it('requires approved policy and active team/team_member in SQL', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<any>);
-      const mockConnection = getMockDBConnection({ sql: sqlStub });
+    it('scopes to the feature and submission and applies the active + ancestry-aware access checks', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const compiled = query.toSQL();
+          const sql = compiled.sql.toLowerCase();
+          // scoped to the requested feature within the requested submission
+          expect(sql).to.include('"sf"."submission_feature_id" = ?');
+          expect(sql).to.include('"sf"."submission_id" = ?');
+          // active-window guard on the feature itself
+          expect(sql).to.include('record_effective_date');
+          // ancestry-aware access fragment (closure walk + scope anchor)
+          expect(sql).to.include('submission_feature_closure');
+          expect(sql).to.include('security_scope_anchor');
+          // bindings carry the feature id, submission id, and the bound systemUserId
+          expect(compiled.bindings).to.include.members([100, 200, 1]);
+          return { rowCount: 0, rows: [] } as QueryResult<any>;
+        }
+      });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      await repository.findTeamPolicyBySubmissionFeature(1, 100);
-
-      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
-      expect(sqlText).to.include("and p.status = 'approved'");
-      expect(sqlText).to.include('inner join team t');
-      expect(sqlText).to.include('and t.record_end_date is null');
-      expect(sqlText).to.include('and tm.record_end_date is null');
+      await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
     });
   });
 });

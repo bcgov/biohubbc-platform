@@ -21,7 +21,8 @@ const mockFeature = {
   submission_name: 'Test Submission',
   source_id: null,
   data: { species_name: 'Wolf', count: '5' },
-  secured: false
+  secured: false,
+  security_reasons: []
 };
 
 const mockRelatedFeatures = [
