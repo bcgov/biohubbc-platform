@@ -1,7 +1,7 @@
 [
   {
     "id": "cc07359b-dd25-4965-98d0-d8b89558432c",
-    "type": "dataset",
+    "type": "survey",
     "properties": {
       "name": "Feature Type Sampler",
       "start_date": "2020-01-01",
