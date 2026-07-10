@@ -2,15 +2,17 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP401 } from '../errors/http-error';
-import { isSystemUserInactive } from '../models/user';
 import {
   AvailableUser,
   IAddSystemUserParams,
+  IUpdateSystemUserParams,
   SystemRoles,
   SystemUser,
   SystemUserExtended,
-  UserRepository
-} from '../repositories/user-repository';
+  isSystemUserInactive
+} from '../models/system-user';
+import { UserRepository } from '../repositories/user-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -120,18 +122,30 @@ export class UserService extends DBService {
   }
 
   /**
-   * Get a list of all system users.
+   * Get a paginated list of all non-database system users.
    *
+   * @param {string} [search] - Optional search term to filter users by identifier, display name, email, or identity source.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting options.
    * @return {*}  {Promise<SystemUserExtended[]>}
    * @memberof UserService
    */
-  async listSystemUsers(): Promise<SystemUserExtended[]> {
-    return this.userRepository.listSystemUsers();
+  async listSystemUsers(search?: string, pagination?: ApiPaginationOptions): Promise<SystemUserExtended[]> {
+    return this.userRepository.listSystemUsers(search, pagination);
   }
 
   /**
-   * Gets a system user, adding them if they do not already exist, or activating them if they had been deactivated (soft
-   * deleted).
+   * Count all non-database system users.
+   *
+   * @param {string} [search] - Optional search term to filter users by identifier, display name, email, or identity source.
+   * @return {*}  {Promise<number>}
+   * @memberof UserService
+   */
+  async getSystemUsersCount(search?: string): Promise<number> {
+    return this.userRepository.getSystemUsersCount(search);
+  }
+
+  /**
+   * Gets a system user, adding them if they do not already exist.
    *
    * @param {string} userGuid
    * @param {string} userIdentifier
@@ -164,36 +178,23 @@ export class UserService extends DBService {
       return this.getUserById(newUserId.system_user_id);
     }
 
-    if (!existingUser.record_end_date) {
+    if (!isSystemUserInactive(existingUser)) {
       // system user is already active
       return existingUser;
     }
 
-    // system user is not active, re-activate them
-    await this.activateSystemUser(existingUser.system_user_id);
-
-    // get the newly activated user
-    return this.getUserById(existingUser.system_user_id);
+    throw new HTTP401('User account is inactive');
   }
 
   /**
-   * Activates an existing system user that had been deactivated (soft deleted).
+   * Updates a system user.
    *
    * @param {number} systemUserId
+   * @param {IUpdateSystemUserParams} updates
    * @memberof UserService
    */
-  async activateSystemUser(systemUserId: number) {
-    await this.userRepository.activateSystemUser(systemUserId);
-  }
-
-  /**
-   * Deactivates an existing system user (soft delete).
-   *
-   * @param {number} systemUserId
-   * @memberof UserService
-   */
-  async deactivateSystemUser(systemUserId: number) {
-    await this.userRepository.deactivateSystemUser(systemUserId);
+  async updateSystemUser(systemUserId: number, updates: IUpdateSystemUserParams) {
+    await this.userRepository.updateSystemUser(systemUserId, updates);
   }
 
   /**
@@ -301,7 +302,7 @@ export class UserService extends DBService {
    *
    * - If user doesn't exist: creates with Member role
    * - If user exists and is active: updates profile fields
-   * - If user exists but is expired: throws HTTP 401
+   * - If user exists but is inactive: throws HTTP 401
    *
    * @param {string} userGuid - The user's Keycloak GUID
    * @param {string} userIdentifier - The user's identifier (e.g., IDIR username)
@@ -333,7 +334,7 @@ export class UserService extends DBService {
 
     // User exists - check if soft-deleted (inactive)
     if (isSystemUserInactive(existingUser)) {
-      throw new HTTP401('User account is expired or inactive');
+      throw new HTTP401('User account is inactive');
     }
 
     // User exists and is active - update profile fields

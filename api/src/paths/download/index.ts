@@ -11,6 +11,7 @@ import { DownloadService } from '../../services/download/download-service';
 import { getApiBaseUrl } from '../../utils/api-url';
 import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
+import { getActiveSystemUserId } from '../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/download');
 
@@ -264,7 +265,7 @@ export function createDownload(): RequestHandler {
     try {
       await connection.open();
 
-      const requestedBy = isAuthenticated ? connection.systemUserId() : null;
+      const requestedBy = isAuthenticated ? await getActiveSystemUserId(connection) : null;
 
       const downloadService = new DownloadService(connection);
 

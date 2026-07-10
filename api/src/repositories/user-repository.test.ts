@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { UserRepository } from './user-repository';
 
@@ -229,7 +230,7 @@ describe('UserRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
+        knex: async () => {
           return mockQueryResponse;
         }
       });
@@ -248,7 +249,7 @@ describe('UserRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
+        knex: async () => {
           return mockQueryResponse;
         }
       });
@@ -259,13 +260,57 @@ describe('UserRepository', () => {
 
       expect(response).to.equal(mockResponse);
     });
+
+    it('should include blocked users and exclude system and database users', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      let capturedQuery: any;
+      const mockDBConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          capturedQuery = query;
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      await userRepository.listSystemUsers();
+
+      const sql = capturedQuery.toSQL();
+      expect(sql.sql).not.to.contain('su.record_end_date is null');
+      expect(sql.sql).to.contain('"uis"."name"');
+      expect(sql.bindings).to.contain(SYSTEM_IDENTITY_SOURCE.SYSTEM);
+      expect(sql.bindings).to.contain(SYSTEM_IDENTITY_SOURCE.DATABASE);
+    });
   });
 
-  describe('activateSystemUser', () => {
+  describe('getSystemUsersCount', () => {
     afterEach(() => {
       sinon.restore();
     });
-    it('should throw an error when activate fails', async () => {
+
+    it('should return user count', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ count: 3 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      const response = await userRepository.getSystemUsersCount();
+
+      expect(response).to.equal(3);
+    });
+  });
+
+  describe('updateSystemUser', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+    it('should throw an error when update fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -277,85 +322,31 @@ describe('UserRepository', () => {
       const userRepository = new UserRepository(mockDBConnection);
 
       try {
-        await userRepository.activateSystemUser(1);
+        await userRepository.updateSystemUser(1, { record_end_date: null });
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to activate system user');
+        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to update system user');
       }
     });
 
-    it('should activate user', async () => {
-      const mockResponse = [
-        {
-          system_user_id: 1,
-          user_identity_source_id: 1,
-          user_identifier: 1,
-          record_end_date: 'data',
-          record_effective_date: 'date'
-        }
-      ];
-      const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
+    it('should update system user fields', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
 
+      let capturedStatement: any;
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
+        sql: async (statement: any) => {
+          capturedStatement = statement;
           return mockQueryResponse;
         }
       });
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.activateSystemUser(1);
+      const response = await userRepository.updateSystemUser(1, { record_end_date: '2026-01-01T00:00:00.000Z' });
 
       expect(response).to.equal(undefined);
-    });
-  });
-
-  describe('deactivateSystemUser', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-    it('should throw an error when deactivate fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const userRepository = new UserRepository(mockDBConnection);
-
-      try {
-        await userRepository.deactivateSystemUser(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to deactivate system user');
-      }
-    });
-
-    it('should deactivate user', async () => {
-      const mockResponse = [
-        {
-          system_user_id: 1,
-          user_identity_source_id: 1,
-          user_identifier: 1,
-          record_end_date: 'data',
-          record_effective_date: 'date'
-        }
-      ];
-      const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const userRepository = new UserRepository(mockDBConnection);
-
-      const response = await userRepository.deactivateSystemUser(1);
-
-      expect(response).to.equal(undefined);
+      expect(capturedStatement.text).to.contain('record_end_date =');
+      expect(capturedStatement.values).to.contain('2026-01-01T00:00:00.000Z');
     });
   });
 

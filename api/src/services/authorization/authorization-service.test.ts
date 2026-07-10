@@ -6,7 +6,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
-import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUser, SystemUserExtended } from '../../models/system-user';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { UserService } from '../user-service';
 import {
@@ -147,6 +147,27 @@ describe('authorizeSystemAdministrator', function () {
 
     expect(isAuthorized).to.equal(true);
   });
+
+  it('returns false if the cached system administrator is blocked', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: {
+        role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        record_end_date: '2999-01-01',
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
+      } as unknown as SystemUserExtended
+    });
+
+    const isAuthorized = await authorizationService.authorizeSystemAdministrator();
+
+    expect(isAuthorized).to.equal(false);
+  });
 });
 
 describe('authorizeBySystemRole', function () {
@@ -182,7 +203,7 @@ describe('authorizeBySystemRole', function () {
     expect(isAuthorizedBySystemRole).to.equal(false);
   });
 
-  it('returns false if `record_end_date` is null', async function () {
+  it('returns false if `record_end_date` is set', async function () {
     const mockAuthorizeSystemRoles: AuthorizeBySystemRoles = {
       validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
       discriminator: 'SystemRole'
@@ -213,6 +234,31 @@ describe('authorizeBySystemRole', function () {
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+  });
+
+  it('returns false if the cached system user is blocked', async function () {
+    const mockAuthorizeSystemRoles: AuthorizeBySystemRoles = {
+      validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      discriminator: 'SystemRole'
+    };
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: {
+        role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        record_end_date: '2999-01-01',
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
+      } as unknown as SystemUserExtended
+    });
+
+    const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
+
+    expect(isAuthorizedBySystemRole).to.equal(false);
   });
 
   it('returns false if the user does not have any valid roles', async function () {
@@ -394,7 +440,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '',
+      record_end_date: null,
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -426,7 +472,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '',
+      record_end_date: null,
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -448,6 +494,72 @@ describe('getCachedSystemUser', function () {
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(null);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+    expect(authorizationService['_systemUser']).to.be.undefined;
+  });
+
+  it('returns null if the fetched user is blocked', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '2999-01-01',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+    expect(authorizationService['_systemUser']).to.be.undefined;
+  });
+
+  it('returns null and clears the cached user if the cached user is blocked', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '2999-01-01',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+    authorizationService['_systemUser'] = systemUser;
 
     const result = await authorizationService.getCachedSystemUser();
     expect(result).to.be.null;
@@ -683,7 +795,7 @@ describe('getSystemUserObject', function () {
     expect(systemUserObject).to.equal(mockSystemUserWithRolesResponse);
   });
 
-  it('returns null if the system user is soft-deleted (record_end_date in the past)', async function () {
+  it('returns null if the system user is soft-deleted', async function () {
     const mockDBConnection = getMockDBConnection();
 
     const mockSystemUserWithRolesResponse = {
@@ -708,20 +820,12 @@ describe('isSystemUserInactive', function () {
     expect(result).to.be.false;
   });
 
-  it('returns true if `record_end_date` is in the past', function () {
+  it('returns true if `record_end_date` is set', function () {
     const result = AuthorizationService.isSystemUserInactive({
       record_end_date: '2020-01-01'
     } as unknown as SystemUserExtended);
 
     expect(result).to.be.true;
-  });
-
-  it('returns false if `record_end_date` is in the future', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: '2999-01-01'
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.false;
   });
 });
 

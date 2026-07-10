@@ -86,27 +86,36 @@ describe('useUserApi', () => {
   });
 
   it('getUsersList works as expected', async () => {
-    mock.onGet('/api/user/list').reply(200, [
-      {
-        system_user_id: 1,
-        user_identifier: 'myidirboss',
-        role_names: ['role 1', 'role 2']
-      },
-      {
-        system_user_id: 2,
-        user_identifier: 'myidirbossagain',
-        role_names: ['role 1', 'role 4']
+    mock.onGet('/api/user/list').reply(200, {
+      users: [
+        {
+          system_user_id: 1,
+          user_identifier: 'myidirboss',
+          role_names: ['role 1', 'role 2']
+        },
+        {
+          system_user_id: 2,
+          user_identifier: 'myidirbossagain',
+          role_names: ['role 1', 'role 4']
+        }
+      ],
+      pagination: {
+        total: 2,
+        current_page: 1,
+        last_page: 1,
+        per_page: 10
       }
-    ]);
+    });
 
     const result = await useUserApi(axiosInstance).getUsersList();
 
-    expect(result[0].system_user_id).toEqual(1);
-    expect(result[0].user_identifier).toEqual('myidirboss');
-    expect(result[0].role_names).toEqual(['role 1', 'role 2']);
-    expect(result[1].system_user_id).toEqual(2);
-    expect(result[1].user_identifier).toEqual('myidirbossagain');
-    expect(result[1].role_names).toEqual(['role 1', 'role 4']);
+    expect(result.users[0].system_user_id).toEqual(1);
+    expect(result.users[0].user_identifier).toEqual('myidirboss');
+    expect(result.users[0].role_names).toEqual(['role 1', 'role 2']);
+    expect(result.users[1].system_user_id).toEqual(2);
+    expect(result.users[1].user_identifier).toEqual('myidirbossagain');
+    expect(result.users[1].role_names).toEqual(['role 1', 'role 4']);
+    expect(result.pagination.total).toEqual(2);
   });
 
   it('addSystemUserRoles works as expected', async () => {
@@ -117,5 +126,15 @@ describe('useUserApi', () => {
     const result = await useUserApi(axiosInstance).addSystemUserRoles(1, [1, 2, 3]);
 
     expect(result).toEqual(3);
+  });
+
+  it('updateSystemUser works as expected', async () => {
+    const userId = 1;
+
+    mock.onPatch(`/api/user/${userId}`, { record_end_date: null }).reply(200);
+
+    const result = await useUserApi(axiosInstance).updateSystemUser(1, { record_end_date: null });
+
+    expect(result).toBeUndefined();
   });
 });

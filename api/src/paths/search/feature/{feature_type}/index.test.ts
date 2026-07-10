@@ -7,6 +7,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import * as db from '../../../../database/db';
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { SearchFeatureResultWithRelevancy } from '../../../../services/search-feature-service.interface';
+import { UserService } from '../../../../services/user-service';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -516,6 +517,7 @@ describe('searchFeatures', () => {
       systemUserId: () => 123
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -535,5 +537,36 @@ describe('searchFeatures', () => {
 
     expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(123);
+  });
+
+  it('should pass null systemUserId for inactive authenticated requests', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves(),
+      systemUserId: () => 123
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'getUserById').rejects(new Error('inactive'));
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.keycloak_token = 'some-valid-token';
+    mockReq.params = { feature_type: 'survey' };
+    mockReq.body = {
+      expression: expressionTree,
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
+    expect(searchStub.firstCall.args[3]).to.equal(null);
   });
 });

@@ -6,7 +6,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db'
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { HTTP401 } from '../../errors/http-error';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../models/system-user';
 import { ApiKeyService } from '../../services/api-key-service';
 import { UserService } from '../../services/user-service';
 import * as apiKeyAuth from './api-key-authentication';

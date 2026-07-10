@@ -30,9 +30,49 @@ export const SystemUserExtended = SystemUser.extend({
 
 export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
 
+export const AvailableUser = z.object({
+  system_user_id: z.number(),
+  user_identifier: z.string()
+});
+
+export type AvailableUser = z.infer<typeof AvailableUser>;
+
+export const SystemRoles = z.object({
+  system_role_id: z.number(),
+  name: z.string()
+});
+
+export type SystemRoles = z.infer<typeof SystemRoles>;
+
+export const UpdateSystemUser = z.object({
+  record_end_date: z.string().nullable()
+});
+
+export type UpdateSystemUser = z.infer<typeof UpdateSystemUser>;
+
 /**
- * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set to now or in the
- * past.
+ * Parameters for adding a new system user.
+ */
+export interface IAddSystemUserParams {
+  userGuid: string;
+  userIdentifier: string;
+  identitySource: string;
+  displayName?: string | null;
+  email?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  agency?: string | null;
+}
+
+/**
+ * Parameters for updating a system user.
+ */
+export interface IUpdateSystemUserParams {
+  record_end_date: string | null;
+}
+
+/**
+ * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set.
  *
  * This is the single source of truth for "is this user revoked"; both authorization and the login upsert flow rely on
  * it so they agree on what counts as inactive.
@@ -41,5 +81,5 @@ export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
  * @return {*}  {boolean}
  */
 export const isSystemUserInactive = (systemUser: Pick<SystemUser, 'record_end_date'>): boolean => {
-  return Boolean(systemUser.record_end_date) && new Date(systemUser.record_end_date as string) <= new Date();
+  return systemUser.record_end_date != null;
 };

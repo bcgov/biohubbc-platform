@@ -8,6 +8,7 @@ import * as db from '../../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
 import { DownloadDetailRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
+import { UserService } from '../../../services/user-service';
 
 chai.use(sinonChai);
 
@@ -36,6 +37,7 @@ describe('paths/download/{downloadId}/index', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
 
       const mockDownload = makeDownloadRecord();
 
