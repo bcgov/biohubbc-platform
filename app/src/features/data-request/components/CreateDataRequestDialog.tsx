@@ -6,6 +6,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import { useEffect, useMemo } from 'react';
+import { getUserLabel } from 'utils/Utils';
 import { CreateDataRequestDialogYup } from './CreateDataRequestDialogYup';
 import { CreateDataRequestForm, ICreateDataRequestFormValues } from './form/CreateDataRequestForm';
 
@@ -55,13 +56,14 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
     availableUsersLoader.load();
   }, [open, availableUsersLoader]);
 
+  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
   const userOptions = useMemo<SearchOption[]>(
     () =>
-      (availableUsersLoader.data?.users ?? []).map((user) => ({
+      availableUsers.map((user) => ({
         value: user.system_user_id,
-        label: user.user_identifier
+        label: getUserLabel(user)
       })),
-    [availableUsersLoader.data?.users]
+    [availableUsers]
   );
 
   const debouncedAvailableUserRefresh = useDebounce((search: string) => {
@@ -78,6 +80,7 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
         element: (
           <CreateDataRequestForm
             options={userOptions}
+            availableUsers={availableUsers}
             isLoadingUsers={availableUsersLoader.isLoading}
             isSubmitting={isSubmitting}
             onSearchUsers={debouncedAvailableUserRefresh}

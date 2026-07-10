@@ -39,6 +39,7 @@ describe('TeamMemberService', () => {
         team_member_id: '11111111-1111-1111-1111-111111111111',
         system_user_id: 1,
         user_identifier: 'user_1',
+        display_name: 'User, One WLRS:EX',
         email: 'user_1@test.com'
       };
 
@@ -70,6 +71,7 @@ describe('TeamMemberService', () => {
         team_member_id: '11111111-1111-1111-1111-111111111111',
         system_user_id: 1,
         user_identifier: 'user_1',
+        display_name: 'User, One WLRS:EX',
         email: 'user_1@test.com'
       };
 

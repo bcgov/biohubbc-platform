@@ -217,7 +217,7 @@ export class TeamMemberRepository extends BaseRepository {
     const sortField = sortFieldMap[pagination?.sort || ''] || 'su.user_identifier';
     const query = knex
       .table('team_member as tm')
-      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.email'])
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.display_name', 'su.email'])
       .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
       .where('tm.team_id', teamId)
       .whereNull('tm.record_end_date')
@@ -243,7 +243,7 @@ export class TeamMemberRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('team_member as tm')
-      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.email'])
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.display_name', 'su.email'])
       .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
       .where('tm.team_id', teamMemberData.team_id)
       .where('tm.system_user_id', teamMemberData.system_user_id)

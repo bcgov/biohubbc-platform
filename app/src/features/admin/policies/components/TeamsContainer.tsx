@@ -156,7 +156,11 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     try {
       const { members } = await biohubApi.teams.getTeamMembers(team.team_id);
       setEditingTeamMembers(
-        members.map((m) => ({ system_user_id: m.system_user_id, user_identifier: m.user_identifier }))
+        members.map((m) => ({
+          system_user_id: m.system_user_id,
+          user_identifier: m.user_identifier,
+          display_name: m.display_name
+        }))
       );
     } catch (error) {
       const apiError = error as APIError;

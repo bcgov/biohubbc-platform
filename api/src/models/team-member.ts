@@ -12,6 +12,7 @@ export const TeamMemberWithUser = z.object({
   team_member_id: z.string().uuid(),
   system_user_id: z.number().int(),
   user_identifier: z.string(),
+  display_name: z.string().nullable(),
   email: z.string().nullable()
 });
 

@@ -73,6 +73,11 @@ GET.apiDoc = {
                       type: 'string',
                       description: 'The GUID for the user.'
                     },
+                    display_name: {
+                      type: 'string',
+                      nullable: true,
+                      description: 'Keycloak display name for the user.'
+                    },
                     record_end_date: {
                       type: 'string',
                       nullable: true

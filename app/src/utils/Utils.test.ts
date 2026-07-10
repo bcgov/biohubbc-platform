@@ -11,6 +11,7 @@ import {
   getFormattedDateRangeString,
   getFormattedFileSize,
   getFormattedIdentitySource,
+  getUserLabel,
   isObject,
   jsonParseObjectProperties,
   jsonStringifyObjectProperties,
@@ -478,5 +479,29 @@ describe('getFormattedIdentitySource', () => {
       const response = firstOrNull(arr);
       expect(response).toEqual({ id: 1 });
     });
+  });
+});
+
+describe('getUserLabel', () => {
+  it('returns the display name when present', () => {
+    expect(getUserLabel({ display_name: 'Bryan, Luke WLRS:EX', user_identifier: 'lbryan' })).toEqual(
+      'Bryan, Luke WLRS:EX'
+    );
+  });
+
+  it('falls back to the user identifier when display name is null', () => {
+    expect(getUserLabel({ display_name: null, user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is undefined', () => {
+    expect(getUserLabel({ user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is empty', () => {
+    expect(getUserLabel({ display_name: '', user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is whitespace-only', () => {
+    expect(getUserLabel({ display_name: '   ', user_identifier: 'lbryan' })).toEqual('lbryan');
   });
 });

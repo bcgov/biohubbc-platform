@@ -45,6 +45,7 @@ describe('DataRequestService', () => {
     team_member_id: 'd4e5f6a7-b8c9-0123-defa-234567890123',
     system_user_id: 1,
     user_identifier: 'user_1',
+    display_name: 'User, One WLRS:EX',
     email: 'user_1@test.com'
   };
 
