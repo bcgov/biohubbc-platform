@@ -1,4 +1,5 @@
 import { Grid, Pagination, Stack, Typography } from '@mui/material';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useState } from 'react';
@@ -38,27 +39,25 @@ export const FeaturedDownloadsSection = () => {
   const downloads = galleryDataLoader.data?.downloads ?? [];
   const lastPage = galleryDataLoader.data?.pagination.last_page ?? 0;
 
-  // Fail closed BEFORE any layout (see component JSDoc): error, pending first load, and empty
-  // result all render nothing.
-  if (galleryDataLoader.error || downloads.length === 0) {
-    return null;
-  }
-
+  // Fail closed (see component JSDoc): error, pending first load, and empty result all render
+  // nothing. `hasNoData` with no `hasNoDataFallback` makes LoadingGuard render nothing in each case.
   return (
-    <Stack gap={2} mt={5}>
-      <Typography variant="h3">Featured Downloads</Typography>
-      <Grid container spacing={3}>
-        {downloads.map((download) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={download.download_id}>
-            <FeaturedDownloadTile download={download} />
-          </Grid>
-        ))}
-      </Grid>
-      {lastPage > 1 ? (
-        <Stack alignItems="center">
-          <Pagination count={lastPage} page={page} onChange={(_, newPage) => setPage(newPage)} shape="rounded" />
-        </Stack>
-      ) : null}
-    </Stack>
+    <LoadingGuard hasNoData={Boolean(galleryDataLoader.error) || downloads.length === 0}>
+      <Stack gap={2} mt={5}>
+        <Typography variant="h3">Featured Downloads</Typography>
+        <Grid container spacing={3}>
+          {downloads.map((download) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={download.download_id}>
+              <FeaturedDownloadTile download={download} />
+            </Grid>
+          ))}
+        </Grid>
+        {lastPage > 1 ? (
+          <Stack alignItems="center">
+            <Pagination count={lastPage} page={page} onChange={(_, newPage) => setPage(newPage)} shape="rounded" />
+          </Stack>
+        ) : null}
+      </Stack>
+    </LoadingGuard>
   );
 };
