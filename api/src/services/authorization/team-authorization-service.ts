@@ -24,9 +24,6 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
-   * - `submission_feature`: the feature is not effectively secured, or the user's team
-   *   holds a security scope anchored on the feature or one of its ancestors (the same
-   *   ancestry-aware check the search/download read paths apply).
    *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
@@ -48,16 +45,6 @@ export class TeamAuthorizationService extends DBService {
         );
         break;
 
-      case 'submission_feature':
-        // Ancestry-aware access check shared with the search/download read paths: unsecured
-        // features are open; secured features require the user's team to hold a scope anchored
-        // on the feature or one of its ancestors.
-        return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
-          systemUserId,
-          entity.submissionFeatureId,
-          entity.submissionId
-        );
-
       default:
         return false;
     }
@@ -72,5 +59,31 @@ export class TeamAuthorizationService extends DBService {
     }
 
     return true;
+  }
+
+  /**
+   * Determine whether a submission feature is accessible to a user, using the ancestry-aware,
+   * closure-based security check shared with the search/download read paths: the feature is
+   * unsecured, or the user's team holds a security scope anchored on the feature or one of its
+   * ancestors.
+   *
+   * `systemUserId` may be `null` for anonymous users, who can still access unsecured features.
+   *
+   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
+   * @param {number} submissionFeatureId
+   * @param {number} submissionId The submission the feature must belong to.
+   * @return {Promise<boolean>}
+   * @memberof TeamAuthorizationService
+   */
+  async isSubmissionFeatureAccessibleToUser(
+    systemUserId: number | null,
+    submissionFeatureId: number,
+    submissionId: number
+  ): Promise<boolean> {
+    return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
+      systemUserId,
+      submissionFeatureId,
+      submissionId
+    );
   }
 }

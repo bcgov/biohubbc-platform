@@ -129,5 +129,25 @@ describe('TeamAuthorizationRepository', () => {
       const repository = new TeamAuthorizationRepository(mockConnection);
       await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
     });
+
+    it('applies the unsecured-only filter for anonymous users (no scope-anchor grant branch)', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const sql = query.toSQL().sql.toLowerCase();
+          // still scoped and active-gated
+          expect(sql).to.include('"sf"."submission_id" = ?');
+          expect(sql).to.include('record_effective_date');
+          // anonymous: unsecured-only — closure ancestry walk, but no scope-anchor grant branch
+          expect(sql).to.include('submission_feature_closure');
+          expect(sql).to.not.include('security_scope_anchor');
+          return { rowCount: 1, rows: [{ '1': 1 }] } as unknown as QueryResult<any>;
+        }
+      });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(null, 100, 200);
+
+      expect(result).to.be.true;
+    });
   });
 });

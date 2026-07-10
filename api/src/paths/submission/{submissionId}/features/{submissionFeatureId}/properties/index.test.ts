@@ -85,5 +85,33 @@ describe('properties index', () => {
       ]);
       expect(mockRes.jsonValue.pagination.total).to.equal(2);
     });
+
+    it('uses the API user connection for anonymous (no token) requests', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const getAPIUserDBConnectionStub = sinon
+        .stub(db.dbDependencies, 'getAPIUserDBConnection')
+        .returns(dbConnectionObj);
+      const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      sinon
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
+        .resolves({ properties: [], total: 0 });
+
+      const requestHandler = index.getSubmissionFeatureProperties();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      // No keycloak_token on the request => anonymous caller reading an unsecured feature.
+      mockReq.params = {
+        submissionId: '1',
+        submissionFeatureId: '10'
+      };
+      mockReq.query = { page: '1', limit: '10' };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
+      expect(getDBConnectionStub).to.not.have.been.called;
+      expect(mockRes.statusValue).to.equal(200);
+    });
   });
 });

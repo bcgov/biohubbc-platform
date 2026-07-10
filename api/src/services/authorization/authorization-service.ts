@@ -46,16 +46,27 @@ export type TeamAuthorizationEntity =
   | {
       entity: 'data_request';
       dataRequestId: string;
-    }
-  | {
-      entity: 'submission_feature';
-      submissionFeatureId: number;
-      submissionId: number;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {
   discriminator: 'Team';
 };
+
+/**
+ * Authorization rule that checks policy/security-scope access to a submission feature.
+ *
+ * Unlike `Team` (a pure team-membership check), feature access is granted when the feature is open
+ * or when the user has access through the feature's security policy. Anonymous requests are allowed
+ * to reach this check (they can still read unsecured features).
+ *
+ * @export
+ * @interface AuthorizeByPolicy
+ */
+export interface AuthorizeByPolicy {
+  discriminator: 'Policy';
+  submissionFeatureId: number;
+  submissionId: number;
+}
 
 /**
  * Authorization rule that checks if a jwt token maps to a known contributor by client id.
@@ -67,7 +78,12 @@ export interface AuthorizeByContributor {
   discriminator: 'Contributor';
 }
 
-export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser | AuthorizeByContributor | AuthorizeByTeam;
+export type AuthorizeRule =
+  | AuthorizeBySystemRoles
+  | AuthorizeBySystemUser
+  | AuthorizeByContributor
+  | AuthorizeByTeam
+  | AuthorizeByPolicy;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -139,6 +155,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'Team':
           authorizeResults.push(await this.authorizeByTeam(authorizeRule));
+          break;
+        case 'Policy':
+          authorizeResults.push(await this.authorizeByPolicy(authorizeRule));
           break;
       }
     }
@@ -229,6 +248,32 @@ export class AuthorizationService extends DBService {
 
     const teamAuthorizationService = new TeamAuthorizationService(this.connection);
     return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
+  }
+
+  /**
+   * Check whether the current request is authorized to access a submission feature.
+   *
+   * Access is granted when the feature is open, or when the authenticated user has access through
+   * the feature's security policy. Anonymous requests are permitted to reach this check (they can
+   * still read unsecured features), so the (possibly `null`) system user id is passed through.
+   *
+   * @param {AuthorizeByPolicy} authorizeRule
+   * @returns {Promise<boolean>}
+   */
+  async authorizeByPolicy(authorizeRule: AuthorizeByPolicy): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
+    }
+
+    const user = await this.getCachedSystemUser();
+
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
+
+    return teamAuthorizationService.isSubmissionFeatureAccessibleToUser(
+      user?.system_user_id ?? null,
+      authorizeRule.submissionFeatureId,
+      authorizeRule.submissionId
+    );
   }
 
   /**

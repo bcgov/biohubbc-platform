@@ -103,38 +103,33 @@ describe('TeamAuthorizationService', () => {
         expect(result).to.be.false;
       });
     });
+  });
 
-    describe('entity: submission_feature', () => {
-      it('returns true when the feature is accessible to the user, passing through the entity ids', async () => {
-        const mockConnection = getMockDBConnection();
-        const accessibleStub = sinon
-          .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
-          .resolves(true);
+  describe('isSubmissionFeatureAccessibleToUser', () => {
+    it('delegates to the repository and returns its result, passing the ids through', async () => {
+      const mockConnection = getMockDBConnection();
+      const repoStub = sinon
+        .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
+        .resolves(true);
 
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, {
-          entity: 'submission_feature',
-          submissionFeatureId: 2,
-          submissionId: 3
-        });
+      const service = new TeamAuthorizationService(mockConnection);
+      const result = await service.isSubmissionFeatureAccessibleToUser(1, 2, 3);
 
-        expect(result).to.be.true;
-        expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
-      });
+      expect(result).to.be.true;
+      expect(repoStub).to.have.been.calledOnceWith(1, 2, 3);
+    });
 
-      it('returns false when the feature is not accessible to the user', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
+    it('passes a null system user id through for anonymous users', async () => {
+      const mockConnection = getMockDBConnection();
+      const repoStub = sinon
+        .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureAccessibleToUser')
+        .resolves(false);
 
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, {
-          entity: 'submission_feature',
-          submissionFeatureId: 2,
-          submissionId: 3
-        });
+      const service = new TeamAuthorizationService(mockConnection);
+      const result = await service.isSubmissionFeatureAccessibleToUser(null, 2, 3);
 
-        expect(result).to.be.false;
-      });
+      expect(result).to.be.false;
+      expect(repoStub).to.have.been.calledOnceWith(null, 2, 3);
     });
   });
 });
