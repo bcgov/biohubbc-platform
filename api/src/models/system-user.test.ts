@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { isSystemUserInactive, SystemUser } from './user';
+import { isSystemUserInactive, SystemUser } from './system-user';
 
 describe('isSystemUserInactive', () => {
   it('returns false if `record_end_date` is null', () => {
