@@ -1,13 +1,18 @@
+import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SystemUser, SystemUserExtended } from '../models/user';
+import {
+  AvailableUser,
+  IAddSystemUserParams,
+  IUpdateSystemUserParams,
+  SystemRoles,
+  SystemUser,
+  SystemUserExtended
+} from '../models/system-user';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-
-// Re-export for backward compatibility
-export { SystemUser, SystemUserExtended } from '../models/user';
 
 /**
  * Maximum number of users to return in getAvailableUsers.
@@ -15,35 +20,9 @@ export { SystemUser, SystemUserExtended } from '../models/user';
 const MAX_AVAILABLE_USERS_LIMIT = 50;
 
 /**
- * A user available for team membership.
+ * Identity sources to exclude from user administration lists.
  */
-export const AvailableUser = z.object({
-  system_user_id: z.number(),
-  user_identifier: z.string()
-});
-
-export type AvailableUser = z.infer<typeof AvailableUser>;
-
-const SystemRoles = z.object({
-  system_role_id: z.number(),
-  name: z.string()
-});
-
-export type SystemRoles = z.infer<typeof SystemRoles>;
-
-/**
- * Parameters for adding a new system user.
- */
-export interface IAddSystemUserParams {
-  userGuid: string;
-  userIdentifier: string;
-  identitySource: string;
-  displayName?: string | null;
-  email?: string | null;
-  givenName?: string | null;
-  familyName?: string | null;
-  agency?: string | null;
-}
+const EXCLUDED_USER_ADMIN_IDENTITY_SOURCES = [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE];
 
 export class UserRepository extends BaseRepository {
   /**
@@ -164,7 +143,7 @@ export class UserRepository extends BaseRepository {
       ON
         uis.user_identity_source_id = su.user_identity_source_id
       WHERE
-        su.user_guid = ${userGuid}
+        LOWER(su.user_guid) = ${userGuid.toLowerCase()}
       GROUP BY
         su.system_user_id,
         su.user_identity_source_id,
@@ -276,7 +255,7 @@ export class UserRepository extends BaseRepository {
         agency
       )
       VALUES (
-        ${params.userGuid},
+        ${params.userGuid.toLowerCase()},
         (
           SELECT
             user_identity_source_id
@@ -310,100 +289,151 @@ export class UserRepository extends BaseRepository {
   }
 
   /**
-   * Get a list of all system users.
+   * Get a paginated list of all non-system and non-database system users.
    *
+   * @param {string} [search] - Optional search term to filter users by identifier, display name, email, or identity source.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting options.
    * @return {*}  {Promise<SystemUserExtended[]>}
    * @memberof UserRepository
    */
-  async listSystemUsers(): Promise<SystemUserExtended[]> {
-    const sqlStatement = SQL`
-      SELECT
-        su.*,
-        uis.name AS identity_source,
-        array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
-        array_remove(array_agg(sr.name), NULL) AS role_names
-      FROM
-        "system_user" su
-      LEFT JOIN
-        system_user_role sur
-      ON
-        su.system_user_id = sur.system_user_id
-      LEFT JOIN
-        system_role sr
-      ON
-        sur.system_role_id = sr.system_role_id
-      LEFT JOIN
-      	user_identity_source uis
-      ON
-      	su.user_identity_source_id = uis.user_identity_source_id
-      WHERE
-        su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
-      GROUP BY
-        su.system_user_id,
-        su.user_identity_source_id,
-        su.user_identifier,
-        su.user_guid,
-        su.record_effective_date,
-        su.record_end_date,
-        su.create_date,
-        su.create_user,
-        su.update_date,
-        su.update_user,
-        su.revision_count,
-        su.display_name,
-        su.given_name,
-        su.family_name,
-        su.email,
-        su.agency,
-        su.notes,
-        uis.name;
-    `;
+  async listSystemUsers(search?: string, pagination?: ApiPaginationOptions): Promise<SystemUserExtended[]> {
+    const knex = getKnex();
+    let query = knex
+      .table('system_user as su')
+      .select(
+        'su.*',
+        'uis.name as identity_source',
+        knex.raw('array_remove(array_agg(sr.system_role_id), NULL) AS role_ids'),
+        knex.raw('array_remove(array_agg(sr.name), NULL) AS role_names')
+      )
+      .leftJoin('system_user_role as sur', 'su.system_user_id', 'sur.system_user_id')
+      .leftJoin('system_role as sr', 'sur.system_role_id', 'sr.system_role_id')
+      .leftJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
+      .whereNotIn('uis.name', EXCLUDED_USER_ADMIN_IDENTITY_SOURCES)
+      .groupBy(
+        'su.system_user_id',
+        'su.user_identity_source_id',
+        'su.user_identifier',
+        'su.user_guid',
+        'su.record_effective_date',
+        'su.record_end_date',
+        'su.create_date',
+        'su.create_user',
+        'su.update_date',
+        'su.update_user',
+        'su.revision_count',
+        'su.display_name',
+        'su.given_name',
+        'su.family_name',
+        'su.email',
+        'su.agency',
+        'su.notes',
+        'uis.name'
+      );
 
-    const response = await this.connection.sql(sqlStatement, SystemUserExtended);
+    query = this.applySystemUserSearch(query, search);
+    query = this.applySystemUserPagination(query, pagination);
+
+    const response = await this.connection.knex(query, SystemUserExtended);
 
     return response.rows;
   }
 
   /**
-   * Activates an existing system user that had been deactivated (soft deleted).
+   * Count all non-system and non-database system users.
    *
-   * @param {number} systemUserId
+   * @param {string} [search] - Optional search term to filter users by identifier, display name, email, or identity source.
+   * @return {*}  {Promise<number>}
    * @memberof UserRepository
    */
-  async activateSystemUser(systemUserId: number) {
-    const sqlStatement = SQL`
-      UPDATE
-        "system_user"
-      SET
-        record_end_date = NULL
-      WHERE
-        system_user_id = ${systemUserId}
-      RETURNING
-        *;
-    `;
+  async getSystemUsersCount(search?: string): Promise<number> {
+    const knex = getKnex();
+    let query = knex
+      .table('system_user as su')
+      .leftJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
+      .whereNotIn('uis.name', EXCLUDED_USER_ADMIN_IDENTITY_SOURCES)
+      .select(knex.raw('count(*)::integer as count'));
 
-    const response = await this.connection.sql(sqlStatement);
+    query = this.applySystemUserSearch(query, search);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to activate system user', [
-        'UserRepository->activateSystemUser',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 
   /**
-   * Deactivates an existing system user (soft delete).
+   * Apply the supported user search filter to a system user query.
    *
-   * @param {number} systemUserId
+   * @param {Knex.QueryBuilder} query - Base system user query.
+   * @param {string} [search] - Optional search term to filter users by identifier, display name, email, or identity source.
+   * @return {*}  {Knex.QueryBuilder}
    * @memberof UserRepository
    */
-  async deactivateSystemUser(systemUserId: number) {
+  private applySystemUserSearch(query: Knex.QueryBuilder, search?: string): Knex.QueryBuilder {
+    if (!search) {
+      return query;
+    }
+
+    const term = `%${search.toLowerCase()}%`;
+
+    query.andWhere((builder) => {
+      builder
+        .whereRaw('LOWER(su.user_identifier) LIKE ?', [term])
+        .orWhereRaw('LOWER(su.display_name) LIKE ?', [term])
+        .orWhereRaw('LOWER(su.email) LIKE ?', [term])
+        .orWhereRaw('LOWER(uis.name) LIKE ?', [term]);
+    });
+
+    return query;
+  }
+
+  /**
+   * Apply pagination and supported sorting to a system user query.
+   *
+   * @param {Knex.QueryBuilder} query - Base system user query.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting options.
+   * @return {*}  {Knex.QueryBuilder}
+   * @memberof UserRepository
+   */
+  private applySystemUserPagination(query: Knex.QueryBuilder, pagination?: ApiPaginationOptions): Knex.QueryBuilder {
+    const sortColumns: Record<string, string> = {
+      system_user_id: 'su.system_user_id',
+      user_identifier: 'su.user_identifier',
+      identity_source: 'uis.name',
+      record_end_date: 'su.record_end_date',
+      create_date: 'su.create_date'
+    };
+
+    if (pagination?.sort && pagination.order && sortColumns[pagination.sort]) {
+      query.orderBy(sortColumns[pagination.sort], pagination.order);
+    } else {
+      query.orderBy('su.user_identifier', 'asc');
+    }
+
+    if (pagination?.limit) {
+      query.limit(pagination.limit);
+    }
+
+    if (pagination?.page && pagination.limit) {
+      query.offset((pagination.page - 1) * pagination.limit);
+    }
+
+    return query;
+  }
+
+  /**
+   * Updates a system user.
+   *
+   * @param {number} systemUserId
+   * @param {IUpdateSystemUserParams} updates
+   * @memberof UserRepository
+   */
+  async updateSystemUser(systemUserId: number, updates: IUpdateSystemUserParams) {
     const sqlStatement = SQL`
       UPDATE
         "system_user"
       SET
-        record_end_date = now()
+        record_end_date = ${updates.record_end_date}
       WHERE
         system_user_id = ${systemUserId}
       RETURNING
@@ -413,8 +443,8 @@ export class UserRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to deactivate system user', [
-        'UserRepository->deactivateSystemUser',
+      throw new ApiExecuteSQLError('Failed to update system user', [
+        'UserRepository->updateSystemUser',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

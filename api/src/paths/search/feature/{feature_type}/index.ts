@@ -11,6 +11,7 @@ import {
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../../utils/pagination';
+import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}');
 
@@ -59,7 +60,7 @@ export function searchFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
       const featureType = req.params.feature_type?.trim().toLowerCase();
       const pagination = makePaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);

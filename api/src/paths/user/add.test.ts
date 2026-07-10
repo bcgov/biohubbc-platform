@@ -6,7 +6,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db'
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../models/system-user';
 import { UserService } from '../../services/user-service';
 import * as user from './add';
 

@@ -1,6 +1,6 @@
-import { OpenAPIV3 } from 'openapi-types';
-import { SystemUserWithRoles } from '../models/system-user-view';
-import { AuthorizationScheme } from '../services/authorization-service';
+import type { OpenAPIV3 } from 'openapi-types';
+import type { SystemUserExtended } from '../models/system-user';
+import type { AuthorizationScheme } from '../services/authorization/authorization-service';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -17,7 +17,7 @@ declare module 'express-serve-static-core' {
     /**
      * SIMS system user details object.
      */
-    system_user?: SystemUserWithRoles;
+    system_user?: SystemUserExtended;
 
     /**
      * Authorization Scheme object.

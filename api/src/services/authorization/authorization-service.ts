@@ -1,6 +1,6 @@
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
-import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended, isSystemUserInactive } from '../../models/system-user';
 import { getUserGuid } from '../../utils/keycloak-utils';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
@@ -171,15 +171,12 @@ export class AuthorizationService extends DBService {
    * @return {*}  {boolean} `true` if the user is a system administrator, `false` otherwise.
    */
   async authorizeSystemAdministrator(): Promise<boolean> {
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const systemUserObject = await this.getCachedSystemUser();
 
     if (!systemUserObject) {
-      // Cannot verify user roles
+      // Cannot verify user roles (unknown or soft-deleted user)
       return false;
     }
-
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
 
     return systemUserObject.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
   }
@@ -197,18 +194,10 @@ export class AuthorizationService extends DBService {
       return false;
     }
 
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const systemUserObject = await this.getCachedSystemUser();
 
     if (!systemUserObject) {
-      // Cannot verify user roles
-      return false;
-    }
-
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
-
-    if (systemUserObject.record_end_date) {
-      //system user has an expired record
+      // Cannot verify user roles (unknown or soft-deleted user)
       return false;
     }
 
@@ -279,16 +268,29 @@ export class AuthorizationService extends DBService {
   /**
    * Private helper method to fetch and cache the system user object.
    *
-   * @returns {Promise<SystemUser | null>} Resolves with the system user object, or `null` if not found.
+   * Returns `null` for an unknown or soft-deleted (inactive) user, including a cached or constructor-injected one.
+   *
+   * @returns {Promise<SystemUserExtended | null>} Resolves with the system user object, or `null` if not found or
+   * inactive.
    */
-  async getCachedSystemUser(): Promise<SystemUser | null> {
+  async getCachedSystemUser(): Promise<SystemUserExtended | null> {
     if (this._systemUser) {
+      if (isSystemUserInactive(this._systemUser)) {
+        this._systemUser = undefined;
+        return null;
+      }
+
       return this._systemUser;
     }
 
     const user = await this.getSystemUserObject(); // fetch from DB or service
+    if (user && isSystemUserInactive(user)) {
+      this._systemUser = undefined;
+      return null;
+    }
+
     this._systemUser = user ?? undefined;
-    return this._systemUser ?? null;
+    return user;
   }
 
   /**
@@ -364,6 +366,11 @@ export class AuthorizationService extends DBService {
     }
 
     if (!systemUserWithRoles) {
+      return null;
+    }
+
+    if (isSystemUserInactive(systemUserWithRoles)) {
+      // Soft-deleted (revoked) users are treated as if they do not exist for all authorization rules
       return null;
     }
 

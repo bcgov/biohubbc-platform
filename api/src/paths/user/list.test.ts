@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../models/system-user';
 import { UserService } from '../../services/user-service';
 import * as users from './list';
 
@@ -20,6 +20,7 @@ describe('users', () => {
       const mockDBConnection = getMockDBConnection();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = { page: '1', limit: '10', search: 'identifier' };
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
@@ -48,13 +49,26 @@ describe('users', () => {
         }
       ];
 
-      sinon.stub(UserService.prototype, 'listSystemUsers').resolves(mockResponse);
+      const listStub = sinon.stub(UserService.prototype, 'listSystemUsers').resolves(mockResponse);
+      const countStub = sinon.stub(UserService.prototype, 'getSystemUsersCount').resolves(1);
 
       const requestHandler = users.getUserList();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(mockRes.jsonValue).to.eql(mockResponse);
+      expect(mockRes.jsonValue).to.eql({
+        users: mockResponse,
+        pagination: {
+          total: 1,
+          per_page: 10,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        }
+      });
+      expect(listStub).to.have.been.calledOnce;
+      expect(countStub).to.have.been.calledOnceWith('identifier');
     });
   });
 });

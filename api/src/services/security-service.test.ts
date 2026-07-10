@@ -237,11 +237,13 @@ describe('SecurityService', () => {
     afterEach(() => {
       sinon.restore();
     });
+
     it('should throw an error if user is not admin, and document is pending review (does not have a security review timestamp', async () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
@@ -269,6 +271,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
@@ -305,6 +308,7 @@ describe('SecurityService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
 
       const securityService = new SecurityService(mockDBConnection);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
         .resolves(false);
@@ -341,6 +345,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
         .resolves(false);
@@ -377,6 +382,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
       const isArtifactPendingReviewStub = sinon

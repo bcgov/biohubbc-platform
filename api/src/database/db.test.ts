@@ -7,7 +7,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
-import { SystemUser } from '../repositories/user-repository';
+import { SystemUser } from '../models/system-user';
 import * as db from './db';
 import {
   DB_CLIENT,

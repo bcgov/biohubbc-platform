@@ -19,10 +19,10 @@ export const UpdateSystemUserI18N = {
     'An error has occurred while attempting to update the system user. If the error persists, please contact your system administrator.'
 };
 
-export const DeleteSystemUserI18N = {
-  deleteUserErrorTitle: 'Error Deleting System User',
-  deleteUserErrorText:
-    'An error has occurred while attempting to delete the system user. If the error persists, please contact your system administrator.'
+export const BlockSystemUserI18N = {
+  blockUserErrorTitle: 'Error Blocking System User',
+  blockUserErrorText:
+    'An error has occurred while attempting to block the system user. If the error persists, please contact your system administrator.'
 };
 
 export const ApplySecurityRulesI18N = {

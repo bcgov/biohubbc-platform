@@ -8,6 +8,7 @@ import {
 import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
+import { getActiveSystemUserId } from '../utils/system-user-context';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
@@ -234,9 +235,8 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async getSecuredArtifactBasedOnRulesAndPermissions(artifactId: number): Promise<any> {
-    const isSystemUserAdmin = await this.userService.isSystemUserAdmin();
-
-    const userId = this.connection.systemUserId();
+    const userId = await getActiveSystemUserId(this.connection);
+    const isSystemUserAdmin = userId ? await this.userService.isSystemUserAdmin() : false;
 
     const isArtifactPendingReview = await this.isArtifactPendingReview(artifactId);
 
@@ -247,7 +247,7 @@ export class SecurityService extends DBService {
 
     const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
 
-    const pers_harm_exceptionIds = await this.getPersecutionAndHarmExceptionsIdsByUser(userId);
+    const pers_harm_exceptionIds = userId ? await this.getPersecutionAndHarmExceptionsIdsByUser(userId) : [];
 
     const userHasExceptionsToAllRules = artifactSecurityRuleIds.every((rule) => pers_harm_exceptionIds.includes(rule));
 

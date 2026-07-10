@@ -8,6 +8,7 @@ import * as db from '../../database/db';
 import { HTTP400, HTTPError } from '../../errors/http-error';
 import { DownloadListRecord } from '../../models/download';
 import { DownloadService } from '../../services/download/download-service';
+import { UserService } from '../../services/user-service';
 
 chai.use(sinonChai);
 
@@ -143,6 +144,7 @@ describe('paths/download/index', () => {
       const commitStub = sinon.stub();
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42, commit: commitStub });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
 
       const createDownloadRequestStub = sinon
         .stub(DownloadService.prototype, 'createDownloadRequest')
@@ -176,6 +178,7 @@ describe('paths/download/index', () => {
     it('uses the authenticated user as requestedBy and returns only download fields', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const apiUserStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
       const createDownloadRequestStub = sinon

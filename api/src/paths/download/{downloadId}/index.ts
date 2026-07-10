@@ -5,6 +5,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../services/download/download-service';
 import { getLogger } from '../../../utils/logger';
+import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
@@ -134,7 +135,7 @@ export function findDownloadById(): RequestHandler {
       await connection.open();
 
       const downloadService = new DownloadService(connection);
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
       const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
       await connection.commit();
