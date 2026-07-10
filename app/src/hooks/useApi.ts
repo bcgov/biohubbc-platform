@@ -8,6 +8,7 @@ import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
+import { useGalleryApi } from './api/useGalleryApi';
 import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
@@ -58,6 +59,8 @@ export const useApi = () => {
 
   const downloadExport = useDownloadExportApi(apiAxios);
 
+  const gallery = useGalleryApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   const tickets = useTicketsApi(apiAxios);
@@ -83,6 +86,7 @@ export const useApi = () => {
     teams,
     download,
     downloadExport,
+    gallery,
     teamPolicies,
     tickets,
     dataRequest,

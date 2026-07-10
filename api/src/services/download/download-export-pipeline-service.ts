@@ -154,8 +154,10 @@ export class DownloadExportPipelineService extends DBService {
    * pg-boss DLQ.
    *
    * `errorMetadata.error` is re-keyed to `error_message` to match the repo's
-   * column name while keeping the caller surface consistent with
-   * `DownloadPipelineService.transitionDownloadVersionStatus`.
+   * column name, mirroring the error-metadata handling of
+   * `DownloadPipelineService.transitionDownloadVersionStatus` (whose metadata
+   * bag additionally carries a READY-only `featureCount` that has no group
+   * equivalent).
    */
   async transitionGroupStatus(
     groupId: string,

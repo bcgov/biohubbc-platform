@@ -57,12 +57,13 @@ export class DownloadVersionRepository extends BaseRepository {
    * COALESCE preserves an already-set field when a later transition passes only the
    * fields it owns (e.g. the READY transition sets completed_at + materialized_at
    * without clearing the started_at written at PROCESSING; an error_message set on
-   * FAILED is never cleared by a subsequent update).
+   * FAILED — or a feature_count set on READY — is never cleared by a subsequent
+   * update).
    *
    * @param {string} downloadVersionId - The download version ID.
    * @param {DownloadStatusEnum} status - The new lifecycle status.
-   * @param {{ started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string }} [metadata]
-   *   Optional timestamps / error to set alongside the status.
+   * @param {{ started_at?: string; completed_at?: string; materialized_at?: string; error_message?: string; feature_count?: number }} [metadata]
+   *   Optional timestamps / error / materialized feature count to set alongside the status.
    * @return {Promise<void>}
    * @throws {ApiExecuteSQLError} when no version matches the given ID (rowCount !== 1).
    * @memberof DownloadVersionRepository
@@ -75,6 +76,7 @@ export class DownloadVersionRepository extends BaseRepository {
       completed_at?: string;
       materialized_at?: string;
       error_message?: string;
+      feature_count?: number;
     }
   ): Promise<void> {
     const sql = SQL`
@@ -84,7 +86,8 @@ export class DownloadVersionRepository extends BaseRepository {
         started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
         completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at),
         materialized_at = COALESCE(${metadata?.materialized_at ?? null}::timestamptz, materialized_at),
-        error_message = COALESCE(${metadata?.error_message ?? null}, error_message)
+        error_message = COALESCE(${metadata?.error_message ?? null}, error_message),
+        feature_count = COALESCE(${metadata?.feature_count ?? null}, feature_count)
       WHERE download_version_id = ${downloadVersionId};
     `;
 
