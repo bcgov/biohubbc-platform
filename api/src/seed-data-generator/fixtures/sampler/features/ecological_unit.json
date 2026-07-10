@@ -1,0 +1,12 @@
+[
+  {
+    "id": "4b8506fc-c1e4-491d-a624-40123ee49867",
+    "type": "ecological_unit",
+    "properties": {
+      "ecological_unit_type": "Biogeoclimatic Zone",
+      "ecological_unit_value": "Boreal White and Black Spruce"
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

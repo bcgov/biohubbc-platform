@@ -72,7 +72,8 @@ export interface IUpdateSystemUserParams {
 }
 
 /**
- * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set.
+ * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set to now or in the
+ * past.
  *
  * This is the single source of truth for "is this user revoked"; both authorization and the login upsert flow rely on
  * it so they agree on what counts as inactive.
@@ -81,5 +82,5 @@ export interface IUpdateSystemUserParams {
  * @return {*}  {boolean}
  */
 export const isSystemUserInactive = (systemUser: Pick<SystemUser, 'record_end_date'>): boolean => {
-  return systemUser.record_end_date != null;
+  return Boolean(systemUser.record_end_date) && new Date(systemUser.record_end_date as string) <= new Date();
 };

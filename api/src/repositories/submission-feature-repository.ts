@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureActive } from './sql-fragments';
+import { isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
 
 /**
@@ -134,6 +134,20 @@ export class SubmissionFeatureRepository extends BaseRepository {
   /**
    * Get a submission feature record by Id.
    *
+   * `secured` is the effectively-secured state: the feature is secured when it or any ancestor
+   * carries an active security rule, resolved through the precomputed closure ancestry. This
+   * mirrors the read-path visibility check, so the detail page's secured badge agrees with search
+   * results and with what actually hides the data.
+   *
+   * `security_reasons` are the distinct names of the security rules securing this feature directly
+   * or via an ancestor. It is empty when the feature is not effectively secured. It can also be empty
+   * while `secured` is true: in the fail-closed case the feature counts as secured because its closure
+   * ancestry has not been built yet, so the securing rules cannot be resolved — the UI then reveals
+   * only that the feature is secured and exposes no sensitive detail.
+   *
+   * Only active, non-end-dated security rows are counted, so draft or retired security never drives
+   * the UI.
+   *
    * @param {number} submissionFeatureId
    * @returns {Promise<SubmissionFeature>}
    * @memberof SubmissionFeatureRepository
@@ -151,13 +165,23 @@ export class SubmissionFeatureRepository extends BaseRepository {
         ft.name as feature_type_name,
         ft.display_name as feature_type_display_name,
         s.name as submission_name,
-        EXISTS (
-          SELECT 1
-          FROM submission_feature_security sfs
-          WHERE sfs.submission_feature_id = sf.submission_feature_id
+    `;
+    // The security fragments are raw, zero-placeholder SQL and must be appended as text: interpolating
+    // them into a SQL`` tag would bind them as parameter values rather than splice them as SQL.
+    sqlStatement.append(`
+        ${isEffectivelySecured('sf.submission_feature_id')} AS secured,
+        COALESCE((
+          SELECT ARRAY_REMOVE(ARRAY_AGG(DISTINCT sr.name ORDER BY sr.name), NULL)
+          FROM submission_feature_closure c
+          JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
+          JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
+          JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id
+          WHERE c.source_submission_feature_id = sf.submission_feature_id
+            AND c.is_ancestor = true
             AND sfs.record_end_date IS NULL
             AND sfs.status = 'active'
-        ) AS secured
+            AND ${isSubmissionFeatureActive('sf_sec')}
+        ), ARRAY[]::varchar[]) AS security_reasons
       FROM
         submission_feature sf
       JOIN
@@ -165,8 +189,8 @@ export class SubmissionFeatureRepository extends BaseRepository {
       JOIN
         submission s ON s.submission_id = sf.submission_id
       WHERE
-        sf.submission_feature_id = ${submissionFeatureId}
-    `;
+        sf.submission_feature_id =`);
+    sqlStatement.append(SQL` ${submissionFeatureId}`);
     sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeature);

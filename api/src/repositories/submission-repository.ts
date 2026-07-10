@@ -77,7 +77,8 @@ export const SubmissionFeature = z.object({
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
   submission_name: z.string(),
-  secured: z.boolean()
+  secured: z.boolean(),
+  security_reasons: z.array(z.string())
 });
 
 export type SubmissionFeature = z.infer<typeof SubmissionFeature>;

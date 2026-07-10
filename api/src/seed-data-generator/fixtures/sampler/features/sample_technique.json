@@ -1,0 +1,15 @@
+[
+  {
+    "id": "b79f63cf-e580-49ca-bf6d-cecc15206e8c",
+    "type": "sample_technique",
+    "properties": {
+      "name": "Sampler Technique 1",
+      "method_name": "Camera Trap",
+      "response_metric": "Count",
+      "description": "Sampler sampling technique.",
+      "detect_distance": 25
+    },
+    "content": [],
+    "parent": "7c47959e-39c5-4a7d-a648-a066b17b9366"
+  }
+]

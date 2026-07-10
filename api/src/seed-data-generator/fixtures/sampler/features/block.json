@@ -1,0 +1,12 @@
+[
+  {
+    "id": "3b8edf80-c065-43d1-85af-d93f3719d057",
+    "type": "block",
+    "properties": {
+      "name": "Sampler Block 1",
+      "description": "Sampler survey block."
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

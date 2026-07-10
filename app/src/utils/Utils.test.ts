@@ -5,6 +5,7 @@ import {
   downloadFile,
   ensureProtocol,
   firstOrNull,
+  formatFeatureCount,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
@@ -206,6 +207,46 @@ describe('getFormattedFileSize', () => {
   it('returns answer in GB if fileSize >= 1000000000', async () => {
     const formattedFileSize = getFormattedFileSize(1000000000);
     expect(formattedFileSize).toEqual('1.0 GB');
+  });
+});
+
+describe('formatFeatureCount', () => {
+  it('returns null when count is null so the caller omits the line', () => {
+    expect(formatFeatureCount(null)).toBeNull();
+  });
+
+  it('returns `0 features` when count is 0', () => {
+    expect(formatFeatureCount(0)).toEqual('0 features');
+  });
+
+  it('returns singular `1 feature` when count is 1', () => {
+    expect(formatFeatureCount(1)).toEqual('1 feature');
+  });
+
+  it('returns plain counts under 1000', () => {
+    expect(formatFeatureCount(2)).toEqual('2 features');
+    expect(formatFeatureCount(999)).toEqual('999 features');
+  });
+
+  it('returns `1k features` at the lower k boundary with trailing `.0` stripped', () => {
+    expect(formatFeatureCount(1000)).toEqual('1k features');
+  });
+
+  it('returns compact k form with one decimal', () => {
+    expect(formatFeatureCount(17412)).toEqual('17.4k features');
+  });
+
+  it('strips a trailing `.0` from mid-band k counts', () => {
+    expect(formatFeatureCount(17000)).toEqual('17k features');
+  });
+
+  it('returns compact M form for counts of a million or more', () => {
+    expect(formatFeatureCount(2500000)).toEqual('2.5M features');
+    expect(formatFeatureCount(1000000)).toEqual('1M features');
+  });
+
+  it('promotes a count that rounds up to 1000k into the M band', () => {
+    expect(formatFeatureCount(999999)).toEqual('1M features');
   });
 });
 

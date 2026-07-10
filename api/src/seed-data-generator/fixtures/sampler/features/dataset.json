@@ -1,0 +1,24 @@
+[
+  {
+    "id": "cc07359b-dd25-4965-98d0-d8b89558432c",
+    "type": "survey",
+    "properties": {
+      "name": "Feature Type Sampler",
+      "start_date": "2020-01-01",
+      "end_date": "2020-12-31",
+      "objectives": "One valid feature per feature type for pipeline coverage.",
+      "focal_species": [180702]
+    },
+    "content": [
+      "7c47959e-39c5-4a7d-a648-a066b17b9366",
+      "c21e3c06-054c-4c03-943b-29d71c7398b6",
+      "3b8edf80-c065-43d1-85af-d93f3719d057",
+      "4b8506fc-c1e4-491d-a624-40123ee49867",
+      "cbb9ec4c-1874-47fa-942c-7be0f1db15d9",
+      "a2b7d902-6c92-4136-a9c6-3310aad67125",
+      "091551fc-2149-4efe-acb7-d9eaff01b4b9",
+      "3e263a19-b717-49d6-b6f5-7b99d2a4732b"
+    ],
+    "parent": null
+  }
+]

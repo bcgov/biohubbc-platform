@@ -76,8 +76,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('inner join "feature_type_property" as "ftp"');
       expect(sql).to.include('"ftp"."feature_property_id"');
-      expect(sql).to.include('"ft"."name" = \'survey\'');
-      expect(sql).to.include('from (with recursive "evidence"');
+      expect(sql).to.include('"anchor_ft"."name" = \'survey\'');
+      expect(sql).to.include('from (with "evidence"');
       expect(sql).to.include('intersect');
       expect(sql).to.include('feature_property_id');
     });
@@ -125,9 +125,6 @@ describe('expression-evaluation', () => {
     });
 
     it('should also apply security filtering to projected target features (defense in depth)', () => {
-      // Filtering only the predicate evidence is not enough: graph traversal can reach a secured
-      // *target* feature from an unsecured evidence feature, so consumers that use the subquery
-      // directly (e.g. the download pipeline cursor) would otherwise leak that target id.
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -143,10 +140,8 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
-      // The target-side filter is keyed on `sf.submission_feature_id`, distinct from the
-      // evidence-side filter on `p.submission_feature_id`.
-      expect(sql).to.include('"sf"."submission_feature_id"');
-      expect(sql).to.match(/security_scope_anchor[\s\S]*"sf"\."submission_feature_id"/);
+      expect(sql).to.include('"anchor_sf"."submission_feature_id"');
+      expect(sql).to.match(/security_scope_anchor[\s\S]*"anchor_sf"\."submission_feature_id"/);
     });
 
     it('should narrow predicate evidence by feature_type_property_id when provided', () => {
@@ -170,7 +165,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('"p"."feature_type_property_id" = 123');
     });
 
-    it('should project related predicate evidence to anchor feature ids through the content walk and closure probes', () => {
+    it('should project related predicate evidence to anchor feature ids through closure probes', () => {
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -187,40 +182,36 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
 
-      // Evidence CTE seeds the recursive content walk (WITH RECURSIVE is restored by the content-edge recursion).
       expect(sql).to.include('submission_feature_property_taxon');
-      expect(sql).to.include('with recursive "evidence" as');
+      expect(sql).to.include('with "evidence" as');
 
-      // Bounded recursive content walk over submission_feature_feature edges.
-      expect(sql).to.include('"content_edges"');
-      expect(sql).to.include('"content_reach"');
-      expect(sql).to.include('from "submission_feature_feature" as "sff"');
-      expect(sql).to.include('source_sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < source_sf.record_end_date');
-      expect(sql).to.include('target_sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < target_sf.record_end_date');
-      // Depth bound and cycle guard on the recursive term.
-      expect(sql).to.include('"content_reach"."depth" < 6');
-      expect(sql).to.include('= ANY(content_reach.path)');
+      expect(sql).to.include('from "submission_feature" as "anchor_sf"');
+      expect(sql).to.include('inner join "feature_type" as "anchor_ft"');
+      expect(sql).to.include('"anchor_ft"."name" = \'telemetry\'');
+      expect(sql).to.include('anchor_sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < anchor_sf.record_end_date');
 
-      // Closure probed from every content-reached node — forward (by source) and reverse (by target).
-      expect(sql).to.include('from "submission_feature_closure" as "c"');
-      expect(sql).to.include('"cr"."feature_id" = "c"."source_submission_feature_id"');
-      expect(sql).to.include('"cr"."feature_id" = "c"."target_submission_feature_id"');
-      expect(sql).to.include('"c"."target_submission_feature_id" as "submission_feature_id"');
-      expect(sql).to.include('"c"."source_submission_feature_id" as "submission_feature_id"');
+      expect(sql).to.include('from "evidence"');
+      expect(sql).to.include('inner join "submission_feature" as "evidence_sf"');
+      expect(sql).to.include('inner join "feature_type" as "evidence_ft"');
+      expect(sql).to.include('evidence_sf.record_effective_date <= now()');
+      expect(sql).to.include('now() < evidence_sf.record_end_date');
 
-      // The reachable selects are UNION-combined (dedup), and the anchor type is applied to the resolved targets.
-      expect(sql).to.include(' union ');
-      expect(sql).to.include('"ft"."name" = \'telemetry\'');
-      expect(sql).to.include('sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < sf.record_end_date');
+      expect(sql).to.include('evidence_ft.name = anchor_ft.name');
+      expect(sql).to.include('evidence_sf.submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('evidence_ft.name <> anchor_ft.name');
 
-      // The synthetic survey↔same-submission membership edge has been removed — content edges only.
-      expect(sql).to.not.include('as "survey_sf"');
-      expect(sql).to.not.include('"related_sf"."submission_id" = "survey_sf"."submission_id"');
+      expect(sql).to.include('from "submission_feature_closure" as "c_forward"');
+      expect(sql).to.include('c_forward.source_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('c_forward.target_submission_feature_id = evidence_sf.submission_feature_id');
 
-      // The old graph-edge union machinery is gone (parent/child reach now comes from the closure).
+      expect(sql).to.include('from "submission_feature_closure" as "c_reverse"');
+      expect(sql).to.include('c_reverse.source_submission_feature_id = evidence_sf.submission_feature_id');
+      expect(sql).to.include('c_reverse.target_submission_feature_id = anchor_sf.submission_feature_id');
+
+      expect(sql).to.not.include('"content_edges"');
+      expect(sql).to.not.include('"content_reach"');
+      expect(sql).to.not.include('from "submission_feature_feature" as "sff"');
       expect(sql).to.not.include('connected_features');
       expect(sql).to.not.include('graph_edges');
       expect(sql).to.not.include('parent_submission_feature_id as');
@@ -253,7 +244,7 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include(' union ');
       expect(sql).to.not.include(' intersect ');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+      expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
     });
 
     it('should recursively compose nested expression target sets', () => {
@@ -295,7 +286,7 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include(' intersect ');
       expect(sql).to.include(' union ');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
+      expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
     });
 
     it('should use feature-level NotEquals evidence semantics for multi-value properties', () => {
@@ -368,7 +359,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('p.value');
     });
 
-    it('should project predicate evidence to species_observation targets through the content walk and closure probes', () => {
+    it('should project predicate evidence to species_observation targets through same-type matching and closure probes', () => {
       const expressionTree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
@@ -387,17 +378,17 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('with recursive "evidence" as');
-      expect(sql).to.include('"content_reach"');
-      expect(sql).to.include('"content_edges"');
-      expect(sql).to.include('from "submission_feature_feature" as "sff"');
-      expect(sql).to.include('from "submission_feature_closure" as "c"');
-      expect(sql).to.include('"cr"."feature_id" = "c"."source_submission_feature_id"');
-      expect(sql).to.include('"cr"."feature_id" = "c"."target_submission_feature_id"');
-      expect(sql).to.include('"content_reach"."depth" < 6');
-      expect(sql).to.include(' union ');
-      expect(sql).to.include('"ft"."name" = \'species_observation\'');
-      expect(sql).to.not.include('as "survey_sf"');
+      expect(sql).to.include('with "evidence" as');
+      expect(sql).to.include('from "submission_feature" as "anchor_sf"');
+      expect(sql).to.include('from "evidence"');
+      expect(sql).to.include('evidence_ft.name = anchor_ft.name');
+      expect(sql).to.include('evidence_sf.submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('from "submission_feature_closure" as "c_forward"');
+      expect(sql).to.include('from "submission_feature_closure" as "c_reverse"');
+      expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
+      expect(sql).to.not.include('"content_reach"');
+      expect(sql).to.not.include('"content_edges"');
+      expect(sql).to.not.include('from "submission_feature_feature" as "sff"');
       expect(sql).to.not.include('connected_features');
     });
   });
@@ -413,7 +404,6 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('sf.record_effective_date <= now()');
       expect(sql).to.include('now() < sf.record_end_date');
       expect(sql).to.not.include('"ft"."record_end_date" is null');
-      // Authenticated path uses isAccessibleToUser → security_scope_anchor + bound user id
       expect(sql).to.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
       expect(sql).to.include('42');
@@ -423,7 +413,6 @@ describe('expression-evaluation', () => {
       const sql = buildBroadFeatureTypeSubquery('fish', null).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      // Anonymous: emits NOT EXISTS (uppercase, raw SQL fragment) with no scope-anchor branch
       expect(sql.toLowerCase()).to.include('not exists');
       expect(sql).to.not.include('security_scope_anchor');
     });
@@ -446,7 +435,7 @@ describe('expression-evaluation', () => {
     it('emits the same expression criteria as the filtered variant', () => {
       const sql = buildUnfilteredExpressionTreeFeatureIdsSubquery('dataset', expressionTree).toString();
 
-      expect(sql).to.include('"ft"."name" = \'dataset\'');
+      expect(sql).to.include('"anchor_ft"."name" = \'dataset\'');
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('"p"."submission_feature_id"');
     });
@@ -454,7 +443,6 @@ describe('expression-evaluation', () => {
     it('applies NO security/access filter (the candidate set before access filtering)', () => {
       const sql = buildUnfilteredExpressionTreeFeatureIdsSubquery('dataset', expressionTree).toString();
 
-      // Neither the authenticated scope-grant probe nor the anonymous NOT-secured probe is emitted.
       expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.not.include('team_security_scope');
       expect(sql).to.not.include('submission_feature_security');

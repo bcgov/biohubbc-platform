@@ -161,6 +161,39 @@ export const getFormattedFileSize = (fileSize: number) => {
 };
 
 /**
+ * Format a feature count for display (e.g. on a download tile).
+ *
+ * Compact forms are for readability of large numbers only: counts under 1000 render plain
+ * (`412 features`, singular `1 feature`), while larger counts render with one decimal max and a
+ * trailing `.0` stripped (`17.4k features`, `17k features`, `2.5M features`). Lowercase `k` is
+ * deliberate — the desired display form is `17.4k`, whereas `Intl.NumberFormat` compact notation
+ * emits an uppercase `17.4K`. The band is chosen on the rounded thousands value, so a count that
+ * rounds up to 1000k promotes into the M band (999999 → `1M features`, never `1000k features`).
+ *
+ * A `null` count returns `null` so the caller hides the line entirely rather than rendering a
+ * broken value (e.g. versions materialized before counting existed carry no count).
+ *
+ * @param {number | null} count
+ * @return {*}  {(string | null)} formatted count string, or `null` when no count is stored
+ */
+export const formatFeatureCount = (count: number | null): string | null => {
+  if (count === null) {
+    return null;
+  }
+
+  if (count < 1000) {
+    return `${count} ${pluralize(count, 'feature')}`;
+  }
+
+  const thousands = Number.parseFloat((count / 1000).toFixed(1));
+  if (thousands < 1000) {
+    return `${thousands}k features`;
+  }
+
+  return `${Number.parseFloat((count / 1000000).toFixed(1))}M features`;
+};
+
+/**
  * Check if an unknown value is an object.
  *
  * @param {unknown} obj

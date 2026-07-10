@@ -170,6 +170,91 @@ describe('DownloadPipelineService', () => {
       expect(metadata.completed_at).to.be.a('string');
       expect(metadata.materialized_at).to.be.undefined;
     });
+
+    it('maps featureCount to feature_count on processing→ready alongside the timestamps', async () => {
+      // Verifies: the READY transition re-keys metadata.featureCount → the repo's feature_count
+      // column while still stamping completed_at + materialized_at.
+
+      // Step 1: Stub the version-status read to return a PROCESSING version
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
+
+      // Step 2: Perform the ready transition with the materialized feature count
+      await service.transitionDownloadVersionStatus(
+        versionId,
+        DownloadStatusEnum.READY,
+        [DownloadStatusEnum.PROCESSING],
+        { featureCount: 42 }
+      );
+
+      // Step 3: Verify the count landed under the repo key and the timestamps are still set
+      const metadata = updateStub.firstCall.args[2] as {
+        completed_at?: string;
+        materialized_at?: string;
+        feature_count?: number;
+      };
+      expect(metadata.feature_count).to.equal(42);
+      expect(metadata.completed_at).to.be.a('string');
+      expect(metadata.materialized_at).to.be.a('string');
+    });
+
+    it('passes featureCount 0 through to the repo (strict undefined check, not truthiness)', async () => {
+      // Verifies: a legitimate count of 0 (empty policy scope) is persisted — a truthiness
+      // guard on featureCount would silently drop it.
+
+      // Step 1: Stub the version-status read to return a PROCESSING version
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
+
+      // Step 2: Perform the ready transition with a zero count
+      await service.transitionDownloadVersionStatus(
+        versionId,
+        DownloadStatusEnum.READY,
+        [DownloadStatusEnum.PROCESSING],
+        { featureCount: 0 }
+      );
+
+      // Step 3: Verify the zero landed (strictly) under the repo key
+      const metadata = updateStub.firstCall.args[2] as { feature_count?: number };
+      expect(metadata.feature_count).to.equal(0);
+    });
+
+    it('omits feature_count when featureCount is absent (FAILED transition with error only)', async () => {
+      // Verifies: transitions that don't own the count (e.g. the DLQ's FAILED transition) leave
+      // feature_count out of the update bag entirely, so the repo COALESCE preserves any stored value.
+
+      // Step 1: Stub the version-status read to return a PROCESSING version
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
+
+      // Step 2: Perform the failing transition with error metadata only
+      await service.transitionDownloadVersionStatus(
+        versionId,
+        DownloadStatusEnum.FAILED,
+        [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
+        { error: 'job failed after all retries' }
+      );
+
+      // Step 3: Verify no feature_count key was passed
+      const metadata = updateStub.firstCall.args[2] as { error_message?: string; feature_count?: number };
+      expect(metadata.error_message).to.equal('job failed after all retries');
+      expect(metadata.feature_count).to.be.undefined;
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -844,6 +929,103 @@ describe('DownloadPipelineService', () => {
       expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
       expect(linkStub.firstCall.args[2]).to.equal('observation');
       expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
+    });
+
+    // Minimal hydrated feature for the row-count tests — shape matches what
+    // hydrateFeatureBatch assembles (ParquetFeatureData).
+    const hydratedFeature = (id: number) => ({
+      submission_feature_id: id,
+      uuid: `uuid-${id}`,
+      feature_type_name: 'observation',
+      data: { species: 'moose' },
+      parent_uuid: null
+    });
+
+    it('returns the accumulated hydrated row count across cursor batches', async () => {
+      // Verifies: the count is accumulated during the streaming write (2 batches → 2 + 1
+      // hydrated rows → 3) so the caller can persist the version's total at materialization
+      // time instead of computing a live COUNT later.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(
+          mockBaseCursor([[{ submission_feature_id: 1 }, { submission_feature_id: 2 }], [{ submission_feature_id: 3 }]])
+        );
+
+      const hydrateStub = sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch');
+      hydrateStub.onCall(0).resolves([hydratedFeature(1), hydratedFeature(2)]);
+      hydrateStub.onCall(1).resolves([hydratedFeature(3)]);
+
+      const result = await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(result).to.equal(3);
+      expect(mockWriter.appendRow).to.have.been.calledThrice;
+    });
+
+    it('counts HYDRATED rows, not base cursor rows', async () => {
+      // Verifies: the count reflects what actually lands in the Parquet file — the hydrated
+      // rows written through appendRow — not the raw base cursor batch size.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      // Base batch has 3 rows...
+      sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(
+          mockBaseCursor([[{ submission_feature_id: 1 }, { submission_feature_id: 2 }, { submission_feature_id: 3 }]])
+        );
+      // ...but hydration resolves only 2.
+      sinon
+        .stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch')
+        .resolves([hydratedFeature(1), hydratedFeature(2)]);
+
+      const result = await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(result).to.equal(2);
+      expect(mockWriter.appendRow).to.have.been.calledTwice;
+    });
+
+    it('returns 0 (not undefined/NaN) for an empty cursor', async () => {
+      // Verifies: a feature type with no visible rows still reports an explicit numeric 0 so
+      // the caller's sum stays a number.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { mockWriter } = stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      const result = await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(result).to.equal(0);
+      expect(mockWriter.appendRow).to.not.have.been.called;
     });
   });
 

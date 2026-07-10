@@ -1,7 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { DBService } from '../db-service';
-import { SubmissionFeatureService } from '../submission-feature-service';
 import { TeamAuthorizationEntity } from './authorization-service';
 
 /**
@@ -25,8 +24,6 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
-   * - `submission_feature`: membership in a policy recipient team linked through
-   *   team_policy for an ALLOWing policy statement chain.
    *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
@@ -48,29 +45,6 @@ export class TeamAuthorizationService extends DBService {
         );
         break;
 
-      case 'submission_feature': {
-        const submissionFeatureService = new SubmissionFeatureService(this.connection);
-        const feature = await submissionFeatureService.getSubmissionFeatureById(entity.submissionFeatureId);
-
-        if (!feature.secured) {
-          return true;
-        }
-
-        if (
-          entity.submissionId !== undefined &&
-          entity.submissionId !== null &&
-          feature.submission_id !== entity.submissionId
-        ) {
-          return false;
-        }
-
-        record = await this.teamAuthorizationRepository.findTeamPolicyBySubmissionFeature(
-          systemUserId,
-          entity.submissionFeatureId
-        );
-        break;
-      }
-
       default:
         return false;
     }
@@ -85,5 +59,31 @@ export class TeamAuthorizationService extends DBService {
     }
 
     return true;
+  }
+
+  /**
+   * Determine whether a submission feature is accessible to a user, using the ancestry-aware,
+   * closure-based security check shared with the search/download read paths: the feature is
+   * unsecured, or the user's team holds a security scope anchored on the feature or one of its
+   * ancestors.
+   *
+   * `systemUserId` may be `null` for anonymous users, who can still access unsecured features.
+   *
+   * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
+   * @param {number} submissionFeatureId
+   * @param {number} submissionId The submission the feature must belong to.
+   * @return {Promise<boolean>}
+   * @memberof TeamAuthorizationService
+   */
+  async isSubmissionFeatureAccessibleToUser(
+    systemUserId: number | null,
+    submissionFeatureId: number,
+    submissionId: number
+  ): Promise<boolean> {
+    return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
+      systemUserId,
+      submissionFeatureId,
+      submissionId
+    );
   }
 }

@@ -227,6 +227,75 @@ describe('process-download-job', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
 
+    it('sums per-feature-type row counts and passes featureCount on the READY transition only', async () => {
+      setupMockConnection();
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+
+      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      schemaLookup.set('a', []);
+      schemaLookup.set('b', []);
+      schemaLookup.set('c', []);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup,
+        featureTypes: ['a', 'b', 'c'],
+        statements: [createMockStatement('a'), createMockStatement('b'), createMockStatement('c')]
+      });
+
+      // Each per-type write reports the rows it materialized; the handler sums them.
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet');
+      writeStub.onCall(0).resolves(2);
+      writeStub.onCall(1).resolves(3);
+      writeStub.onCall(2).resolves(5);
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // The PROCESSING transition carries no metadata; the READY transition carries the sum.
+      expect(transitionStub).to.have.been.calledTwice;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(transitionStub.firstCall.args[3]).to.be.undefined;
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(transitionStub.secondCall.args[3]).to.deep.equal({ featureCount: 10 });
+    });
+
+    it('passes featureCount 0 to READY when there are no statements (explicit 0, not skipped metadata)', async () => {
+      setupMockConnection();
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: [],
+        statements: []
+      });
+
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves(0);
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // No writes ran, but the version still materialized (as empty) — READY records an
+      // explicit 0, distinguishing "counted, empty" from the pre-counting NULL.
+      expect(writeStub).to.not.have.been.called;
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(transitionStub.secondCall.args[3]).to.deep.equal({ featureCount: 0 });
+    });
+
     it('enters processing cleanly when a mid-job retry finds the version already in PROCESSING', async () => {
       setupMockConnection();
 

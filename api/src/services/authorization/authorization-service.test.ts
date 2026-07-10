@@ -93,6 +93,11 @@ describe('executeAuthorizeConfig', function () {
       },
       {
         discriminator: 'Contributor'
+      },
+      {
+        discriminator: 'Policy',
+        submissionFeatureId: 1,
+        submissionId: 2
       }
     ];
     const mockDBConnection = getMockDBConnection();
@@ -100,12 +105,13 @@ describe('executeAuthorizeConfig', function () {
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByPolicy').resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const authorizeResults = await authorizationService.executeAuthorizeConfig(mockAuthorizeRules);
 
-    expect(authorizeResults).to.eql([false, true, true]);
+    expect(authorizeResults).to.eql([false, true, true, true]);
   });
 });
 
@@ -148,25 +154,19 @@ describe('authorizeSystemAdministrator', function () {
     expect(isAuthorized).to.equal(true);
   });
 
-  it('returns false if the cached system administrator is blocked', async function () {
+  it('returns false if the injected system user is soft-deleted, even with the admin role', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: {
-        role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
-        record_end_date: '2999-01-01',
-        display_name: null,
-        given_name: null,
-        family_name: null,
-        email: null,
-        agency: null,
-        notes: null
-      } as unknown as SystemUserExtended
-    });
+    const softDeletedAdmin = {
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedAdmin });
 
     const isAuthorized = await authorizationService.authorizeSystemAdministrator();
 
-    expect(isAuthorized).to.equal(false);
+    expect(isAuthorized).to.be.false;
   });
 });
 
@@ -210,7 +210,7 @@ describe('authorizeBySystemRole', function () {
     };
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = { record_end_date: 'datetime' } as unknown as SystemUserExtended;
+    const mockGetSystemUsersObjectResponse = { record_end_date: '2020-01-01' } as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -246,7 +246,7 @@ describe('authorizeBySystemRole', function () {
     const authorizationService = new AuthorizationService(mockDBConnection, {
       systemUser: {
         role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
-        record_end_date: '2999-01-01',
+        record_end_date: '2020-01-01',
         display_name: null,
         given_name: null,
         family_name: null,
@@ -341,6 +341,18 @@ describe('authorizeBySystemUser', function () {
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemUser();
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+  });
+
+  it('returns false if the injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: { record_end_date: '2020-01-01' } as unknown as SystemUserExtended
+    });
+
+    const isAuthorizedBySystemUser = await authorizationService.authorizeBySystemUser();
+
+    expect(isAuthorizedBySystemUser).to.be.false;
   });
 });
 
@@ -517,7 +529,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '2999-01-01',
+      record_end_date: '2020-01-01',
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -550,7 +562,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '2999-01-01',
+      record_end_date: '2020-01-01',
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -565,6 +577,21 @@ describe('getCachedSystemUser', function () {
     expect(result).to.be.null;
     expect(authorizationService['_systemUser']).to.be.undefined;
   });
+
+  it('returns null if the cached/injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const softDeletedUser = {
+      system_user_id: 1,
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    // Simulate a constructor-injected (e.g. via req.system_user) soft-deleted user
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedUser });
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+  });
 });
 
 describe('authorizeByTeam', function () {
@@ -572,9 +599,12 @@ describe('authorizeByTeam', function () {
     sinon.restore();
   });
 
-  const systemUser: SystemUser = {
+  const systemUser: SystemUserExtended = {
     system_user_id: 1,
     user_identity_source_id: 2,
+    identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_ids: [],
+    role_names: [],
     user_identifier: 'test-user',
     user_guid: 'guid-123',
     record_effective_date: '',
@@ -637,6 +667,86 @@ describe('authorizeByTeam', function () {
     });
 
     expect(result).to.be.false;
+  });
+});
+
+describe('authorizeByPolicy', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  const systemUser: SystemUser = {
+    system_user_id: 1,
+    user_identity_source_id: 2,
+    user_identifier: 'test-user',
+    user_guid: 'guid-123',
+    record_effective_date: '',
+    record_end_date: '',
+    create_date: '2023-01-01',
+    create_user: 1,
+    update_date: null,
+    update_user: null,
+    revision_count: 0,
+    display_name: null,
+    given_name: null,
+    family_name: null,
+    email: null,
+    agency: null,
+    notes: null
+  };
+
+  it('returns true when the feature is accessible, passing the authenticated user id and entity ids', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
+    });
+
+    expect(result).to.be.true;
+    expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
+  });
+
+  it('returns false when the feature is not accessible to the user', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    sinon.stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('passes a null system user id through for anonymous requests', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
+    });
+
+    expect(result).to.be.true;
+    expect(accessibleStub).to.have.been.calledOnceWith(null, 2, 3);
   });
 });
 
@@ -795,7 +905,7 @@ describe('getSystemUserObject', function () {
     expect(systemUserObject).to.equal(mockSystemUserWithRolesResponse);
   });
 
-  it('returns null if the system user is soft-deleted', async function () {
+  it('returns null if the system user is soft-deleted (record_end_date in the past)', async function () {
     const mockDBConnection = getMockDBConnection();
 
     const mockSystemUserWithRolesResponse = {

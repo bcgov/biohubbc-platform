@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { DownloadDetailRecord } from './download';
+
 /**
  * HTTP request body for adding a download to a gallery.
  *
@@ -14,3 +17,20 @@ export interface AddGalleryDownloadRequestBody {
   downloadId: string;
   sort?: number | null;
 }
+
+/**
+ * Landing-tile read shape: a gallery download detail row plus the latest
+ * version's stored feature count. `feature_count` must stay `.nullable()` —
+ * versions materialized before counting existed carry NULL, and one stale row
+ * must not fail the whole list parse.
+ */
+export const GalleryDownloadTileRecord = DownloadDetailRecord.extend({
+  feature_count: z.number().int().nullable()
+});
+export type GalleryDownloadTileRecord = z.infer<typeof GalleryDownloadTileRecord>;
+
+/**
+ * Read shape for the `SELECT EXISTS (...)` membership check.
+ */
+export const GalleryDownloadExists = z.object({ exists: z.boolean() });
+export type GalleryDownloadExists = z.infer<typeof GalleryDownloadExists>;
