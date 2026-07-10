@@ -378,16 +378,6 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Returns `true` if the system user is inactive (soft-deleted), i.e. their `record_end_date` is set.
-   *
-   * @param {SystemUserExtended} systemUser
-   * @return {*}  {boolean}
-   */
-  static isSystemUserInactive(systemUser: SystemUserExtended): boolean {
-    return isSystemUserInactive(systemUser);
-  }
-
-  /**
    * Finds a single user based on their keycloak token information.
    *
    * @return {*}  {(Promise<SystemUserExtended | null>)}

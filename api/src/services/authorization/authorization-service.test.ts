@@ -921,24 +921,6 @@ describe('getSystemUserObject', function () {
   });
 });
 
-describe('isSystemUserInactive', function () {
-  it('returns false if `record_end_date` is null', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: null
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.false;
-  });
-
-  it('returns true if `record_end_date` is set', function () {
-    const result = AuthorizationService.isSystemUserInactive({
-      record_end_date: '2020-01-01'
-    } as unknown as SystemUserExtended);
-
-    expect(result).to.be.true;
-  });
-});
-
 describe('getSystemUserWithRoles', function () {
   afterEach(() => {
     sinon.restore();
