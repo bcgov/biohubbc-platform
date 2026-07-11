@@ -5,7 +5,6 @@ import sinonChai from 'sinon-chai';
 import { startUpload } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
-import { HTTP401 } from '../../../../errors/http-error';
 import { SystemUserExtended } from '../../../../repositories/user-repository';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from '../../../../services/upload/upload-ingestion-service.interface';
@@ -27,128 +26,32 @@ const mockUploadResponse: PresignedUploadUrlResponse = {
   ]
 };
 
-// Token that resolves to a user guid + identifier via keycloak-utils.
-const mockToken = { preferred_username: '42-guid@idir', idir_username: 'jsmith', identity_provider: 'idir' };
+// The human submitter is supplied in the request body (the request itself is authenticated as the
+// SIMS service client).
+const mockSubmitter = { guid: '42-guid', identifier: 'jsmith', identitySource: 'IDIR' };
+
+const mockBody = {
+  bytes: 12345,
+  name: 'name',
+  description: 'description',
+  comment: 'comment',
+  submitter: mockSubmitter
+};
 
 describe('archive upload handler', () => {
+  let ensureSystemUserStub: sinon.SinonStub;
+
+  beforeEach(() => {
+    ensureSystemUserStub = sinon
+      .stub(UserService.prototype, 'ensureSystemUser')
+      .resolves({ system_user_id: 42 } as SystemUserExtended);
+  });
+
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('when authenticated', () => {
-    let ensureSystemUserStub: sinon.SinonStub;
-
-    beforeEach(() => {
-      ensureSystemUserStub = sinon
-        .stub(UserService.prototype, 'ensureSystemUser')
-        .resolves({ system_user_id: 42 } as SystemUserExtended);
-    });
-
-    it('should initialize upload and return 201 on success', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const startArchiveUploadStub = sinon
-        .stub(UploadIngestionService.prototype, 'startArchiveUpload')
-        .resolves(mockUploadResponse);
-
-      const requestHandler = startUpload();
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.body = { bytes: 12345, name: 'name', description: 'description', comment: 'comment' };
-      mockReq.keycloak_token = mockToken;
-      mockReq.contributor_id = 11;
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      // Submitter resolved from the token.
-      expect(ensureSystemUserStub).to.have.been.calledOnceWith('42-guid', 'jsmith', sinon.match.string);
-
-      expect(startArchiveUploadStub).to.have.been.calledOnce;
-      expect(startArchiveUploadStub.getCall(0).args[0]).to.equal(12345);
-      expect(startArchiveUploadStub.getCall(0).args[1]).to.include({
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        system_user_id: 42,
-        contributor_id: 11
-      });
-      // Submitter id is forwarded for the submission_team grant.
-      expect(startArchiveUploadStub.getCall(0).args[2]).to.equal(42);
-
-      expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.deep.equal(mockUploadResponse);
-
-      expect(dbConnectionObj.commit).to.have.been.calledOnce;
-      expect(dbConnectionObj.release).to.have.been.calledOnce;
-    });
-
-    it('should rollback and throw error if upload service fails', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const error = new Error('Upload failed');
-      sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
-
-      const requestHandler = startUpload();
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.body = { bytes: 12345, name: 'name', description: 'description', comment: 'comment' };
-      mockReq.keycloak_token = mockToken;
-      mockReq.contributor_id = 11;
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail('Expected error to be thrown');
-      } catch (err) {
-        expect(err).to.equal(error);
-        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
-        expect(dbConnectionObj.release).to.have.been.calledOnce;
-      }
-    });
-
-    it('should generate a UUID for the submission object', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const startArchiveUploadStub = sinon
-        .stub(UploadIngestionService.prototype, 'startArchiveUpload')
-        .resolves(mockUploadResponse);
-
-      const requestHandler = startUpload();
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.body = { bytes: 12345, name: 'name', description: 'description', comment: 'comment' };
-      mockReq.keycloak_token = mockToken;
-      mockReq.contributor_id = 11;
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      const submissionArg = startArchiveUploadStub.getCall(0).args[1];
-      expect(submissionArg.uuid).to.be.a('string');
-      expect(submissionArg).to.include({
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        system_user_id: 42,
-        contributor_id: 11
-      });
-    });
-  });
-
-  it('should reject with 401 and not create records when the token cannot be resolved to a user', async () => {
+  it('should resolve the body submitter, initialize the upload, and return 201 on success', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -156,14 +59,56 @@ describe('archive upload handler', () => {
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    const ensureSystemUserStub = sinon.stub(UserService.prototype, 'ensureSystemUser');
-    const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload');
+    const startArchiveUploadStub = sinon
+      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
+      .resolves(mockUploadResponse);
 
     const requestHandler = startUpload();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { bytes: 12345, name: 'name', description: 'description', comment: 'comment' };
-    // Token without preferred_username / idir_username cannot resolve to a user guid.
+    mockReq.body = { ...mockBody };
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
+    mockReq.contributor_id = 11;
+
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    // Submitter resolved from the request body, not the token.
+    expect(ensureSystemUserStub).to.have.been.calledOnceWith('42-guid', 'jsmith', 'IDIR');
+
+    expect(startArchiveUploadStub).to.have.been.calledOnce;
+    expect(startArchiveUploadStub.getCall(0).args[0]).to.equal(12345);
+    expect(startArchiveUploadStub.getCall(0).args[1]).to.include({
+      name: 'name',
+      description: 'description',
+      comment: 'comment',
+      system_user_id: 42,
+      contributor_id: 11
+    });
+    // The submitter (not the service client) is forwarded for the submission_team grant.
+    expect(startArchiveUploadStub.getCall(0).args[2]).to.equal(42);
+
+    expect(mockRes.statusValue).to.equal(201);
+    expect(mockRes.jsonValue).to.deep.equal(mockUploadResponse);
+
+    expect(dbConnectionObj.commit).to.have.been.calledOnce;
+    expect(dbConnectionObj.release).to.have.been.calledOnce;
+  });
+
+  it('should rollback and throw error if upload service fails', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+    const error = new Error('Upload failed');
+    sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
+
+    const requestHandler = startUpload();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = { ...mockBody };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
     mockReq.contributor_id = 11;
 
@@ -171,12 +116,71 @@ describe('archive upload handler', () => {
       await requestHandler(mockReq, mockRes, mockNext);
       expect.fail('Expected error to be thrown');
     } catch (err) {
-      expect(err).to.be.instanceOf(HTTP401);
-      expect(ensureSystemUserStub).to.not.have.been.called;
+      expect(err).to.equal(error);
+      expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      expect(dbConnectionObj.release).to.have.been.calledOnce;
+    }
+  });
+
+  it('should rollback and create no records when the submitter cannot be resolved', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+    // ensureSystemUser rejects (e.g. invalid identity source) -> nothing should be created.
+    ensureSystemUserStub.rejects(new Error('Failed to resolve submitter'));
+    const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload');
+
+    const requestHandler = startUpload();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = { ...mockBody };
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
+    mockReq.contributor_id = 11;
+
+    try {
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect.fail('Expected error to be thrown');
+    } catch {
       expect(startArchiveUploadStub).to.not.have.been.called;
       expect(dbConnectionObj.commit).to.not.have.been.called;
       expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
+  });
+
+  it('should generate a UUID for the submission object', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+    const startArchiveUploadStub = sinon
+      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
+      .resolves(mockUploadResponse);
+
+    const requestHandler = startUpload();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = { ...mockBody };
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
+    mockReq.contributor_id = 11;
+
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    const submissionArg = startArchiveUploadStub.getCall(0).args[1];
+    expect(submissionArg.uuid).to.be.a('string');
+    expect(submissionArg).to.include({
+      name: 'name',
+      description: 'description',
+      comment: 'comment',
+      system_user_id: 42,
+      contributor_id: 11
+    });
   });
 });

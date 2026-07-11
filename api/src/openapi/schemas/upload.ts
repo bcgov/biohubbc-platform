@@ -1,9 +1,36 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
+
+/**
+ * Identity of the human user on whose behalf a service client (e.g. SIMS) is creating a submission
+ * upload. BioHub resolves this user (creating or reactivating their `system_user` record as needed)
+ * and grants them access to the submission via `submission_team`.
+ */
+export const SubmitterSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['guid', 'identifier', 'identitySource'],
+  properties: {
+    guid: {
+      type: 'string',
+      description: "The submitting user's identity provider GUID."
+    },
+    identifier: {
+      type: 'string',
+      description: "The submitting user's username (e.g. IDIR or BCeID username)."
+    },
+    identitySource: {
+      type: 'string',
+      enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID_BASIC, SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS],
+      description: "The submitting user's identity source."
+    }
+  }
+};
 
 export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['bytes', 'name', 'description', 'comment'],
+  required: ['bytes', 'name', 'description', 'comment', 'submitter'],
   properties: {
     bytes: {
       type: 'integer',
@@ -23,6 +50,7 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'Comments for system administrators about the submission'
     },
+    submitter: SubmitterSchema,
     blueprint_id: {
       type: 'integer',
       description:
@@ -110,7 +138,7 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
 export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['bytes'],
+  required: ['bytes', 'submitter'],
   properties: {
     bytes: {
       type: 'integer',
@@ -130,6 +158,7 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'Comments for system administrators about the submission.'
     },
+    submitter: SubmitterSchema,
     blueprint_id: {
       type: 'integer',
       description:

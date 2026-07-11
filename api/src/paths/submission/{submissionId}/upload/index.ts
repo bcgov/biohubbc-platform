@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP401 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   CreateSubmissionUploadResponseSchema,
@@ -10,7 +9,6 @@ import {
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { UserService } from '../../../../services/user-service';
-import { getUserGuid, getUserIdentifier, getUserIdentitySource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/upload');
@@ -73,17 +71,14 @@ export function createSubmissionUpload(): RequestHandler {
     try {
       await connection.open();
 
-      // Resolve the appending user from the authenticated token, creating or reactivating their
-      // system_user record as needed. Reject if the token cannot be resolved to a user.
-      const userGuid = getUserGuid(token);
-      const userIdentifier = getUserIdentifier(token);
-
-      if (!userGuid || !userIdentifier) {
-        throw new HTTP401('Failed to identify submitting user from token');
-      }
+      // The request is authenticated as the submitting service client (Contributor). The human
+      // submitter on whose behalf the upload is appended is supplied in the request body. Resolve
+      // them, creating or reactivating their system_user record as needed; any failure throws and
+      // rolls back the transaction so no records are created.
+      const { guid, identifier, identitySource } = req.body.submitter;
 
       const userService = new UserService(connection);
-      const submitter = await userService.ensureSystemUser(userGuid, userIdentifier, getUserIdentitySource(token));
+      const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
 
       const submissionUuid = req.params.submissionId as string;
       const { bytes, blueprint_id } = req.body;
