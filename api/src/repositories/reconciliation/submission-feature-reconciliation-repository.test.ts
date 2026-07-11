@@ -29,20 +29,19 @@ describe('SubmissionFeatureReconciliationRepository', () => {
   });
 
   describe('insertReconciliationRecordsFromClassification', () => {
-    it('classifies pending rows against the published baseline and returns outcome counts', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(
-          mockQueryResult(
-            [{ outcome: 'new' }, { outcome: 'new' }, { outcome: 'unchanged' }, { outcome: 'superseded' }],
-            4
-          )
-        );
+    it('classifies pending rows against the published baseline and returns the per-outcome tally rows', async () => {
+      const outcomeCountRows = [
+        { outcome: 'new', count: 2 },
+        { outcome: 'unchanged', count: 1 },
+        { outcome: 'superseded', count: 1 }
+      ];
+      const sqlStub = sinon.stub().resolves(mockQueryResult(outcomeCountRows, 3));
       const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const counts = await repository.insertReconciliationRecordsFromClassification(UPLOAD_ID, 42);
+      const rows = await repository.insertReconciliationRecordsFromClassification(UPLOAD_ID, 42);
 
-      expect(counts).to.eql({ new: 2, unchanged: 1, superseded: 1, conflict: 0 });
+      // The repository returns the raw (outcome, count) rows; the service assembles the counts object.
+      expect(rows).to.eql(outcomeCountRows);
 
       const sqlText = sqlStub.firstCall.args[0].text as string;
       // Incoming = the upload's pending rows only (re-approval of an activated upload is a no-op).
@@ -57,7 +56,10 @@ describe('SubmissionFeatureReconciliationRepository', () => {
       expect(sqlText).to.include("i.source_id IS NULL OR i.key_count > 1 OR b.key_count > 1 THEN 'conflict'");
       expect(sqlText).to.include('DISTINCT ON (feature_type_id, source_id)');
       expect(sqlText).to.include('INSERT INTO submission_upload_feature_reconciliation');
+      // The tally is aggregated in SQL — the repository does no row shaping.
       expect(sqlText).to.include('RETURNING outcome');
+      expect(sqlText).to.include('SELECT outcome, COUNT(*)::integer AS count');
+      expect(sqlText).to.include('GROUP BY outcome');
     });
   });
 

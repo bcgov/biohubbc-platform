@@ -6,11 +6,13 @@ export const SubmissionFeatureReconciliationOutcome = z.enum(['new', 'unchanged'
 
 export type SubmissionFeatureReconciliationOutcome = z.infer<typeof SubmissionFeatureReconciliationOutcome>;
 
-export interface ReconciliationOutcomeCounts {
-  new: number;
-  unchanged: number;
-  superseded: number;
-  conflict: number;
+/**
+ * One row of the per-outcome tally returned by the classification query — the raw
+ * `(outcome, count)` grouping. The service assembles these into a keyed counts object.
+ */
+export interface ReconciliationOutcomeCount {
+  outcome: SubmissionFeatureReconciliationOutcome;
+  count: number;
 }
 
 /**
@@ -64,15 +66,18 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * Already-published rows of the upload are excluded from the input, which makes
    * re-approval of an already-activated upload a no-op.
    *
+   * Returns the per-outcome tally (aggregated in SQL) as raw `(outcome, count)` rows;
+   * the service assembles them into a keyed counts object.
+   *
    * @param {string} submissionUploadId The submission upload scope.
    * @param {number} submissionId The submission the upload belongs to.
-   * @returns {Promise<ReconciliationOutcomeCounts>} Outcome counts for the upload.
+   * @returns {Promise<ReconciliationOutcomeCount[]>} One row per distinct outcome written.
    * @memberof SubmissionFeatureReconciliationRepository
    */
   async insertReconciliationRecordsFromClassification(
     submissionUploadId: string,
     submissionId: number
-  ): Promise<ReconciliationOutcomeCounts> {
+  ): Promise<ReconciliationOutcomeCount[]> {
     const sqlStatement = SQL`
       WITH incoming AS (
         SELECT
@@ -125,43 +130,43 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
           outcome
         FROM classified
         ORDER BY feature_type_id, source_id, incoming_submission_feature_id
+      ),
+      inserted AS (
+        INSERT INTO submission_upload_feature_reconciliation (
+          submission_upload_id,
+          feature_type_id,
+          source_id,
+          outcome,
+          submission_feature_id,
+          previous_submission_feature_id
+        )
+        SELECT
+          ${submissionUploadId}::uuid,
+          d.feature_type_id,
+          d.source_id,
+          d.outcome::submission_feature_reconciliation_outcome,
+          CASE
+            WHEN d.outcome = 'conflict' THEN NULL
+            WHEN d.outcome = 'unchanged' THEN d.baseline_submission_feature_id
+            ELSE d.incoming_submission_feature_id
+          END,
+          CASE
+            WHEN d.outcome = 'superseded' THEN d.baseline_submission_feature_id
+          END
+        FROM deduplicated d
+        RETURNING outcome
       )
-      INSERT INTO submission_upload_feature_reconciliation (
-        submission_upload_id,
-        feature_type_id,
-        source_id,
-        outcome,
-        submission_feature_id,
-        previous_submission_feature_id
-      )
-      SELECT
-        ${submissionUploadId}::uuid,
-        d.feature_type_id,
-        d.source_id,
-        d.outcome::submission_feature_reconciliation_outcome,
-        CASE
-          WHEN d.outcome = 'conflict' THEN NULL
-          WHEN d.outcome = 'unchanged' THEN d.baseline_submission_feature_id
-          ELSE d.incoming_submission_feature_id
-        END,
-        CASE
-          WHEN d.outcome = 'superseded' THEN d.baseline_submission_feature_id
-        END
-      FROM deduplicated d
-      RETURNING outcome;
+      SELECT outcome, COUNT(*)::integer AS count
+      FROM inserted
+      GROUP BY outcome;
     `;
 
     const response = await this.connection.sql(
       sqlStatement,
-      z.object({ outcome: SubmissionFeatureReconciliationOutcome })
+      z.object({ outcome: SubmissionFeatureReconciliationOutcome, count: z.number() })
     );
 
-    const counts: ReconciliationOutcomeCounts = { new: 0, unchanged: 0, superseded: 0, conflict: 0 };
-    for (const row of response.rows) {
-      counts[row.outcome] += 1;
-    }
-
-    return counts;
+    return response.rows;
   }
 
   /**
