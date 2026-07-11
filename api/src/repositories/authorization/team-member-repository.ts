@@ -232,14 +232,13 @@ export class TeamMemberRepository extends BaseRepository {
   }
 
   /**
-   * Get a single team member with user details for a team and system user.
+   * Find a single team member with user details for a team and system user.
    *
-   * @param {string} teamId - The ID of the team.
-   * @param {number} systemUserId - The system user ID.
+   * @param {TeamMemberByUserFilter} teamMemberData - The team and system user identifiers.
    * @return {Promise<TeamMemberWithUser | null>}
    * @memberof TeamMemberRepository
    */
-  async getTeamMemberWithUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMemberWithUser | null> {
+  async findTeamMemberWithUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMemberWithUser | null> {
     const knex = getKnex();
     const query = knex
       .table('team_member as tm')

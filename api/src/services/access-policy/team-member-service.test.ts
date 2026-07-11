@@ -44,7 +44,7 @@ describe('TeamMemberService', () => {
       };
 
       const getWithUserStub = sinon
-        .stub(TeamMemberRepository.prototype, 'getTeamMemberWithUser')
+        .stub(TeamMemberRepository.prototype, 'findTeamMemberWithUser')
         .onFirstCall()
         .resolves(null)
         .onSecondCall()
@@ -75,7 +75,7 @@ describe('TeamMemberService', () => {
         email: 'user_1@test.com'
       };
 
-      sinon.stub(TeamMemberRepository.prototype, 'getTeamMemberWithUser').resolves(existingTeamMember);
+      sinon.stub(TeamMemberRepository.prototype, 'findTeamMemberWithUser').resolves(existingTeamMember);
       const insertStub = sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves({} as TeamMember);
 
       const input: CreateTeamMember = {
