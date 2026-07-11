@@ -6,16 +6,23 @@ import {
 import { IDBConnection } from '../../database/db';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { SubmissionFeatureDerivedStateRepository } from '../../repositories/reconciliation/submission-feature-derived-state-repository';
-import {
-  ReconciliationOutcomeCounts,
-  SubmissionFeatureReconciliationRepository
-} from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
+import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
 
 const defaultLog = getLogger('services/reconciliation/submission-feature-reconciliation-service');
+
+/**
+ * Per-outcome feature counts for a reconciled upload.
+ */
+export interface ReconciliationOutcomeCounts {
+  new: number;
+  unchanged: number;
+  superseded: number;
+  conflict: number;
+}
 
 /**
  * Service that reconciles a submission upload's pending features against the submission's
@@ -105,10 +112,15 @@ export class SubmissionFeatureReconciliationService extends DBService {
     }
 
     await this.reconciliationRepository.deleteReconciliationRecordsBySubmissionUploadId(submissionUploadId);
-    const counts = await this.reconciliationRepository.insertReconciliationRecordsFromClassification(
+    const outcomeCountRows = await this.reconciliationRepository.insertReconciliationRecordsFromClassification(
       submissionUploadId,
       submissionId
     );
+
+    const counts: ReconciliationOutcomeCounts = { new: 0, unchanged: 0, superseded: 0, conflict: 0 };
+    for (const { outcome, count } of outcomeCountRows) {
+      counts[outcome] = count;
+    }
 
     const supersededCount = await this.reconciliationRepository.endSupersededBaselineRows(submissionUploadId);
     const unchangedEndedCount = await this.reconciliationRepository.endUnchangedIncomingRows(submissionUploadId);

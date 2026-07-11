@@ -7,8 +7,6 @@ import type { Knex } from 'knex';
  *   feature content, used to classify re-submitted features as unchanged vs superseded.
  * - Adds `submission_feature.universal_id`: optional cross-submission/external correlation
  *   metadata. Not used for reconciliation and not unique.
- * - Backfills `source_id` from the raw payload for legacy rows so they can participate in
- *   reconciliation.
  * - Soft-ends duplicate published rows per reconciliation key (keeping the newest), then
  *   enforces at most one published row per `(submission_id, feature_type_id, source_id)`
  *   via a partial unique index. Pending (unreviewed) rows deliberately remain outside the
@@ -36,19 +34,13 @@ export async function up(knex: Knex): Promise<void> {
       'Optional correlation identity supplied by the source system for cross-submission or external grouping, search, or provenance. Not used for upload reconciliation and not unique.';
 
     --------------------------------------------------------------------------------
-    -- 2) Backfill legacy source_id from the raw payload where available, so legacy
-    --    rows can participate in reconciliation instead of lingering as unmatchable
-    --    duplicates.
-    --------------------------------------------------------------------------------
-    UPDATE submission_feature
-    SET source_id = LEFT(data->>'id', 200)
-    WHERE source_id IS NULL
-      AND NULLIF(data->>'id', '') IS NOT NULL;
-
-    --------------------------------------------------------------------------------
-    -- 3) Dedupe existing duplicate published rows per reconciliation key: keep the
+    -- 2) Dedupe existing duplicate published rows per reconciliation key: keep the
     --    newest row per (submission_id, feature_type_id, source_id), soft-end the rest.
-    --    Historical (already-ended) and pending rows are untouched.
+    --    Historical (already-ended) and pending rows are untouched. This is the data
+    --    cleanup required before the partial unique index in step 3 can be created (it
+    --    is not a value backfill); rows with a NULL source_id are left untouched and are
+    --    excluded from the index. Legacy rows are not otherwise repaired here — source_id
+    --    is populated at ingest for all new data.
     --------------------------------------------------------------------------------
     WITH ranked AS (
       SELECT
@@ -69,7 +61,7 @@ export async function up(knex: Knex): Promise<void> {
       AND r.rn > 1;
 
     --------------------------------------------------------------------------------
-    -- 4) At most one PUBLISHED row per reconciliation key. Pending rows
+    -- 3) At most one PUBLISHED row per reconciliation key. Pending rows
     --    (record_effective_date IS NULL) are excluded: they legitimately coexist with
     --    the published row for the same key while awaiting review. Publication of a
     --    replacement row must therefore soft-end its predecessor first.
@@ -84,7 +76,7 @@ export async function up(knex: Knex): Promise<void> {
       'Enforces at most one published (active) submission_feature row per (submission_id, feature_type_id, source_id) reconciliation key.';
 
     --------------------------------------------------------------------------------
-    -- 5) Helper index for submission-scoped source_id resolution and reconciliation
+    -- 4) Helper index for submission-scoped source_id resolution and reconciliation
     --    classification joins.
     --------------------------------------------------------------------------------
     CREATE INDEX submission_feature_idx7
@@ -95,7 +87,7 @@ export async function up(knex: Knex): Promise<void> {
       'Partial index for resolving live submission-scoped submission_feature source_id references.';
 
     --------------------------------------------------------------------------------
-    -- 6) Durable per-upload reconciliation outcomes.
+    -- 5) Durable per-upload reconciliation outcomes.
     --    Outcomes describe how each incoming feature changed the submission state:
     --      new:        no published feature existed for the key; the incoming row was published.
     --      unchanged:  a published feature existed with identical content; it remains published.
@@ -189,9 +181,9 @@ export async function up(knex: Knex): Promise<void> {
 /**
  * Reverts the reconciliation schema changes.
  *
- * Note: the soft-ends applied by the dedupe step (up step 3) and the backfilled
- * source_id values (up step 2) are intentionally not reverted — both are safe-lossy
- * data corrections that remain valid under the pre-migration schema.
+ * Note: the soft-ends applied by the dedupe step (up step 2) are intentionally not
+ * reverted — they are a safe-lossy data correction that remains valid under the
+ * pre-migration schema.
  *
  * @export
  * @param {Knex} knex

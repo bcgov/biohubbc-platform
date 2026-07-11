@@ -5,10 +5,12 @@ import {
   SubmissionUploadReviewStatus,
   UpdateSubmissionUploadReviewStatus
 } from '../../models/submission-upload-review-status';
-import { ReconciliationOutcomeCounts } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { DBService } from '../db-service';
-import { SubmissionFeatureReconciliationService } from '../reconciliation/submission-feature-reconciliation-service';
+import {
+  ReconciliationOutcomeCounts,
+  SubmissionFeatureReconciliationService
+} from '../reconciliation/submission-feature-reconciliation-service';
 import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';

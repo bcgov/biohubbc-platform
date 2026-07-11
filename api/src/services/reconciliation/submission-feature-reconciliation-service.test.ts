@@ -42,7 +42,11 @@ describe('SubmissionFeatureReconciliationService', () => {
         .resolves(),
       classify: sinon
         .stub(SubmissionFeatureReconciliationRepository.prototype, 'insertReconciliationRecordsFromClassification')
-        .resolves({ new: 2, unchanged: 1, superseded: 1, conflict: 0 }),
+        .resolves([
+          { outcome: 'new', count: 2 },
+          { outcome: 'unchanged', count: 1 },
+          { outcome: 'superseded', count: 1 }
+        ]),
       endSuperseded: sinon
         .stub(SubmissionFeatureReconciliationRepository.prototype, 'endSupersededBaselineRows')
         .resolves(1),
