@@ -80,7 +80,7 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
-   * Get a single active team record by its exact name.
+   * Find a single active team record by its exact name.
    *
    * The partial unique index `team_nuk1` guarantees at most one active team per name, so this
    * returns either the matching team or `null`.
@@ -89,7 +89,7 @@ export class TeamRepository extends BaseRepository {
    * @return {Promise<Team | null>} - The matching team, or `null` if none exists.
    * @memberof TeamRepository
    */
-  async getTeamByName(name: string): Promise<Team | null> {
+  async findTeamByName(name: string): Promise<Team | null> {
     const knex = getKnex();
     const query = knex
       .from('team as t')

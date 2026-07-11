@@ -74,7 +74,7 @@ describe('TeamRepository', () => {
     });
   });
 
-  describe('getTeamByName', () => {
+  describe('findTeamByName', () => {
     it('returns a team when one matches the name', async () => {
       const mockRows = [{ team_id: '1', name: 'Submission Owner 7', description: null, member_count: 1 }];
       const mockResponse = { rowCount: 1, rows: mockRows } as unknown as Promise<QueryResult<any>>;
@@ -82,7 +82,7 @@ describe('TeamRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repository = new TeamRepository(mockConnection);
 
-      const result = await repository.getTeamByName('Submission Owner 7');
+      const result = await repository.findTeamByName('Submission Owner 7');
       expect(result).to.eql(mockRows[0]);
     });
 
@@ -91,7 +91,7 @@ describe('TeamRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repository = new TeamRepository(mockConnection);
 
-      const result = await repository.getTeamByName('Submission Owner 7');
+      const result = await repository.findTeamByName('Submission Owner 7');
       expect(result).to.be.null;
     });
   });

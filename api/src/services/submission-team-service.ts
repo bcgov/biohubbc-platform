@@ -52,7 +52,7 @@ export class SubmissionTeamService extends DBService {
     `);
 
     // Find-or-create the user's personal owner team, ensuring they are a member.
-    const existingTeam = await this.teamService.getTeamByName(ownerTeamName);
+    const existingTeam = await this.teamService.findTeamByName(ownerTeamName);
 
     let teamId: string;
 

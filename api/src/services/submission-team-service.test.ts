@@ -44,7 +44,7 @@ describe('SubmissionTeamService', () => {
 
   describe('grantSubmissionAccessToUser', () => {
     it('creates the owner team when it does not exist, then links the submission', async () => {
-      const getTeamByNameStub = sinon.stub(TeamService.prototype, 'getTeamByName').resolves(null);
+      const findTeamByNameStub = sinon.stub(TeamService.prototype, 'findTeamByName').resolves(null);
       const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam').resolves(ownerTeam);
       const createMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember');
       const insertLinkStub = sinon.stub(SubmissionTeamRepository.prototype, 'insertSubmissionTeam').resolves(mockLink);
@@ -53,7 +53,7 @@ describe('SubmissionTeamService', () => {
 
       // Acquires a per-user advisory lock before the find-or-create to avoid concurrent races.
       expect(sqlStub.firstCall.args[0].text).to.contain('pg_advisory_xact_lock');
-      expect(getTeamByNameStub).to.have.been.calledWith('Submission Owner 7');
+      expect(findTeamByNameStub).to.have.been.calledWith('Submission Owner 7');
       expect(createTeamStub).to.have.been.calledWithMatch({
         name: 'Submission Owner 7',
         system_user_ids: [7]
@@ -64,7 +64,7 @@ describe('SubmissionTeamService', () => {
     });
 
     it('reuses the existing owner team and ensures membership, then links the submission', async () => {
-      const getTeamByNameStub = sinon.stub(TeamService.prototype, 'getTeamByName').resolves(ownerTeam);
+      const findTeamByNameStub = sinon.stub(TeamService.prototype, 'findTeamByName').resolves(ownerTeam);
       const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
       const createMemberStub = sinon
         .stub(TeamMemberService.prototype, 'createTeamMember')
@@ -73,14 +73,14 @@ describe('SubmissionTeamService', () => {
 
       await service.grantSubmissionAccessToUser(10, 7);
 
-      expect(getTeamByNameStub).to.have.been.calledWith('Submission Owner 7');
+      expect(findTeamByNameStub).to.have.been.calledWith('Submission Owner 7');
       expect(createTeamStub).to.not.have.been.called;
       expect(createMemberStub).to.have.been.calledWith({ team_id: ownerTeam.team_id, system_user_id: 7 });
       expect(insertLinkStub).to.have.been.calledWith({ submission_id: 10, team_id: ownerTeam.team_id });
     });
 
     it('is idempotent when the link already exists (repository returns null)', async () => {
-      sinon.stub(TeamService.prototype, 'getTeamByName').resolves(ownerTeam);
+      sinon.stub(TeamService.prototype, 'findTeamByName').resolves(ownerTeam);
       sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves({} as TeamMemberWithUser);
       const insertLinkStub = sinon.stub(SubmissionTeamRepository.prototype, 'insertSubmissionTeam').resolves(null);
 
