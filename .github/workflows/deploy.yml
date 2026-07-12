@@ -100,26 +100,10 @@ jobs:
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
 
-      # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
-      - uses: ./.github/actions/setup-openshift-cli
-        env:
-          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
-        with:
-          oc-version: ${{ env.OC_VERSION }}
-          cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
-
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
         run: |
           echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
-
-      # Scale down any existing OpenShift pods for this PR deployment
-      # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
-      # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
-      - name: Scale down app pods
-        run: oc get Deployment --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Build and push the app image
       - name: Build and Push App Image
@@ -172,26 +156,10 @@ jobs:
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
 
-      # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
-      - uses: ./.github/actions/setup-openshift-cli
-        env:
-          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
-        with:
-          oc-version: ${{ env.OC_VERSION }}
-          cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
-
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
         run: |
           echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
-
-      # Scale down any existing OpenShift pods for this PR deployment
-      # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
-      # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
-      - name: Scale down database pods
-        run: oc get Deployment --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Build and push the database image using Docker
       - name: Build and Push Database Image
@@ -243,16 +211,6 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
-
-      # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
-      - uses: ./.github/actions/setup-openshift-cli
-        env:
-          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
-        with:
-          oc-version: ${{ env.OC_VERSION }}
-          cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
 
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
@@ -310,26 +268,10 @@ jobs:
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
 
-      # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
-      - uses: ./.github/actions/setup-openshift-cli
-        env:
-          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
-        with:
-          oc-version: ${{ env.OC_VERSION }}
-          cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
-
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
         run: |
           echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
-
-      # Scale down any existing OpenShift pods for this PR deployment
-      # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
-      # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
-      - name: Scale down API pods
-        run: oc get Deployment --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Build and push the API image
       - name: Build and Push API Image
@@ -400,6 +342,12 @@ jobs:
           cache-dir: ${{ env.OC_CACHE_DIR }}
           login: "true"
           namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
+
+      # Scale down this PR's existing pods before deploying.
+      # Why? Helm creates the new pods before the old ones terminate, and twice the resources would be needed in that
+      # moment. Scaling to zero first avoids deploy failures when the namespace is near its resource quota.
+      - name: Scale down PR pods
+        run: oc get deployment --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev --selector env-id=$PR_NUMBER -o name | xargs -r -n1 oc scale --replicas=0
 
       # Deploy the Helm chart
       - name: Deploy Helm Chart
