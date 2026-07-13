@@ -265,7 +265,7 @@ describe('SearchFeatureRepository', () => {
   });
 
   describe('searchFeaturesByExpressionTreeProperties', () => {
-    it('should build a typed-property schema query over the filtered feature set', async () => {
+    it('should return metadata only for typed values belonging to features in the full filtered result', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -278,10 +278,19 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include('"p"."submission_feature_id", "p"."feature_type_property_id"');
+      expect(sql.match(/"matching_features"/g)).to.have.length(2);
+      expect(sql).to.include('"tpr"."submission_feature_id" = "mf"."submission_feature_id"');
+      expect(sql).to.include('"mf"."feature_type_id" = "matching_ftp"."feature_type_id"');
+      expect(sql).to.include('group by "tpr"."feature_type_property_id"');
+      expect(sql).to.include('from "present_property_ids" as "ppi"');
       expect(sql).to.include('"fpt"."name" as "type_name"');
       expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
       expect(sql).to.not.include('jsonb_object_keys');
       expect(sql).to.not.include('typed_properties');
+      expect(sql).to.not.include('in (select "submission_feature_id" from "matching_features")');
+      expect(sql).to.not.include(' limit ');
+      expect(sql).to.not.include(' offset ');
     });
   });
 });

@@ -134,7 +134,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
       .limit(1);
 
-    // Authenticated: a secured match is hidden when the caller cannot access it. Reuses the canonical
+    // Authenticated: a secured match is hidden when the caller cannot access it. Reuses the shared
     // isAccessibleToUser check (anchor-based, identical to the visible-results access filter) so the
     // banner stays consistent with which rows are actually shown. The candidate is already effectively
     // secured here, so isAccessibleToUser short-circuits to its team-scope-anchor branch.
@@ -149,12 +149,14 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets property metadata for properties that have typed values on the full filtered result set.
+   * Gets metadata for properties with at least one non-null typed value on the full filtered result set.
+   * Pagination is intentionally irrelevant. A typed row counts only when its property belongs to the
+   * matched feature's feature type, mirroring row-level property hydration.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
    * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<FeatureTypeProperty[]>} Active property metadata with at least one typed value row.
+   * @return {Promise<FeatureTypeProperty[]>} Active metadata for properties with at least one non-null value.
    */
   async searchFeaturesByExpressionTreeProperties(
     anchorFeatureType: string,
@@ -162,6 +164,9 @@ export class SearchFeatureRepository extends BaseRepository {
     systemUserId?: number | null
   ): Promise<FeatureTypeProperty[]> {
     const knex = getKnex();
+
+    // Compile the normalized expression into an unexecuted feature-id subquery. When there is no
+    // expression, the matching-feature query below uses all active features of the anchor type.
     const expressionFeatureIds = expressionTree
       ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
           anchorFeatureType,
@@ -169,24 +174,49 @@ export class SearchFeatureRepository extends BaseRepository {
           systemUserId ?? null
         )
       : null;
+
+    // Build the full, security-filtered result set as (submission_feature_id, feature_type_id).
+    // This intentionally has no LIMIT/OFFSET: top-level property metadata describes every feature
+    // matched by the expression, independently of the page returned in `features`.
     const matchingFeaturesQuery = this.buildExpressionTreeMatchingFeaturesQuery(
       knex,
       anchorFeatureType,
       expressionFeatureIds,
       systemUserId
     );
+
+    // Normalize all indexed typed-property tables to the two columns needed for presence checks.
+    // Typed rows represent non-null values. Keeping the matching-feature join outside this
+    // UNION means PostgreSQL consumes `matching_features` once instead of once per property table.
     const typedPropertyRowsQuery = knex.unionAll(
       this.typedPropertyTableNames.map((tableName) =>
-        knex(`${tableName} as p`)
-          .select('p.feature_type_property_id')
-          .whereIn('p.submission_feature_id', knex('matching_features').select('submission_feature_id'))
+        knex(`${tableName} as p`).select('p.submission_feature_id', 'p.feature_type_property_id')
       ),
       true
     );
+
+    // Retain property ids that occur on at least one matched feature. The feature-type join mirrors
+    // row hydration and rejects stale or unrelated property rows attached to a feature id. Grouping
+    // here reduces an arbitrarily large value set to the small set of distinct property ids before
+    // descriptive metadata is joined.
+    const presentPropertyIdsQuery = knex('typed_property_rows as tpr')
+      .select('tpr.feature_type_property_id')
+      .join('matching_features as mf', 'tpr.submission_feature_id', 'mf.submission_feature_id')
+      .join('feature_type_property as matching_ftp', (join) => {
+        join
+          .on('tpr.feature_type_property_id', '=', 'matching_ftp.feature_type_property_id')
+          .andOn('mf.feature_type_id', '=', 'matching_ftp.feature_type_id');
+      })
+      .whereNull('matching_ftp.record_end_date')
+      .groupBy('tpr.feature_type_property_id');
+
+    // Assemble the three stages as single-use CTEs, then hydrate only the active metadata records
+    // for property ids proven to have a non-null value in the full expression result.
     const query = knex
       .with('matching_features', matchingFeaturesQuery)
       .with('typed_property_rows', typedPropertyRowsQuery)
-      .from('typed_property_rows as tpr')
+      .with('present_property_ids', presentPropertyIdsQuery)
+      .from('present_property_ids as ppi')
       .select(
         'ftp.feature_type_property_id',
         'fp.feature_property_id',
@@ -199,35 +229,24 @@ export class SearchFeatureRepository extends BaseRepository {
         'fp.calculated_value',
         'ftp.allow_multiple'
       )
-      .join('feature_type_property as ftp', 'tpr.feature_type_property_id', 'ftp.feature_type_property_id')
+      .join('feature_type_property as ftp', 'ppi.feature_type_property_id', 'ftp.feature_type_property_id')
       .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
       .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
       .whereNull('ftp.record_end_date')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
-      .groupBy(
-        'ftp.feature_type_property_id',
-        'fp.feature_property_id',
-        'fpt.feature_property_type_id',
-        'fp.name',
-        'fp.display_name',
-        'fp.description',
-        'fpt.name',
-        'ftp.required_value',
-        'fp.calculated_value',
-        'ftp.allow_multiple',
-        'ftp.sort'
-      )
       .orderByRaw('ftp.sort ASC NULLS LAST')
       .orderBy('fp.display_name', 'asc');
 
+    // Only the compact metadata result crosses the database/application boundary; matching feature
+    // ids and typed value rows remain inside PostgreSQL.
     const response = await this.connection.knex(query, FeatureTypeProperty);
 
     return response.rows;
   }
 
   /**
-   * Builds the filtered set of matching submission_feature ids without result hydration.
+   * Builds the filtered set of matching submission features without result hydration.
    *
    * Used by count and property-metadata queries so they do not pay the cost of building
    * row-level properties JSON that they never read.
@@ -236,7 +255,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {string} anchorFeatureType - Route anchor/result feature type
    * @param {Knex.QueryBuilder | null} expressionFeatureIds - Optional expression-tree matches
    * @param {number | null} [systemUserId] - Security context
-   * @return {Knex.QueryBuilder} Query returning submission_feature_id rows
+   * @return {Knex.QueryBuilder} Query returning submission_feature_id and feature_type_id rows
    */
   private buildExpressionTreeMatchingFeaturesQuery(
     knex: Knex,
@@ -245,7 +264,7 @@ export class SearchFeatureRepository extends BaseRepository {
     systemUserId?: number | null
   ): Knex.QueryBuilder {
     const query = knex('submission_feature as sf')
-      .select('sf.submission_feature_id')
+      .select('sf.submission_feature_id', 'sf.feature_type_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
       .whereRaw(isSubmissionFeatureActive('sf'));
@@ -339,7 +358,7 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Builds a lateral join that hydrates the public `properties` JSON object from canonical
+   * Builds a lateral join that hydrates the public `properties` JSON object from indexed
    * typed property tables. Multiple rows for the same property, or properties configured
    * as allow_multiple, are surfaced as JSON arrays.
    *
