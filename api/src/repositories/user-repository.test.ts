@@ -284,6 +284,66 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('getAvailableUsers', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return available users including display_name', async () => {
+      const mockResponse = [
+        { system_user_id: 1, user_identifier: 'testuser', display_name: 'User, Test WLRS:EX' },
+        { system_user_id: 2, user_identifier: 'anotheruser', display_name: null }
+      ];
+      const mockQueryResponse = { rowCount: 2, rows: mockResponse } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      const response = await userRepository.getAvailableUsers();
+
+      expect(response).to.equal(mockResponse);
+    });
+
+    it('should filter by user_identifier or display_name and order by display label', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const knexStub = sinon.stub().resolves(mockQueryResponse);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      await userRepository.getAvailableUsers('bryan');
+
+      const generatedQuery = knexStub.getCall(0).args[0].toString().toLowerCase();
+
+      expect(generatedQuery).to.contain(`"su"."user_identifier" ilike '%bryan%'`);
+      expect(generatedQuery).to.contain(`"su"."display_name" ilike '%bryan%'`);
+      expect(generatedQuery).to.contain('coalesce(su.display_name, su.user_identifier)');
+    });
+
+    it('should not apply a search filter when search is undefined', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const knexStub = sinon.stub().resolves(mockQueryResponse);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      await userRepository.getAvailableUsers();
+
+      const generatedQuery = knexStub.getCall(0).args[0].toString().toLowerCase();
+
+      expect(generatedQuery).to.not.contain('ilike');
+    });
+  });
+
   describe('getSystemUsersCount', () => {
     afterEach(() => {
       sinon.restore();

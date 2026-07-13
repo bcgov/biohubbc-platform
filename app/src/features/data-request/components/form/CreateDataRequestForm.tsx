@@ -4,9 +4,11 @@ import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { useFormikContext } from 'formik';
 import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
+import { getUserLabel } from 'utils/Utils';
 
 interface ICreateDataRequestFormProps {
   options: SearchOption[];
+  availableUsers: IAvailableUser[];
   isLoadingUsers: boolean;
   isSubmitting: boolean;
   onSearchUsers: (search: string) => void;
@@ -32,12 +34,12 @@ export interface ICreateDataRequestFormValues {
  * @returns {JSX.Element}
  */
 export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
-  const { options, isLoadingUsers, isSubmitting, onSearchUsers } = props;
+  const { options, availableUsers, isLoadingUsers, isSubmitting, onSearchUsers } = props;
   const { values, setFieldValue } = useFormikContext<ICreateDataRequestFormValues>();
 
   const users = values.system_users.map((user) => ({
     id: String(user.system_user_id),
-    label: user.user_identifier
+    label: getUserLabel(user)
   }));
 
   const handleSelectUser = (option: SearchOption | null) => {
@@ -50,13 +52,13 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
       return;
     }
 
-    const nextSystemUsers: IAvailableUser[] = [
-      ...values.system_users,
-      {
-        system_user_id: selectedUserId,
-        user_identifier: option.label
-      }
-    ];
+    const selectedUser = availableUsers.find((user) => user.system_user_id === selectedUserId) ?? {
+      system_user_id: selectedUserId,
+      user_identifier: option.label,
+      display_name: null
+    };
+
+    const nextSystemUsers: IAvailableUser[] = [...values.system_users, selectedUser];
 
     setFieldValue('system_users', nextSystemUsers);
   };

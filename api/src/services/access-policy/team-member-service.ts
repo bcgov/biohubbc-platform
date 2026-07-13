@@ -26,7 +26,7 @@ export class TeamMemberService extends DBService {
    * @memberof TeamMemberService
    */
   async createTeamMember(teamMemberData: CreateTeamMember): Promise<TeamMemberWithUser> {
-    const existing = await this.teamMemberRepository.getTeamMemberWithUser(teamMemberData);
+    const existing = await this.teamMemberRepository.findTeamMemberWithUser(teamMemberData);
 
     if (existing) {
       return existing;
@@ -34,7 +34,7 @@ export class TeamMemberService extends DBService {
 
     await this.teamMemberRepository.insertTeamMember(teamMemberData);
 
-    const created = await this.teamMemberRepository.getTeamMemberWithUser(teamMemberData);
+    const created = await this.teamMemberRepository.findTeamMemberWithUser(teamMemberData);
 
     if (!created) {
       throw new Error('Failed to create team member');

@@ -10,7 +10,7 @@ import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketSystemUserCardProps {
   systemUserId: number;
-  userIdentifier: string;
+  label: string;
   status: TicketSystemUserStatus;
   statusOptions: Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>;
   isSubmitting: boolean;
@@ -25,15 +25,7 @@ interface ITicketSystemUserCardProps {
  * @return {*}
  */
 export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
-  const {
-    systemUserId,
-    userIdentifier,
-    status,
-    statusOptions,
-    isSubmitting,
-    onChangeStatus,
-    onRemoveTicketSystemUser
-  } = props;
+  const { systemUserId, label, status, statusOptions, isSubmitting, onChangeStatus, onRemoveTicketSystemUser } = props;
   const statusOptionGroups: IDropdownMenuItemGroup[] = [
     {
       groupId: 'status-options',
@@ -56,7 +48,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
         justifyContent: 'space-between',
         gap: 2
       }}>
-      <Typography sx={{ fontWeight: 500 }}>{userIdentifier}</Typography>
+      <Typography sx={{ fontWeight: 500 }}>{label}</Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <DropdownButton
           value={status}
@@ -67,7 +59,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
         />
         <IconButton
           size="small"
-          aria-label={`remove ${userIdentifier}`}
+          aria-label={`remove ${label}`}
           onClick={onRemoveTicketSystemUser}
           disabled={isSubmitting}>
           <Icon path={mdiClose} size={0.65} />

@@ -92,6 +92,30 @@ describe('ActiveUsersList', () => {
     });
   });
 
+  it('shows the display name as the primary label with the identifier as a secondary caption', async () => {
+    const { getByText } = renderContainer({
+      rows: [
+        {
+          system_user_id: 1,
+          user_identifier: 'lbryan',
+          user_guid: 'user-guid',
+          record_end_date: null,
+          identity_source: 'idir',
+          role_ids: [1],
+          role_names: ['role 1'],
+          display_name: 'Bryan, Luke WLRS:EX',
+          email: null
+        }
+      ],
+      rowCount: 1
+    });
+
+    await waitFor(() => {
+      expect(getByText('Bryan, Luke WLRS:EX')).toBeVisible();
+      expect(getByText('lbryan')).toBeVisible();
+    });
+  });
+
   it('shows a table row for a user with no assigned role', async () => {
     const { getByTestId } = renderContainer({
       rows: [

@@ -434,6 +434,17 @@ export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURC
 };
 
 /**
+ * Get the human-readable label for a user: the Keycloak display name (ex: `Bryan, Luke WLRS:EX`) when
+ * available, otherwise the raw user identifier (ex: IDIR username).
+ *
+ * @param {{ display_name?: string | null; user_identifier: string }} user The user to label
+ * @returns {*} {string} the display label for the user
+ */
+export const getUserLabel = (user: { display_name?: string | null; user_identifier: string }): string => {
+  return user.display_name?.trim() || user.user_identifier;
+};
+
+/**
  * same implementation as Object.keys but with correct typings for interable
  *
  * @template Obj

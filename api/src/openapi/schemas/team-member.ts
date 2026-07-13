@@ -7,7 +7,7 @@ import { paginationResponseSchema } from './pagination';
 export const TeamMemberSchema: OpenAPIV3.SchemaObject = {
   title: 'TeamMember',
   type: 'object',
-  required: ['team_member_id', 'system_user_id', 'user_identifier', 'email'],
+  required: ['team_member_id', 'system_user_id', 'user_identifier', 'display_name', 'email'],
   properties: {
     team_member_id: {
       type: 'string',
@@ -21,6 +21,11 @@ export const TeamMemberSchema: OpenAPIV3.SchemaObject = {
     user_identifier: {
       type: 'string',
       description: 'Username or identifier from identity provider'
+    },
+    display_name: {
+      type: 'string',
+      nullable: true,
+      description: 'Keycloak display name for the user'
     },
     email: {
       type: 'string',
@@ -68,7 +73,7 @@ export const TeamMemberByUserRequestSchema: OpenAPIV3.SchemaObject = {
 export const AvailableUserSchema: OpenAPIV3.SchemaObject = {
   title: 'AvailableUser',
   type: 'object',
-  required: ['system_user_id', 'user_identifier'],
+  required: ['system_user_id', 'user_identifier', 'display_name'],
   properties: {
     system_user_id: {
       type: 'integer',
@@ -77,6 +82,11 @@ export const AvailableUserSchema: OpenAPIV3.SchemaObject = {
     user_identifier: {
       type: 'string',
       description: 'Username or identifier from identity provider'
+    },
+    display_name: {
+      type: 'string',
+      nullable: true,
+      description: 'Keycloak display name for the user'
     }
   }
 };

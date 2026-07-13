@@ -54,13 +54,13 @@ const mockTeams: ITeam[] = [
 ];
 
 const mockAvailableUsers = [
-  { system_user_id: 1, user_identifier: 'alice' },
-  { system_user_id: 2, user_identifier: 'bob' }
+  { system_user_id: 1, user_identifier: 'alice', display_name: null },
+  { system_user_id: 2, user_identifier: 'bob', display_name: null }
 ];
 
 const mockTeamMembers = [
-  { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
-  { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' }
+  { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice', display_name: null },
+  { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob', display_name: null }
 ];
 
 const mockCreateTeam = vi.fn();
@@ -290,7 +290,7 @@ describe('TeamsContainer', () => {
       // When a team has 1 member (was 2), the update payload sends [1].
       // The backend diff removes the absent member (2) — subtractive sync.
       mockGetTeamMembers.mockResolvedValueOnce({
-        members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
+        members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice', display_name: null }]
       });
       mockUpdateTeam.mockResolvedValueOnce({});
       const mockRefresh = vi.fn();

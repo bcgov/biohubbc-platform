@@ -40,7 +40,13 @@ describe('getTeamMembers', () => {
 
   it('should return 200 with paginated team members', async () => {
     const mockMembers: TeamMemberWithUser[] = [
-      { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice', email: 'a@test.com' }
+      {
+        team_member_id: 'tm-1',
+        system_user_id: 1,
+        user_identifier: 'alice',
+        display_name: 'Wonderland, Alice WLRS:EX',
+        email: 'a@test.com'
+      }
     ];
     const mockResponse = {
       members: mockMembers,
@@ -77,6 +83,7 @@ describe('getTeamMembers', () => {
       team_member_id: 'tm-1',
       system_user_id: 42,
       user_identifier: 'user_42',
+      display_name: 'User, FortyTwo WLRS:EX',
       email: 'user_42@test.com'
     };
     const createStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(createdTeamMember);
@@ -94,6 +101,7 @@ describe('getTeamMembers', () => {
       team_member_id: 'tm-1',
       system_user_id: 42,
       user_identifier: 'user_42',
+      display_name: 'User, FortyTwo WLRS:EX',
       email: 'user_42@test.com'
     });
   });

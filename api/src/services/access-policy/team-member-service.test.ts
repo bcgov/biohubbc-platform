@@ -39,11 +39,12 @@ describe('TeamMemberService', () => {
         team_member_id: '11111111-1111-1111-1111-111111111111',
         system_user_id: 1,
         user_identifier: 'user_1',
+        display_name: 'User, One WLRS:EX',
         email: 'user_1@test.com'
       };
 
       const getWithUserStub = sinon
-        .stub(TeamMemberRepository.prototype, 'getTeamMemberWithUser')
+        .stub(TeamMemberRepository.prototype, 'findTeamMemberWithUser')
         .onFirstCall()
         .resolves(null)
         .onSecondCall()
@@ -70,10 +71,11 @@ describe('TeamMemberService', () => {
         team_member_id: '11111111-1111-1111-1111-111111111111',
         system_user_id: 1,
         user_identifier: 'user_1',
+        display_name: 'User, One WLRS:EX',
         email: 'user_1@test.com'
       };
 
-      sinon.stub(TeamMemberRepository.prototype, 'getTeamMemberWithUser').resolves(existingTeamMember);
+      sinon.stub(TeamMemberRepository.prototype, 'findTeamMemberWithUser').resolves(existingTeamMember);
       const insertStub = sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves({} as TeamMember);
 
       const input: CreateTeamMember = {

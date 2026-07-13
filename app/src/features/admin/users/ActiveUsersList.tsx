@@ -14,6 +14,7 @@ import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
 import { useMemo } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
+import { getUserLabel } from 'utils/Utils';
 
 export interface IUsersListRowActions {
   onChangeRole: (user: ISystemUser, roleId: number, roleName: string) => void;
@@ -55,14 +56,25 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
     () => [
       {
         field: 'user_identifier',
-        headerName: 'Username',
+        headerName: 'Name',
         minWidth: 220,
         flex: 1,
-        renderCell: (params) => (
-          <Typography variant="body2" noWrap title={params.value || ''}>
-            {params.value || 'No identifier'}
-          </Typography>
-        )
+        renderCell: (params) => {
+          const label = getUserLabel(params.row);
+
+          return (
+            <Stack>
+              <Typography variant="body2" noWrap title={label || 'No identifier'}>
+                {label || 'No identifier'}
+              </Typography>
+              {params.row.display_name?.trim() ? (
+                <Typography variant="caption" color="textSecondary" noWrap title={params.row.user_identifier}>
+                  {params.row.user_identifier}
+                </Typography>
+              ) : null}
+            </Stack>
+          );
+        }
       },
       {
         field: 'identity_source',

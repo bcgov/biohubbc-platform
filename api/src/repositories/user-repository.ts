@@ -508,7 +508,7 @@ export class UserRepository extends BaseRepository {
   /**
    * Get available users for team membership (excludes SYSTEM and DATABASE users).
    *
-   * @param {string} [search] - Optional search term to filter by user_identifier.
+   * @param {string} [search] - Optional search term to filter by user_identifier or display_name.
    * @return {Promise<AvailableUser[]>}
    * @memberof UserRepository
    */
@@ -516,15 +516,16 @@ export class UserRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('system_user as su')
-      .select(['su.system_user_id', 'su.user_identifier'])
+      .select(['su.system_user_id', 'su.user_identifier', 'su.display_name'])
       .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
       .whereNull('su.record_end_date')
       .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
-      .orderBy('su.user_identifier', 'asc')
+      .orderByRaw('COALESCE(su.display_name, su.user_identifier) ASC')
       .limit(MAX_AVAILABLE_USERS_LIMIT);
 
     if (search?.trim()) {
-      query.whereILike('su.user_identifier', `%${search.trim()}%`);
+      const term = `%${search.trim()}%`;
+      query.where((builder) => builder.whereILike('su.user_identifier', term).orWhereILike('su.display_name', term));
     }
 
     const response = await this.connection.knex(query, AvailableUser);

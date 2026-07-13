@@ -32,7 +32,8 @@ export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
 
 export const AvailableUser = z.object({
   system_user_id: z.number(),
-  user_identifier: z.string()
+  user_identifier: z.string(),
+  display_name: z.string().nullable()
 });
 
 export type AvailableUser = z.infer<typeof AvailableUser>;
