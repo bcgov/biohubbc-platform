@@ -696,8 +696,11 @@ function applyTimestampComparisonOperator(
  * @param {number | undefined} value - Target taxon id.
  * @param {Knex} knex - Knex instance used to build recursive taxon subqueries.
  * @return {Knex.QueryBuilder} Evidence query with the taxon operator applied.
+ *
+ * Exported so the parent-child hierarchy operators can be exercised directly against a real database
+ * in integration tests (they walk the `taxon.parent_taxon_id` self-reference via recursive CTEs).
  */
-function applyTaxonExpressionOperator(
+export function applyTaxonExpressionOperator(
   query: Knex.QueryBuilder,
   column: string,
   operator: InternalTypedPredicate['operator'],
@@ -710,11 +713,7 @@ function applyTaxonExpressionOperator(
     case 'ParentOf':
       return query.whereRaw('EXISTS (?)', [buildTaxonAncestorExistsQuery(knex, value, column, false)]);
     case 'ChildOf':
-      return query.whereRaw(
-        `NULLIF((SELECT itis_data->>'parentTSN' FROM taxon WHERE taxon_id = ${column}), '')::integer = ` +
-          `(SELECT itis_tsn FROM taxon WHERE taxon_id = ?)`,
-        [value]
-      );
+      return query.whereRaw(`(SELECT parent_taxon_id FROM taxon WHERE taxon_id = ${column}) = ?`, [value]);
     case 'DescendsFrom':
       return query.whereRaw('EXISTS (?)', [buildTaxonDescendantExistsQuery(knex, value, column)]);
     case 'AscendsFrom':
@@ -743,13 +742,13 @@ function buildTaxonAncestorExistsQuery(
 
   return knex.raw(
     `WITH RECURSIVE ancestors AS (
-      SELECT taxon_id, itis_tsn, NULLIF(itis_data->>'parentTSN', '')::integer AS parent_tsn, 0 AS depth
+      SELECT taxon_id, parent_taxon_id, 0 AS depth
       FROM taxon
       WHERE taxon_id = ?
       UNION ALL
-      SELECT parent.taxon_id, parent.itis_tsn, NULLIF(parent.itis_data->>'parentTSN', '')::integer, ancestors.depth + 1
+      SELECT parent.taxon_id, parent.parent_taxon_id, ancestors.depth + 1
       FROM taxon parent
-      JOIN ancestors ON parent.itis_tsn = ancestors.parent_tsn
+      JOIN ancestors ON parent.taxon_id = ancestors.parent_taxon_id
       WHERE parent.record_end_date IS NULL
     )
     SELECT 1
@@ -775,13 +774,13 @@ function buildTaxonDescendantExistsQuery(
 ): Knex.Raw {
   return knex.raw(
     `WITH RECURSIVE ancestors AS (
-      SELECT taxon_id, itis_tsn, NULLIF(itis_data->>'parentTSN', '')::integer AS parent_tsn
+      SELECT taxon_id, parent_taxon_id
       FROM taxon
       WHERE taxon_id = ${candidateTaxonColumn}
       UNION ALL
-      SELECT parent.taxon_id, parent.itis_tsn, NULLIF(parent.itis_data->>'parentTSN', '')::integer
+      SELECT parent.taxon_id, parent.parent_taxon_id
       FROM taxon parent
-      JOIN ancestors ON parent.itis_tsn = ancestors.parent_tsn
+      JOIN ancestors ON parent.taxon_id = ancestors.parent_taxon_id
       WHERE parent.record_end_date IS NULL
     )
     SELECT 1

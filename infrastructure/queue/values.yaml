@@ -48,6 +48,11 @@ app:
     host: clamav
     port: 3310
 
+  # ITIS SOLR
+  itisSolr: "https://services.itis.gov"
+  itisTsnLookupBatchSize: "100"
+  itisTsnLookupDelayMs: "1000"
+
   # Logging
   logging:
     level: "" # Log level for logs written to the console (console transport)

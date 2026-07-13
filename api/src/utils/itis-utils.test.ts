@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { TaxonSearchResult } from '../services/taxonomy-service';
+import { TaxonSearchResult } from '../services/taxonomy-service.interface';
 import { getItisTaxonCommonNames, sortTaxonSearchResults } from './itis-utils';
 
 describe('itis-sort', () => {

@@ -45,10 +45,10 @@ change). It is intentionally NOT wired into any build or request flow.
   `capture.is_recapture`, defined by `20260709130000_boolean_feature_properties`. Without that
   migration the indexer resolves no Blueprint assignment for them and silently drops both values,
   producing a fixture whose `property_boolean` count is `0`.
-- **ITIS taxa must be present.** The indexer resolves each `taxon_id` against the `taxon` table and
-  fail-fasts the whole submission's property indexing if any TSN is unresolved. A clean local DB has an
-  empty `taxon` table (no ITIS sync has run), so the taxa the datasets reference must be seeded first,
-  e.g.:
+- **ITIS taxa may need to be preseeded for offline fixture generation.** The indexer treats each
+  `taxon_id` value as an ITIS TSN. In normal ingestion it hydrates missing taxa through ITIS before
+  inserting canonical taxon property rows. For deterministic/offline fixture generation, preseed the
+  taxa the datasets reference first, e.g.:
 
   ```sql
   SET search_path TO biohub, public;
@@ -118,7 +118,7 @@ for a broken run.
 | Gap | Symptom | What a fix needs |
 |-----|---------|------------------|
 | **Artifact links are not replayed.** Since `20260629120000_submission_feature_property_artifact`, the pipeline writes feature→file links to `submission_feature_property_artifact`. `dump.ts` and the replay seed only know the older `submission_feature_artifact` table. | The dumped `artifact` count is `0` for both tiers (it was `1` before that migration). The `report.pdf` and `Moose_Walklines.zip` links are absent from seeded data. | A `property_artifact` section in `SnapshotFixture`, keyed by the artifact's `object_key` (its stable natural key), plus the matching insert + count assertion in `10_snapshot_features.ts`. |
-| **`taxon` properties are not replayed.** The `taxon` FK is the `taxon` table's surrogate PK, which is not stable across environments. | `property_taxon` is dumped empty; the replay asserts it at `0`. The taxon-typed properties (`survey.focal_species`, `habitat_feature.associated_species`) cannot be exercised by expression predicates from seed data. Note that `animal.taxon_id` and `species_observation.taxon_id` are `number`-typed, not `taxon`-typed, so those *are* replayed. | Dump `itis_tsn` (the stable natural key) instead of `taxon_id`, and seed the referenced taxa into `taxon` before the replay resolves them back. |
+| **`taxon` properties are not replayed.** The `taxon` FK is the `taxon` table's surrogate PK, which is not stable across environments. | `property_taxon` is dumped empty; the replay asserts it at `0`. Taxon-typed properties cannot be exercised by expression predicates from seed data until the dump captures a stable taxonomy key. | Dump `itis_tsn` (the stable natural key) instead of `taxon_id`, and seed the referenced taxa into `taxon` before the replay resolves them back. |
 | **`code` properties are not replayed.** `contributor_codeset_code_id` is a per-upload surrogate id. | `property_code` is dumped empty; the replay asserts it at `0`. `code`-typed predicates (`survey.collected_data`, `sample_technique.attractant`, `sample_period.method_technique`) cannot be exercised. | Dump the codeset name + code value as a composite natural key, and re-resolve it against the replayed contributor's codeset. |
 | **`feature`-reference properties are unexercised.** No source dataset uses one. | `property_feature` is always `0`. The dump and replay both support it; there is simply nothing to dump. | A source feature carrying a feature-reference property. |
 
