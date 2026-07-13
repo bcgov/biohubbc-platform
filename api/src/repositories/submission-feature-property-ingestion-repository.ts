@@ -864,6 +864,65 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Get the distinct unresolved taxon TSNs for one upload.
+   *
+   * Returns TSNs from taxon candidate rows that either did not resolve to a local `taxon_id` or resolved
+   * to an incomplete taxon row, so their full ITIS hierarchy and details can be ensured locally before
+   * taxon resolution errors are recorded.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<number[]>}
+   */
+  async getUnresolvedTaxonTsnsBySubmissionUploadId(submissionUploadId: string): Promise<number[]> {
+    const sql = SQL`
+      SELECT DISTINCT c.tsn
+      FROM submission_upload_staging_taxon_candidate c
+      LEFT JOIN taxon t
+        ON t.taxon_id = c.taxon_id
+       AND t.record_end_date IS NULL
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.tsn IS NOT NULL
+        AND (
+          c.taxon_id IS NULL
+          OR (t.parent_taxon_id IS NULL AND lower(t.rank) <> 'kingdom')
+          OR t.rank IS NULL
+        );
+    `;
+
+    const response = await this.connection.sql(
+      sql,
+      z.object({
+        tsn: z.number()
+      })
+    );
+
+    return response.rows.map((row) => row.tsn);
+  }
+
+  /**
+   * Resolve `taxon_id` for previously-unresolved taxon candidate rows.
+   *
+   * After missing taxa and their hierarchy are ensured locally, backfill `taxon_id` on candidate rows
+   * whose parsed TSN now matches an active `taxon` row. Avoids re-running full candidate population.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async resolveTaxonCandidateTaxonIdsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_upload_staging_taxon_candidate c
+      SET taxon_id = t.taxon_id
+      FROM taxon t
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.taxon_id IS NULL
+        AND t.itis_tsn = c.tsn
+        AND t.record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Create `submission_upload_staging_artifact_candidate` with tarball-relative references and resolved artifact IDs.
    *
    * Artifact-key values are trimmed only. Resolution is performed within the

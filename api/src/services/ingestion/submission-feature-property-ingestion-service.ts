@@ -5,6 +5,7 @@ import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
+import { TaxonomyService } from '../taxonomy-service';
 import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
@@ -18,6 +19,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   contributorService: ContributorService;
   submissionUploadReviewService: SubmissionUploadReviewService;
   submissionUploadService: SubmissionUploadService;
+  taxonomyService: TaxonomyService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -28,6 +30,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     this.contributorService = new ContributorService(connection);
     this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
+    this.taxonomyService = new TaxonomyService(connection);
   }
 
   /**
@@ -157,6 +160,19 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         contributor.contributor_id
       );
+
+      // Phase 5b: ensure missing taxa and their full ITIS hierarchy exist locally, then resolve any
+      // taxon candidates that were previously unresolved. This runs before taxon resolution errors are
+      // recorded so that valid-but-uncached taxa are fetched from ITIS rather than failing ingestion.
+      currentPhase = 'ensure taxon hierarchy for unresolved taxon candidates';
+      defaultLog.debug({
+        label: 'indexSubmissionPropertiesBySubmissionUploadId',
+        message: 'phase start',
+        submissionId,
+        submissionUploadId,
+        phase: currentPhase
+      });
+      await this.ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(submissionUploadId);
 
       // Phase 6: FK reference validation/resolution diagnostics.
       currentPhase = 'record code, taxon, artifact, and feature resolution errors';
@@ -425,6 +441,36 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
     await this.submissionFeaturePropertyIngestionRepository.populateFeatureCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
+  }
+
+  /**
+   * Ensure missing taxa (and their full ITIS hierarchy) referenced by unresolved taxon candidates exist
+   * locally, then backfill the now-resolvable candidate `taxon_id` values.
+   *
+   * Runs after taxon candidate population and before taxon resolution error recording so that valid taxa
+   * not yet cached locally are fetched from ITIS (with their full lineage and parent links) rather than
+   * failing ingestion.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  private async ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(
+    submissionUploadId: string
+  ): Promise<void> {
+    const unresolvedTsns =
+      await this.submissionFeaturePropertyIngestionRepository.getUnresolvedTaxonTsnsBySubmissionUploadId(
+        submissionUploadId
+      );
+
+    if (!unresolvedTsns.length) {
+      return;
+    }
+
+    await this.taxonomyService.ensureTaxonHierarchyByTsnIds(unresolvedTsns);
+
+    await this.submissionFeaturePropertyIngestionRepository.resolveTaxonCandidateTaxonIdsBySubmissionUploadId(
       submissionUploadId
     );
   }

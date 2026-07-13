@@ -39,15 +39,17 @@
 
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
-import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import {
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../../models/expression-tree-internal';
 import {
+  applyTaxonExpressionOperator,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
+import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -367,6 +369,63 @@ describe('expression-evaluation (integration)', function () {
   async function mintPropertyEdgeLabel(sourceFeatureType: string, targetFeatureType: string): Promise<number> {
     const { featureTypePropertyId } = await createFeatureTypeProperty(connection, sourceFeatureType, targetFeatureType);
     return featureTypePropertyId;
+  }
+
+  type TaxonOperator = Parameters<typeof applyTaxonExpressionOperator>[2];
+
+  /**
+   * Seed an A -> B -> C lineage (C is a child of B, B is a child of A) with `parent_itis_tsn` set from
+   * the lineage and `parent_taxon_id` resolved — the exact relational shape the search operators walk.
+   */
+  async function seedLineage(): Promise<{ a: number; b: number; c: number }> {
+    const repo = new TaxonomyRepository(connection);
+    const aTsn = 900001;
+    const bTsn = 900002;
+    const cTsn = 900003;
+
+    const [a, b, c] = await repo.insertTaxonRecords([
+      {
+        itis_tsn: aTsn,
+        itis_scientific_name: 'Ancestora testus',
+        rank: 'Kingdom',
+        common_name: 'A',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      },
+      {
+        itis_tsn: bTsn,
+        itis_scientific_name: 'Betwena testus',
+        rank: 'Genus',
+        common_name: 'B',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      },
+      {
+        itis_tsn: cTsn,
+        itis_scientific_name: 'Childa testus',
+        rank: 'Species',
+        common_name: 'C',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      }
+    ]);
+
+    await repo.updateTaxonParentLinks([
+      { itis_tsn: bTsn, parent_itis_tsn: aTsn },
+      { itis_tsn: cTsn, parent_itis_tsn: bTsn }
+    ]);
+
+    return { a: a.taxon_id, b: b.taxon_id, c: c.taxon_id };
+  }
+
+  /** Apply a taxon operator against the full `taxon` table and return the matching taxon_id set. */
+  async function runTaxonOperator(operator: TaxonOperator, targetTaxonId: number): Promise<Set<number>> {
+    const knex = getKnex();
+    const query = knex.queryBuilder().select('t.taxon_id').from('taxon as t');
+    applyTaxonExpressionOperator(query, 't.taxon_id', operator, targetTaxonId, knex);
+    const { sql, bindings } = query.toSQL().toNative();
+    const result = await connection.query<{ taxon_id: number }>(sql, bindings as any[]);
+    return new Set(result.rows.map((r) => r.taxon_id));
   }
 
   // === broad feature-type projection (no closure needed) ===================
@@ -1093,6 +1152,54 @@ describe('expression-evaluation (integration)', function () {
       );
 
       expect(ids.has(q)).to.equal(false);
+    });
+  });
+
+  // === taxon parent-child hierarchy operators (walk taxon.parent_taxon_id) ==================
+
+  describe('applyTaxonExpressionOperator — parent-child hierarchy over parent_taxon_id', () => {
+    it('ChildOf resolves immediate children via parent_taxon_id', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const childrenOfB = await runTaxonOperator('ChildOf', b);
+      expect(childrenOfB.has(c)).to.equal(true);
+      expect(childrenOfB.has(b)).to.equal(false);
+      expect(childrenOfB.has(a)).to.equal(false);
+
+      const childrenOfA = await runTaxonOperator('ChildOf', a);
+      expect(childrenOfA.has(b)).to.equal(true);
+      expect(childrenOfA.has(c)).to.equal(false);
+    });
+
+    it('ParentOf resolves only the immediate parent (depth 1)', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const parentOfC = await runTaxonOperator('ParentOf', c);
+      expect(parentOfC.has(b)).to.equal(true);
+      expect(parentOfC.has(a)).to.equal(false);
+      expect(parentOfC.has(c)).to.equal(false);
+    });
+
+    it('AscendsFrom resolves all ancestors of the target', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const ancestorsOfC = await runTaxonOperator('AscendsFrom', c);
+      expect(ancestorsOfC.has(a)).to.equal(true);
+      expect(ancestorsOfC.has(b)).to.equal(true);
+      expect(ancestorsOfC.has(c)).to.equal(true);
+    });
+
+    it('DescendsFrom resolves all descendants of the target', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const descendantsOfA = await runTaxonOperator('DescendsFrom', a);
+      expect(descendantsOfA.has(b)).to.equal(true);
+      expect(descendantsOfA.has(c)).to.equal(true);
+
+      // A leaf has no descendants above it.
+      const descendantsOfC = await runTaxonOperator('DescendsFrom', c);
+      expect(descendantsOfC.has(a)).to.equal(false);
+      expect(descendantsOfC.has(b)).to.equal(false);
     });
   });
 });

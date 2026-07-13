@@ -213,6 +213,46 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('getUnresolvedTaxonTsnsBySubmissionUploadId', () => {
+    it('returns the distinct unresolved taxon TSNs for the upload', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ tsn: 180542 }, { tsn: 180541 }]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      const response = await repository.getUnresolvedTaxonTsnsBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('SELECT DISTINCT c.tsn');
+      expect(sqlText).to.include('FROM submission_upload_staging_taxon_candidate c');
+      expect(sqlText).to.include('LEFT JOIN taxon t');
+      expect(sqlText).to.include('c.taxon_id IS NULL');
+      expect(sqlText).to.include('t.parent_taxon_id IS NULL');
+      expect(sqlText).to.include("lower(t.rank) <> 'kingdom'");
+      expect(sqlText).to.include('t.rank IS NULL');
+      expect(response).to.eql([180542, 180541]);
+    });
+  });
+
+  describe('resolveTaxonCandidateTaxonIdsBySubmissionUploadId', () => {
+    it('backfills taxon_id for previously-unresolved taxon candidate rows', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.resolveTaxonCandidateTaxonIdsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('UPDATE submission_upload_staging_taxon_candidate c');
+      expect(sqlText).to.include('SET taxon_id = t.taxon_id');
+      expect(sqlText).to.include('FROM taxon t');
+      expect(sqlText).to.include('t.itis_tsn = c.tsn');
+    });
+  });
+
   describe('populateFeatureCandidateStagingBySubmissionUploadId', () => {
     it('resolves feature property jsonb values into feature candidate staging', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
