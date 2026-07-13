@@ -46,14 +46,14 @@ const systemUsers: SystemUserSeed[] = [
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '543C3CE2F4DE472DB3A569FD0024B244',
-    display_name: 'Thompson, Anissa WLRS:EX'
+    display_name: 'Thompson, Andrew WLRS:EX'
   },
   {
     identifier: 'ameijer',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '74231b32026141a7acec6bcc0284f038',
-    display_name: 'Meijer, Aidan WLRS:EX'
+    display_name: 'Meijer, Annika WLRS:EX'
   },
   {
     identifier: 'dylrogow',
