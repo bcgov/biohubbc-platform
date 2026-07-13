@@ -137,14 +137,14 @@ describe('SubmissionFeatureReconciliationService — activation and submission_f
     // Upload A publishes a brand new feature: not a transition, so nothing is logged.
     const versionA = await publishVersion(submissionId, HASH_1);
     expect(versionA.counts).to.eql({ new: 1, unchanged: 0, superseded: 0, conflict: 0 });
-    expect(await getLogRows(submissionId)).to.have.length(0);
+    expect(await getLogRows(submissionId)).to.be.empty;
 
     // Upload B re-submits the same source with changed content: A is superseded by B.
     const versionB = await publishVersion(submissionId, HASH_2);
     expect(versionB.counts).to.eql({ new: 0, unchanged: 0, superseded: 1, conflict: 0 });
 
     const logRows = await getLogRows(submissionId);
-    expect(logRows).to.have.length(1);
+    expect(logRows).to.have.lengthOf(1);
     expect(logRows[0]).to.include({
       submission_id: submissionId,
       submission_upload_id: versionB.submissionUploadId,
@@ -167,13 +167,13 @@ describe('SubmissionFeatureReconciliationService — activation and submission_f
     // Re-approving the already-activated upload is a no-op: no new log rows.
     const reapprovalCounts = await service.reconcileAndActivateSubmissionUpload(versionB.submissionUploadId);
     expect(reapprovalCounts).to.eql({ new: 0, unchanged: 0, superseded: 0, conflict: 0 });
-    expect(await getLogRows(submissionId)).to.have.length(1);
+    expect(await getLogRows(submissionId)).to.have.lengthOf(1);
 
     // An unchanged re-submission (same content hash) leaves the active feature untouched
     // and is counted by the reconciliation summary, not the log.
     const versionC = await publishVersion(submissionId, HASH_2);
     expect(versionC.counts).to.eql({ new: 0, unchanged: 1, superseded: 0, conflict: 0 });
-    expect(await getLogRows(submissionId)).to.have.length(1);
+    expect(await getLogRows(submissionId)).to.have.lengthOf(1);
 
     const lifecycleBAfterC = await getFeatureLifecycle(versionB.submissionFeatureId);
     expect(lifecycleBAfterC.record_end_date).to.be.null;
@@ -187,7 +187,7 @@ describe('SubmissionFeatureReconciliationService — activation and submission_f
     const versionD = await publishVersion(submissionId, HASH_3);
 
     const logRows = await getLogRows(submissionId);
-    expect(logRows).to.have.length(2);
+    expect(logRows).to.have.lengthOf(2);
     expect(logRows.map((row) => [row.previous_submission_feature_id, row.new_submission_feature_id])).to.eql([
       [versionA.submissionFeatureId, versionB.submissionFeatureId],
       [versionB.submissionFeatureId, versionD.submissionFeatureId]
@@ -292,7 +292,7 @@ describe('SubmissionFeatureReconciliationService — activation and submission_f
     `);
 
     const logRows = await getLogRows(submissionId);
-    expect(logRows).to.have.length(1);
+    expect(logRows).to.have.lengthOf(1);
     expect(logRows[0]).to.include({
       action: 'removed',
       previous_submission_feature_id: feature1,
