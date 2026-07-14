@@ -143,6 +143,8 @@ export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
     },
     properties: {
       type: 'array',
+      description:
+        'Metadata for properties with a non-null indexed value on at least one feature in the full filtered expression result. Independent of pagination.',
       items: featureSearchPropertySchema
     },
     pagination: paginationResponseSchema,
