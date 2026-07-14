@@ -61,6 +61,7 @@ export interface IFlattenedBlock {
   properties: Record<string, unknown>;
   content: string[];
   parent: string | null;
+  universal_id?: string;
 }
 
 /**

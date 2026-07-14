@@ -37,7 +37,7 @@ function compareByCodeUnit(a: string, b: string): number {
  * (submission_id, feature_type_id, source_id) to classify the feature as unchanged
  * or superseded.
  *
- * Canonical form (the normative spec):
+ * Normalized form:
  * - The hashed object is `{ type, parent, content, properties }` from the submitted
  *   block. The feature's own `id` (its source id) is excluded — identity is carried
  *   by the reconciliation key, the hash covers content only. Database-generated
@@ -46,11 +46,11 @@ function compareByCodeUnit(a: string, b: string): number {
  * - `parent` is the parent's source id, normalized to `null` when absent.
  * - `content` (feature references by source id) is sorted lexicographically: it is an
  *   unordered relationship set.
- * - Each top-level `properties.<key>` array is sorted by the canonical serialization
+ * - Each top-level `properties.<key>` array is sorted by the stable JSON serialization
  *   of its elements: multi-value properties are stored as unordered typed rows.
  *   Arrays nested deeper are NOT sorted (e.g. GeoJSON `coordinates` are
  *   order-semantic).
- * - Serialization is canonical JSON: object keys sorted recursively, no whitespace,
+ * - Serialization uses stable JSON: object keys sorted recursively, no whitespace,
  *   numbers as their `JSON.stringify` output (the input has round-tripped through
  *   `JSON.parse`, matching the jsonb semantics of the stored `data` column), object
  *   entries with `undefined` values dropped and `undefined` array elements emitted
@@ -61,22 +61,22 @@ function compareByCodeUnit(a: string, b: string): number {
  *
  * @export
  * @param {IFlattenedBlock} feature The submitted feature block.
- * @return {*} {string} SHA-256 hex digest (64 characters) of the canonical form.
+ * @return {*} {string} SHA-256 hex digest (64 characters) of the normalized form.
  */
 export function computeSubmissionFeatureContentHash(feature: IFlattenedBlock): string {
-  const canonical = {
+  const normalized = {
     content: [...(feature.content ?? [])].sort(compareByCodeUnit),
     parent: feature.parent ?? null,
     properties: normalizeTopLevelPropertyArrays(feature.properties ?? {}),
     type: feature.type
   };
 
-  return createHash('sha256').update(serializeCanonicalJson(canonical), 'utf8').digest('hex');
+  return createHash('sha256').update(serializeStableJson(normalized), 'utf8').digest('hex');
 }
 
 /**
  * Return a copy of a properties object with each top-level array value sorted by the
- * canonical serialization of its elements. Non-array values and deeper arrays are
+ * stable JSON serialization of its elements. Non-array values and deeper arrays are
  * left untouched.
  *
  * @param {Record<string, unknown>} properties The submitted feature properties.
@@ -89,7 +89,7 @@ function normalizeTopLevelPropertyArrays(properties: Record<string, unknown>): R
     const value = properties[key];
     normalized[key] = Array.isArray(value)
       ? value
-          .map((item) => ({ item, serialized: serializeCanonicalJson(item) }))
+          .map((item) => ({ item, serialized: serializeStableJson(item) }))
           .sort((a, b) => compareByCodeUnit(a.serialized, b.serialized))
           .map(({ item }) => item)
       : value;
@@ -99,27 +99,27 @@ function normalizeTopLevelPropertyArrays(properties: Record<string, unknown>): R
 }
 
 /**
- * Serialize a JSON-compatible value to canonical JSON: object keys sorted recursively,
+ * Serialize a JSON-compatible value to stable JSON: object keys sorted recursively,
  * no whitespace, `undefined` object entries dropped and `undefined` array elements
  * emitted as `null` (mirroring `JSON.stringify` semantics).
  *
  * @param {unknown} value The value to serialize.
- * @return {*} {string} The canonical JSON string.
+ * @return {*} {string} The stable JSON string.
  */
-function serializeCanonicalJson(value: unknown): string {
+function serializeStableJson(value: unknown): string {
   if (value === null || value === undefined) {
     return 'null';
   }
 
   if (Array.isArray(value)) {
-    return `[${value.map((item) => serializeCanonicalJson(item)).join(',')}]`;
+    return `[${value.map((item) => serializeStableJson(item)).join(',')}]`;
   }
 
   if (typeof value === 'object') {
     const entries = Object.keys(value as Record<string, unknown>)
       .sort(compareByCodeUnit)
       .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
-      .map((key) => `${JSON.stringify(key)}:${serializeCanonicalJson((value as Record<string, unknown>)[key])}`);
+      .map((key) => `${JSON.stringify(key)}:${serializeStableJson((value as Record<string, unknown>)[key])}`);
 
     return `{${entries.join(',')}}`;
   }

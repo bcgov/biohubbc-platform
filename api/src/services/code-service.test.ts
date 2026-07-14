@@ -51,7 +51,9 @@ describe('codeService', () => {
       const result = await codeService.getAllCodeSets();
 
       expect(getFeatureTypePropertiesStub).to.have.been.calledOnce;
-      expect(result).to.eql({ feature_type_with_properties: mockFeatureTypePropertyCodes });
+      expect(result).to.eql({
+        feature_type_with_properties: mockFeatureTypePropertyCodes
+      });
     });
   });
 
