@@ -22,6 +22,11 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     comment: {
       type: 'string',
       description: 'Comments for system administrators about the submission'
+    },
+    blueprint_id: {
+      type: 'integer',
+      description:
+        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -124,6 +129,11 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     comment: {
       type: 'string',
       description: 'Comments for system administrators about the submission.'
+    },
+    blueprint_id: {
+      type: 'integer',
+      description:
+        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -232,9 +242,13 @@ export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
 export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['scope'],
+  required: ['scope', 'status'],
   properties: {
-    scope: { type: 'string', enum: ['validation', 'security'] }
+    scope: { type: 'string', enum: ['validation', 'security'] },
+    status: {
+      type: 'string',
+      enum: ['pending', 'requested', 'in_progress', 'completed', 'blocked', 'skipped', 'cancelled']
+    }
   }
 };
 

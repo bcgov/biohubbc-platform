@@ -4,12 +4,13 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { DropdownButton, IDropdownButtonItemGroup } from 'components/DropdownButton';
+import { DropdownButton } from 'components/DropdownButton';
+import { IDropdownMenuItemGroup } from 'components/menu/DropdownMenu.interface';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
-export interface ITicketSystemUserCardProps {
+interface ITicketSystemUserCardProps {
   systemUserId: number;
-  userIdentifier: string;
+  label: string;
   status: TicketSystemUserStatus;
   statusOptions: Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>;
   isSubmitting: boolean;
@@ -24,16 +25,8 @@ export interface ITicketSystemUserCardProps {
  * @return {*}
  */
 export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
-  const {
-    systemUserId,
-    userIdentifier,
-    status,
-    statusOptions,
-    isSubmitting,
-    onChangeStatus,
-    onRemoveTicketSystemUser
-  } = props;
-  const statusOptionGroups: IDropdownButtonItemGroup[] = [
+  const { systemUserId, label, status, statusOptions, isSubmitting, onChangeStatus, onRemoveTicketSystemUser } = props;
+  const statusOptionGroups: IDropdownMenuItemGroup[] = [
     {
       groupId: 'status-options',
       items: statusOptions.map((statusOption) => ({
@@ -55,7 +48,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
         justifyContent: 'space-between',
         gap: 2
       }}>
-      <Typography sx={{ fontWeight: 500 }}>{userIdentifier}</Typography>
+      <Typography sx={{ fontWeight: 500 }}>{label}</Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <DropdownButton
           value={status}
@@ -66,7 +59,7 @@ export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
         />
         <IconButton
           size="small"
-          aria-label={`remove ${userIdentifier}`}
+          aria-label={`remove ${label}`}
           onClick={onRemoveTicketSystemUser}
           disabled={isSubmitting}>
           <Icon path={mdiClose} size={0.65} />

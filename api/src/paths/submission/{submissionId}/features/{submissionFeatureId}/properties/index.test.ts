@@ -6,7 +6,7 @@ import * as index from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import * as db from '../../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../../errors/http-error';
-import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
+import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
 
 chai.use(sinonChai);
 
@@ -21,7 +21,7 @@ describe('properties index', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeaturePropertiesStub = sinon
-        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureProperties')
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
         .throws(new HTTP400('Error', ['Error']));
 
       const requestHandler = index.getSubmissionFeatureProperties();
@@ -48,7 +48,7 @@ describe('properties index', () => {
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeaturePropertiesStub = sinon
-        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureProperties')
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
         .resolves({
           properties: [
             { id: 'species_name', property: 'species name', value: 'Wolf' },
@@ -84,6 +84,34 @@ describe('properties index', () => {
         { id: 'count', property: 'count', value: '2' }
       ]);
       expect(mockRes.jsonValue.pagination.total).to.equal(2);
+    });
+
+    it('uses the API user connection for anonymous (no token) requests', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const getAPIUserDBConnectionStub = sinon
+        .stub(db.dbDependencies, 'getAPIUserDBConnection')
+        .returns(dbConnectionObj);
+      const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+      sinon
+        .stub(SubmissionFeaturePropertyService.prototype, 'getSubmissionFeatureProperties')
+        .resolves({ properties: [], total: 0 });
+
+      const requestHandler = index.getSubmissionFeatureProperties();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      // No keycloak_token on the request => anonymous caller reading an unsecured feature.
+      mockReq.params = {
+        submissionId: '1',
+        submissionFeatureId: '10'
+      };
+      mockReq.query = { page: '1', limit: '10' };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
+      expect(getDBConnectionStub).to.not.have.been.called;
+      expect(mockRes.statusValue).to.equal(200);
     });
   });
 });

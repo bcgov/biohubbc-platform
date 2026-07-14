@@ -4,6 +4,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
+import { getUserLabel } from 'utils/Utils';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
@@ -46,7 +47,7 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
           {visibleMembers.map((member) => (
             <TicketSidebarItem
               key={member.team_member_id}
-              label={member.user_identifier}
+              label={getUserLabel(member)}
               onRemove={() => onRemoveUser(member.team_member_id)}
             />
           ))}

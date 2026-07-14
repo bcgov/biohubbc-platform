@@ -1,0 +1,13 @@
+[
+  {
+    "id": "26cde575-7367-4b33-a832-dfdb0b86f264",
+    "type": "measurement",
+    "properties": {
+      "measurement_type": "Body Mass",
+      "measurement_value": 412.5,
+      "description": "Sampler measurement."
+    },
+    "content": [],
+    "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6"
+  }
+]

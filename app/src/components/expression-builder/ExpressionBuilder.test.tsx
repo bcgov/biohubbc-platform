@@ -1,7 +1,8 @@
 import userEvent from '@testing-library/user-event';
 import { SearchPropertyResponse } from 'interfaces/useSearchApi.interface';
 import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
-import { ExpressionBuilder } from './ExpressionBuilder';
+import { ExpressionBuilder as BaseExpressionBuilder } from './ExpressionBuilder';
+import { SearchExpressionBuilder as ExpressionBuilder } from './SearchExpressionBuilder';
 
 const searchPropertiesMock = vi.hoisted(() => vi.fn());
 const searchSpeciesMock = vi.hoisted(() => vi.fn());
@@ -155,6 +156,32 @@ describe('ExpressionBuilder', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('does not load property search metadata when rendering read-only', async () => {
+    render(
+      <BaseExpressionBuilder
+        readOnly
+        value={{
+          type: 'expression',
+          operator: 'AND',
+          clauses: [
+            {
+              type: 'predicate',
+              feature_property_id: 1,
+              feature_type_property_id: null,
+              operator: 'Equals',
+              value: 'sensitive'
+            }
+          ]
+        }}
+      />
+    );
+
+    await flushAsyncUpdates();
+
+    expect(searchPropertiesMock).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText('Property #1')).toBeVisible();
   });
 
   it('applies one valid condition as a serialized expression tree', async () => {
@@ -868,6 +895,7 @@ describe('ExpressionBuilder', () => {
       await waitFor(() =>
         expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'habitat' }, { page: 1, limit: 25 })
       );
+      await waitFor(() => expect(propertyInputs[0]).toHaveValue('Description'));
       listbox = await openCombobox(propertyInputs[1]);
       fireEvent.click(within(listbox).getByRole('option', { name: 'Habitat name' }));
 

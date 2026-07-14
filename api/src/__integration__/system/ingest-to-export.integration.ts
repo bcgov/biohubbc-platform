@@ -1,4 +1,4 @@
-// System integration test: end-to-end cart → download → export → CSV.
+// System integration test: end-to-end download → export → CSV.
 //
 // Mirrors `scripts/test_telemetry_export.py` end-to-end, against a real DB +
 // MinIO. The pipeline reads telemetry from `submission_feature` + the typed
@@ -11,16 +11,19 @@
 
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadExportService } from '../../services/download/download-export-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /** Download a zip file from S3 and return it as an AdmZip instance. */
@@ -51,9 +54,14 @@ describe('Ingest → Download → Export (system integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
+    // This spec drives the export pipeline directly via `runExportGroup`; stub the job publish so
+    // the request path doesn't enqueue a real pg-boss job (which the worker would then process
+    // concurrently with the manual run) and doesn't require an initialized pg-boss in the test process.
+    sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob').resolves();
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -80,6 +88,27 @@ describe('Ingest → Download → Export (system integration)', function () {
     return result.rows[0].feature_type_property_id as number;
   }
 
+  /** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
+  async function lookupBlueprintFeatureTypePropertyId(submissionFeatureId: number, ftpId: number): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT bftp.blueprint_feature_type_property_id
+      FROM submission_feature sf
+      INNER JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      INNER JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+      INNER JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${ftpId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+      LIMIT 1;
+    `);
+    if (!result.rowCount) {
+      throw new Error(`blueprint_feature_type_property not found for feature ${submissionFeatureId}, ftp ${ftpId}`);
+    }
+    return result.rows[0].blueprint_feature_type_property_id as number;
+  }
+
   /**
    * Mirror what 963's indexer would write for a telemetry feature: one row per
    * declared property in the matching typed table. The download pipeline reads
@@ -96,11 +125,16 @@ describe('Ingest → Download → Export (system integration)', function () {
     const timestampId = await lookupFeatureTypePropertyId('telemetry', 'timestamp');
     const geometryId = await lookupFeatureTypePropertyId('telemetry', 'geometry');
 
+    const dopBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, dopId);
+    const elevationBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, elevationId);
+    const timestampBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, timestampId);
+    const geometryBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, geometryId);
+
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
       VALUES
-        (${submissionFeatureId}, ${dopId}, ${data.dop}, ${systemUserId}),
-        (${submissionFeatureId}, ${elevationId}, ${data.elevation}, ${systemUserId});
+        (${submissionFeatureId}, ${dopId}, ${dopBftpId}, ${data.dop}, ${systemUserId}),
+        (${submissionFeatureId}, ${elevationId}, ${elevationBftpId}, ${data.elevation}, ${systemUserId});
     `);
     // The timestamp table stores partial-component datetimes — split the ISO
     // string into date + time at the call site (the boundary that has the
@@ -110,19 +144,19 @@ describe('Ingest → Download → Export (system integration)', function () {
     const timeValue = data.timestamp.slice(11, 19);
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_timestamp
-        (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
-      VALUES (${submissionFeatureId}, ${timestampId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
+        (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
+      VALUES (${submissionFeatureId}, ${timestampId}, ${timestampBftpId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
     `);
     // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
     const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
     await connection.query(
-      `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
-       VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
-      [submissionFeatureId, geometryId, JSON.stringify(innerGeom), systemUserId]
+      `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+       VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4), $5)`,
+      [submissionFeatureId, geometryId, geometryBftpId, JSON.stringify(innerGeom), systemUserId]
     );
   }
 
-  it('telemetry: cart → download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
+  it('telemetry: download → export round-trips to CSV with submission_feature_id, uuid, parent_uuid, and every property column', async () => {
     const submissionId = await createTestSubmission(connection);
 
     const telemetryData = {
@@ -144,6 +178,16 @@ describe('Ingest → Download → Export (system integration)', function () {
     const featureId = await createTestFeature(connection, submissionId, 'telemetry', telemetryData);
     await indexTelemetryProperties(featureId, telemetryData);
 
+    // createTestFeature skips the indexing pipeline that builds the closure. The export's security filter
+    // (isEffectivelySecured) fails closed on a feature with no closure rows, so build the closure self-loop
+    // the recompute would write — otherwise the feature reads as secured and is dropped from the export.
+    const uploadRow = await connection.sql(SQL`
+      SELECT submission_upload_id FROM submission_feature WHERE submission_feature_id = ${featureId};
+    `);
+    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(
+      uploadRow.rows[0].submission_upload_id
+    );
+
     // Build a download policy + download via the real services. Broad-path
     // policy on the telemetry feature type — at export time the security
     // filter is applied for the policy creator's authorization scope.
@@ -152,19 +196,26 @@ describe('Ingest → Download → Export (system integration)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: 'ingest-to-export integration test',
       description: null,
-      featureTypes: ['telemetry'],
       expressionId: null
     });
 
     const downloadService = new DownloadService(connection);
     const { download_id: downloadId } = await downloadService.createDownload({
       policyId: policy_id,
-      format: 'parquet'
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
     });
+
+    // Materialize the download's version. The parquet pipeline links each artifact to this version,
+    // and runExportGroup discovers feature types from it; reads resolve the most-recent version, so
+    // there is no stored "current version" pointer to set.
+    const downloadVersionRepo = new DownloadVersionRepository(connection);
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    const downloadVersionId = version.download_version_id;
 
     // Run the download (Parquet) pipeline.
     const pipelineService = new DownloadPipelineService(connection);
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING
     ]);
     const source = await new DownloadRepository(connection).getDownloadSource(downloadId);
@@ -173,36 +224,62 @@ describe('Ingest → Download → Export (system integration)', function () {
       const featureTypeName = statement.urn_feature_type;
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: schemaLookup.get(featureTypeName) ?? [],
         featureTypeName,
         statement
       });
     }
-    await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+    await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
       DownloadStatusEnum.PROCESSING
     ]);
 
-    // Run the export (CSV) pipeline.
+    // Run the export (CSV) pipeline through the resolve-or-create group contract.
+    // Per-feature-type recipe over the one materialized type (telemetry), all
+    // columns (no output_columns) — the pre-config-driven behaviour this test
+    // asserts on (the full telemetry CSV header).
     const exportService = new DownloadExportService(connection);
-    const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {});
+    const exportRecord = await exportService.createDownloadVersionExport(
+      downloadId,
+      systemUserId,
+      {
+        download_version_id: downloadVersionId,
+        version: 1,
+        export_type: 'csv',
+        mode: 'per_feature_type',
+        feature_types: ['telemetry'],
+        merge_steps: []
+      },
+      connection
+    );
+    // The export record no longer exposes the internal artifact-group FK (it is server-only), so the
+    // group id is read straight from the row to drive the pipeline and locate its part-zips.
+    const exportGroup = await connection.sql(SQL`
+      SELECT download_version_export_artifact_group_id
+      FROM download_version_export
+      WHERE download_version_export_id = ${exportRecord.download_version_export_id};
+    `);
+    const groupId = exportGroup.rows[0].download_version_export_artifact_group_id;
     const exportPipelineService = new DownloadExportPipelineService(connection);
-    await exportPipelineService.runExport(exportRecord.download_export_id);
+    await exportPipelineService.runExportGroup(groupId);
 
-    // Locate the part-zip on S3 and extract chunk1.csv.
+    // Locate the part-zip on S3 and extract chunk1.csv. Part artifacts are linked to the shared
+    // artifact GROUP (keyed by the group id), not the per-user export row.
     const artifacts = await connection.sql(SQL`
       SELECT a.bucket, a.object_key
-      FROM download_export_artifact dea
-      INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-      WHERE dea.download_export_id = ${exportRecord.download_export_id}
-        AND dea.record_end_date IS NULL
-      ORDER BY dea.chunk_id ASC;
+      FROM download_version_export_artifact dvea
+      INNER JOIN artifact a ON a.artifact_id = dvea.artifact_id
+      WHERE dvea.download_version_export_artifact_group_id = ${groupId}
+        AND dvea.record_end_date IS NULL
+      ORDER BY dvea.chunk_id ASC;
     `);
     expect(artifacts.rowCount).to.equal(1, 'expected exactly one part-zip artifact');
 
     const storageService = new ObjectStorageService();
     const zip = await downloadZipFromS3(storageService, artifacts.rows[0].object_key);
-    const chunkEntryName = `biohub-export-${exportRecord.download_export_id}/telemetry/chunk1.csv`;
+    // The physical zip is shared across exports, so its internal entry names are keyed by the group id.
+    const chunkEntryName = `biohub-export-${groupId}/telemetry/chunk1.csv`;
     const csv = zipEntryText(zip, chunkEntryName);
     expect(csv, 'expected chunk1.csv to be present in the part-zip').to.not.equal('');
 
@@ -233,8 +310,8 @@ describe('Ingest → Download → Export (system integration)', function () {
     expect(col('submission_feature_id')).to.equal(String(featureId));
     // uuid is generated server-side; we don't pin the exact value, just assert it's a non-empty UUID-looking string.
     expect(col('uuid')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-    // Telemetry's parent (the dataset) is set inside createTestFeature → empty for root-level test feature.
-    // Real telemetry has a dataset parent; the column at minimum must be present (not crash).
+    // Telemetry's parent (the survey) is set inside createTestFeature → empty for root-level test feature.
+    // Real telemetry has a survey parent; the column at minimum must be present (not crash).
     expect(header).to.include('parent_uuid');
 
     expect(col('dop'), 'dop should round-trip the ingested number').to.equal('4.2');

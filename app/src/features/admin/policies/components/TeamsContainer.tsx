@@ -14,8 +14,8 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IAvailableUser, ITeam } from 'interfaces/useTeamsApi.interface';
-import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
 
 /**
@@ -156,7 +156,11 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     try {
       const { members } = await biohubApi.teams.getTeamMembers(team.team_id);
       setEditingTeamMembers(
-        members.map((m) => ({ system_user_id: m.system_user_id, user_identifier: m.user_identifier }))
+        members.map((m) => ({
+          system_user_id: m.system_user_id,
+          user_identifier: m.user_identifier,
+          display_name: m.display_name
+        }))
       );
     } catch (error) {
       const apiError = error as APIError;
@@ -299,8 +303,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       field: 'description',
       headerName: 'Description',
       flex: 2,
-      minWidth: 200,
-      valueGetter: (value) => value || '-'
+      minWidth: 200
     },
     {
       field: 'member_count',

@@ -8,6 +8,7 @@ import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -76,7 +77,8 @@ export const SubmissionFeature = z.object({
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
   submission_name: z.string(),
-  secured: z.boolean()
+  secured: z.boolean(),
+  security_reasons: z.array(z.string())
 });
 
 export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
@@ -645,13 +647,13 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get spatial component counts by dataset id
+   * Get spatial component counts by survey id
    *
-   * @param {string} datasetId
+   * @param {string} surveyId
    * @returns {Promise<ISpatialComponentCount[]>}
    * @memberof SubmissionRepository
    */
-  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
+  async getSpatialComponentCountBySurveyId(surveyId: string): Promise<ISpatialComponentCount[]> {
     const sqlStatement = SQL`
         SELECT
           features_array #> '{properties, type}' spatial_type,
@@ -661,7 +663,7 @@ export class SubmissionRepository extends BaseRepository {
           jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
           submission s,
           submission_observation so
-        WHERE s.uuid = ${datasetId}
+        WHERE s.uuid = ${surveyId}
         AND so.submission_id = s.submission_id
         AND ssc.submission_observation_id = so.submission_observation_id
         AND so.record_end_timestamp is null
@@ -887,6 +889,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -987,6 +991,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -1062,6 +1068,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       LEFT JOIN 
         submission_regions
       ON
@@ -1112,8 +1120,13 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       WHERE
         submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')}`);
+    sqlStatement.append(`
       GROUP BY
         submission_feature.submission_feature_id,
         feature_type.name,
@@ -1121,7 +1134,7 @@ export class SubmissionRepository extends BaseRepository {
         feature_type.sort
       ORDER BY
         feature_type.sort ASC;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);
     return response.rows;
@@ -1171,7 +1184,9 @@ export class SubmissionRepository extends BaseRepository {
         this.on('sf.submission_id', '=', 's.submission_id').andOnNull('sf.parent_submission_feature_id');
       })
       .innerJoin('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'sf.submission_feature_id')
+      .leftJoin('submission_feature_security as sfs', function () {
+        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
+      })
       .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
       .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
       .where('tm.system_user_id', systemUserId)
@@ -1331,6 +1346,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
@@ -1463,6 +1480,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      AND
+        submission_feature_security.status = 'active'
       INNER JOIN
         feature_type
       ON
@@ -1675,8 +1694,9 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission_id = ${submissionId}
       and
-        parent_submission_feature_id is null;
+        parent_submission_feature_id is null
     `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -1721,6 +1741,9 @@ export class SubmissionRepository extends BaseRepository {
         parent_submission_feature_id IS null
       AND
         s.submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
 
       UNION ALL
 
@@ -1743,6 +1766,9 @@ export class SubmissionRepository extends BaseRepository {
       ft.feature_type_id = sf.feature_type_id
       where
         sf.submission_id = ${submissionId}
+    `);
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
     )
     SELECT
       w_submission_feature.submission_feature_id,
@@ -1761,7 +1787,7 @@ export class SubmissionRepository extends BaseRepository {
     ORDER BY
       level,
       submission_feature_id;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
 
@@ -1806,10 +1832,15 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security sfs
       ON
         sf.submission_feature_id = sfs.submission_feature_id
+      AND
+        sfs.status = 'active'
       WHERE
         parent_submission_feature_id IS null
       AND
         s.submission_id = ${submissionId}
+    `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
       AND sfs.submission_feature_security_id IS NULL
 
       UNION ALL
@@ -1835,8 +1866,13 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security sfs
       ON
         sf.submission_feature_id = sfs.submission_feature_id
+      AND
+        sfs.status = 'active'
       WHERE
         sf.submission_id = ${submissionId}
+    `);
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
+    sqlStatement.append(SQL`
       AND sfs.submission_feature_security_id IS NULL
     )
     SELECT
@@ -1856,7 +1892,7 @@ export class SubmissionRepository extends BaseRepository {
     ORDER BY
       level,
       submission_feature_id;
-    `;
+    `);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
 
@@ -1887,14 +1923,16 @@ export class SubmissionRepository extends BaseRepository {
         knex.raw('feature_type.name AS feature_type_name'),
         knex.raw(`
         EXISTS (
-          SELECT 1 
+          SELECT 1
           FROM submission_feature_security sfs
           WHERE sfs.submission_feature_id = submission_feature.submission_feature_id
+            AND sfs.status = 'active'
         ) AS secured
       `)
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-      .where('submission_feature.submission_id', submissionId);
+      .where('submission_feature.submission_id', submissionId)
+      .whereRaw(isSubmissionFeatureActive('submission_feature'));
 
     const normalizedSearch = filters?.search?.trim().toLowerCase();
     if (normalizedSearch) {

@@ -15,7 +15,7 @@ interface IUseFuzzyOptions<T> extends IFuseOptions<T> {
  * 4. highlighting with matched indices
  *
  * @template T - object of some type
- * @param {T[]} [data] - dataset to fuzzy find against
+ * @param {T[]} [data] - data set to fuzzy find against
  * @param {IUseFuzzyOptions<T>} [options={}] - fuse options + additional customizations
  * @returns {*}
  */
@@ -78,12 +78,12 @@ const useFuzzySearch = <T,>(data?: T[], options: IUseFuzzyOptions<T> = {}) => {
 
     /**
      * modify the value to include the fuse.js logical 'OR' operator
-     * ie: 'moose | dataset'
+     * ie: 'moose | survey'
      *
      */
     const searchValue = value.replaceAll(' ', ' | ');
-    const fuzzyDatasets = fuse.search(searchValue);
-    setFuzzyData(fuzzyDatasets);
+    const fuzzyResults = fuse.search(searchValue);
+    setFuzzyData(fuzzyResults);
   };
 
   /**

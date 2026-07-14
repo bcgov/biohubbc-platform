@@ -2,7 +2,11 @@ import type { PredicatePropertyTypeName } from '../constants/expression';
 import { OperatorsByPropertyType, SupportedExpressionPropertyTypes } from '../constants/expression';
 import { IDBConnection } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
-import type { InternalTypedPredicate, PredicateOperator } from '../models/expression-predicate';
+import type {
+  InternalTypedPredicate,
+  PredicateOperator,
+  TimestampInternalPredicate
+} from '../models/expression-predicate';
 import { ExpressionTree, ExpressionTreeClause, ExpressionTreePredicate } from '../models/expression-tree';
 import {
   NormalizedExpressionTreeClause,
@@ -302,11 +306,11 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    * This parses the scalar, enforces operator-specific temporal kinds, and returns the internal timestamp shape.
    *
    * @param {ExpressionTreePredicate} predicate - Public datetime predicate leaf.
-   * @return {InternalTypedPredicate} Internal timestamp predicate payload.
+   * @return {TimestampInternalPredicate} Internal timestamp predicate payload.
    * @private
    * @memberof ExpressionPredicateSemanticValidator
    */
-  private buildTimestampPredicate(predicate: ExpressionTreePredicate): InternalTypedPredicate {
+  private buildTimestampPredicate(predicate: ExpressionTreePredicate): TimestampInternalPredicate {
     if (typeof predicate.value !== 'string') {
       throw new ApiValidationError('Datetime predicate value must be a scalar string', [
         'ExpressionPredicateSemanticValidator->buildTimestampPredicate',
@@ -350,7 +354,10 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     return {
       type: 'timestamp',
       operator: predicate.operator,
-      value: predicate.value
+      value: {
+        date_value: parsed.date_value,
+        time_value: parsed.time_value
+      }
     };
   }
 }

@@ -68,7 +68,8 @@ describe('TicketCommentRepository', () => {
         ticket_id: mockTicketId,
         user_identifier: 'Sarah',
         create_date: '2026-02-25T00:00:00.000Z',
-        comment: 'New comment'
+        comment: 'New comment',
+        artifacts: []
       };
       const mockQueryResponse = Promise.resolve(mockQueryResult([mockRow]));
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -151,7 +152,8 @@ describe('TicketCommentRepository', () => {
           ticket_id: mockTicketId,
           user_identifier: 'Sarah',
           create_date: '2026-02-25T00:00:00.000Z',
-          comment: 'New comment'
+          comment: 'New comment',
+          artifacts: []
         }
       ];
       const mockQueryResponse = Promise.resolve(mockQueryResult(rows));

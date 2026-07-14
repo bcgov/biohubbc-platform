@@ -22,6 +22,8 @@ interface SystemUserSeed {
   type: SYSTEM_IDENTITY_SOURCE;
   role_name: SYSTEM_USER_ROLE_NAME;
   user_guid: string;
+  /** Keycloak display name. Optional: omit to exercise the user_identifier fallback in the app. */
+  display_name?: string;
 }
 
 const systemUsers: SystemUserSeed[] = [
@@ -29,49 +31,43 @@ const systemUsers: SystemUserSeed[] = [
     identifier: 'achirico',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'E3A279530D164485BF43C6FE7A49E175'
+    user_guid: 'E3A279530D164485BF43C6FE7A49E175',
+    display_name: 'Chirico, Albert WLRS:EX'
   },
   {
     identifier: 'mauberti',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '62EC624E50844486A046DC9709854F8D'
+    user_guid: '62EC624E50844486A046DC9709854F8D',
+    display_name: 'Aubertin-Young, Macgregor WLRS:EX'
   },
   {
     identifier: 'anthomps',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '543C3CE2F4DE472DB3A569FD0024B244'
+    user_guid: '543C3CE2F4DE472DB3A569FD0024B244',
+    display_name: 'Thompson, Andrew WLRS:EX'
   },
   {
     identifier: 'ameijer',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '74231b32026141a7acec6bcc0284f038'
+    user_guid: '74231b32026141a7acec6bcc0284f038',
+    display_name: 'Meijer, Annika WLRS:EX'
   },
   {
     identifier: 'dylrogow',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '473C7CDAC46D402AA79AE980DDDB85C3'
+    user_guid: '473C7CDAC46D402AA79AE980DDDB85C3',
+    display_name: 'Rogowsky, Dylan WLRS:EX'
   },
   {
-    identifier: 'abushara',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '9266B99E3E9C42339D9F951CBB6E3494'
-  },
-  {
+    // No display_name: exercises the user_identifier fallback in user selectors.
     identifier: 'dahogan',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '6936047233B94EA0B8C0698F6349E027'
-  },
-  {
-    identifier: 'jpilon',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'A8ADEA1A0F3147C09CBA91D6CE2AE07B'
   }
 ];
 
@@ -153,6 +149,7 @@ const insertSystemUserSQL = (systemUser: SystemUserSeed) => `
     user_identity_source_id,
     user_identifier,
     user_guid,
+    display_name,
     record_effective_date,
     create_date,
     create_user
@@ -161,6 +158,7 @@ const insertSystemUserSQL = (systemUser: SystemUserSeed) => `
     user_identity_source_id,
     '${systemUser.identifier}',
     LOWER('${systemUser.user_guid}'),
+    ${systemUser.display_name ? `'${systemUser.display_name.replace(/'/g, "''")}'` : 'NULL'},
     now(),
     now(),
     (SELECT system_user_id from "system_user" where LOWER(user_identifier) = LOWER('${DB_ADMIN}'))

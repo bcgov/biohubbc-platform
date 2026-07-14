@@ -1,9 +1,7 @@
-import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
-import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended, isSystemUserInactive } from '../../models/system-user';
 import { getUserGuid } from '../../utils/keycloak-utils';
-import { CartService } from '../cart-service';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
 import { UserService } from '../user-service';
@@ -48,16 +46,27 @@ export type TeamAuthorizationEntity =
   | {
       entity: 'data_request';
       dataRequestId: string;
-    }
-  | {
-      entity: 'submission_feature';
-      submissionFeatureId: number;
-      submissionId: number;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {
   discriminator: 'Team';
 };
+
+/**
+ * Authorization rule that checks policy/security-scope access to a submission feature.
+ *
+ * Unlike `Team` (a pure team-membership check), feature access is granted when the feature is open
+ * or when the user has access through the feature's security policy. Anonymous requests are allowed
+ * to reach this check (they can still read unsecured features).
+ *
+ * @export
+ * @interface AuthorizeByPolicy
+ */
+export interface AuthorizeByPolicy {
+  discriminator: 'Policy';
+  submissionFeatureId: number;
+  submissionId: number;
+}
 
 /**
  * Authorization rule that checks if a jwt token maps to a known contributor by client id.
@@ -69,23 +78,12 @@ export interface AuthorizeByContributor {
   discriminator: 'Contributor';
 }
 
-/**
- * Authorization rule that checks if the cart belongs to the system user.
- *
- * @export
- * @interface AuthorizeByCart
- */
-export interface AuthorizeByCart {
-  cartId: string;
-  discriminator: 'Cart';
-}
-
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByContributor
   | AuthorizeByTeam
-  | AuthorizeByCart;
+  | AuthorizeByPolicy;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -158,8 +156,8 @@ export class AuthorizationService extends DBService {
         case 'Team':
           authorizeResults.push(await this.authorizeByTeam(authorizeRule));
           break;
-        case 'Cart':
-          authorizeResults.push(await this.authorizeByCart(authorizeRule));
+        case 'Policy':
+          authorizeResults.push(await this.authorizeByPolicy(authorizeRule));
           break;
       }
     }
@@ -173,15 +171,12 @@ export class AuthorizationService extends DBService {
    * @return {*}  {boolean} `true` if the user is a system administrator, `false` otherwise.
    */
   async authorizeSystemAdministrator(): Promise<boolean> {
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const systemUserObject = await this.getCachedSystemUser();
 
     if (!systemUserObject) {
-      // Cannot verify user roles
+      // Cannot verify user roles (unknown or soft-deleted user)
       return false;
     }
-
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
 
     return systemUserObject.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
   }
@@ -199,18 +194,10 @@ export class AuthorizationService extends DBService {
       return false;
     }
 
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const systemUserObject = await this.getCachedSystemUser();
 
     if (!systemUserObject) {
-      // Cannot verify user roles
-      return false;
-    }
-
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
-
-    if (systemUserObject.record_end_date) {
-      //system user has an expired record
+      // Cannot verify user roles (unknown or soft-deleted user)
       return false;
     }
 
@@ -253,66 +240,57 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is authorized to access the cart
+   * Check whether the current request is authorized to access a submission feature.
    *
-   * @param {AuthorizeByCart} authorizeByCart
-   * @return {Promise<boolean>}
+   * Access is granted when the feature is open, or when the authenticated user has access through
+   * the feature's security policy. Anonymous requests are permitted to reach this check (they can
+   * still read unsecured features), so the (possibly `null`) system user id is passed through.
+   *
+   * @param {AuthorizeByPolicy} authorizeRule
+   * @returns {Promise<boolean>}
    */
-  async authorizeByCart(authorizeByCart: AuthorizeByCart): Promise<boolean> {
-    const { cartId } = authorizeByCart;
-
-    // Fetch the cart based on the cartId
-    const cartService = new CartService(this.connection);
-    const cart = await cartService.findCartById(cartId);
-
-    // Cart does not exist
-    if (!cart) {
+  async authorizeByPolicy(authorizeRule: AuthorizeByPolicy): Promise<boolean> {
+    if (!authorizeRule) {
       return false;
     }
 
-    // Only active carts are accessible
-    if (cart.cart_status !== 'active') {
-      return false;
-    }
+    const user = await this.getCachedSystemUser();
 
-    // Deny access to carts whose validity window has ended
-    const recordEndDate = cart.record_end_date ? dayjs(cart.record_end_date) : null;
-    const cartValidityEnded = recordEndDate !== null && (!recordEndDate.isValid() || !recordEndDate.isAfter(dayjs()));
-    if (cartValidityEnded) {
-      return false;
-    }
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
 
-    // Ensure we have the current system user
-    const currentUser = await this.getCachedSystemUser();
-
-    // If the cart has a system_user_id (created by an authenticated user), and the current user is authenticated
-    if (cart.system_user_id && currentUser) {
-      // Check if the authenticated user is the owner of the cart
-      return cart.system_user_id === currentUser.system_user_id;
-    }
-
-    // If the cart was created by an unauthenticated user (no system_user_id set)
-    if (!cart.system_user_id) {
-      // Allow access for both authenticated and non-authenticated users (there is no ownership to verify)
-      return true;
-    }
-
-    return false;
+    return teamAuthorizationService.isSubmissionFeatureAccessibleToUser(
+      user?.system_user_id ?? null,
+      authorizeRule.submissionFeatureId,
+      authorizeRule.submissionId
+    );
   }
 
   /**
    * Private helper method to fetch and cache the system user object.
    *
-   * @returns {Promise<SystemUser | null>} Resolves with the system user object, or `null` if not found.
+   * Returns `null` for an unknown or soft-deleted (inactive) user, including a cached or constructor-injected one.
+   *
+   * @returns {Promise<SystemUserExtended | null>} Resolves with the system user object, or `null` if not found or
+   * inactive.
    */
-  async getCachedSystemUser(): Promise<SystemUser | null> {
+  async getCachedSystemUser(): Promise<SystemUserExtended | null> {
     if (this._systemUser) {
+      if (isSystemUserInactive(this._systemUser)) {
+        this._systemUser = undefined;
+        return null;
+      }
+
       return this._systemUser;
     }
 
     const user = await this.getSystemUserObject(); // fetch from DB or service
+    if (user && isSystemUserInactive(user)) {
+      this._systemUser = undefined;
+      return null;
+    }
+
     this._systemUser = user ?? undefined;
-    return this._systemUser ?? null;
+    return user;
   }
 
   /**
@@ -388,6 +366,11 @@ export class AuthorizationService extends DBService {
     }
 
     if (!systemUserWithRoles) {
+      return null;
+    }
+
+    if (isSystemUserInactive(systemUserWithRoles)) {
+      // Soft-deleted (revoked) users are treated as if they do not exist for all authorization rules
       return null;
     }
 

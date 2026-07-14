@@ -1,7 +1,8 @@
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
+import dayjs from 'dayjs';
+import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
 import { useCodesContext } from 'hooks/useContext';
 import { useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router';
@@ -11,7 +12,7 @@ import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links'
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
-import { useSearchResultCartActions } from './hooks/useSearchResultCartActions';
+import { useSearchResultDataRequest } from './hooks/useSearchResultDataRequest';
 import { useSearchResultDownload } from './hooks/useSearchResultDownload';
 import { useSearchResultExpression } from './hooks/useSearchResultExpression';
 import { useSearchResultNavigation } from './hooks/useSearchResultNavigation';
@@ -40,54 +41,37 @@ export const SearchResultPage = () => {
     () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
     [codesDataLoader.data?.feature_type_with_properties]
   );
-  const featureTypeOptions = useMemo(
-    () =>
-      (codesDataLoader.data?.feature_type_with_properties ?? []).map((type) => ({
-        label: type.feature_type.name,
-        value: type.feature_type.name
-      })),
-    [codesDataLoader.data?.feature_type_with_properties]
-  );
-
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, isLoading, searchParams, setSearchParams, pagination } = useSearchResults(
-    routeConfig?.featureTypeName,
-    Boolean(routeConfig),
-    expressionTree,
-    expressionApplyRevision
-  );
-  const { cart, handleAddAllToCart } = useSearchResultCartActions(rows);
+  const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
+    useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
     useSearchResultPagingSort({ pagination, setSearchParams });
-  const { handleResultClick, handleFeatureTypeTabChange, handleRequestAccess } =
-    useSearchResultNavigation(featureTypeLinks);
+  const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
-    setDownloadView,
     isCreateDownloadDialogOpen,
     isSubmittingDownload,
     handleOpenCreateDownload,
     handleCreateDownload,
-    handleCancelCreateDownload,
-    handleCheckout
+    handleCancelCreateDownload
   } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
+  const {
+    isCreateDataRequestDialogOpen,
+    isSubmittingDataRequest,
+    handleOpenCreateDataRequest,
+    handleCreateDataRequest,
+    handleCancelCreateDataRequest
+  } = useSearchResultDataRequest({ featureType: routeConfig?.featureTypeName, expressionTree });
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
-  const hasSecuredResults = rows.some((row) => row.is_secured);
+  // Show the "request access" banner when the search matched secured features hidden from the caller,
+  // not merely because visible rows the caller can already see are secured.
+  const hasHiddenSecuredResults = hasMoreSecuredFeatures;
 
   if (routeConfig) {
     return (
       <LoadingGuard>
-        <ResultPageContainer
-          rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
-          rightSidebar={
-            <DownloadSidebar
-              cart={cart}
-              activeView={downloadView}
-              onViewChange={setDownloadView}
-              onDownload={handleCheckout}
-            />
-          }>
+        <ResultPageContainer rightSidebarTitle={downloadView} rightSidebar={<DownloadSidebar />}>
           <SearchResultPageHeader
             activeFeatureType={routeConfig.featureTypeName}
             featureTypeLinks={featureTypeLinks}
@@ -97,10 +81,11 @@ export const SearchResultPage = () => {
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
-          {hasSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleRequestAccess} />}
+          {hasHiddenSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
 
           <SearchResultPanel
             rows={rows}
+            featureTypeProperties={properties}
             isLoading={isLoading}
             pagination={pagination}
             sortOptions={sortOptions}
@@ -108,7 +93,6 @@ export const SearchResultPage = () => {
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
             isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
-            onAddAllToCart={handleAddAllToCart}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}
@@ -122,11 +106,17 @@ export const SearchResultPage = () => {
           <CreateDownloadDialog
             open={isCreateDownloadDialogOpen}
             isSubmitting={isSubmittingDownload}
-            defaultName={`${routeConfig.title} download`}
-            defaultFeatureType={routeConfig.featureTypeName}
-            featureTypeOptions={featureTypeOptions}
+            defaultName={`${routeConfig.featureTypeName} - ${dayjs().format('YYYY-MM-DD HH:mm')}`}
             onCancel={handleCancelCreateDownload}
             onSave={handleCreateDownload}
+          />
+
+          <CreateDataRequestDialog
+            open={isCreateDataRequestDialogOpen}
+            isSubmitting={isSubmittingDataRequest}
+            initialReason=""
+            onCancel={handleCancelCreateDataRequest}
+            onSave={handleCreateDataRequest}
           />
         </ResultPageContainer>
       </LoadingGuard>

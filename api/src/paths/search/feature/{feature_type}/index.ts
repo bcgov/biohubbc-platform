@@ -11,6 +11,7 @@ import {
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../../utils/pagination';
+import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}');
 
@@ -59,7 +60,7 @@ export function searchFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
       const featureType = req.params.feature_type?.trim().toLowerCase();
       const pagination = makePaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
@@ -76,18 +77,17 @@ export function searchFeatures(): RequestHandler {
 
       const expressionTree = expressionTreeParseResult?.data;
 
-      const { features, count } = await service.searchFeaturesByExpressionTreeWithCount(
-        featureType,
-        expressionTree,
-        pagination,
-        systemUserId
-      );
+      const { features, properties, count, has_more_secured_features } =
+        await service.searchFeaturesByExpressionTreeWithCount(featureType, expressionTree, pagination, systemUserId);
 
       await connection.commit();
 
-      res.setHeader('Cache-Control', 'public, max-age=90');
-
-      return res.status(200).json({ features: features, pagination: makePaginationResponse(count, pagination) });
+      return res.status(200).json({
+        features,
+        properties,
+        pagination: makePaginationResponse(count, pagination),
+        has_more_secured_features
+      });
     } catch (error) {
       defaultLog.error({ label: 'searchFeatures', message: 'error', error });
       await connection.rollback();

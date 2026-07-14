@@ -1,5 +1,4 @@
 import { EditDialog } from 'components/dialog/EditDialog';
-import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
 import { CreateDownloadDialogYup } from './CreateDownloadDialogYup';
 import { CreateDownloadForm, ICreateDownloadFormValues } from './CreateDownloadForm';
 
@@ -7,27 +6,23 @@ interface ICreateDownloadDialogProps {
   open: boolean;
   isSubmitting: boolean;
   defaultName: string;
-  defaultFeatureType: string;
-  featureTypeOptions: ICustomMultiAutocompleteOption[];
   onCancel: () => void;
   onSave: (values: ICreateDownloadFormValues) => void;
 }
 
 /**
  * Dialog wrapper for creating a download. Thin layer over `EditDialog` that wires the form +
- * Yup schema and seeds initial values from the search route's anchor (page title and the
- * route's primary feature type).
+ * Yup schema and seeds the initial display name from the search route.
  *
  * Submit lifecycle (in-flight flag, snackbars, sidebar switching) is owned by the parent page,
  * not this dialog.
  */
 export const CreateDownloadDialog = (props: ICreateDownloadDialogProps) => {
-  const { open, isSubmitting, defaultName, defaultFeatureType, featureTypeOptions, onCancel, onSave } = props;
+  const { open, isSubmitting, defaultName, onCancel, onSave } = props;
 
   const initialValues: ICreateDownloadFormValues = {
     name: defaultName,
-    description: null,
-    featureTypes: [defaultFeatureType]
+    description: null
   };
 
   return (
@@ -37,7 +32,7 @@ export const CreateDownloadDialog = (props: ICreateDownloadDialogProps) => {
       dialogTitle="Create Download"
       dialogSaveButtonLabel="Create"
       component={{
-        element: <CreateDownloadForm featureTypeOptions={featureTypeOptions} />,
+        element: <CreateDownloadForm />,
         initialValues,
         validationSchema: CreateDownloadDialogYup
       }}

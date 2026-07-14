@@ -1,11 +1,11 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
-import { ViewPolicyDialog } from 'features/admin/policies/components/ViewPolicyDialog';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
 import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditForm.interface';
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
+import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
 
@@ -28,23 +28,26 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleCloseEditCommentDialog,
     handleSaveEditedComment,
     handleConfirmDeleteComment
-  } = useTicketTimelineCommentActions({ ticket });
+  } = useTicketTimelineCommentActions();
   const {
     updatingDataRequestId,
     isEditPolicyDialogOpen,
-    isViewPolicyDialogOpen,
     selectedPolicy,
-    viewPolicy,
     isLoadingPolicy,
     isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
     handleOpenPolicyDialog,
-    handleOpenViewPolicyDialog,
+    handleOpenPolicyDetailPage,
     handleClosePolicyDialog,
-    handleCloseViewPolicyDialog,
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
+  const {
+    handleRequestSubmissionUploadReview,
+    handleUpdateSubmissionUploadReview,
+    handleConfirmSubmissionUploadReviewStatusUpdate,
+    handleConfirmSubmissionUploadReviewStatusReset
+  } = useTicketTimelineUploadActions();
 
   return (
     <>
@@ -56,9 +59,13 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onEditComment={handleOpenEditCommentDialog}
         onDeleteComment={handleConfirmDeleteComment}
         onViewPolicy={handleOpenPolicyDialog}
-        onViewFinalizedPolicy={handleOpenViewPolicyDialog}
+        onViewFinalizedPolicy={handleOpenPolicyDetailPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
+        onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
+        onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
+        onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
+        onConfirmSubmissionUploadReviewStatusReset={handleConfirmSubmissionUploadReviewStatusReset}
       />
 
       {selectedPolicy && (
@@ -71,10 +78,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         />
       )}
 
-      {viewPolicy && (
-        <ViewPolicyDialog open={isViewPolicyDialogOpen} policy={viewPolicy} onClose={handleCloseViewPolicyDialog} />
-      )}
-
       {selectedComment && (
         <EditDialog<ITicketCommentEditFormValues>
           open={isEditCommentDialogOpen}
@@ -85,7 +88,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           component={{
             element: (
               <TicketCommentEditForm
-                artifacts={ticket.artifacts}
                 isSaving={isSavingComment}
                 isUploadingAttachment={isUploadingCommentAttachment}
                 onUploadAttachment={handleEditCommentUploadAttachment}

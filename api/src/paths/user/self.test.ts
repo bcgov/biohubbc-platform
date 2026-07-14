@@ -6,7 +6,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db'
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { HTTP401, HTTPError } from '../../errors/http-error';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../models/system-user';
 import { UserService } from '../../services/user-service';
 import * as self from './self';
 
@@ -171,17 +171,17 @@ describe('upsertUser', () => {
     expect(mockRes.jsonValue.email).to.equal('updated@example.com');
   });
 
-  it('should throw a 401 error when user is expired', async () => {
+  it('should throw a 401 error when user is inactive', async () => {
     stubSelfDependencies({
-      displayName: 'Expired User',
-      email: 'expired@example.com',
-      givenName: 'Expired',
+      displayName: 'Inactive User',
+      email: 'inactive@example.com',
+      givenName: 'Inactive',
       familyName: 'User'
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const http401Error = new HTTP401('User account is expired or inactive');
+    const http401Error = new HTTP401('User account is inactive');
     sinon.stub(UserService.prototype, 'upsertSelf').rejects(http401Error);
 
     try {
@@ -191,7 +191,7 @@ describe('upsertUser', () => {
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(401);
-      expect((actualError as HTTPError).message).to.equal('User account is expired or inactive');
+      expect((actualError as HTTPError).message).to.equal('User account is inactive');
     }
   });
 

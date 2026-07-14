@@ -28,6 +28,10 @@ export interface IComputeScopeAnchorsJobData {
  * ON CONFLICT DO NOTHING makes each batch idempotent — safe to retry on
  * partial failure.
  *
+ * If the scope currently has no active approved ALLOW statement, the job exits
+ * without deleting anchors. Access is controlled by `team_security_scope`; anchor
+ * rows are reusable cache entries for when the same scope is granted again.
+ *
  * @param {PgBoss.Job<IComputeScopeAnchorsJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
@@ -47,13 +51,12 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
       const urn = await withConnection((conn) => new SecurityScopeService(conn).resolveUrnForScope(securityScopeId));
 
       if (!urn) {
-        // Orphaned scope — no active policy statements. Clean up all derived data
-        // (anchors + team grants) instead of running the expensive CTE for nothing.
-        await withConnection((conn) => new SecurityScopeService(conn).deleteOrphanedScopeData(securityScopeId));
-
+        // No active approved ALLOW statement currently references this scope.
+        // Anchors are reusable cache rows and do not grant access without
+        // team_security_scope, so leave them in place for future reuse.
         defaultLog.info({
           label: 'computeScopeAnchorsJobHandler',
-          message: 'Orphaned scope (no active policy statements), all anchors deleted',
+          message: 'Scope has no active approved ALLOW statements, anchor computation skipped',
           jobId: job.id,
           securityScopeId
         });

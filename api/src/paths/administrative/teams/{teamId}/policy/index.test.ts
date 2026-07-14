@@ -30,12 +30,14 @@ describe('teams/{teamId}/policy', () => {
       {
         team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '33333333-3333-3333-3333-333333333333'
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        record_end_date: null
       },
       {
         team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         team_id: '22222222-2222-2222-2222-222222222222',
-        policy_id: '44444444-4444-4444-4444-444444444444'
+        policy_id: '44444444-4444-4444-4444-444444444444',
+        record_end_date: null
       }
     ];
 

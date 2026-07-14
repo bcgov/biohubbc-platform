@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon, { SinonStub } from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { SystemUser } from '../repositories/user-repository';
+import { SystemUser } from '../models/system-user';
 import { dbConstantsDependencies, getDBConstants, initDBConstants } from './db-constants';
 
 chai.use(sinonChai);

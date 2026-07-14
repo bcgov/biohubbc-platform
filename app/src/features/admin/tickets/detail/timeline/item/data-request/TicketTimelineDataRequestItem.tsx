@@ -1,6 +1,6 @@
 import { Button, Stack, Typography } from '@mui/material';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { IAddPolicyFormValues } from 'features/admin/policies/components/AddPolicyForm';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { TicketTimelineItem } from '../layout/TicketTimelineItem';
@@ -9,7 +9,7 @@ interface ITicketTimelineDataRequestItemProps {
   dataRequest: DataRequestResponse;
   dateLabel: string;
   isUpdating: boolean;
-  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IAddPolicyFormValues>) => void;
+  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IPolicyFormValues>) => void;
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onApprove: (dataRequestId: string) => void;
   onDeny: (dataRequestId: string) => void;
@@ -71,11 +71,7 @@ export const TicketTimelineDataRequestItem = (props: ITicketTimelineDataRequestI
                   size="small"
                   color="primary"
                   variant="contained"
-                  onClick={() =>
-                    onViewPolicy(dataRequest.data_request_id, dataRequest.policy_id, {
-                      status: PolicyStatus.REVIEWED
-                    })
-                  }
+                  onClick={() => onViewFinalizedPolicy(dataRequest.data_request_id, dataRequest.policy_id)}
                   disabled={isUpdating}>
                   Review Policy
                 </Button>

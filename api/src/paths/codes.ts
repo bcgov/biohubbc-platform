@@ -29,7 +29,7 @@ GET.apiDoc = {
                   properties: {
                     feature_type: {
                       type: 'object',
-                      required: ['feature_type_id', 'name', 'display_name'],
+                      required: ['feature_type_id', 'name', 'display_name', 'description'],
                       properties: {
                         feature_type_id: {
                           type: 'integer',
@@ -39,12 +39,17 @@ GET.apiDoc = {
                         name: {
                           type: 'string',
                           description: 'The feature type name.',
-                          example: 'dataset'
+                          example: 'survey'
                         },
                         display_name: {
                           type: 'string',
                           description: 'The feature type display name.',
-                          example: 'Dataset'
+                          example: 'Survey'
+                        },
+                        description: {
+                          type: 'string',
+                          nullable: true,
+                          description: 'The feature type description.'
                         }
                       },
                       additionalProperties: false
@@ -57,7 +62,6 @@ GET.apiDoc = {
                           'feature_type_property_id',
                           'name',
                           'display_name',
-                          'description',
                           'type_name',
                           'required_value',
                           'calculated_value',
@@ -81,6 +85,7 @@ GET.apiDoc = {
                           },
                           description: {
                             type: 'string',
+                            nullable: true,
                             description: 'The feature property description.',
                             example: 'Description text'
                           },

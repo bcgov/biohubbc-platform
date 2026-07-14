@@ -64,7 +64,7 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
   const connection = authorizationDependencies.getAPIUserDBConnection();
 
   try {
-    const authorizationScheme: AuthorizationScheme = req.authorization_scheme;
+    const authorizationScheme = req.authorization_scheme;
 
     if (!authorizationScheme) {
       // No authorization scheme specified, all authenticated users are authorized

@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const TeamPolicy = z.object({
   team_policy_id: z.string().uuid(),
   team_id: z.string().uuid(),
-  policy_id: z.string().uuid()
+  policy_id: z.string().uuid(),
+  record_end_date: z.string().nullable()
 });
 
 export type TeamPolicy = z.infer<typeof TeamPolicy>;
@@ -29,5 +30,5 @@ export interface CreateTeamPoliciesRequest {
 }
 
 export interface UpdateTeamPolicy {
-  record_end_date?: string;
+  record_end_date?: string | null;
 }

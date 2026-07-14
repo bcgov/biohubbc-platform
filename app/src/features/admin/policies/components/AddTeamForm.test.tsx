@@ -114,8 +114,8 @@ describe('AddTeamForm', () => {
 
     it('allows array of member user objects', async () => {
       const users = [
-        { system_user_id: 1, user_identifier: 'alice' },
-        { system_user_id: 2, user_identifier: 'bob' }
+        { system_user_id: 1, user_identifier: 'alice', display_name: null },
+        { system_user_id: 2, user_identifier: 'bob', display_name: null }
       ];
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',

@@ -69,10 +69,14 @@ export function createSubmissionUpload(): RequestHandler {
       await connection.open();
 
       const submissionUuid = req.params.submissionId as string;
-      const { bytes } = req.body;
+      const { bytes, blueprint_id } = req.body;
 
       const uploadIngestionService = new UploadIngestionService(connection);
-      const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(bytes, submissionUuid);
+      const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(
+        bytes,
+        submissionUuid,
+        blueprint_id
+      );
 
       await connection.commit();
 

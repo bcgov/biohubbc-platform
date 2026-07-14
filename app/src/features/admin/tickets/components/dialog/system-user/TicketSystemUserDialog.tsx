@@ -8,12 +8,12 @@ import useDebounce from 'hooks/useDebounce';
 import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
 import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getUserLabel } from 'utils/Utils';
 import { TicketSystemUserDialogYup } from './TicketSystemUserDialogYup';
 import { ITicketSystemUserFormValues, TicketSystemUserForm } from './form/TicketSystemUserForm';
 
 interface ITicketSystemUserDialogProps {
   open: boolean;
-  ticketId: string;
   onClose: () => void;
 }
 
@@ -28,10 +28,10 @@ const TicketSystemUserFormInitialValues: ITicketSystemUserFormValues = {
  * @return {*}
  */
 export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
-  const { open, ticketId, onClose } = props;
+  const { open, onClose } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
   const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const showApiError = useCallback(
@@ -71,7 +71,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
         status: ticketSystemUser.status,
         system_user: {
           system_user_id: ticketSystemUser.system_user_id,
-          display_name: null,
+          display_name: ticketSystemUser.display_name,
           user_identifier: ticketSystemUser.user_identifier,
           email: null
         }
@@ -126,7 +126,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
     () =>
       availableUsers.map((user) => ({
         value: user.system_user_id,
-        label: user.user_identifier
+        label: getUserLabel(user)
       })),
     [availableUsers]
   );
@@ -199,6 +199,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
         element: (
           <TicketSystemUserForm
             options={options}
+            availableUsers={availableUsers}
             isLoadingUsers={availableUsersLoader.isLoading}
             isSubmitting={isSubmitting}
             onSearchUsers={debouncedAvailableUserRefresh}

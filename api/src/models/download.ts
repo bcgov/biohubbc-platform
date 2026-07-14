@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
+import { DownloadVersionExportListRow } from './download-version-export';
 import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
+  download_version_id: z.string().uuid(), // resolved most-recent version (a committed download always has one)
   download_status: DownloadStatusZod,
   format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
@@ -16,22 +17,27 @@ export const DownloadRecord = z.object({
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
 /**
- * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
- * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
+ * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
+ * `DownloadRecord` with the owning policy's display fields (`name`,
+ * `description`), joined in via `LEFT JOIN biohub.policy`. Both the detail read
+ * and the paginated list read carry these fields, so every download read parses
+ * against `name`/`description`.
  */
-export const DownloadListRecordBase = DownloadRecord;
-export type DownloadListRecordBase = z.infer<typeof DownloadListRecordBase>;
+export const DownloadDetailRecord = DownloadRecord.extend({
+  name: z.string(),
+  description: z.string().nullable()
+});
+export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
 
 /**
- * Service-layer (and public API) list-row shape. `exports[]` is attached by
- * `DownloadService.getDownloadsByTeamMembership` via a parallel batch-fetch from
- * `DownloadExportService` and grouped by download_id in JS. Mirrors the assembly
- * pattern used by `TicketService.getTicket` (`ticket-service.ts`) — composed at
- * the service layer rather than via SQL aggregation so repositories stay
- * single-SQL CRUD.
+ * Service-layer (and public API) private download-list shape. Extends
+ * `DownloadDetailRecord` (base download + the owning policy's `name`/`description`)
+ * with `exports[]`, attached by `DownloadService.getDownloadsByTeamMembership`
+ * via a batch-fetch from `DownloadVersionExportRepository` and grouped by
+ * download_id in JS.
  */
-export const DownloadListRecord = DownloadListRecordBase.extend({
-  exports: z.array(DownloadExportListRow)
+export const DownloadListRecord = DownloadDetailRecord.extend({
+  exports: z.array(DownloadVersionExportListRow)
 });
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
@@ -40,7 +46,7 @@ export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
  * from the COUNT(*) OVER() window — stripped before returning to callers. Does
  * NOT carry `exports`; those are fetched separately and attached in the service.
  */
-export const DownloadListRow = DownloadListRecordBase.extend({
+export const DownloadListRow = DownloadDetailRecord.extend({
   total_count: z.number()
 });
 export type DownloadListRow = z.infer<typeof DownloadListRow>;
@@ -64,23 +70,42 @@ export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
  * Minimal projection of a download record for export-time pipeline evaluation.
  *
  * `policy_id` resolves to the policy whose statements drive what to export.
- * `create_user` carries the policy creator's identity so the pipeline can
- * apply the security filter at export time using the user's authorization
- * scope at the moment of export — not at create time.
+ * `requested_by` is the security identity the export is built with: the
+ * requesting user for an authenticated download. It drives the parquet security
+ * filter — the pipeline judges feature visibility against this identity's
+ * authorization scope. Distinct from the audit `create_user` (who inserted the
+ * row); for an authenticated download they coincide, but the security filter
+ * must read `requested_by` so the identity stays decoupled from the inserting
+ * connection's grants.
+ *
+ * `requested_by` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const DownloadSource = z.object({
   policy_id: z.string().uuid(),
-  create_user: z.number()
+  requested_by: z.number().nullable()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
 /**
  * Payload for creating a new download record. The download's feature set is
  * defined by the referenced policy; format is the export wire format.
+ *
+ * `requestedBy` is the security identity the resulting export is filtered for —
+ * persisted to `download.requested_by` and used by the parquet pipeline, not the
+ * audit `create_user`.
+ *
+ * `requestedBy` is nullable: NULL means an anonymous (public-by-link) download
+ * with no security identity, and the pipeline evaluates it as unsecured-only.
+ * Must stay nullable — coercing NULL to a real user id would filter by that
+ * user's grants and leak secured data into a public-by-link download.
  */
 export const CreateDownload = z.object({
   policyId: z.string().uuid(),
-  format: z.string()
+  format: z.string(),
+  requestedBy: z.number().nullable()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
@@ -99,7 +124,6 @@ export const CreateDownloadRequestBody = z
   .object({
     name: z.string().min(1).max(100),
     description: z.string().max(1000).nullable().optional(),
-    featureTypes: z.array(z.string()).min(1),
     expression: ExpressionTree.nullable()
   })
   .strict();
@@ -120,6 +144,21 @@ export const DownloadArtifactInfo = z.object({
   object_key: z.string()
 });
 export type DownloadArtifactInfo = z.infer<typeof DownloadArtifactInfo>;
+
+/**
+ * A single entry in the presigned-URL endpoint's `parts[]` response.
+ *
+ * - `feature_type` — feature type name for the Parquet file, parsed from the S3
+ *   object key shape `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+ * - `url` — presigned S3 URL minted at request time; clients must not cache it.
+ * - `expires_at` — ISO timestamp when the URL expires (30 minutes from request time).
+ */
+export const DownloadParquetPart = z.object({
+  feature_type: z.string(),
+  url: z.string(),
+  expires_at: z.string()
+});
+export type DownloadParquetPart = z.infer<typeof DownloadParquetPart>;
 
 /**
  * Row shape for the Parquet download pipeline.

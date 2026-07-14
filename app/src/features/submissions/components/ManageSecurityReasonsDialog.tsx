@@ -154,13 +154,13 @@ const ManageSecurityReasonsDialog = (props: PropsWithChildren<IManageSecurityRea
 
               <DialogContent>
                 <DialogContentText id="component-dialog-description">
-                  Manage security reasons for content and data submitted as part of this dataset.
+                  Manage security reasons for content and data submitted as part of this survey.
                 </DialogContentText>
                 <DialogContentText id="component-dialog-title">
                   <strong>Select Security Reasons</strong>
                 </DialogContentText>
                 <DialogContentText id="component-dialog-description">
-                  Select the reasons this dataset should be secured.
+                  Select the reasons this survey should be secured.
                 </DialogContentText>
                 dropdown
               </DialogContent>

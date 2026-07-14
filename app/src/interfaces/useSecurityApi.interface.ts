@@ -79,6 +79,22 @@ export interface ISecurityCategoryWithRuleCount {
   rule_count: number;
 }
 
+export interface ISecurityCategory {
+  security_category_id: number;
+  name: string;
+  description: string | null;
+}
+
+export interface ICreateSecurityCategoryRequest {
+  name: string;
+  description: string;
+}
+
+export interface IUpdateSecurityCategoryRequest {
+  name: string;
+  description: string;
+}
+
 export interface ISecurityCategoriesResponse {
   categories: ISecurityCategoryWithRuleCount[];
   pagination: ApiPaginationResponseParams;
@@ -86,9 +102,34 @@ export interface ISecurityCategoriesResponse {
 
 export interface ISecurityReasonWithFeatureCount {
   security_rule_id: number;
+  security_category_id: number;
+  category_name: string;
   name: string;
   description: string | null;
+  is_active: boolean;
   feature_count: number;
+}
+
+export interface ISecurityReason {
+  security_rule_id: number;
+  security_category_id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+}
+
+export interface ICreateSecurityReasonRequest {
+  name: string;
+  description: string;
+  security_category_id: number;
+  is_active: boolean;
+}
+
+export interface IUpdateSecurityReasonRequest {
+  name: string;
+  description: string;
+  security_category_id: number;
+  is_active: boolean;
 }
 
 export interface ISecurityReasonsResponse {

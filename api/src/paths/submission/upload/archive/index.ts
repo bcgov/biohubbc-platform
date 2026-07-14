@@ -63,11 +63,11 @@ export function startUpload(): RequestHandler {
       const system_user_id = req.system_user!.system_user_id;
       const contributorId = req.contributor_id!;
 
-      const { bytes, ...rest } = req.body;
+      const { bytes, blueprint_id, ...rest } = req.body;
       const submission = { ...rest, uuid: v4(), system_user_id, contributor_id: contributorId } as ICreateSubmission;
       const uploadIngestionService = new UploadIngestionService(connection);
 
-      const result = await uploadIngestionService.startArchiveUpload(bytes, submission);
+      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, blueprint_id);
 
       await connection.commit();
 

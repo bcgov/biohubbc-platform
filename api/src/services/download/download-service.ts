@@ -1,23 +1,40 @@
+import { SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { CreateDownload, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
-import { DownloadExportListRow } from '../../models/download-export';
+import {
+  CreateDownload,
+  DownloadDetailRecord,
+  DownloadId,
+  DownloadListRecord,
+  DownloadParquetPart
+} from '../../models/download';
+import { DownloadVersionRecord } from '../../models/download-version';
+import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPolicyService } from './download-policy-service';
 
 export interface CreateDownloadRequestPayload {
   name: string;
   description: string | null;
-  featureTypes: string[];
   expression: ExpressionTree | null;
-  systemUserId: number;
+  requestedBy: number | null;
+}
+
+/**
+ * Result of creating a download request.
+ */
+export interface CreateDownloadRequestResult {
+  download_id: string;
 }
 
 /**
@@ -36,13 +53,8 @@ export interface CreateDownloadRequestPayload {
  */
 export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
-  /**
-   * Held directly (not via `DownloadExportService`) to avoid a circular
-   * construction chain — `DownloadExportService` already composes `DownloadService`
-   * for its auth helper, and layering a `DownloadExportService` dependency here
-   * would loop at construction time.
-   */
-  downloadExportRepository: DownloadExportRepository;
+  downloadVersionExportRepository: DownloadVersionExportRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   teamService: TeamService;
   expressionTreeService: ExpressionTreeService;
   downloadPolicyService: DownloadPolicyService;
@@ -63,7 +75,8 @@ export class DownloadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
+    this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.teamService = new TeamService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.downloadPolicyService = new DownloadPolicyService(connection);
@@ -92,58 +105,95 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Create a download request end-to-end for an authenticated user.
+   * Create a download request end-to-end for an authenticated or anonymous user.
    *
    * Persists the optional expression tree, creates the owning download policy, creates the
-   * download record, links a fresh team to the download for the requesting user, and queues
-   * the worker job. The caller (route handler) wraps this in a single transaction so a
-   * mid-flow failure leaves no orphan rows.
+   * download record, wires up access for the requester, and queues the worker job. The caller
+   * (route handler) wraps this in a single transaction so a mid-flow failure leaves no orphan
+   * rows.
    *
-   * Authorization is enforced at export time, not create time. The user's authorization is
-   * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
-   * create-time would let users export data they no longer have access to by simply queuing
-   * a download earlier.
+   * `requestedBy` is the security identity the export is built with: it is persisted to
+   * `download.requested_by` (which drives the parquet security filter) and, for authenticated
+   * requests, used to seed the single-member team. requested_by and the single-member team are
+   * seeded from the same identity at creation: the person the content is filtered for is exactly
+   * the person granted access. They diverge only later, via claim.
+   *
+   * An anonymous caller's only handle is the download UUID itself; the public download page lets
+   * them watch status, and any later export is a separate user-initiated action.
+   *
+   * Authorization is enforced at export time, not create time — the worker re-evaluates
+   * visibility against `requested_by`, so a user cannot export data they no longer have access
+   * to by queuing a download earlier.
    *
    * @param {CreateDownloadRequestPayload} payload - Request payload.
-   * @return {Promise<DownloadId>} The created download identifier.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier.
    * @memberof DownloadService
    */
-  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<DownloadId> {
+  async createDownloadRequest(payload: CreateDownloadRequestPayload): Promise<CreateDownloadRequestResult> {
     let expressionId: string | null = null;
     if (payload.expression !== null) {
-      const result = await this.expressionTreeService.writeExpressionTree(payload.expression);
-      expressionId = result.expression_id;
+      const expression = await this.expressionTreeService.writeExpressionTree(payload.expression);
+      expressionId = expression.expression_id;
     }
 
     const { policy_id } = await this.downloadPolicyService.createDownloadPolicy({
       name: payload.name,
       description: payload.description,
-      featureTypes: payload.featureTypes,
       expressionId
     });
 
-    const { download_id } = await this.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await this.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: payload.requestedBy
+    });
 
-    await this.linkDownloadToNewTeam(
-      download_id,
-      payload.systemUserId,
-      `Team for download ${download_id}`,
-      'Team automatically created for download'
-    );
+    if (payload.requestedBy !== null) {
+      await this.linkDownloadToNewTeam(
+        download_id,
+        payload.requestedBy,
+        `Team for download ${download_id}`,
+        'Team automatically created for download'
+      );
+    }
+    // Anonymous: no team link — UUID is the credential.
 
-    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: download_id });
+    // A download materializes exactly one version at request time. rerunDownload creates that
+    // first version and enqueues the worker job keyed on it — the version is the temporal axis the
+    // parquet/export pipeline links artifacts to. The write + enqueue ride the route's transaction
+    // so a mid-flow failure rolls back the download and its version together.
+    await this.rerunDownload(download_id);
 
     return { download_id };
+  }
+
+  /**
+   * Create and enqueue a new version of an existing download.
+   *
+   * Both the manual create path and the scheduler call this; materialization logic is never
+   * re-implemented — a rerun is just a new version plus the same enqueue. The write + enqueue ride
+   * the caller's transaction, so the worker only sees the job after commit.
+   *
+   * @param {string} downloadId - The download ID to materialize a new version for.
+   * @return {Promise<DownloadVersionRecord>} The newly created version.
+   * @memberof DownloadService
+   */
+  async rerunDownload(downloadId: string): Promise<DownloadVersionRecord> {
+    const version = await this.downloadVersionRepository.createDownloadVersion(downloadId);
+    await DownloadService.dependencies.publishProcessDownloadJob(this.connection, {
+      downloadVersionId: version.download_version_id
+    });
+    return version;
   }
 
   /**
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord | null>}
+   * @return {Promise<DownloadDetailRecord | null>}
    * @memberof DownloadService
    */
-  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
     return this.downloadRepository.findDownloadById(downloadId);
   }
 
@@ -179,7 +229,7 @@ export class DownloadService extends DBService {
     }
 
     const downloadIds = baseDownloads.map((d) => d.download_id);
-    const exportRows = await this.downloadExportRepository.listDownloadExportsByDownloadIds(downloadIds);
+    const exportRows = await this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadIds(downloadIds);
 
     const exportsByDownloadId = groupExportsByDownloadId(exportRows);
 
@@ -235,10 +285,10 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID.
    * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
-   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
+   * @return {Promise<DownloadDetailRecord>} The download record (avoids a second fetch by the caller).
    * @memberof DownloadService
    */
-  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
+  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadDetailRecord> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
 
     if (!download) {
@@ -293,6 +343,51 @@ export class DownloadService extends DBService {
   }
 
   /**
+   * Build the presigned-URL list for a Parquet download.
+   *
+   * Returns one entry per Parquet artifact — typically one per feature type
+   * (e.g. Animal, Observation). The `feature_type` is parsed from the S3 key
+   * shape `downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`.
+   * Artifacts that do not match this shape (e.g. export zips) are filtered out.
+   *
+   * URLs expire after 30 minutes and should not be cached.
+   *
+   * Does not enforce authorization — callers must first call `getAuthorizedDownload`
+   * to confirm access before calling this method.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The version whose Parquet artifacts to sign.
+   * @return {Promise<DownloadParquetPart[]>}
+   * @memberof DownloadService
+   */
+  async listDownloadParquetUrls(downloadId: string, downloadVersionId: string): Promise<DownloadParquetPart[]> {
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
+      downloadVersionId
+    );
+    const objectStorageService = new ObjectStorageService();
+
+    const parts: DownloadParquetPart[] = [];
+
+    for (const artifact of artifacts) {
+      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId, downloadVersionId);
+      if (featureType === null) {
+        continue;
+      }
+
+      const expiresAt = new Date(Date.now() + SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD * 1000).toISOString();
+      const url = await objectStorageService.getSignedUrl(
+        BucketType.MAIN,
+        artifact.object_key,
+        SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD
+      );
+
+      parts.push({ feature_type: featureType, url, expires_at: expiresAt });
+    }
+
+    return parts;
+  }
+
+  /**
    * Claim an anonymous download for an authenticated user.
    *
    * Converts a UUID-only credential into team-based access by creating a team
@@ -334,8 +429,10 @@ export class DownloadService extends DBService {
  * `download_id` then `create_date DESC`, so the first occurrence of each id
  * seeds that id's bucket and subsequent rows append in the repo's order.
  */
-export const groupExportsByDownloadId = (rows: DownloadExportListRow[]): Map<string, DownloadExportListRow[]> => {
-  const grouped = new Map<string, DownloadExportListRow[]>();
+export const groupExportsByDownloadId = (
+  rows: DownloadVersionExportListRow[]
+): Map<string, DownloadVersionExportListRow[]> => {
+  const grouped = new Map<string, DownloadVersionExportListRow[]>();
   for (const row of rows) {
     const list = grouped.get(row.download_id);
     if (list) {

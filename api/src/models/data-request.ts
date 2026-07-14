@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExpressionTree } from './expression-tree';
 import { PolicyStatus } from './policy';
 
 export const DataRequest = z.object({
@@ -35,9 +36,32 @@ export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 export const CreateDataRequestPayload = z.object({
   requested_by: z.number().int(),
   reason: z.string(),
-  system_user_ids: z.array(z.number().int())
+  system_user_ids: z.array(z.number().int()),
+  featureTypes: z.array(z.string()).min(1).optional(),
+  expression: ExpressionTree.nullable().optional()
 });
 export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;
+
+/**
+ * Request-body shape for `POST /api/data-request`. Omits `requested_by` so the route
+ * authoritatively injects it from `connection.systemUserId()` rather than trusting the
+ * client. `.strict()` rejects unknown keys — including a stray `expression.ui_id` from
+ * the frontend — so decoder bugs fail fast at the boundary instead of flowing into a
+ * persisted policy / expression tree. `reason` is tightened to `min(1)` so the route
+ * rejects an empty string at the boundary instead of letting it through to the
+ * ticket-subject helper. `featureTypes` and `expression` are required at the boundary
+ * because the only caller is the search result page, which always supplies an active
+ * feature type and an applied expression (possibly `null`). Keeping the internal service
+ * payload permissive lets the legacy ticket-bound flow continue to omit both.
+ */
+export const CreateDataRequestRequestBody = CreateDataRequestPayload.omit({ requested_by: true })
+  .extend({
+    reason: z.string().min(1),
+    featureTypes: z.array(z.string()).min(1),
+    expression: ExpressionTree.nullable()
+  })
+  .strict();
+export type CreateDataRequestRequestBody = z.infer<typeof CreateDataRequestRequestBody>;
 
 export const UpdateDataRequest = z.object({
   reason: z.string().optional()

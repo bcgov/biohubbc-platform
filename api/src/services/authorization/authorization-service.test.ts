@@ -6,9 +6,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
-import { Cart, CartStatus } from '../../models/cart';
-import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
-import { CartService } from '../cart-service';
+import { SystemUser, SystemUserExtended } from '../../models/system-user';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { UserService } from '../user-service';
 import {
@@ -95,6 +93,11 @@ describe('executeAuthorizeConfig', function () {
       },
       {
         discriminator: 'Contributor'
+      },
+      {
+        discriminator: 'Policy',
+        submissionFeatureId: 1,
+        submissionId: 2
       }
     ];
     const mockDBConnection = getMockDBConnection();
@@ -102,12 +105,13 @@ describe('executeAuthorizeConfig', function () {
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByPolicy').resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const authorizeResults = await authorizationService.executeAuthorizeConfig(mockAuthorizeRules);
 
-    expect(authorizeResults).to.eql([false, true, true]);
+    expect(authorizeResults).to.eql([false, true, true, true]);
   });
 });
 
@@ -149,6 +153,21 @@ describe('authorizeSystemAdministrator', function () {
 
     expect(isAuthorized).to.equal(true);
   });
+
+  it('returns false if the injected system user is soft-deleted, even with the admin role', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const softDeletedAdmin = {
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedAdmin });
+
+    const isAuthorized = await authorizationService.authorizeSystemAdministrator();
+
+    expect(isAuthorized).to.be.false;
+  });
 });
 
 describe('authorizeBySystemRole', function () {
@@ -184,14 +203,14 @@ describe('authorizeBySystemRole', function () {
     expect(isAuthorizedBySystemRole).to.equal(false);
   });
 
-  it('returns false if `record_end_date` is null', async function () {
+  it('returns false if `record_end_date` is set', async function () {
     const mockAuthorizeSystemRoles: AuthorizeBySystemRoles = {
       validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
       discriminator: 'SystemRole'
     };
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = { record_end_date: 'datetime' } as unknown as SystemUserExtended;
+    const mockGetSystemUsersObjectResponse = { record_end_date: '2020-01-01' } as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -215,6 +234,31 @@ describe('authorizeBySystemRole', function () {
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+  });
+
+  it('returns false if the cached system user is blocked', async function () {
+    const mockAuthorizeSystemRoles: AuthorizeBySystemRoles = {
+      validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      discriminator: 'SystemRole'
+    };
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: {
+        role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        record_end_date: '2020-01-01',
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
+      } as unknown as SystemUserExtended
+    });
+
+    const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
+
+    expect(isAuthorizedBySystemRole).to.equal(false);
   });
 
   it('returns false if the user does not have any valid roles', async function () {
@@ -297,6 +341,18 @@ describe('authorizeBySystemUser', function () {
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemUser();
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+  });
+
+  it('returns false if the injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: { record_end_date: '2020-01-01' } as unknown as SystemUserExtended
+    });
+
+    const isAuthorizedBySystemUser = await authorizationService.authorizeBySystemUser();
+
+    expect(isAuthorizedBySystemUser).to.be.false;
   });
 });
 
@@ -396,7 +452,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '',
+      record_end_date: null,
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -428,7 +484,7 @@ describe('getCachedSystemUser', function () {
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
-      record_end_date: '',
+      record_end_date: null,
       create_date: '2023-01-01',
       create_user: 1,
       update_date: null,
@@ -455,6 +511,87 @@ describe('getCachedSystemUser', function () {
     expect(result).to.be.null;
     expect(authorizationService['_systemUser']).to.be.undefined;
   });
+
+  it('returns null if the fetched user is blocked', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '2020-01-01',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+    expect(authorizationService['_systemUser']).to.be.undefined;
+  });
+
+  it('returns null and clears the cached user if the cached user is blocked', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '2020-01-01',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+    authorizationService['_systemUser'] = systemUser;
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+    expect(authorizationService['_systemUser']).to.be.undefined;
+  });
+
+  it('returns null if the cached/injected system user is soft-deleted', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const softDeletedUser = {
+      system_user_id: 1,
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+
+    // Simulate a constructor-injected (e.g. via req.system_user) soft-deleted user
+    const authorizationService = new AuthorizationService(mockDBConnection, { systemUser: softDeletedUser });
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+  });
 });
 
 describe('authorizeByTeam', function () {
@@ -462,9 +599,12 @@ describe('authorizeByTeam', function () {
     sinon.restore();
   });
 
-  const systemUser: SystemUser = {
+  const systemUser: SystemUserExtended = {
     system_user_id: 1,
     user_identity_source_id: 2,
+    identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_ids: [],
+    role_names: [],
     user_identifier: 'test-user',
     user_guid: 'guid-123',
     record_effective_date: '',
@@ -530,17 +670,10 @@ describe('authorizeByTeam', function () {
   });
 });
 
-describe('authorizeByCart', function () {
+describe('authorizeByPolicy', function () {
   afterEach(() => {
     sinon.restore();
   });
-
-  const fakeCart: Cart = {
-    cart_id: 'cart-1',
-    cart_status: CartStatus.ACTIVE,
-    system_user_id: 1,
-    record_end_date: null
-  };
 
   const systemUser: SystemUser = {
     system_user_id: 1,
@@ -562,202 +695,58 @@ describe('authorizeByCart', function () {
     notes: null
   };
 
-  it('returns true if the user owns the cart', async function () {
+  it('returns true when the feature is accessible, passing the authenticated user id and entity ids', async function () {
     const mockDBConnection = getMockDBConnection();
-    const fakeCart: Cart = {
-      cart_id: 'cart-1',
-      system_user_id: 1,
-      cart_status: CartStatus.ACTIVE,
-      record_end_date: null
-    };
-
-    sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
-
-    const systemUser = { system_user_id: 1 } as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
     });
 
     expect(result).to.be.true;
+    expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
   });
 
-  it('returns false if the user does not own the cart', async function () {
+  it('returns false when the feature is not accessible to the user', async function () {
     const mockDBConnection = getMockDBConnection();
-    const fakeCartWithDifferentOwner: Cart = {
-      cart_id: 'cart-1',
-      cart_status: CartStatus.ACTIVE,
-      system_user_id: 2,
-      record_end_date: null
-    };
-    sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCartWithDifferentOwner);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    sinon.stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser').resolves(false);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
     });
 
     expect(result).to.be.false;
   });
 
-  it('returns true if the cart is unauthenticated (no system_user_id)', async function () {
+  it('passes a null system user id through for anonymous requests', async function () {
     const mockDBConnection = getMockDBConnection();
-    const fakeUnauthenticatedCart: Cart = {
-      cart_id: 'cart-1',
-      cart_status: CartStatus.ACTIVE,
-      system_user_id: null, // No system_user_id, indicating it's unauthenticated
-      record_end_date: null
-    };
-    sinon.stub(CartService.prototype, 'findCartById').resolves(fakeUnauthenticatedCart);
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.true;
-  });
-
-  it('returns false if cart does not exist', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves(null);
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false if no system user is found (user is unauthenticated)', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const accessibleStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureAccessibleToUser')
+      .resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false if cart is checked out', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves({
-      cart_id: 'cart-1',
-      cart_status: CartStatus.CHECKED_OUT,
-      system_user_id: 1,
-      record_end_date: null
-    });
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false if cart is expired', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves({
-      cart_id: 'cart-1',
-      cart_status: CartStatus.EXPIRED,
-      system_user_id: 1,
-      record_end_date: null
-    });
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false if cart is abandoned', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves({
-      cart_id: 'cart-1',
-      cart_status: CartStatus.ABANDONED,
-      system_user_id: 1,
-      record_end_date: null
-    });
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false if cart record_end_date is in the past', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves({
-      cart_id: 'cart-1',
-      cart_status: CartStatus.ACTIVE,
-      system_user_id: 1,
-      record_end_date: '2000-01-01T00:00:00.000Z'
-    });
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
-    });
-
-    expect(result).to.be.false;
-  });
-
-  it('returns true if cart record_end_date is in the future and user owns the cart', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(CartService.prototype, 'findCartById').resolves({
-      cart_id: 'cart-1',
-      cart_status: CartStatus.ACTIVE,
-      system_user_id: 1,
-      record_end_date: '2999-01-01T00:00:00.000Z'
-    });
-
-    const systemUser = { system_user_id: 1 } as SystemUserExtended;
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByCart({
-      discriminator: 'Cart',
-      cartId: 'cart-1'
+    const result = await authorizationService.authorizeByPolicy({
+      discriminator: 'Policy',
+      submissionFeatureId: 2,
+      submissionId: 3
     });
 
     expect(result).to.be.true;
+    expect(accessibleStub).to.have.been.calledOnceWith(null, 2, 3);
   });
 });
 
@@ -914,6 +903,21 @@ describe('getSystemUserObject', function () {
     const systemUserObject = await authorizationService.getSystemUserObject();
 
     expect(systemUserObject).to.equal(mockSystemUserWithRolesResponse);
+  });
+
+  it('returns null if the system user is soft-deleted (record_end_date in the past)', async function () {
+    const mockDBConnection = getMockDBConnection();
+
+    const mockSystemUserWithRolesResponse = {
+      record_end_date: '2020-01-01'
+    } as unknown as SystemUserExtended;
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserWithRoles').resolves(mockSystemUserWithRolesResponse);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const systemUserObject = await authorizationService.getSystemUserObject();
+
+    expect(systemUserObject).to.be.null;
   });
 });
 

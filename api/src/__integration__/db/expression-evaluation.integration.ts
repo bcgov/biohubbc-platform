@@ -1,49 +1,83 @@
-// Integration test for expression-evaluation — verifies that the
-// emitted SQL (recursive expression-tree evaluator + broad feature-type
-// projection) returns the expected submission_feature_id sets against a real
-// schema, including the security filter applied for an authenticated user.
+// Integration tests for expression-evaluation — verifies that the emitted SQL returns the expected
+// submission_feature_id sets against a real schema, including the security filter applied for an
+// authenticated user.
 //
-// Both the search wrapper (POST /api/search/feature) and the download pipeline
-// (POST /api/download) consume the same emitted SQL, so a single substrate
-// keeps semantics identical across both consumers — these tests pin that.
+// SEMANTICS UNDER TEST — anchor-first closure projection:
+// The evaluator resolves a predicate's direct evidence features (security-filtered on the evidence side)
+// and then tests candidate anchors of the requested feature type against that evidence:
+//
+//   evidence       = active features that directly carry a typed property row matching the predicate
+//   same-type      = evidence.feature_type == anchor.feature_type AND evidence.id == anchor.id
+//   different-type = evidence.feature_type != anchor.feature_type AND closure connects anchor and evidence
+//                    in either direction
+//   result         = active anchors of anchorFeatureType that satisfy one of the above and pass target security
+//
+// The closure (submission_feature_closure) is UPLOAD-SCOPED and precomputes parent-ancestry and
+// property-reference reach. A parent edge stores (source=child, target=parent); a property edge stores
+// (source=feature, target=referenced). It is built by SubmissionFeatureClosureService.computeClosureForUpload
+// AFTER seeding and BEFORE running the subquery. Closure relatedness therefore REQUIRES a shared upload.
+// Content edges are excluded from the closure and are no longer walked at read time.
+//
+// Key consequences pinned by these tests:
+//   1. Reflexive same-type matches return only the evidence row itself, not siblings connected through a
+//      shared parent or upload.
+//   2. Ancestor / descendant / property reach REQUIRES a shared upload + computeClosureForUpload.
+//   3. Content edges, including multi-hop content chains and content->closure chains, do not produce matches.
+//   4. Target security is applied after projection so related secured anchors do not leak.
+//
+// UO#5 / API-shape acceptance rows are exercised at the route layer and are out of scope for this
+// evaluator suite, which pins the emitted-SQL reachability semantics directly.
+//
+// Both the search wrapper (POST /api/search/feature) and the download pipeline (POST /api/download)
+// consume the same emitted SQL, so a single substrate keeps semantics identical across both consumers.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
-// Run: make test-db
-// Requires: make web (database must be running with seed data)
+// Run: docker compose exec api npm run test:mocha -- --no-config --extension ts \
+//        'src/__integration__/db/expression-evaluation.integration.ts'
+// Requires: database container running with seed data.
 
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
-import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import {
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../../models/expression-tree-internal';
 import {
+  applyTaxonExpressionOperator,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
+import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { createFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
+// Verified seed ids (checked against the live DB):
+//   feature_property name           = 31
+//   sample_site.name ftp            = 45
+//   survey.name ftp                = 70
+const FEATURE_PROPERTY_NAME_ID = 31;
+const SAMPLE_SITE_NAME_FTP_ID = 45;
+const SURVEY_NAME_FTP_ID = 70;
+
 /**
- * Build a normalized predicate clause that targets the `sample_site.name` string property.
+ * Build a normalized predicate clause that targets a string `name` property.
  *
- * Why sample_site rather than dataset: the evaluator's recursive graph projects evidence
- * through dataset → all-features-in-submission synthetic edges, which would pull in
- * decoy datasets when we want a clean target set. Anchoring on a non-dataset feature
- * type with its own `name` property keeps the target set tight, one feature per
- * submission per test.
- *
- * Both the predicate-evidence query and the typed-table JOIN need
- * (feature_property_id, feature_type_property_id, internal_predicate type/operator/value).
- *
- * Seed values: feature_property_id=31 (name, string), feature_type_property_id=45 (sample_site.name).
+ * `feature_property_id` stays 31 (the shared `name` feature_property); `featureTypePropertyId` selects
+ * the typed slot to filter on (45 = sample_site.name, 70 = survey.name). The predicate is intentionally
+ * target-feature agnostic — it only identifies EVIDENCE features that carry the matching string row; the
+ * evaluator then projects anchor candidates against that evidence.
  */
-function namePredicate(value: string): NormalizedExpressionTreePredicate {
+function namePredicate(
+  value: string,
+  featureTypePropertyId: number = SAMPLE_SITE_NAME_FTP_ID
+): NormalizedExpressionTreePredicate {
   return {
     type: 'predicate',
-    feature_property_id: 31,
-    feature_type_property_id: 45,
+    feature_property_id: FEATURE_PROPERTY_NAME_ID,
+    feature_type_property_id: featureTypePropertyId,
     operator: 'Equals',
     value,
     feature_property_type_id: 1,
@@ -71,33 +105,330 @@ describe('expression-evaluation (integration)', function () {
     connection.release();
   });
 
+  // --- local fixture helpers -----------------------------------------------
+
   /**
-   * Helper: write the typed string property row used by the predicate query.
-   * The expression-tree evaluator JOINs feature_type_property + reads from
-   * `submission_feature_property_string`; both have to be populated for a row
-   * to satisfy a string predicate.
+   * Insert one submission_feature bound to a SPECIFIC upload, resolving feature_type_id by NAME so the
+   * anchor filter can isolate a target type.
    *
-   * Uses sample_site.name (feature_type_property_id=45) — see `namePredicate` for why.
+   * The closure recompute is upload-scoped and only walks edges whose BOTH endpoints are active features
+   * of the same upload, so a parent and its children must share one submission_upload_id. createTestFeature
+   * mints its OWN upload per call and cannot place a parent + child under one upload, so the closure-driven
+   * fixtures insert features directly here. `recordEndDate` marks a feature inactive (excluded from the
+   * active universe and dropped from the closure.
+   *
+   * @returns The new submission_feature_id.
    */
-  async function indexNameProperty(submissionFeatureId: number, value: string): Promise<void> {
+  async function insertFeatureRow(params: {
+    submissionId: number;
+    submissionUploadId: string;
+    featureTypeName: string;
+    parentFeatureId?: number;
+    recordEndDate?: boolean;
+  }): Promise<number> {
+    const systemUserId = connection.systemUserId();
+
+    const result = await connection.sql(SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        feature_type_id,
+        parent_submission_feature_id,
+        data,
+        data_byte_size,
+        record_effective_date,
+        record_end_date,
+        create_user
+      )
+      VALUES (
+        ${params.submissionId},
+        ${params.submissionUploadId}::uuid,
+        (SELECT feature_type_id FROM feature_type WHERE name = ${params.featureTypeName} LIMIT 1),
+        ${params.parentFeatureId ?? null},
+        '{}'::jsonb,
+        500,
+        now(),
+        ${params.recordEndDate ? 'now()' : null},
+        ${systemUserId}
+      )
+      RETURNING submission_feature_id;
+    `);
+
+    return result.rows[0].submission_feature_id;
+  }
+
+  /**
+   * Rebuild the closure for every upload holding an active feature of the submission.
+   *
+   * The security filter classifies a feature via `isEffectivelySecured`, which fails closed when the
+   * feature has no closure rows. `createTestFeature` mints a fresh upload per call and builds no closure,
+   * so its features need their self-loops rebuilt before the authenticated security filter reads them as
+   * active + unsecured rather than hidden-by-default.
+   */
+  async function rebuildClosureForSubmission(submissionId: number): Promise<void> {
+    const uploads = await connection.sql(SQL`
+      SELECT DISTINCT submission_upload_id
+      FROM submission_feature
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `);
+    for (const row of uploads.rows) {
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(row.submission_upload_id);
+    }
+  }
+
+  /**
+   * Index a string `name` value on a feature so a predicate can find it as evidence.
+   *
+   * The evaluator JOINs feature_type_property and reads from submission_feature_property_string; both must
+   * agree on the typed slot. `featureTypePropertyId` defaults to sample_site.name (45); pass 70 for
+   * survey.name. The slot here MUST match the one in the matching `namePredicate(...)`.
+   */
+  async function indexNameProperty(
+    submissionFeatureId: number,
+    value: string,
+    featureTypePropertyId: number = SAMPLE_SITE_NAME_FTP_ID
+  ): Promise<void> {
     const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_string
-        (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, 45, ${value}, ${systemUserId});
+        (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+      SELECT
+        ${submissionFeatureId},
+        ${featureTypePropertyId},
+        bftp.blueprint_feature_type_property_id,
+        ${value},
+        ${systemUserId}
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId};
     `);
   }
 
   /**
-   * Helper: run an emitted Knex subquery and return the resulting set of
-   * submission_feature_id values. Strips ordering off the caller — set-equality
-   * is what every test cares about.
+   * Insert a single content edge (submission_feature_feature) source -> target.
+   *
+   * Content edges are NOT part of the closure and are no longer walked by expression evaluation. The
+   * helper drives negative assertions that content-only relatedness does not produce matches. The table has a unique index on
+   * (LEAST(source, target), GREATEST(source, target)), so only ONE direction per unordered pair may be
+   * inserted.
+   */
+  async function insertContentEdge(sourceFeatureId: number, targetFeatureId: number): Promise<void> {
+    const systemUserId = connection.systemUserId();
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id, create_user)
+      VALUES (${sourceFeatureId}, ${targetFeatureId}, ${systemUserId});
+    `);
+  }
+
+  /**
+   * Insert a property edge (submission_feature_property_feature) source -> referenced, using the supplied
+   * feature_type_property_id (mint one via createFeatureTypeProperty on the source type). In the closure
+   * this stores (source=feature, target=referenced): closureForward(feature) reaches the referenced
+   * feature; closureReverse(referenced) reaches the referencing feature.
+   */
+  async function insertPropertyEdge(
+    sourceFeatureId: number,
+    referencedFeatureId: number,
+    featureTypePropertyId: number
+  ): Promise<void> {
+    const systemUserId = connection.systemUserId();
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_feature (
+        submission_feature_id,
+        feature_type_property_id,
+        blueprint_feature_type_property_id,
+        referenced_submission_feature_id,
+        create_user
+      )
+      SELECT
+        ${sourceFeatureId},
+        ${featureTypePropertyId},
+        bftp.blueprint_feature_type_property_id,
+        ${referencedFeatureId},
+        ${systemUserId}
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${sourceFeatureId};
+    `);
+  }
+
+  /** Apply security rule 1 to a feature so anonymous callers (and ungranted users) cannot read it. */
+  async function secureFeature(submissionFeatureId: number): Promise<void> {
+    const systemUserId = connection.systemUserId();
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+      VALUES (${submissionFeatureId}, 1, ${systemUserId});
+    `);
+  }
+
+  /**
+   * Grant the current API user read access to a SECURED feature by standing up the scope-grant chain the
+   * security filter's Branch 2 walks: security_scope -> security_scope_anchor (on the feature) ->
+   * team_security_scope -> team -> team_member (for connection.systemUserId()). Without this chain a
+   * plain DATABASE-type API user is NOT effectively privileged over an arbitrary secured feature.
+   */
+  async function grantPrivilegedAccess(anchorSubmissionFeatureId: number): Promise<void> {
+    const systemUserId = connection.systemUserId();
+
+    const scope = await connection.sql(SQL`
+      INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+      VALUES (${`test-scope-${anchorSubmissionFeatureId}`}, '*', '*', '*')
+      RETURNING security_scope_id;
+    `);
+    const securityScopeId = scope.rows[0].security_scope_id;
+
+    await connection.sql(SQL`
+      INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
+      VALUES (${securityScopeId}, ${anchorSubmissionFeatureId});
+    `);
+
+    const team = await connection.sql(SQL`
+      INSERT INTO team (name, description, create_user)
+      VALUES (${`Privileged Test Team ${anchorSubmissionFeatureId}`}, 'integration', ${systemUserId})
+      RETURNING team_id;
+    `);
+    const teamId = team.rows[0].team_id;
+
+    await connection.sql(SQL`
+      INSERT INTO team_security_scope (team_id, security_scope_id)
+      VALUES (${teamId}, ${securityScopeId});
+    `);
+
+    await connection.sql(SQL`
+      INSERT INTO team_member (system_user_id, team_id, create_user)
+      VALUES (${systemUserId}, ${teamId}, ${systemUserId});
+    `);
+  }
+
+  /**
+   * Run an emitted Knex subquery and return the resulting SET of submission_feature_id values. Set
+   * equality is what every reachability test asserts on; ordering is irrelevant. NOTE: a Set hides
+   * duplicates — use runCount where duplicate suppression matters.
    */
   async function runSubquery(subquery: any): Promise<Set<number>> {
     const { sql, bindings } = subquery.toSQL().toNative();
     const result = await connection.query<{ submission_feature_id: number }>(sql, bindings as any[]);
     return new Set(result.rows.map((r) => r.submission_feature_id));
   }
+
+  /**
+   * Count the rows the emitted subquery returns by wrapping it as a derived table. Needed where a Set
+   * would collapse duplicates.
+   */
+  async function runCount(subquery: any): Promise<number> {
+    const { sql, bindings } = subquery.toSQL().toNative();
+    const result = await connection.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM (${sql}) t`,
+      bindings as any[]
+    );
+    return result.rows[0].count;
+  }
+
+  /**
+   * Seed a `survey -> animal -> capture` parent chain under ONE upload, index `name` on the survey, and
+   * rebuild the closure. The common fixture for closure descendant/ancestor reach tests anchored on the
+   * survey name.
+   */
+  async function seedSurveyAnimalCaptureChain(
+    name: string
+  ): Promise<{ submissionId: number; uploadId: string; d: number; a: number; c: number }> {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+    const a = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'animal',
+      parentFeatureId: d
+    });
+    const c = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: uploadId,
+      featureTypeName: 'capture',
+      parentFeatureId: a
+    });
+    await indexNameProperty(d, name, SURVEY_NAME_FTP_ID);
+    await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+    return { submissionId, uploadId, d, a, c };
+  }
+
+  /** Mint a real feature_type_property usable as a property-edge label, from source type to target type. */
+  async function mintPropertyEdgeLabel(sourceFeatureType: string, targetFeatureType: string): Promise<number> {
+    const { featureTypePropertyId } = await createFeatureTypeProperty(connection, sourceFeatureType, targetFeatureType);
+    return featureTypePropertyId;
+  }
+
+  type TaxonOperator = Parameters<typeof applyTaxonExpressionOperator>[2];
+
+  /**
+   * Seed an A -> B -> C lineage (C is a child of B, B is a child of A) with `parent_itis_tsn` set from
+   * the lineage and `parent_taxon_id` resolved — the exact relational shape the search operators walk.
+   */
+  async function seedLineage(): Promise<{ a: number; b: number; c: number }> {
+    const repo = new TaxonomyRepository(connection);
+    const aTsn = 900001;
+    const bTsn = 900002;
+    const cTsn = 900003;
+
+    const [a, b, c] = await repo.insertTaxonRecords([
+      {
+        itis_tsn: aTsn,
+        itis_scientific_name: 'Ancestora testus',
+        rank: 'Kingdom',
+        common_name: 'A',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      },
+      {
+        itis_tsn: bTsn,
+        itis_scientific_name: 'Betwena testus',
+        rank: 'Genus',
+        common_name: 'B',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      },
+      {
+        itis_tsn: cTsn,
+        itis_scientific_name: 'Childa testus',
+        rank: 'Species',
+        common_name: 'C',
+        itis_data: {},
+        itis_update_date: '2024-01-01'
+      }
+    ]);
+
+    await repo.updateTaxonParentLinks([
+      { itis_tsn: bTsn, parent_itis_tsn: aTsn },
+      { itis_tsn: cTsn, parent_itis_tsn: bTsn }
+    ]);
+
+    return { a: a.taxon_id, b: b.taxon_id, c: c.taxon_id };
+  }
+
+  /** Apply a taxon operator against the full `taxon` table and return the matching taxon_id set. */
+  async function runTaxonOperator(operator: TaxonOperator, targetTaxonId: number): Promise<Set<number>> {
+    const knex = getKnex();
+    const query = knex.queryBuilder().select('t.taxon_id').from('taxon as t');
+    applyTaxonExpressionOperator(query, 't.taxon_id', operator, targetTaxonId, knex);
+    const { sql, bindings } = query.toSQL().toNative();
+    const result = await connection.query<{ taxon_id: number }>(sql, bindings as any[]);
+    return new Set(result.rows.map((r) => r.taxon_id));
+  }
+
+  // === broad feature-type projection (no closure needed) ===================
 
   describe('buildBroadFeatureTypeSubquery', () => {
     it('returns every active submission_feature of the given type for an authenticated user', async () => {
@@ -107,6 +438,10 @@ describe('expression-evaluation (integration)', function () {
       // Decoy of a different feature type — must not appear.
       const decoy = await createTestFeature(connection, submissionId, 'capture', { comment: 'cap' });
 
+      // Build the closure self-loops so the authenticated security filter reads these active features as
+      // unsecured, not hidden-by-default (isEffectivelySecured fails closed on missing closure rows).
+      await rebuildClosureForSubmission(submissionId);
+
       const subquery = buildBroadFeatureTypeSubquery('sample_site', connection.systemUserId());
       const ids = await runSubquery(subquery);
 
@@ -115,44 +450,61 @@ describe('expression-evaluation (integration)', function () {
       expect(ids.has(decoy)).to.equal(false);
     });
 
-    it('partial-access export: types with no readable features return an empty set without error', async () => {
+    it('partial-access export: strips a secured feature the caller cannot read (no error)', async () => {
       // Edge Case #8 from spec.md — a download with N feature types where the policy creator
       // can read some but not others. Per-statement evaluation returns the readable rows for
       // the accessible type and an empty set for the inaccessible type. The pipeline still
       // completes (one Parquet per statement, some empty) — "5 in, 5 files, 1 empty" is a
       // valid, deliberate outcome, not a failure.
+      // The broad subquery's security filter resolves "is this feature secured" via the closure
+      // (isEffectivelySecured), so the secured `restricted` feature only reads as secured
+      // once its closure self-loop exists. Seed it under a shared upload and rebuild the closure
+      // BEFORE the subquery; otherwise an empty closure reads it as unsecured and it is NOT stripped.
       const submissionAccessible = await createTestSubmission(connection);
-      const accessible = await createTestFeature(connection, submissionAccessible, 'sample_site', { name: 'visible' });
+      const uploadAccessible = await createTestUpload(connection, submissionAccessible);
+      const accessible = await insertFeatureRow({
+        submissionId: submissionAccessible,
+        submissionUploadId: uploadAccessible,
+        featureTypeName: 'sample_site'
+      });
 
       const submissionRestricted = await createTestSubmission(connection);
-      const restricted = await createTestFeature(connection, submissionRestricted, 'capture', { comment: 'hidden' });
+      const uploadRestricted = await createTestUpload(connection, submissionRestricted);
+      const restricted = await insertFeatureRow({
+        submissionId: submissionRestricted,
+        submissionUploadId: uploadRestricted,
+        featureTypeName: 'capture'
+      });
 
       // Apply a security rule. With systemUserId=null (anonymous), the security filter
       // strips any secured feature — the same mechanism that strips features from a
       // statement whose policy creator lacks the matching team grant.
-      const systemUserId = connection.systemUserId();
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-        VALUES (${restricted}, 1, ${systemUserId});
-      `);
+      await secureFeature(restricted);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(uploadAccessible);
+      await closure.computeClosureForUpload(uploadRestricted);
 
       // Per-statement subquery for the type the user CAN see → returns the row.
       const accessibleIds = await runSubquery(buildBroadFeatureTypeSubquery('sample_site', null));
       expect(accessibleIds.has(accessible)).to.equal(true);
 
-      // Per-statement subquery for the type the user CAN'T see → returns nothing
-      // and crucially does not throw. At pipeline level this is what produces an
-      // empty Parquet file rather than a failed download.
+      // Per-statement subquery for the type the user CAN'T see → the caller's inaccessible
+      // secured feature is stripped, and crucially the subquery does not throw. At pipeline
+      // level this is what produces an empty (or reduced) Parquet file rather than a failed
+      // download. Other UNSECURED features of this type may exist in seed data and legitimately
+      // appear, so the guarantee under test is that the secured, inaccessible feature is absent.
       const restrictedIds = await runSubquery(buildBroadFeatureTypeSubquery('capture', null));
       expect(restrictedIds.has(restricted)).to.equal(false);
-      expect(restrictedIds.size).to.equal(0);
     });
   });
 
-  describe('buildExpressionTreeFeatureIdsSubquery', () => {
+  // === self-match: same-type evidence must be the anchor row itself ================================
+
+  describe('buildExpressionTreeFeatureIdsSubquery — same-type self-match', () => {
     it('AND tree returns only features matching every predicate', async () => {
-      // Use isolated submissions so the dataset → submission synthetic edge can't
-      // bridge target and decoy into the same connected component.
+      // Self-match: anchor type == evidence type, so the result is the evidence itself with no closure or
+      // content edges needed. Isolated submissions keep the target and decoy from sharing any reach.
       const submissionTarget = await createTestSubmission(connection);
       const target = await createTestFeature(connection, submissionTarget, 'sample_site', { name: 'AND-target' });
       await indexNameProperty(target, 'AND-target');
@@ -160,6 +512,10 @@ describe('expression-evaluation (integration)', function () {
       const submissionOther = await createTestSubmission(connection);
       const other = await createTestFeature(connection, submissionOther, 'sample_site', { name: 'AND-other' });
       await indexNameProperty(other, 'AND-other');
+
+      // Self-loops so the authenticated security filter reads these as active + unsecured (fail-closed).
+      await rebuildClosureForSubmission(submissionTarget);
+      await rebuildClosureForSubmission(submissionOther);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -175,7 +531,8 @@ describe('expression-evaluation (integration)', function () {
     });
 
     it('OR tree returns the union of predicate matches', async () => {
-      // Each candidate lives in its own submission to keep the bridge narrow.
+      // Self-match OR: the UNION combinator over two predicate branches; each candidate is its own
+      // evidence. Each in its own submission to keep reach narrow.
       const submissionA = await createTestSubmission(connection);
       const a = await createTestFeature(connection, submissionA, 'sample_site', { name: 'OR-A' });
       await indexNameProperty(a, 'OR-A');
@@ -187,6 +544,11 @@ describe('expression-evaluation (integration)', function () {
       const submissionDecoy = await createTestSubmission(connection);
       const decoy = await createTestFeature(connection, submissionDecoy, 'sample_site', { name: 'OR-decoy' });
       await indexNameProperty(decoy, 'OR-decoy');
+
+      // Self-loops so the authenticated security filter reads these as active + unsecured (fail-closed).
+      await rebuildClosureForSubmission(submissionA);
+      await rebuildClosureForSubmission(submissionB);
+      await rebuildClosureForSubmission(submissionDecoy);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -203,22 +565,35 @@ describe('expression-evaluation (integration)', function () {
     });
 
     it('security filter excludes features the user cannot read', async () => {
+      // Evidence-side security: a secured candidate is dropped before projection, so it never reaches
+      // the result even as its own self-match. The drop is driven by the closure-based security filter
+      // (isEffectivelySecured), so each feature is seeded under its OWN upload and its closure
+      // self-loop is rebuilt BEFORE the subquery — without the self-loop the secured feature reads as
+      // unsecured and would NOT be stripped. Separate uploads keep the OR-tree reach narrow (each
+      // feature only self-matches; no shared upload means no incidental closure relatedness between them).
       const submissionOpen = await createTestSubmission(connection);
-      const open = await createTestFeature(connection, submissionOpen, 'sample_site', { name: 'Open-secfilter' });
+      const uploadOpen = await createTestUpload(connection, submissionOpen);
+      const open = await insertFeatureRow({
+        submissionId: submissionOpen,
+        submissionUploadId: uploadOpen,
+        featureTypeName: 'sample_site'
+      });
       await indexNameProperty(open, 'Open-secfilter');
 
       const submissionSecured = await createTestSubmission(connection);
-      const secured = await createTestFeature(connection, submissionSecured, 'sample_site', {
-        name: 'Secured-secfilter'
+      const uploadSecured = await createTestUpload(connection, submissionSecured);
+      const secured = await insertFeatureRow({
+        submissionId: submissionSecured,
+        submissionUploadId: uploadSecured,
+        featureTypeName: 'sample_site'
       });
       await indexNameProperty(secured, 'Secured-secfilter');
 
-      // Apply a security rule. Anonymous callers see only unsecured features.
-      const systemUserId = connection.systemUserId();
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-        VALUES (${secured}, 1, ${systemUserId});
-      `);
+      await secureFeature(secured);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(uploadOpen);
+      await closure.computeClosureForUpload(uploadSecured);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
@@ -232,46 +607,599 @@ describe('expression-evaluation (integration)', function () {
       expect(ids.has(secured)).to.equal(false);
     });
 
-    it('security filter excludes secured target features even when reached from unsecured evidence (defense in depth)', async () => {
-      // Regression test for the leak path the download pipeline previously had:
-      // evidence-side filtering let the predicate see an unsecured row, then graph traversal
-      // projected to a related SECURED target row. With only evidence-side filtering, the
-      // secured target id flowed out of the subquery to any consumer that bypassed the search
-      // wrapper's outer filter (e.g. the download cursor). The fix re-applies the security
-      // filter at the projected target level.
-      const submission = await createTestSubmission(connection);
+    it('same-type evidence does not pull in sibling anchors through a shared parent', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
 
-      // Evidence row — anonymous callers can read it; carries the predicate match.
-      const evidence = await createTestFeature(connection, submission, 'sample_site', { name: 'evidence-row' });
-      await indexNameProperty(evidence, 'evidence-row');
+      const survey = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      const matchingObservation = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: survey
+      });
+      const siblingObservation = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: survey
+      });
 
-      // Target row — same anchor type, parent of evidence so the parent-child graph edge
-      // bridges them. SECURED, so anonymous callers must NOT see it.
-      const securedTarget = await createTestFeature(
-        connection,
-        submission,
-        'sample_site',
-        { name: 'secured-target' },
-        evidence
-      );
-      const systemUserId = connection.systemUserId();
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-        VALUES (${securedTarget}, 1, ${systemUserId});
-      `);
+      await indexNameProperty(matchingObservation, 'high-elevation-observation', SAMPLE_SITE_NAME_FTP_ID);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
       const tree: NormalizedExpressionTreeExpression = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('evidence-row')]
+        clauses: [namePredicate('high-elevation-observation', SAMPLE_SITE_NAME_FTP_ID)]
       };
-      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, null);
-      const ids = await runSubquery(subquery);
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId())
+      );
 
-      // Evidence is unsecured and matches the predicate — keep it.
-      expect(ids.has(evidence)).to.equal(true);
-      // Secured target is reachable via the graph from `evidence` — must NOT leak through.
-      expect(ids.has(securedTarget)).to.equal(false);
+      expect(ids.has(matchingObservation)).to.equal(true);
+      expect(ids.has(siblingObservation)).to.equal(false);
+    });
+  });
+
+  // === closure reachability without recursive content walking =============================
+
+  describe('buildExpressionTreeFeatureIdsSubquery — anchor-first closure reachability', () => {
+    /**
+     * Descendant reach (load-bearing reverse closure probe). D(survey) <- A(animal) <- C(capture) under one
+     * upload; evidence = D (survey.name). closureReverse(D) = D's descendants = {A, C}.
+     * Anchor=capture isolates C. A FORWARD-ONLY probe would return EMPTY here — descendant reach exists only
+     * because the closure is probed in BOTH directions.
+     */
+    it('1: descendant reach — anchor below evidence is recovered via closureReverse', async () => {
+      const { c } = await seedSurveyAnimalCaptureChain('Caribou Study');
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('Caribou Study', SURVEY_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('capture', tree, connection.systemUserId()));
+
+      expect(ids.has(c)).to.equal(true);
+    });
+
+    /**
+     * Ancestor reach (forward closure probe). D(survey) <- S(sample_site) under one upload; evidence = S.
+     * closureForward(S) = S's ancestors = {D}. Anchor=survey isolates D.
+     */
+    it('2: ancestor reach — anchor above evidence is recovered via closureForward', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const s = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: d
+      });
+      await indexNameProperty(s, 'leaf', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('leaf', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('survey', tree, connection.systemUserId()));
+
+      expect(ids.has(d)).to.equal(true);
+    });
+
+    /**
+     * Property-reference reach in BOTH directions. F(sample_site) -> G(animal) via a property edge, NO parent
+     * link. Forward: evidence=F, closureForward(F)->G, anchor=animal returns G (the referenced feature).
+     * Reverse: evidence=G, closureReverse(G)->F, anchor=sample_site returns F (the referencing feature).
+     */
+    it('3: property-reference reach — referenced (forward) and referencing (reverse) both recovered', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const f = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      const g = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'animal' });
+      const label = await mintPropertyEdgeLabel('sample_site', 'animal');
+      await insertPropertyEdge(f, g, label);
+      await indexNameProperty(f, 'ref', SAMPLE_SITE_NAME_FTP_ID);
+      // Index G with an animal-agnostic value reusing the sample_site slot only for evidence selection in
+      // the reverse sub-case; the predicate is type-agnostic and only needs a matching string row.
+      await indexNameProperty(g, 'ref-reverse', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      // (a) forward: filter F (referencing) -> anchor animal returns G (referenced).
+      const forwardTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('ref', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const forwardIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('animal', forwardTree, connection.systemUserId())
+      );
+      expect(forwardIds.has(g)).to.equal(true);
+
+      // (b) reverse: filter G (referenced) -> anchor sample_site returns F (referencing).
+      const reverseTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('ref-reverse', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const reverseIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', reverseTree, connection.systemUserId())
+      );
+      expect(reverseIds.has(f)).to.equal(true);
+    });
+
+    /**
+     * Defense-in-depth: the security filter is re-applied to PROJECTED targets, not just evidence. evidence
+     * (sample_site, unsecured) and securedTarget (animal, parent=evidence) share one upload, so the closure
+     * connects them (parent edge securedTarget->evidence => closureReverse(evidence) reaches it). With
+     * systemUserId=null the secured target must NOT leak; with a privileged user (scope-granted) it appears.
+     */
+    it('4: secured projected target is filtered for anonymous and visible to a granted user', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const evidence = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site'
+      });
+      const securedTarget = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'animal',
+        parentFeatureId: evidence
+      });
+      await indexNameProperty(evidence, 'evidence-row', SAMPLE_SITE_NAME_FTP_ID);
+      await secureFeature(securedTarget);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('evidence-row', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+
+      // Anonymous: evidence (unsecured) is kept; the secured descendant must not leak.
+      const anonymousIds = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, null));
+      expect(anonymousIds.has(securedTarget)).to.equal(false);
+
+      // Granted: stand up the scope-grant chain on the secured target, then the privileged user sees it.
+      await grantPrivilegedAccess(securedTarget);
+      const grantedIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId())
+      );
+      expect(grantedIds.has(securedTarget)).to.equal(true);
+    });
+
+    /**
+     * Reflexive reach. A single feature E(sample_site) returns itself because same-type evidence directly
+     * matches the anchor row.
+     */
+    it('5: reflexive — evidence returns itself with empty closure and no edges', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const e = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      await indexNameProperty(e, 'self', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('self', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(e)).to.equal(true);
+    });
+
+    /**
+     * Duplicate suppression. F is reachable from evidence E both as a referenced feature (closureForward, via a
+     * property edge E->F) AND as a descendant (closureReverse, via parent F->E). F must appear EXACTLY ONCE
+     * so a downstream count(*) wrap does not double-count.
+     */
+    it('6: UNION dedup — a multi-path target appears exactly once', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const e = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      // F is BOTH a descendant of E (parent edge F->E) and a referenced feature of E (property edge E->F).
+      const f = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'animal',
+        parentFeatureId: e
+      });
+      const label = await mintPropertyEdgeLabel('sample_site', 'animal');
+      await insertPropertyEdge(e, f, label);
+      await indexNameProperty(e, 'dedup', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('dedup', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const subquery = buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId());
+
+      expect(await runCount(subquery)).to.equal(1);
+      expect((await runSubquery(subquery)).has(f)).to.equal(true);
+    });
+
+    /**
+     * Content-only reach is intentionally absent. F(sample_site) -content-> G(telemetry); G2(telemetry)
+     * has NO edge. The closure adds only self loops, so neither telemetry row is connected through closure.
+     */
+    it('7: content-only — content neighbour is not reached', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const f = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      const g = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'telemetry' });
+      const g2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'telemetry' });
+      await insertContentEdge(f, g);
+      await indexNameProperty(f, 'c', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('c', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('telemetry', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(g)).to.equal(false);
+      expect(ids.has(g2)).to.equal(false);
+    });
+
+    /**
+     * Survey membership fan-out has been removed. D(survey) with a real descendant Y(animal, parent=D) and an
+     * UNCONNECTED same-submission X(animal, no parent). Evidence=D reaches Y via closureReverse (Y is D's
+     * descendant) but no longer reaches X — the synthetic survey->every-feature-in-submission membership edge is
+     * gone, so an unconnected same-submission feature is unreachable from survey evidence.
+     */
+    it('8: survey evidence reaches descendants via closure but not unconnected same-submission features', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const d = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const y = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'animal',
+        parentFeatureId: d
+      });
+      const x = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'animal' });
+      await indexNameProperty(d, 'ds', SURVEY_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('ds', SURVEY_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId()));
+
+      expect(ids.has(y)).to.equal(true);
+      expect(ids.has(x)).to.equal(false);
+    });
+
+    /**
+     * Empty-closure behaviour, two halves, evaluated on the authenticated path.
+     * (a) uploadA gets NO closure: A(sample_site) <- E(sample_site), evidence=E, anchor=sample_site -> A
+     *     ABSENT. With no ancestry rows the parent A is unreachable from E, and (post fail-closed) E itself
+     *     reads as secured and is stripped — either way A does not appear.
+     * (b) uploadB's closure is rebuilt to self-loops only (no e2->m ancestor edge). E2(sample_site)
+     *     -content-> M(animal), evidence=E2, anchor=animal remains ABSENT because content edges are not walked.
+     */
+    it('9: empty closure — closure ancestor reach absent, content reach absent', async () => {
+      const submissionId = await createTestSubmission(connection);
+
+      // (a) closure ancestor reach needs the closure — do NOT rebuild it.
+      const uploadA = await createTestUpload(connection, submissionId);
+      const ancestorSite = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadA,
+        featureTypeName: 'sample_site'
+      });
+      const e = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadA,
+        featureTypeName: 'sample_site',
+        parentFeatureId: ancestorSite
+      });
+      await indexNameProperty(e, 'no-closure-ancestor', SAMPLE_SITE_NAME_FTP_ID);
+
+      const ancestorTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('no-closure-ancestor', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ancestorIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', ancestorTree, connection.systemUserId())
+      );
+      expect(ancestorIds.has(ancestorSite)).to.equal(false);
+
+      // (b) Rebuild uploadB's closure to give e2 and m their self-loops. m is NOT e2's child, so no e2->m
+      // ancestor edge is created. The content edge alone must not reach m.
+      const uploadB = await createTestUpload(connection, submissionId);
+      const e2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'sample_site' });
+      const m = await insertFeatureRow({ submissionId, submissionUploadId: uploadB, featureTypeName: 'animal' });
+      await insertContentEdge(e2, m);
+      await indexNameProperty(e2, 'no-closure-content', SAMPLE_SITE_NAME_FTP_ID);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadB);
+
+      const contentTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('no-closure-content', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const contentIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('animal', contentTree, connection.systemUserId())
+      );
+      expect(contentIds.has(m)).to.equal(false);
+    });
+
+    /**
+     * AND/OR compose over closure-related features. Two surveys in separate submissions each have a child
+     * sample_site: D1 <- S1, D2 <- S2. An OR of [D1.name, D2.name] anchored at sample_site UNIONs the two
+     * descendant reaches (S1 and S2). An AND INTERSECTs them — no sample_site is a descendant of both surveys,
+     * so the intersection is empty. The raw combinator is already pinned by the self-match AND/OR tests; this
+     * guards that it composes correctly when leaves resolve THROUGH closure relatedness.
+     */
+    it('10: AND/OR compose over closure-related features (union widens, intersect narrows)', async () => {
+      const submissionOne = await createTestSubmission(connection);
+      const uploadOne = await createTestUpload(connection, submissionOne);
+      const d1 = await insertFeatureRow({
+        submissionId: submissionOne,
+        submissionUploadId: uploadOne,
+        featureTypeName: 'survey'
+      });
+      const s1 = await insertFeatureRow({
+        submissionId: submissionOne,
+        submissionUploadId: uploadOne,
+        featureTypeName: 'sample_site',
+        parentFeatureId: d1
+      });
+      await indexNameProperty(d1, 'compose-d1', SURVEY_NAME_FTP_ID);
+
+      const submissionTwo = await createTestSubmission(connection);
+      const uploadTwo = await createTestUpload(connection, submissionTwo);
+      const d2 = await insertFeatureRow({
+        submissionId: submissionTwo,
+        submissionUploadId: uploadTwo,
+        featureTypeName: 'survey'
+      });
+      const s2 = await insertFeatureRow({
+        submissionId: submissionTwo,
+        submissionUploadId: uploadTwo,
+        featureTypeName: 'sample_site',
+        parentFeatureId: d2
+      });
+      await indexNameProperty(d2, 'compose-d2', SURVEY_NAME_FTP_ID);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(uploadOne);
+      await closure.computeClosureForUpload(uploadTwo);
+
+      const orTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
+      };
+      const orIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', orTree, connection.systemUserId())
+      );
+      expect(orIds.has(s1)).to.equal(true);
+      expect(orIds.has(s2)).to.equal(true);
+
+      const andTree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
+      };
+      const andIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', andTree, connection.systemUserId())
+      );
+      // No sample_site descends from BOTH surveys, so the intersection of the two reaches is empty.
+      expect(andIds.has(s1)).to.equal(false);
+      expect(andIds.has(s2)).to.equal(false);
+    });
+
+    /**
+     * Cross-type anchor filter. D(survey) <- A(animal) <- C(capture) under one upload; evidence=D is
+     * connected to both descendants through closureReverse. Anchor=animal returns ONLY A, not C (capture)
+     * or D (survey).
+     */
+    it('11: anchor type filters the reachable set to one type', async () => {
+      const { d, a, c } = await seedSurveyAnimalCaptureChain('cross-type');
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('cross-type', SURVEY_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('animal', tree, connection.systemUserId()));
+
+      expect(ids.has(a)).to.equal(true);
+      expect(ids.has(c)).to.equal(false);
+      expect(ids.has(d)).to.equal(false);
+    });
+
+    /**
+     * Multi-hop content chain. Content edges A->B and B->C only (no A->C). Evidence=A; because expression
+     * evaluation no longer walks content edges, anchor=telemetry returns neither C nor the unconnected decoy.
+     */
+    it('12: multi-hop content chain — target is not reached across content hops', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const a = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      const b = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'animal' });
+      const c = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'telemetry' });
+      const cDecoy = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'telemetry'
+      });
+      await insertContentEdge(a, b);
+      await insertContentEdge(b, c);
+      await indexNameProperty(a, 'chain', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('chain', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('telemetry', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(c)).to.equal(false);
+      expect(ids.has(cDecoy)).to.equal(false);
+    });
+
+    /**
+     * content->closure chain. E -content-> M, and M's parent is P (closure: M->P ancestor). Evidence=E;
+     * because content edges are not walked, M is never used as bridge evidence and anchor=capture returns
+     * neither P nor the unconnected Pdecoy.
+     */
+    it('13: content->closure chain — content neighbour does not contribute its closure ancestor', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const e = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
+      const p = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'capture' });
+      const m = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'animal',
+        parentFeatureId: p
+      });
+      const pDecoy = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'capture'
+      });
+      await insertContentEdge(e, m);
+      await indexNameProperty(e, 'cc', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('cc', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('capture', tree, connection.systemUserId()));
+
+      expect(ids.has(p)).to.equal(false);
+      expect(ids.has(pDecoy)).to.equal(false);
+    });
+
+    /**
+     * Closure-then-content remains absent. A(capture) is rootless; E(sample_site, parent=A) so the closure
+     * gives E->A ancestor. A -content-> Q (NOT E->Q). Evidence=E; closureForward(E)->A, but A's content
+     * neighbour Q is never walked.
+     */
+    it('14: closure-ancestor then its content edge is not recovered', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+
+      const a = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'capture' });
+      const e = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: a
+      });
+      const q = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'telemetry' });
+      await insertContentEdge(a, q);
+      await indexNameProperty(e, 'gap', SAMPLE_SITE_NAME_FTP_ID);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree: NormalizedExpressionTreeExpression = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [namePredicate('gap', SAMPLE_SITE_NAME_FTP_ID)]
+      };
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('telemetry', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(q)).to.equal(false);
+    });
+  });
+
+  // === taxon parent-child hierarchy operators (walk taxon.parent_taxon_id) ==================
+
+  describe('applyTaxonExpressionOperator — parent-child hierarchy over parent_taxon_id', () => {
+    it('ChildOf resolves immediate children via parent_taxon_id', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const childrenOfB = await runTaxonOperator('ChildOf', b);
+      expect(childrenOfB.has(c)).to.equal(true);
+      expect(childrenOfB.has(b)).to.equal(false);
+      expect(childrenOfB.has(a)).to.equal(false);
+
+      const childrenOfA = await runTaxonOperator('ChildOf', a);
+      expect(childrenOfA.has(b)).to.equal(true);
+      expect(childrenOfA.has(c)).to.equal(false);
+    });
+
+    it('ParentOf resolves only the immediate parent (depth 1)', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const parentOfC = await runTaxonOperator('ParentOf', c);
+      expect(parentOfC.has(b)).to.equal(true);
+      expect(parentOfC.has(a)).to.equal(false);
+      expect(parentOfC.has(c)).to.equal(false);
+    });
+
+    it('AscendsFrom resolves all ancestors of the target', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const ancestorsOfC = await runTaxonOperator('AscendsFrom', c);
+      expect(ancestorsOfC.has(a)).to.equal(true);
+      expect(ancestorsOfC.has(b)).to.equal(true);
+      expect(ancestorsOfC.has(c)).to.equal(true);
+    });
+
+    it('DescendsFrom resolves all descendants of the target', async () => {
+      const { a, b, c } = await seedLineage();
+
+      const descendantsOfA = await runTaxonOperator('DescendsFrom', a);
+      expect(descendantsOfA.has(b)).to.equal(true);
+      expect(descendantsOfA.has(c)).to.equal(true);
+
+      // A leaf has no descendants above it.
+      const descendantsOfC = await runTaxonOperator('DescendsFrom', c);
+      expect(descendantsOfC.has(a)).to.equal(false);
+      expect(descendantsOfC.has(b)).to.equal(false);
     });
   });
 });

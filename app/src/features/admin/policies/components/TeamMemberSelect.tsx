@@ -9,6 +9,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getUserLabel } from 'utils/Utils';
 
 /**
  * Props for TeamMemberSelect component.
@@ -91,7 +92,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
       }
     }
 
-    return Array.from(optionsMap.values()).sort((a, b) => a.user_identifier.localeCompare(b.user_identifier));
+    return Array.from(optionsMap.values()).sort((a, b) => getUserLabel(a).localeCompare(getUserLabel(b)));
   }, [usersDataLoader.data?.users, selectedUsers]);
 
   /**
@@ -111,7 +112,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
       value={selectedUsers}
       inputValue={inputValue}
       loading={usersDataLoader.isLoading}
-      getOptionLabel={(user) => user.user_identifier}
+      getOptionLabel={(user) => getUserLabel(user)}
       isOptionEqualToValue={(option, value) => option.system_user_id === value.system_user_id}
       onInputChange={handleInputChange}
       onChange={handleChange}
@@ -129,7 +130,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
           <li key={key} {...otherProps}>
             <Box display="flex" alignItems="center" gap={1}>
               <Icon path={mdiAccountOutline} size={0.875} />
-              <Typography>{user.user_identifier}</Typography>
+              <Typography>{getUserLabel(user)}</Typography>
             </Box>
           </li>
         );

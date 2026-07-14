@@ -1,55 +1,26 @@
 import { mdiMenuDown } from '@mdi/js';
 import Icon from '@mdi/react';
-import type { ButtonProps } from '@mui/material/Button';
 import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import { Fragment, useMemo, useState } from 'react';
-
-export interface IDropdownButtonItem {
-  value: string;
-  label: string;
-  iconPath: string;
-}
-
-export interface IDropdownButtonItemGroup {
-  groupId: string;
-  items: IDropdownButtonItem[];
-}
-
-export interface IDropdownButtonProps extends Omit<
-  ButtonProps,
-  'children' | 'onClick' | 'onSelect' | 'value' | 'className'
-> {
-  value: string;
-  itemGroups: IDropdownButtonItemGroup[];
-  onSelect: (value: string) => void;
-}
+import { IDropdownButtonProps } from './DropdownButton.interface';
+import { DropdownMenu } from './menu/DropdownMenu';
+import { useDropdownMenu } from './menu/useDropdownMenu';
 
 /**
  * Single-button dropdown menu showing the currently selected option label.
+ * Use when choosing a value from grouped menu options is the only action.
+ * The selected `value` controls the button label and `onSelect` receives the next item value.
  *
  * @param {IDropdownButtonProps} props
  * @return {*}
  */
 export const DropdownButton = (props: IDropdownButtonProps) => {
-  const { value, itemGroups, onSelect, size = 'medium', ...buttonProps } = props;
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const open = Boolean(anchorEl);
-
-  const flattenedItems = useMemo(() => itemGroups.flatMap((group) => group.items), [itemGroups]);
-  const selectedLabel = useMemo(
-    () => flattenedItems.find((item) => item.value === value)?.label ?? value,
-    [flattenedItems, value]
+  const { value, itemGroups, onSelect, valueColorMap, size = 'medium', ...buttonProps } = props;
+  const { anchorEl, open, selectedLabel, handleClose, handleOpen, handleSelect } = useDropdownMenu(
+    value,
+    itemGroups,
+    onSelect
   );
-  const handleClose = () => setAnchorEl(null);
-  const handleSelect = (nextValue: string) => {
-    handleClose();
-    onSelect(nextValue);
-  };
+  const selectedColor = valueColorMap?.[value];
 
   return (
     <>
@@ -57,13 +28,27 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
         variant="outlined"
         size={size}
         {...buttonProps}
-        onClick={(event) => setAnchorEl(event.currentTarget)}
+        color={selectedColor ?? buttonProps.color}
+        onClick={(event) => handleOpen(event.currentTarget)}
         endIcon={<Icon path={mdiMenuDown} size={1} />}
         sx={{
           minWidth: size === 'small' ? 128 : 180,
           justifyContent: 'space-between',
           textTransform: 'none',
-          backgroundColor: 'grey.50',
+          backgroundColor: selectedColor ? `${selectedColor}.main` : 'grey.50',
+          borderColor: selectedColor ? `${selectedColor}.main` : undefined,
+          color: selectedColor ? `${selectedColor}.contrastText` : undefined,
+          '&:hover': selectedColor
+            ? {
+                backgroundColor: `${selectedColor}.dark`,
+                borderColor: `${selectedColor}.dark`
+              }
+            : undefined,
+          '&.Mui-disabled': {
+            color: 'action.disabled',
+            backgroundColor: 'action.disabledBackground',
+            borderColor: 'action.disabledBackground'
+          },
           ...(size === 'small'
             ? {
                 height: 34,
@@ -76,24 +61,14 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
         {selectedLabel}
       </Button>
 
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        {itemGroups.map((group, groupIndex) => (
-          <Fragment key={group.groupId}>
-            {group.items.map((item) => (
-              <MenuItem
-                key={`${group.groupId}-${item.value}`}
-                selected={item.value === value}
-                onClick={() => handleSelect(item.value)}>
-                <ListItemIcon>
-                  <Icon path={item.iconPath} size={0.75} />
-                </ListItemIcon>
-                <ListItemText>{item.label}</ListItemText>
-              </MenuItem>
-            ))}
-            {groupIndex < itemGroups.length - 1 ? <Divider /> : null}
-          </Fragment>
-        ))}
-      </Menu>
+      <DropdownMenu
+        anchorEl={anchorEl}
+        open={open}
+        value={value}
+        itemGroups={itemGroups}
+        onClose={handleClose}
+        onSelect={handleSelect}
+      />
     </>
   );
 };

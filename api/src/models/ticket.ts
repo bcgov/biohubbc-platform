@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { DataRequest } from './data-request';
 import { TicketSubmissionUpload } from './submission-upload';
-import { TicketArtifact } from './ticket-artifact';
 import { TicketComment } from './ticket-comment';
 import { TicketReference } from './ticket-reference';
 import { TicketStatus as TicketStatusRecord } from './ticket-status';
@@ -62,7 +61,6 @@ export type UpdateTicketStatusRequest = z.infer<typeof UpdateTicketStatusRequest
 export const TicketWithHistory = Ticket.extend({
   statuses: z.array(TicketStatusRecord),
   comments: z.array(TicketComment),
-  artifacts: z.array(TicketArtifact),
   references: z.array(TicketReference),
   data_requests: z.array(DataRequest),
   submission_uploads: z.array(TicketSubmissionUpload),

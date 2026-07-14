@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import type { Expression } from '../models/expression';
+import type { ExpressionClause } from '../models/expression-clause';
 import type { InternalTypedPredicate } from '../models/expression-predicate';
 import type {
   ExpressionTree,
@@ -17,7 +19,6 @@ import type { ReadPredicateNodeRow } from '../models/predicate';
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
-import { parseTimestamp } from '../utils/timestamp';
 import { DBService } from './db-service';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 import type {
@@ -28,6 +29,18 @@ import type {
   ReadExpressionClause,
   WriteExpressionClause
 } from './expression-tree-service.interface';
+
+interface ReconstructExpressionTreeContext {
+  expressionsById: Map<string, Expression>;
+  clausesByExpressionId: Map<string, ExpressionClause[]>;
+  predicatesById: Map<string, ReadPredicateNodeRow>;
+}
+
+interface ReconstructHydrationContext {
+  expressionsById: Map<string, Expression>;
+  clausesByExpressionId: Map<string, ExpressionClause[]>;
+  predicateIds: Set<string>;
+}
 
 /**
  * Service for writing and reading reusable expression trees.
@@ -112,17 +125,19 @@ export class ExpressionTreeService extends DBService {
   }
 
   /**
-   * Reconstruct an expression node recursively from storage rows.
+   * Reconstruct an expression node from storage rows.
    *
-   * Read reconstruction walks the persisted graph from an expression anchor
-   * through its ordered `expression_clause` links. Predicate links are hydrated
-   * in batch for the current node; expression links recurse into child nodes.
+   * Read reconstruction first hydrates the persisted graph from the root
+   * expression anchor through its ordered `expression_clause` links, batching
+   * expression and clause reads by tree level. Predicate links are hydrated once
+   * after all reachable clauses are known. The final API tree is then assembled
+   * from in-memory maps.
    *
    * This routine:
-   * 1. Guards against cycles during traversal (defensive check in service layer).
-   * 2. Loads expression anchor + ordered clause links.
-   * 3. Hydrates predicate clauses in batch per expression node.
-   * 4. Re-enters recursively for child expression clauses.
+   * 1. Loads expression anchors and ordered clause links in batches.
+   * 2. Hydrates all predicate leaves in one read.
+   * 3. Guards against cycles during in-memory assembly.
+   * 4. Re-enters recursively for child expression clauses without more DB I/O.
    *
    * @private
    * @param {string} expressionId - Expression id to reconstruct.
@@ -134,47 +149,169 @@ export class ExpressionTreeService extends DBService {
     expressionId: string,
     visitedExpressionIds: Set<string>
   ): Promise<ExpressionTreeExpression> {
-    if (visitedExpressionIds.has(expressionId)) {
-      throw new ApiGeneralError('Cycle detected in expression tree', [
+    const expressionsById = new Map<string, Expression>();
+    const clausesByExpressionId = new Map<string, ExpressionClause[]>();
+    const predicateIds = new Set<string>();
+    let pendingExpressionIds = [expressionId];
+
+    while (pendingExpressionIds.length > 0) {
+      const expressionIdsToRead = [...new Set(pendingExpressionIds)].filter((id) => !expressionsById.has(id));
+      pendingExpressionIds = [];
+
+      if (expressionIdsToRead.length === 0) {
+        continue;
+      }
+
+      pendingExpressionIds = await this.hydrateExpressionTreeStorageBatch(expressionIdsToRead, {
+        expressionsById,
+        clausesByExpressionId,
+        predicateIds
+      });
+    }
+
+    const readPredicates = await this.predicateRepository.readPredicateNodes([...predicateIds]);
+    const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
+
+    return this.buildExpressionTreeFromStorage(expressionId, visitedExpressionIds, {
+      expressionsById,
+      clausesByExpressionId,
+      predicatesById
+    });
+  }
+
+  /**
+   * Hydrate one breadth-first batch of expression and clause rows.
+   *
+   * @private
+   * @param {string[]} expressionIdsToRead - Expression ids in the current read batch.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @return {Promise<string[]>} Child expression ids that still need hydration.
+   * @memberof ExpressionTreeService
+   */
+  private async hydrateExpressionTreeStorageBatch(
+    expressionIdsToRead: string[],
+    context: ReconstructHydrationContext
+  ): Promise<string[]> {
+    const [expressions, clauses] = await Promise.all([
+      this.expressionRepository.getExpressionsByIds(expressionIdsToRead),
+      this.expressionClauseRepository.getExpressionClausesByExpressionIds(expressionIdsToRead)
+    ]);
+
+    for (const expression of expressions) {
+      context.expressionsById.set(expression.expression_id, expression);
+      context.clausesByExpressionId.set(expression.expression_id, []);
+    }
+
+    return this.recordHydratedExpressionClauses(clauses, context);
+  }
+
+  /**
+   * Record hydrated clause rows and collect unresolved child expression ids.
+   *
+   * @private
+   * @param {ExpressionClause[]} clauses - Clause rows from the current read batch.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @return {string[]} Child expression ids that still need hydration.
+   * @memberof ExpressionTreeService
+   */
+  private recordHydratedExpressionClauses(clauses: ExpressionClause[], context: ReconstructHydrationContext): string[] {
+    const pendingExpressionIds: string[] = [];
+
+    for (const clause of clauses) {
+      this.recordHydratedExpressionClause(clause, context, pendingExpressionIds);
+    }
+
+    return pendingExpressionIds;
+  }
+
+  /**
+   * Record one hydrated clause row.
+   *
+   * @private
+   * @param {ExpressionClause} clause - Clause row from storage.
+   * @param {ReconstructHydrationContext} context - Mutable reconstruction maps.
+   * @param {string[]} pendingExpressionIds - Child expression ids queued for hydration.
+   * @memberof ExpressionTreeService
+   */
+  private recordHydratedExpressionClause(
+    clause: ExpressionClause,
+    context: ReconstructHydrationContext,
+    pendingExpressionIds: string[]
+  ): void {
+    const expressionClauses = context.clausesByExpressionId.get(clause.expression_id) ?? [];
+    expressionClauses.push(clause);
+    context.clausesByExpressionId.set(clause.expression_id, expressionClauses);
+
+    if (clause.predicate_id) {
+      context.predicateIds.add(clause.predicate_id);
+      return;
+    }
+
+    if (!clause.child_expression_id) {
+      throw new ApiGeneralError('Invalid expression clause target', [
         'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-        `expressionId=${expressionId}`
+        `expressionClauseId=${clause.expression_clause_id}`
       ]);
     }
 
-    const nextVisitedExpressionIds = new Set(visitedExpressionIds);
-    nextVisitedExpressionIds.add(expressionId);
+    if (!context.expressionsById.has(clause.child_expression_id)) {
+      pendingExpressionIds.push(clause.child_expression_id);
+    }
+  }
 
-    // The expression anchor stores only node identity: logical operator and hash.
-    const expression = await this.expressionRepository.getExpressionById(expressionId);
+  /**
+   * Build an API expression tree from already-hydrated storage rows.
+   *
+   * @private
+   * @param {string} currentExpressionId - Expression id to build.
+   * @param {Set<string>} currentVisitedExpressionIds - Path-local set used for cycle detection.
+   * @param {ReconstructExpressionTreeContext} context - Hydrated storage rows keyed by id.
+   * @return {ExpressionTreeExpression} Reconstructed expression node.
+   * @memberof ExpressionTreeService
+   */
+  private buildExpressionTreeFromStorage(
+    currentExpressionId: string,
+    currentVisitedExpressionIds: Set<string>,
+    context: ReconstructExpressionTreeContext
+  ): ExpressionTreeExpression {
+    if (currentVisitedExpressionIds.has(currentExpressionId)) {
+      throw new ApiGeneralError('Cycle detected in expression tree', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionId=${currentExpressionId}`
+      ]);
+    }
 
-    // Clause rows are the only source of child ordering and branch structure.
-    const links = await this.expressionClauseRepository.getExpressionClausesByExpressionId(expressionId);
+    const expression = context.expressionsById.get(currentExpressionId);
+
+    if (!expression) {
+      throw new ApiGeneralError('Missing expression row while reconstructing expression tree', [
+        'ExpressionTreeService->reconstructExpressionTreeFromStorage',
+        `expressionId=${currentExpressionId}`
+      ]);
+    }
+
+    const links = context.clausesByExpressionId.get(currentExpressionId) ?? [];
 
     if (links.length === 0) {
       throw new ApiGeneralError('Expression has no active clauses', [
         'ExpressionTreeService->reconstructExpressionTreeFromStorage',
-        `expressionId=${expressionId}`
+        `expressionId=${currentExpressionId}`
       ]);
     }
 
-    const predicateIds = links.map((link) => link.predicate_id).filter((value): value is string => !!value);
-
-    // Batch-read predicate payload projections once per expression node to avoid
-    // N+1 reads while still preserving clause order below.
-    const readPredicates = await this.predicateRepository.readPredicateNodes(predicateIds);
-    const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
-
+    const nextVisitedExpressionIds = new Set(currentVisitedExpressionIds);
+    nextVisitedExpressionIds.add(currentExpressionId);
     const readClauses: ReadExpressionClause[] = [];
 
     for (const link of links) {
       if (link.predicate_id) {
-        const predicateRow = predicatesById.get(link.predicate_id);
+        const predicateRow = context.predicatesById.get(link.predicate_id);
 
         if (!predicateRow) {
           throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
             'ExpressionTreeService->reconstructExpressionTreeFromStorage',
             `predicateId=${link.predicate_id}`,
-            `expressionId=${expressionId}`
+            `expressionId=${currentExpressionId}`
           ]);
         }
 
@@ -194,9 +331,7 @@ export class ExpressionTreeService extends DBService {
 
       readClauses.push({
         sequence: link.sequence,
-        // Child expressions are stored by id, so reconstruct that subtree before
-        // sorting the current node's clauses back into sequence order.
-        clause: await this.reconstructExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds)
+        clause: this.buildExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds, context)
       });
     }
 
@@ -456,27 +591,14 @@ export class ExpressionTreeService extends DBService {
           );
         }
 
-        // Public/internal timestamp predicates keep a scalar string value, but
-        // storage and SQL comparison logic operate on split date/time columns.
-        // Hash on the parsed parts so date-only, time-only, and datetime values
-        // preserve the same semantics used by persistence/search.
-        const parsedTimestamp = parseTimestamp(predicate.value);
-
-        if (!parsedTimestamp) {
-          throw new ApiGeneralError('Unsupported timestamp predicate value for normalization', [
-            'ExpressionTreeService->buildNormalizedPredicateIdentityForHash',
-            { value: predicate.value }
-          ]);
-        }
-
         return this.buildPredicateIdentity(
           feature_property_id,
           feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
-            date: parsedTimestamp.date_value ?? '',
-            time: parsedTimestamp.time_value ?? ''
+            date: predicate.value.date_value ?? '',
+            time: predicate.value.time_value ?? ''
           }
         );
       }
@@ -656,10 +778,13 @@ export class ExpressionTreeService extends DBService {
    * keyed by semantic hash and can be reused; the typed payload table is written
    * only when the anchor is first inserted.
    *
-   * Concurrency-safe flow:
+   * Reuse flow:
    * 1. Reuse preloaded id when present.
-   * 2. Upsert anchor by hash and return resolved id + insert-state.
-   * 3. Write typed payload row only when the anchor is newly inserted.
+   * 2. Insert anchor by hash.
+   * 3. Write typed payload row for the new anchor.
+   *
+   * Concurrent duplicate writes are guarded by the active predicate-hash
+   * uniqueness constraint.
    *
    * @private
    * @param {ExpressionTreePredicateWithHash} clause - Hashed predicate clause.
@@ -702,8 +827,11 @@ export class ExpressionTreeService extends DBService {
    * Steps:
    * 1. Reuse existing anchor when hash is already known.
    * 2. Resolve child clauses (predicate ids / child expression ids).
-   * 3. Upsert expression anchor by hash.
-   * 4. Insert clause edges only when the anchor is newly inserted.
+   * 3. Insert expression anchor by hash.
+   * 4. Insert clause edges for the new anchor.
+   *
+   * Concurrent duplicate writes are guarded by the active expression-hash
+   * uniqueness constraint.
    *
    * @private
    * @param {ExpressionTreeExpressionWithHash} expression - Hashed expression node.

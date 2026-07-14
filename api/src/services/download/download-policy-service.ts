@@ -1,25 +1,21 @@
 import { IDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
-import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { PolicyStatementExpressionService } from '../access-policy/policy-statement-expression-service';
+import { PolicyExpressionService } from '../access-policy/policy-expression-service';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { DBService } from '../db-service';
 
 export interface CreateDownloadPolicyPayload {
   name: string;
   description: string | null;
-  featureTypes: string[];
   expressionId: string | null;
 }
 
 export class DownloadPolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
-  featureIngestionRepository: FeatureIngestionRepository;
+  policyExpressionService: PolicyExpressionService;
 
   /**
    * Build a download-policy service.
@@ -30,17 +26,17 @@ export class DownloadPolicyService extends DBService {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
-    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
   }
 
   /**
-   * Create a download's owning policy: one policy + N statements (one per feature type)
-   * + optional expression links (one per statement when an expression is provided).
+   * Create a download's owning policy: one policy + one wildcard statement.
+   * Request-created downloads pass an expression id; a few lower-level tests
+   * and setup helpers still create broad policies directly.
    *
    * Download policies define the feature set to export, not who can read it. Skipping
-   * team_policy / security_scope here keeps create-download from being a backdoor for
-   * granting access; export-time enforcement is the security boundary.
+   * team_policy / team_security_scope grants keeps create-download from being a
+   * backdoor for granting access; export-time enforcement is the security boundary.
    *
    * The policy is created with status 'approved' on insert, bypassing the pending ->
    * reviewed -> approved review flow that PolicyService.updatePolicy enforces. Download
@@ -52,17 +48,6 @@ export class DownloadPolicyService extends DBService {
    * @memberof DownloadPolicyService
    */
   async createDownloadPolicy(payload: CreateDownloadPolicyPayload): Promise<{ policy_id: string }> {
-    // Reject unknown feature type names up front so a typo or stale FE id doesn't silently
-    // produce a download with empty Parquet files. The check is per-create rather than at
-    // app start because feature_type rows can be added/retired between deploys; one extra
-    // SELECT per request is cheap (~10 rows in seed; bounded by domain size).
-    const activeFeatureTypes = await this.featureIngestionRepository.getActiveFeatureTypeMap();
-    const knownNames = new Set(activeFeatureTypes.map((row) => row.name));
-    const unknown = payload.featureTypes.filter((name) => !knownNames.has(name));
-    if (unknown.length > 0) {
-      throw new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes: unknown }]);
-    }
-
     const policyData: CreatePolicy = {
       name: payload.name,
       description: payload.description ?? undefined,
@@ -70,21 +55,20 @@ export class DownloadPolicyService extends DBService {
     };
 
     const policy = await this.policyRepository.insertPolicy(policyData);
+    const policyExpression =
+      payload.expressionId === null
+        ? null
+        : await this.policyExpressionService.ensurePolicyExpression({
+            policyId: policy.policy_id,
+            expressionId: payload.expressionId
+          });
 
-    for (const featureType of payload.featureTypes) {
-      const statement = await this.policyStatementService.createPolicyStatement({
-        policy_id: policy.policy_id,
-        effect: PolicyEffect.ALLOW,
-        submission_feature_urn: `urn:*:${featureType}:*`
-      });
-
-      if (payload.expressionId !== null) {
-        await this.policyStatementExpressionService.replacePolicyStatementExpression(
-          statement.policy_statement_id,
-          payload.expressionId
-        );
-      }
-    }
+    await this.policyStatementService.createPolicyStatement({
+      policy_id: policy.policy_id,
+      effect: PolicyEffect.ALLOW,
+      submission_feature_urn: 'urn:*:*:*',
+      policy_expression_id: policyExpression?.policy_expression_id ?? null
+    });
 
     return { policy_id: policy.policy_id };
   }

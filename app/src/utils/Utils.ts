@@ -161,6 +161,39 @@ export const getFormattedFileSize = (fileSize: number) => {
 };
 
 /**
+ * Format a feature count for display (e.g. on a download tile).
+ *
+ * Compact forms are for readability of large numbers only: counts under 1000 render plain
+ * (`412 features`, singular `1 feature`), while larger counts render with one decimal max and a
+ * trailing `.0` stripped (`17.4k features`, `17k features`, `2.5M features`). Lowercase `k` is
+ * deliberate — the desired display form is `17.4k`, whereas `Intl.NumberFormat` compact notation
+ * emits an uppercase `17.4K`. The band is chosen on the rounded thousands value, so a count that
+ * rounds up to 1000k promotes into the M band (999999 → `1M features`, never `1000k features`).
+ *
+ * A `null` count returns `null` so the caller hides the line entirely rather than rendering a
+ * broken value (e.g. versions materialized before counting existed carry no count).
+ *
+ * @param {number | null} count
+ * @return {*}  {(string | null)} formatted count string, or `null` when no count is stored
+ */
+export const formatFeatureCount = (count: number | null): string | null => {
+  if (count === null) {
+    return null;
+  }
+
+  if (count < 1000) {
+    return `${count} ${pluralize(count, 'feature')}`;
+  }
+
+  const thousands = Number.parseFloat((count / 1000).toFixed(1));
+  if (thousands < 1000) {
+    return `${thousands}k features`;
+  }
+
+  return `${Number.parseFloat((count / 1000000).toFixed(1))}M features`;
+};
+
+/**
  * Check if an unknown value is an object.
  *
  * @param {unknown} obj
@@ -287,6 +320,46 @@ export const buildUrl = (...urlParts: (string | undefined)[]): string => {
     .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
 
+/** OIDC authorization-response query params appended by Keycloak to the return URL after login. */
+const OIDC_RESPONSE_PARAMS = ['code', 'state', 'session_state', 'iss', 'error', 'error_description'];
+
+/**
+ * Strips the OIDC authorization-response params from a return URL while preserving any original
+ * application query params (e.g. the encoded `expr` search expression). Used by the post-login
+ * `onSigninCallback` so the user lands back on the same search results after authenticating.
+ *
+ * @param {string} href The full return URL (e.g. `window.location.href`).
+ * @returns The path + remaining query string, with the OIDC response params removed.
+ */
+export const stripOidcParams = (href: string): string => {
+  const url = new URL(href);
+  OIDC_RESPONSE_PARAMS.forEach((param) => url.searchParams.delete(param));
+  return `${url.pathname}${url.search}`;
+};
+
+/**
+ * Reads the post-login return location carried through the OIDC `state` param (set by callers such as
+ * the "Request Access" flow that redirect unauthenticated users to login). Used by `onSigninCallback` to
+ * navigate back to the originating search after authenticating, since the registered `redirect_uri` is a
+ * fixed origin and login otherwise lands on `/`.
+ *
+ * Only a safe same-origin relative path is returned (must start with a single `/`); anything else —
+ * absent state, an absolute URL, or a protocol-relative `//host` — yields `undefined`, guarding against
+ * open redirects.
+ *
+ * @param {unknown} user The OIDC user passed to `onSigninCallback` (its `state` holds the value set at signin).
+ * @returns The relative return path, or `undefined` when none/unsafe.
+ */
+export const getPostLoginReturnTo = (user: unknown): string | undefined => {
+  const returnTo = (user as { state?: { returnTo?: unknown } } | null | undefined)?.state?.returnTo;
+
+  if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+    return returnTo;
+  }
+
+  return undefined;
+};
+
 /**
  * Generates the <title> tag text for a React route
  * @param pageName The name of the page, e.g. 'Projects'
@@ -358,6 +431,17 @@ export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURC
     default:
       return null;
   }
+};
+
+/**
+ * Get the human-readable label for a user: the Keycloak display name (ex: `Bryan, Luke WLRS:EX`) when
+ * available, otherwise the raw user identifier (ex: IDIR username).
+ *
+ * @param {{ display_name?: string | null; user_identifier: string }} user The user to label
+ * @returns {*} {string} the display label for the user
+ */
+export const getUserLabel = (user: { display_name?: string | null; user_identifier: string }): string => {
+  return user.display_name?.trim() || user.user_identifier;
 };
 
 /**

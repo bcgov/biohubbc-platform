@@ -48,6 +48,13 @@ export const rootAPIDoc = {
         bearerFormat: 'JWT',
         description:
           "To access optionally authenticated api routes, a valid JWT token may optionally be provided in the 'Authorization' header. The 'Authorization' header value must be of the form: `Bearer xxxxxx.yyyyyyy.zzzzzz`. This security scheme should be used on endpoints that do not require a request to be authenticated, but which do return different values based on whether or not the request is authenticated."
+      },
+      ApiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+        description:
+          "To access API-key-gated routes, a valid BioHub API key must be present in the 'X-API-Key' header. API keys are generated per user account and expire after 6 months. The key format is `biohub_<prefix>_<secret>`. This security scheme should be used on endpoints that are intended for non-interactive scripts and external systems."
       }
     },
     responses: {

@@ -42,14 +42,14 @@ export class ArtifactService extends DBService {
   }
 
   /**
-   * Retrieves all artifacts belonging to the given dataset.
+   * Retrieves all artifacts belonging to the given survey.
    *
-   * @param {string} datasetId The ID of the dataset
-   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
+   * @param {string} surveyId The ID of the survey
+   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the survey
    * @memberof ArtifactService
    */
-  async getArtifactsByDatasetId(datasetId: string): Promise<Artifact[]> {
-    return this.artifactRepository.getArtifactsByDatasetId(datasetId);
+  async getArtifactsBySurveyId(surveyId: string): Promise<Artifact[]> {
+    return this.artifactRepository.getArtifactsBySurveyId(surveyId);
   }
 
   /**

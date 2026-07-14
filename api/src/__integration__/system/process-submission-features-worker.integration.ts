@@ -164,6 +164,7 @@ describe('Process Submission Features Worker', function () {
     uploadId: string;
     submissionUploadId: string;
     ticketId: string;
+    blueprintId: number;
     artifactId: string;
     objectKey: string;
   }> {
@@ -218,12 +219,17 @@ describe('Process Submission Features Worker', function () {
     // 5. ticket (required FK for submission_upload)
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
 
-    // 6. submission_upload (links submission to upload)
+    // 6. submission_upload (links submission to upload; pinned to the active default Blueprint)
+    const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
+      .where({ is_default: true })
+      .whereNull('record_end_date')
+      .select('blueprint_id');
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
-        ticket_id: ticketId
+        ticket_id: ticketId,
+        blueprint_id: blueprintId
       })
       .returning('submission_upload_id');
 
@@ -239,6 +245,7 @@ describe('Process Submission Features Worker', function () {
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
       ticketId,
+      blueprintId,
       artifactId: artifact.artifact_id,
       objectKey
     };
@@ -253,6 +260,7 @@ describe('Process Submission Features Worker', function () {
     submissionId: number;
     uploadId: string;
     ticketId: string;
+    blueprintId: number;
   }): Promise<void> {
     const connection = getAPIUserDBConnection();
     try {
@@ -262,7 +270,8 @@ describe('Process Submission Features Worker', function () {
         submission_id: params.submissionId,
         upload_id: params.uploadId,
         status: 'uploaded',
-        ticket_id: params.ticketId
+        ticket_id: params.ticketId,
+        blueprint_id: params.blueprintId
       });
       await connection.commit();
       expect(result.status).to.equal('published');
@@ -272,19 +281,19 @@ describe('Process Submission Features Worker', function () {
   }
 
   it('should process a valid submission and reach completed status', async () => {
-    const datasetId = randomUUID();
+    const surveyId = randomUUID();
     const featureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
             id: featureId,
-            type: 'dataset',
+            type: 'survey',
             properties: {
-              name: 'Integration Test Dataset',
+              name: 'Integration Test Survey',
               focal_species: [12345],
               start_date: '2024-01-01'
             },
@@ -295,8 +304,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
+    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+      tarBuffer
+    );
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
 
     // Wait for the worker to finish
     const validation = await waitForValidationStatus(db, submissionId);
@@ -309,7 +320,7 @@ describe('Process Submission Features Worker', function () {
       .select('feature_type.name as feature_type_name');
 
     expect(features.length).to.be.greaterThanOrEqual(1);
-    expect(features.some((f: { feature_type_name: string }) => f.feature_type_name === 'dataset')).to.be.true;
+    expect(features.some((f: { feature_type_name: string }) => f.feature_type_name === 'survey')).to.be.true;
   });
 
   it('should prevent concurrent jobs for same submission upload via singleton key', async () => {
@@ -343,13 +354,13 @@ describe('Process Submission Features Worker', function () {
   });
 
   it('should ignore unknown feature type without marking upload invalid', async () => {
-    const datasetId = randomUUID();
+    const surveyId = randomUUID();
     const featureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
             id: featureId,
@@ -362,8 +373,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
+    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+      tarBuffer
+    );
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
 
     const validation = await waitForValidationStatus(db, submissionId);
     expect(validation.status).to.equal('completed');
@@ -459,9 +472,13 @@ describe('SubmissionIngestionService pipeline (system)', function () {
    * block's setupSubmissionWithTar, using Knex (auto-committed) so the service's
    * own short-lived transactions can see the rows.
    */
-  async function setupSubmissionWithTar(
-    tarBuffer: Buffer
-  ): Promise<{ submissionId: number; uploadId: string; submissionUploadId: string; ticketId: string }> {
+  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{
+    submissionId: number;
+    uploadId: string;
+    submissionUploadId: string;
+    ticketId: string;
+    blueprintId: number;
+  }> {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
 
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
@@ -513,12 +530,17 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
     createdTicketIds.push(ticketId);
 
-    // 6. submission_upload
+    // 6. submission_upload (pinned to the active default Blueprint)
+    const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
+      .where({ is_default: true })
+      .whereNull('record_end_date')
+      .select('blueprint_id');
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
-        ticket_id: ticketId
+        ticket_id: ticketId,
+        blueprint_id: blueprintId
       })
       .returning('submission_upload_id');
 
@@ -533,7 +555,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submissionId: submission.submission_id,
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
-      ticketId
+      ticketId,
+      blueprintId
     };
   }
 
@@ -552,26 +575,27 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
       status: 'uploaded',
-      ticket_id: setup.ticketId
+      ticket_id: setup.ticketId,
+      blueprint_id: setup.blueprintId
     });
     return { result, ...setup };
   }
 
   it('should process a valid submission and create features', async () => {
-    const datasetId = randomUUID();
-    const datasetFeatureId = randomUUID();
+    const surveyId = randomUUID();
+    const surveyFeatureId = randomUUID();
     const siteFeatureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
-            id: datasetFeatureId,
-            type: 'dataset',
+            id: surveyFeatureId,
+            type: 'survey',
             properties: {
-              name: 'Test Dataset',
+              name: 'Test Survey',
               focal_species: [12345],
               start_date: '2024-01-01'
             },
@@ -588,7 +612,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
             type: 'sample_site',
             properties: { name: 'Test Site' },
             content: [],
-            parent: datasetFeatureId
+            parent: surveyFeatureId
           }
         ])
       }
@@ -610,23 +634,23 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       );
 
     const typeNames = features.map((r) => r.feature_type_name);
-    expect(typeNames).to.include('dataset');
+    expect(typeNames).to.include('survey');
     expect(typeNames).to.include('sample_site');
 
     // Parent relationships are unresolved in raw ingest (handled later by indexing).
-    const dataset = features.find((r) => r.feature_type_name === 'dataset');
+    const survey = features.find((r) => r.feature_type_name === 'survey');
     const site = features.find((r) => r.feature_type_name === 'sample_site');
-    expect(dataset?.parent_submission_feature_id).to.be.null;
+    expect(survey?.parent_submission_feature_id).to.be.null;
     expect(site?.parent_submission_feature_id).to.be.null;
   });
 
   it('should ignore unknown feature type during raw insert', async () => {
-    const datasetId = randomUUID();
+    const surveyId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
             id: randomUUID(),
@@ -651,20 +675,20 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   });
 
   it('should process media files and create artifact records', async () => {
-    const datasetId = randomUUID();
-    const datasetFeatureId = randomUUID();
+    const surveyId = randomUUID();
+    const surveyFeatureId = randomUUID();
     const fileFeatureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
-            id: datasetFeatureId,
-            type: 'dataset',
+            id: surveyFeatureId,
+            type: 'survey',
             properties: {
-              name: 'Media Test Dataset',
+              name: 'Media Test Survey',
               focal_species: [12345],
               start_date: '2024-01-01'
             },
@@ -681,7 +705,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
             type: 'file',
             properties: { filename: 'photo.jpg', file_size: 1024, file_type: 'image/jpeg' },
             content: [],
-            parent: datasetFeatureId
+            parent: surveyFeatureId
           }
         ])
       },
@@ -696,7 +720,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
 
-    // Verify features were inserted (dataset + file)
+    // Verify features were inserted (survey + file)
     const features = await db('biohub.submission_feature as sf')
       .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('sf.submission_id', submissionId)
@@ -707,7 +731,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       );
 
     const typeNames = features.map((r) => r.feature_type_name);
-    expect(typeNames).to.include('dataset');
+    expect(typeNames).to.include('survey');
     expect(typeNames).to.include('file');
 
     // Raw ingest keeps original feature payload shape.
@@ -726,20 +750,20 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   });
 
   it('should ingest successfully when referenced media file is missing from tar', async () => {
-    const datasetId = randomUUID();
-    const datasetFeatureId = randomUUID();
+    const surveyId = randomUUID();
+    const surveyFeatureId = randomUUID();
     const fileFeatureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
-            id: datasetFeatureId,
-            type: 'dataset',
+            id: surveyFeatureId,
+            type: 'survey',
             properties: {
-              name: 'Missing Media Dataset',
+              name: 'Missing Media Survey',
               focal_species: [12345],
               start_date: '2024-01-01'
             },
@@ -756,7 +780,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
             type: 'file',
             properties: { filename: 'missing.pdf', file_size: 2048, file_type: 'application/pdf' },
             content: [],
-            parent: datasetFeatureId
+            parent: surveyFeatureId
           }
         ])
       }
@@ -776,17 +800,17 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   });
 
   it('should persist unknown properties to JSONB without validation error', async () => {
-    const datasetId = randomUUID();
+    const surveyId = randomUUID();
     const featureId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
             id: featureId,
-            type: 'dataset',
+            type: 'survey',
             properties: {
               name: 'Unknown Props Test',
               focal_species: [12345],
@@ -809,14 +833,14 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     const features = await db('biohub.submission_feature as sf')
       .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('sf.submission_id', submissionId)
-      .where('ft.name', 'dataset')
+      .where('ft.name', 'survey')
       .select<Array<{ data: Record<string, unknown> }>>('sf.data');
 
     expect(features).to.have.lengthOf(1);
 
     const data = features[0].data;
     expect(data).to.have.property('id', featureId);
-    expect(data).to.have.property('type', 'dataset');
+    expect(data).to.have.property('type', 'survey');
     expect(data).to.have.property('properties');
     const properties = data.properties as Record<string, unknown>;
     expect(properties).to.have.property('name', 'Unknown Props Test');
@@ -827,13 +851,13 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   });
 
   it('should ignore unknown feature types during raw insert', async () => {
-    const datasetId = randomUUID();
+    const surveyId = randomUUID();
     const duplicateId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
-      { name: '.dataset-id', content: datasetId },
+      { name: '.survey-id', content: surveyId },
       {
-        name: 'features/dataset.json',
+        name: 'features/survey.json',
         content: JSON.stringify([
           {
             id: duplicateId,

@@ -64,8 +64,8 @@ describe('biohub-tar-parser', () => {
     it('streams features, codesets, and media in one pass', async () => {
       const tarBuffer = await createTestTar([
         {
-          name: 'features/dataset.json',
-          content: JSON.stringify([{ id: 'feature-1', type: 'dataset', properties: {}, content: [], parent: null }])
+          name: 'features/survey.json',
+          content: JSON.stringify([{ id: 'feature-1', type: 'survey', properties: {}, content: [], parent: null }])
         },
         {
           name: 'codes/agency.json',
@@ -130,11 +130,11 @@ describe('biohub-tar-parser', () => {
     it('flushes feature batches when byte threshold is reached', async () => {
       const tarBuffer = await createTestTar([
         {
-          name: 'features/dataset-a.json',
+          name: 'features/survey-a.json',
           content: JSON.stringify([
             {
               id: 'feature-1',
-              type: 'dataset',
+              type: 'survey',
               properties: { description: 'x'.repeat(200) },
               content: [],
               parent: null
@@ -142,11 +142,11 @@ describe('biohub-tar-parser', () => {
           ])
         },
         {
-          name: 'features/dataset-b.json',
+          name: 'features/survey-b.json',
           content: JSON.stringify([
             {
               id: 'feature-2',
-              type: 'dataset',
+              type: 'survey',
               properties: { description: 'y'.repeat(200) },
               content: [],
               parent: null
@@ -205,7 +205,7 @@ describe('biohub-tar-parser', () => {
       const tarBuffer = await createTestTar([
         {
           name: 'features/bad.json',
-          content: JSON.stringify([{ type: 'dataset', properties: { name: 'Missing id' } }])
+          content: JSON.stringify([{ type: 'survey', properties: { name: 'Missing id' } }])
         }
       ]);
 

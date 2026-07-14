@@ -1,4 +1,4 @@
-import { TaxonSearchResult } from '../services/taxonomy-service';
+import { TaxonSearchResult } from '../services/taxonomy-service.interface';
 
 /**
  * Sorts the ITIS response by how strongly records match the search terms

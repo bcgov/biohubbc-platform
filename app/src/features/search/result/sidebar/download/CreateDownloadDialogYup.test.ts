@@ -3,8 +3,7 @@ import { CreateDownloadDialogYup } from './CreateDownloadDialogYup';
 
 const validValues = {
   name: 'Moose download',
-  description: 'Moose observations in the Skeena',
-  featureTypes: ['dataset']
+  description: 'Moose observations in the Skeena'
 };
 
 describe('CreateDownloadDialogYup', () => {
@@ -15,12 +14,6 @@ describe('CreateDownloadDialogYup', () => {
   it('rejects a name longer than 100 characters', async () => {
     await expect(CreateDownloadDialogYup.validate({ ...validValues, name: 'x'.repeat(101) })).rejects.toThrow(
       /100 characters or less/
-    );
-  });
-
-  it('rejects an empty featureTypes array', async () => {
-    await expect(CreateDownloadDialogYup.validate({ ...validValues, featureTypes: [] })).rejects.toThrow(
-      /at least one feature type/
     );
   });
 

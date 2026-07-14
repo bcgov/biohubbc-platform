@@ -7,6 +7,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import * as db from '../../../../database/db';
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { SearchFeatureResultWithRelevancy } from '../../../../services/search-feature-service.interface';
+import { UserService } from '../../../../services/user-service';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -40,7 +41,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -48,9 +49,8 @@ describe('searchFeatures', () => {
         submission_id: 10,
         uuid: '550e8400-e29b-41d4-a716-446655440001',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_name: 'Moose Study 2024',
-        feature_description: 'A study of moose habitat in Northern BC',
+        feature_type_name: 'survey',
+        properties: {},
         submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
         relevancy_score: 0.75,
@@ -68,16 +68,17 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[1]).to.eql(expressionTree);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 10,
@@ -85,7 +86,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -99,7 +101,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: '  DATASET  ' };
+    mockReq.params = { feature_type: '  SURVEY  ' };
     mockReq.body = {
       expression: expressionTree,
       pagination: {
@@ -110,12 +112,12 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(mockRes.statusValue).to.equal(200);
   });
 
@@ -129,7 +131,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -137,9 +139,8 @@ describe('searchFeatures', () => {
         submission_id: 11,
         uuid: '550e8400-e29b-41d4-a716-446655440002',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_name: 'Moose Population Survey',
-        feature_description: 'Population survey data for moose',
+        feature_type_name: 'survey',
+        properties: {},
         submission_name: 'Species Census 2024',
         is_secured: true,
         relevancy_score: 0.6,
@@ -157,14 +158,16 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
+    // A visible secured row the caller CAN see must not, by itself, set has_more_secured_features.
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 10,
@@ -172,8 +175,38 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
+  });
+
+  it('should expose has_more_secured_features when secured matches are hidden from the caller', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { feature_type: 'dataset' };
+    mockReq.body = {
+      expression: expressionTree,
+      pagination: { page: '1', limit: '10' }
+    };
+
+    sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: true });
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue.has_more_secured_features).to.equal(true);
+    // No hidden secured rows are leaked alongside the flag.
+    expect(mockRes.jsonValue.features).to.eql([]);
   });
 
   it('should handle pagination with multiple pages', async () => {
@@ -186,7 +219,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -194,9 +227,8 @@ describe('searchFeatures', () => {
         submission_id: 12,
         uuid: '550e8400-e29b-41d4-a716-446655440003',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_name: 'Dataset 1',
-        feature_description: 'Description 1',
+        feature_type_name: 'survey',
+        properties: {},
         submission_name: 'Submission 1',
         is_secured: false,
         relevancy_score: 0.8,
@@ -209,14 +241,14 @@ describe('searchFeatures', () => {
       pagination: {
         page: '2',
         limit: '5',
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
       }
     };
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: 25 });
+      .resolves({ features: mockResults, properties: [], count: 25, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -224,14 +256,16 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 25,
         per_page: 5,
         current_page: 2,
         last_page: 5,
-        sort: 'feature_name',
+        sort: 'feature_type_name',
         order: 'asc'
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -245,7 +279,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -257,7 +291,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -265,6 +299,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: [],
+      properties: [],
       pagination: {
         total: 0,
         per_page: 10,
@@ -272,7 +307,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -286,7 +322,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -321,7 +357,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: {
         type: 'expression'
@@ -362,8 +398,7 @@ describe('searchFeatures', () => {
         uuid: '550e8400-e29b-41d4-a716-446655440005',
         feature_type_id: 3,
         feature_type_name: 'telemetry',
-        feature_name: 'Telemetry 1',
-        feature_description: null,
+        properties: {},
         submission_name: 'Telemetry Submission',
         is_secured: false,
         relevancy_score: 1,
@@ -373,7 +408,7 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: 37 });
+      .resolves({ features: mockResults, properties: [], count: 37, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -401,7 +436,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -409,9 +444,8 @@ describe('searchFeatures', () => {
         submission_id: 13,
         uuid: '550e8400-e29b-41d4-a716-446655440004',
         feature_type_id: 1,
-        feature_type_name: 'dataset',
-        feature_name: 'Dataset Without Pagination',
-        feature_description: 'Description',
+        feature_type_name: 'survey',
+        properties: {},
         submission_name: 'Submission',
         is_secured: false,
         relevancy_score: 0.9,
@@ -425,7 +459,7 @@ describe('searchFeatures', () => {
 
     sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, count: mockResults.length });
+      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -433,6 +467,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
+      properties: [],
       pagination: {
         total: 1,
         per_page: 25,
@@ -440,7 +475,8 @@ describe('searchFeatures', () => {
         last_page: 1,
         sort: undefined,
         order: undefined
-      }
+      },
+      has_more_secured_features: false
     });
   });
 
@@ -454,7 +490,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
 
     mockReq.body = {
       expression: expressionTree,
@@ -463,12 +499,12 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(null);
   });
 
@@ -481,11 +517,12 @@ describe('searchFeatures', () => {
       systemUserId: () => 123
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = 'some-valid-token';
-    mockReq.params = { feature_type: 'dataset' };
+    mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: expressionTree,
       pagination: { page: '1', limit: '10' }
@@ -493,12 +530,43 @@ describe('searchFeatures', () => {
 
     const searchStub = sinon
       .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], count: 0 });
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(searchStub.firstCall.args[0]).to.equal('dataset');
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(123);
+  });
+
+  it('should pass null systemUserId for inactive authenticated requests', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves(),
+      systemUserId: () => 123
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'getUserById').rejects(new Error('inactive'));
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.keycloak_token = 'some-valid-token';
+    mockReq.params = { feature_type: 'survey' };
+    mockReq.body = {
+      expression: expressionTree,
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
+      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(searchStub.firstCall.args[0]).to.equal('survey');
+    expect(searchStub.firstCall.args[3]).to.equal(null);
   });
 });

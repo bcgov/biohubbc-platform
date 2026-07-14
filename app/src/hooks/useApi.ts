@@ -1,13 +1,14 @@
 import { useConfigContext } from 'hooks/useContext';
 import useAdminApi from './api/useAdminApi';
+import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
-import { useCartApi } from './api/useCartApi';
 import { useDownloadApi } from './api/useDownloadApi';
 import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
+import { useGalleryApi } from './api/useGalleryApi';
 import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
@@ -54,17 +55,19 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
-  const cart = useCartApi(apiAxios);
-
   const download = useDownloadApi(apiAxios);
 
   const downloadExport = useDownloadExportApi(apiAxios);
+
+  const gallery = useGalleryApi(apiAxios);
 
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   const tickets = useTicketsApi(apiAxios);
 
   const dataRequest = useDataRequestApi(apiAxios);
+
+  const apiKeys = useApiKeysApi(apiAxios);
 
   const objectStorage = useObjectStorageApi();
 
@@ -81,12 +84,13 @@ export const useApi = () => {
     policies,
     search,
     teams,
-    cart,
     download,
     downloadExport,
+    gallery,
     teamPolicies,
     tickets,
     dataRequest,
+    apiKeys,
     objectStorage
   };
 };

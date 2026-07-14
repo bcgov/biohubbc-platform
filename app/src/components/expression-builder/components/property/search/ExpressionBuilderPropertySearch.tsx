@@ -17,6 +17,8 @@ interface ExpressionBuilderPropertySearchProps {
   showSearchIcon?: boolean;
   /** Marks the input invalid for validation feedback. */
   error?: boolean;
+  /** Disables property edits. */
+  disabled?: boolean;
   /** Inline style overrides for compact token layouts. */
   sx?: SxProps<Theme>;
   /** Reports the property selected by the user. */
@@ -44,6 +46,7 @@ export const ExpressionBuilderPropertySearch = ({
   placeholder,
   showSearchIcon = true,
   error,
+  disabled,
   sx,
   onSelectProperty,
   onSearchInputChange
@@ -65,6 +68,7 @@ export const ExpressionBuilderPropertySearch = ({
       size="small"
       variant="outlined"
       error={error}
+      disabled={disabled}
       selectedValue={value}
       sx={sx}
       options={properties}

@@ -1,409 +1,210 @@
-import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiCancel, mdiCheck, mdiDotsVertical, mdiMagnify, mdiMenuDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
-import Toolbar from '@mui/material/Toolbar';
+import Chip from '@mui/material/Chip';
+import InputAdornment from '@mui/material/InputAdornment';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { EditDialog } from 'components/dialog/EditDialog';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
-import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
-import { ISnackbarProps } from 'contexts/dialogContext';
-import { APIError } from 'hooks/api/useAxios';
-import { useApi } from 'hooks/useApi';
-import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
-import { useCallback, useState } from 'react';
-import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
-import AddSystemUsersForm, {
-  AddSystemUsersFormInitialValues,
-  AddSystemUsersFormYupSchema,
-  IAddSystemUsersForm
-} from './AddSystemUsersForm';
+import { useMemo } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
+import { getUserLabel } from 'utils/Utils';
 
-const useStyles = () => {
-  return {
-    table: {
-      '& td': {
-        verticalAlign: 'middle'
-      }
-    }
-  };
-};
+export interface IUsersListRowActions {
+  onChangeRole: (user: ISystemUser, roleId: number, roleName: string) => void;
+  onBlockUser: (user: ISystemUser) => void;
+  onActivateUser: (user: ISystemUser) => void;
+}
 
-export interface IActiveUsersListProps {
-  activeUsers: ISystemUser[];
-  refresh: () => void;
+export interface IActiveUsersListProps extends IServerPaginationProps {
+  rows: ISystemUser[];
+  systemRoles: IGetRoles[];
+  searchTerm: string;
+  onSearch: (term: string) => void;
+  onAddUsers: () => void;
+  rowActions: IUsersListRowActions;
 }
 
 /**
- * Table to display a list of active users.
+ * Server-paginated system users list.
  *
- * @param {*} props
+ * @param {IActiveUsersListProps} props
  * @return {*}
  */
-const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> = (props) => {
-  const classes = useStyles();
-  const biohubApi = useApi();
-  const { activeUsers } = props;
+const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
+  const {
+    rows,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    systemRoles,
+    searchTerm,
+    onSearch,
+    onAddUsers,
+    rowActions
+  } = props;
 
-  const rolesDataLoader = useDataLoader(() => {
-    return biohubApi.user.getRoles();
-  });
+  const columns: GridColDef<ISystemUser>[] = useMemo(
+    () => [
+      {
+        field: 'user_identifier',
+        headerName: 'Name',
+        minWidth: 220,
+        flex: 1,
+        renderCell: (params) => {
+          const label = getUserLabel(params.row);
 
-  rolesDataLoader.load();
-
-  let systemRoles: IGetRoles[] = [];
-  if (rolesDataLoader.data) {
-    systemRoles = rolesDataLoader.data;
-  }
-
-  const [rowsPerPage, setRowsPerPage] = useState(50);
-  const [page, setPage] = useState(0);
-  const dialogContext = useDialogContext();
-
-  const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
-
-  const showSnackBar = useCallback(
-    (textDialogProps?: Partial<ISnackbarProps>) => {
-      dialogContext.setSnackbar({ ...textDialogProps, open: true });
-    },
-    [dialogContext]
-  );
-
-  const closeYesNoDialog = useCallback(() => {
-    dialogContext.setYesNoDialog({ open: false });
-  }, [dialogContext]);
-
-  const handleRemoveUserClick = (row: ISystemUser) => {
-    dialogContext.setYesNoDialog({
-      dialogTitle: 'Remove user?',
-      dialogContent: (
-        <Typography variant="body1" component="div" color="textSecondary">
-          Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application and all
-          related projects. Are you sure you want to proceed?
-        </Typography>
-      ),
-      yesButtonLabel: 'Remove User',
-      noButtonLabel: 'Cancel',
-      yesButtonProps: { color: 'error' },
-      onClose: closeYesNoDialog,
-      onNo: closeYesNoDialog,
-      open: true,
-      onYes: buildConfirmRemoveUserHandler(row)
-    });
-  };
-
-  const deActivateSystemUser = useCallback(
-    async (user: ISystemUser) => {
-      if (!user?.system_user_id) {
-        return;
-      }
-      try {
-        await biohubApi.user.deleteSystemUser(user.system_user_id);
-
-        showSnackBar({
-          snackbarMessage: (
-            <>
-              <Typography variant="body2" component="div">
-                User <strong>{user.user_identifier}</strong> removed from application.
+          return (
+            <Stack>
+              <Typography variant="body2" noWrap title={label || 'No identifier'}>
+                {label || 'No identifier'}
               </Typography>
-            </>
-          ),
-          open: true
-        });
-
-        props.refresh();
-      } catch (error) {
-        const apiError = error as APIError;
-
-        dialogContext.setErrorDialog({
-          open: true,
-          dialogTitle: DeleteSystemUserI18N.deleteUserErrorTitle,
-          dialogText: DeleteSystemUserI18N.deleteUserErrorText,
-          dialogError: apiError.message,
-          dialogErrorDetails: apiError.errors,
-          onClose: () => {
-            dialogContext.setErrorDialog({ open: false });
-          },
-          onOk: () => {
-            dialogContext.setErrorDialog({ open: false });
-          }
-        });
-      }
-    },
-    [biohubApi.user, dialogContext, props, showSnackBar]
-  );
-
-  const handleChangeUserPermissionsClick = (row: ISystemUser, newRoleName: any, newRoleId: number) => {
-    dialogContext.setYesNoDialog({
-      dialogTitle: 'Change User Role?',
-      dialogContent: (
-        <Typography variant="body1" color="textSecondary">
-          Change user <strong>{row.user_identifier}</strong>'s role to <strong>{newRoleName}</strong>?
-        </Typography>
-      ),
-      yesButtonLabel: 'Change Role',
-      noButtonLabel: 'Cancel',
-      yesButtonProps: { color: 'primary' },
-      onClose: closeYesNoDialog,
-      onNo: closeYesNoDialog,
-      open: true,
-      onYes: buildConfirmRoleChangeHandler(row, newRoleId, newRoleName)
-    });
-  };
-
-  const changeSystemUserRole = useCallback(
-    async (user: ISystemUser, roleId: number, roleName: string) => {
-      if (!user?.system_user_id) {
-        return;
-      }
-      const roleIds = [roleId];
-
-      try {
-        await biohubApi.user.updateSystemUserRoles(user.system_user_id, roleIds);
-
-        showSnackBar({
-          snackbarMessage: (
-            <>
-              <Typography variant="body2" component="div">
-                User <strong>{user.user_identifier}</strong>'s role has changed to <strong>{roleName}</strong>.
-              </Typography>
-            </>
-          ),
-          open: true
-        });
-
-        props.refresh();
-      } catch (error) {
-        const apiError = error as APIError;
-        dialogContext.setErrorDialog({
-          open: true,
-          dialogTitle: UpdateSystemUserI18N.updateUserErrorTitle,
-          dialogText: UpdateSystemUserI18N.updateUserErrorText,
-          dialogError: apiError.message,
-          dialogErrorDetails: apiError.errors,
-          onClose: () => {
-            dialogContext.setErrorDialog({ open: false });
-          },
-          onOk: () => {
-            dialogContext.setErrorDialog({ open: false });
-          }
-        });
-      }
-    },
-    [biohubApi.user, dialogContext, props, showSnackBar]
-  );
-
-  const buildConfirmRemoveUserHandler = useCallback(
-    (user: ISystemUser) => () => {
-      const confirmRemoveUser = async () => {
-        try {
-          await deActivateSystemUser(user);
-        } finally {
-          closeYesNoDialog();
+              {params.row.display_name?.trim() ? (
+                <Typography variant="caption" color="textSecondary" noWrap title={params.row.user_identifier}>
+                  {params.row.user_identifier}
+                </Typography>
+              ) : null}
+            </Stack>
+          );
         }
-      };
+      },
+      {
+        field: 'identity_source',
+        headerName: 'Identity Source',
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => <Typography variant="body2">{params.value}</Typography>
+      },
+      {
+        field: 'record_end_date',
+        headerName: 'Status',
+        minWidth: 130,
+        flex: 0.6,
+        renderCell: (params) => {
+          const isBlocked = Boolean(params.value);
 
-      confirmRemoveUser();
-    },
-    [closeYesNoDialog, deActivateSystemUser]
-  );
-
-  const buildConfirmRoleChangeHandler = useCallback(
-    (user: ISystemUser, roleId: number, roleName: string) => () => {
-      const confirmRoleChange = async () => {
-        try {
-          await changeSystemUserRole(user, roleId, roleName);
-        } finally {
-          closeYesNoDialog();
+          return (
+            <Chip
+              label={isBlocked ? 'Blocked' : 'Active'}
+              size="small"
+              color={isBlocked ? 'default' : 'success'}
+              sx={{ fontWeight: 700 }}
+            />
+          );
         }
-      };
-
-      confirmRoleChange();
-    },
-    [changeSystemUserRole, closeYesNoDialog]
-  );
-
-  const handleAddSystemUsersSave = async (values: IAddSystemUsersForm) => {
-    setOpenAddUserDialog(false);
-
-    try {
-      for (const systemUser of values.systemUsers) {
-        await biohubApi.admin.addSystemUser(
-          systemUser.userIdentifier,
-          systemUser.userGuid,
-          systemUser.identitySource,
-          systemUser.systemRole
-        );
-      }
-
-      props.refresh();
-
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
-          </Typography>
+      },
+      {
+        field: 'role_names',
+        headerName: 'Role',
+        minWidth: 220,
+        flex: 1,
+        sortable: false,
+        renderCell: (params) => (
+          <Box onClick={(event) => event.stopPropagation()}>
+            <CustomMenuButton
+              buttonLabel={params.row.role_names.join(', ') || 'No assigned role'}
+              buttonTitle="Change User Permissions"
+              menuItems={systemRoles.map((role) => ({
+                menuLabel: role.name,
+                menuOnClick: () => rowActions.onChangeRole(params.row, role.system_role_id, role.name)
+              }))}
+              buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
+            />
+          </Box>
         )
-      });
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: AddSystemUserI18N.addUserErrorTitle,
-        dialogText: AddSystemUserI18N.addUserErrorText,
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
+      },
+      {
+        field: 'actions',
+        headerName: 'Actions',
+        minWidth: 100,
+        flex: 0.5,
+        sortable: false,
+        align: 'center',
+        headerAlign: 'center',
+        renderCell: (params) => {
+          const isBlocked = Boolean(params.row.record_end_date);
+
+          return (
+            <Box onClick={(event) => event.stopPropagation()}>
+              <CustomMenuIconButton
+                buttonTitle="Actions"
+                buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+                menuItems={[
+                  isBlocked
+                    ? {
+                        menuIcon: <Icon path={mdiCheck} size={0.875} />,
+                        menuLabel: 'Activate user',
+                        menuOnClick: () => rowActions.onActivateUser(params.row)
+                      }
+                    : {
+                        menuIcon: <Icon path={mdiCancel} size={0.875} />,
+                        menuLabel: 'Block user',
+                        menuOnClick: () => rowActions.onBlockUser(params.row)
+                      }
+                ]}
+              />
+            </Box>
+          );
         }
-      });
-    }
-  };
+      }
+    ],
+    [rowActions, systemRoles]
+  );
 
   return (
-    <>
-      <Container maxWidth="xl">
-        <Paper>
-          <Toolbar
-            sx={{
-              pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 },
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-            <Typography variant="h4" component="h2">
-              Active Users{' '}
-              <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
-                ({activeUsers?.length || 0})
-              </Typography>
-            </Typography>
-            <Button
-              size="medium"
-              color="primary"
-              variant="contained"
-              data-testid="invite-system-users-button"
-              aria-label={'Add Users'}
-              startIcon={<Icon path={mdiPlus} size={1} />}
-              onClick={() => setOpenAddUserDialog(true)}
-              sx={{ fontWeight: 700 }}>
-              Add Users
-            </Button>
-          </Toolbar>
-          <TableContainer>
-            <Table sx={classes.table}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Username</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell align="center" width="100">
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody data-testid="active-users-table">
-                {!activeUsers?.length && (
-                  <TableRow data-testid={'active-users-row-0'}>
-                    <TableCell colSpan={6} style={{ textAlign: 'center' }}>
-                      No Active Users
-                    </TableCell>
-                  </TableRow>
-                )}
-                {activeUsers.length > 0 &&
-                  activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
-                    <TableRow data-testid={`active-user-row-${index}`} key={row.system_user_id}>
-                      <TableCell>{row.user_identifier || 'No identifier'}</TableCell>
-                      <TableCell>
-                        <CustomMenuButton
-                          buttonLabel={row.role_names.join(', ') || 'No assigned role'}
-                          buttonTitle={'Change User Permissions'}
-                          menuItems={systemRoles.map((item) => {
-                            return {
-                              menuLabel: item.name,
-                              menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.system_role_id)
-                            };
-                          })}
-                          buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
-                        />
-                      </TableCell>
-
-                      <TableCell align="center">
-                        <Box>
-                          <CustomMenuIconButton
-                            buttonTitle="Actions"
-                            buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-                            menuItems={[
-                              {
-                                menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-                                menuLabel: 'Remove user',
-                                menuOnClick: () => handleRemoveUserClick(row)
-                              }
-                            ]}
-                          />
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {activeUsers?.length > 0 && (
-            <TablePagination
-              rowsPerPageOptions={[50, 100, 200]}
-              component="div"
-              count={activeUsers.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
-              onRowsPerPageChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                handleChangeRowsPerPage(event, setPage, setRowsPerPage)
+    <PageSection
+      id="users"
+      label={
+        <>
+          Users{' '}
+          <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
+            ({rowCount})
+          </Typography>
+        </>
+      }
+      onAdd={onAddUsers}
+      addLabel="Add Users"
+      headerContent={
+        <Stack gap={1} direction="row" alignItems="center">
+          <TextField
+            size="small"
+            placeholder="Search by username"
+            value={searchTerm}
+            onChange={(event) => onSearch(event.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Icon path={mdiMagnify} size={0.875} />
+                  </InputAdornment>
+                )
               }
-            />
-          )}
-        </Paper>
-      </Container>
-
-      <EditDialog
-        isLoading={false}
-        dialogTitle={'Add Users'}
-        open={openAddUserDialog}
-        dialogSaveButtonLabel={'Add'}
-        component={{
-          element: (
-            <AddSystemUsersForm
-              system_roles={
-                systemRoles.map((item) => {
-                  return { value: item.system_role_id, label: item.name };
-                }) || []
-              }
-            />
-          ),
-          initialValues: AddSystemUsersFormInitialValues,
-          validationSchema: AddSystemUsersFormYupSchema
-        }}
-        onCancel={() => setOpenAddUserDialog(false)}
-        onSave={async (values) => {
-          await handleAddSystemUsersSave(values);
-          setOpenAddUserDialog(false);
-        }}
+            }}
+            sx={{ width: 250 }}
+          />
+        </Stack>
+      }>
+      <ServerPaginatedDataGrid<ISystemUser>
+        dataTestId="users-table"
+        rows={rows}
+        columns={columns}
+        getRowId={(row) => row.system_user_id}
+        noRowsMessage="No users"
+        rowCount={rowCount}
+        paginationModel={paginationModel}
+        setPaginationModel={setPaginationModel}
+        sortModel={sortModel}
+        setSortModel={setSortModel}
       />
-    </>
+    </PageSection>
   );
 };
 

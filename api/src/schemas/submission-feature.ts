@@ -19,7 +19,8 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         'feature_type_name',
         'feature_type_display_name',
         'submission_name',
-        'secured'
+        'secured',
+        'security_reasons'
       ],
       properties: {
         submission_feature_id: {
@@ -67,6 +68,12 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         secured: {
           type: 'boolean',
           description: 'Indicates whether this feature is secured or restricted.'
+        },
+        security_reasons: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            "Distinct active security rule names applied across this feature's closure ancestry; empty when the feature is not effectively secured."
         }
       }
     },

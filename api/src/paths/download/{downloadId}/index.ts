@@ -5,6 +5,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../services/download/download-service';
 import { getLogger } from '../../../utils/logger';
+import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
@@ -72,15 +73,27 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['download_id', 'status'],
+            required: ['download_id', 'download_version_id', 'status', 'name'],
             properties: {
               download_id: {
                 type: 'string',
                 format: 'uuid'
               },
+              download_version_id: {
+                type: 'string',
+                format: 'uuid',
+                description: 'The most-recent materialized version of this download.'
+              },
               status: {
                 type: 'string',
                 enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+              },
+              name: {
+                type: 'string'
+              },
+              description: {
+                type: 'string',
+                nullable: true
               },
               started_at: {
                 type: 'string',
@@ -122,14 +135,17 @@ export function findDownloadById(): RequestHandler {
       await connection.open();
 
       const downloadService = new DownloadService(connection);
-      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
       const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
       await connection.commit();
 
       return res.status(200).json({
         download_id: download.download_id,
+        download_version_id: download.download_version_id,
         status: download.download_status,
+        name: download.name,
+        description: download.description,
         started_at: download.started_at,
         completed_at: download.completed_at,
         downloaded_at: download.downloaded_at

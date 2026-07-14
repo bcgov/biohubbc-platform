@@ -52,7 +52,8 @@ interface UseExpressionBuilderPropertiesResult {
  */
 export const useExpressionBuilderProperties = (
   recommendedSearchTerm: string | undefined,
-  usedPropertyKeys: Set<string>
+  usedPropertyKeys: Set<string>,
+  enabled = true
 ): UseExpressionBuilderPropertiesResult => {
   const api = useApi();
   const dialogContext = useDialogContext();
@@ -155,6 +156,10 @@ export const useExpressionBuilderProperties = (
    */
   const speciesPredicatePropertyLoader = useDataLoader(
     async () => {
+      if (!enabled) {
+        return null;
+      }
+
       const response = await searchPropertiesRef.current({ keyword: 'taxon_id' }, { page: 1, limit: 25 });
 
       return findSpeciesPredicateProperty(
@@ -181,59 +186,66 @@ export const useExpressionBuilderProperties = (
    * @param {string} keyword Trimmed keyword used to filter property-search results.
    * @param {number} lookupId Monotonic request id used to discard stale responses.
    */
-  const loadPropertyOptions = useCallback(async (keyword: string, lookupId: number) => {
-    try {
-      const usedPropertyKeysSnapshot = usedPropertyKeysRef.current;
-      const shouldHydrateMissingUsedProperties = keyword.length === 0 && usedPropertyKeysSnapshot.size > 0;
-      const collectedPropertiesByKey = new Map<string, ExpressionBuilderProperty>();
-      let page = 1;
-      let lastPage = 1;
-      let pagesFetched = 0;
-
-      do {
-        const response = await searchPropertiesRef.current(keyword ? { keyword } : {}, {
-          page,
-          limit: PROPERTY_SEARCH_DEFAULT_LIMIT
-        });
-        const mappedProperties = Object.values(response.properties)
-          .flat()
-          .map(mapSearchPropertyToExpressionBuilderProperty);
-
-        mappedProperties.forEach((property) => {
-          collectedPropertiesByKey.set(getExpressionBuilderPropertyKeyFromProperty(property), property);
-        });
-
-        pagesFetched += 1;
-        lastPage = response.pagination.last_page;
-        page += 1;
-
-        if (!shouldHydrateMissingUsedProperties) {
-          break;
-        }
-
-        const missingUsedPropertyCount = Array.from(usedPropertyKeysSnapshot).filter(
-          (key) => !collectedPropertiesByKey.has(key)
-        ).length;
-
-        if (missingUsedPropertyCount === 0) {
-          break;
-        }
-      } while (page <= lastPage && pagesFetched < PROPERTY_SEARCH_HYDRATION_MAX_PAGES);
-
-      const nextProperties = Array.from(collectedPropertiesByKey.values());
-
-      if (lookupId === activePropertyOptionsLookupIdRef.current) {
-        setPropertyOptions(nextProperties);
+  const loadPropertyOptions = useCallback(
+    async (keyword: string, lookupId: number) => {
+      if (!enabled) {
+        return;
       }
-    } catch (error) {
-      if (lookupId === activePropertyOptionsLookupIdRef.current) {
-        setSnackbarRef.current({
-          open: true,
-          snackbarMessage: `Failed to load properties: ${(error as Error).message}`
-        });
+
+      try {
+        const usedPropertyKeysSnapshot = usedPropertyKeysRef.current;
+        const shouldHydrateMissingUsedProperties = keyword.length === 0 && usedPropertyKeysSnapshot.size > 0;
+        const collectedPropertiesByKey = new Map<string, ExpressionBuilderProperty>();
+        let page = 1;
+        let lastPage = 1;
+        let pagesFetched = 0;
+
+        do {
+          const response = await searchPropertiesRef.current(keyword ? { keyword } : {}, {
+            page,
+            limit: PROPERTY_SEARCH_DEFAULT_LIMIT
+          });
+          const mappedProperties = Object.values(response.properties)
+            .flat()
+            .map(mapSearchPropertyToExpressionBuilderProperty);
+
+          mappedProperties.forEach((property) => {
+            collectedPropertiesByKey.set(getExpressionBuilderPropertyKeyFromProperty(property), property);
+          });
+
+          pagesFetched += 1;
+          lastPage = response.pagination.last_page;
+          page += 1;
+
+          if (!shouldHydrateMissingUsedProperties) {
+            break;
+          }
+
+          const missingUsedPropertyCount = Array.from(usedPropertyKeysSnapshot).filter(
+            (key) => !collectedPropertiesByKey.has(key)
+          ).length;
+
+          if (missingUsedPropertyCount === 0) {
+            break;
+          }
+        } while (page <= lastPage && pagesFetched < PROPERTY_SEARCH_HYDRATION_MAX_PAGES);
+
+        const nextProperties = Array.from(collectedPropertiesByKey.values());
+
+        if (lookupId === activePropertyOptionsLookupIdRef.current) {
+          setPropertyOptions(nextProperties);
+        }
+      } catch (error) {
+        if (lookupId === activePropertyOptionsLookupIdRef.current) {
+          setSnackbarRef.current({
+            open: true,
+            snackbarMessage: `Failed to load properties: ${(error as Error).message}`
+          });
+        }
       }
-    }
-  }, []);
+    },
+    [enabled]
+  );
 
   /**
    * Debounced wrapper around property-picker option loading.
@@ -258,13 +270,21 @@ export const useExpressionBuilderProperties = (
    */
   const refreshPropertyOptions = useCallback(
     (keyword = '') => {
+      if (!enabled) {
+        return;
+      }
+
       const lookupId = ++activePropertyOptionsLookupIdRef.current;
       debouncedLoadPropertyOptions(keyword.trim(), lookupId);
     },
-    [debouncedLoadPropertyOptions]
+    [debouncedLoadPropertyOptions, enabled]
   );
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const lookupId = ++activePropertyOptionsLookupIdRef.current;
     const loadInitialPropertyOptions = async () => {
       await loadPropertyOptions('', lookupId);
@@ -273,10 +293,14 @@ export const useExpressionBuilderProperties = (
     loadInitialPropertyOptions();
 
     return () => debouncedLoadPropertyOptions.cancel();
-  }, [debouncedLoadPropertyOptions, loadPropertyOptions]);
+  }, [debouncedLoadPropertyOptions, enabled, loadPropertyOptions]);
 
   // Recommendation requests are keyed by the debounced search term from the parent.
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const keyword = recommendedSearchTerm?.trim();
 
     if (!keyword) {
@@ -297,7 +321,7 @@ export const useExpressionBuilderProperties = (
         pagination: { page: 1, limit: 25 }
       }
     });
-  }, [recommendedSearchTerm, refreshRecommendedFilters]);
+  }, [enabled, recommendedSearchTerm, refreshRecommendedFilters]);
 
   /**
    * Loads the normalized `taxon_id` property used to convert species suggestion chips into predicates.
@@ -314,6 +338,10 @@ export const useExpressionBuilderProperties = (
    * @returns {Promise<ExpressionBuilderProperty | null>} The cached or loaded taxon predicate property, or null when unavailable.
    */
   const loadSpeciesPredicateProperty = useCallback(async (): Promise<ExpressionBuilderProperty | null> => {
+    if (!enabled) {
+      return null;
+    }
+
     const existingProperty = findSpeciesPredicateProperty(knownProperties);
 
     if (existingProperty) {
@@ -327,7 +355,7 @@ export const useExpressionBuilderProperties = (
     }
 
     return property ?? null;
-  }, [findSpeciesPredicateProperty, handlePropertySelected, knownProperties, speciesPredicatePropertyLoader]);
+  }, [enabled, findSpeciesPredicateProperty, handlePropertySelected, knownProperties, speciesPredicatePropertyLoader]);
 
   return {
     propertyOptions,

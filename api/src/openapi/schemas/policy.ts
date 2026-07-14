@@ -9,60 +9,19 @@ import { paginationResponseSchema } from './pagination';
 import { featureSearchExpressionTreeSchema } from './search/search-feature';
 
 /**
- * Schema for policy statement condition.
+ * Schema for policy statement with optional policy-expression link.
  */
-export const PolicyStatementConditionSchema: OpenAPIV3.SchemaObject = {
-  title: 'PolicyStatementCondition',
+export const PolicyStatementWithExpressionSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyStatementWithExpression',
   type: 'object',
-  required: ['policy_statement_condition_id', 'policy_statement_id', 'operator', 'key', 'value'],
-  properties: {
-    policy_statement_condition_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique identifier for the condition'
-    },
-    policy_statement_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'The policy statement this condition belongs to'
-    },
-    operator: {
-      type: 'string',
-      enum: [
-        'StringEquals',
-        'StringNotEquals',
-        'StringLike',
-        'NumericEquals',
-        'Bool',
-        'Exists',
-        'DateBefore',
-        'DateAfter',
-        'Within',
-        'Intersects',
-        'Contains',
-        'ParentOf',
-        'ChildOf'
-      ],
-      description: 'The comparison operator for the condition'
-    },
-    key: {
-      type: 'string',
-      maxLength: 500,
-      description: 'The key to evaluate'
-    },
-    value: {
-      description: 'The value to compare against'
-    }
-  }
-};
-
-/**
- * Schema for policy statement with conditions.
- */
-export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
-  title: 'PolicyStatementWithConditions',
-  type: 'object',
-  required: ['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn', 'conditions'],
+  required: [
+    'policy_statement_id',
+    'policy_id',
+    'effect',
+    'security_scope_id',
+    'submission_feature_urn',
+    'policy_expression_id'
+  ],
   properties: {
     policy_statement_id: {
       type: 'string',
@@ -79,19 +38,62 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
       enum: ['allow', 'deny'],
       description: 'Whether the statement allows or denies access'
     },
+    security_scope_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Reusable security scope this policy-specific statement references'
+    },
     submission_feature_urn: {
       type: 'string',
-      maxLength: 500,
       description: 'The URN pattern this statement applies to'
     },
-    conditions: {
-      type: 'array',
-      items: PolicyStatementConditionSchema,
-      description: 'Conditions that must be met for this statement to apply'
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'Optional policy-owned expression linked to this statement'
+    }
+  }
+};
+
+/**
+ * Schema for a policy-owned expression with its hydrated expression tree.
+ */
+export const PolicyExpressionWithExpressionSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyExpressionWithExpression',
+  type: 'object',
+  required: ['policy_expression_id', 'policy_id', 'expression_id', 'name', 'description', 'expression'],
+  properties: {
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique identifier for the policy expression'
+    },
+    policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The policy this expression belongs to'
+    },
+    expression_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The stored root expression identifier'
+    },
+    name: {
+      type: 'string',
+      maxLength: 100,
+      nullable: true,
+      description: 'Name of the policy expression'
+    },
+    description: {
+      type: 'string',
+      maxLength: 1000,
+      nullable: true,
+      description: 'Description of the policy expression'
     },
     expression: {
       ...featureSearchExpressionTreeSchema,
-      description: 'Optional expression tree that builds the runtime feature graph for this statement'
+      description: 'Expression tree for this policy expression'
     }
   }
 };
@@ -129,12 +131,12 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Schema for a policy with its statements and conditions.
+ * Schema for a policy with its statements.
  */
 export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyWithStatements',
   type: 'object',
-  required: ['policy_id', 'name', 'status', 'statements'],
+  required: ['policy_id', 'name', 'status', 'statements', 'expressions'],
   properties: {
     policy_id: {
       type: 'string',
@@ -159,8 +161,13 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
     },
     statements: {
       type: 'array',
-      items: PolicyStatementWithConditionsSchema,
-      description: 'Policy statements with their conditions'
+      items: PolicyStatementWithExpressionSchema,
+      description: 'Policy statements'
+    },
+    expressions: {
+      type: 'array',
+      items: PolicyExpressionWithExpressionSchema,
+      description: 'Policy expressions'
     }
   }
 };
@@ -177,6 +184,23 @@ export const PoliciesListResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: PolicyWithStatementsSchema,
       description: 'List of policies with statements'
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
+ * Schema for paginated policy expressions list response.
+ */
+export const PolicyExpressionsListResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'PolicyExpressionsListResponse',
+  type: 'object',
+  required: ['expressions', 'pagination'],
+  properties: {
+    expressions: {
+      type: 'array',
+      items: PolicyExpressionWithExpressionSchema,
+      description: 'List of policy expressions'
     },
     pagination: paginationResponseSchema
   }
@@ -200,47 +224,39 @@ export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       description: 'The URN pattern this statement applies to'
     },
-    conditions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['operator', 'key', 'value'],
-        properties: {
-          operator: {
-            type: 'string',
-            enum: [
-              'StringEquals',
-              'StringNotEquals',
-              'StringLike',
-              'NumericEquals',
-              'Bool',
-              'Exists',
-              'DateBefore',
-              'DateAfter',
-              'Within',
-              'Intersects',
-              'Contains',
-              'ParentOf',
-              'ChildOf'
-            ],
-            description: 'The comparison operator'
-          },
-          key: {
-            type: 'string',
-            maxLength: 500,
-            description: 'The key to evaluate'
-          },
-          value: {
-            description: 'The value to compare against'
-          }
-        }
-      },
-      description: 'Optional conditions for this statement'
+    policy_expression_id: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'Optional existing policy expression to link to this statement'
+    }
+  }
+};
+
+/**
+ * Schema for create policy expression request body.
+ */
+export const CreatePolicyExpressionRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreatePolicyExpressionRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'expression'],
+  properties: {
+    name: {
+      type: 'string',
+      maxLength: 100,
+      description: 'Name of the policy expression'
+    },
+    description: {
+      type: 'string',
+      maxLength: 1000,
+      nullable: true,
+      description: 'Description of the policy expression'
     },
     expression: {
       ...featureSearchExpressionTreeSchema,
       description:
-        'Optional expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
+        'Expression tree. Predicate operators and value shapes are validated server-side based on selected property metadata.'
     }
   }
 };
@@ -277,7 +293,8 @@ export const CreatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
 export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdatePolicyRequest',
   type: 'object',
-  required: ['name', 'statements'],
+  additionalProperties: false,
+  required: ['name'],
   properties: {
     name: {
       type: 'string',
@@ -293,11 +310,6 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       enum: ['requested', 'reviewed', 'approved', 'denied'],
       description: 'Optional lifecycle state for the policy'
-    },
-    statements: {
-      type: 'array',
-      items: CreatePolicyStatementPayloadSchema,
-      description: 'Policy statements (replaces existing)'
     }
   }
 };

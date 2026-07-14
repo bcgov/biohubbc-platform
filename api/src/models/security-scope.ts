@@ -2,27 +2,18 @@ import { z } from 'zod';
 
 /**
  * Canonical structural access definition derived from a policy statement URN.
- * Deduplicated by scope_hash — same URN always maps to the same scope,
+ * Deduplicated by scope_hash; same URN always maps to the same scope,
  * regardless of which policy defined it.
  */
 export const SecurityScope = z.object({
   security_scope_id: z.string().uuid(),
-  scope_hash: z.string()
+  scope_hash: z.string(),
+  urn_submission_id: z.string(),
+  urn_feature_type: z.string(),
+  urn_feature_id: z.string()
 });
 
 export type SecurityScope = z.infer<typeof SecurityScope>;
-
-/**
- * Maps a policy statement to its security scope.
- * One statement = one scope. Multiple statements can share the same scope.
- */
-export const PolicyStatementScope = z.object({
-  policy_statement_scope_id: z.string().uuid(),
-  policy_statement_id: z.string().uuid(),
-  security_scope_id: z.string().uuid()
-});
-
-export type PolicyStatementScope = z.infer<typeof PolicyStatementScope>;
 
 /**
  * Binds a security scope to an anchor feature — the root of a secured subtree.
@@ -39,7 +30,7 @@ export type SecurityScopeAnchor = z.infer<typeof SecurityScopeAnchor>;
 
 /**
  * Grants a team access to a security scope. Derived from the
- * team_policy → policy_statement → policy_statement_scope chain.
+ * team_policy -> policy_statement.security_scope_id chain.
  * Rebuilt synchronously on policy/team-policy mutations (~30 rows per team at scale).
  */
 export const TeamSecurityScope = z.object({
@@ -51,7 +42,7 @@ export const TeamSecurityScope = z.object({
 export type TeamSecurityScope = z.infer<typeof TeamSecurityScope>;
 
 /**
- * Picked shape for queries that return only the scope ID (e.g. findScopeIdsForStatements).
+ * Picked shape for queries that return only the scope ID.
  */
 export const SecurityScopeId = SecurityScope.pick({ security_scope_id: true });
 export type SecurityScopeId = z.infer<typeof SecurityScopeId>;
