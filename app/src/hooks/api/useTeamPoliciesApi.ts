@@ -4,9 +4,10 @@ import {
   ICreateTeamPoliciesResponse,
   ICreateTeamPolicyRequest,
   ITeamPoliciesResponse,
+  ITeamPolicySearchParams,
   ITeamPolicy
 } from 'interfaces/useTeamPoliciesApi.interface';
-import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with team-policy associations.
@@ -23,23 +24,24 @@ export const useTeamPoliciesApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITeamPoliciesResponse>}
    */
   const getTeamPolicies = async (
-    searchParams?: ApiSearchParams,
+    searchParams?: ITeamPolicySearchParams,
     pagination?: ApiPaginationRequestOptions
   ): Promise<ITeamPoliciesResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/team-policies', { params });
+    const { data } = await axios.get('/api/administrative/policies/team', { params });
 
     return data;
   };
 
   /**
-   * Create a team-policy association.
+   * Associate a team with a policy.
    *
+   * @param {string} policyId
    * @param {ICreateTeamPolicyRequest} request
    * @return {*} {Promise<ITeamPolicy>}
    */
-  const createTeamPolicy = async (request: ICreateTeamPolicyRequest): Promise<ITeamPolicy> => {
-    const { data } = await axios.post('/api/administrative/team-policies', request);
+  const createTeamPolicy = async (policyId: string, request: ICreateTeamPolicyRequest): Promise<ITeamPolicy> => {
+    const { data } = await axios.post(`/api/administrative/policies/${policyId}/team`, request);
 
     return data;
   };
@@ -67,7 +69,7 @@ export const useTeamPoliciesApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<void>}
    */
   const deleteTeamPolicy = async (teamPolicyId: string): Promise<void> => {
-    await axios.delete(`/api/administrative/team-policies/${teamPolicyId}`);
+    await axios.delete(`/api/administrative/policies/team/${teamPolicyId}`);
   };
 
   return {

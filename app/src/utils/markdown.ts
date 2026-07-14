@@ -1,10 +1,6 @@
 import { ReactNode } from 'react';
 import { defaultUrlTransform } from 'react-markdown';
-import {
-  TICKET_ARTIFACT_ID_ONLY_PATTERN,
-  TICKET_ARTIFACT_PATH_PATTERN,
-  TICKET_ARTIFACT_REFERENCE_PATTERN
-} from 'constants/ticket';
+import { TICKET_ARTIFACT_PATH_PATTERN, TICKET_ARTIFACT_REFERENCE_PATTERN } from 'constants/ticket';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 
 /**
@@ -96,10 +92,8 @@ export const getNodeText = (node: ReactNode): string => {
 /**
  * Choose the display label for a resolved ticket artifact link.
  *
- * The artifact key's filename is normally the most accurate label because it is
- * returned by the API. If that filename itself is only a UUID and the markdown
- * link supplied a meaningful non-UUID label, the markdown label is used instead
- * so users see the original filename typed into the comment.
+ * The markdown label is user-authored and should be preserved when present.
+ * The artifact key's filename is used only as a fallback for empty labels.
  *
  * @param {ITicketArtifact} artifact - Resolved ticket artifact metadata.
  * @param {ReactNode} children - Rendered markdown link children.
@@ -109,15 +103,7 @@ export const getArtifactLinkText = (artifact: ITicketArtifact, children: ReactNo
   const artifactDisplayName = getArtifactDisplayName(artifact);
   const markdownLabel = getNodeText(children).trim();
 
-  if (
-    TICKET_ARTIFACT_ID_ONLY_PATTERN.test(artifactDisplayName) &&
-    markdownLabel &&
-    !TICKET_ARTIFACT_ID_ONLY_PATTERN.test(markdownLabel)
-  ) {
-    return markdownLabel;
-  }
-
-  return artifactDisplayName;
+  return markdownLabel || artifactDisplayName;
 };
 
 /**

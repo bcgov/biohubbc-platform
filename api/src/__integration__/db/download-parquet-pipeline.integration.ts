@@ -7,7 +7,7 @@
 //   streamFeatureBaseBySearchQueryAndType  →  fetchTypedPropertyRows
 //
 // Also covers: status transitions and the writeFeatureTypeParquet artifact contract
-// (one artifact + one download_artifact row per feature type, idempotent on retry).
+// (one artifact + one download_version_artifact row per feature type, idempotent on retry).
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -24,13 +24,24 @@ import { ApiConflictError } from '../../errors/api-error';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
+import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import {
+  createFeatureTypeProperty,
+  createTestUpload,
+  insertSubmissionFeaturePropertyFeature
+} from '../helpers/test-feature-property-helpers';
+import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -97,7 +108,7 @@ function assembleFeatureData(
  * The Parquet writer is replaced with a no-op that never writes to the stream,
  * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
  * The upload is stubbed to resolve without consuming the stream. The real SQL paths
- * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
+ * for ArtifactService.insertArtifact and DownloadVersionRepository.createDownloadVersionArtifact
  * remain unstubbed — those are exactly the idempotency contracts we verify.
  */
 function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
@@ -112,9 +123,11 @@ describe('Download Parquet pipeline (integration)', function () {
 
   let connection: IDBConnection;
   let downloadRepo: DownloadRepository;
+  let downloadVersionRepo: DownloadVersionRepository;
   let pipelineService: DownloadPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
+  let scopeRepo: SecurityScopeRepository;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -124,9 +137,11 @@ describe('Download Parquet pipeline (integration)', function () {
     connection = getAPIUserDBConnection();
     await connection.open();
     downloadRepo = new DownloadRepository(connection);
+    downloadVersionRepo = new DownloadVersionRepository(connection);
     pipelineService = new DownloadPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
+    scopeRepo = new SecurityScopeRepository(connection);
   });
 
   afterEach(async () => {
@@ -142,15 +157,77 @@ describe('Download Parquet pipeline (integration)', function () {
    * download id. The returned download is the standard broad-path policy used
    * by the writeFeatureTypeParquet tests below.
    */
-  async function createPolicyDownload(featureTypes: string[]): Promise<string> {
+  async function createPolicyDownload(): Promise<string> {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `pq-pipeline-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes,
       expressionId: null
     });
-    const { download_id } = await downloadService.createDownload({ policyId: policy_id, format: 'parquet' });
+    const { download_id } = await downloadService.createDownload({
+      policyId: policy_id,
+      format: 'parquet',
+      requestedBy: connection.systemUserId()
+    });
     return download_id;
+  }
+
+  /**
+   * Helper: materialize a download_version for the given download, returning the
+   * version id. The Parquet pipeline links each produced artifact to this version
+   * via download_version_artifact, so the writeFeatureTypeParquet tests below need
+   * a real version row (FK target). Reads resolve the most-recent active version —
+   * there is no stored current-version pointer to set.
+   */
+  async function createDownloadVersionFor(downloadId: string): Promise<string> {
+    const version = await downloadVersionRepo.createDownloadVersion(downloadId);
+    return version.download_version_id;
+  }
+
+  /**
+   * Insert ONE submission_feature bound to a SPECIFIC upload, resolving feature_type_id by name.
+   *
+   * The export security filter resolves "is this feature secured" via the precomputed closure
+   * (isEffectivelySecured), which needs the feature's closure SELF-LOOP. That self-loop only
+   * exists after computeClosureForUpload runs for the feature's upload. createTestFeature mints a NEW
+   * upload per call and never rebuilds the closure, so a feature secured that way reads as unsecured and
+   * is NOT stripped. The security tests therefore seed features directly under a SHARED upload via
+   * createTestUpload + this helper, then rebuild the closure AFTER securing and BEFORE the subquery.
+   *
+   * @returns The new submission_feature_id.
+   */
+  async function insertFeatureRow(params: {
+    submissionId: number;
+    submissionUploadId: string;
+    featureTypeName: string;
+    parentFeatureId?: number;
+  }): Promise<number> {
+    const systemUserId = connection.systemUserId();
+
+    const result = await connection.sql(SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        feature_type_id,
+        parent_submission_feature_id,
+        data,
+        data_byte_size,
+        record_effective_date,
+        create_user
+      )
+      VALUES (
+        ${params.submissionId},
+        ${params.submissionUploadId}::uuid,
+        (SELECT feature_type_id FROM feature_type WHERE name = ${params.featureTypeName} LIMIT 1),
+        ${params.parentFeatureId ?? null},
+        '{}'::jsonb,
+        500,
+        now(),
+        ${systemUserId}
+      )
+      RETURNING submission_feature_id;
+    `);
+
+    return result.rows[0].submission_feature_id;
   }
 
   /**
@@ -161,6 +238,32 @@ describe('Download Parquet pipeline (integration)', function () {
    * For taxon: value is the taxon_id.
    * For geometry: value is a GeoJSON string passed through ST_GeomFromGeoJSON.
    */
+  /** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
+  async function resolveBlueprintFeatureTypePropertyId(
+    submissionFeatureId: number,
+    featureTypePropertyId: number
+  ): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT bftp.blueprint_feature_type_property_id
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+      LIMIT 1;
+    `);
+    if (!result.rows[0]) {
+      throw new Error(
+        `No blueprint_feature_type_property for feature ${submissionFeatureId}, ftp ${featureTypePropertyId}`
+      );
+    }
+    return result.rows[0].blueprint_feature_type_property_id as number;
+  }
+
   async function insertTypedPropertyRow(
     tableName: string,
     submissionFeatureId: number,
@@ -168,39 +271,80 @@ describe('Download Parquet pipeline (integration)', function () {
     value: unknown
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
+    const bftpId = await resolveBlueprintFeatureTypePropertyId(submissionFeatureId, featureTypePropertyId);
 
     if (tableName === 'submission_feature_property_code') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, contributor_codeset_code_id, create_user)
-        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
+        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${bftpId}, ${value as number}, ${systemUserId});
       `);
     } else if (tableName === 'submission_feature_property_taxon') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, taxon_id, create_user)
-        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, taxon_id, create_user)
+        VALUES (${submissionFeatureId}, ${featureTypePropertyId}, ${bftpId}, ${value as number}, ${systemUserId});
       `);
     } else if (tableName === 'submission_feature_property_geometry') {
       await connection.query(
-        `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
-         VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
-        [submissionFeatureId, featureTypePropertyId, value as string, systemUserId]
+        `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+         VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4), $5)`,
+        [submissionFeatureId, featureTypePropertyId, bftpId, value as string, systemUserId]
       );
     } else if (tableName === 'submission_feature_property_timestamp') {
       const ts = value as { date_value: string | null; time_value: string | null };
       await connection.query(
         `INSERT INTO submission_feature_property_timestamp
-           (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [submissionFeatureId, featureTypePropertyId, ts.date_value, ts.time_value, systemUserId]
+           (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [submissionFeatureId, featureTypePropertyId, bftpId, ts.date_value, ts.time_value, systemUserId]
       );
     } else {
       // string, number, boolean — all use a `value` column
       await connection.query(
-        `INSERT INTO ${tableName} (submission_feature_id, feature_type_property_id, value, create_user)
-         VALUES ($1, $2, $3, $4)`,
-        [submissionFeatureId, featureTypePropertyId, value, systemUserId]
+        `INSERT INTO ${tableName} (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [submissionFeatureId, featureTypePropertyId, bftpId, value, systemUserId]
       );
     }
+  }
+
+  /**
+   * Assign a feature_type_property to the active default Blueprint (idempotent), so directly-created code/
+   * taxon properties resolve a non-null blueprint_feature_type_property_id when their typed rows are inserted.
+   */
+  async function assignPropertyToDefaultBlueprint(
+    featureTypeName: string,
+    featureTypePropertyId: number
+  ): Promise<void> {
+    const systemUserId = connection.systemUserId();
+    const bftResult = await connection.sql(SQL`
+      WITH inserted AS (
+        INSERT INTO blueprint_feature_type (blueprint_id, feature_type_id, create_user)
+        VALUES (
+          (SELECT blueprint_id FROM blueprint WHERE is_default = true AND record_end_date IS NULL LIMIT 1),
+          (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
+          ${systemUserId}
+        )
+        ON CONFLICT (blueprint_id, feature_type_id) WHERE record_end_date IS NULL
+        DO NOTHING
+        RETURNING blueprint_feature_type_id
+      )
+      SELECT blueprint_feature_type_id FROM inserted
+      UNION ALL
+      SELECT bft.blueprint_feature_type_id
+      FROM blueprint_feature_type bft
+      JOIN blueprint b USING (blueprint_id)
+      JOIN feature_type ft USING (feature_type_id)
+      WHERE b.is_default = true AND b.record_end_date IS NULL AND bft.record_end_date IS NULL AND ft.name = ${featureTypeName}
+      LIMIT 1;
+    `);
+    const blueprintFeatureTypeId = bftResult.rows[0].blueprint_feature_type_id;
+
+    await connection.sql(SQL`
+      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_type_property_id, create_user)
+      VALUES (${blueprintFeatureTypeId}, ${featureTypePropertyId}, ${systemUserId})
+      ON CONFLICT (blueprint_feature_type_id, feature_type_property_id) WHERE record_end_date IS NULL
+      DO NOTHING;
+    `);
   }
 
   /**
@@ -274,6 +418,8 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const contributorCodesetCodeId = codeResult.rows[0].contributor_codeset_code_id;
 
+    await assignPropertyToDefaultBlueprint(featureTypeName, featureTypePropertyId);
+
     return { featureTypePropertyId, contributorCodesetCodeId };
   }
 
@@ -320,6 +466,8 @@ describe('Download Parquet pipeline (integration)', function () {
     `);
     const taxonId = taxonResult.rows[0].taxon_id;
 
+    await assignPropertyToDefaultBlueprint(featureTypeName, featureTypePropertyId);
+
     return { featureTypePropertyId, taxonId };
   }
 
@@ -327,7 +475,7 @@ describe('Download Parquet pipeline (integration)', function () {
    * Helper: stream base feature rows via the search-query path (filtered by
    * submission_id), then hydrate with typed property values.
    *
-   * The cart cursor is gone — every download flow now resolves features through
+   * The legacy cursor is gone — every download flow now resolves features through
    * an expression-evaluator subquery. For these tests we substitute a simple
    * "all features for this submission" subquery so each test's fixture set is
    * the unit under hydration; the typed-table joins are what we actually verify.
@@ -353,7 +501,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
   /**
    * Helper: consume a base-feature-row stream and hydrate each batch with typed property values.
-   * Collects the result into a flat array — fine for test-sized datasets.
+   * Collects the result into a flat array — fine for test-sized data sets.
    */
   async function hydrateFromStream(
     stream: AsyncGenerator<BaseFeatureRow[]>,
@@ -523,6 +671,163 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(rows[0].data.species).to.include('Ursus arctos');
     });
 
+    describe('feature properties', () => {
+      it('hydrates a single feature reference into a length-1 URN array', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-1'
+        });
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId
+        );
+
+        const refRow = await connection.sql(SQL`
+          SELECT urn FROM submission_feature WHERE submission_feature_id = ${referencedFeatureId};
+        `);
+        const urnR1 = refRow.rows[0].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-single');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnR1]);
+      });
+
+      it('orders multiple feature references ASC by referenced_submission_feature_id', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureId1 = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-1'
+        });
+        const referencedFeatureId2 = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'ref-2'
+        });
+        // Sanity: ids are inserted in ascending order
+        expect(referencedFeatureId1).to.be.lessThan(referencedFeatureId2);
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        // Insert link rows in REVERSE order to prove the SQL's ORDER BY does the work
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId2
+        );
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureId1
+        );
+
+        const refRows = await connection.sql(SQL`
+          SELECT submission_feature_id, urn FROM submission_feature
+          WHERE submission_feature_id = ANY(${[referencedFeatureId1, referencedFeatureId2]})
+          ORDER BY submission_feature_id ASC;
+        `);
+        const urnR1 = refRows.rows[0].urn;
+        const urnR2 = refRows.rows[1].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-multi');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnR1, urnR2]);
+      });
+
+      it('returns null when a feature property is requested but no link rows exist', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+
+        const { propertyName } = await createFeatureTypeProperty(connection, 'capture', 'observation_subcount', true);
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-none');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.be.null;
+      });
+
+      it('excludes soft-deleted referenced features from the URN array', async () => {
+        const submissionId = await createTestSubmission(connection);
+        const sourceFeatureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'src' });
+        const referencedFeatureLiveId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'live'
+        });
+        const referencedFeatureDeletedId = await createTestFeature(connection, submissionId, 'observation_subcount', {
+          name: 'soft-deleted'
+        });
+
+        const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+          connection,
+          'capture',
+          'observation_subcount',
+          true
+        );
+
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureLiveId
+        );
+        await insertSubmissionFeaturePropertyFeature(
+          connection,
+          sourceFeatureId,
+          featureTypePropertyId,
+          referencedFeatureDeletedId
+        );
+
+        // Soft-delete one referenced feature
+        await connection.sql(SQL`
+          UPDATE submission_feature
+          SET record_end_date = now()
+          WHERE submission_feature_id = ${referencedFeatureDeletedId};
+        `);
+
+        const liveRow = await connection.sql(SQL`
+          SELECT urn FROM submission_feature WHERE submission_feature_id = ${referencedFeatureLiveId};
+        `);
+        const urnLive = liveRow.rows[0].urn;
+
+        const properties: CsvPropertyDefinition[] = [
+          { feature_property_name: propertyName, feature_property_type_name: 'feature' }
+        ];
+
+        const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-feature-soft-deleted');
+        const sourceRow = rows.find((r) => r.submission_feature_id === sourceFeatureId);
+        expect(sourceRow).to.exist;
+        expect(sourceRow!.data[propertyName]).to.deep.equal([urnLive]);
+      });
+    });
+
     it('returns geometry as GeoJSON object', async () => {
       const submissionId = await createTestSubmission(connection);
       const sampleSiteFeatureId = await createTestFeature(connection, submissionId, 'sample_site', {
@@ -552,7 +857,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
     it('populates parent_uuid for child features', async () => {
       const submissionId = await createTestSubmission(connection);
-      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Parent DS' });
+      const parentFeatureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Parent DS' });
       // Returned id intentionally discarded — the test asserts on the parent_uuid
       // field of the hydrated capture row, not on its own id.
       await createTestFeature(connection, submissionId, 'capture', { comment: 'child' }, parentFeatureId);
@@ -594,9 +899,13 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(rows[0].data.imaginary_bool).to.be.null;
     });
 
-    it('falls back to JSONB for array properties', async () => {
+    it('emits null for unsupported array properties (does not read submission_feature.data)', async () => {
+      // The hydrator reads only the typed submission_feature_property_* tables; it must NOT fall
+      // back to submission_feature.data (pre-indexing JSONB that can diverge from indexed values).
+      // 'array' (and 'object') are unsupported property types, so they are emitted as null even
+      // when the raw JSONB holds a value.
       const submissionId = await createTestSubmission(connection);
-      const datasetFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
+      const surveyFeatureId = await createTestFeature(connection, submissionId, 'survey', {
         name: 'Array Test',
         properties: { focal_species: ['bear', 'elk'] }
       });
@@ -605,11 +914,11 @@ describe('Download Parquet pipeline (integration)', function () {
         { feature_property_name: 'focal_species', feature_property_type_name: 'array' }
       ];
 
-      const rows = await streamAndHydrateBySubmission(submissionId, 'dataset', properties, 'pq-array');
+      const rows = await streamAndHydrateBySubmission(submissionId, 'survey', properties, 'pq-array');
       expect(rows).to.have.length(1);
-      expect(rows[0].data.focal_species).to.deep.equal(['bear', 'elk']);
+      expect(rows[0].data.focal_species).to.be.null;
       // Suppress unused-variable warning — the feature id keeps the helper output traceable in failures.
-      expect(datasetFeatureId).to.be.a('number');
+      expect(surveyFeatureId).to.be.a('number');
     });
 
     it('hydrates multiple features in same batch without cross-contamination', async () => {
@@ -638,7 +947,10 @@ describe('Download Parquet pipeline (integration)', function () {
 
   describe('status transitions', () => {
     it('transitions download status from pending to processing to ready, and rejects an illegal third transition', async () => {
-      const downloadId = await createPolicyDownload(['dataset']);
+      const downloadId = await createPolicyDownload();
+      // Status lives on the version, so the download needs one to be findable, and
+      // the transition keys off the version id.
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
 
       // Verify initial state
       const initial = await downloadService.findDownloadById(downloadId);
@@ -647,7 +959,7 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(initial!.completed_at).to.be.null;
 
       // pending → processing: started_at populated, completed_at still null
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.PROCESSING, [
         DownloadStatusEnum.PENDING
       ]);
       const processing = await downloadService.findDownloadById(downloadId);
@@ -658,7 +970,7 @@ describe('Download Parquet pipeline (integration)', function () {
       const firstStartedAt = processing!.started_at;
 
       // processing → ready: completed_at populated, started_at unchanged
-      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+      await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
         DownloadStatusEnum.PROCESSING
       ]);
       const ready = await downloadService.findDownloadById(downloadId);
@@ -666,9 +978,9 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(ready!.started_at).to.equal(firstStartedAt);
       expect(ready!.completed_at).to.not.be.null;
 
-      // Illegal transition: retrying processing → ready on a READY download throws ApiConflictError
+      // Illegal transition: retrying processing → ready on a READY version throws ApiConflictError
       try {
-        await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+        await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [
           DownloadStatusEnum.PROCESSING
         ]);
         expect.fail('Expected ApiConflictError for illegal transition from READY');
@@ -678,7 +990,7 @@ describe('Download Parquet pipeline (integration)', function () {
     });
   });
 
-  describe('writeFeatureTypeParquet — artifact + download_artifact rows', () => {
+  describe('writeFeatureTypeParquet — artifact + download_version_artifact rows', () => {
     // ParquetWriter is stubbed — no properties are resolved against typed tables, so
     // an empty property list is safe and minimizes test surface area.
     const emptyProperties: CsvPropertyDefinition[] = [];
@@ -692,84 +1004,91 @@ describe('Download Parquet pipeline (integration)', function () {
      */
     const broadStatement = (urn_feature_type: string): ActivePolicyStatementWithExpression => ({
       policy_statement_id: '00000000-0000-0000-0000-000000000001',
+      effect: PolicyEffect.ALLOW,
       urn_feature_type,
       expression_id: null
     });
 
-    it('inserts one artifact + one download_artifact row for a single feature type', async () => {
+    it('inserts one artifact + one download_version_artifact row for a single feature type', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
-      const downloadId = await createPolicyDownload(['dataset']);
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Happy path survey' });
+      const downloadId = await createPolicyDownload();
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const artifactRows = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.bucket, artifact.object_key, artifact.byte_size,
                artifact.checksum_sha256, artifact.artifact_status, artifact.format, artifact.uploaded_at
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(artifactRows.rowCount).to.equal(1);
 
       const artifact = artifactRows.rows[0];
       expect(artifact.format).to.equal('parquet');
       expect(artifact.artifact_status).to.equal('uploaded');
-      expect(artifact.object_key).to.equal(`downloads/${downloadId}/dataset/data.parquet`);
+      expect(artifact.object_key).to.equal(`downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`);
       expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
       expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
       expect(Number(artifact.byte_size)).to.be.at.least(0);
       expect(artifact.uploaded_at).to.not.be.null;
 
-      // Explicit FK linkage: download_artifact.artifact_id matches artifact.artifact_id
+      // Explicit FK linkage: download_version_artifact.artifact_id matches artifact.artifact_id,
+      // carries the feature type name, and is keyed to the materialized version.
       const linkRows = await connection.sql(SQL`
-        SELECT artifact_id, download_id
-        FROM download_artifact
-        WHERE download_id = ${downloadId}
+        SELECT artifact_id, download_version_id, feature_type_name
+        FROM download_version_artifact
+        WHERE download_version_id = ${downloadVersionId}
           AND record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
       expect(linkRows.rows[0].artifact_id).to.equal(artifact.artifact_id);
-      expect(linkRows.rows[0].download_id).to.equal(downloadId);
+      expect(linkRows.rows[0].download_version_id).to.equal(downloadVersionId);
+      expect(linkRows.rows[0].feature_type_name).to.equal('survey');
 
       // download status untouched — writeFeatureTypeParquet does not transition status
       const download = await downloadService.findDownloadById(downloadId);
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
     });
 
-    it('is idempotent on retry — second call does not create a duplicate artifact or download_artifact row', async () => {
+    it('is idempotent on retry — second call does not create a duplicate artifact or download_version_artifact row', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
-      const downloadId = await createPolicyDownload(['dataset']);
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Retry survey' });
+      const downloadId = await createPolicyDownload();
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       // Call 1
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const afterFirst = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       expect(afterFirst.rowCount).to.equal(1);
       const firstArtifactId = afterFirst.rows[0].artifact_id;
@@ -779,18 +1098,19 @@ describe('Download Parquet pipeline (integration)', function () {
       // Call 2 — same download, same feature type
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
 
       const afterSecond = await connection.sql(SQL`
         SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL;
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL;
       `);
       // Idempotency: same row count, same artifact_id, unchanged checksum + byte_size
       expect(afterSecond.rowCount).to.equal(1);
@@ -799,24 +1119,27 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(String(afterSecond.rows[0].byte_size)).to.equal(String(firstByteSize));
     });
 
-    it('inserts one artifact + one download_artifact row per feature type when the download has multiple types', async () => {
+    it('inserts one artifact + one download_version_artifact row per feature type when the download has multiple types', async () => {
       stubParquetAndUpload();
 
       const submissionId = await createTestSubmission(connection);
-      await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
+      await createTestFeature(connection, submissionId, 'survey', { name: 'Multi DS' });
       await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
-      const downloadId = await createPolicyDownload(['dataset', 'capture']);
+      const downloadId = await createPolicyDownload();
+      const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
-        featureTypeName: 'dataset',
-        statement: broadStatement('dataset')
+        featureTypeName: 'survey',
+        statement: broadStatement('survey')
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
+        downloadVersionId,
         source,
         properties: emptyProperties,
         featureTypeName: 'capture',
@@ -824,25 +1147,133 @@ describe('Download Parquet pipeline (integration)', function () {
       });
 
       const artifactRows = await connection.sql(SQL`
-        SELECT artifact.artifact_id, artifact.object_key, download_artifact.download_id
+        SELECT artifact.artifact_id, artifact.object_key, download_version_artifact.download_version_id
         FROM artifact
-        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
-        WHERE download_artifact.download_id = ${downloadId}
-          AND download_artifact.record_end_date IS NULL
+        INNER JOIN download_version_artifact ON download_version_artifact.artifact_id = artifact.artifact_id
+        WHERE download_version_artifact.download_version_id = ${downloadVersionId}
+          AND download_version_artifact.record_end_date IS NULL
         ORDER BY artifact.object_key;
       `);
       expect(artifactRows.rowCount).to.equal(2);
       const objectKeys = artifactRows.rows.map((r: any) => r.object_key);
       expect(objectKeys).to.deep.equal([
-        `downloads/${downloadId}/capture/data.parquet`,
-        `downloads/${downloadId}/dataset/data.parquet`
+        `downloads/${downloadId}/versions/${downloadVersionId}/capture/data.parquet`,
+        `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`
       ]);
-      // Both rows link to the same download
+      // Both rows link to the same materialized version
       for (const row of artifactRows.rows) {
-        expect(row.download_id).to.equal(downloadId);
+        expect(row.download_version_id).to.equal(downloadVersionId);
       }
       // The two artifact_ids are distinct
       expect(artifactRows.rows[0].artifact_id).to.not.equal(artifactRows.rows[1].artifact_id);
+    });
+  });
+
+  describe('export security filter — requested_by drives feature visibility', () => {
+    /**
+     * Run the feature-selection subquery the broad (no-expression) parquet path
+     * uses, and return the produced submission_feature_id set.
+     *
+     * `writeFeatureTypeParquet` builds `buildBroadFeatureTypeSubquery(featureTypeName,
+     * source.requested_by)` and streams its rows into the Parquet file. Driving the
+     * same builder with `source.requested_by` is the load-bearing assertion: whatever
+     * this set excludes never reaches the file. Asserting the id set directly avoids
+     * stubbing the Parquet writer + S3 just to peek at what was streamed.
+     */
+    async function selectedFeatureIds(featureTypeName: string, requestedBy: number | null): Promise<Set<number>> {
+      const subquery = buildBroadFeatureTypeSubquery(featureTypeName, requestedBy);
+      const { sql, bindings } = subquery.toSQL().toNative();
+      const result = await connection.query<{ submission_feature_id: number }>(sql, bindings as any[]);
+      return new Set(result.rows.map((r) => r.submission_feature_id));
+    }
+
+    it('anonymous export (requested_by NULL) excludes a secured feature, includes its unsecured sibling', async () => {
+      // AC #4 — an anonymous download must never package secured data. Two same-type
+      // features in one submission; one is secured. The anonymous identity used to
+      // build the export must strip the secured id while keeping the unsecured one.
+      //
+      // The export security filter (isEffectivelySecured) reads the precomputed closure, so
+      // the secured feature is only recognised as secured once its closure self-loop exists. Seed both
+      // siblings under a SHARED upload and rebuild the closure AFTER securing — without the rebuild the
+      // empty closure reads securedId as unsecured and it would leak into the anonymous export.
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const unsecuredId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      const securedId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      await secureFeature(connection, securedId);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const { policy_id } = await policyService.createDownloadPolicy({
+        name: `pq-sec-anon-${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: null,
+        expressionId: null
+      });
+      const { download_id } = await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: null
+      });
+      const source = await downloadRepo.getDownloadSource(download_id);
+      expect(source.requested_by).to.be.null;
+
+      const ids = await selectedFeatureIds('survey', source.requested_by);
+      expect(ids.has(unsecuredId)).to.equal(true);
+      expect(ids.has(securedId)).to.equal(false);
+    });
+
+    it('authenticated export with grants includes the secured feature (authenticated path unchanged)', async () => {
+      // AC #5 — a user with a scope grant to the secured feature still gets it in
+      // their export. Same fixture as the anon case, but the export is built with the
+      // granted user's id as requested_by.
+      //
+      // The closure rebuild is load-bearing here too: it makes isEffectivelySecured recognise
+      // securedId as secured (Branch 1 fails), so visibility now hinges on the scope grant (Branch 2's
+      // closure-anchor probe). WITHOUT the rebuild this test would pass spuriously — an empty closure
+      // reads securedId as unsecured, so it would be "visible" regardless of any grant.
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const unsecuredId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      const securedId = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      await secureFeature(connection, securedId);
+
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'pq-export-access-team');
+
+      const { policy_id } = await policyService.createDownloadPolicy({
+        name: `pq-sec-auth-${Date.now()}-${randomUUID().slice(0, 8)}`,
+        description: null,
+        expressionId: null
+      });
+      const { download_id } = await downloadService.createDownload({
+        policyId: policy_id,
+        format: 'parquet',
+        requestedBy: userId
+      });
+      const source = await downloadRepo.getDownloadSource(download_id);
+      expect(source.requested_by).to.equal(userId);
+
+      const ids = await selectedFeatureIds('survey', source.requested_by);
+      expect(ids.has(unsecuredId)).to.equal(true);
+      expect(ids.has(securedId)).to.equal(true);
     });
   });
 });

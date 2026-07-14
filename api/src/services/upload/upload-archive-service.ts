@@ -75,14 +75,14 @@ export class UploadArchiveService extends DBService {
   }
 
   /**
-   * Retrieves an upload archive record by artifact ID.
+   * Finds an upload archive record by artifact ID, returning null when none exists.
    *
    * @param {string} artifactId The ID of the artifact
-   * @return {Promise<UploadArchive | null>} The upload archive record or null if not found
+   * @return {Promise<UploadArchive | null>} The upload archive record, or null if not found
    * @memberof UploadArchiveService
    */
-  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive> {
-    return this.uploadArchiveRepository.getUploadArchiveByArtifactId(artifactId);
+  async findUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive | null> {
+    return this.uploadArchiveRepository.findUploadArchiveByArtifactId(artifactId);
   }
 
   /**

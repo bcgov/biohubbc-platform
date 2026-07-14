@@ -76,11 +76,14 @@ describe('SubmissionUploadReviewService', () => {
   });
 
   describe('insertSubmissionUploadReview', () => {
-    it('inserts a requested review row when no active review exists for the scope', async () => {
+    it('soft deletes the active scoped review before inserting the replacement row', async () => {
       const review = buildReview({
         submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
         scope: SubmissionUploadReviewScope.SECURITY
       });
+      const softDeleteStub = sinon
+        .stub(SubmissionUploadReviewRepository.prototype, 'softDeleteActiveSubmissionUploadReviewsByScope')
+        .resolves(1);
       const insertStub = sinon
         .stub(SubmissionUploadReviewRepository.prototype, 'insertSubmissionUploadReview')
         .resolves(review);
@@ -89,13 +92,20 @@ describe('SubmissionUploadReviewService', () => {
       const result = await service.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
+        status: SubmissionUploadReviewStatus.REQUESTED,
         requested_by: 7
       });
 
       expect(result).to.eql(review);
+      expect(softDeleteStub).to.have.been.calledOnceWith(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '550e8400-e29b-41d4-a716-446655440000',
+        SubmissionUploadReviewScope.SECURITY
+      );
       expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         scope: SubmissionUploadReviewScope.SECURITY,
+        status: SubmissionUploadReviewStatus.REQUESTED,
         requested_by: 7
       });
     });

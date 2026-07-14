@@ -52,7 +52,6 @@ export const TicketDetailPage = () => {
                         {ticket.status === 'open' && (
                           <TicketComment
                             comment={comment}
-                            artifacts={ticket.artifacts}
                             setComment={setComment}
                             isSaving={isSavingComment}
                             isUploadingAttachment={isUploadingAttachment}
@@ -63,18 +62,12 @@ export const TicketDetailPage = () => {
                       </Stack>
 
                       <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
-                        <TicketSidebar
-                          ticketId={ticket.ticket_id}
-                          teamId={ticket.team_id}
-                          ticketSystemUsers={ticket.ticket_system_users}
-                          references={ticket.references}
-                          dataRequests={ticket.data_requests}
-                        />
+                        <TicketSidebar />
                       </Box>
                     </Stack>
                   </PageSection>
                 ),
-                artifacts: <TicketArtifacts ticket={ticket} />
+                artifacts: <TicketArtifacts />
               }}
             />
           </Container>

@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../services/security-service';
+import { SecurityRuleService } from '../../../services/security-rule-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/security/rules');
@@ -44,6 +44,7 @@ GET.apiDoc = {
                 'security_rule_id',
                 'name',
                 'description',
+                'is_active',
                 'record_effective_date',
                 'record_end_date',
                 'security_category_id',
@@ -56,11 +57,19 @@ GET.apiDoc = {
                 security_rule_id: {
                   type: 'integer'
                 },
+                policy_id: {
+                  type: 'string',
+                  format: 'uuid',
+                  nullable: true
+                },
                 name: {
                   type: 'string'
                 },
                 description: {
                   type: 'string'
+                },
+                is_active: {
+                  type: 'boolean'
                 },
                 record_effective_date: {
                   type: 'string'
@@ -114,7 +123,7 @@ GET.apiDoc = {
 export function getActiveSecurityRules(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const service = new SecurityService(connection);
+    const service = new SecurityRuleService(connection);
 
     try {
       await connection.open();

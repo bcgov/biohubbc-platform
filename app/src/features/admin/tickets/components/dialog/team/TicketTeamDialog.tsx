@@ -8,6 +8,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getUserLabel } from 'utils/Utils';
 
 interface ITicketTeamDialogProps {
   open: boolean;
@@ -60,7 +61,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     () =>
       availableUsers.map((user) => ({
         value: user.system_user_id,
-        label: user.user_identifier
+        label: getUserLabel(user)
       })),
     [availableUsers]
   );
@@ -80,11 +81,18 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
         return;
       }
 
+      const selectedUser = availableUsers.find((user) => user.system_user_id === selectedUserId) ?? {
+        system_user_id: selectedUserId,
+        user_identifier: option.label,
+        display_name: null
+      };
+
       const optimisticTeamMemberId = `optimistic-${selectedUserId}-${Date.now()}`;
       const optimisticMember: ITeamMember = {
         team_member_id: optimisticTeamMemberId,
-        system_user_id: selectedUserId,
-        user_identifier: option.label
+        system_user_id: selectedUser.system_user_id,
+        user_identifier: selectedUser.user_identifier,
+        display_name: selectedUser.display_name
       };
 
       try {
@@ -102,7 +110,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
         setIsSubmitting(false);
       }
     },
-    [api.teams, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
+    [api.teams, availableUsers, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
   );
 
   const handleRemoveUser = useCallback(
@@ -129,7 +137,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     () =>
       members.map((member) => ({
         id: member.team_member_id,
-        label: member.user_identifier
+        label: getUserLabel(member)
       })),
     [members]
   );

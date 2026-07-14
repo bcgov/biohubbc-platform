@@ -25,6 +25,7 @@ export const SubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
   ticket_id: z.string().uuid(),
+  blueprint_id: z.number(),
   comment: z.string().nullable().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });
@@ -38,6 +39,7 @@ export const CreateSubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   ticket_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
+  blueprint_id: z.number(),
   comment: z.string().nullable().optional()
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
@@ -57,6 +59,12 @@ export interface SubmissionUploadFilters {
   role?: UploadArtifactRoleEnum;
 }
 
+export const TicketSubmissionUploadReviews = z.object({
+  validation: SubmissionUploadReview.nullable(),
+  security: SubmissionUploadReview.nullable()
+});
+export type TicketSubmissionUploadReviews = z.infer<typeof TicketSubmissionUploadReviews>;
+
 export const TicketSubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
   submission_uuid: z.string().uuid(),
@@ -69,6 +77,6 @@ export const TicketSubmissionUpload = z.object({
   upload_status: SubmissionUploadJobStatus,
   review_status: SubmissionUploadStatusTypeEnum,
   validation: TicketSubmissionValidation.nullable(),
-  reviews: z.array(SubmissionUploadReview)
+  reviews: TicketSubmissionUploadReviews
 });
 export type TicketSubmissionUpload = z.infer<typeof TicketSubmissionUpload>;

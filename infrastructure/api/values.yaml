@@ -87,6 +87,8 @@ app:
 
   # ITIS SOLR
   itisSolr: "https://services.itis.gov"
+  itisTsnLookupBatchSize: "100"
+  itisTsnLookupDelayMs: "1000"
 
   # GCNotify
   gcnotify:

@@ -26,7 +26,7 @@ describe('parseFeatureUrn', () => {
 
   describe('when called with an invalid URN', () => {
     it('throws an error if the prefix is not "urn"', () => {
-      const urn = 'invalid:1:dataset:2';
+      const urn = 'invalid:1:survey:2';
 
       try {
         parseFeatureUrn(urn);
@@ -37,7 +37,7 @@ describe('parseFeatureUrn', () => {
     });
 
     it('throws an error if the URN has too few parts', () => {
-      const urn = 'urn:123:dataset'; // missing feature ID
+      const urn = 'urn:123:survey'; // missing feature ID
 
       try {
         parseFeatureUrn(urn);
@@ -48,7 +48,7 @@ describe('parseFeatureUrn', () => {
     });
 
     it('throws an error if the URN has too many parts', () => {
-      const urn = 'urn:1:dataset:2:extra';
+      const urn = 'urn:1:survey:2:extra';
 
       try {
         parseFeatureUrn(urn);

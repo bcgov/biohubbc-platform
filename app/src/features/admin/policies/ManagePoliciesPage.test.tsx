@@ -61,8 +61,22 @@ vi.mock('../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
 const mockPolicies = [
-  { policy_id: 'p1', name: 'Policy One', description: 'First policy', status: 'active', statements: [] },
-  { policy_id: 'p2', name: 'Policy Two', description: 'Second policy', status: 'active', statements: [] }
+  {
+    policy_id: 'p1',
+    name: 'Policy One',
+    description: 'First policy',
+    status: 'active',
+    statements: [],
+    expressions: []
+  },
+  {
+    policy_id: 'p2',
+    name: 'Policy Two',
+    description: 'Second policy',
+    status: 'active',
+    statements: [],
+    expressions: []
+  }
 ];
 
 const mockTeams = [
@@ -71,9 +85,30 @@ const mockTeams = [
 ];
 
 const mockTeamPolicies = [
-  { team_policy_id: 'tp1', team_id: 't1', policy_id: 'p1', team_name: 'Team Alpha', policy_name: 'Policy One' },
-  { team_policy_id: 'tp2', team_id: 't2', policy_id: 'p2', team_name: 'Team Beta', policy_name: 'Policy Two' },
-  { team_policy_id: 'tp3', team_id: 't1', policy_id: 'p2', team_name: 'Team Alpha', policy_name: 'Policy Two' }
+  {
+    team_policy_id: 'tp1',
+    team_id: 't1',
+    policy_id: 'p1',
+    record_end_date: null,
+    team_name: 'Team Alpha',
+    policy_name: 'Policy One'
+  },
+  {
+    team_policy_id: 'tp2',
+    team_id: 't2',
+    policy_id: 'p2',
+    record_end_date: null,
+    team_name: 'Team Beta',
+    policy_name: 'Policy Two'
+  },
+  {
+    team_policy_id: 'tp3',
+    team_id: 't1',
+    policy_id: 'p2',
+    record_end_date: null,
+    team_name: 'Team Alpha',
+    policy_name: 'Policy Two'
+  }
 ];
 
 const mockGetPolicies = vi.fn();

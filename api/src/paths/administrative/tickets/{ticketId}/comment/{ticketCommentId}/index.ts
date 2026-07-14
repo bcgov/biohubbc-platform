@@ -161,7 +161,7 @@ export function deleteTicketComment(): RequestHandler {
       await connection.open();
 
       const ticketCommentService = new TicketCommentService(connection);
-      await ticketCommentService.deleteTicketCommentByTicketId(req.params.ticketId, req.params.ticketCommentId);
+      await ticketCommentService.deleteTicketComment(req.params.ticketId, req.params.ticketCommentId);
 
       await connection.commit();
 

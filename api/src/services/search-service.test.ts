@@ -111,7 +111,7 @@ describe('SearchService', () => {
 
   describe('getSearchSummary', () => {
     it('should return summary counts for features, submissions, and taxonomy', async () => {
-      const featureSummary = [{ feature_type_name: 'dataset', total: 5 }];
+      const featureSummary = [{ feature_type_name: 'survey', total: 5 }];
       const submissionSummary = { total: 3 };
       const taxonomySummary = { total: 5 };
 

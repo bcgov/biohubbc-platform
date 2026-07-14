@@ -1,4 +1,6 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
+import { ExpressionTreeExpression } from './expression.interface';
+import { ITeamPolicyDetails } from './useTeamPoliciesApi.interface';
 
 export enum PolicyStatus {
   REQUESTED = 'requested',
@@ -17,33 +19,26 @@ export interface IPolicySummary {
   status: PolicyStatus;
 }
 
-/**
- * Policy with statements and conditions (API response).
- */
 export interface IPolicy extends IPolicySummary {
   statements: IPolicyStatement[];
+  expressions: IPolicyExpression[];
 }
 
-/**
- * Policy statement with conditions.
- */
 export interface IPolicyStatement {
   policy_statement_id: string;
   policy_id: string;
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
-  conditions: IPolicyStatementCondition[];
+  policy_expression_id: string | null;
 }
 
-/**
- * Policy statement condition.
- */
-export interface IPolicyStatementCondition {
-  policy_statement_condition_id: string;
-  policy_statement_id: string;
-  operator: string;
-  key: string;
-  value: unknown;
+export interface IPolicyExpression {
+  policy_expression_id: string;
+  policy_id: string;
+  expression_id: string;
+  name: string | null;
+  description: string | null;
+  expression: ExpressionTreeExpression;
 }
 
 /**
@@ -55,12 +50,27 @@ export interface IPoliciesResponse {
 }
 
 /**
+ * Paginated policy expressions response.
+ */
+export interface IPolicyExpressionsResponse {
+  expressions: IPolicyExpression[];
+  pagination: ApiPaginationResponseParams;
+}
+
+/**
+ * Paginated policy teams response.
+ */
+export interface IPolicyTeamsResponse {
+  teams: ITeamPolicyDetails[];
+  pagination: ApiPaginationResponseParams;
+}
+
+/**
  * Create policy request payload.
  */
 export interface ICreatePolicyRequest {
   name: string;
   description?: string;
-  status?: PolicyStatus;
   statements: ICreatePolicyStatementRequest[];
 }
 
@@ -70,16 +80,16 @@ export interface ICreatePolicyRequest {
 export interface ICreatePolicyStatementRequest {
   effect: 'allow' | 'deny';
   submission_feature_urn: string;
-  conditions?: ICreatePolicyConditionRequest[];
+  policy_expression_id?: string | null;
 }
 
 /**
- * Create policy condition request.
+ * Create policy expression request.
  */
-export interface ICreatePolicyConditionRequest {
-  operator: string;
-  key: string;
-  value: unknown;
+export interface ICreatePolicyExpressionRequest {
+  name: string;
+  description?: string | null;
+  expression: ExpressionTreeExpression;
 }
 
 /**
@@ -89,7 +99,6 @@ export interface IUpdatePolicyRequest {
   name: string;
   description?: string;
   status?: PolicyStatus;
-  statements: ICreatePolicyStatementRequest[];
 }
 
 /**

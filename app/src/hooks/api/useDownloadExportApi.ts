@@ -1,5 +1,10 @@
 import { AxiosInstance } from 'axios';
-import { CreateExportPayload, DownloadExport, DownloadExportDetail } from 'interfaces/useDownloadExportApi.interface';
+import {
+  CreateExportPayload,
+  DownloadExport,
+  DownloadExportDetail,
+  DownloadFeatureType
+} from 'interfaces/useDownloadExportApi.interface';
 
 /**
  * Returns a set of supported api methods for working with CSV exports of downloads.
@@ -19,11 +24,11 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    * is not a team member, 401 if unauthenticated.
    *
    * @param {string} downloadId
-   * @param {CreateExportPayload} [payload]
+   * @param {CreateExportPayload} payload
    * @return {Promise<DownloadExport>}
    */
-  const createExport = async (downloadId: string, payload?: CreateExportPayload): Promise<DownloadExport> => {
-    const { data } = await axios.post<DownloadExport>(`/api/download/${downloadId}/export`, payload ?? {});
+  const createExport = async (downloadId: string, payload: CreateExportPayload): Promise<DownloadExport> => {
+    const { data } = await axios.post<DownloadExport>(`/api/download/${downloadId}/export`, payload);
     return data;
   };
 
@@ -32,13 +37,26 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    *
    * URLs regenerate per request — callers must not cache them.
    *
+   * @param {string} downloadId
    * @param {string} exportId
    * @return {Promise<DownloadExportDetail>}
    */
-  const getExport = async (exportId: string): Promise<DownloadExportDetail> => {
-    const { data } = await axios.get<DownloadExportDetail>(`/api/download-export/${exportId}`);
+  const getExport = async (downloadId: string, exportId: string): Promise<DownloadExportDetail> => {
+    const { data } = await axios.get<DownloadExportDetail>(`/api/download/${downloadId}/export/${exportId}`);
     return data;
   };
 
-  return { createExport, getExport };
+  /**
+   * Lists the download's materialized feature types and their exportable columns,
+   * which drive the export config picker.
+   *
+   * @param {string} downloadId
+   * @return {Promise<DownloadFeatureType[]>}
+   */
+  const getDownloadFeatureTypes = async (downloadId: string): Promise<DownloadFeatureType[]> => {
+    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`);
+    return data;
+  };
+
+  return { createExport, getExport, getDownloadFeatureTypes };
 };

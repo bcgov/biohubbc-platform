@@ -53,4 +53,29 @@ export class ExpressionClauseRepository extends BaseRepository {
     const response = await this.connection.knex(query, ExpressionClause);
     return response.rows;
   }
+
+  /**
+   * Fetch all active clauses for multiple expressions in expression/sequence order.
+   *
+   * @param {string[]} expressionIds - Parent expression identifiers.
+   * @return {Promise<ExpressionClause[]>} Active ordered clause rows.
+   */
+  async getExpressionClausesByExpressionIds(expressionIds: string[]): Promise<ExpressionClause[]> {
+    if (expressionIds.length === 0) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('expression_clause')
+      .select(['expression_clause_id', 'expression_id', 'sequence', 'predicate_id', 'child_expression_id'])
+      .whereIn('expression_id', [...new Set(expressionIds)])
+      .whereNull('record_end_date')
+      .orderBy([
+        { column: 'expression_id', order: 'asc' },
+        { column: 'sequence', order: 'asc' }
+      ]);
+
+    const response = await this.connection.knex(query, ExpressionClause);
+    return response.rows;
+  }
 }

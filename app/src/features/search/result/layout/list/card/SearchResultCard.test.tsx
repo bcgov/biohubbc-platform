@@ -1,5 +1,5 @@
 import { cleanup } from '@testing-library/react';
-import { createMockSearchFeature } from 'test-helpers/cart-helpers';
+import { createMockSearchFeature } from 'test-helpers/search-result-helpers';
 import { render } from 'test-helpers/test-utils';
 import { SearchResultCard } from './SearchResultCard';
 
@@ -9,29 +9,29 @@ describe('SearchResultCard', () => {
   });
 
   it('renders lock icon when result is secured', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
 
-    const { getByTestId } = render(<SearchResultCard result={securedResult} isInCart={false} onClick={vi.fn()} />);
+    const { getByTestId } = render(<SearchResultCard result={securedResult} onClick={vi.fn()} />);
 
     expect(getByTestId('secured-icon')).toBeVisible();
   });
 
   it('does not render lock icon when result is not secured', () => {
-    const unsecuredResult = createMockSearchFeature(2, 'Dataset', false);
+    const unsecuredResult = createMockSearchFeature(2, 'Survey', false);
 
-    const { queryByTestId } = render(<SearchResultCard result={unsecuredResult} isInCart={false} onClick={vi.fn()} />);
+    const { queryByTestId } = render(<SearchResultCard result={unsecuredResult} onClick={vi.fn()} />);
 
     expect(queryByTestId('secured-icon')).not.toBeInTheDocument();
   });
 
-  it('renders lock icon alongside cart buttons without conflict', () => {
+  it('opens the result when clicked', () => {
     const securedResult = createMockSearchFeature(3, 'Observation', true);
+    const onClick = vi.fn();
 
-    const { getByTestId, getByTitle } = render(
-      <SearchResultCard result={securedResult} isInCart={false} onClick={vi.fn()} onAddToCart={vi.fn()} />
-    );
+    const { getByRole } = render(<SearchResultCard result={securedResult} onClick={onClick} />);
 
-    expect(getByTestId('secured-icon')).toBeVisible();
-    expect(getByTitle('Add to Cart')).toBeVisible();
+    getByRole('button').click();
+
+    expect(onClick).toHaveBeenCalledWith(securedResult);
   });
 });

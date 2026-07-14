@@ -57,9 +57,15 @@ export class UploadIngestionService extends DBService {
    *
    * @param {number} bytes
    * @param {ICreateSubmission} submission
+   * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
+   * the system default Blueprint when omitted (new submissions have no prior upload to inherit from).
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
-  async startArchiveUpload(bytes: number, submission: ICreateSubmission): Promise<PresignedUploadUrlResponse> {
+  async startArchiveUpload(
+    bytes: number,
+    submission: ICreateSubmission,
+    requestedBlueprintId?: number | null
+  ): Promise<PresignedUploadUrlResponse> {
     // 1. Create submission (intent)
     const { submission_id } = await this.submissionService.insertSubmissionRecord(submission);
 
@@ -72,7 +78,8 @@ export class UploadIngestionService extends DBService {
       submission_id,
       submissionUuidFromTable,
       [submission.system_user_id],
-      submission.comment
+      submission.comment,
+      requestedBlueprintId
     );
   }
 
@@ -82,12 +89,15 @@ export class UploadIngestionService extends DBService {
    *
    * @param {number} bytes
    * @param {string} submissionUuid - Submission UUID (submission.uuid).
+   * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
+   * the submission's most recent prior upload Blueprint when omitted.
    * @returns {Promise<PresignedUploadUrlResponse>}
    * @throws {ApiNotFoundError} If no submission exists for the given UUID (mapped to 404 by error handler).
    */
   async startArchiveUploadForExistingSubmissionByUuid(
     bytes: number,
-    submissionUuid: string
+    submissionUuid: string,
+    requestedBlueprintId?: number | null
   ): Promise<PresignedUploadUrlResponse> {
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
@@ -96,7 +106,8 @@ export class UploadIngestionService extends DBService {
       byUuid.submission_id,
       submissionRecord.uuid,
       [submissionRecord.system_user_id],
-      submissionRecord.comment ?? null
+      submissionRecord.comment ?? null,
+      requestedBlueprintId
     );
   }
 
@@ -107,6 +118,10 @@ export class UploadIngestionService extends DBService {
    * @param {number} bytes
    * @param {number} submissionId - Integer PK for DB operations
    * @param {string} submissionUuid - Submission UUID; used when building response (API returns this as submissionId for client use).
+   * @param {number[]} systemUserIds - System users to associate with the upload's ticket.
+   * @param {string | null} [comment] - Optional upload comment.
+   * @param {number | null} [requestedBlueprintId] - Optional Blueprint to pin the upload to; resolved
+   * to provided → most recent prior upload → system default.
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
   async _startArchiveUploadForSubmission(
@@ -114,8 +129,15 @@ export class UploadIngestionService extends DBService {
     submissionId: number,
     submissionUuid: string,
     systemUserIds: number[],
-    comment?: string | null
+    comment?: string | null,
+    requestedBlueprintId?: number | null
   ): Promise<PresignedUploadUrlResponse> {
+    // 0. Pin the Blueprint this upload will be indexed with (provided → prior upload → default).
+    const blueprint_id = await this.submissionUploadService.resolveBlueprintIdForUpload(
+      submissionId,
+      requestedBlueprintId
+    );
+
     // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
       upload_status: UploadStatusEnum.PENDING,
@@ -137,6 +159,7 @@ export class UploadIngestionService extends DBService {
       upload_id,
       ticket_id: ticket.ticket_id,
       status: 'uploaded',
+      blueprint_id,
       comment: comment ?? null
     });
 

@@ -1,6 +1,7 @@
 import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
+import { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -9,19 +10,26 @@ import { PoliciesContainer, IPoliciesContainerProps } from './PoliciesContainer'
 // Types for DataGrid mock
 interface MockDataGridProps {
   rows: IPolicy[];
+  columns?: { field: string; renderCell?: (params: { row: IPolicy }) => ReactNode }[];
   localeText?: { noRowsLabel?: string };
+  onRowClick?: (params: { row: IPolicy }) => void;
 }
+
+const mockNavigate = vi.hoisted(() => vi.fn());
 
 // Simple DataGrid mock - just renders rows as divs, no behavior simulation
 vi.mock('@mui/x-data-grid', () => ({
-  DataGrid: ({ rows, localeText }: MockDataGridProps) => (
+  DataGrid: ({ rows, columns = [], localeText, onRowClick }: MockDataGridProps) => (
     <div data-testid="mock-data-grid">
       {rows.length === 0 ? (
         <div>{localeText?.noRowsLabel}</div>
       ) : (
         rows.map((row) => (
-          <div key={row.policy_id} data-testid={`row-${row.policy_id}`}>
+          <div key={row.policy_id} data-testid={`row-${row.policy_id}`} onClick={() => onRowClick?.({ row })}>
             {row.name}
+            {columns.map((column) => (
+              <div key={column.field}>{column.renderCell?.({ row })}</div>
+            ))}
           </div>
         ))
       )}
@@ -29,17 +37,14 @@ vi.mock('@mui/x-data-grid', () => ({
   )
 }));
 
-// Mock Monaco Editor
-vi.mock('@monaco-editor/react', () => ({
-  default: ({ value, onChange }: { value?: string; onChange?: (value?: string) => void }) => (
-    <textarea data-testid="monaco-editor" value={value || ''} onChange={(e) => onChange?.(e.target.value)} />
-  ),
-  loader: {
-    init: vi.fn().mockResolvedValue({
-      languages: { json: { jsonDefaults: { setDiagnosticsOptions: vi.fn() } } }
-    })
-  }
-}));
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate
+  };
+});
 
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
@@ -65,6 +70,15 @@ const defaultProps: IPoliciesContainerProps = {
   refresh: vi.fn(),
   searchTerm: '',
   onSearch: vi.fn()
+};
+
+const policy: IPolicy = {
+  policy_id: 'policy-1',
+  name: 'Sensitive Wildlife Policy',
+  description: 'Policy description',
+  status: 'approved' as IPolicy['status'],
+  expressions: [],
+  statements: []
 };
 
 const renderComponent = (props: Partial<IPoliciesContainerProps> = {}) => {
@@ -94,6 +108,24 @@ describe('PoliciesContainer', () => {
       await waitFor(() => {
         expect(getByText('(42)')).toBeVisible();
       });
+    });
+  });
+
+  describe('Rows', () => {
+    it('navigates to the policy detail page when a row is clicked', async () => {
+      const { getByTestId } = renderComponent({ policies: [policy], rowCount: 1 });
+
+      fireEvent.click(getByTestId('row-policy-1'));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/policy/policy-1');
+    });
+
+    it('does not navigate when the row actions button is clicked', async () => {
+      const { getByTestId } = renderComponent({ policies: [policy], rowCount: 1 });
+
+      fireEvent.click(getByTestId('custom-menu-icon-Actions'));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 
@@ -148,7 +180,7 @@ describe('PoliciesContainer', () => {
       const mockRefresh = vi.fn();
 
       // Step 3: Render component with mock refresh prop
-      const { getByTestId, getByLabelText, getByRole } = renderComponent({ refresh: mockRefresh });
+      const { getByTestId, getByLabelText, getByRole, queryByLabelText } = renderComponent({ refresh: mockRefresh });
 
       // Step 4: Click "Add" button to open dialog
       fireEvent.click(getByTestId('policies-add-button'));
@@ -157,6 +189,7 @@ describe('PoliciesContainer', () => {
       await waitFor(() => {
         expect(getByLabelText('Policy Name *')).toBeVisible();
       });
+      expect(queryByLabelText('Status *')).not.toBeInTheDocument();
 
       // Step 6: Fill form fields
       fireEvent.change(getByLabelText('Policy Name *'), { target: { value: 'New Policy' } });
@@ -170,10 +203,12 @@ describe('PoliciesContainer', () => {
         expect(mockUseApi.policies.createPolicy).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'New Policy',
-            description: 'A description'
+            description: 'A description',
+            statements: []
           })
         );
       });
+      expect(mockUseApi.policies.createPolicy.mock.calls[0][0]).not.toHaveProperty('status');
 
       // Step 9: Verify refresh was called after success
       await waitFor(() => {

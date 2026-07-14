@@ -1,0 +1,15 @@
+[
+  {
+    "id": "8cd8cc9f-6422-4b5a-acde-cb3a9944b82b",
+    "type": "marking",
+    "properties": {
+      "body_position": "Left Ear",
+      "marking_type": "Ear Tag",
+      "identifier": "TAG-001",
+      "primary_colour": "Yellow",
+      "comment": "Sampler marking."
+    },
+    "content": [],
+    "parent": "c21e3c06-054c-4c03-943b-29d71c7398b6"
+  }
+]

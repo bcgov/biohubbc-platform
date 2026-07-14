@@ -66,11 +66,13 @@ export class SubmissionUploadReviewService extends DBService {
   /**
    * Insert a scoped review for a submission upload.
    *
-   * New rows always start in `requested`; status transitions happen through
-   * `updateSubmissionUploadReview`.
+   * Review requests are replacement operations for a scope: before creating the
+   * new active row, the service soft-deletes any active review rows for the same
+   * upload and scope. That preserves historical rows and prevents conflicts with
+   * the `submission_upload_review_nuk1` active-row unique index.
    *
    * @param {string} submissionUuid - The submission UUID.
-   * @param {CreateSubmissionUploadReview} params - Review insert details.
+   * @param {CreateSubmissionUploadReview} params - Review insert details, including the initial task status.
    * @return {Promise<SubmissionUploadReview>} The created active review row.
    * @memberof SubmissionUploadReviewService
    */
@@ -78,9 +80,16 @@ export class SubmissionUploadReviewService extends DBService {
     submissionUuid: string,
     params: CreateSubmissionUploadReview
   ): Promise<SubmissionUploadReview> {
+    await this.submissionUploadReviewRepository.softDeleteActiveSubmissionUploadReviewsByScope(
+      submissionUuid,
+      params.submission_upload_id,
+      params.scope
+    );
+
     return this.submissionUploadReviewRepository.insertSubmissionUploadReview(submissionUuid, {
       submission_upload_id: params.submission_upload_id,
       scope: params.scope,
+      status: params.status,
       requested_by: params.requested_by
     });
   }

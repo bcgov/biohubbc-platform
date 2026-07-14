@@ -1,0 +1,12 @@
+[
+  {
+    "id": "091551fc-2149-4efe-acb7-d9eaff01b4b9",
+    "type": "stratum",
+    "properties": {
+      "name": "Sampler Stratum 1",
+      "description": "Sampler survey stratum."
+    },
+    "content": [],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

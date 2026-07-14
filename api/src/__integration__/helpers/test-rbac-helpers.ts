@@ -67,7 +67,7 @@ export async function createPolicy(
 
 /**
  * Create a policy statement with the given URN.
- * The DB trigger auto-decomposes the URN into indexed columns.
+ * The policy statement references a reusable security_scope row for its URN envelope.
  *
  * Defaults to `effect='allow'` so existing callers that grant access keep
  * their original shape; tests for DENY-only policies override the effect.
@@ -83,9 +83,19 @@ export async function createPolicyStatement(
   effect: PolicyEffect = PolicyEffect.ALLOW
 ): Promise<string> {
   const systemUserId = connection.systemUserId();
+  const scopeHash = computeScopeHash(urn);
+  const [, urnSubmissionId, urnFeatureType, urnFeatureId] = urn.split(':');
+  const scopeResult = await connection.sql(SQL`
+    INSERT INTO security_scope (scope_hash, urn_submission_id, urn_feature_type, urn_feature_id)
+    VALUES (${scopeHash}, ${urnSubmissionId}, ${urnFeatureType}, ${urnFeatureId})
+    ON CONFLICT (scope_hash) DO UPDATE SET scope_hash = EXCLUDED.scope_hash
+    RETURNING security_scope_id;
+  `);
+  const securityScopeId = scopeResult.rows[0].security_scope_id;
+
   const result = await connection.sql(SQL`
-    INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-    VALUES (${policyId}, ${effect}::biohub.policy_effect, ${urn}, ${systemUserId})
+    INSERT INTO policy_statement (policy_id, effect, security_scope_id, create_user)
+    VALUES (${policyId}, ${effect}::biohub.policy_effect, ${securityScopeId}, ${systemUserId})
     RETURNING policy_statement_id;
   `);
   return result.rows[0].policy_statement_id;
@@ -138,13 +148,21 @@ export async function setupScopeChain(
   urn: string
 ): Promise<string> {
   const scopeHash = computeScopeHash(urn);
-  const inserted = await scopeRepo.insertSecurityScope(scopeHash);
+  const [, urnSubmissionId, urnFeatureType, urnFeatureId] = urn.split(':');
+  const inserted = await scopeRepo.insertSecurityScope(scopeHash, {
+    urn_submission_id: urnSubmissionId,
+    urn_feature_type: urnFeatureType,
+    urn_feature_id: urnFeatureId
+  });
 
   const scopeId = inserted
     ? inserted.security_scope_id
     : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
 
-  await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
+  await scopeRepo.connection.query(
+    'UPDATE policy_statement SET security_scope_id = $1 WHERE policy_statement_id = $2',
+    [scopeId, policyStatementId]
+  );
   await computeAnchors(scopeRepo, scopeId);
 
   return scopeId;

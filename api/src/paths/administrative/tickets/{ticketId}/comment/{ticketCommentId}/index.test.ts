@@ -30,7 +30,8 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
       ticket_id: ticketId,
       user_identifier: 'Sarah',
       create_date: '2026-02-25T00:00:00.000Z',
-      comment: 'Updated comment'
+      comment: 'Updated comment',
+      artifacts: []
     };
 
     const updateCommentStub = sinon
@@ -60,7 +61,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
-    const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketCommentByTicketId').resolves();
+    const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketComment').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId, ticketCommentId };

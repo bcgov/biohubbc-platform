@@ -5,18 +5,78 @@ import {
   downloadFile,
   ensureProtocol,
   firstOrNull,
+  formatFeatureCount,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
   getFormattedFileSize,
   getFormattedIdentitySource,
+  getUserLabel,
   isObject,
   jsonParseObjectProperties,
   jsonStringifyObjectProperties,
+  getPostLoginReturnTo,
   pluralize,
   safeJSONParse,
-  safeJSONStringify
+  safeJSONStringify,
+  stripOidcParams
 } from './Utils';
+
+describe('stripOidcParams', () => {
+  it('removes all OIDC response params while preserving application query params', () => {
+    const href =
+      'https://biohub.example/search/species_observation?expr=eyJhYmMiOjF9&page=2&code=abc&state=xyz&session_state=s1&iss=https%3A%2F%2Fkc';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation?expr=eyJhYmMiOjF9&page=2');
+  });
+
+  it('removes OIDC error params (error, error_description)', () => {
+    const href = 'https://biohub.example/search/dataset?search=caribou&error=access_denied&error_description=denied';
+
+    expect(stripOidcParams(href)).toEqual('/search/dataset?search=caribou');
+  });
+
+  it('returns the path with no query string when only OIDC params are present', () => {
+    const href = 'https://biohub.example/search/species_observation?code=abc&state=xyz';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation');
+  });
+
+  it('preserves a path that has no query string', () => {
+    const href = 'https://biohub.example/search/species_observation';
+
+    expect(stripOidcParams(href)).toEqual('/search/species_observation');
+  });
+
+  it('keeps an application param that merely shares a substring with an OIDC param', () => {
+    // `state_code` must survive — only exact-name OIDC params are stripped.
+    const href = 'https://biohub.example/search/dataset?state_code=BC&code=abc';
+
+    expect(stripOidcParams(href)).toEqual('/search/dataset?state_code=BC');
+  });
+});
+
+describe('getPostLoginReturnTo', () => {
+  it('returns the relative returnTo carried on the OIDC state', () => {
+    const user = { state: { returnTo: '/search/species_observation?expr=eyJhYmMiOjF9&page=2' } };
+
+    expect(getPostLoginReturnTo(user)).toEqual('/search/species_observation?expr=eyJhYmMiOjF9&page=2');
+  });
+
+  it('returns undefined when there is no state or returnTo', () => {
+    expect(getPostLoginReturnTo(undefined)).toBeUndefined();
+    expect(getPostLoginReturnTo(null)).toBeUndefined();
+    expect(getPostLoginReturnTo({})).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: {} })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: 42 } })).toBeUndefined();
+  });
+
+  it('rejects unsafe (non-relative) return targets to guard against open redirects', () => {
+    expect(getPostLoginReturnTo({ state: { returnTo: 'https://evil.example/phish' } })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: '//evil.example/phish' } })).toBeUndefined();
+    expect(getPostLoginReturnTo({ state: { returnTo: 'search/dataset' } })).toBeUndefined();
+  });
+});
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {
@@ -148,6 +208,46 @@ describe('getFormattedFileSize', () => {
   it('returns answer in GB if fileSize >= 1000000000', async () => {
     const formattedFileSize = getFormattedFileSize(1000000000);
     expect(formattedFileSize).toEqual('1.0 GB');
+  });
+});
+
+describe('formatFeatureCount', () => {
+  it('returns null when count is null so the caller omits the line', () => {
+    expect(formatFeatureCount(null)).toBeNull();
+  });
+
+  it('returns `0 features` when count is 0', () => {
+    expect(formatFeatureCount(0)).toEqual('0 features');
+  });
+
+  it('returns singular `1 feature` when count is 1', () => {
+    expect(formatFeatureCount(1)).toEqual('1 feature');
+  });
+
+  it('returns plain counts under 1000', () => {
+    expect(formatFeatureCount(2)).toEqual('2 features');
+    expect(formatFeatureCount(999)).toEqual('999 features');
+  });
+
+  it('returns `1k features` at the lower k boundary with trailing `.0` stripped', () => {
+    expect(formatFeatureCount(1000)).toEqual('1k features');
+  });
+
+  it('returns compact k form with one decimal', () => {
+    expect(formatFeatureCount(17412)).toEqual('17.4k features');
+  });
+
+  it('strips a trailing `.0` from mid-band k counts', () => {
+    expect(formatFeatureCount(17000)).toEqual('17k features');
+  });
+
+  it('returns compact M form for counts of a million or more', () => {
+    expect(formatFeatureCount(2500000)).toEqual('2.5M features');
+    expect(formatFeatureCount(1000000)).toEqual('1M features');
+  });
+
+  it('promotes a count that rounds up to 1000k into the M band', () => {
+    expect(formatFeatureCount(999999)).toEqual('1M features');
   });
 });
 
@@ -379,5 +479,29 @@ describe('getFormattedIdentitySource', () => {
       const response = firstOrNull(arr);
       expect(response).toEqual({ id: 1 });
     });
+  });
+});
+
+describe('getUserLabel', () => {
+  it('returns the display name when present', () => {
+    expect(getUserLabel({ display_name: 'Bryan, Luke WLRS:EX', user_identifier: 'lbryan' })).toEqual(
+      'Bryan, Luke WLRS:EX'
+    );
+  });
+
+  it('falls back to the user identifier when display name is null', () => {
+    expect(getUserLabel({ display_name: null, user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is undefined', () => {
+    expect(getUserLabel({ user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is empty', () => {
+    expect(getUserLabel({ display_name: '', user_identifier: 'lbryan' })).toEqual('lbryan');
+  });
+
+  it('falls back to the user identifier when display name is whitespace-only', () => {
+    expect(getUserLabel({ display_name: '   ', user_identifier: 'lbryan' })).toEqual('lbryan');
   });
 });

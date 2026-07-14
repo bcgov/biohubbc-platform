@@ -20,7 +20,7 @@ describe('FeatureIngestionRepository', () => {
       const mockQueryResponse = {
         rowCount: 2,
         rows: [
-          { feature_type_id: 1, name: 'dataset' },
+          { feature_type_id: 1, name: 'survey' },
           { feature_type_id: 2, name: 'sample_site' }
         ]
       } as any as Promise<QueryResult<any>>;
@@ -30,7 +30,7 @@ describe('FeatureIngestionRepository', () => {
       const result = await ingestionRepository.getActiveFeatureTypeMap();
 
       expect(result).to.deep.equal([
-        { feature_type_id: 1, name: 'dataset' },
+        { feature_type_id: 1, name: 'survey' },
         { feature_type_id: 2, name: 'sample_site' }
       ]);
     });
@@ -46,8 +46,8 @@ describe('FeatureIngestionRepository', () => {
           featureTypeId: 77,
           data: {
             id: 'feature-1',
-            type: 'dataset',
-            properties: { name: 'Dataset 1' },
+            type: 'survey',
+            properties: { name: 'Survey 1' },
             content: [],
             parent: null
           },

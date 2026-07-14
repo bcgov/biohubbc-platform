@@ -2,20 +2,33 @@ import { ParquetReader } from '@dsnp/parquetjs';
 import archiver from 'archiver';
 import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
-import { DownloadExportRecord } from '../../models/download-export';
+import { ExportConfig, MergeStep, OutputColumn } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
+import { CsvPropertyDefinition, escapeCsvField, flattenFeatureBySchema } from '../../utils/csv-utils';
 import {
-  buildSchemaHeaders,
-  CsvPropertyDefinition,
-  escapeCsvField,
-  flattenFeatureBySchema
-} from '../../utils/csv-utils';
-import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollPart } from '../../utils/export-utils';
+  buildOutputRecord,
+  coerceJoinKey,
+  computeDimensionProjection,
+  dedupeOutputColumnNames,
+  DimensionMaps,
+  joinRowTransform,
+  materializedColumnsForType,
+  orderMergeSteps,
+  STRUCTURAL_COLUMNS
+} from '../../utils/export-config-utils';
+import {
+  buildParquetKey,
+  buildPartZipKey,
+  parseFeatureTypeFromParquetKey,
+  shouldRollPart
+} from '../../utils/export-utils';
 import { _getS3Client, getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { CodeService } from '../code-service';
@@ -61,15 +74,28 @@ export interface PartArchiverBundle {
 }
 
 /**
+ * Write a line to a PassThrough and respect back-pressure — without the `drain`
+ * wait, a slow S3 leg lets the row loop out-run the pipe and the working set
+ * silently grows past our bound.
+ */
+const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
+  if (!entry.write(line)) {
+    await once(entry, 'drain');
+  }
+};
+
+/**
  * Background processing pipeline for CSV exports.
  *
- * Called exclusively by the pg-boss job handler
- * (`processDownloadExportJobHandler`). Reads the per-feature-type Parquet
- * artifacts already produced by the parent download pipeline, converts rows to
- * CSV, and rolls them into one or more part-zips whose size is bounded by the
- * per-export `max_part_size_bytes` — a read-side knob so the same download can
- * be re-exported at different part sizes without re-running the expensive
- * Parquet pipeline.
+ * Called exclusively by the pg-boss group job handler. Packages a download
+ * VERSION's per-feature-type Parquet artifacts once per export-artifact GROUP:
+ * N identical user export requests dedupe onto a single group, so they share
+ * one physical zip set instead of each re-running this expensive pipeline.
+ * Rows are converted to CSV and rolled into one or more part-zips whose size is
+ * bounded by the group's `max_part_size_bytes` — a read-side knob so the same
+ * version can be re-exported at different part sizes without re-running the
+ * Parquet pipeline. Lifecycle status and timing live on the group row, never on
+ * the per-user export.
  *
  * Request-time operations (CRUD, auth, presigned URLs) live in
  * `DownloadExportService`.
@@ -79,59 +105,69 @@ export interface PartArchiverBundle {
  * @extends {DBService}
  */
 export class DownloadExportPipelineService extends DBService {
-  downloadExportRepository: DownloadExportRepository;
-  downloadRepository: DownloadRepository;
+  downloadVersionExportRepository: DownloadVersionExportRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   artifactService: ArtifactService;
+  codeService: CodeService;
+  objectStorageService: ObjectStorageService;
 
   constructor(connection: IDBConnection) {
     super(connection);
-    this.downloadExportRepository = new DownloadExportRepository(connection);
-    this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.artifactService = new ArtifactService(connection);
+    this.codeService = new CodeService(connection);
+    this.objectStorageService = new ObjectStorageService();
   }
 
   /**
-   * Validate an export status transition against an allowed current-status set.
+   * Validate an export-artifact-group status transition against an allowed
+   * current-status set.
    *
    * Pure business-rule assertion; no I/O. Mirrors
    * `DownloadPipelineService.assertDownloadStatusTransition`.
    */
-  private assertExportStatusTransition(
-    exportId: string,
-    currentStatus: DownloadExportRecord['status'],
+  private assertGroupStatusTransition(
+    groupId: string,
+    currentStatus: DownloadVersionExportArtifactGroupRecord['status'],
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[]
   ): void {
     if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
       throw new ApiConflictError('Invalid download export status transition', [
-        'DownloadExportPipelineService->transitionExportStatus',
-        { exportId, currentStatus, nextStatus, allowedCurrentStatuses }
+        'DownloadExportPipelineService->transitionGroupStatus',
+        { groupId, currentStatus, nextStatus, allowedCurrentStatuses }
       ]);
     }
   }
 
   /**
-   * Transition an export from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition an export-artifact group from one of `allowedCurrentStatuses` to
+   * `nextStatus`.
    *
-   * Fetches the export, asserts the transition is allowed, then writes the new
-   * status plus timestamps via `updateDownloadExportStatus`. The state machine
-   * lives in the service; the repository stays a thin CRUD wrapper. Illegal
-   * transitions (including retries of already-terminal jobs) throw
-   * `ApiConflictError` and bubble up to the pg-boss DLQ.
+   * Fetches the group, asserts the transition is allowed, then writes the new
+   * status plus timestamps via `updateExportArtifactGroupStatus`. Lifecycle
+   * state lives on the GROUP (shared by every user export that dedupes onto it),
+   * never on the per-user export. The state machine lives in the service; the
+   * repository stays a thin CRUD wrapper. Illegal transitions (including retries
+   * of already-terminal jobs) throw `ApiConflictError` and bubble up to the
+   * pg-boss DLQ.
    *
    * `errorMetadata.error` is re-keyed to `error_message` to match the repo's
-   * column name while keeping the caller surface consistent with
-   * `DownloadPipelineService.transitionDownloadStatus`.
+   * column name, mirroring the error-metadata handling of
+   * `DownloadPipelineService.transitionDownloadVersionStatus` (whose metadata
+   * bag additionally carries a READY-only `featureCount` that has no group
+   * equivalent).
    */
-  async transitionExportStatus(
-    exportId: string,
+  async transitionGroupStatus(
+    groupId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
     errorMetadata?: { error?: string }
   ): Promise<void> {
-    const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
+    const group = await this.downloadVersionExportRepository.getExportArtifactGroupById(groupId);
 
-    this.assertExportStatusTransition(exportId, exportRecord.status, nextStatus, allowedCurrentStatuses);
+    this.assertGroupStatusTransition(groupId, group.status, nextStatus, allowedCurrentStatuses);
 
     const now = new Date().toISOString();
     const timestamps: { started_at?: string; completed_at?: string } = {};
@@ -144,26 +180,34 @@ export class DownloadExportPipelineService extends DBService {
 
     const errorMessage = errorMetadata?.error === undefined ? {} : { error_message: errorMetadata.error };
 
-    await this.downloadExportRepository.updateDownloadExportStatus(exportId, nextStatus, {
+    await this.downloadVersionExportRepository.updateExportArtifactGroupStatus(groupId, nextStatus, {
       ...errorMessage,
       ...timestamps
     });
   }
 
   /**
-   * Discover which feature-type Parquet artifacts exist for a download.
+   * Discover which feature-type Parquet artifacts exist for a download's
+   * materialized version.
    *
-   * Parquet keys follow `downloads/{downloadId}/{featureTypeName}/data.parquet`
-   * — anything else (including our own part-zip artifacts) is silently skipped
-   * via `parseFeatureTypeFromParquetKey` returning null. Deduped because
-   * download artifacts can accrete across retries.
+   * Artifacts are discovered from the version's `download_version_artifact`
+   * links, so a re-run of the parquet pipeline against the same version is the
+   * unit of discovery. The Parquet object key is version-scoped
+   * (`downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`),
+   * so the key parse is validated against BOTH `downloadId` and
+   * `downloadVersionId` — any non-matching artifact (a different version's
+   * Parquet, or our own part-zip artifacts) is silently skipped via
+   * `parseFeatureTypeFromParquetKey` returning null. Deduped because version
+   * artifacts can accrete across retries.
    */
-  async listExportFeatureTypes(downloadId: string): Promise<string[]> {
-    const artifacts = await this.downloadRepository.listDownloadArtifactsByDownloadId(downloadId);
+  async listExportFeatureTypes(downloadId: string, downloadVersionId: string): Promise<string[]> {
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
+      downloadVersionId
+    );
 
     const featureTypes = new Set<string>();
     for (const artifact of artifacts) {
-      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId);
+      const featureType = parseFeatureTypeFromParquetKey(artifact.object_key, downloadId, downloadVersionId);
       if (featureType !== null) {
         featureTypes.add(featureType);
       }
@@ -185,7 +229,7 @@ export class DownloadExportPipelineService extends DBService {
    *     → archiver.pipe(passThrough) → hashCount.transform → S3 multipart upload
    * The working set is one Parquet row group (≤ 128 MB on disk, typically
    * smaller in memory after decode) + archiver deflate buffer + AWS multipart
-   * part (64 MB) — bounded regardless of dataset size.
+   * part (64 MB) — bounded regardless of survey size.
    *
    * Back-pressure: if the PassThrough's internal buffer fills, `write()`
    * returns `false` and we `await once(pt, 'drain')` before feeding the next
@@ -208,8 +252,9 @@ export class DownloadExportPipelineService extends DBService {
    * what's left of the feature type's cursor.
    */
   async writeFeatureTypeExport(params: {
-    exportId: string;
+    groupId: string;
     downloadId: string;
+    downloadVersionId: string;
     featureTypeName: string;
     properties: CsvPropertyDefinition[];
     maxPartSizeBytes: bigint;
@@ -226,6 +271,10 @@ export class DownloadExportPipelineService extends DBService {
     // resumed call processes this row first instead of re-reading the cursor —
     // the look-ahead has already advanced past it.
     resumeRow?: Record<string, unknown>;
+    // The materialized column names to keep for this type (a
+    // per_feature_type `output_columns` selection). The structural trace
+    // columns are always kept regardless; absent ⇒ all columns, the default.
+    selectedColumns?: Set<string>;
   }): Promise<{
     finalPart: number;
     chunksWritten: number;
@@ -239,19 +288,30 @@ export class DownloadExportPipelineService extends DBService {
     // pulling the cursor again.
     pendingRow?: Record<string, unknown>;
   }> {
-    const { exportId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
+    const { groupId, downloadId, downloadVersionId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } =
+      params;
     let { currentPart } = params;
 
     // Reuse the reader + cursor across roll-overs so we don't re-fetch the
     // Parquet footer every time a feature type spans multiple parts.
-    const reader = params.resumeReader ?? (await this.openParquetReader(downloadId, featureTypeName));
+    const reader =
+      params.resumeReader ?? (await this.openParquetReader(downloadId, downloadVersionId, featureTypeName));
     const cursor = params.resumeCursor ?? reader.getCursor();
 
-    // submission_feature_id leads so consumers can trace a CSV row back to
-    // its feature-detail page in the platform. `uuid` + `parent_uuid` follow
-    // as the cross-file star-schema join keys — telemetry → deployment →
-    // animal joins downstream by `parent_uuid → uuid`.
-    const headers = ['submission_feature_id', 'uuid', 'parent_uuid', ...buildSchemaHeaders(properties)];
+    // The exact materialized column set for this type (structural trace columns —
+    // submission_feature_id, uuid, parent_uuid — followed by the schema headers).
+    // Derived from the shared `materializedColumnsForType` so this writer's header
+    // set stays identical to what AC8 validation and the join engine check against.
+    const allHeaders = materializedColumnsForType(properties);
+    // A column filter (per_feature_type output_columns selection) keeps the
+    // structural trace columns plus the chosen schema columns; an absent filter
+    // emits every column (the default). Raw header names — per-type files have no
+    // cross-type name collisions, so no rename is applied.
+    const headers = params.selectedColumns
+      ? allHeaders.filter(
+          (header) => (STRUCTURAL_COLUMNS as readonly string[]).includes(header) || params.selectedColumns!.has(header)
+        )
+      : allHeaders;
     const headerLine = headers.map(escapeCsvField).join(',') + '\n';
     // Hoisted: most feature types have zero artifact_key properties, so
     // pre-filter once instead of re-scanning every row.
@@ -279,20 +339,11 @@ export class DownloadExportPipelineService extends DBService {
     // PassThrough; archiver reads from it and writes to its own output pipe.
     const openChunkEntry = (): PassThrough => {
       const bundle = currentBundle();
-      const entryName = `biohub-export-${exportId}/${featureTypeName}/chunk${chunkIndex}.csv`;
+      const entryName = `biohub-export-${groupId}/${featureTypeName}/chunk${chunkIndex}.csv`;
       const entry = new PassThrough();
       bundle.archive.append(entry, { name: entryName });
       chunksWritten += 1;
       return entry;
-    };
-
-    // Write to a PassThrough and respect back-pressure — without the `drain`
-    // wait, a slow S3 leg lets the row loop out-run the pipe and the working
-    // set silently grows past our bound.
-    const writeLine = async (entry: PassThrough, line: string): Promise<void> => {
-      if (!entry.write(line)) {
-        await once(entry, 'drain');
-      }
     };
 
     // Open lazily on first row so a zero-row feature type (or a cursor that
@@ -337,7 +388,7 @@ export class DownloadExportPipelineService extends DBService {
         const flattened = flattenFeatureBySchema(next, properties, submissionFeatureId, `files${currentPart}`);
         flattened['submission_feature_id'] = String(submissionFeatureId);
         // `uuid` is NOT NULL in the Parquet schema; `parent_uuid` is nullable
-        // (root types like `dataset` have no parent) — emit empty string so
+        // (root types like `survey` have no parent) — emit empty string so
         // the column is still present. Narrow to `string | null` rather than
         // `String(unknown)` so we don't risk an `[object Object]` stringify.
         flattened['uuid'] = (next.uuid as string | null) ?? '';
@@ -480,41 +531,46 @@ export class DownloadExportPipelineService extends DBService {
    * credential config stays in sync with the rest of the codebase — no inline
    * duplication of the region / path-style / env-var config.
    */
-  private async openParquetReader(downloadId: string, featureTypeName: string): Promise<ParquetReader> {
+  private async openParquetReader(
+    downloadId: string,
+    downloadVersionId: string,
+    featureTypeName: string
+  ): Promise<ParquetReader> {
     return ParquetReader.openS3(_getS3Client(), {
       Bucket: getObjectStoreBucketName(),
-      Key: `downloads/${downloadId}/${featureTypeName}/data.parquet`
+      Key: buildParquetKey(downloadId, downloadVersionId, featureTypeName)
     });
   }
 
   /**
    * Finalize the given part's archiver, record the resulting artifact, and
-   * link it to the export via `download_export_artifact`.
+   * link it to the export-artifact group via `download_version_export_artifact`.
    *
    * The S3 key is deterministic (via `buildPartZipKey`) so a retry overwrites
    * the same object; `insertArtifact` is idempotent on
-   * `(bucket, object_key)`, and `createDownloadExportArtifact` is idempotent on
-   * `(download_export_id, artifact_id)` — a retried part converges to the
-   * same DB + S3 state as a first-time success.
+   * `(bucket, object_key)`, and `createExportArtifactGroupArtifact` is
+   * idempotent on `(download_version_export_artifact_group_id, artifact_id)` — a
+   * retried part converges to the same DB + S3 state as a first-time success.
    *
    * `chunk_id` on the link row doubles as the 1-based part index for the
    * detail endpoint's `parts[]` ordering.
    */
   async writePartZip(params: {
-    exportId: string;
+    groupId: string;
     downloadId: string;
+    downloadVersionId: string;
     partIndex: number;
     archive: archiver.Archiver;
     uploadPromise: Promise<void>;
     hashCount: ReturnType<typeof createHashCountStream>;
   }): Promise<{ artifactId: string; byteCount: number }> {
-    const { exportId, downloadId, partIndex, archive, uploadPromise, hashCount } = params;
+    const { groupId, downloadId, downloadVersionId, partIndex, archive, uploadPromise, hashCount } = params;
 
     await archive.finalize();
     await uploadPromise;
 
     const { sha256Hex, byteCount } = hashCount.getResult();
-    const objectKey = buildPartZipKey(downloadId, exportId, partIndex);
+    const objectKey = buildPartZipKey(downloadId, downloadVersionId, groupId, partIndex);
 
     const { artifact_id } = await this.artifactService.insertArtifact({
       bucket: getObjectStoreBucketName(),
@@ -526,7 +582,7 @@ export class DownloadExportPipelineService extends DBService {
       format: 'zip'
     });
 
-    await this.downloadExportRepository.createDownloadExportArtifact(exportId, artifact_id, partIndex);
+    await this.downloadVersionExportRepository.createExportArtifactGroupArtifact(groupId, artifact_id, partIndex);
 
     return { artifactId: artifact_id, byteCount };
   }
@@ -540,8 +596,7 @@ export class DownloadExportPipelineService extends DBService {
    * not either in isolation.
    */
   private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
-    const codeService = new CodeService(this.connection);
-    const allFeatureTypeCodes = await codeService.getFeatureTypePropertyCodes();
+    const allFeatureTypeCodes = await this.codeService.getFeatureTypePropertyCodes();
 
     const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {
@@ -554,6 +609,435 @@ export class DownloadExportPipelineService extends DBService {
       );
     }
     return lookup;
+  }
+
+  /**
+   * Group `output_columns` into per-feature-type column sets for the
+   * `per_feature_type` column filter.
+   *
+   * Returns `undefined` when no selection was given so the writer falls back to
+   * all columns — the omitted-output_columns default. A type absent from the
+   * returned map likewise gets no filter (all its columns): selecting columns for
+   * one type does not narrow another, since each per-type CSV is independent and a
+   * user who scoped one type's columns still expects the rest in full.
+   */
+  private buildSelectedColumnsByType(outputColumns: OutputColumn[] | undefined): Map<string, Set<string>> | undefined {
+    if (outputColumns === undefined) {
+      return undefined;
+    }
+
+    const selectedColumnsByType = new Map<string, Set<string>>();
+    for (const outputColumn of outputColumns) {
+      const columns = selectedColumnsByType.get(outputColumn.feature_type) ?? new Set<string>();
+      columns.add(outputColumn.column);
+      selectedColumnsByType.set(outputColumn.feature_type, columns);
+    }
+
+    return selectedColumnsByType;
+  }
+
+  /**
+   * Convert a raw per-type Parquet row into a materialized, CSV-ready record:
+   * flatten schema properties to their materialized header names with formatted
+   * values (datetime → YYYY-MM-DD / HH:MM:SS, spatial → WKT, artifact_key →
+   * filePath), then re-attach the structural trace columns the flattener does not
+   * own.
+   *
+   * The denormalized join operates on these materialized names so a config's
+   * column references (validated against `materializedColumnsForType`) resolve
+   * directly against the joined row. Operating on raw Parquet rows instead would
+   * render datetime as integers/Dates and key artifact paths under their raw
+   * property name rather than `filePath`, silently breaking those columns.
+   */
+  private materializeParquetRow(
+    row: Record<string, unknown>,
+    properties: CsvPropertyDefinition[]
+  ): Record<string, string> {
+    const submissionFeatureId = Number(row.submission_feature_id ?? 0);
+    const flattened = flattenFeatureBySchema(row, properties, submissionFeatureId);
+    // `flattenFeatureBySchema` owns only the schema properties; re-attach the
+    // structural trace columns so the join can probe/output on them too.
+    flattened['submission_feature_id'] = row.submission_feature_id == null ? '' : String(submissionFeatureId);
+    flattened['uuid'] = (row.uuid as string | null) ?? '';
+    flattened['parent_uuid'] = (row.parent_uuid as string | null) ?? '';
+    return flattened;
+  }
+
+  /**
+   * Build the in-memory hash maps that form the BUILD side of the denormalized
+   * broadcast join — one map per distinct dimension feature type, keyed by that
+   * dimension's join column.
+   *
+   * Each dimension is read fully into memory once (the broadcast/build side) so
+   * the root can be streamed and probed against it without re-reading. Three
+   * properties of this build matter:
+   *
+   * - **Row-count budget fail-fast.** The Parquet footer carries the row count,
+   *   so a footer-only preflight rejects an over-budget dimension
+   *   (`> DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS`) BEFORE buffering a single row — steering the client
+   *   to the raw-Parquet download path instead of risking an out-of-memory join.
+   * - **Materialize-then-trim memory bound.** Rows are read in full (no reader
+   *   column projection — the flattener needs every raw input to format datetime /
+   *   spatial / artifact_key), materialized, then trimmed in memory to only the
+   *   columns this dimension actually contributes (`computeDimensionProjection`).
+   *   The map therefore holds the minimum each dimension owes the output, not the
+   *   whole wide row.
+   * - **Null keys are never indexed.** A row whose join key coerces to `''`
+   *   (null / absent) is skipped — SQL `NULL ≠ NULL`, so a null-keyed dimension
+   *   row must never match a null-keyed root row.
+   *
+   * Single-column index: a dimension type is indexed by ONE join column — the
+   * `right_column` of the first step that joins to it. A config that joins the
+   * same dimension type on two different columns is rejected here, rather than
+   * silently mis-probing the single index and returning no/wrong matches; a
+   * per-column index would be needed to lift that.
+   */
+  private async buildDimensionMaps(params: {
+    downloadId: string;
+    downloadVersionId: string;
+    orderedSteps: MergeStep[];
+    outputColumns: OutputColumn[];
+    schemaLookup: Map<string, CsvPropertyDefinition[]>;
+  }): Promise<DimensionMaps> {
+    const dimMaps: DimensionMaps = new Map();
+
+    const dimensionFeatureTypes = new Set(params.orderedSteps.map((step) => step.right_feature_type));
+
+    for (const featureType of dimensionFeatureTypes) {
+      dimMaps.set(featureType, await this.buildDimensionMap(featureType, params));
+    }
+
+    return dimMaps;
+  }
+
+  /**
+   * Build the BUILD-side hash map for ONE dimension feature type: resolve its
+   * single join column (rejecting a config that joins the type on two different
+   * columns, which would mis-probe the one index), preflight the Parquet footer
+   * row count against the in-memory join budget, then buffer its rows.
+   */
+  private async buildDimensionMap(
+    featureType: string,
+    params: {
+      downloadId: string;
+      downloadVersionId: string;
+      orderedSteps: MergeStep[];
+      outputColumns: OutputColumn[];
+      schemaLookup: Map<string, CsvPropertyDefinition[]>;
+    }
+  ): Promise<Map<string, Record<string, unknown>[]>> {
+    const { downloadId, downloadVersionId, orderedSteps, outputColumns, schemaLookup } = params;
+
+    // Index this dimension by the first step that joins to it (one join column
+    // per dimension), so every probe against this type uses one key.
+    const stepsForType = orderedSteps.filter((step) => step.right_feature_type === featureType);
+    const keyStep = stepsForType[0];
+
+    // Guard the single-column-index assumption: the dimension is bucketed by
+    // one `right_column`, so a second step joining the same type on a different
+    // column would probe the wrong index and silently miss. Reject it loudly.
+    const conflictingStep = stepsForType.find((step) => step.right_column !== keyStep.right_column);
+    if (conflictingStep) {
+      throw new Error(
+        `Denormalized export: dimension '${featureType}' is joined on multiple columns ('${keyStep.right_column}' and '${conflictingStep.right_column}'); a dimension may be joined on only one column.`
+      );
+    }
+
+    const reader = await this.openParquetReader(downloadId, downloadVersionId, featureType);
+    try {
+      // Footer-only preflight: reject an over-budget dimension before buffering
+      // any rows so an oversize join fails fast rather than exhausting memory.
+      const rowCount = Number(await reader.getRowCount());
+      if (rowCount > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+        throw new Error(
+          `Denormalized export: dimension '${featureType}' has ${rowCount} rows, exceeding the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} — use the raw-Parquet download path for joins this large.`
+        );
+      }
+
+      const projection = computeDimensionProjection(featureType, orderedSteps, outputColumns);
+      const properties = schemaLookup.get(featureType) ?? [];
+
+      return await this.bufferDimensionRows(reader, { featureType, keyStep, projection, properties });
+    } finally {
+      await reader.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Stream a dimension's Parquet rows into its build-side hash map — keyed by the
+   * coerced join key and trimmed to the projected columns. A runtime row-count
+   * backstop aborts if a corrupt/under-reporting footer streams past the in-memory
+   * budget; null/empty keys are never indexed (SQL NULL ≠ NULL).
+   */
+  private async bufferDimensionRows(
+    reader: ParquetReader,
+    options: {
+      featureType: string;
+      keyStep: MergeStep;
+      projection: Set<string>;
+      properties: CsvPropertyDefinition[];
+    }
+  ): Promise<Map<string, Record<string, unknown>[]>> {
+    const { featureType, keyStep, projection, properties } = options;
+    const map = new Map<string, Record<string, unknown>[]>();
+
+    // FULL rows from the reader — flattening needs the raw inputs; the map is
+    // trimmed to `projection` per row instead of projecting at the reader.
+    const cursor = reader.getCursor();
+    let rowsBuffered = 0;
+    let raw = (await cursor.next()) as Record<string, unknown> | null;
+    while (raw !== null) {
+      // Runtime backstop for the footer preflight: a corrupt or under-reporting
+      // footer could pass the row-count check yet stream more rows than the
+      // budget, OOMing the worker. Abort before the map can outgrow the budget.
+      rowsBuffered += 1;
+      if (rowsBuffered > DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS) {
+        throw new Error(
+          `Denormalized export: dimension '${featureType}' streamed past the in-memory join budget of ${DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS} rows (Parquet footer under-reported its row count) — use the raw-Parquet download path for joins this large.`
+        );
+      }
+      const materialized = this.materializeParquetRow(raw, properties);
+      const key = coerceJoinKey(materialized[keyStep.right_column]);
+      // Never index a null/empty key — SQL NULL ≠ NULL, so a null-keyed
+      // dimension row must not match a null-keyed root row.
+      if (key !== '') {
+        const projected: Record<string, unknown> = {};
+        for (const column of projection) {
+          if (column in materialized) {
+            projected[column] = materialized[column];
+          }
+        }
+        const bucket = map.get(key) ?? [];
+        bucket.push(projected);
+        map.set(key, bucket);
+      }
+      raw = (await cursor.next()) as Record<string, unknown> | null;
+    }
+
+    return map;
+  }
+
+  /**
+   * Resolve the output columns for a denormalized export, materializing the
+   * "all columns" default when the config omits `output_columns`.
+   *
+   * Mirrors the per-type "omitted ⇒ all columns" default — and is what makes the
+   * single-type, no-merge-steps passthrough emit that type's rows. The root type's
+   * columns keep their RAW header names (root columns stay unprefixed on the joined
+   * row); each contributed dimension type's columns omit `output_column` so
+   * `buildOutputRecord` falls back to the `${feature_type}_${column}` name, which
+   * keeps cross-type headers unique.
+   *
+   * Both paths are run through `dedupeOutputColumnNames` so the resolved header
+   * names are guaranteed unique: user-supplied `output_columns` can collide (two
+   * columns explicitly named the same), and even the default path can collide in
+   * the contrived case of a root property literally named `${dimType}_${dimColumn}`.
+   * Without this, colliding names silently overwrite one another in the CSV row.
+   */
+  private resolveDenormalizedOutputColumns(
+    config: ExportConfig,
+    orderedSteps: MergeStep[],
+    schemaLookup: Map<string, CsvPropertyDefinition[]>
+  ): OutputColumn[] {
+    if (config.output_columns) {
+      return dedupeOutputColumnNames(config.output_columns);
+    }
+
+    const rootFeatureType = config.root_feature_type!;
+    const rootProperties = schemaLookup.get(rootFeatureType) ?? [];
+
+    const outputColumns: OutputColumn[] = materializedColumnsForType(rootProperties).map((column) => ({
+      feature_type: rootFeatureType,
+      column,
+      output_column: column
+    }));
+
+    // Each dimension contributed by a merge step, deduped in merge order, gets all
+    // its materialized columns with no explicit output name (prefixed for
+    // uniqueness by buildOutputRecord).
+    const seenDimensions = new Set<string>();
+    for (const step of orderedSteps) {
+      const featureType = step.right_feature_type;
+      if (seenDimensions.has(featureType)) {
+        continue;
+      }
+      seenDimensions.add(featureType);
+
+      const properties = schemaLookup.get(featureType) ?? [];
+      for (const column of materializedColumnsForType(properties)) {
+        outputColumns.push({ feature_type: featureType, column });
+      }
+    }
+
+    return dedupeOutputColumnNames(outputColumns);
+  }
+
+  /**
+   * Run the denormalized export: a broadcast LEFT join that streams the root
+   * feature type and folds every dimension into each root row, writing the wide
+   * joined rows into size-bounded part-zips.
+   *
+   * Shape and ordering choices captured here because they are load-bearing:
+   *
+   * - **Broadcast left-join, build-side first.** Every dimension is buffered in
+   *   memory (`buildDimensionMaps`) BEFORE any upload opens, so an over-budget
+   *   dimension fails fast without having created an archiver / multipart upload to
+   *   tear down. The root is then streamed and probed against the buffers row by
+   *   row — the root is never fully materialized, only one root row's bounded
+   *   fan-out is live at a time.
+   * - **No binary streaming.** Denormalized output is analytical tabular columns;
+   *   an `artifact_key` here carries the materialized `filePath` STRING, not a
+   *   bundled file. The part-zip spine is reused verbatim minus the binary
+   *   projection and `streamBinariesToPart` calls.
+   * - **Roll BEFORE writing.** With no binaries to project, the part can be rolled
+   *   before the next row is written; because the row that triggers the roll is
+   *   then written into the fresh part, the final part is guaranteed non-empty and
+   *   no look-ahead is needed (unlike the per-type path).
+   *
+   * Retry-as-lifecycle: errors are NOT caught into a FAILED transition here — they
+   * bubble to the pg-boss DLQ, which owns the FAILED transition after the retry
+   * budget is exhausted (same contract as `runExportGroup`).
+   */
+  private async runDenormalizedExport(params: {
+    groupId: string;
+    downloadId: string;
+    downloadVersionId: string;
+    config: ExportConfig;
+    maxPartSizeBytes: bigint;
+    schemaLookup: Map<string, CsvPropertyDefinition[]>;
+  }): Promise<void> {
+    const { groupId, downloadId, downloadVersionId, config, maxPartSizeBytes, schemaLookup } = params;
+
+    // Denormalized always has a root (validated at request time).
+    const rootFeatureType = config.root_feature_type!;
+    const rootProperties = schemaLookup.get(rootFeatureType) ?? [];
+
+    const orderedSteps = orderMergeSteps(rootFeatureType, config.merge_steps);
+    const outputColumns = this.resolveDenormalizedOutputColumns(config, orderedSteps, schemaLookup);
+
+    const headers = outputColumns.map(
+      (outputColumn) => outputColumn.output_column ?? `${outputColumn.feature_type}_${outputColumn.column}`
+    );
+    const headerLine = headers.map(escapeCsvField).join(',') + '\n';
+
+    // Build side first: buffer every dimension so an over-budget one fails before
+    // any upload opens.
+    const dimMaps = await this.buildDimensionMaps({
+      downloadId,
+      downloadVersionId,
+      orderedSteps,
+      outputColumns,
+      schemaLookup
+    });
+
+    const reader = await this.openParquetReader(downloadId, downloadVersionId, rootFeatureType);
+
+    // Fail loud if the root has zero rows — otherwise we finalize an empty zip the
+    // user's OS refuses to extract (mirrors the per-type empty-zip guard). Guard
+    // before any bundle is created so there is nothing to tear down.
+    if (Number(await reader.getRowCount()) === 0) {
+      await reader.close().catch(() => undefined);
+      throw new Error(
+        `Export group ${groupId}: denormalized root '${rootFeatureType}' has zero rows — refusing to write an empty zip.`
+      );
+    }
+
+    const archiverByPart = new Map<number, PartArchiverBundle>();
+    let currentPart = 1;
+    archiverByPart.set(currentPart, this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart));
+
+    const currentBundle = (): PartArchiverBundle => {
+      const bundle = archiverByPart.get(currentPart);
+      if (!bundle) {
+        throw new Error(
+          `DownloadExportPipelineService->runDenormalizedExport: no archiver bundle for part ${currentPart}`
+        );
+      }
+      return bundle;
+    };
+
+    // chunkIndex threads across part-zips so the joined CSVs stay monotonic
+    // (`chunk1.csv`, `chunk2.csv`, …) and don't collide on flat-extract.
+    let chunkIndex = 1;
+    let currentEntry: PassThrough | null = null;
+
+    try {
+      const cursor = reader.getCursor();
+      let raw = (await cursor.next()) as Record<string, unknown> | null;
+      while (raw !== null) {
+        const rootRow = this.materializeParquetRow(raw, rootProperties);
+
+        for (const joined of joinRowTransform(rootRow, rootFeatureType, orderedSteps, dimMaps)) {
+          // Roll BEFORE writing: with no binaries to project, rolling here keeps
+          // the final part non-empty (the triggering row lands in the fresh part).
+          if (currentEntry !== null && shouldRollPart(currentBundle().byteCount, maxPartSizeBytes)) {
+            currentEntry.end();
+            const rolledBundle = currentBundle();
+            await this.writePartZip({
+              groupId,
+              downloadId,
+              downloadVersionId,
+              partIndex: currentPart,
+              archive: rolledBundle.archive,
+              uploadPromise: rolledBundle.uploadPromise,
+              hashCount: rolledBundle.hashCount
+            });
+            archiverByPart.delete(currentPart);
+            currentPart += 1;
+            chunkIndex += 1;
+            archiverByPart.set(
+              currentPart,
+              this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart)
+            );
+            currentEntry = null;
+          }
+
+          // Lazy-open the chunk entry on the first joined row of this part; the
+          // header is written on every chunk so any single `chunkN.csv` is usable
+          // on its own.
+          if (currentEntry === null) {
+            currentEntry = new PassThrough();
+            currentBundle().archive.append(currentEntry, {
+              name: `biohub-export-${groupId}/${rootFeatureType}/chunk${chunkIndex}.csv`
+            });
+            await writeLine(currentEntry, headerLine);
+            currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
+          }
+
+          const record = buildOutputRecord(joined, outputColumns, rootFeatureType);
+          const line = headers.map((header) => escapeCsvField(record[header] ?? '')).join(',') + '\n';
+          await writeLine(currentEntry, line);
+          currentBundle().byteCount += BigInt(Buffer.byteLength(line, 'utf8'));
+        }
+
+        raw = (await cursor.next()) as Record<string, unknown> | null;
+      }
+
+      currentEntry?.end();
+      await reader.close().catch(() => undefined);
+
+      // Finalize every still-open part in ascending index order (mirrors
+      // runExportGroup's trailing finalize, minus the binary streaming).
+      const openPartIndexes = Array.from(archiverByPart.keys()).sort((a, b) => a - b);
+      for (const partIndex of openPartIndexes) {
+        const bundle = archiverByPart.get(partIndex)!;
+        await this.writePartZip({
+          groupId,
+          downloadId,
+          downloadVersionId,
+          partIndex,
+          archive: bundle.archive,
+          uploadPromise: bundle.uploadPromise,
+          hashCount: bundle.hashCount
+        });
+        archiverByPart.delete(partIndex);
+      }
+    } catch (error) {
+      currentEntry?.end();
+      await reader.close().catch(() => undefined);
+      this.abortOpenArchivers(archiverByPart);
+      throw error;
+    }
   }
 
   /**
@@ -570,9 +1054,14 @@ export class DownloadExportPipelineService extends DBService {
    * pipe that never closes — `uploadPromise` would hang forever. Routing the
    * error into `passThrough.destroy(err)` tears down the entire downstream
    * pipeline (passThrough → hashCount → S3 upload) so `uploadPromise`
-   * rejects, which `writePartZip` / `runExport` can observe.
+   * rejects, which `writePartZip` / `runExportGroup` can observe.
    */
-  private createPartArchiverBundle(exportId: string, downloadId: string, partIndex: number): PartArchiverBundle {
+  private createPartArchiverBundle(
+    groupId: string,
+    downloadId: string,
+    downloadVersionId: string,
+    partIndex: number
+  ): PartArchiverBundle {
     const archive = archiver('zip', { zlib: { level: 5 } });
     const passThrough = new PassThrough();
     const hashCount = createHashCountStream();
@@ -584,32 +1073,42 @@ export class DownloadExportPipelineService extends DBService {
     archive.pipe(passThrough);
     passThrough.pipe(hashCount.transform);
 
-    const objectStorageService = new ObjectStorageService();
-    const uploadPromise = objectStorageService.uploadStream(
+    const uploadPromise = this.objectStorageService.uploadStream(
       BucketType.MAIN,
       hashCount.transform,
       'application/zip',
-      buildPartZipKey(downloadId, exportId, partIndex)
+      buildPartZipKey(downloadId, downloadVersionId, groupId, partIndex)
     );
 
     return { archive, uploadPromise, passThrough, hashCount, byteCount: 0n };
   }
 
   /**
-   * Orchestrate the CSV export pipeline end-to-end.
+   * Orchestrate the CSV export pipeline end-to-end for one export-artifact group.
    *
    * Sequence:
    *  1. Transition PENDING → PROCESSING (idempotent — re-entering a running
-   *     export is allowed so pg-boss retries converge).
-   *  2. Resolve the download + per-type schema lookup.
-   *  3. For each feature type in order, stream Parquet rows into the current
-   *     part's CSV chunks. Roll to a new part once the per-export
-   *     `max_part_size_bytes` is crossed.
+   *     group is allowed so pg-boss retries converge).
+   *  2. Resolve the version the group is pinned to, then the per-type schema
+   *     lookup.
+   *  3. Branch on the config's `mode`:
+   *     - `denormalized` → `runDenormalizedExport` (broadcast join into wide
+   *       CSV rows), then transition READY and return.
+   *     - `per_feature_type` (default) → for each configured feature type, stream
+   *       Parquet rows into the current part's CSV chunks, rolling to a new part
+   *       once the group's `max_part_size_bytes` is crossed.
    *  4. Finalize every open part via `writePartZip`, in index order.
    *  5. Transition PROCESSING → READY.
    *
+   * The version is resolved from the GROUP (`group.download_version_id`), not
+   * from the download's most-recent version. The group is pinned to the specific
+   * version it was created against, so a later re-run of the download — which
+   * creates a NEW version rather than mutating the parent — does NOT change what
+   * this group packages. Re-reading the latest version would silently zip a newer
+   * version's artifacts; resolving from the group eliminates that drift.
+   *
    * Feature types are processed sequentially, not in parallel, to cap memory:
-   * a download with tens of types and hundreds of thousands of rows would
+   * a version with tens of types and hundreds of thousands of rows would
    * otherwise risk OOM in a single pg-boss worker process. Per-type buffering
    * is the bound.
    *
@@ -617,34 +1116,64 @@ export class DownloadExportPipelineService extends DBService {
    * failure and the DLQ handler owns the FAILED transition — duplicating it
    * would mask the root cause and race the retry path.
    */
-  async runExport(exportId: string): Promise<void> {
-    await this.transitionExportStatus(exportId, DownloadStatusEnum.PROCESSING, [
+  async runExportGroup(groupId: string): Promise<void> {
+    await this.transitionGroupStatus(groupId, DownloadStatusEnum.PROCESSING, [
       DownloadStatusEnum.PENDING,
       DownloadStatusEnum.PROCESSING
     ]);
 
-    const exportRecord = await this.downloadExportRepository.getDownloadExportById(exportId);
-    const download = await this.downloadRepository.getDownloadById(exportRecord.download_id);
+    const group = await this.downloadVersionExportRepository.getExportArtifactGroupById(groupId);
+
+    // Resolve the version the group is pinned to (NOT the download's current
+    // version) so a later re-materialization of the download doesn't change what
+    // this group packages. getDownloadVersionById throws ApiNotFoundError if the
+    // version is gone — that absence is the guard.
+    const version = await this.downloadVersionRepository.getDownloadVersionById(group.download_version_id);
+    const downloadId = version.download_id;
+    const downloadVersionId = group.download_version_id;
 
     const schemaLookup = await this.buildSchemaLookup();
-    const featureTypes = await this.listExportFeatureTypes(download.download_id);
+    const config = group.config;
+    const maxPartSizeBytes = BigInt(group.max_part_size_bytes);
 
-    // Fail loud if the parent download has no Parquet artifacts — otherwise the
+    // Denormalized mode joins the per-type Parquet into wide CSV rows; it owns its
+    // own part-zip spine (no binary streaming) and finalizes inside the call.
+    if (config.mode === 'denormalized') {
+      await this.runDenormalizedExport({
+        groupId,
+        downloadId,
+        downloadVersionId,
+        config,
+        maxPartSizeBytes,
+        schemaLookup
+      });
+      await this.transitionGroupStatus(groupId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+      return;
+    }
+
+    // per_feature_type: emit one CSV per configured type. Discovery finds every
+    // materialized type; restrict it to the config's selection so a type that was
+    // materialized but not requested is not exported.
+    const selectedColumnsByType = this.buildSelectedColumnsByType(config.output_columns);
+    const featureTypes = (await this.listExportFeatureTypes(downloadId, downloadVersionId)).filter((featureType) =>
+      config.feature_types.includes(featureType)
+    );
+
+    // Fail loud if the version has no Parquet artifacts — otherwise the
     // archiver finalizes an empty zip (just the central-directory record) and the
     // user downloads a file their OS refuses to extract. Retry-as-lifecycle: the
-    // DLQ handler transitions the export to FAILED after the pg-boss retry budget
+    // DLQ handler transitions the group to FAILED after the pg-boss retry budget
     // is exhausted, and the error_message is propagated to the card.
     if (featureTypes.length === 0) {
       throw new Error(
-        `Export ${exportId}: parent download ${download.download_id} has no Parquet artifacts to export — refusing to write an empty zip.`
+        `Export group ${groupId}: version ${downloadVersionId} has no Parquet artifacts to export — refusing to write an empty zip.`
       );
     }
 
-    const maxPartSizeBytes = BigInt(exportRecord.max_part_size_bytes);
     const archiverByPart = new Map<number, PartArchiverBundle>();
     let currentPart = 1;
 
-    archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
+    archiverByPart.set(currentPart, this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart));
 
     // Binary file references are collected as rows stream by, grouped by the
     // part index the referring row landed in. Each part's binaries must stream
@@ -655,7 +1184,6 @@ export class DownloadExportPipelineService extends DBService {
     // turning the per-part lookup into O(refs-in-this-part) instead of
     // O(all-refs-ever).
     const fileRefsByPart = new Map<number, FileFeatureRef[]>();
-    const objectStorageService = new ObjectStorageService();
     let totalChunksWritten = 0;
 
     try {
@@ -676,8 +1204,9 @@ export class DownloadExportPipelineService extends DBService {
 
         while (true) {
           const result = await this.writeFeatureTypeExport({
-            exportId,
-            downloadId: download.download_id,
+            groupId,
+            downloadId,
+            downloadVersionId,
             featureTypeName,
             properties,
             maxPartSizeBytes,
@@ -686,7 +1215,8 @@ export class DownloadExportPipelineService extends DBService {
             resumeReader: pendingReader,
             resumeCursor: pendingCursor,
             resumeChunkIndex: pendingChunkIndex,
-            resumeRow: pendingRow
+            resumeRow: pendingRow,
+            selectedColumns: selectedColumnsByType?.get(featureTypeName)
           });
 
           for (const ref of result.fileRefs) {
@@ -710,13 +1240,14 @@ export class DownloadExportPipelineService extends DBService {
           await this.streamBinariesToPart(
             oldBundle,
             fileRefsByPart.get(oldPartIndex) ?? [],
-            exportId,
+            groupId,
             oldPartIndex,
-            objectStorageService
+            this.objectStorageService
           );
           await this.writePartZip({
-            exportId,
-            downloadId: download.download_id,
+            groupId,
+            downloadId,
+            downloadVersionId,
             partIndex: oldPartIndex,
             archive: oldBundle.archive,
             uploadPromise: oldBundle.uploadPromise,
@@ -726,7 +1257,10 @@ export class DownloadExportPipelineService extends DBService {
           fileRefsByPart.delete(oldPartIndex);
 
           currentPart = result.finalPart;
-          archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
+          archiverByPart.set(
+            currentPart,
+            this.createPartArchiverBundle(groupId, downloadId, downloadVersionId, currentPart)
+          );
           pendingReader = result.pendingReader;
           pendingCursor = result.pendingCursor;
           pendingChunkIndex = result.pendingChunkIndex;
@@ -739,7 +1273,7 @@ export class DownloadExportPipelineService extends DBService {
       // the user's OS will refuse to extract.
       if (totalChunksWritten === 0) {
         throw new Error(
-          `Export ${exportId}: every feature type resolved to zero rows (${featureTypes.join(
+          `Export group ${groupId}: every feature type resolved to zero rows (${featureTypes.join(
             ', '
           )}) — refusing to write an empty zip.`
         );
@@ -754,13 +1288,14 @@ export class DownloadExportPipelineService extends DBService {
         await this.streamBinariesToPart(
           bundle,
           fileRefsByPart.get(partIndex) ?? [],
-          exportId,
+          groupId,
           partIndex,
-          objectStorageService
+          this.objectStorageService
         );
         await this.writePartZip({
-          exportId,
-          downloadId: download.download_id,
+          groupId,
+          downloadId,
+          downloadVersionId,
           partIndex,
           archive: bundle.archive,
           uploadPromise: bundle.uploadPromise,
@@ -774,7 +1309,7 @@ export class DownloadExportPipelineService extends DBService {
       throw error;
     }
 
-    await this.transitionExportStatus(exportId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+    await this.transitionGroupStatus(groupId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
   }
 
   /**
@@ -812,13 +1347,13 @@ export class DownloadExportPipelineService extends DBService {
   private async streamBinariesToPart(
     bundle: PartArchiverBundle,
     fileRefs: FileFeatureRef[],
-    exportId: string,
+    groupId: string,
     partIndex: number,
     objectStorageService: ObjectStorageService
   ): Promise<void> {
     for (const ref of fileRefs) {
       const fileName = ref.filePath.split('/').pop() ?? 'file';
-      const entryName = `biohub-export-${exportId}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
+      const entryName = `biohub-export-${groupId}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
       await this.appendBinaryToArchive(bundle.archive, objectStorageService, ref.filePath, entryName);
     }
   }

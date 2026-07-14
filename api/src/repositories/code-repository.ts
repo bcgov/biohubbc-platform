@@ -23,7 +23,8 @@ export class CodeRepository extends BaseRepository {
       SELECT 
         feature_type_id, 
         name,
-        display_name
+        display_name,
+        description
       FROM 
         feature_type
       WHERE
@@ -47,7 +48,8 @@ export class CodeRepository extends BaseRepository {
         JSON_BUILD_OBJECT(
           'feature_type_id', ft.feature_type_id,
           'name', ft.name,
-          'display_name', ft.display_name
+          'display_name', ft.display_name,
+          'description', ft.description
         ) AS "feature_type",
         COALESCE(
           JSON_AGG(

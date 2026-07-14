@@ -1,10 +1,11 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
+import { computeSubmissionFeatureClosureForUpload } from '../seed-utils';
 import {
-  insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionRecord,
   insertSubmissionUploadRecord,
+  insertSurveyRecord,
   insertTelemetryRecord,
   insertUploadRecord
 } from './04_mock_test_data';
@@ -35,13 +36,14 @@ export async function seed(knex: Knex): Promise<void> {
       SET SEARCH_PATH = 'biohub','public';
     `);
 
-    // Create realistic test scenarios
+    // The real feature data comes from the committed snapshot seed (10_snapshot_features.ts), which is
+    // injected post-malware-scan and so can only represent a clean/scanned state. These tiny synthetic
+    // submissions exist solely to cover the artifact scan-status axis the snapshot cannot express — one
+    // per scan state: SECURE→clean, PARTIALLY_SECURE→pending, UNSECURE→infected (see getSecurityConfig).
     const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
       { level: 'SECURE', reviewed: true, withArchive: true },
-      { level: 'SECURE', reviewed: true, withArchive: true },
       { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
-      { level: 'UNSECURE', reviewed: true, withArchive: false },
-      { level: 'UNSECURE', reviewed: false, withArchive: false }
+      { level: 'UNSECURE', reviewed: true, withArchive: false }
     ];
 
     const seedContexts: SeedContext[] = [];
@@ -106,6 +108,13 @@ export async function seed(knex: Knex): Promise<void> {
       )
       WHERE sf.data_byte_size IS NULL;
     `);
+
+    // Derived reachability closure — recomputed wholesale per upload (DELETE + recursive-CTE INSERT),
+    // mirroring SubmissionFeatureClosureRepository. Search resolves relatedness against this table, so
+    // seeded uploads need their closure rows to be searchable.
+    for (const { submission_upload_id } of seedContexts) {
+      await computeSubmissionFeatureClosureForUpload(trx, submission_upload_id);
+    }
   });
 }
 
@@ -126,7 +135,7 @@ const createSubmissionWithUploads = async (
   const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
 
   // --- 3. Create features (requires submission_upload_id for FK) ---
-  const parent_feature_id = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
+  const parent_feature_id = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
   const sampleSiteIds = await Promise.all([
     insertSampleSiteRecord(knex, {
       submission_id,

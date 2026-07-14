@@ -1,0 +1,52 @@
+fullnameOverride: clamav
+
+image:
+  repository: clamav/clamav-debian
+  tag: "1.4"
+  pullPolicy: IfNotPresent
+
+service:
+  name: clamav
+  port: 3310
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClassName: netapp-file-standard
+  accessMode: ReadWriteMany
+
+networkPolicy:
+  enabled: false
+  allowedPodSelectors:
+    - app.kubernetes.io/name: biohub-platform-api
+    - app.kubernetes.io/name: biohub-platform-queue
+
+freshclam:
+  databaseMirror: https://clamav-mirror.apps.silver.devops.gov.bc.ca
+
+clamd:
+  tcpSocket: 3310
+  logVerbose: true
+  logTime: true
+  logClean: true
+  logSyslog: false
+  foreground: true
+  streamMaxLength: 2000M
+  maxFileSize: 2000M
+  maxScanSize: 2000M
+  alertExceedsMax: true
+  maxThreads: 20
+  maxConnectionQueueLength: 30
+  readTimeout: 300
+  selfCheck: 600
+  extraDirectives: []

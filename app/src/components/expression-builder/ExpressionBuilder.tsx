@@ -1,7 +1,5 @@
-import { mdiCodeBraces, mdiSourceBranch } from '@mdi/js';
-import Icon from '@mdi/react';
 import AddIcon from '@mui/icons-material/Add';
-import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionLogicalOperator, ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -46,7 +44,15 @@ import { useExpressionBuilderProperties } from './hooks/useExpressionBuilderProp
  * @param {ExpressionBuilderProps} props - Search expression builder inputs and callbacks.
  * @returns {JSX.Element} Interactive expression builder UI.
  */
-export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCancel }: ExpressionBuilderProps) => {
+export const ExpressionBuilder = ({
+  value,
+  recommendedSearchTerm,
+  readOnly = false,
+  slots,
+  onChange,
+  onValidationChange,
+  onApply
+}: ExpressionBuilderProps) => {
   const dialogContext = useDialogContext();
   const [rootNode, setRootNode] = useState<BuilderExpressionNode>(() =>
     value ? hydrateBuilderExpressionNode(value) : createInitialBuilderExpressionNode()
@@ -96,6 +102,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
   const usedPropertyKeys = useMemo(() => getUsedExpressionBuilderPropertyKeys(rootNode), [rootNode]);
   const {
     propertyOptions,
+    selectedProperties,
     knownProperties,
     suggestedProperties,
     suggestedSpecies,
@@ -103,8 +110,16 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
     handlePropertySelected,
     loadSpeciesPredicateProperty,
     refreshPropertyOptions
-  } = useExpressionBuilderProperties(recommendedSearchTerm, usedPropertyKeys);
-  const hasSuggestions = suggestedProperties.length > 0 || suggestedSpecies.length > 0;
+  } = useExpressionBuilderProperties(recommendedSearchTerm, usedPropertyKeys, !readOnly);
+  const hasSuggestions = !readOnly && (suggestedProperties.length > 0 || suggestedSpecies.length > 0);
+
+  const hasStartedExpressionDraft = useCallback((clause: BuilderClauseNode): boolean => {
+    if (clause.type === 'expression') {
+      return clause.clauses.some((childClause) => hasStartedExpressionDraft(childClause));
+    }
+
+    return clause.feature_property_id !== null;
+  }, []);
 
   const getPredicateProperty = useCallback(
     (predicate: BuilderPredicateNode): ExpressionBuilderProperty | null => {
@@ -172,6 +187,28 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
       value ? hydrateBuilderExpressionNode(value, knownPropertiesRef.current) : createInitialBuilderExpressionNode()
     );
   }, [value]);
+
+  useEffect(() => {
+    if (!onChange && !onValidationChange) {
+      return;
+    }
+
+    const hasStartedDraft = rootNode.clauses.some((clause) => hasStartedExpressionDraft(clause));
+
+    if (!hasStartedDraft) {
+      onValidationChange?.(null);
+      onChange?.(null);
+      return;
+    }
+
+    if (!validation.isValid) {
+      onValidationChange?.('Policy expression is invalid');
+      return;
+    }
+
+    onValidationChange?.(null);
+    onChange?.(serializeExpressionTree(rootNode));
+  }, [hasStartedExpressionDraft, onChange, onValidationChange, rootNode, validation.isValid]);
 
   // Apply is the only public emission path. Incomplete drafts stay local and
   // report their first validation error instead of producing an API tree.
@@ -472,7 +509,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
             key={clause.ui_id}
             node={clause}
             properties={propertyOptions}
-            selectedProperties={knownProperties}
+            selectedProperties={selectedProperties}
             onRemoveClause={handleRemoveClause}
             onPropertySearchInputChange={refreshPropertyOptions}
             onGroupOperatorChange={handleGroupOperatorChange}
@@ -489,6 +526,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
             onGroupDragEnter={handleGroupDragEnter}
             onGroupDragLeave={handleGroupDragLeave}
             onDropOnGroup={handleDropOnGroup}
+            readOnly={readOnly}
           />
         );
       }
@@ -498,7 +536,7 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
           key={clause.ui_id}
           node={clause}
           properties={propertyOptions}
-          selectedProperties={knownProperties}
+          selectedProperties={selectedProperties}
           onPropertySearchInputChange={refreshPropertyOptions}
           onPropertyChange={handlePropertyChange}
           onOperatorChange={handleOperatorChange}
@@ -508,13 +546,14 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
           onDropOnPredicate={handleDropOnPredicate}
           draggedPredicateId={draggedPredicateId}
           onRemove={handleRemoveClause}
+          readOnly={readOnly}
         />
       );
     },
     [
       activeDropGroupId,
-      knownProperties,
       propertyOptions,
+      selectedProperties,
       draggedGroupId,
       draggedPredicateId,
       handleDropOnGroup,
@@ -527,15 +566,36 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
       handlePredicateDragOver,
       handlePredicateDragStart,
       handlePropertyChange,
+      readOnly,
       refreshPropertyOptions,
       handleRemoveClause,
       handleValueChange
     ]
   );
 
+  const slotProps = useMemo(
+    () => ({
+      hasSuggestions,
+      suggestedProperties,
+      suggestedSpecies,
+      onSuggestedPropertyClick: handleSuggestedPropertyClick,
+      onSuggestedSpeciesClick: handleSuggestedSpeciesClick,
+      onAddCondition: handleAddCondition,
+      onApply: handleApply
+    }),
+    [
+      handleAddCondition,
+      handleApply,
+      handleSuggestedPropertyClick,
+      handleSuggestedSpeciesClick,
+      hasSuggestions,
+      suggestedProperties,
+      suggestedSpecies
+    ]
+  );
+
   return (
-    <Paper
-      elevation={0}
+    <Box
       data-testid="expression-builder"
       data-root-drop-active={isRootDropTarget ? 'true' : 'false'}
       onClick={(event) => event.stopPropagation()}
@@ -544,79 +604,34 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
       onDragLeave={handleRootDragLeave}
       onDrop={handleRootDrop}
       sx={{
-        bgcolor: 'background.paper',
-        borderRadius: 1,
         display: 'flex',
         flex: '1 1 auto',
         flexDirection: 'column',
-        maxHeight: '60vh',
         minHeight: 0,
-        transition: 'none'
+        position: 'relative',
+        transition: 'none',
+        '&::after': {
+          border: '2px solid transparent',
+          borderRadius: 1,
+          content: '""',
+          inset: 0,
+          pointerEvents: 'none',
+          position: 'absolute'
+        },
+        '&[data-root-drop-active="true"]::after': {
+          borderColor: 'primary.main'
+        }
       }}>
       <Box
         data-testid="expression-input-surface"
         onDragOver={handleRootDragOver}
         onDrop={handleRootDrop}
-        sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', p: 2, pb: 1 }}>
-        {hasSuggestions && (
-          <Stack gap={1} mb={2}>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Suggested
-            </Typography>
-            <Stack direction="row" gap={1} flexWrap="wrap">
-              {suggestedProperties.map((suggestion) => (
-                <Chip
-                  key={getExpressionBuilderPropertyKeyFromProperty(suggestion)}
-                  icon={<Icon path={mdiCodeBraces} size={0.6} />}
-                  label={suggestion.label}
-                  variant="outlined"
-                  onClick={() => handleSuggestedPropertyClick(suggestion)}
-                  sx={{
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    color: 'text.secondary',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    height: 30,
-                    '& .MuiChip-icon': {
-                      flexShrink: 0,
-                      height: 18,
-                      mx: 0.25,
-                      width: 18
-                    }
-                  }}
-                />
-              ))}
-              {suggestedSpecies.map((suggestion) => (
-                <Chip
-                  key={suggestion.value}
-                  icon={<Icon path={mdiSourceBranch} size={0.6} />}
-                  label={suggestion.label}
-                  variant="outlined"
-                  onClick={() => handleSuggestedSpeciesClick(suggestion)}
-                  sx={{
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    color: 'text.secondary',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    height: 30,
-                    '& .MuiChip-icon': {
-                      flexShrink: 0,
-                      height: 18,
-                      mx: 0.25,
-                      width: 18
-                    }
-                  }}
-                />
-              ))}
-            </Stack>
-          </Stack>
-        )}
-
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          Filters
-        </Typography>
+        sx={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflowY: 'auto'
+        }}>
+        {slots?.header?.(slotProps)}
 
         <Stack
           data-testid="expression-clause-stack"
@@ -632,38 +647,21 @@ export const ExpressionBuilder = ({ value, recommendedSearchTerm, onApply, onCan
           {rootNode.clauses.map(renderRootClause)}
         </Stack>
 
-        <Stack direction="row">
-          <Button
-            variant="text"
-            size="small"
-            startIcon={<AddIcon fontSize="small" />}
-            onClick={handleAddCondition}
-            sx={{ alignSelf: 'flex-start', mt: 0.5, textTransform: 'none' }}>
-            Add Filter
-          </Button>
-        </Stack>
+        {!readOnly && (
+          <Stack direction="row">
+            <Button
+              variant="text"
+              size="small"
+              startIcon={<AddIcon fontSize="small" />}
+              onClick={handleAddCondition}
+              sx={{ alignSelf: 'flex-start', mt: 0.5, textTransform: 'none' }}>
+              Add Filter
+            </Button>
+          </Stack>
+        )}
       </Box>
 
-      <Stack
-        direction="row"
-        justifyContent="flex-end"
-        gap={1}
-        onDragOver={handleRootDragOver}
-        onDrop={handleRootDrop}
-        sx={{
-          bgcolor: 'background.paper',
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          flex: '0 0 auto',
-          p: 2
-        }}>
-        <Button variant="contained" onClick={handleApply} size="small">
-          Apply
-        </Button>
-        <Button variant="outlined" color="inherit" onClick={onCancel} size="small">
-          Cancel
-        </Button>
-      </Stack>
-    </Paper>
+      {!readOnly && slots?.footer?.(slotProps)}
+    </Box>
   );
 };

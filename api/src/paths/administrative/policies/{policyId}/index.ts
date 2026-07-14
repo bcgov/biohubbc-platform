@@ -2,9 +2,13 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { CreatePolicyDefinition } from '../../../../models/policy';
+import { UpdatePolicy } from '../../../../models/policy';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { PolicyWithStatementsSchema, UpdatePolicyRequestSchema } from '../../../../openapi/schemas/policy';
+import {
+  PolicySchema,
+  PolicyWithStatementsSchema,
+  UpdatePolicyRequestSchema
+} from '../../../../openapi/schemas/policy';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../../services/access-policy/policy-service';
 import { getLogger } from '../../../../utils/logger';
@@ -26,7 +30,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get a policy by ID with its statements and conditions.',
+  description: 'Get a policy by ID with its statements.',
   tags: ['admin'],
   security: [
     {
@@ -103,7 +107,7 @@ export const PUT: Operation = [
 ];
 
 PUT.apiDoc = {
-  description: 'Update a policy with statements.',
+  description: 'Update a policy.',
   tags: ['admin'],
   security: [
     {
@@ -133,10 +137,10 @@ PUT.apiDoc = {
   },
   responses: {
     200: {
-      description: 'The updated policy with statements.',
+      description: 'The updated policy.',
       content: {
         'application/json': {
-          schema: PolicyWithStatementsSchema
+          schema: PolicySchema
         }
       }
     },
@@ -145,7 +149,7 @@ PUT.apiDoc = {
 };
 
 /**
- * Update a policy with statements.
+ * Update a policy.
  *
  * @returns {RequestHandler}
  */
@@ -154,17 +158,13 @@ export function updatePolicy(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
 
     const policyId = req.params.policyId;
-    const { name, description, status, statements } = req.body as CreatePolicyDefinition;
+    const { name, description, status } = req.body as UpdatePolicy;
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.updatePolicyWithStatements(
-        policyId,
-        { name, description, status },
-        statements
-      );
+      const response = await policyService.updatePolicy(policyId, { name, description, status });
 
       await connection.commit();
 

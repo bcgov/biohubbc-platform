@@ -55,7 +55,7 @@ POST.apiDoc = {
             },
             pathToParent: {
               type: 'string',
-              description: 'URL path of the parent dataset belonging to the request artifacts'
+              description: 'URL path of the parent survey belonging to the request artifacts'
             },
             artifactIds: {
               type: 'array',

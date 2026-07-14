@@ -1,21 +1,14 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
-import { SecurityCategoryWithRuleCount } from '../models/security-category';
-import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
+import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
 import {
-  ArtifactPersecution,
-  PersecutionAndHarmSecurity,
-  SECURITY_APPLIED_STATUS,
-  SecurityCategoryRecord,
-  SecurityRepository,
-  SecurityRuleAndCategory,
-  SecurityRuleRecord,
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
-} from '../repositories/security-repository';
+} from '../models/submission-feature-security';
+import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { getActiveSystemUserId } from '../utils/system-user-context';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
@@ -139,7 +132,7 @@ export class SecurityService extends DBService {
   /**
    * Apply security rules to all selected artifacts.
    *
-   * @param {SecurityReason[]} securityReasons
+   * @param {number[]} securityReasonIds
    * @param {Artifact[]} selectedArtifacts
    * @return {*}  {(Promise<({ artifact_persecution_id: number } | undefined)[]>)}
    * @memberof SecurityService
@@ -242,9 +235,8 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async getSecuredArtifactBasedOnRulesAndPermissions(artifactId: number): Promise<any> {
-    const isSystemUserAdmin = await this.userService.isSystemUserAdmin();
-
-    const userId = this.connection.systemUserId();
+    const userId = await getActiveSystemUserId(this.connection);
+    const isSystemUserAdmin = userId ? await this.userService.isSystemUserAdmin() : false;
 
     const isArtifactPendingReview = await this.isArtifactPendingReview(artifactId);
 
@@ -255,7 +247,7 @@ export class SecurityService extends DBService {
 
     const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
 
-    const pers_harm_exceptionIds = await this.getPersecutionAndHarmExceptionsIdsByUser(userId);
+    const pers_harm_exceptionIds = userId ? await this.getPersecutionAndHarmExceptionsIdsByUser(userId) : [];
 
     const userHasExceptionsToAllRules = artifactSecurityRuleIds.every((rule) => pers_harm_exceptionIds.includes(rule));
 
@@ -325,14 +317,14 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Returns true is any artifacts in the dataset are pending review
+   * Returns true is any artifacts in the survey are pending review
    *
-   * @param {string} datasetId
+   * @param {string} surveyId
    * @return {*}  {Promise<boolean>}
    * @memberof SecurityService
    */
-  async isDatasetPendingReview(datasetId: string): Promise<boolean> {
-    const artifactIds = (await this.artifactService.getArtifactsByDatasetId(datasetId)).map((item) => item.artifact_id);
+  async isSurveyPendingReview(surveyId: string): Promise<boolean> {
+    const artifactIds = (await this.artifactService.getArtifactsBySurveyId(surveyId)).map((item) => item.artifact_id);
 
     const artifactSecurityRules = await Promise.all(
       artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))
@@ -454,90 +446,5 @@ export class SecurityService extends DBService {
     submissionFeatureIds?: number[]
   ): Promise<SubmissionFeatureSecurityRulesSummary> {
     return this.securityRepository.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
-  }
-
-  /**
-   * Gets a list of all active security rules. A security rule is active if it has not
-   * been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    return this.securityRepository.getActiveSecurityRules();
-  }
-
-  /**
-   * Gets a list of all active security rules with associated categories. A security rule is
-   * active if it has not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityService
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    return this.securityRepository.getActiveRulesAndCategories();
-  }
-
-  /**
-   * Gets a list of all active security categories. A security category is active if it has
-   * not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityCategoryRecord[]>}
-   * @memberof SecurityService
-   */
-  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
-    return this.securityRepository.getActiveSecurityCategories();
-  }
-
-  /**
-   * Gets paginated security categories with a count of associated active rules.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesWithRuleCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityCategoryWithRuleCount[]> {
-    return this.securityRepository.getSecurityCategoriesWithRuleCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security categories matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityCategoriesCount(filters);
-  }
-
-  /**
-   * Gets paginated security rules with a count of associated submission features.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityRuleWithFeatureCount[]> {
-    return this.securityRepository.getSecurityRulesWithFeatureCount(filters, pagination);
-  }
-
-  /**
-   * Gets total count of active security rules matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
-    return this.securityRepository.getSecurityRulesCount(filters);
   }
 }

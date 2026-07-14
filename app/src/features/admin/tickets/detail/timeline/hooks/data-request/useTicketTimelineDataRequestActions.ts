@@ -1,10 +1,10 @@
-import { IAddPolicyFormValues } from 'features/admin/policies/components/AddPolicyForm';
-import { transformPolicyJsonToApi } from 'features/admin/policies/utils/policyTransform';
+import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 
 /**
@@ -14,15 +14,14 @@ import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirm
  */
 export const useTicketTimelineDataRequestActions = () => {
   const api = useApi();
+  const navigate = useNavigate();
   const dialogContext = useDialogContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const { ticketDataLoader } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
-  const [isViewPolicyDialogOpen, setIsViewPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
   const [selectedDataRequestId, setSelectedDataRequestId] = useState<string | null>(null);
-  const [viewPolicy, setViewPolicy] = useState<IPolicy | null>(null);
   const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
@@ -146,13 +145,13 @@ export const useTicketTimelineDataRequestActions = () => {
    *
    * @param {string} dataRequestId Identifier of the data request whose policy is being edited.
    * @param {string} policyId Identifier of the policy to fetch.
-   * @param {Partial<IAddPolicyFormValues>} [initialValues] Optional form value overrides.
+   * @param {Partial<IPolicyFormValues>} [initialValues] Optional form value overrides.
    * @returns {Promise<void>} Resolves after the policy has loaded or an error has been shown.
    */
   const handleOpenPolicyDialog = async (
     dataRequestId: string,
     policyId: string,
-    initialValues?: Partial<IAddPolicyFormValues>
+    initialValues?: Partial<IPolicyFormValues>
   ) => {
     try {
       setIsLoadingPolicy(true);
@@ -177,30 +176,17 @@ export const useTicketTimelineDataRequestActions = () => {
   };
 
   /**
-   * Open the read-only finalized policy dialog for a data request.
+   * Open the read-only finalized policy detail page for a data request.
    *
    * Finalized data-request items call this when users need to inspect approved or denied policy details without editing
    * the policy body.
    *
    * @param {string} _dataRequestId Identifier of the data request whose policy is being viewed.
    * @param {string} policyId Identifier of the policy to fetch.
-   * @returns {Promise<void>} Resolves after the policy has loaded or an error has been shown.
+   * @returns {void}
    */
-  const handleOpenViewPolicyDialog = async (_dataRequestId: string, policyId: string) => {
-    try {
-      setIsLoadingPolicy(true);
-      const policy = await api.policies.getPolicy(policyId);
-      setViewPolicy(policy);
-      setIsViewPolicyDialogOpen(true);
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsLoadingPolicy(false);
-    }
+  const handleOpenPolicyDetailPage = (_dataRequestId: string, policyId: string) => {
+    navigate(`/admin/policy/${policyId}`);
   };
 
   /**
@@ -222,32 +208,15 @@ export const useTicketTimelineDataRequestActions = () => {
   };
 
   /**
-   * Close the finalized policy dialog and clear selected view state.
-   *
-   * The dialog stays mounted while policy details are loading to avoid dismissing a request that may still populate the
-   * dialog content.
-   *
-   * @returns {void}
-   */
-  const handleCloseViewPolicyDialog = () => {
-    if (isLoadingPolicy) {
-      return;
-    }
-
-    setIsViewPolicyDialogOpen(false);
-    setViewPolicy(null);
-  };
-
-  /**
    * Save edited policy details from the policy dialog.
    *
-   * The edit dialog calls this with form values. The handler transforms policy JSON into API statements, persists the
-   * policy update, patches cached data-request status for the matching policy, and closes the dialog on success.
+   * The edit dialog calls this with form values. The handler persists policy metadata, preserves existing statements,
+   * patches cached data-request status for the matching policy, and closes the dialog on success.
    *
-   * @param {IAddPolicyFormValues} values Current policy form values.
+   * @param {IPolicyFormValues} values Current policy form values.
    * @returns {Promise<void>} Resolves after the save attempt has completed.
    */
-  const handleSavePolicy = async (values: IAddPolicyFormValues) => {
+  const handleSavePolicy = async (values: IPolicyFormValues) => {
     if (!selectedPolicy || !selectedDataRequestId) {
       return;
     }
@@ -255,15 +224,16 @@ export const useTicketTimelineDataRequestActions = () => {
     try {
       setIsSavingPolicy(true);
 
-      const statements = transformPolicyJsonToApi(values.policy_json);
       const updatedPolicy = await api.policies.updatePolicy(selectedPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
-        status: values.status,
-        statements
+        status: values.status
       });
 
-      setSelectedPolicy(updatedPolicy);
+      setSelectedPolicy({
+        ...selectedPolicy,
+        ...updatedPolicy
+      });
 
       const latestTicket = ticketDataLoader.data;
       if (latestTicket) {
@@ -299,17 +269,14 @@ export const useTicketTimelineDataRequestActions = () => {
   return {
     updatingDataRequestId,
     isEditPolicyDialogOpen,
-    isViewPolicyDialogOpen,
     selectedPolicy,
-    viewPolicy,
     isLoadingPolicy,
     isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
     handleOpenPolicyDialog,
-    handleOpenViewPolicyDialog,
+    handleOpenPolicyDetailPage,
     handleClosePolicyDialog,
-    handleCloseViewPolicyDialog,
     handleSavePolicy
   };
 };

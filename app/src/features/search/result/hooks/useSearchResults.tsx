@@ -36,6 +36,7 @@ const buildPagination = (params: URLSearchParams): SearchResultsPagination => ({
 
 const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureResponse => ({
   features: [],
+  properties: [],
   pagination: {
     total: 0,
     per_page: pagination.limit,
@@ -43,7 +44,8 @@ const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureR
     last_page: 1,
     sort: pagination.sort,
     order: pagination.order
-  }
+  },
+  has_more_secured_features: false
 });
 
 const isAbortError = (error: unknown) => {
@@ -75,11 +77,13 @@ export const useSearchResults = (
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
   const [data, setData] = useState<SearchFeatureResponse>();
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSettled, setHasSettled] = useState(false);
   const searchApiRef = useRef(api.search);
   const dialogContextRef = useRef(dialogContext);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
   const previousRefreshKeyRef = useRef(refreshKey);
+  const previousExpressionTreeRef = useRef(expressionTree);
 
   useEffect(() => {
     searchApiRef.current = api.search;
@@ -142,6 +146,7 @@ export const useSearchResults = (
 
       if (nextData) {
         setData(nextData);
+        setHasSettled(true);
       }
 
       setIsLoading(false);
@@ -149,7 +154,20 @@ export const useSearchResults = (
     [loadSearchResults]
   );
 
-  const debouncedRefresh = useMemo(() => debounce(startSearch, 300), [startSearch]);
+  const debouncedRefresh = useMemo(() => {
+    const debouncedSearch = debounce(startSearch, 300);
+    const refresh = (input: Omit<SearchResultsLoaderInput, 'signal'>) => {
+      // The request itself is debounced so quick pagination/sort changes coalesce,
+      // but the table should enter its loading state immediately. Otherwise stale
+      // rows or the "No results found" empty state can flash during the 300ms wait.
+      setIsLoading(true);
+      debouncedSearch(input);
+    };
+
+    refresh.cancel = debouncedSearch.cancel;
+
+    return refresh;
+  }, [startSearch]);
 
   /**
    * Writes normalized result query params to the router.
@@ -214,22 +232,33 @@ export const useSearchResults = (
       debouncedRefresh.cancel();
       abortControllerRef.current?.abort();
       setData(buildEmptyResponse(pagination));
+      setHasSettled(true);
       setIsLoading(false);
       return;
     }
 
     const input = { params: searchParams, expressionTree, featureTypeName };
     const isExplicitExpressionApply = previousRefreshKeyRef.current !== refreshKey;
+    const isExpressionTreeChange = previousExpressionTreeRef.current !== expressionTree;
     previousRefreshKeyRef.current = refreshKey;
+    previousExpressionTreeRef.current = expressionTree;
 
-    abortControllerRef.current?.abort();
-
-    if (isExplicitExpressionApply) {
+    // Applying filters should feel immediate. A changed expression comes from the
+    // URL update; an unchanged re-apply comes from refreshKey. Both skip the
+    // debounce and start exactly one request.
+    if (isExplicitExpressionApply || isExpressionTreeChange) {
       debouncedRefresh.cancel();
       startSearch(input);
       return;
     }
 
+    // For debounced route/param changes, invalidate the in-flight request before
+    // aborting it. The aborted request can still resolve its catch path; without
+    // advancing requestId first, that stale completion can set isLoading=false
+    // while the new debounced search is still pending, causing an empty-state flash
+    // when switching tabs.
+    requestIdRef.current += 1;
+    abortControllerRef.current?.abort();
     debouncedRefresh(input);
   }, [searchParams, expressionTree, featureTypeName, enabled, refreshKey, debouncedRefresh, startSearch]);
 
@@ -243,7 +272,9 @@ export const useSearchResults = (
 
   return {
     rows: data?.features ?? [],
-    isLoading,
+    properties: data?.properties ?? [],
+    hasMoreSecuredFeatures: data?.has_more_secured_features ?? false,
+    isLoading: isLoading || !hasSettled,
     searchParams,
     setSearchParams,
     pagination: data?.pagination

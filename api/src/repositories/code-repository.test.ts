@@ -21,8 +21,9 @@ describe('CodeRepository', () => {
     it('should return rows if succeeds', async () => {
       const mockRow: FeatureType = {
         feature_type_id: 1,
-        name: 'dataset',
-        display_name: 'Dataset'
+        name: 'survey',
+        display_name: 'Survey',
+        description: null
       };
 
       const mockQueryResponse = {
@@ -51,8 +52,9 @@ describe('CodeRepository', () => {
       const mockRow: FeatureTypeWithProperties = {
         feature_type: {
           feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset'
+          name: 'survey',
+          display_name: 'Survey',
+          description: null
         },
         properties: [
           {

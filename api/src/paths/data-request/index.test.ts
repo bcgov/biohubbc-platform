@@ -7,8 +7,9 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db'
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
+import { HTTP400 } from '../../errors/http-error';
 import { DataRequest } from '../../models/data-request';
-import { SystemUserExtended } from '../../models/user';
+import { SystemUserExtended } from '../../models/system-user';
 import { DataRequestService } from '../../services/data-request-service';
 import { UserService } from '../../services/user-service';
 
@@ -191,6 +192,12 @@ describe('data-request', () => {
 
       const requestHandler = createDataRequest();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'Test',
+        system_user_ids: [],
+        featureTypes: ['observation'],
+        expression: null
+      };
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -202,7 +209,21 @@ describe('data-request', () => {
       }
     });
 
-    it('POST creates a data request without requiring ticketId in payload', async () => {
+    const expressionTree = {
+      type: 'expression' as const,
+      operator: 'AND' as const,
+      clauses: [
+        {
+          type: 'predicate' as const,
+          feature_property_id: 1,
+          feature_type_property_id: null,
+          operator: 'Equals' as const,
+          value: 'mammalia'
+        }
+      ]
+    };
+
+    it('R1: forwards parsed payload (featureTypes + expression) to service with requested_by unioned into system_user_ids', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
         commit: sinon.stub(),
@@ -217,20 +238,239 @@ describe('data-request', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         reason: 'Need secured data for analysis',
-        system_user_ids: [2, 3]
+        system_user_ids: [3, 4],
+        featureTypes: ['observation'],
+        expression: expressionTree
+      };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      // The route unions requester into system_user_ids before calling the service so the service
+      // can treat system_user_ids as the canonical access list.
+      expect(createStub).to.have.been.calledOnceWith({
+        requested_by: mockNonAdminUser.system_user_id,
+        reason: 'Need secured data for analysis',
+        system_user_ids: [mockNonAdminUser.system_user_id, 3, 4],
+        featureTypes: ['observation'],
+        expression: expressionTree
+      });
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockDBConnection.release).to.have.been.calledOnce;
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.eql(mockDataRequest);
+    });
+
+    it('R2: rejects unknown keys inside expression with 400 (Zod .strict())', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'reason text',
+        system_user_ids: [],
+        featureTypes: ['observation'],
+        expression: {
+          ...expressionTree,
+          ui_id: 'rogue-key-from-frontend'
+        }
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
+    });
+
+    it('R3: accepts expression: null literally and forwards as null', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'reason text',
+        system_user_ids: [],
+        featureTypes: ['observation'],
+        expression: null
       };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(createStub).to.have.been.calledOnceWith({
         requested_by: mockNonAdminUser.system_user_id,
-        reason: 'Need secured data for analysis',
-        system_user_ids: [2, 3]
+        reason: 'reason text',
+        system_user_ids: [mockNonAdminUser.system_user_id],
+        featureTypes: ['observation'],
+        expression: null
       });
-      expect(mockDBConnection.commit).to.have.been.calledOnce;
-      expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.eql(mockDataRequest);
+    });
+
+    it('R4: rejects payload missing featureTypes/expression with 400', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'Need secured data for analysis',
+        system_user_ids: []
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
+    });
+
+    it('R5: rejects featureTypes: [] (minItems: 1) with 400', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'reason text',
+        system_user_ids: [],
+        featureTypes: [],
+        expression: null
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
+    });
+
+    it('R6: rejects empty reason with 400', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: '',
+        system_user_ids: []
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
+    });
+
+    it('R7: propagates HTTP400 from service (e.g. unknown feature type)', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      sinon
+        .stub(DataRequestService.prototype, 'createDataRequest')
+        .rejects(new HTTP400('Unknown feature type(s)', [{ unknownFeatureTypes: ['weatherz'] }]));
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'reason text',
+        system_user_ids: [],
+        featureTypes: ['weatherz'],
+        expression: null
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Unknown feature type(s)');
+        expect(mockDBConnection.rollback).to.have.been.calledOnce;
+        expect(mockDBConnection.release).to.have.been.calledOnce;
+      }
+    });
+
+    it('R8: rejects requested_by in body (Zod .strict() at top level)', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'reason text',
+        system_user_ids: [],
+        requested_by: 99
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Invalid request body');
+        expect(createStub).to.not.have.been.called;
+      }
     });
 
     it('rolls back and rethrows if service throws', async () => {
@@ -248,7 +488,9 @@ describe('data-request', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
         reason: 'Test',
-        system_user_ids: [2, 3]
+        system_user_ids: [2, 3],
+        featureTypes: ['observation'],
+        expression: null
       };
 
       try {

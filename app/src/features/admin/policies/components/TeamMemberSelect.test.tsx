@@ -8,9 +8,9 @@ vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
 const mockUsers = [
-  { system_user_id: 1, user_identifier: 'alice' },
-  { system_user_id: 2, user_identifier: 'bob' },
-  { system_user_id: 3, user_identifier: 'charlie' }
+  { system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' },
+  { system_user_id: 2, user_identifier: 'bob', display_name: null },
+  { system_user_id: 3, user_identifier: 'charlie', display_name: '' }
 ];
 
 const mockGetAvailableUsers = vi.fn().mockResolvedValue({ users: mockUsers });
@@ -63,24 +63,24 @@ describe('TeamMemberSelect', () => {
     });
   });
 
-  it('displays selected users as chips', async () => {
+  it('displays selected users as chips using the display label with fallback', async () => {
     const mockOnChange = vi.fn();
     const selectedUsers = [
-      { system_user_id: 1, user_identifier: 'alice' },
-      { system_user_id: 2, user_identifier: 'bob' }
+      { system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' },
+      { system_user_id: 2, user_identifier: 'bob', display_name: null }
     ];
 
     const { getByText } = render(<TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />);
 
     await waitFor(() => {
-      expect(getByText('alice')).toBeVisible();
+      expect(getByText('Wonderland, Alice WLRS:EX')).toBeVisible();
       expect(getByText('bob')).toBeVisible();
     });
   });
 
-  it('displays user_identifier for selected users', async () => {
+  it('falls back to user_identifier when display_name is empty', async () => {
     const mockOnChange = vi.fn();
-    const selectedUsers = [{ system_user_id: 3, user_identifier: 'charlie' }];
+    const selectedUsers = [{ system_user_id: 3, user_identifier: 'charlie', display_name: '' }];
 
     const { getByText } = render(<TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />);
 
@@ -112,15 +112,16 @@ describe('TeamMemberSelect', () => {
 
     const listbox = getByRole('listbox');
     const options = within(listbox).getAllByRole('option');
+    // Options are sorted by display label, so 'bob' sorts before 'Wonderland, Alice WLRS:EX'
     fireEvent.click(options[0]);
 
-    // Verify onChange was called with the full user object
+    // Verify onChange was called with the full user object, including display_name
     await waitFor(() => {
-      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 1, user_identifier: 'alice' }]);
+      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 2, user_identifier: 'bob', display_name: null }]);
     });
   });
 
-  it('displays user_identifier in dropdown options', async () => {
+  it('displays the display label in dropdown options', async () => {
     const mockOnChange = vi.fn();
 
     const { getByLabelText, getByRole, getByText } = render(
@@ -143,16 +144,16 @@ describe('TeamMemberSelect', () => {
       expect(listbox).toBeVisible();
     });
 
-    // Verify user_identifier is displayed
-    expect(getByText('alice')).toBeVisible();
+    // Verify the display label (or user_identifier fallback) is displayed
+    expect(getByText('Wonderland, Alice WLRS:EX')).toBeVisible();
     expect(getByText('bob')).toBeVisible();
   });
 
   it('removes user when chip is deleted', async () => {
     const mockOnChange = vi.fn();
     const selectedUsers = [
-      { system_user_id: 1, user_identifier: 'alice' },
-      { system_user_id: 2, user_identifier: 'bob' }
+      { system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' },
+      { system_user_id: 2, user_identifier: 'bob', display_name: null }
     ];
 
     const { getAllByTestId, getByText } = render(
@@ -161,7 +162,7 @@ describe('TeamMemberSelect', () => {
 
     // Wait for chips to render
     await waitFor(() => {
-      expect(getByText('alice')).toBeVisible();
+      expect(getByText('Wonderland, Alice WLRS:EX')).toBeVisible();
       expect(getByText('bob')).toBeVisible();
     });
 
@@ -171,7 +172,7 @@ describe('TeamMemberSelect', () => {
 
     // Verify onChange was called without the removed user
     await waitFor(() => {
-      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 2, user_identifier: 'bob' }]);
+      expect(mockOnChange).toHaveBeenCalledWith([{ system_user_id: 2, user_identifier: 'bob', display_name: null }]);
     });
   });
 
@@ -206,7 +207,7 @@ describe('TeamMemberSelect', () => {
     mockGetAvailableUsers.mockResolvedValueOnce({ users: mockUsers });
 
     const mockOnChange = vi.fn();
-    const selectedUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
+    const selectedUsers = [{ system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' }];
 
     const { getAllByText, getByLabelText, queryByRole } = render(
       <TeamMemberSelect selectedUsers={selectedUsers} onChange={mockOnChange} />
@@ -223,7 +224,7 @@ describe('TeamMemberSelect', () => {
 
     // Mock a search that returns different users (not including alice)
     mockGetAvailableUsers.mockResolvedValueOnce({
-      users: [{ system_user_id: 4, user_identifier: 'david' }]
+      users: [{ system_user_id: 4, user_identifier: 'david', display_name: null }]
     });
 
     // Type a search that wouldn't normally include alice
@@ -240,7 +241,30 @@ describe('TeamMemberSelect', () => {
 
     // Alice should still be visible as a chip because she's selected
     // Use getAllByText since alice may appear as chip and in dropdown
-    const aliceElements = getAllByText('alice');
+    const aliceElements = getAllByText('Wonderland, Alice WLRS:EX');
     expect(aliceElements.length).toBeGreaterThan(0);
+  });
+
+  it('sorts dropdown options by display label', async () => {
+    const mockOnChange = vi.fn();
+
+    const { getByLabelText, getByRole } = render(<TeamMemberSelect selectedUsers={[]} onChange={mockOnChange} />);
+
+    // Wait for users to load
+    await waitFor(() => {
+      expect(mockGetAvailableUsers).toHaveBeenCalled();
+    });
+
+    // Open the dropdown
+    const input = getByLabelText('Team Members');
+    fireEvent.click(input);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    await waitFor(() => {
+      expect(getByRole('listbox')).toBeVisible();
+    });
+
+    const options = within(getByRole('listbox')).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(['bob', 'charlie', 'Wonderland, Alice WLRS:EX']);
   });
 });

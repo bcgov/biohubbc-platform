@@ -31,7 +31,7 @@ GET.apiDoc = {
       in: 'query',
       name: 'search',
       schema: { type: 'string' },
-      description: 'Search term to filter users by user_identifier (case-insensitive partial match)'
+      description: 'Search term to filter users by user_identifier or display_name (case-insensitive partial match)'
     }
   ],
   responses: {

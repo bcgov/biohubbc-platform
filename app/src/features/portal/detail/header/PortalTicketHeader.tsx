@@ -4,8 +4,6 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
-import { TicketHeaderSubtitle } from 'features/admin/tickets/detail/header/TicketHeaderSubtitle';
-import { useDialogContext } from 'hooks/useContext';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -21,17 +19,6 @@ interface IPortalTicketHeaderProps {
  */
 export const PortalTicketHeader = (props: IPortalTicketHeaderProps) => {
   const { ticket } = props;
-  const dialogContext = useDialogContext();
-
-  const handleReadMoreClick = () => {
-    dialogContext.setOkDialog({
-      open: true,
-      dialogTitle: 'Ticket Description',
-      dialogText: '',
-      dialogContent: <Typography>{ticket.description}</Typography>,
-      onClose: () => dialogContext.setOkDialog({ open: false })
-    });
-  };
 
   return (
     <PageHeader
@@ -46,20 +33,17 @@ export const PortalTicketHeader = (props: IPortalTicketHeaderProps) => {
       }
       label={<Typography variant="h1">{ticket.subject}</Typography>}
       subheader={
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1}>
-            <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
-            <Chip
-              label={ticket.status}
-              color={ticket.status === 'open' ? 'success' : 'default'}
-              sx={{ textTransform: 'capitalize' }}
-            />
-          </Stack>
-          {ticket.description ? (
-            <TicketHeaderSubtitle text={ticket.description} onReadMore={handleReadMoreClick} />
-          ) : null}
+        <Stack direction="row" spacing={1}>
+          <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
+          <Chip
+            label={ticket.status}
+            color={ticket.status === 'open' ? 'success' : 'default'}
+            sx={{ textTransform: 'capitalize' }}
+          />
         </Stack>
       }
+      description={ticket.description}
+      descriptionDialogTitle="Ticket Description"
     />
   );
 };

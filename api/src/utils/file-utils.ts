@@ -23,8 +23,8 @@ import { getLogger } from './logger';
 
 const defaultLog = getLogger('/api/src/utils/file-utils');
 
-export interface IDatasetS3FileKey {
-  datasetUUID: string;
+export interface ISurveyS3FileKey {
+  surveyUUID: string;
   fileName: string;
 }
 
@@ -410,10 +410,10 @@ export async function getS3SignedURLs(keys: string[]): Promise<(string | null)[]
 }
 
 /**
- * Generate an S3 key for a dataset artifact file.
+ * Generate an S3 key for a survey artifact file.
  *
  * @example
- * <s3_key_prefix>/datasets/<dataset_uuid>/artifacts/<artifact_id>/<file_name>
+ * <s3_key_prefix>/surveys/<survey_uuid>/artifacts/<artifact_id>/<file_name>
  *
  * @export
  * @param {IArtifactS3FileKey} options
@@ -426,21 +426,21 @@ export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) 
 }
 
 /**
- * Generate an S3 key for a dataset DwCA file.
+ * Generate an S3 key for a survey DwCA file.
  *
  * @example
- * <s3_key_prefix>/datasets/<dataset_uuid>/dwca/<file_name>
+ * <s3_key_prefix>/surveys/<survey_uuid>/dwca/<file_name>
  *
  * @export
- * @param {IDatasetS3FileKey} options
+ * @param {ISurveyS3FileKey} options
  * @return {*}
  */
-export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
+export function generateSurveyS3FileKey(options: ISurveyS3FileKey) {
   const keyParts: (string | number)[] = [];
 
   keyParts.push(getS3KeyPrefix());
-  keyParts.push('datasets');
-  keyParts.push(options.datasetUUID);
+  keyParts.push('surveys');
+  keyParts.push(options.surveyUUID);
   keyParts.push('dwca');
   keyParts.push(options.fileName);
 

@@ -22,10 +22,15 @@ import type { CsvPropertyDefinition } from './csv-utils';
  *
  * Most property types map 1:1 (one property -> one column). `datetime`
  * expands to two — see {@link expandPropertyToColumns}.
+ *
+ * `repeated` marks the column as a native Parquet LIST (the schema field gets
+ * `repetitionType === 'REPEATED'`), used by `feature` properties so downstream
+ * readers see an array column they can UNNEST without JSON parsing.
  */
 export interface FeatureColumnSpec {
   name: string;
   parquetType: FieldDefinition['type'];
+  repeated?: boolean;
 }
 
 /**
@@ -60,6 +65,20 @@ export interface FeatureColumnSpec {
  *   two-element (`<name>_date`, `<name>_time`) for datetime.
  */
 export function expandPropertyToColumns(prop: CsvPropertyDefinition): FeatureColumnSpec[] {
+  if (prop.feature_property_type_name === 'feature') {
+    // Native Parquet LIST<UTF8> preserves the columnar shape of cross-feature
+    // references so downstream readers (DuckDB, pyarrow, Spark) can UNNEST
+    // directly — no per-row JSON.parse on a stringified array, no loss of
+    // per-element predicate pushdown. The `repeated` flag becomes
+    // `repetitionType: 'REPEATED'` on the Parquet schema field.
+    //
+    // The defensive normalization in `encodePropertyValue` (scalar → single-
+    // element array) handles contract drift from upstream: the hydrator
+    // guarantees arrays of URN strings today, but a malformed cell should
+    // land in Parquet as a valid one-element list rather than crash the
+    // writer mid-file.
+    return [{ name: prop.feature_property_name, parquetType: 'UTF8', repeated: true }];
+  }
   if (prop.feature_property_type_name === 'datetime') {
     // Native Parquet logical types — DATE (INT32 days-since-epoch) and TIME_MILLIS
     // (INT32 ms-since-midnight). DuckDB / pandas / arrow read these as native
@@ -124,9 +143,12 @@ export function timeStringToMillis(s: string): number {
  * `_number`, etc.). This function bridges those type names to Parquet column types so
  * downstream consumers (DuckDB, QGIS, pandas) get native typed columns instead of strings.
  *
- * `array`, `object`, and `artifact_key` types have dynamic internal structure (arrays of
- * objects, nested JSON, file paths). No typed table exists for them — they fall back to
- * UTF8 (JSON-stringified) for Parquet output. `spatial` maps to BYTE_ARRAY for WKB encoding.
+ * `array` and `object` types have dynamic internal structure (arrays of objects, nested
+ * JSON). They serialize as UTF8 — the caller JSON-stringifies and consumers `JSON.parse`
+ * the cell. The Parquet JSON LogicalType was tempting (DuckDB/pyarrow auto-deserialize)
+ * but @dsnp/parquetjs's shredder unwraps `Array.isArray(value)` regardless of annotation,
+ * so a raw array on a non-REPEATED JSON cell throws at write time. `artifact_key` is a
+ * file path string and stays UTF8. `spatial` maps to `BYTE_ARRAY` for WKB encoding.
  *
  * @param typeName - The feature property type name from `feature_type_property`.
  * @returns The Parquet type string.
@@ -148,6 +170,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       throw new Error(
         `propertyTypeToParquetType: 'datetime' has no single Parquet type — use expandPropertyToColumns to get DATE + TIME_MILLIS`
       );
+    case 'feature':
+      // `feature` cannot map to a single primitive — it emits a native LIST<UTF8>
+      // (UTF8 with `repeated: true`) via `expandPropertyToColumns`. Reaching this
+      // case means a caller bypassed the helper and asked for a scalar type;
+      // silently returning UTF8 would erase the list shape from the Parquet footer.
+      throw new Error(
+        `propertyTypeToParquetType: 'feature' has no single Parquet type — use expandPropertyToColumns to get a repeated UTF8 column`
+      );
     case 'code':
       // Code properties arrive pre-resolved: the cursor JOIN resolves FK -> display label
       return 'UTF8';
@@ -158,10 +188,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       // GeoParquet WKB-encoded geometry — each spatial property gets its own BYTE_ARRAY column
       return 'BYTE_ARRAY';
     case 'array':
-      // Dynamic internal structure — JSON-stringified for Parquet output
-      return 'UTF8';
     case 'object':
-      // Dynamic internal structure — JSON-stringified for Parquet output
+      // JSON-encoded UTF8 string. The Parquet `JSON` LogicalType was tempting
+      // here (DuckDB/pyarrow auto-deserialize), but @dsnp/parquetjs's shredder
+      // unconditionally unwraps `Array.isArray(value)` into multiple per-row
+      // values regardless of column annotation — passing a raw array to a
+      // non-REPEATED JSON cell throws "too many values for field" at write
+      // time. UTF8 + caller-side `JSON.stringify` sidesteps the shred-layer
+      // mismatch; consumers `JSON.parse` the cell themselves.
       return 'UTF8';
     case 'artifact_key':
       // File path string — no special encoding needed
@@ -176,7 +210,7 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  *
  * Different feature types have different column schemas — each Parquet file contains
  * one feature type only. Every file includes a nullable `parent_uuid` column for
- * star-schema joins between files. Root types (e.g., dataset) will have null values;
+ * star-schema joins between files. Root types (e.g., survey) will have null values;
  * child types will have the parent feature's UUID.
  *
  * Spatial properties each get their own BYTE_ARRAY column (WKB-encoded) using the
@@ -194,7 +228,7 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
   // Every Parquet file includes the feature UUID for cross-file joins
   fields['uuid'] = { type: 'UTF8', optional: false };
 
-  // Every file includes parent_uuid for star-schema joins. Root types (dataset)
+  // Every file includes parent_uuid for star-schema joins. Root types (survey)
   // will have null values; child types link back to the parent feature type's file.
   // Always present so consumers don't need to know which types are roots.
   fields['parent_uuid'] = { type: 'UTF8', optional: true };
@@ -209,7 +243,9 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
 
   for (const prop of properties) {
     for (const col of expandPropertyToColumns(prop)) {
-      fields[col.name] = { type: col.parquetType, optional: true };
+      fields[col.name] = col.repeated
+        ? { type: col.parquetType, repeated: true }
+        : { type: col.parquetType, optional: true };
     }
   }
 
@@ -273,6 +309,11 @@ function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unkno
     case 'array':
     case 'object':
       return JSON.stringify(value);
+    case 'feature':
+      // `feature` columns are native Parquet LIST<UTF8>; the writer expects an
+      // array. Defensive normalization: a scalar from upstream contract drift
+      // lands as a one-element list rather than crashing the writer mid-file.
+      return Array.isArray(value) ? value : [String(value)];
     default:
       // string, number, boolean, code, taxon, artifact_key — pass through directly
       return value;

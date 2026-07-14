@@ -3,6 +3,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
 import { SearchContainer } from './container/SearchContainer';
+import { FeaturedDownloadsSection } from './gallery/FeaturedDownloadsSection';
 import { buildSearchFeatureTypeLinks } from './utils/search-feature-type-links';
 
 /**
@@ -39,6 +40,7 @@ export const SearchPage = () => {
           <SearchContainer links={featureTypeLinks} isLoading={isLoading} />
         </Stack>
       </Paper>
+      <FeaturedDownloadsSection />
     </Container>
   );
 };

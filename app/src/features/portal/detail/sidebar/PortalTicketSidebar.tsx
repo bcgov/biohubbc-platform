@@ -9,6 +9,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
 import { useEffect } from 'react';
+import { getUserLabel } from 'utils/Utils';
 
 interface IPortalTicketSidebarProps {
   teamId: string;
@@ -45,9 +46,9 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
             {ticketSystemUsers.map((ticketSystemUser) => (
               <TicketSidebarItem
                 key={ticketSystemUser.ticket_system_user_id}
-                label={`${
-                  ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier
-                } (${getTicketSystemUserStatusLabel(ticketSystemUser.status)})`}
+                label={`${getUserLabel(ticketSystemUser.system_user)} (${getTicketSystemUserStatusLabel(
+                  ticketSystemUser.status
+                )})`}
               />
             ))}
           </Stack>
@@ -66,7 +67,7 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
           hasNoDataFallback={<Typography variant="body2">No participants</Typography>}>
           <Stack spacing={0.75}>
             {members.map((member) => (
-              <TicketSidebarItem key={member.team_member_id} label={member.user_identifier} />
+              <TicketSidebarItem key={member.team_member_id} label={getUserLabel(member)} />
             ))}
           </Stack>
         </LoadingGuard>

@@ -45,7 +45,7 @@ vi.mock('./CreateTeamPolicyDialog', () => ({
         <div>Add Assignment</div>
         <button
           data-testid="mock-create-assignment-save"
-          onClick={() => onSave({ team_id: 'team-3', policies: ['policy-3'] })}>
+          onClick={() => onSave({ team_id: 'team-3', policy_id: 'policy-3' })}>
           Save
         </button>
       </div>
@@ -57,6 +57,7 @@ const mockTeamPolicies: ITeamPolicyDetails[] = [
     team_policy_id: 'tp-1',
     team_id: 'team-1',
     policy_id: 'policy-1',
+    record_end_date: null,
     team_name: 'Alpha Team',
     policy_name: 'Data Access Policy'
   },
@@ -64,6 +65,7 @@ const mockTeamPolicies: ITeamPolicyDetails[] = [
     team_policy_id: 'tp-2',
     team_id: 'team-2',
     policy_id: 'policy-2',
+    record_end_date: null,
     team_name: 'Beta Team',
     policy_name: 'Security Policy'
   }
@@ -81,6 +83,7 @@ const mockPolicies: IPolicy[] = [
     name: 'Data Access Policy',
     description: 'Access policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   },
   {
@@ -88,6 +91,7 @@ const mockPolicies: IPolicy[] = [
     name: 'Security Policy',
     description: 'Security policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   },
   {
@@ -95,11 +99,12 @@ const mockPolicies: IPolicy[] = [
     name: 'Admin Policy',
     description: 'Admin policy',
     status: PolicyStatus.APPROVED,
+    expressions: [],
     statements: []
   }
 ];
 
-const mockCreateTeamPolicies = vi.fn();
+const mockCreateTeamPolicy = vi.fn();
 const mockDeleteTeamPolicy = vi.fn();
 const mockGetTeams = vi.fn();
 const mockGetPolicies = vi.fn();
@@ -107,7 +112,7 @@ const mockGetPolicies = vi.fn();
 const mockUseApi = {
   teamPolicies: {
     deleteTeamPolicy: mockDeleteTeamPolicy,
-    createTeamPolicies: mockCreateTeamPolicies
+    createTeamPolicy: mockCreateTeamPolicy
   },
   teams: {
     getTeams: mockGetTeams
@@ -188,8 +193,8 @@ describe('TeamPoliciesContainer', () => {
     expect(mockOnSearch).toHaveBeenCalledWith('Security');
   });
 
-  it('calls createTeamPolicies API when Add dialog is saved', async () => {
-    mockCreateTeamPolicies.mockResolvedValueOnce({});
+  it('calls createTeamPolicy API when Add dialog is saved', async () => {
+    mockCreateTeamPolicy.mockResolvedValueOnce({});
     const mockRefresh = vi.fn();
 
     const { getByRole, getByTestId } = renderComponent({ refresh: mockRefresh });
@@ -202,7 +207,7 @@ describe('TeamPoliciesContainer', () => {
     fireEvent.click(getByTestId('mock-create-assignment-save'));
 
     await waitFor(() => {
-      expect(mockCreateTeamPolicies).toHaveBeenCalledWith('team-3', { policies: ['policy-3'] });
+      expect(mockCreateTeamPolicy).toHaveBeenCalledWith('policy-3', { team_id: 'team-3' });
     });
 
     await waitFor(() => {

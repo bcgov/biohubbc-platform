@@ -66,7 +66,7 @@ describe('getAvailableUsers', () => {
   });
 
   it('should return 200 with users matching search parameter', async () => {
-    const mockUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
+    const mockUsers = [{ system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' }];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
@@ -83,8 +83,8 @@ describe('getAvailableUsers', () => {
 
   it('should handle empty search parameter', async () => {
     const mockUsers = [
-      { system_user_id: 1, user_identifier: 'alice' },
-      { system_user_id: 2, user_identifier: 'bob' }
+      { system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' },
+      { system_user_id: 2, user_identifier: 'bob', display_name: null }
     ];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
@@ -102,8 +102,8 @@ describe('getAvailableUsers', () => {
 
   it('should handle whitespace-only search parameter', async () => {
     const mockUsers = [
-      { system_user_id: 1, user_identifier: 'alice' },
-      { system_user_id: 2, user_identifier: 'bob' }
+      { system_user_id: 1, user_identifier: 'alice', display_name: 'Wonderland, Alice WLRS:EX' },
+      { system_user_id: 2, user_identifier: 'bob', display_name: null }
     ];
 
     const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });

@@ -45,7 +45,7 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves dataset artifacts
+ * Retrieves survey artifacts
  *
  * @returns {RequestHandler}
  */

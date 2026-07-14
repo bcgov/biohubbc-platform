@@ -31,16 +31,16 @@ describe('ArtifactService', () => {
     });
   });
 
-  describe('getArtifactsByDatasetId', () => {
+  describe('getArtifactsBySurveyId', () => {
     it('should return an array of artifacts', async () => {
       const mockDBConnection = getMockDBConnection();
       const artifactService = new ArtifactService(mockDBConnection);
 
       const getArtifactRecordsStub = sinon
-        .stub(ArtifactRepository.prototype, 'getArtifactsByDatasetId')
+        .stub(ArtifactRepository.prototype, 'getArtifactsBySurveyId')
         .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
-      const response = await artifactService.getArtifactsByDatasetId('abcd');
+      const response = await artifactService.getArtifactsBySurveyId('abcd');
 
       expect(getArtifactRecordsStub).to.be.calledWith('abcd');
       expect(response).to.be.eql([{ artifact_id: 1 }, { artifact_id: 2 }]);

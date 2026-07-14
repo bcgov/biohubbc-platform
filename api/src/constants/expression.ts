@@ -2,11 +2,6 @@ import type { PredicateOperator } from '../models/expression-predicate';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 
 /**
- * Maximum graph depth for recursive expression search projection.
- */
-export const MAX_SEARCH_GRAPH_DEPTH = 6;
-
-/**
  * Shared operator registry keyed by resolved feature property type.
  *
  * Used after structural parsing to validate predicate semantics and expose expression-builder metadata.

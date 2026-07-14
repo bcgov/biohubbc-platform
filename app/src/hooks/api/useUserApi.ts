@@ -1,6 +1,12 @@
 import { AxiosInstance } from 'axios';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
-import { ISystemUser } from 'interfaces/useUserApi.interface';
+import {
+  IGetSystemUsersResponse,
+  ISystemUser,
+  ISystemUsersQueryParams,
+  IUpdateSystemUser
+} from 'interfaces/useUserApi.interface';
+import qs from 'qs';
 
 /**
  * Returns a set of supported api methods for working with users.
@@ -63,21 +69,24 @@ const useUserApi = (axios: AxiosInstance) => {
    *
    * @return {*}  {Promise<ISystemUser[]>}
    */
-  const getUsersList = async (): Promise<ISystemUser[]> => {
-    const { data } = await axios.get('/api/user/list');
+  const getUsersList = async (params?: ISystemUsersQueryParams): Promise<IGetSystemUsersResponse> => {
+    const { data } = await axios.get('/api/user/list', {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
 
     return data;
   };
 
   /**
-   * Get user details for all users.
+   * Update a system user.
    *
-   * @return {*}  {Promise<ISystemUser[]>}
+   * @param {number} systemUserId
+   * @param {IUpdateSystemUser} updates
+   * @return {*}  {Promise<void>}
    */
-  const deleteSystemUser = async (userId: number): Promise<number> => {
-    const { data } = await axios.delete(`/api/user/${userId}/delete`);
-
-    return data;
+  const updateSystemUser = async (systemUserId: number, updates: IUpdateSystemUser): Promise<void> => {
+    await axios.patch(`/api/user/${systemUserId}`, updates);
   };
 
   /**
@@ -110,7 +119,7 @@ const useUserApi = (axios: AxiosInstance) => {
     getOrRegisterUser,
     getUserById,
     getUsersList,
-    deleteSystemUser,
+    updateSystemUser,
     updateSystemUserRoles,
     addSystemUserRoles
   };

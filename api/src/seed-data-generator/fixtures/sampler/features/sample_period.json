@@ -1,0 +1,14 @@
+[
+  {
+    "id": "4befc0b1-4183-4264-8532-916b562c9a59",
+    "type": "sample_period",
+    "properties": {
+      "start_date": "2020-06-01",
+      "end_date": "2020-06-30",
+      "site_identifier": "Sampler Site 1",
+      "sample_technique": "Sampler Technique 1"
+    },
+    "content": [],
+    "parent": "7c47959e-39c5-4a7d-a648-a066b17b9366"
+  }
+]

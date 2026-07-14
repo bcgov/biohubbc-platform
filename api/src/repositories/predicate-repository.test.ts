@@ -20,8 +20,8 @@ describe('PredicateRepository', () => {
 
   describe('insertPredicateAnchor', () => {
     it('returns inserted predicate row when a predicate anchor is created', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: true }], 1));
-      const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: true }], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
 
       const result = await repository.insertPredicateAnchor({
         feature_property_id: 11,
@@ -31,22 +31,8 @@ describe('PredicateRepository', () => {
       });
 
       expect(result).to.eql({ ...predicateRow, inserted: true });
-      expect(sqlStub.callCount).to.equal(1);
-    });
-
-    it('returns resolved predicate row on conflict', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: false }], 1));
-      const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
-
-      const result = await repository.insertPredicateAnchor({
-        feature_property_id: 11,
-        feature_type_property_id: 22,
-        feature_property_type_id: 3,
-        predicate_hash: 'hash-1'
-      });
-
-      expect(result).to.eql({ ...predicateRow, inserted: false });
-      expect(sqlStub.callCount).to.equal(1);
+      expect(knexStub.callCount).to.equal(1);
+      expect(knexStub.firstCall.args[0].toString()).to.not.include('ON CONFLICT');
     });
   });
 
@@ -109,11 +95,17 @@ describe('PredicateRepository', () => {
       expect(knexStub.callCount).to.equal(1);
     });
 
-    it('splits scalar timestamp payloads for insert', async () => {
+    it('inserts split timestamp payloads', async () => {
       const cases = [
-        { value: '2024-01-01', bindings: ['2024-01-01', 'After', 'pred-1', null] },
-        { value: '14:30:00-07:00', bindings: [null, 'After', 'pred-1', '14:30:00-07:00'] },
-        { value: '2024-01-01T14:30:00-07:00', bindings: ['2024-01-01', 'After', 'pred-1', '14:30:00-07:00'] }
+        { value: { date_value: '2024-01-01', time_value: null }, bindings: ['2024-01-01', 'After', 'pred-1', null] },
+        {
+          value: { date_value: null, time_value: '14:30:00-07:00' },
+          bindings: [null, 'After', 'pred-1', '14:30:00-07:00']
+        },
+        {
+          value: { date_value: '2024-01-01', time_value: '14:30:00-07:00' },
+          bindings: ['2024-01-01', 'After', 'pred-1', '14:30:00-07:00']
+        }
       ];
 
       for (const testCase of cases) {
@@ -142,15 +134,14 @@ describe('PredicateRepository', () => {
       expect(knexStub.firstCall.args[0].toSQL().bindings).to.eql([null, 'Exists', 'pred-1', null]);
     });
 
-    it('throws when timestamp payload value is unsupported', async () => {
+    it('throws when timestamp payload value is missing for a comparison operator', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([], 1));
       const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
 
       try {
         await repository.writePredicatePayload('pred-1', {
           type: 'timestamp',
-          operator: 'After',
-          value: 'not-a-timestamp'
+          operator: 'After'
         });
         expect.fail();
       } catch (error) {

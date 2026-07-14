@@ -38,12 +38,13 @@ export const InlineAutocomplete = <T,>({
   startAdornment,
   textFieldSx,
   error,
+  disablePortal = false,
   variant = 'standard',
   ...props
 }: InlineAutocompleteProps<T>) => {
   return (
     <Autocomplete<T, false, false, false>
-      disablePortal
+      disablePortal={disablePortal}
       {...props}
       value={selectedValue ?? null}
       renderInput={(params) => {

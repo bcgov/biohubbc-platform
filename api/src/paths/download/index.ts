@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { CreateDownloadRequestBody } from '../../models/download';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -11,6 +11,7 @@ import { DownloadService } from '../../services/download/download-service';
 import { getApiBaseUrl } from '../../utils/api-url';
 import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
+import { getActiveSystemUserId } from '../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/download');
 
@@ -43,11 +44,24 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'download_status', 'create_date', 'exports'],
+                  required: [
+                    'download_id',
+                    'download_version_id',
+                    'download_status',
+                    'create_date',
+                    'name',
+                    'description',
+                    'exports'
+                  ],
                   properties: {
                     download_id: {
                       type: 'string',
                       format: 'uuid'
+                    },
+                    download_version_id: {
+                      type: 'string',
+                      format: 'uuid',
+                      description: 'The most-recent materialized version of this download.'
                     },
                     download_status: {
                       type: 'string',
@@ -55,6 +69,15 @@ GET.apiDoc = {
                     },
                     create_date: {
                       type: 'string'
+                    },
+                    name: {
+                      type: 'string',
+                      description: "The owning policy's display name."
+                    },
+                    description: {
+                      type: 'string',
+                      nullable: true,
+                      description: "The owning policy's description."
                     },
                     started_at: {
                       type: 'string',
@@ -71,7 +94,7 @@ GET.apiDoc = {
                       items: {
                         type: 'object',
                         required: [
-                          'download_export_id',
+                          'download_version_export_id',
                           'download_id',
                           'format',
                           'status',
@@ -83,7 +106,7 @@ GET.apiDoc = {
                           'part_count'
                         ],
                         properties: {
-                          download_export_id: { type: 'string', format: 'uuid' },
+                          download_version_export_id: { type: 'string', format: 'uuid' },
                           download_id: { type: 'string', format: 'uuid' },
                           format: { type: 'string' },
                           status: {
@@ -119,6 +142,8 @@ GET.apiDoc = {
  * download_id (UUID), not through this listing endpoint. Without a user identity there
  * is no way to scope "my downloads", so allowing unauthenticated access would return
  * every anonymous download in the system.
+ *
+ * @returns {RequestHandler}
  */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {
@@ -147,18 +172,15 @@ export function getDownloads(): RequestHandler {
   };
 }
 
-export const POST: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
-  createDownload()
-];
+export const POST: Operation = [createDownload()];
 
 POST.apiDoc = {
   description:
-    'Create a download request from a name, target feature types, and an optional expression tree. Returns a download id and a URL the caller can poll for status.',
+    'Create a download request from a name and expression tree. Returns a download id and a URL the caller can poll for status.',
   tags: ['download'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
@@ -168,11 +190,10 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           additionalProperties: false,
-          required: ['name', 'featureTypes', 'expression'],
+          required: ['name', 'expression'],
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 100 },
             description: { type: 'string', maxLength: 1000, nullable: true },
-            featureTypes: { type: 'array', items: { type: 'string' }, minItems: 1 },
             expression: { ...featureSearchExpressionTreeSchema, nullable: true }
           }
         }
@@ -206,16 +227,23 @@ POST.apiDoc = {
 };
 
 /**
- * Create a download request.
+ * Create a download request. Anonymous-capable: a missing bearer token is allowed.
  *
- * Delegates the business orchestration (expression tree → policy → download → team link →
- * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing,
- * the transaction boundary, and response shaping.
+ * Without a bearer token the request runs on the shared API-user connection and `requestedBy`
+ * is null. A null `requested_by` is the security identity "anonymous" — the parquet packaging
+ * filters to only unsecured data, so an anonymous caller can never pull secured records. An
+ * authenticated request runs on that user's connection and scopes the package to data visible
+ * to them; authorization is re-evaluated at export time against `requested_by`, so queuing
+ * early grants no extra access later.
  *
- * Authorization is enforced at export time, not create time. The user's authorization is
- * re-evaluated when the worker runs, using `download.create_user`. Snapshotting access at
- * create-time would let users export data they no longer have access to by simply queuing
- * a download earlier.
+ * The response shape is `{ download_id, download_url }` for both callers. The download UUID is
+ * the credential for the anonymous caller, who watches status on the public download page; the
+ * authenticated caller drives the explicit two-call export flow (create export, then poll it)
+ * from the Downloads UI.
+ *
+ * Delegates the business orchestration (optional expression tree → policy → download → team link →
+ * worker job) to `DownloadService.createDownloadRequest`. The route owns request parsing, the
+ * connection choice, the transaction boundary, and response shaping.
  *
  * @return {RequestHandler}
  */
@@ -229,21 +257,23 @@ export function createDownload(): RequestHandler {
     if (!parseResult.success) {
       throw new HTTP400('Invalid request body', parseResult.error.issues);
     }
-    const { name, description, featureTypes, expression } = parseResult.data;
+    const { name, description, expression } = parseResult.data;
 
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
+
+      const requestedBy = isAuthenticated ? await getActiveSystemUserId(connection) : null;
 
       const downloadService = new DownloadService(connection);
 
       const { download_id } = await downloadService.createDownloadRequest({
         name,
         description: description ?? null,
-        featureTypes,
         expression,
-        systemUserId: connection.systemUserId()
+        requestedBy
       });
 
       await connection.commit();

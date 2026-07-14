@@ -4,7 +4,7 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useArtifactApi.interface';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 

@@ -2,13 +2,19 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper, { PaperProps } from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import { useDialogContext } from 'hooks/useContext';
 import { PropsWithChildren, ReactNode } from 'react';
+
+const DESCRIPTION_PREVIEW_MAX_LENGTH = 300;
 
 export interface PageHeaderProps extends PaperProps {
   maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   breadcrumbs?: ReactNode;
   label?: ReactNode;
   subheader?: ReactNode;
+  description?: string | null;
+  descriptionDialogTitle?: string;
+  descriptionPreviewMaxLength?: number;
   tabs?: ReactNode;
   buttons?: ReactNode;
 }
@@ -24,11 +30,32 @@ export const PageHeader = ({
   breadcrumbs,
   label,
   subheader,
+  description,
+  descriptionDialogTitle = 'Description',
+  descriptionPreviewMaxLength = DESCRIPTION_PREVIEW_MAX_LENGTH,
   tabs,
   buttons,
   ...paperProps
 }: PropsWithChildren<PageHeaderProps>) => {
-  const hasStructuredContent = Boolean(breadcrumbs || label || subheader || tabs || buttons);
+  const dialogContext = useDialogContext();
+  const hasStructuredContent = Boolean(breadcrumbs || label || subheader || description || tabs || buttons);
+  const isDescriptionTruncated = Boolean(description && description.length > descriptionPreviewMaxLength);
+  const descriptionPreview =
+    description && isDescriptionTruncated ? description.slice(0, descriptionPreviewMaxLength) : description;
+
+  const handleReadMoreClick = () => {
+    if (!description) {
+      return;
+    }
+
+    dialogContext.setOkDialog({
+      open: true,
+      dialogTitle: descriptionDialogTitle,
+      dialogText: '',
+      dialogContent: <Typography sx={{ whiteSpace: 'pre-wrap' }}>{description}</Typography>,
+      onClose: () => dialogContext.setOkDialog({ open: false })
+    });
+  };
 
   return (
     <Paper
@@ -70,8 +97,47 @@ export const PageHeader = ({
                 )}
               </Box>
             )}
+            {descriptionPreview && (
+              <Typography
+                color="text.secondary"
+                component="div"
+                mt={1.5}
+                sx={{
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word'
+                }}>
+                {descriptionPreview}
+                {isDescriptionTruncated ? (
+                  <>
+                    ...{' '}
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: 700,
+                        color: 'primary.light',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        '&:hover': {
+                          textDecoration: 'underline'
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onClick={handleReadMoreClick}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleReadMoreClick();
+                        }
+                      }}>
+                      read more
+                    </Box>
+                  </>
+                ) : null}
+              </Typography>
+            )}
             {tabs && <Box mt={1.5}>{tabs}</Box>}
-            {children && <Box mt={tabs || subheader ? 2 : 0}>{children}</Box>}
+            {children && <Box mt={tabs || subheader || description ? 2 : 0}>{children}</Box>}
           </>
         ) : (
           <Box>{children}</Box>

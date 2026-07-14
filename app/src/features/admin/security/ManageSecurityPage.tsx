@@ -6,7 +6,7 @@ import { CategoriesContainer } from './components/CategoriesContainer';
 import { ReasonsContainer } from './components/ReasonsContainer';
 
 /**
- * Admin page for viewing security categories and reasons.
+ * Admin page for managing security categories and reasons.
  *
  * @returns {*}
  */
@@ -29,7 +29,7 @@ export const ManageSecurityPage = () => {
 
   return (
     <>
-      <PageHeader label="Security" />
+      <PageHeader label="Manage Security" />
       <Box py={4}>
         <CategoriesContainer
           categories={categories.rows}
@@ -52,6 +52,7 @@ export const ManageSecurityPage = () => {
             sortModel={reasons.sortModel}
             setSortModel={reasons.handleSortChange}
             refresh={reasons.refresh}
+            refreshCategories={categories.refresh}
             searchTerm={reasons.searchTerm}
             onSearch={reasons.handleSearch}
           />

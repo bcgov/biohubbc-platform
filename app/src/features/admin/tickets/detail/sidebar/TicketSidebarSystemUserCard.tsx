@@ -8,6 +8,7 @@ import { ContextMenuButton, IContextMenuItem } from 'components/ContextMenuButto
 import { TICKET_SYSTEM_USER_STATUS_PRESENTATION } from 'constants/ticket';
 import { ITicketSystemUser, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
+import { getUserLabel } from 'utils/Utils';
 
 interface ITicketSidebarSystemUserCardProps {
   ticketSystemUser: ITicketSystemUser;
@@ -39,7 +40,7 @@ export const TicketSidebarSystemUserCard = (props: ITicketSidebarSystemUserCardP
     []
   );
 
-  const displayLabel = ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier;
+  const displayLabel = getUserLabel(ticketSystemUser.system_user);
   const statusContextMenuItems: IContextMenuItem[] = statusOptions.map((statusOption) => ({
     label: statusOption.label,
     icon: <Icon path={statusOption.icon} size={0.7} />,

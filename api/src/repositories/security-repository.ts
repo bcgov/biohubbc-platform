@@ -2,105 +2,15 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { CountResult } from '../models/count';
-import { SecurityCategoryWithRuleCount } from '../models/security-category';
-import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
+import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
+import {
+  SubmissionFeatureSecurityRecord,
+  SubmissionFeatureSecurityRulesSummary
+} from '../models/submission-feature-security';
 import { getLogger } from '../utils/logger';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/security-repository');
-
-export const PersecutionAndHarmSecurity = z.object({
-  persecution_or_harm_id: z.number(),
-  persecution_or_harm_type_id: z.number(),
-  wldtaxonomic_units_id: z.number(),
-  name: z.string(),
-  description: z.string().nullable().optional()
-});
-
-export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecurity>;
-
-export const SecurityRuleRecord = z.object({
-  security_rule_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
-
-export const SecurityCategoryRecord = z.object({
-  security_category_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SecurityCategoryRecord = z.infer<typeof SecurityCategoryRecord>;
-
-export const SecurityRuleAndCategory = z.object({
-  security_rule_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  security_category_id: z.number(),
-  category_name: z.string(),
-  category_description: z.string(),
-  category_record_effective_date: z.string(),
-  category_record_end_date: z.string().nullable()
-});
-export type SecurityRuleAndCategory = z.infer<typeof SecurityRuleAndCategory>;
-
-export const SubmissionFeatureSecurityRecord = z.object({
-  submission_feature_security_id: z.number(),
-  submission_feature_id: z.number(),
-  security_rule_id: z.number(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
-
-export const SubmissionFeatureSecurityRulesSummary = z.object({
-  rules: z.array(
-    z.object({
-      security_rule_id: z.number(),
-      count: z.number()
-    })
-  )
-});
-
-export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
-
-export const SecurityReason = z.object({
-  id: z.number(),
-  type_id: z.number()
-});
-export type SecurityReason = z.infer<typeof SecurityReason>;
-
-export const ArtifactPersecution = z.object({
-  artifact_persecution_id: z.number(),
-  persecution_or_harm_id: z.number(),
-  artifact_id: z.number()
-});
-
-export type ArtifactPersecution = z.infer<typeof ArtifactPersecution>;
 
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
@@ -303,67 +213,6 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get all active security categories. A security category is active if it has not been
-   * end-dated.
-   *
-   * @return {*}  {Promise<SecurityCategoryRecord[]>}
-   * @memberof SecurityRepository
-   */
-  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
-    defaultLog.debug({ label: 'getActiveSecurityCategories' });
-    const sql = SQL`
-      SELECT * FROM security_category WHERE record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityCategoryRecord);
-    return response.rows;
-  }
-
-  /**
-   * Gets a list of all active security rules with associated categories. A security rule is
-   * active if it has not been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityRepository
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    defaultLog.debug({ label: 'getActiveRulesAndCategories' });
-    const sql = SQL`
-      SELECT 
-        sr.security_rule_id,
-        sr.name,
-        sr.description,
-        sr.record_effective_date,
-        sr.record_end_date,
-        sc.security_category_id,
-        sc.name as category_name,
-        sc.description as category_description,
-        sc.record_effective_date as category_record_effective_date,
-        sc.record_end_date as category_record_end_date
-      FROM security_rule sr, security_category sc 
-      WHERE sr.security_category_id = sc.security_category_id
-      AND sr.record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleAndCategory);
-    return response.rows;
-  }
-
-  /**
-   * Gets a list of all active security rules. A security rule is active if it has not
-   * been end-dated.
-   *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityRepository
-   */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    defaultLog.debug({ label: 'getActiveSecurityRules' });
-    const sql = SQL`
-      SELECT * FROM security_rule WHERE record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleRecord);
-    return response.rows;
-  }
-
-  /**
    * Attaches all of the given security rules to the given submission features.
    *
    * @param {number[]} submissionFeatureIds
@@ -375,8 +224,12 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
-      return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
+    // Dedupe inputs — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair
+    // appears twice in one INSERT ("cannot affect row a second time")
+    const queryValues = [...new Set(submissionFeatureIds)].flatMap((submissionFeatureId) => {
+      return [...new Set(securityRuleIds)].flatMap(
+        (securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`
+      );
     });
 
     const insertSQL = SQL`
@@ -385,9 +238,13 @@ export class SecurityRepository extends BaseRepository {
       VALUES `;
 
     insertSQL.append(queryValues.join(', '));
+    // A conflicting row may be a 'draft' inserted by automatic screening — manual application
+    // must promote it to 'active' or the rule would silently remain unenforced. Rows already
+    // 'active' are left untouched (and excluded from RETURNING) to avoid audit churn.
     insertSQL.append(`
       ON CONFLICT (submission_feature_id, security_rule_id)
-      DO NOTHING
+      DO UPDATE SET status = 'active'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'active'
       RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
@@ -406,12 +263,16 @@ export class SecurityRepository extends BaseRepository {
     submissionId: number,
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!securityRuleIds.length) {
+    // Dedupe — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair appears
+    // twice in one INSERT ("cannot affect row a second time")
+    const uniqueSecurityRuleIds = [...new Set(securityRuleIds)];
+
+    if (!uniqueSecurityRuleIds.length) {
       return [];
     }
 
-    const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
-    const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
+    const placeholders = uniqueSecurityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
+    const submissionIdPlaceholder = `$${uniqueSecurityRuleIds.length + 1}`;
 
     const sql = `
       INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
@@ -419,14 +280,83 @@ export class SecurityRepository extends BaseRepository {
       FROM submission_feature sf
       CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
       WHERE sf.submission_id = ${submissionIdPlaceholder}
-      ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+      ON CONFLICT (submission_feature_id, security_rule_id)
+      DO UPDATE SET status = 'active'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'active'
       RETURNING *;
     `;
 
-    const insertSQL = SQL([sql], ...securityRuleIds, submissionId);
+    const insertSQL = SQL([sql], ...uniqueSecurityRuleIds, submissionId);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
+  }
+
+  /**
+   * Insert draft `submission_feature_security` rows for every feature in `submissionUploadId`
+   * that is related to one of the trigger features through `submission_feature_closure`.
+   *
+   * This is the automatic screening write path. Rows are inserted with `status = 'draft'` and
+   * linked back to the `submission_upload_security` (scan event) that produced them, so they do
+   * NOT restrict access until an admin promotes them to `status = 'active'`.
+   *
+   * **Closure direction:** The closure is directed `source -> target` (child -> parent/property).
+   * Both directions are probed and unioned so all features meaningfully related to a trigger are
+   * captured (the trigger's descendants via the reverse probe, its ancestors via the forward probe,
+   * plus the self-row).
+   *
+   * **Idempotency:** `ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING` means
+   * rerunning screening for the same upload is safe; an existing row keeps its original
+   * `submission_upload_security_id` (first-scan provenance).
+   *
+   * @param {number[]} triggerFeatureIds `submission_feature_id` values returned by the rule's
+   *   policy evaluator for the given upload.
+   * @param {number} securityRuleId The security rule that identified the triggers.
+   * @param {string} submissionUploadId Scope — only features from this upload are inserted.
+   * @param {number} submissionUploadSecurityId The scan event that produced these rows.
+   * @returns {Promise<number>} The number of draft rows inserted (conflicts excluded).
+   * @memberof SecurityRepository
+   */
+  async insertDraftSecurityForTriggers(
+    triggerFeatureIds: number[],
+    securityRuleId: number,
+    submissionUploadId: string,
+    submissionUploadSecurityId: number
+  ): Promise<number> {
+    if (triggerFeatureIds.length === 0) {
+      return 0;
+    }
+
+    const result = await this.connection.query<{ submission_feature_id: number }>(
+      `WITH trigger_ids AS (
+         SELECT unnest($1::integer[]) AS trigger_id
+       ),
+       related_features AS (
+         -- Reverse probe: features that reach the trigger going UP (descendants + self)
+         SELECT c.source_submission_feature_id AS submission_feature_id
+         FROM trigger_ids tf
+         JOIN submission_feature_closure c ON c.target_submission_feature_id = tf.trigger_id
+
+         UNION
+
+         -- Forward probe: features the trigger can reach going UP (ancestors + self)
+         SELECT c.target_submission_feature_id AS submission_feature_id
+         FROM trigger_ids tf
+         JOIN submission_feature_closure c ON c.source_submission_feature_id = tf.trigger_id
+       )
+       INSERT INTO submission_feature_security
+         (submission_feature_id, security_rule_id, status, submission_upload_security_id, record_effective_date)
+       SELECT DISTINCT rf.submission_feature_id, $2, 'draft'::submission_feature_security_status, $4, now()
+       FROM related_features rf
+       JOIN submission_feature sf ON sf.submission_feature_id = rf.submission_feature_id
+       WHERE sf.submission_upload_id = $3::uuid
+         AND sf.record_end_date IS NULL
+       ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+       RETURNING submission_feature_id`,
+      [triggerFeatureIds, securityRuleId, submissionUploadId, submissionUploadSecurityId]
+    );
+
+    return result.rowCount ?? 0;
   }
 
   /**
@@ -525,7 +455,9 @@ export class SecurityRepository extends BaseRepository {
       .queryBuilder()
       .select('*')
       .from('submission_feature_security')
-      .whereIn('submission_feature_id', submissionFeatureIds);
+      .whereIn('submission_feature_id', submissionFeatureIds)
+      // Draft rows (automatic screening output pending review) are not applied security
+      .where('status', 'active');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
@@ -556,6 +488,7 @@ export class SecurityRepository extends BaseRepository {
       .with('grouped_rules', (qb) => {
         qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
           .from('submission_feature_security as sfs')
+          .where('sfs.status', 'active')
           .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
           .modify((qb) => {
             // Conditionally filter for specific features
@@ -575,135 +508,5 @@ export class SecurityRepository extends BaseRepository {
     const response = await this.connection.knex(finalQuery, SubmissionFeatureSecurityRulesSummary);
 
     return response.rows[0];
-  }
-
-  /**
-   * Get paginated security categories with a count of associated active rules.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
-   * @memberof SecurityRepository
-   */
-  async getSecurityCategoriesWithRuleCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityCategoryWithRuleCount[]> {
-    const knex = getKnex();
-
-    const query = knex
-      .select(
-        'sc.security_category_id',
-        'sc.name',
-        'sc.description',
-        knex.raw('COUNT(sr.security_rule_id)::integer AS rule_count')
-      )
-      .from('security_category as sc')
-      .leftJoin('security_rule as sr', function () {
-        this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sr.record_end_date');
-      })
-      .whereNull('sc.record_end_date')
-      .groupBy('sc.security_category_id', 'sc.name', 'sc.description');
-
-    if (filters?.search) {
-      query.whereILike('sc.name', `%${filters.search}%`);
-    }
-
-    if (pagination) {
-      this.applyPagination(query, pagination);
-    }
-
-    const response = await this.connection.knex(query, SecurityCategoryWithRuleCount);
-    return response.rows;
-  }
-
-  /**
-   * Get total count of active security categories matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityRepository
-   */
-  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
-    const knex = getKnex();
-
-    const query = knex
-      .select(knex.raw('count(*)::integer as count'))
-      .from('security_category')
-      .whereNull('record_end_date');
-
-    if (filters?.search) {
-      query.whereILike('name', `%${filters.search}%`);
-    }
-
-    const response = await this.connection.knex(query, CountResult);
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get security categories count');
-    }
-    return response.rows[0].count;
-  }
-
-  /**
-   * Get paginated security rules with a count of associated submission features.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @param {ApiPaginationOptions} [pagination]
-   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
-   * @memberof SecurityRepository
-   */
-  async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
-    pagination?: ApiPaginationOptions
-  ): Promise<SecurityRuleWithFeatureCount[]> {
-    const knex = getKnex();
-
-    const query = knex
-      .select(
-        'sr.security_rule_id',
-        'sr.name',
-        'sr.description',
-        knex.raw('COUNT(sfs.submission_feature_security_id)::integer AS feature_count')
-      )
-      .from('security_rule as sr')
-      .leftJoin('submission_feature_security as sfs', 'sfs.security_rule_id', 'sr.security_rule_id')
-      .whereNull('sr.record_end_date')
-      .groupBy('sr.security_rule_id', 'sr.name', 'sr.description');
-
-    if (filters?.search) {
-      query.whereILike('sr.name', `%${filters.search}%`);
-    }
-
-    if (pagination) {
-      this.applyPagination(query, pagination);
-    }
-
-    const response = await this.connection.knex(query, SecurityRuleWithFeatureCount);
-    return response.rows;
-  }
-
-  /**
-   * Get total count of active security rules matching optional filters.
-   *
-   * @param {SecuritySearchFilters} [filters]
-   * @return {*}  {Promise<number>}
-   * @memberof SecurityRepository
-   */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
-    const knex = getKnex();
-
-    const query = knex
-      .select(knex.raw('count(*)::integer as count'))
-      .from('security_rule')
-      .whereNull('record_end_date');
-
-    if (filters?.search) {
-      query.whereILike('name', `%${filters.search}%`);
-    }
-
-    const response = await this.connection.knex(query, CountResult);
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get security rules count');
-    }
-    return response.rows[0].count;
   }
 }

@@ -2,6 +2,7 @@ export type FeatureType = {
   feature_type_id: number;
   name: string;
   display_name: string;
+  description: string | null;
 };
 
 export type FeatureTypeWithProperties = {
@@ -13,10 +14,11 @@ export type FeatureTypeProperty = {
   feature_type_property_id: number;
   name: string;
   display_name: string;
-  description: string;
+  description: string | null;
   type_name: string;
   required_value: boolean;
   calculated_value: boolean;
+  allow_multiple: boolean;
 };
 
 /**

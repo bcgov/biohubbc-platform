@@ -28,6 +28,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         status,
         ticket_id,
+        blueprint_id,
         comment
       FROM
         submission_upload
@@ -72,6 +73,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         status,
         ticket_id,
+        blueprint_id,
         comment
       FROM
         submission_upload
@@ -119,6 +121,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.status,
         su.ticket_id,
+        su.blueprint_id,
         su.comment,
         su.record_end_date
       FROM
@@ -170,6 +173,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.upload_id',
         'submission_upload.status',
         'submission_upload.ticket_id',
+        'submission_upload.blueprint_id',
         'submission_upload.comment'
       )
       .from('submission_upload')
@@ -210,7 +214,30 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.status AS upload_status,
         sus.status AS review_status,
         sv.validation,
-        COALESCE(reviews.reviews, '[]'::json) AS reviews
+        json_build_object(
+          'validation',
+          CASE
+            WHEN validation_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', validation_review.submission_upload_review_id,
+              'submission_upload_id', validation_review.submission_upload_id,
+              'scope', validation_review.scope,
+              'status', validation_review.status,
+              'requested_by', validation_review.requested_by
+            )
+          END,
+          'security',
+          CASE
+            WHEN security_review.submission_upload_review_id IS NULL THEN NULL
+            ELSE json_build_object(
+              'submission_upload_review_id', security_review.submission_upload_review_id,
+              'submission_upload_id', security_review.submission_upload_id,
+              'scope', security_review.scope,
+              'status', security_review.status,
+              'requested_by', security_review.requested_by
+            )
+          END
+        ) AS reviews
       FROM
         submission_upload su
       INNER JOIN
@@ -252,24 +279,18 @@ export class SubmissionUploadRepository extends BaseRepository {
           sv.create_date DESC
         LIMIT 1
       ) sv ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT
-          json_agg(
-            json_build_object(
-              'submission_upload_review_id', sur.submission_upload_review_id,
-              'submission_upload_id', sur.submission_upload_id,
-              'scope', sur.scope,
-              'status', sur.status,
-              'requested_by', sur.requested_by
-            )
-            ORDER BY sur.create_date ASC
-          ) AS reviews
-        FROM
-          submission_upload_review sur
-        WHERE
-          sur.submission_upload_id = su.submission_upload_id
-          AND sur.record_end_date IS NULL
-      ) reviews ON TRUE
+      LEFT JOIN
+        submission_upload_review validation_review
+      ON
+        validation_review.submission_upload_id = su.submission_upload_id
+        AND validation_review.scope = 'validation'
+        AND validation_review.record_end_date IS NULL
+      LEFT JOIN
+        submission_upload_review security_review
+      ON
+        security_review.submission_upload_id = su.submission_upload_id
+        AND security_review.scope = 'security'
+        AND security_review.record_end_date IS NULL
       WHERE
         su.ticket_id = ${ticketId}
         AND su.record_end_date IS NULL
@@ -296,12 +317,14 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         ticket_id,
         status,
+        blueprint_id,
         comment
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
         ${submissionUpload.ticket_id},
         ${submissionUpload.status},
+        ${submissionUpload.blueprint_id},
         ${submissionUpload.comment ?? null}
       )
       RETURNING submission_upload_id;
@@ -317,6 +340,36 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Find the `blueprint_id` of the most recent prior submission_upload for a submission.
+   *
+   * Used to pin a new upload to the same Blueprint as the submission's previous upload, so
+   * re-submissions remain stable when the default Blueprint changes. The most recent upload is
+   * selected by `create_date` regardless of `record_end_date` — a soft-deleted prior upload's
+   * Blueprint is still a valid pin.
+   *
+   * @param {number} submissionId - The submission whose prior uploads should be inspected.
+   * @returns {Promise<number | null>} - The prior upload's `blueprint_id`, or null if none exists.
+   */
+  async findMostRecentBlueprintIdBySubmissionId(submissionId: number): Promise<number | null> {
+    const sqlStatement = SQL`
+      SELECT
+        blueprint_id
+      FROM
+        submission_upload
+      WHERE
+        submission_id = ${submissionId}
+      ORDER BY
+        create_date DESC,
+        submission_upload_id DESC
+      LIMIT 1;
+    `;
+
+    const response = await this.connection.sql<{ blueprint_id: number }>(sqlStatement);
+
+    return response.rows[0]?.blueprint_id ?? null;
   }
 
   /**
@@ -419,6 +472,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         status,
         ticket_id,
+        blueprint_id,
         comment
       FROM
         submission_upload
