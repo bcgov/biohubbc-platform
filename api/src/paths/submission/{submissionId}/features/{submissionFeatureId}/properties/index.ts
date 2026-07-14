@@ -88,7 +88,22 @@ GET.apiDoc = {
                   properties: {
                     id: { type: 'string' },
                     property: { type: 'string' },
-                    value: { type: 'string' }
+                    // Scalar-typed values are plain strings; reference-typed values (code, taxon,
+                    // feature) resolve to a structured object carrying a display `label` plus
+                    // stable identifiers for linking.
+                    value: {
+                      oneOf: [
+                        { type: 'string' },
+                        {
+                          type: 'object',
+                          required: ['label'],
+                          additionalProperties: true,
+                          properties: {
+                            label: { type: 'string' }
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               },

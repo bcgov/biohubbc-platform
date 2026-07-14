@@ -39,6 +39,7 @@ export const SubmissionFeaturePage = () => {
       feature={feature}
       relatedFeatures={relatedFeatures ?? []}
       submissionId={submissionId}
+      submissionFeatureId={submissionFeatureId}
       rootBreadcrumbLabel="Search"
       rootBreadcrumbTo={`/search/${location.search}`}
       submissionDetailBasePath="/submission"

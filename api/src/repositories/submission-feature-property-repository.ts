@@ -127,11 +127,14 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
     const limit = pagination.limit ?? 25;
     const page = pagination.page ?? 1;
     const offset = (page - 1) * limit;
-    const primaryOrderBy = publicSortColumn
-      ? `${publicSortColumn} ${resolvedOrder}`
+    // Reference-typed values are structured JSON, so search and sort operate on the derived
+    // `value_text` label rather than the raw `value` column.
+    const sortColumnExpression = publicSortColumn === 'value' ? 'value_text' : publicSortColumn;
+    const primaryOrderBy = sortColumnExpression
+      ? `${sortColumnExpression} ${resolvedOrder}`
       : `sort ${resolvedOrder} NULLS LAST`;
 
-    sqlStatement.append(`ORDER BY ${primaryOrderBy}, property ASC, value ASC, id ASC LIMIT `);
+    sqlStatement.append(`ORDER BY ${primaryOrderBy}, property ASC, value_text ASC, id ASC LIMIT `);
     sqlStatement.append(SQL`${limit}`);
     sqlStatement.append(` OFFSET `);
     sqlStatement.append(SQL`${offset}`);
@@ -169,7 +172,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'string:' || p.submission_feature_property_string_id::text AS id,
           fp.display_name AS property,
-          p.value::text AS value,
+          to_jsonb(p.value::text) AS value,
           ftp.sort
         FROM submission_feature_property_string p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -186,7 +189,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'number:' || p.submission_feature_property_number_id::text AS id,
           fp.display_name AS property,
-          p.value::text AS value,
+          to_jsonb(p.value::text) AS value,
           ftp.sort
         FROM submission_feature_property_number p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -203,7 +206,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'boolean:' || p.submission_feature_property_boolean_id::text AS id,
           fp.display_name AS property,
-          p.value::text AS value,
+          to_jsonb(p.value::text) AS value,
           ftp.sort
         FROM submission_feature_property_boolean p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -220,7 +223,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'timestamp:' || p.submission_feature_property_timestamp_id::text AS id,
           fp.display_name AS property,
-          COALESCE(
+          to_jsonb(COALESCE(
             CASE
               WHEN p.date_value IS NOT NULL AND p.time_value IS NOT NULL
                 THEN to_char(p.date_value, 'YYYY-MM-DD') || 'T' || to_char(p.time_value, 'HH24:MI:SS')
@@ -228,7 +231,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
               ELSE to_char(p.time_value, 'HH24:MI:SS')
             END,
             ''
-          ) AS value,
+          )) AS value,
           ftp.sort
         FROM submission_feature_property_timestamp p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -245,7 +248,13 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'code:' || p.submission_feature_property_code_id::text AS id,
           fp.display_name AS property,
-          ccc.label::text AS value,
+          jsonb_build_object(
+            'codeset_key', cs.key,
+            'codeset_label', cs.label,
+            'code_key', ccc.key,
+            'code_label', ccc.label,
+            'label', ccc.label
+          ) AS value,
           ftp.sort
         FROM submission_feature_property_code p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -259,13 +268,20 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         JOIN contributor_codeset_code ccc
           ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
          AND ccc.record_end_date IS NULL
+        JOIN contributor_codeset cs
+          ON cs.contributor_codeset_id = ccc.contributor_codeset_id
 
         UNION ALL
 
         SELECT
           'taxon:' || p.submission_feature_property_taxon_id::text AS id,
           fp.display_name AS property,
-          COALESCE(t.itis_scientific_name, t.common_name, t.bc_taxon_code, t.itis_tsn::text) AS value,
+          jsonb_build_object(
+            'taxon_id', t.taxon_id,
+            'tsn', t.itis_tsn,
+            'rank', t.rank,
+            'label', COALESCE(t.itis_scientific_name, t.common_name, t.bc_taxon_code, t.itis_tsn::text)
+          ) AS value,
           ftp.sort
         FROM submission_feature_property_taxon p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -285,7 +301,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'geometry:' || p.submission_feature_property_geometry_id::text AS id,
           fp.display_name AS property,
-          public.ST_AsGeoJSON(p.value)::text AS value,
+          to_jsonb(public.ST_AsGeoJSON(p.value)::text) AS value,
           ftp.sort
         FROM submission_feature_property_geometry p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -302,7 +318,10 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'feature:' || p.submission_feature_property_feature_id::text AS id,
           fp.display_name AS property,
-          referenced_sf.urn::text AS value,
+          jsonb_build_object(
+            'urn', referenced_sf.urn,
+            'label', referenced_sf.urn
+          ) AS value,
           ftp.sort
         FROM submission_feature_property_feature p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -322,7 +341,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'artifact_key:' || sfa.submission_feature_artifact_id::text AS id,
           fp.display_name AS property,
-          a.object_key::text AS value,
+          to_jsonb(a.object_key::text) AS value,
           ftp.sort
         FROM submission_feature_artifact sfa
         JOIN active_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
@@ -352,7 +371,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON fp.feature_property_id = ftp.feature_property_id
       ),
       filtered_property_rows AS (
-        SELECT id, property, value, sort
+        SELECT id, property, value,
+          COALESCE(value->>'label', value #>> '{}') AS value_text,
+          sort
         FROM property_rows
     `);
 
@@ -360,7 +381,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
       sqlStatement.append(SQL`
         WHERE (
           LOWER(property) LIKE ${`%${normalizedSearch}%`}
-          OR LOWER(value) LIKE ${`%${normalizedSearch}%`}
+          OR LOWER(COALESCE(value->>'label', value #>> '{}')) LIKE ${`%${normalizedSearch}%`}
         )
       `);
     }

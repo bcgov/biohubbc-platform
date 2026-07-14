@@ -4,6 +4,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
+// The Properties block fetches indexed properties via useApi; stub it so these tests stay focused on
+// the detail content's own rendering (secured banner, no-data fallback).
+vi.mock('components/property/FeaturePropertiesSection', () => ({
+  FeaturePropertiesSection: () => null
+}));
+
 const mockFeature: ISubmissionFeature = {
   submission_feature_id: 10,
   uuid: 'feat-uuid-1',

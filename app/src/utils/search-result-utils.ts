@@ -1,4 +1,5 @@
 import { JsonValue } from 'types/json';
+import { isStructuredPropertyValue } from './property-value-utils';
 import { safeJSONStringify } from './Utils';
 
 /**
@@ -26,6 +27,12 @@ export const formatSubmissionPropertyValue = (value: JsonValue | undefined): str
       // Arrays represent multi-value properties; flatten displayable entries and skip blanks.
       if (Array.isArray(value)) {
         return value.map(formatSubmissionPropertyValue).filter(Boolean).join(', ');
+      }
+
+      // Reference-typed values (taxon, code, feature) expose a readable label; use it for sorting,
+      // quick-filtering, and cell tooltips.
+      if (isStructuredPropertyValue(value)) {
+        return value.label;
       }
 
       // Plain objects, GeoJSON, and nested values should render as JSON, never as "[object Object]".

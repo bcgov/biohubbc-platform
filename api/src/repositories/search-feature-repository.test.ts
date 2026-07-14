@@ -130,6 +130,14 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('contributor_codeset_code');
       expect(sql).to.include('public.ST_AsGeoJSON');
       expect(sql).to.include('referenced_sf.urn');
+      // reference-typed values resolve to structured jsonb objects carrying a display label
+      expect(sql).to.include('jsonb_build_object');
+      expect(sql).to.include('contributor_codeset cs');
+      expect(sql).to.include('cs.key');
+      expect(sql).to.include('cs.label');
+      expect(sql).to.include('t.taxon_id');
+      expect(sql).to.include('t.itis_tsn');
+      expect(sql).to.include('t.rank');
     });
   });
 

@@ -27,10 +27,40 @@ export interface ISubmissionFeatureResponse {
   relatedFeatures: IRelatedSubmissionFeature[];
 }
 
+/** A taxon reference value resolved from the indexed property tables. */
+export interface TaxonPropertyValue {
+  taxon_id: number;
+  tsn: number | null;
+  rank: string | null;
+  label: string;
+}
+
+/** A code reference value resolved from the indexed property tables. */
+export interface CodePropertyValue {
+  codeset_key: string;
+  codeset_label: string;
+  code_key: string;
+  code_label: string;
+  label: string;
+}
+
+/** A feature reference value resolved from the indexed property tables. */
+export interface FeaturePropertyValue {
+  urn: string;
+  label: string;
+}
+
+/**
+ * Reference-typed submitted property values resolve to structured objects carrying a display
+ * `label` plus stable identifiers, so the UI can render the label as a link/link-like element while
+ * retaining the identifiers for routing, hover previews, and formatting.
+ */
+export type StructuredPropertyValue = TaxonPropertyValue | CodePropertyValue | FeaturePropertyValue;
+
 export interface IFeaturePropertyRow {
   id: string;
   property: string;
-  value: string;
+  value: string | StructuredPropertyValue;
 }
 
 export interface SubmissionFeaturePropertyFilters {

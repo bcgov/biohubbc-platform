@@ -362,6 +362,12 @@ export class SearchFeatureRepository extends BaseRepository {
    * typed property tables. Multiple rows for the same property, or properties configured
    * as allow_multiple, are surfaced as JSON arrays.
    *
+   * Reference-typed properties resolve to structured JSON objects rather than bare scalars, so the
+   * UI can render a readable `label` while retaining stable identifiers for linking:
+   * - code:    `{ codeset_key, codeset_label, code_key, code_label, label }`
+   * - taxon:   `{ taxon_id, tsn, rank, label }`
+   * - feature: `{ urn, label }`
+   *
    * @return {string} LEFT JOIN LATERAL SQL fragment
    */
   private buildTypedPropertiesLateralJoinSql(): string {
@@ -463,7 +469,13 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_code_id AS ordinal,
-              to_jsonb(ccc.label) AS value
+              jsonb_build_object(
+                'codeset_key', cs.key,
+                'codeset_label', cs.label,
+                'code_key', ccc.key,
+                'code_label', ccc.label,
+                'label', ccc.label
+              ) AS value
             FROM submission_feature_property_code p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id
@@ -474,6 +486,8 @@ export class SearchFeatureRepository extends BaseRepository {
              AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
+            JOIN contributor_codeset cs
+              ON cs.contributor_codeset_id = ccc.contributor_codeset_id
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -483,7 +497,12 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_taxon_id AS ordinal,
-              to_jsonb(t.itis_scientific_name) AS value
+              jsonb_build_object(
+                'taxon_id', t.taxon_id,
+                'tsn', t.itis_tsn,
+                'rank', t.rank,
+                'label', COALESCE(t.itis_scientific_name, t.common_name, t.bc_taxon_code, t.itis_tsn::text)
+              ) AS value
             FROM submission_feature_property_taxon p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id
@@ -521,7 +540,10 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_feature_id AS ordinal,
-              to_jsonb(referenced_sf.urn) AS value
+              jsonb_build_object(
+                'urn', referenced_sf.urn,
+                'label', referenced_sf.urn
+              ) AS value
             FROM submission_feature_property_feature p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id

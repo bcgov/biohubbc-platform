@@ -22,10 +22,24 @@ export const FeaturePropertyTypeName = z.enum([
   'artifact_key'
 ]);
 
+/**
+ * Reference-typed property values (code, taxon, feature) resolve to structured objects carrying a
+ * display `label` alongside stable identifiers, so search results and feature detail can render the
+ * label as a link/link-like element. Scalar-typed values remain plain strings.
+ *
+ * Shapes:
+ * - code:    `{ codeset_key, codeset_label, code_key, code_label, label }`
+ * - taxon:   `{ taxon_id, tsn, rank, label }`
+ * - feature: `{ urn, label }`
+ */
+export const StructuredPropertyValue = z.object({ label: z.string() }).passthrough();
+
+export type StructuredPropertyValue = z.infer<typeof StructuredPropertyValue>;
+
 export const SubmissionFeatureProperty = z.object({
   id: z.string(),
   property: z.string(),
-  value: z.string()
+  value: z.union([z.string(), StructuredPropertyValue])
 });
 
 export type SubmissionFeatureProperty = z.infer<typeof SubmissionFeatureProperty>;

@@ -9,6 +9,7 @@ vi.mock('../../../../hooks/useApi');
 const mockUseApi = useApi as Mock;
 
 const mockGetSubmissionFeatureById = vi.fn();
+const mockGetSubmissionFeatureProperties = vi.fn();
 
 const mockFeature = {
   submission_feature_id: 10,
@@ -49,13 +50,23 @@ describe('SubmissionFeaturePage', () => {
 
     mockUseApi.mockReturnValue({
       features: {
-        getSubmissionFeatureById: mockGetSubmissionFeatureById
+        getSubmissionFeatureById: mockGetSubmissionFeatureById,
+        getSubmissionFeatureProperties: mockGetSubmissionFeatureProperties
       }
     });
 
     mockGetSubmissionFeatureById.mockResolvedValue({
       feature: mockFeature,
       relatedFeatures: []
+    });
+
+    // The Properties block reads the canonical indexed properties (not feature.data).
+    mockGetSubmissionFeatureProperties.mockResolvedValue({
+      properties: [
+        { id: 'string:1', property: 'species name', value: 'Wolf' },
+        { id: 'number:1', property: 'count', value: '5' }
+      ],
+      pagination: { total: 2, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
 

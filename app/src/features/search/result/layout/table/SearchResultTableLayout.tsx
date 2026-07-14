@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Box, Typography } from '@mui/material';
 import { GridCellParams, GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
@@ -43,7 +44,14 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
       flex: 1,
       sortable: false,
       valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
-      renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
+      renderCell: (params) => {
+        const rawValue = params.row.properties?.[property.name];
+        return (
+          <Typography variant="body2" noWrap title={formatSubmissionPropertyValue(rawValue)} sx={{ width: '100%' }}>
+            <PropertyValueDisplay value={rawValue} featureRouteBasePath="/submission" />
+          </Typography>
+        );
+      }
     }));
 
     return [
