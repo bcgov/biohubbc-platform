@@ -26,10 +26,8 @@ export class CodeService extends DBService {
   async getAllCodeSets(): Promise<IAllCodeSets> {
     defaultLog.debug({ message: 'getAllCodeSets' });
 
-    const [feature_type_with_properties] = await Promise.all([await this.getFeatureTypePropertyCodes()]);
-
     return {
-      feature_type_with_properties
+      feature_type_with_properties: await this.getFeatureTypePropertyCodes()
     };
   }
 

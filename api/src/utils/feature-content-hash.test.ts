@@ -32,6 +32,12 @@ describe('computeSubmissionFeatureContentHash', () => {
     expect(computeSubmissionFeatureContentHash(renamed)).to.equal(computeSubmissionFeatureContentHash(baseFeature));
   });
 
+  it('excludes optional universal correlation metadata from version content', () => {
+    const correlated: IFlattenedBlock = { ...baseFeature, universal_id: 'external-group-1' };
+
+    expect(computeSubmissionFeatureContentHash(correlated)).to.equal(computeSubmissionFeatureContentHash(baseFeature));
+  });
+
   it('is independent of property key ordering', () => {
     const reordered: IFlattenedBlock = {
       ...baseFeature,

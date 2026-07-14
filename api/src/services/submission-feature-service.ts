@@ -23,18 +23,36 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
-   * Un-publish the upload's live features by clearing record_effective_date.
-   *
-   * Used when an upload is denied or returned to the submitted state. Rows ended by
-   * reconciliation are never resurrected. A no-op (zero rows) for uploads whose rows are
-   * already pending.
+   * Activate features belonging to a submission upload.
    *
    * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<number>} Number of rows un-published.
+   * @returns {Promise<void>}
    * @memberof SubmissionFeatureService
    */
-  async unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<number> {
-    return this.submissionFeatureRepository.unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
+  async activateSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.activateSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Deactivate features belonging to a denied submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureService
+   */
+  async deactivateSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.deactivateSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Reset features belonging to a resubmitted upload to pending.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureService
+   */
+  async resetSubmissionFeaturesToPendingForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeatureRepository.resetSubmissionFeaturesToPendingForSubmissionUploadId(submissionUploadId);
   }
 
   /**

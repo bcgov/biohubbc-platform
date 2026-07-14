@@ -1096,12 +1096,12 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('unpublishLiveSubmissionFeaturesBySubmissionUploadId', () => {
+  describe('submission feature lifecycle dates', () => {
     afterEach(() => {
       sinon.restore();
     });
 
-    it('should clear record_effective_date for live rows only, never touching record_end_date', async () => {
+    it('should activate features for an approved upload', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [{ submission_feature_id: 1 }]
@@ -1110,31 +1110,41 @@ describe('SubmissionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const result = await submissionFeatureRepository.unpublishLiveSubmissionFeaturesBySubmissionUploadId(
+      await submissionFeatureRepository.activateSubmissionFeaturesForSubmissionUploadId(
         '550e8400-e29b-41d4-a716-446655440000'
       );
 
       expect(sqlStub.calledOnce).to.be.true;
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.contain('record_effective_date = NULL');
+      expect(sqlText).to.contain('record_effective_date = now()');
       expect(sqlText).to.contain('submission_upload_id = $1');
-      expect(sqlText).to.contain('record_end_date IS NULL');
-      expect(sqlText).to.contain('record_effective_date IS NOT NULL');
-      expect(sqlText).to.not.contain('record_end_date = NULL');
-      expect(sqlText).to.not.contain('record_end_date = now()');
-      expect(result).to.equal(1);
+      expect(sqlText).to.contain('record_end_date = NULL');
     });
 
-    it('should return 0 without throwing when the upload has no published rows', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: sinon.stub().resolves(mockQueryResponse) });
+    it('should deactivate features for a denied upload', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const result = await submissionFeatureRepository.unpublishLiveSubmissionFeaturesBySubmissionUploadId(
+      await submissionFeatureRepository.deactivateSubmissionFeaturesForSubmissionUploadId(
         '550e8400-e29b-41d4-a716-446655440000'
       );
 
-      expect(result).to.equal(0);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
+    });
+
+    it('should reset features to pending for a resubmitted upload', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
+
+      await submissionFeatureRepository.resetSubmissionFeaturesToPendingForSubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.contain('record_effective_date = NULL');
+      expect(sqlText).to.contain('record_end_date = NULL');
     });
   });
 
