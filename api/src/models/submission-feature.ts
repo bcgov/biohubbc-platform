@@ -52,6 +52,16 @@ export interface SubmissionFeatureBatchInsertResult {
 }
 
 /**
+ * Counts returned when revoking submission features and restoring predecessors.
+ */
+export const SubmissionFeatureRevocationResult = z.object({
+  revokedFeatureCount: z.number(),
+  restoredFeatureCount: z.number()
+});
+
+export type SubmissionFeatureRevocationResult = z.infer<typeof SubmissionFeatureRevocationResult>;
+
+/**
  * Flat submission feature structure matching SIMS IFlattenedBlock.
  * Parent-child relationships are expressed via UUID references.
  */

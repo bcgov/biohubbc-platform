@@ -14,6 +14,22 @@ export const JobQueues = {
    */
   PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed',
   /**
+   * Reconcile durable raw feature staging against the current submission state.
+   */
+  RECONCILE_SUBMISSION_FEATURES: 'reconcile-submission-features',
+  /**
+   * Dead letter queue for reconciliation jobs.
+   */
+  RECONCILE_SUBMISSION_FEATURES_FAILED: 'reconcile-submission-features-failed',
+  /**
+   * Promote prepared new and superseded features into pending rows.
+   */
+  PROMOTE_SUBMISSION_FEATURES: 'promote-submission-features',
+  /**
+   * Dead letter queue for promotion jobs.
+   */
+  PROMOTE_SUBMISSION_FEATURES_FAILED: 'promote-submission-features-failed',
+  /**
    * Malware scan queue for uploaded artifacts awaiting security scans.
    */
   MALWARE_SCAN: 'malware-scan',

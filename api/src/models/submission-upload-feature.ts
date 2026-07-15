@@ -43,3 +43,19 @@ export const UpdateSubmissionUploadFeature = SubmissionUploadFeature.pick({
 }).partial();
 
 export type UpdateSubmissionUploadFeature = z.infer<typeof UpdateSubmissionUploadFeature>;
+
+/**
+ * Whether a prepared upload no longer matches the active feature projection.
+ *
+ * Reconciliation records `unchanged` relative to a point-in-time baseline. The
+ * result becomes stale when, before activation, another upload removes that
+ * baseline feature or publishes different content for the same reconciliation
+ * key `(submission_id, feature_type_id, source_id)`. In either case the prepared
+ * upload can no longer safely rely on its earlier `unchanged` classification.
+ */
+export const SubmissionUploadFeaturesStaleResult = z.object({
+  /** True when at least one `unchanged` row has no active feature with the same content hash. */
+  stale: z.boolean()
+});
+
+export type SubmissionUploadFeaturesStaleResult = z.infer<typeof SubmissionUploadFeaturesStaleResult>;

@@ -25,23 +25,34 @@ const FEATURE = {
 describe('SubmissionUploadFeatureRepository', () => {
   afterEach(() => sinon.restore());
 
-  it('inserts one immutable submission upload staging feature', async () => {
-    const sql = sinon.stub().resolves(mockQueryResult([FEATURE], 1));
+  it('patches every staging row and persists the complete reconciliation summary', async () => {
+    const result = { reconciliation: { new: 2, unchanged: 0, superseded: 0, conflict: 1 } };
+    const sql = sinon.stub().resolves(mockQueryResult([result], 1));
+    const repository = new SubmissionUploadFeatureRepository(getMockDBConnection({ sql }));
+    expect(await repository.updateSubmissionUploadFeaturesWithReconciliation(SUBMISSION_UPLOAD_ID, 42)).to.eql(result);
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.include('UPDATE submission_upload_feature staged');
+    expect(text).to.include('INSERT INTO submission_upload_reconciliation');
+    expect(text).to.include('ON CONFLICT (submission_upload_id, reconciliation)');
+    expect(text).to.include('jsonb_build_object');
+    expect(text).to.include("COALESCE(MAX(persisted.count) FILTER (WHERE persisted.reconciliation = 'conflict'), 0)");
+    expect(text).to.include('SELECT DISTINCT ON (feature.feature_type_id, feature.source_id)');
+    expect(text).to.include('(feature.content_hash IS NOT NULL) DESC');
+    expect(text).to.include("incoming.incoming_count > 1 THEN 'conflict'");
+    expect(text).to.include('baseline.content_hash IS NOT NULL');
+  });
+
+  it('detects unchanged rows whose active baseline has changed since reconciliation', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([{ stale: true }], 1));
     const repository = new SubmissionUploadFeatureRepository(getMockDBConnection({ sql }));
 
-    const result = await repository.insertSubmissionUploadFeature({
-      submission_upload_id: FEATURE.submission_upload_id,
-      source_id: FEATURE.source_id,
-      feature_type_id: FEATURE.feature_type_id,
-      data: FEATURE.data,
-      data_byte_size: FEATURE.data_byte_size,
-      content_hash: FEATURE.content_hash,
-      universal_id: FEATURE.universal_id
-    });
-
-    expect(result).to.eql(FEATURE);
-    expect(sql).to.have.been.calledOnce;
-    expect(sql.firstCall.args[0].text).to.include('INSERT INTO submission_upload_feature');
+    expect(await repository.isSubmissionUploadFeaturesStale(SUBMISSION_UPLOAD_ID)).to.eql({ stale: true });
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.include("staged.reconciliation = 'unchanged'");
+    expect(text).to.include('JOIN submission_upload upload');
+    expect(text).to.include('active_feature.record_effective_date <= now()');
+    expect(text).to.include('(active_feature.record_end_date IS NULL OR now() < active_feature.record_end_date)');
+    expect(text).to.include('active_feature.content_hash IS DISTINCT FROM staged.content_hash');
   });
 
   it('gets one submission upload staging feature by id', async () => {

@@ -11,6 +11,8 @@ import * as pollDownloadSchedulesJob from './jobs/poll-download-schedules-job';
 import * as processDownloadJob from './jobs/process-download-job';
 import * as processDownloadVersionExportJob from './jobs/process-download-version-export-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
+import * as promoteSubmissionFeaturesJob from './jobs/promote-submission-features-job';
+import * as reconcileSubmissionFeaturesJob from './jobs/reconcile-submission-features-job';
 import * as submissionUploadSecurityJob from './jobs/submission-upload-security-job';
 import { registerWorkers, workerDependencies } from './worker';
 
@@ -30,8 +32,10 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(20);
+      expect(createQueueStub.callCount).to.equal(24);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.RECONCILE_SUBMISSION_FEATURES)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.PROMOTE_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT)).to.be.true;
@@ -46,6 +50,30 @@ describe('worker', () => {
         workStub.calledWith(
           JobQueues.PROCESS_SUBMISSION_FEATURES,
           processSubmissionFeaturesJob.processSubmissionFeaturesJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.RECONCILE_SUBMISSION_FEATURES,
+          reconcileSubmissionFeaturesJob.reconcileSubmissionFeaturesJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED,
+          reconcileSubmissionFeaturesJob.reconcileSubmissionFeaturesFailedHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.PROMOTE_SUBMISSION_FEATURES,
+          promoteSubmissionFeaturesJob.promoteSubmissionFeaturesJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.PROMOTE_SUBMISSION_FEATURES_FAILED,
+          promoteSubmissionFeaturesJob.promoteSubmissionFeaturesFailedHandler
         )
       ).to.be.true;
       expect(
@@ -152,29 +180,38 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 20 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED, DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED
-      expect(createQueueStub.callCount).to.equal(20);
+      // 24 queues: PROCESS_SUBMISSION_FEATURES + FAILED, RECONCILE_SUBMISSION_FEATURES + FAILED,
+      // PROMOTE_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED,
+      // PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED,
+      // COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED,
+      // POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED,
+      // DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED.
+      expect(createQueueStub.callCount).to.equal(24);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
       expect(createQueueStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
-      expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_FAILED);
-      expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
-      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED);
-      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
-      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
-      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
-      expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
-      expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED);
+      expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.RECONCILE_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.PROMOTE_SUBMISSION_FEATURES_FAILED);
+      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.PROMOTE_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_FAILED);
+      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
+      expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT_FAILED);
+      expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
+      expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+      expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
       // Recompute closure DLQ is created before its main queue
-      expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
-      expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(createQueueStub.getCall(16).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(createQueueStub.getCall(17).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
       // Poll download schedules DLQ is created before its main queue
-      expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
-      expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(createQueueStub.getCall(18).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(createQueueStub.getCall(19).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
       // Automatic security screening DLQ is created before its main queue
-      expect(createQueueStub.getCall(16).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
-      expect(createQueueStub.getCall(17).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
+      expect(createQueueStub.getCall(20).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
+      expect(createQueueStub.getCall(21).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -227,11 +264,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Index submission features handlers are registered after download + download-version-export handlers
-      expect(workStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
-      expect(workStub.getCall(8).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesJobHandler);
+      expect(workStub.getCall(12).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(workStub.getCall(12).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesJobHandler);
 
-      expect(workStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
-      expect(workStub.getCall(9).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesFailedHandler);
+      expect(workStub.getCall(13).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+      expect(workStub.getCall(13).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesFailedHandler);
     });
 
     it('configures dead letter queue for index-submission-features', async () => {
@@ -290,11 +327,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Compute scope anchors handlers are registered after index submission features handlers
-      expect(workStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
-      expect(workStub.getCall(10).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsJobHandler);
+      expect(workStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(workStub.getCall(14).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsJobHandler);
 
-      expect(workStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
-      expect(workStub.getCall(11).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
+      expect(workStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(workStub.getCall(15).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
     });
 
     it('configures dead letter queue + policy:short for compute-scope-anchors', async () => {
@@ -354,13 +391,13 @@ describe('worker', () => {
       await registerWorkers();
 
       // Recompute closure handlers are registered after compute scope anchors handlers
-      expect(workStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
-      expect(workStub.getCall(12).args[1]).to.equal(
+      expect(workStub.getCall(16).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(workStub.getCall(16).args[1]).to.equal(
         computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureJobHandler
       );
 
-      expect(workStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
-      expect(workStub.getCall(13).args[1]).to.equal(
+      expect(workStub.getCall(17).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(workStub.getCall(17).args[1]).to.equal(
         computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
       );
     });
@@ -376,11 +413,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Poll download schedules handlers are registered after recompute closure handlers
-      expect(workStub.getCall(14).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
-      expect(workStub.getCall(14).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler);
+      expect(workStub.getCall(18).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(workStub.getCall(18).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler);
 
-      expect(workStub.getCall(15).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
-      expect(workStub.getCall(15).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler);
+      expect(workStub.getCall(19).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(workStub.getCall(19).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler);
     });
 
     it('configures dead letter queue for poll-download-schedules', async () => {
@@ -469,11 +506,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Screening handlers are registered after poll-download-schedules handlers (calls 16+17 out of 0-based indexing)
-      expect(workStub.getCall(16).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
-      expect(workStub.getCall(16).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityJobHandler);
+      expect(workStub.getCall(20).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
+      expect(workStub.getCall(20).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityJobHandler);
 
-      expect(workStub.getCall(17).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
-      expect(workStub.getCall(17).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityFailedHandler);
+      expect(workStub.getCall(21).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
+      expect(workStub.getCall(21).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityFailedHandler);
     });
   });
 });

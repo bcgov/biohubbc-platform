@@ -35,7 +35,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.open = sinon.stub().resolves();
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.release = sinon.stub();
-    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
@@ -52,6 +52,10 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     ]);
 
     expect(recomputeStub).to.have.been.calledOnceWith(1);
+    expect(mockDBConnection.query).to.have.been.calledOnceWith(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))",
+      ['submission-feature-active-state', 1, 3]
+    );
     expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, {
       submissionId: 1,
       submissionUploadId: 'upload-uuid-1'
@@ -66,7 +70,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = sinon.stub();
-    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+    mockDBConnection.query = sinon.stub().resolves(mockQueryResult([]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
     sinon
