@@ -1,5 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { SubmissionUploadReconciliationCounts } from '../../models/reconciliation';
 import {
   CreateSubmissionUploadReconciliation,
   SubmissionUploadReconciliation,
@@ -16,7 +17,37 @@ import { BaseRepository } from '../base-repository';
  */
 export class SubmissionUploadReconciliationRepository extends BaseRepository {
   /**
-   * Insert or update a reconciliation count for a submission upload and outcome.
+   * Read the complete reconciliation summary in one statement.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<SubmissionUploadReconciliationCounts>} Reconciliation summary row.
+   */
+  async getSubmissionUploadReconciliationCounts(
+    submissionUploadId: string
+  ): Promise<SubmissionUploadReconciliationCounts> {
+    const response = await this.connection.sql(
+      SQL`
+        SELECT
+          CASE
+            WHEN COUNT(summary.submission_upload_reconciliation_id) = 0 THEN NULL
+            ELSE jsonb_build_object(
+              'new', COALESCE(SUM(summary.count) FILTER (WHERE summary.reconciliation = 'new'), 0),
+              'unchanged', COALESCE(SUM(summary.count) FILTER (WHERE summary.reconciliation = 'unchanged'), 0),
+              'superseded', COALESCE(SUM(summary.count) FILTER (WHERE summary.reconciliation = 'superseded'), 0),
+              'conflict', COALESCE(SUM(summary.count) FILTER (WHERE summary.reconciliation = 'conflict'), 0)
+            )
+          END AS reconciliation
+        FROM submission_upload_reconciliation summary
+        WHERE summary.submission_upload_id = ${submissionUploadId}::uuid;
+      `,
+      SubmissionUploadReconciliationCounts
+    );
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert or update a reconciliation count for a submission upload and reconciliation.
    *
    * @param {CreateSubmissionUploadReconciliation} data Reconciliation count fields.
    * @returns {Promise<SubmissionUploadReconciliation>} The inserted count record.

@@ -11,9 +11,8 @@
  * Prefix for the per-submission active-state advisory lock.
  *
  * Serializes every writer of a submission's published feature state and its derived
- * closure: upload activation (reconciliation at approval) takes the blocking form,
- * the closure recompute job takes the try form (skipping is safe — an activation
- * holding the lock recomputes the closure itself).
+ * closure: upload activation and closure recompute jobs both take the blocking form so
+ * every upload continues to its upload-specific security screening.
  *
  * Use with {@link SUBMISSION_ACTIVE_STATE_LOCK_SEED} as
  * `hashtextextended('<prefix>:' || submission_id, seed)`.

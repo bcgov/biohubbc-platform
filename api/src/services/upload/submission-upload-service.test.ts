@@ -328,8 +328,10 @@ describe('SubmissionUploadService', () => {
         status: 'submitted'
       });
       const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').resolves();
-      const updateStatusStub = sinon
-        .stub(SubmissionUploadReviewStatusService.prototype, 'updateSubmissionUploadReviewStatus')
+      // A delete records the status directly — it must not route through the reconciliation-aware
+      // update path (which now lives on SubmissionUploadService).
+      const insertStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus')
         .resolves({
           submission_upload_status_id: 2,
           submission_upload_id: submissionUploadId,
@@ -341,7 +343,10 @@ describe('SubmissionUploadService', () => {
 
       expect(service.getSubmissionUploadBySubmissionUuid).to.have.been.calledOnceWith(submissionId, submissionUploadId);
       expect(deleteUploadStub).to.have.been.calledOnceWith(submissionUploadId);
-      expect(updateStatusStub).to.have.been.calledOnceWith(submissionUploadId, { status: 'deleted' });
+      expect(insertStatusStub).to.have.been.calledOnceWith({
+        submission_upload_id: submissionUploadId,
+        status: 'deleted'
+      });
       expect(deleteTeamStub).to.have.been.calledOnceWith(teamId);
     });
 
@@ -352,9 +357,9 @@ describe('SubmissionUploadService', () => {
         status: 'approved'
       });
       const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
-      const updateStatusStub = sinon.stub(
+      const insertStatusStub = sinon.stub(
         SubmissionUploadReviewStatusService.prototype,
-        'updateSubmissionUploadReviewStatus'
+        'insertSubmissionUploadReviewStatus'
       );
       const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam');
 
@@ -364,7 +369,7 @@ describe('SubmissionUploadService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
         expect(deleteUploadStub).not.to.have.been.called;
-        expect(updateStatusStub).not.to.have.been.called;
+        expect(insertStatusStub).not.to.have.been.called;
         expect(deleteTeamStub).not.to.have.been.called;
       }
     });

@@ -18,6 +18,26 @@ const RECONCILIATION = {
 describe('SubmissionUploadReconciliationRepository', () => {
   afterEach(() => sinon.restore());
 
+  it('returns the complete reconciliation summary in one statement', async () => {
+    const row = { reconciliation: { new: 1, unchanged: 2, superseded: 3, conflict: 4 } };
+    const sql = sinon.stub().resolves(mockQueryResult([row], 1));
+    const repository = new SubmissionUploadReconciliationRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.getSubmissionUploadReconciliationCounts(SUBMISSION_UPLOAD_ID)).to.eql(row);
+    expect(sql).to.have.been.calledOnce;
+    expect(sql.firstCall.args[0].text).to.include('jsonb_build_object');
+    expect(sql.firstCall.args[0].text).to.include("FILTER (WHERE summary.reconciliation = 'conflict')");
+    expect(sql.firstCall.args[0].text).to.include('COALESCE');
+  });
+
+  it('returns a null reconciliation when no summary exists', async () => {
+    const row = { reconciliation: null };
+    const sql = sinon.stub().resolves(mockQueryResult([row], 1));
+    const repository = new SubmissionUploadReconciliationRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.getSubmissionUploadReconciliationCounts(SUBMISSION_UPLOAD_ID)).to.eql(row);
+  });
+
   it('upserts one submission upload reconciliation count', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([RECONCILIATION], 1));
     const repository = new SubmissionUploadReconciliationRepository(getMockDBConnection({ sql }));
