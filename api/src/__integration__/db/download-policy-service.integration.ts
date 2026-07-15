@@ -1,8 +1,8 @@
 // Integration test for DownloadPolicyService — verifies that creating a download
-// policy writes the expected policy + policy_statement + policy_statement_expression
+// policy writes the expected policy + policy_statement links
 // rows against a real database, and that download policies are intentionally
-// scope-free (no team_policy / security_scope rows) so they can never act as a
-// backdoor for granting access.
+// grant-free (no team_policy / team_security_scope rows) so they can never act
+// as a backdoor for granting access.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -44,12 +44,12 @@ describe('DownloadPolicyService (integration)', function () {
 
   /**
    * Helper: write an expression tree with one string predicate against
-   * dataset.name and return the persisted root id. Mirrors the route's call
+   * survey.name and return the persisted root id. Mirrors the route's call
    * sequence (`writeExpressionTree`) so the test exercises the same write
    * path as production.
    */
   async function writeNamePredicate(value: string): Promise<string> {
-    // dataset.name → feature_property_id=31, feature_type_property_id=70 (seed).
+    // survey.name → feature_property_id=31, feature_type_property_id=70 (seed).
     const tree: ExpressionTree = {
       type: 'expression',
       operator: 'AND',
@@ -68,11 +68,10 @@ describe('DownloadPolicyService (integration)', function () {
   }
 
   describe('createDownloadPolicy', () => {
-    it('writes one policy (status=approved) plus one statement per feature type with no expression links on the broad path', async () => {
+    it('writes one policy (status=approved) plus one wildcard statement with no expression links on the broad path', async () => {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Broad Path Test',
         description: 'two feature types, no expression',
-        featureTypes: ['dataset', 'sample_site'],
         expressionId: null
       });
 
@@ -84,63 +83,63 @@ describe('DownloadPolicyService (integration)', function () {
       expect(policyRow.rows[0].status).to.equal('approved');
 
       const statements = await connection.sql(SQL`
-        SELECT urn_feature_type, submission_feature_urn, effect
-        FROM policy_statement
-        WHERE policy_id = ${policy_id} AND record_end_date IS NULL
-        ORDER BY urn_feature_type;
+        SELECT
+          ss.urn_feature_type,
+          concat('urn:', ss.urn_submission_id, ':', ss.urn_feature_type, ':', ss.urn_feature_id) AS submission_feature_urn,
+          ps.effect
+        FROM policy_statement ps
+        JOIN security_scope ss ON ss.security_scope_id = ps.security_scope_id
+        WHERE ps.policy_id = ${policy_id} AND ps.record_end_date IS NULL
+        ORDER BY ss.urn_feature_type;
       `);
-      expect(statements.rowCount).to.equal(2);
-      expect(statements.rows[0].urn_feature_type).to.equal('dataset');
+      expect(statements.rowCount).to.equal(1);
+      expect(statements.rows[0].urn_feature_type).to.equal('*');
       expect(statements.rows[0].effect).to.equal('allow');
-      expect(statements.rows[0].submission_feature_urn).to.equal('urn:*:dataset:*');
-      expect(statements.rows[1].urn_feature_type).to.equal('sample_site');
+      expect(statements.rows[0].submission_feature_urn).to.equal('urn:*:*:*');
 
-      // Broad path: no expression links.
+      // Broad path: no statement-level expression links.
       const expressionLinks = await connection.sql(SQL`
-        SELECT pse.policy_statement_expression_id
-        FROM policy_statement_expression pse
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-        WHERE ps.policy_id = ${policy_id} AND pse.record_end_date IS NULL;
+        SELECT policy_statement_id
+        FROM policy_statement
+        WHERE policy_id = ${policy_id}
+          AND policy_expression_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
       expect(expressionLinks.rowCount).to.equal(0);
     });
 
-    it('writes one expression link per statement when an expressionId is provided, sharing the same expression_id across statements', async () => {
-      // Edge case #2 from the plan: featureTypes:['a','b'] + one expressionId →
-      // 2 statements, 2 expression links, same expression_id on both rows.
+    it('writes one expression link for the wildcard statement when an expressionId is provided', async () => {
       const expressionId = await writeNamePredicate('Edge2-Tree');
 
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Two FT Same Expression',
         description: null,
-        featureTypes: ['dataset', 'sample_site'],
         expressionId
       });
 
       const expressionLinks = await connection.sql(SQL`
-        SELECT pse.expression_id, pse.policy_statement_id
-        FROM policy_statement_expression pse
-        JOIN policy_statement ps ON ps.policy_statement_id = pse.policy_statement_id
-        WHERE ps.policy_id = ${policy_id} AND pse.record_end_date IS NULL;
+        SELECT pe.expression_id, ps.policy_statement_id
+        FROM policy_statement ps
+        JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
+        WHERE ps.policy_id = ${policy_id}
+          AND pe.record_end_date IS NULL;
       `);
-      expect(expressionLinks.rowCount).to.equal(2);
+      expect(expressionLinks.rowCount).to.equal(1);
       const expressionIds = new Set(expressionLinks.rows.map((r: any) => r.expression_id));
       expect(expressionIds.size).to.equal(1);
       expect(expressionIds.has(expressionId)).to.equal(true);
-      // Two distinct statements, both linked to the same expression.
       const statementIds = new Set(expressionLinks.rows.map((r: any) => r.policy_statement_id));
-      expect(statementIds.size).to.equal(2);
+      expect(statementIds.size).to.equal(1);
     });
 
-    it('does not write team_policy or security_scope rows for the new policy', async () => {
+    it('does not write team_policy or team_security_scope grant rows for the new policy', async () => {
       // U4 (AC #5): download policies define the feature set to export, not who
-      // can read it. Skipping team_policy / security_scope keeps create-download
-      // from being a backdoor for granting access; export-time enforcement is
-      // the security boundary.
+      // can read it. Statements still point at security_scope rows, but skipping
+      // team_policy / team_security_scope keeps create-download from being a
+      // backdoor for granting access; export-time enforcement is the security boundary.
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'No Scope Leak',
         description: null,
-        featureTypes: ['dataset'],
         expressionId: null
       });
 
@@ -149,24 +148,25 @@ describe('DownloadPolicyService (integration)', function () {
       `);
       expect(teamPolicies.rows[0].n).to.equal(0);
 
-      // security_scope rows are linked to policy_statement rows via the
-      // policy_statement_scope join table. A scope-free policy must produce
-      // zero rows in that join for any of its statements.
-      const statementIds = (
-        await connection.sql(SQL`
-          SELECT policy_statement_id FROM policy_statement WHERE policy_id = ${policy_id};
-        `)
-      ).rows.map((r: any) => r.policy_statement_id);
-      expect(statementIds.length).to.be.greaterThan(0);
-
-      const scopeJoinRows = await connection.sql(SQL`
-        SELECT count(*)::int AS n FROM policy_statement_scope
-        WHERE policy_statement_id = ANY(${statementIds}::uuid[]);
+      const statements = await connection.sql(SQL`
+        SELECT count(*)::int AS n
+        FROM policy_statement
+        WHERE policy_id = ${policy_id}
+          AND security_scope_id IS NOT NULL
+          AND record_end_date IS NULL;
       `);
-      expect(scopeJoinRows.rows[0].n).to.equal(0);
+      expect(statements.rows[0].n).to.equal(1);
+
+      const teamScopeGrants = await connection.sql(SQL`
+        SELECT count(*)::int AS n
+        FROM team_security_scope tss
+        JOIN policy_statement ps USING (security_scope_id)
+        WHERE ps.policy_id = ${policy_id};
+      `);
+      expect(teamScopeGrants.rows[0].n).to.equal(0);
     });
 
-    it('audit chain: download → policy → policy_statement → policy_statement_expression → expression round-trips the original tree', async () => {
+    it('audit chain: download → policy → policy_statement → policy_expression → expression round-trips the original tree', async () => {
       // U5 (audit chain): walk download → policy → statement → expression link
       // → expression and confirm the persisted tree round-trips deep-equal.
       const inputTree: ExpressionTree = {
@@ -187,7 +187,6 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Audit Chain',
         description: null,
-        featureTypes: ['dataset'],
         expressionId: rootExpressionId
       });
 
@@ -198,11 +197,12 @@ describe('DownloadPolicyService (integration)', function () {
       });
 
       const linkRows = await connection.sql(SQL`
-        SELECT pse.expression_id
+        SELECT pe.expression_id
           FROM download d
           JOIN policy_statement ps USING (policy_id)
-          JOIN policy_statement_expression pse USING (policy_statement_id)
-         WHERE d.download_id = ${download_id} AND pse.record_end_date IS NULL;
+          JOIN policy_expression pe ON pe.policy_expression_id = ps.policy_expression_id
+         WHERE d.download_id = ${download_id}
+           AND pe.record_end_date IS NULL;
       `);
       expect(linkRows.rowCount).to.equal(1);
       const linkedExpressionId = linkRows.rows[0].expression_id as string;
@@ -216,7 +216,6 @@ describe('DownloadPolicyService (integration)', function () {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'Unique Policy',
         description: null,
-        featureTypes: ['dataset'],
         expressionId: null
       });
 
@@ -240,32 +239,10 @@ describe('DownloadPolicyService (integration)', function () {
       }
     });
 
-    it('rejects unknown feature types with HTTP400 before any DB write (AC #7)', async () => {
-      const before = await connection.sql(SQL`SELECT count(*)::int AS n FROM policy;`);
-      const beforeCount = before.rows[0].n as number;
-
-      try {
-        await policyService.createDownloadPolicy({
-          name: 'Should Reject',
-          description: null,
-          featureTypes: ['dataset', 'definitely_not_a_real_feature_type'],
-          expressionId: null
-        });
-        expect.fail('Expected HTTP400 for unknown feature type');
-      } catch (error: any) {
-        // HTTP400 surfaces a `status` of 400.
-        expect(error.status).to.equal(400);
-      }
-
-      const after = await connection.sql(SQL`SELECT count(*)::int AS n FROM policy;`);
-      expect(after.rows[0].n as number).to.equal(beforeCount);
-    });
-
     it('throws foreign_key_violation when deleting a policy that still has a referencing download', async () => {
       const { policy_id } = await policyService.createDownloadPolicy({
         name: 'FK Guard',
         description: null,
-        featureTypes: ['dataset'],
         expressionId: null
       });
       await downloadService.createDownload({

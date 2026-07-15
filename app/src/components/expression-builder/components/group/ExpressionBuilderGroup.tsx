@@ -54,6 +54,8 @@ interface ExpressionBuilderGroupProps {
   onGroupDragLeave: () => unknown;
   /** Drops the active predicate or group onto a group. */
   onDropOnGroup: (groupId: string) => unknown;
+  /** Renders the group as a non-editable policy/view surface. */
+  readOnly?: boolean;
 }
 
 /**
@@ -87,10 +89,11 @@ export const ExpressionBuilderGroup = ({
   activeDropGroupId,
   onGroupDragEnter,
   onGroupDragLeave,
-  onDropOnGroup
+  onDropOnGroup,
+  readOnly = false
 }: ExpressionBuilderGroupProps) => {
   const isDropTarget = activeDropGroupId === node.ui_id;
-  const canDropIntoGroup = !!draggedPredicateId || (!!draggedGroupId && draggedGroupId !== node.ui_id);
+  const canDropIntoGroup = !readOnly && (!!draggedPredicateId || (!!draggedGroupId && draggedGroupId !== node.ui_id));
 
   // Groups are recursive: every child expression renders another group and
   // every predicate renders a token. The parent builder still owns all state, so
@@ -119,6 +122,7 @@ export const ExpressionBuilderGroup = ({
           onGroupDragEnter={onGroupDragEnter}
           onGroupDragLeave={onGroupDragLeave}
           onDropOnGroup={onDropOnGroup}
+          readOnly={readOnly}
         />
       );
     }
@@ -138,6 +142,7 @@ export const ExpressionBuilderGroup = ({
         onDropOnPredicate={onPredicateDropOnPredicate}
         draggedPredicateId={draggedPredicateId}
         onRemove={onRemoveClause}
+        readOnly={readOnly}
       />
     );
   };
@@ -175,36 +180,50 @@ export const ExpressionBuilderGroup = ({
       }}
       sx={{
         alignSelf: 'stretch',
-        boxShadow: isDropTarget ? (theme) => `0 0 0 2px ${theme.palette.primary.main}` : 'none',
         borderRadius: 1,
         bgcolor: isDropTarget ? 'action.selected' : 'action.hover',
         flex: '0 1 auto',
         maxWidth: '100%',
         p: 1.5,
+        position: 'relative',
+        '&::after': {
+          border: '2px solid transparent',
+          borderRadius: 1,
+          content: '""',
+          inset: 0,
+          pointerEvents: 'none',
+          position: 'absolute'
+        },
+        '&[data-drop-active="true"]::after': {
+          borderColor: 'primary.main'
+        },
         transition: 'none'
       }}>
       <Stack direction="row" alignItems="center" gap={1}>
-        <Box
-          draggable
-          aria-label="Drag group"
-          onDragStart={(event) => {
-            event.stopPropagation();
-            onGroupDragStart(node.ui_id);
-          }}
-          sx={{
-            alignItems: 'center',
-            color: 'text.secondary',
-            cursor: 'grab',
-            display: 'inline-flex',
-            '&:active': {
-              cursor: 'grabbing'
-            }
-          }}>
-          <DragIndicatorIcon fontSize="small" />
-        </Box>
+        {!readOnly && (
+          <Box
+            draggable
+            aria-label="Drag group"
+            onDragStart={(event) => {
+              event.stopPropagation();
+              onGroupDragStart(node.ui_id);
+            }}
+            sx={{
+              alignItems: 'center',
+              color: 'text.secondary',
+              cursor: 'grab',
+              display: 'inline-flex',
+              '&:active': {
+                cursor: 'grabbing'
+              }
+            }}>
+            <DragIndicatorIcon fontSize="small" />
+          </Box>
+        )}
         <InlineSelect
           ariaLabel="Group match mode"
           disableClearable
+          disabled={readOnly}
           sx={{
             '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
               bgcolor: 'background.paper',
@@ -253,9 +272,11 @@ export const ExpressionBuilderGroup = ({
             }
           }}
         />
-        <IconButton aria-label="Remove group" size="small" onClick={() => onRemoveClause(node.ui_id)} color="inherit">
-          <Icon path={mdiTrashCanOutline} size={0.6} />
-        </IconButton>
+        {!readOnly && (
+          <IconButton aria-label="Remove group" size="small" onClick={() => onRemoveClause(node.ui_id)} color="inherit">
+            <Icon path={mdiTrashCanOutline} size={0.6} />
+          </IconButton>
+        )}
       </Stack>
 
       {node.clauses.length > 0 && (

@@ -2,6 +2,7 @@ import { faker } from '@faker-js/faker';
 // @ts-ignore ignore error over missing geojson-random declaration (.d.ts) file
 import random from 'geojson-random';
 import { Knex } from 'knex';
+import { computeSubmissionFeatureClosureForUpload } from '../seed-utils';
 
 // Disable mock data seeding by default. Set `ENABLE_MOCK_FEATURE_DATA=true` to enable.
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
@@ -52,8 +53,6 @@ export async function seed(knex: Knex): Promise<void> {
       SET SEARCH_PATH = 'biohub','public';
     `);
 
-    // Ensure there are mock taxonomy records for animals/observations to reference
-    await ensureTaxonomySeed(trx);
     for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
       await insertRecord(trx); // pass the transaction instead of knex
     }
@@ -61,7 +60,7 @@ export async function seed(knex: Knex): Promise<void> {
 }
 
 /**
- * Insert a single submission record, a single dataset record, and related records.
+ * Insert a single submission record, a single survey record, and related records.
  *
  * @param {Knex} knex
  */
@@ -74,8 +73,8 @@ const insertRecord = async (knex: Knex) => {
   const upload_id = await insertUploadRecord(knex);
   const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
 
-  // Dataset
-  const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
+  // Survey
+  const parent_submission_feature_id1 = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
 
   // Telemetry Deployments
   const deployments: { id: number; devices: { submission_feature_id: number; device_id: string }[] }[] = [];
@@ -98,9 +97,6 @@ const insertRecord = async (knex: Knex) => {
   }
 
   // Sample Sites and their children
-  const animalIds: number[] = [];
-  const ecologicalUnitIds: number[] = [];
-  const sampleSiteObservations: { sampleSiteId: number; observationIds: number[] }[] = [];
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
@@ -113,11 +109,11 @@ const insertRecord = async (knex: Knex) => {
       insertAnimalRecord(knex, {
         submission_id,
         submission_upload_id,
-        parent_submission_feature_id: parent_submission_feature_id1
+        parent_submission_feature_id: parent_submission_feature_id2
       })
     );
 
-    // Observations - some additional species_observation rows will share a contributor observation_id.
+    // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
       insertObservationRecord(knex, {
         submission_id,
@@ -127,115 +123,23 @@ const insertRecord = async (knex: Knex) => {
     );
 
     // Wait for all animals and observations for this sample site
-    const animalResults = await Promise.all(animalPromises);
-    const observationResults = await Promise.all(observationPromises);
-
-    // For some observations, create grouped species_observation rows with subcount fields.
-    for (let i = 0; i < observationResults.length; i++) {
-      // ~40% of observations get grouped subcount-style records.
-      if (Math.random() < 0.4) {
-        const numSubcounts = faker.number.int({ min: 1, max: 3 });
-        const groupedObservationId = faker.string.uuid();
-
-        for (let j = 0; j < numSubcounts; j++) {
-          await insertSubcountRecord(knex, {
-            submission_id,
-            submission_upload_id,
-            parent_submission_feature_id: parent_submission_feature_id2,
-            observation_id: groupedObservationId
-          });
-        }
-      }
-    }
-
-    // Collect animal IDs
-    animalIds.push(...animalResults);
-
-    // Store sample site and its observation IDs for linking
-    sampleSiteObservations.push({
-      sampleSiteId: parent_submission_feature_id2,
-      observationIds: observationResults
-    });
+    await Promise.all([...animalPromises, ...observationPromises]);
   });
 
   // Telemetry
   const telemetryPromises = Array.from({ length: 100 }).map(() => {
     const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
+    const randomDevice = randomDeployment.devices[Math.floor(Math.random() * randomDeployment.devices.length)];
     return insertTelemetryRecord(knex, {
       submission_id,
       submission_upload_id,
-      parent_submission_feature_id: randomDeployment.id
+      parent_submission_feature_id: randomDeployment.id,
+      device_id: randomDevice.device_id
     });
   });
 
-  // Create some incidental observations with no parent feature.
-  const incidentalObservationPromises = Array.from({ length: 10 }).map(() =>
-    insertObservationRecord(knex, {
-      submission_id,
-      submission_upload_id,
-      parent_submission_feature_id: null
-    })
-  );
-
-  const ecologicalUnits = [
-    { type: 'population_unit', value: 'telkwa' },
-    { type: 'population_unit', value: 'tweedsmuir' },
-    { type: 'population_unit', value: 'calendar' },
-    { type: 'population_unit', value: 'maxhamish' },
-    { type: 'population_unit', value: 'rainbows' },
-    { type: 'population_unit', value: 'muskwa' },
-    { type: 'population_unit', value: 'gataga' },
-    { type: 'management_unit', value: 'region-7a' },
-    { type: 'management_unit', value: 'region-7b' }
-  ];
-
-  // Create ecological units with no parent feature.
-  const ecologicalUnitPromises = ecologicalUnits.map((ecologicalUnit) =>
-    insertEcologicalUnitRecord(knex, {
-      submission_id,
-      submission_upload_id,
-      parent_submission_feature_id: null,
-      type: ecologicalUnit.type,
-      value: ecologicalUnit.value
-    })
-  );
-
-  // Wait for all sample sites, incidental observations, ecological units, and telemetry to complete concurrently
-  const ecologicalUnitResults = await Promise.all(ecologicalUnitPromises);
-  ecologicalUnitIds.push(...ecologicalUnitResults);
-
-  const incidentalObservationIds = await Promise.all(incidentalObservationPromises);
+  // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
-
-  // For some incidental observations, create grouped species_observation rows with subcount fields.
-  for (let i = 0; i < incidentalObservationIds.length; i++) {
-    // ~40% of incidental observations get grouped subcount-style records.
-    if (Math.random() < 0.4) {
-      const numSubcounts = faker.number.int({ min: 1, max: 4 });
-      const groupedObservationId = faker.string.uuid();
-
-      for (let j = 0; j < numSubcounts; j++) {
-        await insertSubcountRecord(knex, {
-          submission_id,
-          submission_upload_id,
-          parent_submission_feature_id: null,
-          observation_id: groupedObservationId
-        });
-      }
-    }
-  }
-
-  // Link each observation to the dataset such that one dataset can have many observations,
-  // and each observation has at most one dataset link.
-  const datasetObservationIds = sampleSiteObservations
-    .flatMap((entry) => entry.observationIds)
-    .concat(incidentalObservationIds);
-  for (const observationId of datasetObservationIds) {
-    await knex.raw(`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-      VALUES (${parent_submission_feature_id1}, ${observationId})
-    `);
-  }
 
   // Seed submission_feature_feature table
   for (const deployment of deployments) {
@@ -247,53 +151,9 @@ const insertRecord = async (knex: Knex) => {
     }
   }
 
-  // Ensure each deployment is linked to exactly one animal
-  for (let i = 0; i < deployments.length; i++) {
-    const deployment = deployments[i];
-    const animalId = animalIds[i % animalIds.length]; // Distribute animals across deployments
-    await knex.raw(`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-      VALUES (${animalId}, ${deployment.id})
-    `);
-
-    // Update deployment's animal_identifier to match the linked animal's identifier
-    await knex.raw(`
-      UPDATE submission_feature
-      SET data = jsonb_set(data, '{animal_identifier}', (SELECT data->'animal_identifier' FROM submission_feature WHERE submission_feature_id = ${animalId}))
-      WHERE submission_feature_id = ${deployment.id}
-    `);
-  }
-
-  // Note: Extra animals beyond the number of deployments are not linked to any deployment
-
-  // Link some observations to their sample sites
-  for (const { sampleSiteId, observationIds } of sampleSiteObservations) {
-    const linkPercentage = Math.random() * 0.4 + 0.3;
-    const numToLink = Math.max(1, Math.floor(observationIds.length * linkPercentage));
-    const shuffledObservations = observationIds.sort(() => Math.random() - 0.5);
-
-    for (let i = 0; i < numToLink; i++) {
-      const observationId = shuffledObservations[i];
-      await knex.raw(`
-        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-        VALUES (${sampleSiteId}, ${observationId})
-      `);
-    }
-  }
-
-  // Link ecological units to animals. Attach the first two to the first animal so
-  // the telemetry view has deterministic multi-value eco_unit seed coverage.
-  for (let i = 0; i < ecologicalUnitIds.length; i++) {
-    if (animalIds.length > 0) {
-      const ecologicalUnitId = ecologicalUnitIds[i];
-      const animalId = i < 2 ? animalIds[0] : animalIds[Math.floor(Math.random() * animalIds.length)];
-
-      await knex.raw(`
-        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-        VALUES (${ecologicalUnitId}, ${animalId})
-      `);
-    }
-  }
+  // Build the derived reachability closure for this upload. Read-path security resolves against it and
+  // fails closed when absent, so without this every seeded feature reads as secured-and-inaccessible.
+  await computeSubmissionFeatureClosureForUpload(knex, submission_upload_id);
 };
 
 export const insertSubmissionRecord = async (
@@ -307,7 +167,7 @@ export const insertSubmissionRecord = async (
   return submission_id;
 };
 
-export const insertDatasetRecord = async (
+export const insertSurveyRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string }
 ): Promise<number> => {
@@ -319,12 +179,12 @@ export const insertDatasetRecord = async (
       submission_id: options.submission_id,
       submission_upload_id: options.submission_upload_id,
       parent_submission_feature_id: null,
-      feature_type: 'dataset',
+      feature_type: 'survey',
       data: {
         name,
         description,
-        start_date: faker.date.past().toISOString(),
-        end_date: faker.date.future().toISOString(),
+        start_date: faker.date.past().toISOString().split('T')[0],
+        end_date: faker.date.future().toISOString().split('T')[0],
         // Full FeatureCollection matches the ingest contract (see
         // `feature-validation-service.ts:266` — `spatial` is `GeoJSONFeatureCollectionZodSchema`).
         geometry: random.point(
@@ -371,12 +231,20 @@ export const insertSubmissionUploadRecord = async (
 ): Promise<string> => {
   const ticket_id = await ensureTicketForSubmissionUpload(knex, { submission_id, upload_id });
 
+  // Pin the upload to the active default Blueprint (seeded by the initial-blueprint migration).
+  const blueprintRow = await knex('blueprint')
+    .where({ is_default: true })
+    .whereNull('record_end_date')
+    .select('blueprint_id')
+    .first();
+
   const [{ submission_upload_id }] = await knex('submission_upload')
     .insert({
       submission_id,
       upload_id,
       create_user: 1,
-      ticket_id
+      ticket_id,
+      blueprint_id: blueprintRow.blueprint_id
     })
     .returning('submission_upload_id');
 
@@ -506,15 +374,9 @@ export const insertSampleSiteRecord = async (
 
 export const insertObservationRecord = async (
   knex: Knex,
-  options: {
-    submission_id: number;
-    submission_upload_id: string;
-    parent_submission_feature_id: number | null;
-    observation_id?: string | number | null;
-  }
+  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const taxonTsn = await getRandomActiveTaxonTsn(knex);
-  const observationId = options.observation_id ?? faker.string.uuid();
 
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -523,18 +385,12 @@ export const insertObservationRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'species_observation',
       data: {
-        observation_id: observationId,
-        taxon_id: taxonTsn,
         // Full FeatureCollection matches the ingest contract.
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
-        )['features'][0]['geometry'],
-        count: faker.number.int({ min: 1, max: 100 }),
-        timestamp: faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString(),
-        sign: faker.helpers.arrayElement(['tracks', 'scat', 'sighting', 'other']),
-        life_stage: faker.number.int({ min: 1, max: 6 }),
-        sex: faker.number.int({ min: 7, max: 9 })
+        ),
+        count: faker.number.int({ min: 0, max: 100 })
       }
     })}`
   );
@@ -553,120 +409,6 @@ export const insertObservationRecord = async (
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
-
-  // randomly secure some observation points
-  if (Math.random() < 0.1) {
-    const ruleRes = await knex.raw(`SELECT security_rule_id FROM security_rule ORDER BY random() LIMIT 1`);
-    if (ruleRes.rows.length) {
-      await insertSubmissionFeatureSecurity(knex, {
-        submission_feature_id,
-        security_rule_id: ruleRes.rows[0].security_rule_id
-      });
-    }
-  }
-
-  return submission_feature_id;
-};
-
-export const insertSubcountRecord = async (
-  knex: Knex,
-  options: {
-    submission_id: number;
-    submission_upload_id: string;
-    parent_submission_feature_id: number | null;
-    observation_id?: string | number | null;
-  }
-): Promise<number> => {
-  const taxonTsn = await getRandomActiveTaxonTsn(knex);
-  const subcountTaxonId = taxonTsn;
-  const timestamp = faker.date
-    .between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() })
-    .toISOString();
-
-  const sign = faker.helpers.arrayElement(['tracks', 'scat', 'sighting', 'other']);
-  const subcount_comment = faker.helpers.maybe(() => faker.lorem.words(3), { probability: 0.3 }) || null;
-
-  const subcountData: { [key: string]: any } = {
-    taxon_id: subcountTaxonId,
-    geometry: random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])['features'][0]['geometry'],
-    subcount_count: faker.number.int({ min: 1, max: 20 }),
-    subcount_comment,
-    timestamp,
-    sign,
-    life_stage: faker.number.int({ min: 1, max: 6 }),
-    sex: faker.number.int({ min: 7, max: 9 })
-  };
-
-  if (typeof options.observation_id === 'number' || typeof options.observation_id === 'string') {
-    subcountData.observation_id = options.observation_id;
-  }
-
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      submission_upload_id: options.submission_upload_id,
-      parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'species_observation',
-      data: subcountData
-    })}`
-  );
-  const submission_feature_id = response.rows[0].submission_feature_id;
-
-  await knex.raw(`${insertSearchString({ submission_feature_id, property_name: 'sign', value: sign })}`);
-  if (subcount_comment) {
-    await knex.raw(
-      `${insertSearchString({
-        submission_feature_id,
-        property_name: 'subcount_comment',
-        value: subcount_comment
-      })}`
-    );
-  }
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-
-  if (typeof subcountTaxonId === 'number') {
-    await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn: subcountTaxonId })}`);
-  }
-  await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
-
-  return submission_feature_id;
-};
-
-export const insertEcologicalUnitRecord = async (
-  knex: Knex,
-  options: {
-    submission_id: number;
-    submission_upload_id: string;
-    parent_submission_feature_id: number | null;
-    type: string;
-    value: string;
-  }
-): Promise<number> => {
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      submission_upload_id: options.submission_upload_id,
-      parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'ecological_unit',
-      data: {
-        ecological_unit_type: options.type,
-        ecological_unit_value: options.value
-      }
-    })}`
-  );
-  const submission_feature_id = response.rows[0].submission_feature_id;
-
-  // Add search indices for the ecological unit properties
-  await knex.raw(
-    `${insertSearchString({ submission_feature_id, property_name: 'ecological_unit_type', value: options.type })}`
-  );
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: 'ecological_unit_value',
-      value: options.value
-    })}`
-  );
 
   return submission_feature_id;
 };
@@ -687,11 +429,8 @@ const insertAnimalRecord = async (
       data: {
         species,
         count: faker.number.int({ min: 0, max: 100 }),
-        taxon_id: taxonTsn,
-        animal_identifier: faker.lorem.word(),
-        sex: faker.number.int({ min: 7, max: 9 }),
-        start_date: faker.date.past().toISOString(),
-        end_date: faker.date.future().toISOString()
+        start_date: faker.date.past().toISOString().split('T')[0],
+        end_date: faker.date.future().toISOString().split('T')[0]
       }
     })}`
   );
@@ -768,17 +507,14 @@ export const insertSubmissionFeature = (options: {
   submission_upload_id: string;
   parent_submission_feature_id: number | null;
   feature_type:
-    | 'dataset'
+    | 'survey'
     | 'sample_site'
     | 'species_observation'
     | 'animal'
     | 'artifact'
     | 'telemetry'
     | 'telemetry_deployment'
-    | 'telemetry_device'
-    | 'measurement'
-    | 'codeset'
-    | 'ecological_unit';
+    | 'telemetry_device';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
@@ -809,16 +545,21 @@ const insertSearchString = (options: { submission_feature_id: number; property_n
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
+        bftp.blueprint_feature_type_property_id,
         LEFT($$${options.value}$$, 250),
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id AND fpt.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
@@ -840,16 +581,21 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
+        bftp.blueprint_feature_type_property_id,
         ${faker.number.int({ min: 0, max: 100 })},
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -862,16 +608,21 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number; ta
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         taxon_id,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
+        bftp.blueprint_feature_type_property_id,
         t.taxon_id,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     JOIN taxon t
       ON t.itis_tsn = ${options.taxonTsn}
@@ -883,13 +634,14 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number; ta
 `;
 
 const insertSearchStartDatetime = (options: { submission_feature_id: number }) => {
-  const timestamp = faker.date.past().toISOString();
+  const date = faker.date.past().toISOString().split('T')[0];
 
   return `
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         date_value,
         time_value,
         create_user
@@ -897,11 +649,15 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
-        $$${timestamp}$$::timestamptz::date,
-        $$${timestamp}$$::timestamptz::time,
+        bftp.blueprint_feature_type_property_id,
+        $$${date}$$::date,
+        NULL::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -911,13 +667,14 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
 };
 
 const insertSearchEndDatetime = (options: { submission_feature_id: number }) => {
-  const timestamp = faker.date.future().toISOString();
+  const date = faker.date.future().toISOString().split('T')[0];
 
   return `
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         date_value,
         time_value,
         create_user
@@ -925,11 +682,15 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
-        $$${timestamp}$$::timestamptz::date,
-        $$${timestamp}$$::timestamptz::time,
+        bftp.blueprint_feature_type_property_id,
+        $$${date}$$::date,
+        NULL::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -944,12 +705,14 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
+        bftp.blueprint_feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
               random.polygon(
@@ -963,6 +726,9 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -976,12 +742,14 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
     (
         submission_feature_id,
         feature_type_property_id,
+        blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
+        bftp.blueprint_feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
               random.point(
@@ -993,6 +761,9 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -1051,60 +822,6 @@ const getRandomActiveTaxonTsn = async (knex: Knex): Promise<number | undefined> 
   return activeTaxonTsns[randomIntFromInterval(0, activeTaxonTsns.length - 1)];
 };
 
-/**
- * Seeding the taxonomy table with taxon records
- */
-const ensureTaxonomySeed = async (knex: Knex) => {
-  const desiredCount = 5;
-
-  const countRes = await knex.raw(`SELECT count(*)::int as c FROM taxon`);
-  const existing = countRes.rows?.[0]?.c || 0;
-
-  if (existing >= desiredCount) {
-    return;
-  }
-
-  const toCreate = desiredCount - existing;
-  const tsnSet = new Set<number>();
-  while (tsnSet.size < toCreate) {
-    tsnSet.add(faker.number.int({ min: 10000, max: 99999 }));
-  }
-
-  const valuesSql = Array.from(tsnSet)
-    .map((tsn) => {
-      const sci = faker.lorem.word().replace(/'/g, "''");
-      const common = faker.animal.type().replace(/'/g, "''");
-      const itisData = JSON.stringify({ source: 'mock' }).replace(/'/g, "''");
-      return `(${tsn}, $$${sci}$$, $$${common}$$, $$${itisData}$$::jsonb, now(), (SELECT system_user_id from "system_user" where user_identifier = 'SIMS'))`;
-    })
-    .join(',\n');
-
-  const sql = `
-    INSERT INTO taxon (itis_tsn, itis_scientific_name, common_name, itis_data, itis_update_date, create_user)
-    VALUES
-    ${valuesSql};
-  `;
-
-  await knex.raw(sql);
-};
-
-export const insertSubmissionFeatureSecurity = async (
-  knex: Knex,
-  options: { submission_feature_id: number; security_rule_id: number }
-): Promise<number> => {
-  const res = await knex.raw(`
-    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-    VALUES (
-      ${options.submission_feature_id},
-      ${options.security_rule_id},
-      (SELECT system_user_id from "system_user" where user_identifier = 'SIMS')
-    )
-    RETURNING submission_feature_security_id;
-  `);
-
-  return res.rows[0].submission_feature_security_id;
-};
-
 export const insertTelemetryDeployment = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
@@ -1125,27 +842,8 @@ export const insertTelemetryDeployment = async (
       data: deploymentData
     })}`
   );
-  const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: '',
-      value: ''
-    })}`
-  );
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: '',
-      value: ''
-    })}`
-  );
-
-  await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
-
-  return submission_feature_id;
+  return response.rows[0].submission_feature_id;
 };
 
 export const insertTelemetryDevice = async (
@@ -1175,31 +873,8 @@ export const insertTelemetryDevice = async (
       data: deviceData
     })}`
   );
-  const submission_feature_id = response.rows[0].submission_feature_id;
 
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: '',
-      value: ''
-    })}`
-  );
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: '',
-      value: ''
-    })}`
-  );
-  await knex.raw(
-    `${insertSearchString({
-      submission_feature_id,
-      property_name: '',
-      value: ''
-    })}`
-  );
-
-  return { submission_feature_id, device_id };
+  return { submission_feature_id: response.rows[0].submission_feature_id, device_id };
 };
 
 export const insertTelemetryRecord = async (
@@ -1211,21 +886,16 @@ export const insertTelemetryRecord = async (
     device_id?: string;
   }
 ): Promise<number> => {
-  const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
   // Match the `feature_type_property` schema for telemetry (dop, elevation,
   // timestamp, geometry). Property names MUST align with the declarations in
   // `20251001000000_insert_feature_types.ts`. Full FeatureCollection matches
   // the ingest contract.
   const telemetryData = {
-    device_id,
-    latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
-    longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
-    elevation: faker.number.float({ min: -20, max: 3000, multipleOf: 0.1 }),
-    timestamp: faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString(),
-    temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
-    humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
-    dop: faker.number.float({ min: 1, max: 20, multipleOf: 0.1 }),
-    status: faker.helpers.arrayElement(['active', 'idle', 'error'])
+    device_id: options.device_id,
+    dop: faker.number.float({ min: 0.5, max: 10, multipleOf: 0.1 }),
+    elevation: faker.number.float({ min: 0, max: 3000, multipleOf: 0.1 }),
+    timestamp: faker.date.recent().toISOString(),
+    geometry: random.point(1, [-135.878906, 48.617424, -114.433594, 60.664785])
   };
 
   const response = await knex.raw(
@@ -1248,40 +918,46 @@ export const insertTelemetryRecord = async (
   // are hardcoded to `name`/`count` property names, so we use inline SQL here
   // to target telemetry's specific property names.
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?, 1
      FROM submission_feature sf
      JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'dop';`,
     [telemetryData.dop, submission_feature_id]
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?, 1
      FROM submission_feature sf
      JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'elevation';`,
     [telemetryData.elevation, submission_feature_id]
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, date_value, time_value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
+    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
+     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
      FROM submission_feature sf
      JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'timestamp';`,
     [telemetryData.timestamp, telemetryData.timestamp, submission_feature_id]
   );
 
-  await knex.raw(
-    `${insertSpatialPoint({
-      submission_feature_id
-    })}`
-  );
+  // Geometry: use the shared helper which targets `fp.name = 'geometry'`.
+  await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
 
   return submission_feature_id;
 };

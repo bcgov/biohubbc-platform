@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import SQL from 'sql-template-strings';
 import { IDBConnection } from '../../database/db';
-import { getOrCreateIntegrationTicketId } from './test-submission-helpers';
+import { getActiveDefaultBlueprintId, getOrCreateIntegrationTicketId } from './test-submission-helpers';
 
 // Shared fixtures for the feature-property ingestion integration suites
 // (submission-feature-property-ingestion-repository + submission-feature-property-feature-ingestion).
@@ -27,10 +27,11 @@ export async function createTestUpload(connection: IDBConnection, submissionId: 
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
 
@@ -105,6 +106,57 @@ export async function createFeatureTypeProperty(
   `);
   const featureTypePropertyId: number = ftpResult.rows[0].feature_type_property_id;
 
+  const bftResult = await connection.sql(SQL`
+    WITH inserted AS (
+      INSERT INTO blueprint_feature_type (
+        blueprint_id,
+        feature_type_id,
+        create_user
+      )
+      VALUES (
+        (SELECT blueprint_id FROM blueprint WHERE is_default = true AND record_end_date IS NULL LIMIT 1),
+        (SELECT feature_type_id FROM feature_type WHERE name = ${sourceFeatureTypeName} LIMIT 1),
+        ${systemUserId}
+      )
+      ON CONFLICT (blueprint_id, feature_type_id)
+      WHERE record_end_date IS NULL
+      DO NOTHING
+      RETURNING blueprint_feature_type_id
+    )
+    SELECT blueprint_feature_type_id FROM inserted
+    UNION ALL
+    SELECT bft.blueprint_feature_type_id
+    FROM blueprint_feature_type bft
+    JOIN blueprint b USING (blueprint_id)
+    JOIN feature_type ft USING (feature_type_id)
+    WHERE b.is_default = true
+      AND b.record_end_date IS NULL
+      AND bft.record_end_date IS NULL
+      AND ft.name = ${sourceFeatureTypeName}
+    LIMIT 1;
+  `);
+  const blueprintFeatureTypeId: number = bftResult.rows[0].blueprint_feature_type_id;
+
+  await connection.sql(SQL`
+    INSERT INTO blueprint_feature_type_property (
+      blueprint_feature_type_id,
+      feature_type_property_id,
+      required_value,
+      allow_multiple,
+      create_user
+    )
+    VALUES (
+      ${blueprintFeatureTypeId},
+      ${featureTypePropertyId},
+      false,
+      ${allowMultiple},
+      ${systemUserId}
+    )
+    ON CONFLICT (blueprint_feature_type_id, feature_type_property_id)
+    WHERE record_end_date IS NULL
+    DO NOTHING;
+  `);
+
   const targetNames =
     allowedTargetFeatureTypeNames === null
       ? []
@@ -178,15 +230,25 @@ export async function insertSubmissionFeaturePropertyFeature(
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
       feature_type_property_id,
+      blueprint_feature_type_property_id,
       referenced_submission_feature_id,
       create_user
     )
-    VALUES (
+    SELECT
       ${sourceSubmissionFeatureId},
       ${featureTypePropertyId},
+      bftp.blueprint_feature_type_property_id,
       ${referencedSubmissionFeatureId},
       ${systemUserId}
-    );
+    FROM submission_feature sf
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft
+      ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp
+      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+     AND bftp.feature_type_property_id = ${featureTypePropertyId}
+     AND bftp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${sourceSubmissionFeatureId};
   `);
 }
 

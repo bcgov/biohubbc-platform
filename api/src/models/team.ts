@@ -18,7 +18,6 @@ export interface CreateTeam {
 export interface UpdateTeam {
   name?: string;
   description?: string;
-  record_end_date?: string;
   system_user_ids?: number[];
 }
 

@@ -45,5 +45,16 @@ describe('SubmissionFeatureClosureRepository', () => {
 
       expect(result).to.equal(0);
     });
+
+    it('does not require record_effective_date when selecting features for closure', async () => {
+      const sqlSpy = sinon.spy(() => Promise.resolve(mockQueryResult([], 1)));
+      const repository = new SubmissionFeatureClosureRepository(getMockDBConnection({ sql: sqlSpy }));
+
+      await repository.computeClosureForUpload('11111111-1111-1111-1111-111111111111');
+
+      const sqlText = sqlSpy.firstCall.args[0].text;
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.not.include('record_effective_date <= now()');
+    });
   });
 });

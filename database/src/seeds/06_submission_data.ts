@@ -1,10 +1,11 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
+import { computeSubmissionFeatureClosureForUpload } from '../seed-utils';
 import {
-  insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionRecord,
   insertSubmissionUploadRecord,
+  insertSurveyRecord,
   insertTelemetryRecord,
   insertUploadRecord
 } from './04_mock_test_data';
@@ -35,13 +36,14 @@ export async function seed(knex: Knex): Promise<void> {
       SET SEARCH_PATH = 'biohub','public';
     `);
 
-    // Create realistic test scenarios
+    // The real feature data comes from the committed snapshot seed (10_snapshot_features.ts), which is
+    // injected post-malware-scan and so can only represent a clean/scanned state. These tiny synthetic
+    // submissions exist solely to cover the artifact scan-status axis the snapshot cannot express — one
+    // per scan state: SECURE→clean, PARTIALLY_SECURE→pending, UNSECURE→infected (see getSecurityConfig).
     const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
       { level: 'SECURE', reviewed: true, withArchive: true },
-      { level: 'SECURE', reviewed: true, withArchive: true },
       { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
-      { level: 'UNSECURE', reviewed: true, withArchive: false },
-      { level: 'UNSECURE', reviewed: false, withArchive: false }
+      { level: 'UNSECURE', reviewed: true, withArchive: false }
     ];
 
     const seedContexts: SeedContext[] = [];
@@ -133,7 +135,7 @@ const createSubmissionWithUploads = async (
   const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
 
   // --- 3. Create features (requires submission_upload_id for FK) ---
-  const parent_feature_id = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
+  const parent_feature_id = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
   const sampleSiteIds = await Promise.all([
     insertSampleSiteRecord(knex, {
       submission_id,
@@ -196,93 +198,6 @@ const insertMockRelatedSubmissionFeatures = async (
     .insert(relationshipRows)
     .onConflict(['source_feature_id', 'target_feature_id'])
     .ignore();
-};
-
-/**
- * Recompute the derived reachability closure for a single upload (DELETE + recursive-CTE INSERT).
- *
- * Mirrors {@link SubmissionFeatureClosureRepository.deleteClosureForUpload} +
- * {@link SubmissionFeatureClosureRepository.computeClosureForUpload} as a standalone knex helper, since
- * the database package cannot import the api repository. Closure is reachability over the upload's parent
- * and property (feature-reference) edges — content edges (submission_feature_feature) are intentionally
- * excluded. is_ancestor flags the pure parent-ancestry subset (the authorization reach); search reads all
- * rows. Delete-then-insert in one transaction keeps the wholesale recompute idempotent.
- *
- * @param {SeedConnection} knex
- * @param {string} submission_upload_id The submission upload scope.
- * @returns {Promise<void>}
- */
-const computeSubmissionFeatureClosureForUpload = async (
-  knex: SeedConnection,
-  submission_upload_id: string
-): Promise<void> => {
-  await knex.raw(
-    `
-      DELETE FROM submission_feature_closure c
-      USING submission_feature sf
-      WHERE sf.submission_upload_id = ?::uuid
-        AND c.source_submission_feature_id = sf.submission_feature_id;
-    `,
-    [submission_upload_id]
-  );
-
-  await knex.raw(
-    `
-      WITH RECURSIVE
-      active_features AS (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ?::uuid
-          AND record_end_date IS NULL
-      ),
-      self_loops AS (
-        SELECT submission_feature_id AS source, submission_feature_id AS target
-        FROM active_features
-      ),
-      parent_edges AS (
-        SELECT child.submission_feature_id AS source, child.parent_submission_feature_id AS target
-        FROM submission_feature child
-        JOIN active_features af_src ON af_src.submission_feature_id = child.submission_feature_id
-        JOIN active_features af_tgt ON af_tgt.submission_feature_id = child.parent_submission_feature_id
-        WHERE child.parent_submission_feature_id IS NOT NULL
-      ),
-      property_edges AS (
-        SELECT pf.submission_feature_id AS source, pf.referenced_submission_feature_id AS target
-        FROM submission_feature_property_feature pf
-        JOIN active_features af_src ON af_src.submission_feature_id = pf.submission_feature_id
-        JOIN active_features af_tgt ON af_tgt.submission_feature_id = pf.referenced_submission_feature_id
-      ),
-      ancestry_edges AS (
-        SELECT source, target FROM self_loops
-        UNION ALL SELECT source, target FROM parent_edges
-      ),
-      direct_edges AS (
-        SELECT source, target FROM self_loops
-        UNION ALL SELECT source, target FROM parent_edges
-        UNION ALL SELECT source, target FROM property_edges
-      ),
-      ancestry_closure AS (
-        SELECT source, target FROM ancestry_edges
-        UNION
-        SELECT c.source, d.target
-        FROM ancestry_closure c
-        JOIN ancestry_edges d ON d.source = c.target
-      ),
-      closure AS (
-        SELECT source, target FROM direct_edges
-        UNION
-        SELECT c.source, d.target
-        FROM closure c
-        JOIN direct_edges d ON d.source = c.target
-      )
-      INSERT INTO submission_feature_closure (source_submission_feature_id, target_submission_feature_id, is_ancestor)
-      SELECT cl.source, cl.target, (anc.source IS NOT NULL) AS is_ancestor
-      FROM closure cl
-      LEFT JOIN ancestry_closure anc
-        ON anc.source = cl.source AND anc.target = cl.target;
-    `,
-    [submission_upload_id]
-  );
 };
 
 /**

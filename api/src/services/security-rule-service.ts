@@ -42,6 +42,21 @@ export class SecurityRuleService extends DBService {
   }
 
   /**
+   * Gets security rules eligible for automatic screening.
+   *
+   * A rule is screenable when it is not soft-deleted (`record_end_date IS NULL`) and
+   * `is_active = true`. Use this — not `getActiveSecurityRules` — when running
+   * automatic security screening so that admins can opt individual rules out of
+   * screening without soft-deleting them.
+   *
+   * @return {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRuleService
+   */
+  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
+    return this.securityRuleRepository.getScreenableSecurityRules();
+  }
+
+  /**
    * Gets a list of all active security rules with their associated categories.
    *
    * @return {Promise<SecurityRuleAndCategory[]>}

@@ -1,30 +1,24 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { AddItisTaxonRecord, TaxonParentLinkRecord, TaxonRankPatchRecord, TaxonRecord } from '../models/taxon';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/taxonomy-repository');
 
-export const TaxonRecord = z.object({
-  taxon_id: z.number(),
-  itis_tsn: z.number(),
-  bc_taxon_code: z.string().nullable(),
-  itis_scientific_name: z.string(),
-  common_name: z.string().nullable(),
-  itis_data: z.any(),
-  itis_update_date: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-
-export type TaxonRecord = z.infer<typeof TaxonRecord>;
+const taxonRecordColumns = [
+  'taxon_id',
+  'itis_tsn',
+  'parent_itis_tsn',
+  'parent_taxon_id',
+  'bc_taxon_code',
+  'itis_scientific_name',
+  'rank',
+  'common_name',
+  'itis_data',
+  'itis_update_date'
+];
 
 /**
  * Taxonomy Repository
@@ -42,7 +36,16 @@ export class TaxonomyRepository extends BaseRepository {
    * @memberof TaxonomyRepository
    */
   async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonRecord[]> {
-    const queryBuilder = getKnex().queryBuilder().select('*').from('taxon').whereIn('itis_tsn', tsnIds);
+    if (!tsnIds.length) {
+      return [];
+    }
+
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .select(taxonRecordColumns)
+      .from('taxon')
+      .whereIn('itis_tsn', tsnIds)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(queryBuilder, TaxonRecord);
 
@@ -50,83 +53,173 @@ export class TaxonomyRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new taxon record.
+   * Insert or reuse multiple taxon records.
    *
-   * @param {number} itisTsn
-   * @param {string} itisScientificName
-   * @param {string[]} commonNames
-   * @param {Record<any, any>} itisData
-   * @param {string} itisUpdateDate
-   * @return {*}  {Promise<TaxonRecord>}
+   * @param {AddItisTaxonRecord[]} records
+   * @return {*}  {Promise<TaxonRecord[]>}
    * @memberof TaxonomyRepository
    */
-  async addItisTaxonRecord(
-    itisTsn: number,
-    itisScientificName: string,
-    commonNames: string[],
-    itisData: Record<string, unknown>,
-    itisUpdateDate: string
-  ): Promise<TaxonRecord> {
-    defaultLog.debug({ label: 'addItisTaxonRecord', itisTsn });
+  async insertTaxonRecords(records: AddItisTaxonRecord[]): Promise<TaxonRecord[]> {
+    if (!records.length) {
+      return [];
+    }
 
-    // TODO: Store multiple common names rather than just the first item of the commonNames array
+    defaultLog.debug({ label: 'insertTaxonRecords', count: records.length });
+
     const sqlStatement = SQL`
-      WITH inserted_row AS (
+      WITH input_rows AS (
+        SELECT *
+        FROM jsonb_to_recordset(${JSON.stringify(records)}::jsonb) AS input_row(
+          itis_tsn integer,
+          itis_scientific_name text,
+          rank text,
+          common_name text,
+          itis_data jsonb,
+          itis_update_date timestamptz
+        )
+      ),
+      inserted_rows AS (
         INSERT INTO
           taxon 
         (
           itis_tsn,
           itis_scientific_name,
+          rank,
           common_name,
           itis_data,
           itis_update_date
         )
-        VALUES (
-          ${itisTsn},
-          ${itisScientificName},
-          ${commonNames[0] ?? null},
-          ${JSON.stringify(itisData)}::jsonb,
-          ${itisUpdateDate}
-        )
+        SELECT
+          itis_tsn,
+          itis_scientific_name,
+          rank,
+          common_name,
+          itis_data,
+          itis_update_date
+        FROM input_rows
         ON CONFLICT
         DO NOTHING
-        RETURNING *
+        RETURNING
+          taxon_id,
+          itis_tsn,
+          parent_itis_tsn,
+          parent_taxon_id,
+          bc_taxon_code,
+          itis_scientific_name,
+          rank,
+          common_name,
+          itis_data,
+          itis_update_date
       )
-      SELECT * FROM inserted_row
-      UNION
-      SELECT * FROM taxon
-      WHERE 
-        taxon.itis_tsn = ${itisTsn}
-      AND
-        taxon.record_end_date IS null;
+      SELECT
+        taxon_id,
+        itis_tsn,
+        parent_itis_tsn,
+        parent_taxon_id,
+        bc_taxon_code,
+        itis_scientific_name,
+        rank,
+        common_name,
+        itis_data,
+        itis_update_date
+      FROM inserted_rows
+      UNION ALL
+      SELECT
+        taxon_id,
+        itis_tsn,
+        parent_itis_tsn,
+        parent_taxon_id,
+        bc_taxon_code,
+        itis_scientific_name,
+        rank,
+        common_name,
+        itis_data,
+        itis_update_date
+      FROM taxon
+      WHERE taxon.itis_tsn IN (SELECT itis_tsn FROM input_rows)
+        AND taxon.record_end_date IS null;
     `;
 
     const response = await this.connection.sql(sqlStatement, TaxonRecord);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert new taxon record', [
-        'TaxonomyRepository->addItisTaxonRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (response.rowCount !== records.length) {
+      throw new ApiExecuteSQLError('Failed to insert new taxon records', [
+        'TaxonomyRepository->insertTaxonRecords',
+        `rowCount was ${response.rowCount}, expected rowCount = ${records.length}`
       ]);
     }
 
-    return response.rows[0];
+    return response.rows;
   }
 
   /**
-   * Delete an existing taxon record.
+   * Patch missing rank on existing taxon rows.
    *
-   * @param {number} taxonId
+   * This intentionally does not upsert: callers use `insertTaxonRecords` for new taxa, then patch
+   * incomplete cached rows that predate the first-class `rank` column.
+   *
+   * @param {TaxonRankPatchRecord[]} records
+   * @return {*}  {Promise<void>}
    * @memberof TaxonomyRepository
    */
-  async deleteTaxonRecord(taxonId: number) {
+  async patchTaxonRanks(records: TaxonRankPatchRecord[]): Promise<void> {
+    if (!records.length) {
+      return;
+    }
+
     const sqlStatement = SQL`
-      DELETE FROM
-        taxon
-      WHERE
-        taxon_id = ${taxonId}
-      RETURNING
-        *;
+      WITH input_rows AS (
+        SELECT *
+        FROM jsonb_to_recordset(${JSON.stringify(records)}::jsonb) AS input_row(
+          itis_tsn integer,
+          rank text
+        )
+      )
+      UPDATE taxon
+      SET rank = input_rows.rank
+      FROM input_rows
+      WHERE taxon.itis_tsn = input_rows.itis_tsn
+        AND taxon.record_end_date IS NULL
+        AND taxon.rank IS DISTINCT FROM input_rows.rank;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Set `parent_itis_tsn` and resolve `parent_taxon_id` for a batch of taxa.
+   *
+   * @param {TaxonParentLinkRecord[]} records
+   * @return {*}  {Promise<void>}
+   * @memberof TaxonomyRepository
+   */
+  async updateTaxonParentLinks(records: TaxonParentLinkRecord[]): Promise<void> {
+    if (!records.length) {
+      return;
+    }
+
+    const sqlStatement = SQL`
+      WITH input_rows AS (
+        SELECT *
+        FROM jsonb_to_recordset(${JSON.stringify(records)}::jsonb) AS input_row(
+          itis_tsn integer,
+          parent_itis_tsn integer
+        )
+      )
+      UPDATE taxon AS child
+      SET
+        parent_itis_tsn = input_rows.parent_itis_tsn,
+        parent_taxon_id = parent.taxon_id
+      FROM input_rows
+      LEFT JOIN taxon AS parent
+        ON parent.itis_tsn = input_rows.parent_itis_tsn
+       AND parent.record_end_date IS NULL
+      WHERE child.itis_tsn = input_rows.itis_tsn
+        AND child.record_end_date IS NULL
+        AND (
+          child.parent_itis_tsn IS DISTINCT FROM input_rows.parent_itis_tsn
+          OR child.parent_taxon_id IS DISTINCT FROM parent.taxon_id
+        );
     `;
 
     await this.connection.sql(sqlStatement);

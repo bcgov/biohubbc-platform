@@ -57,4 +57,29 @@ describe('ExpressionClauseRepository', () => {
       expect(knexStub.callCount).to.equal(1);
     });
   });
+
+  describe('getExpressionClausesByExpressionIds', () => {
+    it('returns ordered active expression clauses for provided expression ids', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([expressionClauseRow], 1));
+      const repository = new ExpressionClauseRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.getExpressionClausesByExpressionIds([
+        expressionClauseRow.expression_id,
+        expressionClauseRow.expression_id
+      ]);
+
+      expect(result).to.eql([expressionClauseRow]);
+      expect(knexStub.callCount).to.equal(1);
+    });
+
+    it('returns empty array when no expression ids are provided', async () => {
+      const knexStub = sinon.stub();
+      const repository = new ExpressionClauseRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.getExpressionClausesByExpressionIds([]);
+
+      expect(result).to.eql([]);
+      expect(knexStub.callCount).to.equal(0);
+    });
+  });
 });

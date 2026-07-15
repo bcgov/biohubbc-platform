@@ -38,7 +38,7 @@ export const SubmissionsRouter = () => {
         path="/:submission_id"
         element={
           <SubmissionContextProvider>
-            <PageTitle title="Dataset Details" description="Details of a specific submission" />
+            <PageTitle title="Submission Details" description="Details of a specific submission" />
             <AdminSubmissionPage />
           </SubmissionContextProvider>
         }

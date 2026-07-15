@@ -25,6 +25,7 @@ export const SubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
   ticket_id: z.string().uuid(),
+  blueprint_id: z.number(),
   comment: z.string().nullable().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });
@@ -38,6 +39,7 @@ export const CreateSubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   ticket_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
+  blueprint_id: z.number(),
   comment: z.string().nullable().optional()
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;

@@ -6,18 +6,16 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import {
   CreateDownload,
-  DownloadArtifactInfo,
   DownloadDetailRecord,
   DownloadId,
-  DownloadListRecordBase,
   DownloadListRow,
   DownloadSource,
   HasTeams,
   IsAuthorized
 } from '../../models/download';
-import { DownloadStatusEnum } from '../../models/download-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+import { isSubmissionFeatureActive } from '../sql-fragments';
 
 /**
  * Row shape for the typed-cursor base query.
@@ -65,8 +63,8 @@ export class DownloadRepository extends BaseRepository {
     const { policyId, format, requestedBy } = payload;
 
     const sql = SQL`
-      INSERT INTO download (download_status, policy_id, format, requested_by)
-      VALUES ('pending', ${policyId}, ${format}, ${requestedBy})
+      INSERT INTO download (policy_id, format, requested_by)
+      VALUES (${policyId}, ${format}, ${requestedBy})
       RETURNING download_id;
     `;
 
@@ -110,55 +108,6 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Link an artifact to a download via the download_artifact join table.
-   *
-   * Idempotent — the Parquet pipeline writes one download_artifact per feature-type
-   * Parquet file, and a retry of the same feature type must not produce duplicate
-   * links. The `ON CONFLICT … WHERE record_end_date IS NULL DO NOTHING` clause
-   * matches the table's partial unique index so a re-insert on a still-active link
-   * is a silent no-op. A first-time insert returns rowCount=1; a conflict returns
-   * rowCount=0 — both are valid outcomes and neither throws.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} artifactId - The artifact ID.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
-    const sql = SQL`
-      INSERT INTO download_artifact (download_id, artifact_id)
-      VALUES (${downloadId}, ${artifactId})
-      ON CONFLICT (download_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * List all active artifact references for a download, joined to `artifact` for
-   * the S3 `object_key`.
-   *
-   * Used by the export pipeline to discover which Parquet files the parent
-   * download produced (key shape `downloads/{downloadId}/{featureTypeName}/data.parquet`)
-   * without re-running the original search. Bounded by feature-type count for
-   * the download (tens at worst), so no pagination needed.
-   */
-  async listDownloadArtifactsByDownloadId(downloadId: string): Promise<DownloadArtifactInfo[]> {
-    const sql = SQL`
-      SELECT
-        a.artifact_id,
-        a.object_key
-      FROM download_artifact da
-      INNER JOIN artifact a ON a.artifact_id = da.artifact_id
-      WHERE da.download_id = ${downloadId}
-        AND da.record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql, DownloadArtifactInfo);
-    return response.rows;
-  }
-
-  /**
    * Get a download record by ID, including the owning policy's display fields.
    *
    * LEFT JOINs `biohub.policy` so the detail page can show the policy name and
@@ -171,19 +120,35 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async findDownloadById(downloadId: string): Promise<DownloadDetailRecord | null> {
+    // Materialization status/timing live on the version, not download. There is no
+    // stored "current version" pointer; reads resolve the most-recent active version
+    // (ordered create_date DESC) via a LATERAL subquery so a re-run's new version
+    // becomes the one surfaced without flipping a stored pointer. LIMIT 1 keeps it
+    // single-row; a committed download always has ≥1 active version (written in the
+    // create transaction), so the LATERAL join is effectively inner. `dv.status AS
+    // download_status` keeps the record field name so every reader (export gate,
+    // detail/list endpoints, publisher dedup) stays unchanged.
     const sql = SQL`
       SELECT
         d.download_id,
-        d.download_status,
+        dv.download_version_id,
+        dv.status AS download_status,
         d.format,
         d.metadata,
-        d.started_at,
-        d.completed_at,
+        dv.started_at,
+        dv.completed_at,
         d.downloaded_at,
         d.create_date,
         p.name,
         p.description
       FROM download d
+      INNER JOIN LATERAL (
+        SELECT download_version_id, status, started_at, completed_at
+        FROM download_version
+        WHERE download_id = d.download_id AND record_end_date IS NULL
+        ORDER BY create_date DESC, download_version_id DESC
+        LIMIT 1
+      ) dv ON true
       LEFT JOIN policy p ON p.policy_id = d.policy_id
       WHERE d.download_id = ${downloadId};
     `;
@@ -225,30 +190,51 @@ export class DownloadRepository extends BaseRepository {
    * Single authorization path: download_team → team → team_member.
    * Returns downloads where the user is a member of any linked team.
    *
+   * LEFT JOINs `policy` for the owning policy's `name`/`description` so the list
+   * row matches `DownloadDetailRecord` — the same shape the detail read and the
+   * gallery list return. `policy_id` is NOT NULL on `download`, so the join is
+   * effectively inner and never multiplies rows (count stays correct).
+   *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
-   * @return {Promise<{ downloads: DownloadListRecordBase[]; count: number }>}
+   * @return {Promise<{ downloads: DownloadDetailRecord[]; count: number }>}
    * @memberof DownloadRepository
    */
   async getDownloadsByTeamMembership(
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<{ downloads: DownloadListRecordBase[]; count: number }> {
+  ): Promise<{ downloads: DownloadDetailRecord[]; count: number }> {
     const knex = getKnex();
 
+    // Materialization status/timing are sourced from the most-recent active version
+    // (see findDownloadById) via a LATERAL subquery — there is no stored pointer.
+    // Effectively inner: a committed download always has ≥1 active version.
     const query = knex
       .select([
         'd.download_id',
-        'd.download_status',
+        'dv.download_version_id',
+        'dv.status as download_status',
         'd.format',
         'd.metadata',
-        'd.started_at',
-        'd.completed_at',
+        'dv.started_at',
+        'dv.completed_at',
         'd.downloaded_at',
         'd.create_date',
+        'p.name',
+        'p.description',
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
+      .joinRaw(
+        `INNER JOIN LATERAL (
+          SELECT download_version_id, status, started_at, completed_at
+          FROM download_version
+          WHERE download_id = d.download_id AND record_end_date IS NULL
+          ORDER BY create_date DESC, download_version_id DESC
+          LIMIT 1
+        ) dv ON true`
+      )
+      .leftJoin('policy as p', 'p.policy_id', 'd.policy_id')
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
       .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
@@ -270,51 +256,16 @@ export class DownloadRepository extends BaseRepository {
 
     const count = response.rows[0]?.total_count ?? 0;
     // Strip the total_count column from each row before returning
-    const downloads: DownloadListRecordBase[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
+    const downloads: DownloadDetailRecord[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
     return { downloads, count };
   }
 
   /**
-   * Update download status by download ID.
+   * Mark a download as downloaded (sets the downloaded_at timestamp).
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadStatusEnum} downloadStatus - The new download status.
-   * @param {object} [metadata] - Optional metadata (error details, timestamps).
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateDownloadStatus(
-    downloadId: string,
-    downloadStatus: DownloadStatusEnum,
-    metadata?: {
-      error?: string;
-      started_at?: string;
-      completed_at?: string;
-    }
-  ): Promise<void> {
-    const sql = SQL`
-      UPDATE download
-      SET
-        download_status = ${downloadStatus},
-        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
-        started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
-        completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at)
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update download status', [
-        'DownloadRepository->updateDownloadStatus',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-  }
-
-  /**
-   * Mark a download as downloaded (sets downloaded_at timestamp and status).
+   * `downloaded_at` is a user-action timestamp on the download; the materialization
+   * status lives on the version, so this no longer touches a status column.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<void>}
@@ -324,7 +275,6 @@ export class DownloadRepository extends BaseRepository {
     const sql = SQL`
       UPDATE download
       SET
-        download_status = 'downloaded',
         downloaded_at = now()
       WHERE download_id = ${downloadId};
     `;
@@ -429,9 +379,6 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Stream base feature rows for a filter-based download, filtered by feature type.
    *
-   * Same cursor pattern as streamFeatureBaseByCartIdAndType but uses raw SQL
-   * search subquery with bindings instead of a cart join.
-   *
    * Must be called within an open transaction (cursors require tx context).
    *
    * @param {string} downloadId - The download ID (used for cursor naming).
@@ -462,7 +409,7 @@ export class DownloadRepository extends BaseRepository {
         SELECT
           sf.submission_feature_id,
           sf.uuid,
-          sf.data,
+          '{}'::jsonb AS data,
           ft.name AS feature_type_name,
           parent_sf.uuid AS parent_uuid
         FROM submission_feature sf
@@ -606,8 +553,8 @@ export class DownloadRepository extends BaseRepository {
        *   matching the same-file `spatial` precedent's use of `::jsonb`.
        * - `ORDER BY sf.submission_feature_id` is mandatory: export reruns must be byte-identical
        *   for the same data so downstream hash-based diff tooling stays valid.
-       * - The `sf.record_end_date IS NULL` filter is defense-in-depth — ingestion already excludes
-       *   inactive features, but soft-delete-on-read is the codebase convention.
+       * - The `sf` active-window filter is defense-in-depth — ingestion already excludes
+       *   inactive referenced features, but read paths must never surface pending/end-dated rows.
        * - `submission_feature_property_feature` has no soft-delete column, so no `p`-side filter is needed.
        */
       feature: `SELECT
@@ -619,9 +566,41 @@ export class DownloadRepository extends BaseRepository {
       INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
       INNER JOIN submission_feature sf
         ON sf.submission_feature_id = p.referenced_submission_feature_id
-        AND sf.record_end_date IS NULL
+        AND ${isSubmissionFeatureActive('sf')}
       WHERE p.submission_feature_id = ANY($1)
-      GROUP BY p.submission_feature_id, fp.name`
+      GROUP BY p.submission_feature_id, fp.name`,
+      artifact_key: `SELECT
+        sfa.submission_feature_id,
+        fp.name,
+        jsonb_agg(a.object_key ORDER BY a.object_key) AS value
+      FROM submission_feature_artifact sfa
+      INNER JOIN submission_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
+      INNER JOIN artifact a
+        ON a.artifact_id = sfa.artifact_id
+        AND a.artifact_status = 'uploaded'
+      INNER JOIN (
+        SELECT
+          ftp.feature_type_id,
+          MIN(ftp.feature_type_property_id) AS feature_type_property_id
+        FROM feature_type_property ftp
+        INNER JOIN feature_property fp
+          ON fp.feature_property_id = ftp.feature_property_id
+          AND fp.record_end_date IS NULL
+        INNER JOIN feature_property_type fpt
+          ON fpt.feature_property_type_id = fp.feature_property_type_id
+          AND fpt.name = 'artifact_key'
+          AND fpt.record_end_date IS NULL
+        WHERE ftp.record_end_date IS NULL
+        GROUP BY ftp.feature_type_id
+        HAVING COUNT(*) = 1
+      ) artifact_ftp
+        ON artifact_ftp.feature_type_id = sf.feature_type_id
+      INNER JOIN feature_type_property ftp
+        ON ftp.feature_type_property_id = artifact_ftp.feature_type_property_id
+      INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      WHERE sfa.submission_feature_id = ANY($1)
+        AND ${isSubmissionFeatureActive('sf')}
+      GROUP BY sfa.submission_feature_id, fp.name`
     };
 
     // Query only the typed tables for property types present in this batch

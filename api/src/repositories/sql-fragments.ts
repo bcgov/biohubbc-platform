@@ -9,8 +9,23 @@
 import { Knex } from 'knex';
 
 /**
+ * Active-window predicate for submission_feature rows that may surface on read
+ * paths or participate in access evaluation.
+ *
+ * A feature is active only after approval/publication sets record_effective_date
+ * and before any end date. NULL record_effective_date rows are drafts/pending
+ * review and must not be searchable, downloadable, or security anchors.
+ *
+ * @param alias SQL alias for submission_feature.
+ * @returns SQL predicate with zero placeholders.
+ */
+export function isSubmissionFeatureActive(alias: string): string {
+  return `${alias}.record_effective_date <= now() AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date)`;
+}
+
+/**
  * Closure-based "effectively secured" check used on every security-resolving path —
- * the hot read paths (search / cart / download) and the scope-anchor recompute write
+ * the hot read paths (search / download) and the scope-anchor recompute write
  * path: a feature is effectively secured when it or an ancestor has an active security
  * rule that is past its effective date.
  *
@@ -19,7 +34,7 @@ import { Knex } from 'knex';
  * pure parent-ancestry reach including the feature's own self-loop `(F, F)` — joined
  * to the security tables. The ancestry lookup is served by the closure primary key on
  * `source_submission_feature_id`; the security joins are index-served on
- * `target_submission_feature_id`. This matters because it runs on every search, cart,
+ * `target_submission_feature_id`. This matters because it runs on every search
  * and download request.
  *
  * Fails closed on missing closure rows. The closure is built by an async recompute job
@@ -47,9 +62,10 @@ export function isEffectivelySecured(featureIdExpr: string): string {
       WHERE c.source_submission_feature_id = ${featureIdExpr}
         AND c.is_ancestor = true
         AND sfs.record_end_date IS NULL
-        AND sf_sec.record_effective_date <= now()
+        AND sfs.status = 'active'
+        AND ${isSubmissionFeatureActive('sf_sec')}
     )
-    -- Fail closed: the reflexive self-loop (F, F) is written for every active feature when its upload's
+    -- Fail closed: the reflexive self-loop (F, F) is written for every non-deleted feature when its upload's
     -- closure is built, so its absence means the closure is not built (recompute not yet run, or failed).
     -- We then cannot prove the feature is unsecured — treat it as secured rather than leak it. This is a
     -- direct primary-key probe ((source, target) is the PK).
@@ -68,16 +84,22 @@ export function isEffectivelySecured(featureIdExpr: string): string {
  *
  * 1. The feature is NOT effectively secured (no active approved security rule in its
  *    ancestry), OR
- * 2. The user has a team scope grant via a `security_scope_anchor` on an ancestor.
+ * 2. The caller's team holds a scope anchored on this feature or one of its ancestors
+ *    (`security_scope_anchor` reachable via the caller's `team_member`).
  *
  * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
  *
  * This reads the precomputed `submission_feature_closure` ancestry subset
- * (`is_ancestor = true`) instead of doing a recursive parent walk. Branch 1 reuses
- * `isEffectivelySecured`; Branch 2 probes the closure for an ancestor that is
- * a scope anchor the user's team can reach. Both are cheap PK-served closure probes
- * (`source_submission_feature_id`), so the old concern of walking the ancestor chain
- * twice no longer applies — there is no recursive walk at all.
+ * (`is_ancestor = true`, which includes the feature's own self-loop) instead of doing a
+ * recursive parent walk. Branch 1 reuses `isEffectivelySecured`; Branch 2 probes the closure
+ * for an ancestor that is a scope anchor the user's team can reach. Both are cheap PK-served
+ * closure probes (`source_submission_feature_id`), so the old concern of walking the ancestor
+ * chain twice no longer applies — there is no recursive walk at all.
+ *
+ * Note: a caller that has already established the feature is effectively secured (e.g. the
+ * hidden-secured probe) still passes the whole expression here — Branch 1 then re-evaluates
+ * `isEffectivelySecured` (a couple of indexed PK probes) and short-circuits to Branch 2. The cost
+ * is small, and using the canonical check keeps the probe consistent with the visible-results filter.
  *
  * @param featureIdExpr SQL expression for the starting submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'aggregated_results.submission_feature_id')
@@ -88,7 +110,7 @@ export function isAccessibleToUser(featureIdExpr: string): string {
     WHERE
       -- Branch 1: feature is NOT effectively secured
       NOT ${isEffectivelySecured(featureIdExpr)}
-      -- Branch 2: user has a team scope grant via an ancestor that is a scope anchor
+      -- Branch 2: the caller's team holds a scope anchored on this feature or one of its ancestors
       OR EXISTS (
         SELECT 1
         FROM submission_feature_closure c

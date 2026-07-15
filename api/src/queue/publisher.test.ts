@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
+import { createMockDownloadVersionStatusRecord } from '../__mocks__/download';
 import { ApiNotFoundError } from '../errors/api-error';
-import type { DownloadDetailRecord } from '../models/download';
 import type { SubmissionUpload } from '../models/submission-upload';
 import type { SubmissionValidationRecord } from '../models/submission-validation';
-import { DownloadService } from '../services/download/download-service';
+import { DownloadVersionRepository } from '../repositories/download/download-version-repository';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { JobQueues } from './jobs';
 import {
@@ -16,8 +16,8 @@ import {
   publisherDependencies,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
-  publishProcessDownloadExportJob,
   publishProcessDownloadJob,
+  publishProcessDownloadVersionExportJob,
   publishProcessSubmissionFeaturesJob
 } from './publisher';
 
@@ -34,7 +34,8 @@ describe('publisher', () => {
     submission_id: 123,
     upload_id: 'upload-uuid-1',
     status: 'uploaded',
-    ticket_id: '11111111-1111-1111-1111-111111111111'
+    ticket_id: '11111111-1111-1111-1111-111111111111',
+    blueprint_id: 1
   };
 
   describe('publishProcessSubmissionFeaturesJob', () => {
@@ -555,19 +556,7 @@ describe('publisher', () => {
   });
 
   describe('publishProcessDownloadJob', () => {
-    const createMockDownload = (overrides: Partial<DownloadDetailRecord> = {}): DownloadDetailRecord => ({
-      download_id: 'aaaa0000-0000-0000-0000-000000000001',
-      download_status: 'pending',
-      format: 'parquet',
-      metadata: null,
-      started_at: null,
-      completed_at: null,
-      downloaded_at: null,
-      create_date: '2025-01-01T00:00:00Z',
-      name: 'Test download',
-      description: null,
-      ...overrides
-    });
+    const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000001';
 
     it('publishes job to pg-boss with correct queue and data', async () => {
       const mockConnection = getMockDBConnection();
@@ -576,9 +565,11 @@ describe('publisher', () => {
       const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
 
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      const data = { downloadVersionId: DOWNLOAD_VERSION_ID };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -598,10 +589,12 @@ describe('publisher', () => {
       const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
 
       await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+        downloadVersionId: DOWNLOAD_VERSION_ID
       });
 
       const options = sendStub.firstCall.args[2];
@@ -612,37 +605,40 @@ describe('publisher', () => {
       expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
-    it('returns duplicate when download is not in pending status', async () => {
+    it('returns duplicate when version is not in pending status', async () => {
       const mockConnection = getMockDBConnection();
       sinon
-        .stub(DownloadService.prototype, 'findDownloadById')
-        .resolves(createMockDownload({ download_status: 'processing' }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: 'processing' }));
 
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      const data = { downloadVersionId: DOWNLOAD_VERSION_ID };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this download'
+        'Job already exists for this download version'
       );
     });
 
-    it('throws ApiNotFoundError when download not found', async () => {
+    it('propagates ApiNotFoundError when the version does not exist', async () => {
       const mockConnection = getMockDBConnection();
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
+      // The repository's get* throws on a miss; the publisher has no null-guard of its own.
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .rejects(new ApiNotFoundError('Download version not found'));
 
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999' };
+      const data = { downloadVersionId: 'dddd0000-0000-0000-0000-000000000999' };
 
       try {
         await publishProcessDownloadJob(mockConnection, data);
         expect.fail('expected ApiNotFoundError');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
-        expect((error as ApiNotFoundError).message).to.equal('Download not found');
+        expect((error as ApiNotFoundError).message).to.equal('Download version not found');
       }
     });
 
-    it('uses singletonKey based on downloadId to prevent duplicates', async () => {
+    it('uses singletonKey based on downloadVersionId to prevent duplicates', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('download-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -650,15 +646,17 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
-        .stub(DownloadService.prototype, 'findDownloadById')
-        .resolves(createMockDownload({ download_id: 'aaaa0000-0000-0000-0000-000000000456' }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(
+          createMockDownloadVersionStatusRecord({ download_version_id: 'dddd0000-0000-0000-0000-000000000456' })
+        );
 
       await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000456'
+        downloadVersionId: 'dddd0000-0000-0000-0000-000000000456'
       });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('download-aaaa0000-0000-0000-0000-000000000456');
+      expect(options.singletonKey).to.equal('download-version-dddd0000-0000-0000-0000-000000000456');
     });
 
     it('returns duplicate status when send returns null (singleton conflict)', async () => {
@@ -668,27 +666,31 @@ describe('publisher', () => {
       const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
 
       const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+        downloadVersionId: DOWNLOAD_VERSION_ID
       });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this download'
+        'Job already exists for this download version'
       );
     });
 
     it('throws when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
 
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
         await publishProcessDownloadJob(mockConnection, {
-          downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+          downloadVersionId: DOWNLOAD_VERSION_ID
         });
         expect.fail('expected publisher to throw');
       } catch (error) {
@@ -718,21 +720,27 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('anchors-job-id');
     });
 
-    it('uses 30 minute timeout with retry backoff', async () => {
-      const mockConnection = getMockDBConnection();
-      const sendStub = sinon.stub().resolves('anchors-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+    it('uses 30 minute timeout with retry backoff and a 20 second cooldown', async () => {
+      const clock = sinon.useFakeTimers(new Date('2026-06-24T12:00:00.000Z'));
+      try {
+        const mockConnection = getMockDBConnection();
+        const sendStub = sinon.stub().resolves('anchors-job-id');
+        const createQueueStub = sinon.stub().resolves();
+        const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+        sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 
-      const options = sendStub.firstCall.args[2];
-      expect(options.retryLimit).to.equal(3);
-      expect(options.retryDelay).to.equal(60);
-      expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 30);
+        const options = sendStub.firstCall.args[2];
+        expect(options.retryLimit).to.equal(3);
+        expect(options.retryDelay).to.equal(60);
+        expect(options.retryBackoff).to.equal(true);
+        expect(options.expireInSeconds).to.equal(60 * 30);
+        expect(options.startAfter).to.deep.equal(new Date('2026-06-24T12:00:20.000Z'));
+      } finally {
+        clock.restore();
+      }
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
@@ -750,7 +758,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
     });
 
-    it('uses global singletonKey to serialize all anchor computation jobs', async () => {
+    it('uses a per-scope singletonKey to coalesce repeated anchor computation jobs for the same scope', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -761,7 +769,22 @@ describe('publisher', () => {
       await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('scope-anchors');
+      expect(options.singletonKey).to.equal('scope-anchors-scope-uuid-456');
+    });
+
+    it('honours an explicit startAfter override', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+      const startAfter = new Date('2026-06-24T12:05:00.000Z');
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' }, { startAfter });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.startAfter).to.equal(startAfter);
     });
 
     it('returns duplicate status when send returns null', async () => {
@@ -793,8 +816,8 @@ describe('publisher', () => {
     });
   });
 
-  describe('publishProcessDownloadExportJob', () => {
-    it('uses singletonKey based on downloadExportId to prevent duplicates', async () => {
+  describe('publishProcessDownloadVersionExportJob', () => {
+    it('uses singletonKey based on the artifact group id to dedupe export runs', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('export-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -802,15 +825,15 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000456'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000456'
       });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('export-bbbb0000-0000-0000-0000-000000000456');
+      expect(options.singletonKey).to.equal('export-group-cccc0000-0000-0000-0000-000000000456');
     });
 
-    it('uses process download export options with 1 hour timeout', async () => {
+    it('uses process download version export options with 1 hour timeout', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('export-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -818,8 +841,8 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -838,8 +861,8 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       const options = sendStub.firstCall.args[2];
@@ -847,7 +870,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns published status with jobId when boss.send returns a job ID', async () => {
@@ -858,14 +881,14 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      const result = await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       expect(createQueueStub.calledOnce).to.be.true;
-      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(sendStub.calledOnce).to.be.true;
-      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT);
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('export-job-id');
     });
@@ -878,13 +901,13 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishProcessDownloadExportJob(mockConnection, {
-        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      const result = await publishProcessDownloadVersionExportJob(mockConnection, {
+        downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
       });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this download export'
+        'Job already exists for this export artifact group'
       );
     });
 
@@ -893,8 +916,8 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
-        await publishProcessDownloadExportJob(mockConnection, {
-          downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+        await publishProcessDownloadVersionExportJob(mockConnection, {
+          downloadVersionExportArtifactGroupId: 'cccc0000-0000-0000-0000-000000000001'
         });
         expect.fail('expected publisher to throw');
       } catch (error) {
@@ -964,7 +987,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns published status with jobId when boss.send returns a job ID', async () => {

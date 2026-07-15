@@ -1,4 +1,4 @@
-import { mdiDownload, mdiPlus } from '@mdi/js';
+import { mdiDownload } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Container, Divider } from '@mui/material';
 import Button from '@mui/material/Button';
@@ -6,6 +6,7 @@ import { CustomPagination } from 'components/pagination/CustomPagination';
 import { PageSection } from 'components/section/PageSection';
 import { ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { SearchResultOptions } from './option/SearchResultOptions';
@@ -14,6 +15,8 @@ import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchRes
 interface SearchResultPanelProps {
   /** Search result rows returned by the feature search endpoint. */
   rows: SearchFeatureResultWithRelevancy[];
+  /** Feature type property metadata used to build table columns. */
+  featureTypeProperties: FeatureTypeProperty[];
   /** Whether the result request is currently loading. */
   isLoading: boolean;
   /** Pagination metadata returned by the result request. Undefined while the first request is pending. */
@@ -28,8 +31,6 @@ interface SearchResultPanelProps {
   viewOptions: ToggleButtonView<SEARCH_RESULT_VIEW>[];
   /** Whether the create-download action should be disabled. */
   isCreateDownloadDisabled: boolean;
-  /** Adds the current page's result rows to the cart. */
-  onAddAllToCart: () => void;
   /** Opens the create-download flow for the current search. */
   onCreateDownloadClick: () => void;
   /** Updates the URL-driven sort field and direction. */
@@ -49,13 +50,14 @@ interface SearchResultPanelProps {
  *
  * Owns result-panel layout: header actions, sort/view toolbar, table/list
  * rendering, and pagination controls. Page-level hooks inject data loading,
- * navigation, cart, and download behavior.
+ * navigation and download behavior.
  *
  * @param {SearchResultPanelProps} props - Result rows, pagination state, view/sort state, and action callbacks.
  * @returns {JSX.Element} Result panel with toolbar, result list/table, and pagination.
  */
 export const SearchResultPanel = ({
   rows,
+  featureTypeProperties,
   isLoading,
   pagination,
   sortOptions,
@@ -63,7 +65,6 @@ export const SearchResultPanel = ({
   view,
   viewOptions,
   isCreateDownloadDisabled,
-  onAddAllToCart,
   onCreateDownloadClick,
   onSortChange,
   onViewChange,
@@ -91,25 +92,15 @@ export const SearchResultPanel = ({
         id="search-results"
         label="Results"
         headerContent={
-          <>
-            <Button
-              size="small"
-              color="primary"
-              onClick={onAddAllToCart}
-              startIcon={<Icon path={mdiPlus} size={0.8} />}
-              sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-              Add All to Cart
-            </Button>
-            <Button
-              size="small"
-              color="primary"
-              onClick={onCreateDownloadClick}
-              disabled={isCreateDownloadDisabled}
-              startIcon={<Icon path={mdiDownload} size={0.8} />}
-              sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
-              Create Download
-            </Button>
-          </>
+          <Button
+            size="small"
+            color="primary"
+            onClick={onCreateDownloadClick}
+            disabled={isCreateDownloadDisabled}
+            startIcon={<Icon path={mdiDownload} size={0.8} />}
+            sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+            Create Download
+          </Button>
         }>
         <Box sx={{ px: 2, py: 1 }}>
           <SearchResultToolbar
@@ -124,8 +115,14 @@ export const SearchResultPanel = ({
 
         <Divider />
 
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
-          <SearchResultOptions rows={rows} isLoading={isLoading} view={view} onClick={onResultClick} />
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <SearchResultOptions
+            rows={rows}
+            featureTypeProperties={featureTypeProperties}
+            isLoading={isLoading}
+            view={view}
+            onClick={onResultClick}
+          />
         </Box>
 
         <Divider />

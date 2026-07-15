@@ -56,8 +56,8 @@ describe('ValidationRepository', () => {
       const mockData: FeatureTypeProperty[] = [
         {
           feature_type_property_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset',
+          name: 'survey',
+          display_name: 'Survey',
           description: 'asd',
           type_name: 'string',
           required_value: true,

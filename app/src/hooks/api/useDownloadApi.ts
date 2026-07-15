@@ -26,7 +26,7 @@ export const useDownloadApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Create a new download job for the supplied search expression and feature-type set.
+   * Create a new download job for the supplied search expression.
    *
    * @param {CreateDownloadRequest} payload
    * @return {Promise<CreateDownloadResponse>}

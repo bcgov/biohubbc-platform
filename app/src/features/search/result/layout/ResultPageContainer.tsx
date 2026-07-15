@@ -5,7 +5,7 @@ import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
 interface ResultPageContainerProps {
-  /** Optional right rail content, such as the download/cart sidebar. */
+  /** Optional right rail content, such as the download sidebar. */
   rightSidebar?: React.ReactNode;
   /** Expanded right rail width in pixels. */
   rightSidebarWidth?: number;

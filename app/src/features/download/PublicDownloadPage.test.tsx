@@ -17,6 +17,7 @@ const DOWNLOAD_ID = '11111111-2222-3333-4444-555555555555';
 
 const makeDownload = (overrides: Partial<DownloadDetail> = {}): DownloadDetail => ({
   download_id: DOWNLOAD_ID,
+  download_version_id: 'ver-abc-123',
   status: 'pending',
   name: 'Bears in BC',
   description: 'All bear observations within BC',

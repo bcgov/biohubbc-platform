@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getItisTaxonCommonNames, sortTaxonSearchResults } from '../utils/itis-utils';
 import { getLogger } from '../utils/logger';
-import { TaxonSearchResult } from './taxonomy-service';
+import { TaxonSearchResult } from './taxonomy-service.interface';
 
 const defaultLog = getLogger('services/itis-service');
 
@@ -171,7 +171,10 @@ export class ItisService {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
-      defaultLog.debug({ label: 'getItisTermSearchUrl', message: 'Environment variable ITIS_URL is not defined.' });
+      defaultLog.debug({
+        label: 'getItisTermSearchUrl',
+        message: 'Environment variable ITIS_SOLR_URL is not defined.'
+      });
       throw new Error('Failed to build ITIS query.');
     }
 
@@ -193,15 +196,18 @@ export class ItisService {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
-      defaultLog.debug({ label: 'getItisTsnSearchUrl', message: 'Environment variable ITIS_URL is not defined.' });
+      defaultLog.debug({
+        label: 'getItisTsnSearchUrl',
+        message: 'Environment variable ITIS_SOLR_URL is not defined.'
+      });
       throw new Error('Failed to build ITIS query.');
     }
 
-    return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
+    return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       ['kingdom'],
       ['asc'],
       150
-    )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
+    )}&${this._getItisSolrFilterParam()}&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
   /**
@@ -215,15 +221,18 @@ export class ItisService {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
-      defaultLog.debug({ label: 'getItisTsnHierarchyUrl', message: 'Environment variable ITIS_URL is not defined.' });
+      defaultLog.debug({
+        label: 'getItisTsnHierarchyUrl',
+        message: 'Environment variable ITIS_SOLR_URL is not defined.'
+      });
       throw new Error('Failed to build ITIS query.');
     }
 
-    return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
+    return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       ['kingdom'],
       ['asc'],
       150
-    )}&${this._getItisSolrHierarchyParam()}&&q=${this._getItisSolrTsnSearch(tsnIds)}`;
+    )}&${this._getItisSolrHierarchyParam()}&q=${this._getItisSolrTsnSearch(tsnIds)}`;
   }
 
   /**

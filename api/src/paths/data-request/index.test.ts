@@ -9,7 +9,7 @@ import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
 import { DataRequest } from '../../models/data-request';
-import { SystemUserExtended } from '../../models/user';
+import { SystemUserExtended } from '../../models/system-user';
 import { DataRequestService } from '../../services/data-request-service';
 import { UserService } from '../../services/user-service';
 

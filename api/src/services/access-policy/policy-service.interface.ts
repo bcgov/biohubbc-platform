@@ -1,7 +1,7 @@
 import { ExpressionTree } from '../../models/expression-tree';
-import { Policy } from '../../models/policy';
+import { Policy, PolicyStatus } from '../../models/policy';
+import { PolicyExpression } from '../../models/policy-expression';
 import { PolicyStatement } from '../../models/policy-statement';
-import { PolicyStatementCondition } from '../../models/policy-statement-condition';
 
 /**
  * Optional filters when querying policies.
@@ -19,16 +19,22 @@ export interface PolicyFilters {
 }
 
 /**
- * A policy statement with its conditions.
+ * A policy expression with its hydrated expression tree.
  */
-export interface PolicyStatementWithConditions extends PolicyStatement {
-  conditions: PolicyStatementCondition[];
-  expression?: ExpressionTree;
+export interface PolicyExpressionWithExpression extends PolicyExpression {
+  expression: ExpressionTree;
 }
 
 /**
- * A policy with its statements and conditions.
+ * A policy with its statements.
  */
 export interface PolicyWithStatements extends Policy {
-  statements: PolicyStatementWithConditions[];
+  statements: PolicyStatement[];
+  expressions: PolicyExpressionWithExpression[];
 }
+
+export type CacheFanOutTransition = {
+  policyId: string;
+  from: PolicyStatus;
+  to: PolicyStatus;
+};

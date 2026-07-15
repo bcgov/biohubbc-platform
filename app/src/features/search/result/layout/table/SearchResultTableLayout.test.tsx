@@ -1,7 +1,9 @@
 import { GridColDef } from '@mui/x-data-grid';
 import { cleanup, fireEvent, within } from '@testing-library/react';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
-import { createMockSearchFeature } from 'test-helpers/cart-helpers';
+import type { ReactNode } from 'react';
+import { createMockSearchFeature } from 'test-helpers/search-result-helpers';
 import { render } from 'test-helpers/test-utils';
 import { SearchResultTableLayout } from './SearchResultTableLayout';
 
@@ -9,20 +11,40 @@ interface MockDataGridProps {
   rows: SearchFeatureResultWithRelevancy[];
   columns: GridColDef[];
   onRowClick?: (params: { row: SearchFeatureResultWithRelevancy }) => void;
+  paginationModel?: { page: number; pageSize: number };
+  pageSizeOptions?: number[];
 }
 
 vi.mock('components/data-grid/CustomDataGrid', () => ({
-  default: ({ rows, columns, onRowClick }: MockDataGridProps) => (
-    <div data-testid="mock-data-grid">
+  default: ({ rows, columns, onRowClick, paginationModel, pageSizeOptions }: MockDataGridProps) => (
+    <div
+      data-testid="mock-data-grid"
+      data-has-pagination-model={String(Boolean(paginationModel))}
+      data-page-size-options={pageSizeOptions?.join(',')}>
+      <div data-testid="columns">{columns.map((column) => column.headerName).join('|')}</div>
       {rows.map((row) => (
         <div key={row.uuid} data-testid={`row-${row.submission_feature_id}`} onClick={() => onRowClick?.({ row })}>
           {columns
-            .filter((c) => c.renderCell)
-            .map((c) => (
-              <div key={c.field} data-testid={`cell-${c.field}`}>
-                {c.renderCell?.({ value: row[c.field as keyof SearchFeatureResultWithRelevancy], row } as never)}
-              </div>
-            ))}
+            .filter((c) => c.renderCell || c.valueGetter)
+            .map((c) => {
+              const valueGetter = c.valueGetter as
+                | ((
+                    value: unknown,
+                    row: SearchFeatureResultWithRelevancy,
+                    column: GridColDef,
+                    apiRef: unknown
+                  ) => unknown)
+                | undefined;
+              const rowValue = row[c.field as keyof SearchFeatureResultWithRelevancy];
+              const value = valueGetter?.(rowValue, row, c, {}) ?? rowValue;
+              const renderedValue = (c.renderCell?.({ value, row } as never) ?? value) as ReactNode;
+
+              return (
+                <div key={c.field} data-testid={`cell-${c.field}`}>
+                  {renderedValue}
+                </div>
+              );
+            })}
         </div>
       ))}
     </div>
@@ -30,15 +52,48 @@ vi.mock('components/data-grid/CustomDataGrid', () => ({
 }));
 
 describe('SearchResultTableLayout', () => {
+  const featureTypeProperties: FeatureTypeProperty[] = [
+    {
+      feature_type_property_id: 1,
+      name: 'scientific_name',
+      display_name: 'Scientific Name',
+      description: null,
+      type_name: 'string',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: false
+    },
+    {
+      feature_type_property_id: 2,
+      name: 'count',
+      display_name: 'Count',
+      description: null,
+      type_name: 'number',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: false
+    },
+    {
+      feature_type_property_id: 3,
+      name: 'tags',
+      display_name: 'Tags',
+      description: null,
+      type_name: 'string',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: true
+    }
+  ];
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
   it('renders secured icon for secured rows', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
 
-    const { getByTestId } = render(<SearchResultTableLayout results={[securedResult]} cartFeatureIds={new Set()} />);
+    const { getByTestId } = render(<SearchResultTableLayout results={[securedResult]} featureTypeProperties={[]} />);
 
     const securedRow = getByTestId('row-1');
     const securedCell = within(securedRow).getByTestId('cell-is_secured');
@@ -48,7 +103,7 @@ describe('SearchResultTableLayout', () => {
   it('does not render secured icon for unsecured rows', () => {
     const unsecuredResult = createMockSearchFeature(2, 'Observation', false);
 
-    const { getByTestId } = render(<SearchResultTableLayout results={[unsecuredResult]} cartFeatureIds={new Set()} />);
+    const { getByTestId } = render(<SearchResultTableLayout results={[unsecuredResult]} featureTypeProperties={[]} />);
 
     const unsecuredRow = getByTestId('row-2');
     const unsecuredCell = within(unsecuredRow).getByTestId('cell-is_secured');
@@ -57,11 +112,11 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders mixed secured and unsecured rows correctly', () => {
-    const securedResult = createMockSearchFeature(1, 'Dataset', true);
+    const securedResult = createMockSearchFeature(1, 'Survey', true);
     const unsecuredResult = createMockSearchFeature(2, 'Observation', false);
 
     const { getByTestId } = render(
-      <SearchResultTableLayout results={[securedResult, unsecuredResult]} cartFeatureIds={new Set()} />
+      <SearchResultTableLayout results={[securedResult, unsecuredResult]} featureTypeProperties={[]} />
     );
 
     const securedRow = getByTestId('row-1');
@@ -74,11 +129,11 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('calls onClick when a row is clicked', () => {
-    const result = createMockSearchFeature(1, 'Dataset', false);
+    const result = createMockSearchFeature(1, 'Survey', false);
     const onClick = vi.fn();
 
     const { getByTestId } = render(
-      <SearchResultTableLayout results={[result]} cartFeatureIds={new Set()} onClick={onClick} />
+      <SearchResultTableLayout results={[result]} featureTypeProperties={[]} onClick={onClick} />
     );
 
     fireEvent.click(getByTestId('row-1'));
@@ -86,23 +141,37 @@ describe('SearchResultTableLayout', () => {
     expect(onClick).toHaveBeenCalledWith(result);
   });
 
-  it('does not call onClick when an action button is clicked', () => {
-    const result = createMockSearchFeature(1, 'Dataset', false);
-    const onClick = vi.fn();
-    const onAddToCart = vi.fn();
+  it('renders a column for each feature type property', () => {
+    const result = {
+      ...createMockSearchFeature(1, 'Survey', false),
+      properties: {
+        scientific_name: 'Canis lupus',
+        count: 12,
+        tags: ['coastal', 'survey']
+      }
+    };
 
-    const { getByRole } = render(
-      <SearchResultTableLayout
-        results={[result]}
-        cartFeatureIds={new Set()}
-        onClick={onClick}
-        onAddToCart={onAddToCart}
-      />
+    const { getByTestId } = render(
+      <SearchResultTableLayout results={[result]} featureTypeProperties={featureTypeProperties} />
     );
 
-    fireEvent.click(getByRole('button', { name: 'Add' }));
+    expect(getByTestId('columns')).toHaveTextContent('Scientific Name');
+    expect(getByTestId('columns')).toHaveTextContent('Count');
+    expect(getByTestId('columns')).toHaveTextContent('Tags');
+    expect(getByTestId('cell-property:scientific_name')).toHaveTextContent('Canis lupus');
+    expect(getByTestId('cell-property:count')).toHaveTextContent('12');
+    expect(getByTestId('cell-property:tags')).toHaveTextContent('coastal, survey');
+    expect(getByTestId('cell-property:scientific_name').querySelector('.MuiTypography-root')).toBeInTheDocument();
+  });
 
-    expect(onAddToCart).toHaveBeenCalledWith(result);
-    expect(onClick).not.toHaveBeenCalled();
+  it('does not configure internal data grid pagination', () => {
+    const results = Array.from({ length: 25 }, (_value, index) =>
+      createMockSearchFeature(index + 1, `Survey ${index + 1}`, false)
+    );
+
+    const { getByTestId } = render(<SearchResultTableLayout results={results} featureTypeProperties={[]} />);
+
+    expect(getByTestId('mock-data-grid')).toHaveAttribute('data-has-pagination-model', 'false');
+    expect(getByTestId('mock-data-grid')).not.toHaveAttribute('data-page-size-options');
   });
 });

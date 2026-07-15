@@ -40,10 +40,13 @@ describe('UploadIngestionService', () => {
     comment: 'Test Comment'
   };
 
+  const mockBlueprintId = 7;
+
   beforeEach(() => {
     mockConnection = getMockDBConnection({ systemUserId: () => 1 });
     service = new UploadIngestionService(mockConnection);
     sinon.stub(SubmissionUploadReviewService.prototype, 'createDefaultReviewsForUpload').resolves([]);
+    sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForUpload').resolves(mockBlueprintId);
   });
 
   afterEach(() => {
@@ -110,6 +113,7 @@ describe('UploadIngestionService', () => {
           upload_id: mockUploadId,
           ticket_id: '11111111-1111-1111-1111-111111111111',
           status: 'uploaded',
+          blueprint_id: mockBlueprintId,
           comment: mockSubmission.comment
         })
       );

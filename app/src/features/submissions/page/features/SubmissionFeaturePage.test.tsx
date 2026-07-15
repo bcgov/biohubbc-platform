@@ -1,4 +1,3 @@
-import { useCartContext } from 'hooks/useContext';
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
@@ -6,17 +5,10 @@ import { Mock } from 'vitest';
 import { SubmissionFeaturePage } from './SubmissionFeaturePage';
 
 vi.mock('../../../../hooks/useApi');
-vi.mock('../../../../hooks/useContext', () => ({
-  useCartContext: vi.fn()
-}));
 
 const mockUseApi = useApi as Mock;
-const mockUseCartContext = useCartContext as Mock;
 
 const mockGetSubmissionFeatureById = vi.fn();
-const mockGetCartFeatures = vi.fn();
-const mockAddToCart = vi.fn();
-const mockRemoveFromCart = vi.fn();
 
 const mockFeature = {
   submission_feature_id: 10,
@@ -29,7 +21,8 @@ const mockFeature = {
   submission_name: 'Test Submission',
   source_id: null,
   data: { species_name: 'Wolf', count: '5' },
-  secured: false
+  secured: false,
+  security_reasons: []
 };
 
 const mockRelatedFeatures = [
@@ -57,24 +50,13 @@ describe('SubmissionFeaturePage', () => {
     mockUseApi.mockReturnValue({
       features: {
         getSubmissionFeatureById: mockGetSubmissionFeatureById
-      },
-      cart: {
-        getCartFeatures: mockGetCartFeatures
       }
-    });
-
-    mockUseCartContext.mockReturnValue({
-      cartId: 'test-cart-id',
-      addToCart: mockAddToCart,
-      removeFromCart: mockRemoveFromCart
     });
 
     mockGetSubmissionFeatureById.mockResolvedValue({
       feature: mockFeature,
       relatedFeatures: []
     });
-
-    mockGetCartFeatures.mockResolvedValue({ features: [] });
   });
 
   it('renders feature property rows', async () => {
@@ -119,23 +101,5 @@ describe('SubmissionFeaturePage', () => {
     const anchor = relatedLink.closest('a');
 
     expect(anchor).toHaveAttribute('href', '/submission/1/feature/20');
-  });
-
-  it('shows "Add to Cart" when feature is not in the cart', async () => {
-    mockGetCartFeatures.mockResolvedValue({ features: [] });
-
-    const { findByText } = renderPage();
-
-    expect(await findByText('Add to Cart')).toBeVisible();
-  });
-
-  it('shows "In Cart" when feature is in the cart', async () => {
-    mockGetCartFeatures.mockResolvedValue({
-      features: [{ submission_feature_id: 10 }]
-    });
-
-    const { findByText } = renderPage();
-
-    expect(await findByText('In Cart')).toBeVisible();
   });
 });

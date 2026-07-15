@@ -17,15 +17,18 @@ import { randomUUID } from 'node:crypto';
 import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
+import { EXPORTER_VERSION } from '../../constants/download';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadExportPipelineService } from '../../services/download/download-export-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -141,8 +144,8 @@ describe('Download Export pipeline — media (system)', function () {
   this.timeout(60000);
 
   let connection: IDBConnection;
-  let exportRepo: DownloadExportRepository;
-  let downloadRepo: DownloadRepository;
+  let exportRepo: DownloadVersionExportRepository;
+  let versionRepo: DownloadVersionRepository;
   let pipelineService: DownloadExportPipelineService;
   let downloadService: DownloadService;
   let policyService: DownloadPolicyService;
@@ -157,8 +160,8 @@ describe('Download Export pipeline — media (system)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    exportRepo = new DownloadExportRepository(connection);
-    downloadRepo = new DownloadRepository(connection);
+    exportRepo = new DownloadVersionExportRepository(connection);
+    versionRepo = new DownloadVersionRepository(connection);
     pipelineService = new DownloadExportPipelineService(connection);
     downloadService = new DownloadService(connection);
     policyService = new DownloadPolicyService(connection);
@@ -174,9 +177,9 @@ describe('Download Export pipeline — media (system)', function () {
       .sql(
         SQL`
           SELECT a.object_key
-          FROM download_export_artifact dea
-          INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-          WHERE dea.record_end_date IS NULL
+          FROM download_version_export_artifact dvea
+          INNER JOIN artifact a ON a.artifact_id = dvea.artifact_id
+          WHERE dvea.record_end_date IS NULL
             AND a.object_key LIKE 'downloads/%/exports/%';
         `
       )
@@ -205,7 +208,7 @@ describe('Download Export pipeline — media (system)', function () {
   /**
    * Seed a READY download with one `file`-type submission feature whose
    * `data.file` points at a real object in MinIO, and insert a corresponding
-   * per-feature-type Parquet `download_artifact` row.
+   * per-feature-type Parquet `download_version_artifact` row.
    *
    * The Parquet bytes aren't written — we stub `ParquetReader.openS3` per-test
    * to emit a row referencing the seeded artifact key. This keeps the cases
@@ -217,6 +220,7 @@ describe('Download Export pipeline — media (system)', function () {
     extraFileCount = 0
   ): Promise<{
     downloadId: string;
+    downloadVersionId: string;
     submissionFeatureIds: number[];
     artifactKey: string;
   }> {
@@ -246,7 +250,6 @@ describe('Download Export pipeline — media (system)', function () {
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `media-export-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['file'],
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({
@@ -255,16 +258,23 @@ describe('Download Export pipeline — media (system)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
+    // Materialize a download version. The export pipeline discovers feature types
+    // from the version's artifact links; reads resolve the most-recent version.
+    const version = await versionRepo.createDownloadVersion(downloadId);
+    const downloadVersionId = version.download_version_id;
+
+    // Status lives on the version and is sourced back onto the download.
+    await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
       started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString()
+      completed_at: new Date().toISOString(),
+      materialized_at: new Date().toISOString()
     });
 
     // Per-feature-type Parquet artifact row. The Parquet bytes aren't real —
     // ParquetReader.openS3 is stubbed — but the row shape has to match
-    // downloads/{downloadId}/{featureType}/data.parquet so
-    // parseFeatureTypeFromParquetKey picks it up.
-    const parquetKey = `downloads/${downloadId}/file/data.parquet`;
+    // downloads/{downloadId}/versions/{downloadVersionId}/{featureType}/data.parquet
+    // so parseFeatureTypeFromParquetKey picks it up.
+    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/file/data.parquet`;
     const { artifact_id } = await artifactService.insertArtifact({
       bucket: 'test-bucket',
       object_key: parquetKey,
@@ -274,37 +284,83 @@ describe('Download Export pipeline — media (system)', function () {
       uploaded_at: new Date().toISOString(),
       format: 'parquet'
     });
-    await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+    // The export pipeline discovers feature types from the version's artifact links.
+    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'file');
 
-    return { downloadId, submissionFeatureIds, artifactKey };
+    return { downloadId, downloadVersionId, submissionFeatureIds, artifactKey };
   }
 
   /**
-   * Create a pending download_export row. The export pipeline finalizes exactly
-   * one part-zip at `max_part_size_bytes = 524288000` (default 500MB), which is
-   * more than enough for these tiny fixtures.
+   * Materialize an export-artifact group for the version + create a pending
+   * download_version_export attached to it. The pipeline finalizes part-zips at
+   * `max_part_size_bytes = 524288000` (default 500MB), which is more than enough
+   * for these tiny fixtures.
+   *
+   * Returns both ids: lifecycle state + the pipeline entrypoint key off `groupId`,
+   * while the export id is kept for any per-user-export reads.
+   *
+   * The recipe is a `per_feature_type` export over `featureType` with NO
+   * `output_columns` — i.e. all of that type's columns, the pre-config-driven
+   * behaviour these media tests rely on (the binary `artifact_key` column must be
+   * exported for the pipeline to stream the referenced file into the part-zip).
+   * The group row is written directly (bypassing service validation) with the
+   * config canonicalized + hashed via the production helpers, mirroring the DB
+   * pipeline test's seed.
    */
-  async function seedPendingExport(downloadId: string, maxPartSizeBytes = '524288000'): Promise<string> {
-    const record = await exportRepo.createDownloadExport({
-      download_id: downloadId,
-      format: 'csv',
+  async function seedPendingExport(
+    downloadVersionId: string,
+    featureType = 'file',
+    maxPartSizeBytes = '524288000'
+  ): Promise<{ exportId: string; groupId: string }> {
+    const config = ExportConfig.parse({
+      version: 1,
+      export_type: 'csv',
       mode: 'per_feature_type',
-      max_part_size_bytes: maxPartSizeBytes
+      feature_types: [featureType],
+      merge_steps: []
     });
-    return record.download_export_id;
+    const normalized = canonicalizeExportConfig(config);
+    const configHash = computeConfigHash(normalized);
+
+    await exportRepo.createExportArtifactGroup({
+      downloadVersionId,
+      config: normalized,
+      configHash,
+      format: normalized.export_type,
+      mode: normalized.mode,
+      maxPartSizeBytes,
+      exporterVersion: EXPORTER_VERSION
+    });
+    const group = await exportRepo.findActiveExportArtifactGroup(
+      downloadVersionId,
+      configHash,
+      maxPartSizeBytes,
+      EXPORTER_VERSION
+    );
+    // The group was just created (or already active) — non-null by construction.
+    const groupId = group!.download_version_export_artifact_group_id;
+
+    const record = await exportRepo.createDownloadVersionExport({
+      download_version_id: downloadVersionId,
+      format: normalized.export_type,
+      mode: normalized.mode,
+      max_part_size_bytes: maxPartSizeBytes,
+      download_version_export_artifact_group_id: groupId
+    });
+    return { exportId: record.download_version_export_id, groupId };
   }
 
   /**
-   * Look up the part-zip keys the pipeline wrote for an export, in chunk_id order.
+   * Look up the part-zip keys the pipeline wrote for a group, in chunk_id order.
    */
-  async function listPartZipKeysForExport(exportId: string): Promise<string[]> {
+  async function listPartZipKeysForExport(groupId: string): Promise<string[]> {
     const rows = await connection.sql(SQL`
       SELECT a.object_key
-      FROM download_export_artifact dea
-      INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
-      WHERE dea.download_export_id = ${exportId}
-        AND dea.record_end_date IS NULL
-      ORDER BY dea.chunk_id ASC;
+      FROM download_version_export_artifact dvea
+      INNER JOIN artifact a ON a.artifact_id = dvea.artifact_id
+      WHERE dvea.download_version_export_artifact_group_id = ${groupId}
+        AND dvea.record_end_date IS NULL
+      ORDER BY dvea.chunk_id ASC;
     `);
     return rows.rows.map((r: { object_key: string }) => r.object_key);
   }
@@ -314,26 +370,25 @@ describe('Download Export pipeline — media (system)', function () {
   it('happy path — binary is copied into the part-zip at files1/ and referenced by the CSV', async () => {
     const fileContent = Buffer.from('hello world');
     const filename = 'hello.bin';
-    const { downloadId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
+    const { downloadVersionId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
       fileContent,
       filename
     );
-    const exportId = await seedPendingExport(downloadId);
+    const { groupId } = await seedPendingExport(downloadVersionId);
     const featureId = submissionFeatureIds[0];
 
     stubParquetReaderWithRows([{ submission_feature_id: featureId, file: artifactKey }]);
 
-    await pipelineService.runExport(exportId);
+    await pipelineService.runExportGroup(groupId);
 
-    const keys = await listPartZipKeysForExport(exportId);
+    const keys = await listPartZipKeysForExport(groupId);
     expect(keys).to.have.lengthOf(1);
     const partZipKey = keys[0];
 
     const zip = await downloadZipFromS3(storageService, partZipKey);
     const entries = zip.getEntries().map((e) => e.entryName);
-
-    const binaryEntry = `biohub-export-${exportId}/files1/${featureId}_${filename}`;
-    const csvEntry = `biohub-export-${exportId}/file/chunk1.csv`;
+    const binaryEntry = `biohub-export-${groupId}/files1/${featureId}_${filename}`;
+    const csvEntry = `biohub-export-${groupId}/file/chunk1.csv`;
 
     expect(entries).to.include(binaryEntry);
     expect(entries).to.include(csvEntry);
@@ -346,7 +401,8 @@ describe('Download Export pipeline — media (system)', function () {
     expect(csvText).to.include(`files1/${featureId}_${filename}`);
 
     const status = await connection.sql(SQL`
-      SELECT status FROM download_export WHERE download_export_id = ${exportId};
+      SELECT status FROM download_version_export_artifact_group
+      WHERE download_version_export_artifact_group_id = ${groupId};
     `);
     expect(status.rows[0].status).to.equal(DownloadStatusEnum.READY);
   });
@@ -354,11 +410,11 @@ describe('Download Export pipeline — media (system)', function () {
   it('missing binary — pipeline writes an .error.txt placeholder and still finishes READY', async () => {
     const fileContent = Buffer.from('soon to be deleted');
     const filename = 'gone.bin';
-    const { downloadId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
+    const { downloadVersionId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
       fileContent,
       filename
     );
-    const exportId = await seedPendingExport(downloadId);
+    const { groupId } = await seedPendingExport(downloadVersionId);
     const featureId = submissionFeatureIds[0];
 
     // Delete the binary before running the export — the pipeline's getFileStream
@@ -372,14 +428,13 @@ describe('Download Export pipeline — media (system)', function () {
 
     stubParquetReaderWithRows([{ submission_feature_id: featureId, file: artifactKey }]);
 
-    await pipelineService.runExport(exportId);
+    await pipelineService.runExportGroup(groupId);
 
-    const keys = await listPartZipKeysForExport(exportId);
+    const keys = await listPartZipKeysForExport(groupId);
     expect(keys).to.have.lengthOf(1);
     const zip = await downloadZipFromS3(storageService, keys[0]);
     const entries = zip.getEntries().map((e) => e.entryName);
-
-    const binaryEntry = `biohub-export-${exportId}/files1/${featureId}_${filename}`;
+    const binaryEntry = `biohub-export-${groupId}/files1/${featureId}_${filename}`;
     const errorEntry = `${binaryEntry}.error.txt`;
 
     expect(entries, 'binary must not be present after deletion').to.not.include(binaryEntry);
@@ -389,7 +444,8 @@ describe('Download Export pipeline — media (system)', function () {
     expect(errText).to.include('could not retrieve');
 
     const status = await connection.sql(SQL`
-      SELECT status FROM download_export WHERE download_export_id = ${exportId};
+      SELECT status FROM download_version_export_artifact_group
+      WHERE download_version_export_artifact_group_id = ${groupId};
     `);
     expect(status.rows[0].status).to.equal(DownloadStatusEnum.READY);
   });
@@ -403,7 +459,7 @@ describe('Download Export pipeline — media (system)', function () {
   it('cross-part duplication — shared binary is copied into each part and the CSV paths match the owning part', async () => {
     const fileContent = Buffer.from('shared file content for both rows');
     const filename = 'shared.bin';
-    const { downloadId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
+    const { downloadVersionId, submissionFeatureIds, artifactKey } = await seedReadyDownloadWithFileFeature(
       fileContent,
       filename,
       1 // two features total, both pointing at the same artifactKey
@@ -411,24 +467,23 @@ describe('Download Export pipeline — media (system)', function () {
     expect(submissionFeatureIds).to.have.lengthOf(2);
     const [id1, id2] = submissionFeatureIds;
 
-    const exportId = await seedPendingExport(downloadId, '1');
+    const { groupId } = await seedPendingExport(downloadVersionId, 'file', '1');
 
     stubParquetReaderWithRows([
       { submission_feature_id: id1, file: artifactKey },
       { submission_feature_id: id2, file: artifactKey }
     ]);
 
-    await pipelineService.runExport(exportId);
+    await pipelineService.runExportGroup(groupId);
 
-    const keys = await listPartZipKeysForExport(exportId);
+    const keys = await listPartZipKeysForExport(groupId);
     expect(keys.length).to.be.at.least(2);
     const [part1Key, part2Key] = keys;
 
     const part1Zip = await downloadZipFromS3(storageService, part1Key);
     const part2Zip = await downloadZipFromS3(storageService, part2Key);
-
-    const part1Binary = `biohub-export-${exportId}/files1/${id1}_${filename}`;
-    const part2Binary = `biohub-export-${exportId}/files2/${id2}_${filename}`;
+    const part1Binary = `biohub-export-${groupId}/files1/${id1}_${filename}`;
+    const part2Binary = `biohub-export-${groupId}/files2/${id2}_${filename}`;
 
     const part1Bytes = part1Zip.readFile(part1Binary);
     expect(part1Bytes, 'part-1 must contain its binary').to.not.be.null;
@@ -438,7 +493,7 @@ describe('Download Export pipeline — media (system)', function () {
     expect(part2Bytes, 'part-2 must contain its binary').to.not.be.null;
     expect(part2Bytes!.equals(fileContent)).to.be.true;
 
-    const part2CsvEntry = `biohub-export-${exportId}/file/chunk2.csv`;
+    const part2CsvEntry = `biohub-export-${groupId}/file/chunk2.csv`;
     const part2Csv = part2Zip.readFile(part2CsvEntry)?.toString('utf-8') ?? '';
     expect(part2Csv).to.include(`files2/${id2}_${filename}`);
     expect(part2Csv).to.not.include(`files1/`);
@@ -464,19 +519,18 @@ describe('Download Export pipeline — media (system)', function () {
     // (default ~4k rows per group), small enough to write in a minute or two.
     const fixtureTargetBytes = 96 * 1024 * 1024;
 
-    // Seed a download with one feature of type 'dataset'. The export pipeline
+    // Seed a download with one feature of type 'survey'. The export pipeline
     // reads properties via `getFeatureTypePropertyCodes`, so the feature type
-    // must exist in seed data — 'dataset' is a root type already used by the
+    // must exist in seed data — 'survey' is a root type already used by the
     // sibling integration tests.
     const submissionId = await createTestSubmission(connection);
-    await createTestFeature(connection, submissionId, 'dataset', {
+    await createTestFeature(connection, submissionId, 'survey', {
       name: 'oom-seed'
     });
 
     const { policy_id } = await policyService.createDownloadPolicy({
       name: `media-oom-test-${Date.now()}-${randomUUID().slice(0, 8)}`,
       description: null,
-      featureTypes: ['dataset'],
       expressionId: null
     });
     const { download_id: downloadId } = await downloadService.createDownload({
@@ -485,13 +539,20 @@ describe('Download Export pipeline — media (system)', function () {
       requestedBy: connection.systemUserId()
     });
 
-    await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
+    // Materialize a download version so the export group can pin to it. Reads
+    // resolve the most-recent version — there is no stored pointer to set.
+    const version = await versionRepo.createDownloadVersion(downloadId);
+    const downloadVersionId = version.download_version_id;
+
+    // Status lives on the version and is sourced back onto the download.
+    await versionRepo.updateDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, {
       started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString()
+      completed_at: new Date().toISOString(),
+      materialized_at: new Date().toISOString()
     });
 
     // Write the fat Parquet fixture at the canonical per-feature-type key.
-    const parquetKey = `downloads/${downloadId}/dataset/data.parquet`;
+    const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`;
     const uploadedBytes = await writeFatParquetToMinIO(storageService, parquetKey, fixtureTargetBytes);
     s3KeysToCleanup.push(parquetKey);
 
@@ -508,9 +569,9 @@ describe('Download Export pipeline — media (system)', function () {
       uploaded_at: new Date().toISOString(),
       format: 'parquet'
     });
-    await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+    await versionRepo.createDownloadVersionArtifact(downloadVersionId, artifact_id, 'survey');
 
-    const exportId = await seedPendingExport(downloadId);
+    const { groupId } = await seedPendingExport(downloadVersionId, 'survey');
 
     // Baseline: sample heap after writing the fixture but before the export
     // runs. Using `heapUsed` directly — we're watching for large deltas, not
@@ -527,14 +588,14 @@ describe('Download Export pipeline — media (system)', function () {
     }, 250);
 
     try {
-      await pipelineService.runExport(exportId);
+      await pipelineService.runExportGroup(groupId);
     } finally {
       clearInterval(sampler);
     }
-
     // Verify the export finished successfully.
     const statusRow = await connection.sql(SQL`
-      SELECT status FROM download_export WHERE download_export_id = ${exportId};
+      SELECT status FROM download_version_export_artifact_group
+      WHERE download_version_export_artifact_group_id = ${groupId};
     `);
     expect(statusRow.rows[0].status).to.equal(DownloadStatusEnum.READY);
 

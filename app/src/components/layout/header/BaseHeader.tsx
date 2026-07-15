@@ -13,7 +13,7 @@ interface IBaseHeader {
   buttonJSX?: JSX.Element;
 }
 /**
- * Generic header for all dataset/feature views
+ * Generic header for all survey/feature views
  *
  * @return {*}
  */

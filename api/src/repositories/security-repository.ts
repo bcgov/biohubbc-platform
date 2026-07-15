@@ -224,8 +224,12 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
-      return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
+    // Dedupe inputs — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair
+    // appears twice in one INSERT ("cannot affect row a second time")
+    const queryValues = [...new Set(submissionFeatureIds)].flatMap((submissionFeatureId) => {
+      return [...new Set(securityRuleIds)].flatMap(
+        (securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`
+      );
     });
 
     const insertSQL = SQL`
@@ -234,9 +238,13 @@ export class SecurityRepository extends BaseRepository {
       VALUES `;
 
     insertSQL.append(queryValues.join(', '));
+    // A conflicting row may be a 'draft' inserted by automatic screening — manual application
+    // must promote it to 'active' or the rule would silently remain unenforced. Rows already
+    // 'active' are left untouched (and excluded from RETURNING) to avoid audit churn.
     insertSQL.append(`
       ON CONFLICT (submission_feature_id, security_rule_id)
-      DO NOTHING
+      DO UPDATE SET status = 'active'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'active'
       RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
@@ -255,12 +263,16 @@ export class SecurityRepository extends BaseRepository {
     submissionId: number,
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!securityRuleIds.length) {
+    // Dedupe — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair appears
+    // twice in one INSERT ("cannot affect row a second time")
+    const uniqueSecurityRuleIds = [...new Set(securityRuleIds)];
+
+    if (!uniqueSecurityRuleIds.length) {
       return [];
     }
 
-    const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
-    const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
+    const placeholders = uniqueSecurityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
+    const submissionIdPlaceholder = `$${uniqueSecurityRuleIds.length + 1}`;
 
     const sql = `
       INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
@@ -268,14 +280,83 @@ export class SecurityRepository extends BaseRepository {
       FROM submission_feature sf
       CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
       WHERE sf.submission_id = ${submissionIdPlaceholder}
-      ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+      ON CONFLICT (submission_feature_id, security_rule_id)
+      DO UPDATE SET status = 'active'
+      WHERE submission_feature_security.status IS DISTINCT FROM 'active'
       RETURNING *;
     `;
 
-    const insertSQL = SQL([sql], ...securityRuleIds, submissionId);
+    const insertSQL = SQL([sql], ...uniqueSecurityRuleIds, submissionId);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
+  }
+
+  /**
+   * Insert draft `submission_feature_security` rows for every feature in `submissionUploadId`
+   * that is related to one of the trigger features through `submission_feature_closure`.
+   *
+   * This is the automatic screening write path. Rows are inserted with `status = 'draft'` and
+   * linked back to the `submission_upload_security` (scan event) that produced them, so they do
+   * NOT restrict access until an admin promotes them to `status = 'active'`.
+   *
+   * **Closure direction:** The closure is directed `source -> target` (child -> parent/property).
+   * Both directions are probed and unioned so all features meaningfully related to a trigger are
+   * captured (the trigger's descendants via the reverse probe, its ancestors via the forward probe,
+   * plus the self-row).
+   *
+   * **Idempotency:** `ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING` means
+   * rerunning screening for the same upload is safe; an existing row keeps its original
+   * `submission_upload_security_id` (first-scan provenance).
+   *
+   * @param {number[]} triggerFeatureIds `submission_feature_id` values returned by the rule's
+   *   policy evaluator for the given upload.
+   * @param {number} securityRuleId The security rule that identified the triggers.
+   * @param {string} submissionUploadId Scope — only features from this upload are inserted.
+   * @param {number} submissionUploadSecurityId The scan event that produced these rows.
+   * @returns {Promise<number>} The number of draft rows inserted (conflicts excluded).
+   * @memberof SecurityRepository
+   */
+  async insertDraftSecurityForTriggers(
+    triggerFeatureIds: number[],
+    securityRuleId: number,
+    submissionUploadId: string,
+    submissionUploadSecurityId: number
+  ): Promise<number> {
+    if (triggerFeatureIds.length === 0) {
+      return 0;
+    }
+
+    const result = await this.connection.query<{ submission_feature_id: number }>(
+      `WITH trigger_ids AS (
+         SELECT unnest($1::integer[]) AS trigger_id
+       ),
+       related_features AS (
+         -- Reverse probe: features that reach the trigger going UP (descendants + self)
+         SELECT c.source_submission_feature_id AS submission_feature_id
+         FROM trigger_ids tf
+         JOIN submission_feature_closure c ON c.target_submission_feature_id = tf.trigger_id
+
+         UNION
+
+         -- Forward probe: features the trigger can reach going UP (ancestors + self)
+         SELECT c.target_submission_feature_id AS submission_feature_id
+         FROM trigger_ids tf
+         JOIN submission_feature_closure c ON c.source_submission_feature_id = tf.trigger_id
+       )
+       INSERT INTO submission_feature_security
+         (submission_feature_id, security_rule_id, status, submission_upload_security_id, record_effective_date)
+       SELECT DISTINCT rf.submission_feature_id, $2, 'draft'::submission_feature_security_status, $4, now()
+       FROM related_features rf
+       JOIN submission_feature sf ON sf.submission_feature_id = rf.submission_feature_id
+       WHERE sf.submission_upload_id = $3::uuid
+         AND sf.record_end_date IS NULL
+       ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+       RETURNING submission_feature_id`,
+      [triggerFeatureIds, securityRuleId, submissionUploadId, submissionUploadSecurityId]
+    );
+
+    return result.rowCount ?? 0;
   }
 
   /**
@@ -374,7 +455,9 @@ export class SecurityRepository extends BaseRepository {
       .queryBuilder()
       .select('*')
       .from('submission_feature_security')
-      .whereIn('submission_feature_id', submissionFeatureIds);
+      .whereIn('submission_feature_id', submissionFeatureIds)
+      // Draft rows (automatic screening output pending review) are not applied security
+      .where('status', 'active');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
@@ -405,6 +488,7 @@ export class SecurityRepository extends BaseRepository {
       .with('grouped_rules', (qb) => {
         qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
           .from('submission_feature_security as sfs')
+          .where('sfs.status', 'active')
           .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
           .modify((qb) => {
             // Conditionally filter for specific features

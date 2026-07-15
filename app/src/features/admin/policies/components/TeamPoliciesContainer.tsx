@@ -93,13 +93,13 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
     setIsSaving(true);
 
     try {
-      await biohubApi.teamPolicies.createTeamPolicies(values.team_id, { policies: values.policies });
+      await biohubApi.teamPolicies.createTeamPolicy(values.policy_id, { team_id: values.team_id });
 
       setOpenCreateDialog(false);
       refresh();
 
       showSnackBar({
-        snackbarMessage: 'Created assignments'
+        snackbarMessage: 'Created assignment'
       });
     } catch (error) {
       showApiErrorDialog(

@@ -1,11 +1,7 @@
-import SQL, { SQLStatement } from 'sql-template-strings';
-import { z } from 'zod';
-import { getKnex } from '../database/db';
+import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { SubmissionFeatureProperty } from '../models/feature-property';
-import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
+import { isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
 
 /**
@@ -119,8 +115,9 @@ export class SubmissionFeatureRepository extends BaseRepository {
       FROM
         submission_feature
       WHERE
-        uuid = ${submissionUuid};
+        uuid = ${submissionUuid}
     `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -136,6 +133,20 @@ export class SubmissionFeatureRepository extends BaseRepository {
 
   /**
    * Get a submission feature record by Id.
+   *
+   * `secured` is the effectively-secured state: the feature is secured when it or any ancestor
+   * carries an active security rule, resolved through the precomputed closure ancestry. This
+   * mirrors the read-path visibility check, so the detail page's secured badge agrees with search
+   * results and with what actually hides the data.
+   *
+   * `security_reasons` are the distinct names of the security rules securing this feature directly
+   * or via an ancestor. It is empty when the feature is not effectively secured. It can also be empty
+   * while `secured` is true: in the fail-closed case the feature counts as secured because its closure
+   * ancestry has not been built yet, so the securing rules cannot be resolved — the UI then reveals
+   * only that the feature is secured and exposes no sensitive detail.
+   *
+   * Only active, non-end-dated security rows are counted, so draft or retired security never drives
+   * the UI.
    *
    * @param {number} submissionFeatureId
    * @returns {Promise<SubmissionFeature>}
@@ -154,12 +165,23 @@ export class SubmissionFeatureRepository extends BaseRepository {
         ft.name as feature_type_name,
         ft.display_name as feature_type_display_name,
         s.name as submission_name,
-        EXISTS (
-          SELECT 1
-          FROM submission_feature_security sfs
-          WHERE sfs.submission_feature_id = sf.submission_feature_id
+    `;
+    // The security fragments are raw, zero-placeholder SQL and must be appended as text: interpolating
+    // them into a SQL`` tag would bind them as parameter values rather than splice them as SQL.
+    sqlStatement.append(`
+        ${isEffectivelySecured('sf.submission_feature_id')} AS secured,
+        COALESCE((
+          SELECT ARRAY_REMOVE(ARRAY_AGG(DISTINCT sr.name ORDER BY sr.name), NULL)
+          FROM submission_feature_closure c
+          JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
+          JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
+          JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id
+          WHERE c.source_submission_feature_id = sf.submission_feature_id
+            AND c.is_ancestor = true
             AND sfs.record_end_date IS NULL
-        ) AS secured
+            AND sfs.status = 'active'
+            AND ${isSubmissionFeatureActive('sf_sec')}
+        ), ARRAY[]::varchar[]) AS security_reasons
       FROM
         submission_feature sf
       JOIN
@@ -167,8 +189,9 @@ export class SubmissionFeatureRepository extends BaseRepository {
       JOIN
         submission s ON s.submission_id = sf.submission_id
       WHERE
-        sf.submission_feature_id = ${submissionFeatureId};
-    `;
+        sf.submission_feature_id =`);
+    sqlStatement.append(SQL` ${submissionFeatureId}`);
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeature);
 
@@ -204,120 +227,11 @@ export class SubmissionFeatureRepository extends BaseRepository {
         UNION
         SELECT target_feature_id FROM submission_feature_feature
         WHERE source_feature_id = ${submissionFeatureId}
-      );
+      )
     `;
+    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')};`);
 
     const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
     return response.rows;
-  }
-
-  /**
-   * Get paginated and sorted properties for a single submission feature.
-   *
-   * @param {number} submissionFeatureId
-   * @param {ApiPaginationOptions} pagination
-   * @param {SubmissionFeaturePropertyFilters} [filters]
-   * @returns {Promise<SubmissionFeatureProperty[]>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getSubmissionFeatureProperties(
-    submissionFeatureId: number,
-    pagination: ApiPaginationOptions,
-    filters?: SubmissionFeaturePropertyFilters
-  ): Promise<SubmissionFeatureProperty[]> {
-    const knex = getKnex();
-    const normalizedSearch = filters?.search?.trim().toLowerCase();
-
-    const sortColumnMap: Record<string, 'id' | 'property' | 'value'> = {
-      id: 'id',
-      property: 'property',
-      value: 'value'
-    };
-
-    const requestedSort = pagination.sort ? sortColumnMap[pagination.sort] : undefined;
-    const resolvedSort = requestedSort ?? 'property';
-    const resolvedOrder = pagination.order === 'desc' ? 'desc' : 'asc';
-
-    const queryBuilder = knex('submission_feature as sf')
-      .where('sf.submission_feature_id', submissionFeatureId)
-      .crossJoin(knex.raw(`LATERAL jsonb_each_text(COALESCE(sf.data, '{}'::jsonb)) AS prop(key, value)`))
-      .select([
-        knex.raw('prop.key AS id'),
-        knex.raw(`REPLACE(prop.key, '_', ' ') AS property`),
-        knex.raw('prop.value AS value')
-      ]);
-
-    if (normalizedSearch) {
-      queryBuilder.andWhere(function () {
-        this.whereRaw(`LOWER(REPLACE(prop.key, '_', ' ')) LIKE ?`, [`%${normalizedSearch}%`]).orWhereRaw(
-          `LOWER(prop.value) LIKE ?`,
-          [`%${normalizedSearch}%`]
-        );
-      });
-    }
-
-    this.applyPagination(queryBuilder, {
-      ...pagination,
-      sort: resolvedSort,
-      order: resolvedOrder
-    });
-
-    const response = await this.connection.knex(queryBuilder, SubmissionFeatureProperty);
-
-    return response.rows;
-  }
-
-  /**
-   * Count properties for a single submission feature with optional server-side search.
-   *
-   * @param {number} submissionFeatureId
-   * @param {SubmissionFeaturePropertyFilters} [filters]
-   * @returns {Promise<number>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getSubmissionFeaturePropertiesCount(
-    submissionFeatureId: number,
-    filters?: SubmissionFeaturePropertyFilters
-  ): Promise<number> {
-    const normalizedSearch = filters?.search?.trim().toLowerCase();
-    const sqlStatement = this._getSubmissionFeaturePropertiesCountQuery(submissionFeatureId, normalizedSearch);
-    const response = await this.connection.sql(sqlStatement, z.object({ count: z.number() }));
-
-    if (!response.rowCount) {
-      return 0;
-    }
-
-    return response.rows[0].count;
-  }
-
-  /**
-   * Build SQL to count submission feature properties with optional normalized search.
-   *
-   * @param {number} submissionFeatureId
-   * @param {string} [normalizedSearch]
-   * @returns {SQLStatement}
-   * @memberof SubmissionFeatureRepository
-   */
-  private _getSubmissionFeaturePropertiesCountQuery(
-    submissionFeatureId: number,
-    normalizedSearch?: string
-  ): SQLStatement {
-    const sqlStatement = SQL`
-      SELECT COUNT(*)::int AS count
-      FROM submission_feature sf
-      CROSS JOIN LATERAL jsonb_each_text(COALESCE(sf.data, '{}'::jsonb)) AS prop(key, value)
-      WHERE sf.submission_feature_id = ${submissionFeatureId}
-    `;
-
-    if (normalizedSearch) {
-      sqlStatement.append(SQL`
-        AND (
-          LOWER(REPLACE(prop.key, '_', ' ')) LIKE ${`%${normalizedSearch}%`}
-          OR LOWER(prop.value) LIKE ${`%${normalizedSearch}%`}
-        )
-      `);
-    }
-
-    return sqlStatement;
   }
 }

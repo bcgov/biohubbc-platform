@@ -65,6 +65,11 @@ GET.apiDoc = {
                 description: 'The unique user identifier',
                 type: 'string'
               },
+              display_name: {
+                description: 'Keycloak display name for the user',
+                type: 'string',
+                nullable: true
+              },
               record_end_date: {
                 description: 'Determines if the user record has expired',
                 type: 'string'

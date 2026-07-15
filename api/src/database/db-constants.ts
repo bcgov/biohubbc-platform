@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
-import { SystemUser } from '../models/user';
+import { SystemUser } from '../models/system-user';
 
 export type DBConstants = {
   serviceClientUsers: SystemUser[];

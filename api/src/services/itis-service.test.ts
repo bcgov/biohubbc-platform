@@ -292,7 +292,7 @@ describe('ItisService', () => {
       const response = await itisService.getItisSolrTsnHierarchyUrl(mockTsns);
 
       expect(response).to.equal(
-        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+hierarchyTSN&&q=tsn:1'
+        'https://services.itis.gov/?wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+hierarchyTSN&q=tsn:1'
       );
     });
   });
@@ -320,49 +320,20 @@ describe('ItisService', () => {
       const response = await itisService.getItisSolrTsnSearchUrl([123]);
 
       expect(response).to.equal(
-        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&&q=tsn:123'
-      );
-    });
-  });
-
-  describe('getItisSolrTsnSearchUrl', () => {
-    it('throws an error when itis solr url is not set', async () => {
-      process.env.ITIS_SOLR_URL = '';
-
-      const itisService = new ItisService();
-
-      try {
-        await itisService.getItisSolrTsnSearchUrl([123]);
-
-        expect.fail();
-      } catch (error) {
-        expect((error as ApiGeneralError).message).to.equal('Failed to build ITIS query.');
-      }
-    });
-
-    it('returns a valid url', async () => {
-      process.env.ITIS_SOLR_URL = 'https://services.itis.gov/';
-
-      const itisService = new ItisService();
-
-      const response = await itisService.getItisSolrTsnSearchUrl([123]);
-
-      expect(response).to.equal(
-        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&&q=tsn:123'
+        'https://services.itis.gov/?wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&q=tsn:123'
       );
     });
   });
 
   describe('_sanitizeHierarchyData', () => {
-    it('turns an ITIS hierarchy string into an array'),
-      () => {
-        const mockData: ItisSolrSearchResponseHierarchy[] = [{ tsn: '1', hierarchyTSN: ['$3$2$1$'] }];
+    it('turns an ITIS hierarchy string into an array', () => {
+      const mockData: ItisSolrSearchResponseHierarchy[] = [{ tsn: '1', hierarchyTSN: ['$3$2$1$'] }];
 
-        const itisService = new ItisService();
+      const itisService = new ItisService();
 
-        const result = itisService._sanitizeHierarchyData(mockData);
+      const result = itisService._sanitizeHierarchyData(mockData);
 
-        expect(result).to.eql([3, 2, 1]);
-      };
+      expect(result).to.eql([{ tsn: 1, hierarchy: [3, 2, 1] }]);
+    });
   });
 });

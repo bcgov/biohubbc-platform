@@ -4,10 +4,12 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { createMockDownloadVersionStatusRecord } from '../../__mocks__/download';
 import * as db from '../../database/db';
-import { DownloadDetailRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { publisherDependencies } from '../publisher';
@@ -24,11 +26,14 @@ describe('process-download-job', () => {
     sinon.restore();
   });
 
-  const createMockJob = (downloadId: string, jobId = 'test-job-id') =>
+  const DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000001';
+  const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
+
+  const createMockJob = (downloadVersionId: string, jobId = 'test-job-id') =>
     ({
       id: jobId,
       name: 'process-download',
-      data: { downloadId }
+      data: { downloadVersionId }
     } as PgBoss.Job<IProcessDownloadJobData>);
 
   /**
@@ -45,33 +50,24 @@ describe('process-download-job', () => {
     return mockDBConnection;
   };
 
-  const createMockDownloadRecord = (overrides?: Partial<DownloadDetailRecord>): DownloadDetailRecord => ({
-    download_id: 'dl-1',
-    download_status: DownloadStatusEnum.PENDING,
-    format: 'parquet',
-    metadata: null,
-    started_at: null,
-    completed_at: null,
-    downloaded_at: null,
-    create_date: '2026-01-01T00:00:00.000Z',
-    name: 'Test download',
-    description: null,
-    ...overrides
-  });
-
   const createMockStatement = (urn_feature_type: string, expression_id: string | null = null) => ({
     policy_statement_id: `psid-${urn_feature_type}`,
+    effect: PolicyEffect.ALLOW,
     urn_feature_type,
     expression_id
   });
 
   describe('processDownloadJobHandler', () => {
-    it('transitions pending → processing → ready for a download with 3 feature types', async () => {
+    it('transitions pending → processing → ready for a version with 3 feature types', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
 
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
       const source = { policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 };
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
 
@@ -89,48 +85,86 @@ describe('process-download-job', () => {
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
-      // Two status transitions: first to PROCESSING, then to READY
+      // Two status transitions, both keyed on the version id: first to PROCESSING, then to READY
       expect(transitionStub).to.have.been.calledTwice;
-      expect(transitionStub.firstCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.firstCall.args[0]).to.equal(DOWNLOAD_VERSION_ID);
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       expect(transitionStub.firstCall.args[2]).to.deep.equal([
         DownloadStatusEnum.PENDING,
         DownloadStatusEnum.PROCESSING
       ]);
 
-      expect(transitionStub.secondCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.secondCall.args[0]).to.equal(DOWNLOAD_VERSION_ID);
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
       expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
 
-      // writeFeatureTypeParquet called once per statement, in statements order
+      // writeFeatureTypeParquet called once per statement, in statements order. Each payload
+      // threads the version id and the owning download id (derived from the version's download_id).
       expect(writeStub).to.have.been.calledThrice;
       expect(writeStub.firstCall.args[0]).to.deep.include({
-        downloadId: 'dl-1',
+        downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'a',
         statement: statements[0]
       });
       expect(writeStub.secondCall.args[0]).to.deep.include({
-        downloadId: 'dl-1',
+        downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'b',
         statement: statements[1]
       });
       expect(writeStub.thirdCall.args[0]).to.deep.include({
-        downloadId: 'dl-1',
+        downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         source,
         featureTypeName: 'c',
         statement: statements[2]
       });
     });
 
+    it('derives downloadId for the parquet write from the version row download_id', async () => {
+      setupMockConnection();
+
+      // A version that names a specific owning download — the handler must thread that exact
+      // download_id (not the version id) into the parquet write so the S3 key/source resolve correctly.
+      const versionDownloadId = 'bbbb0000-0000-0000-0000-000000000099';
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ download_id: versionDownloadId }));
+
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+
+      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      schemaLookup.set('a', []);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup,
+        featureTypes: ['a'],
+        statements: [createMockStatement('a')]
+      });
+
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      expect(writeStub).to.have.been.calledOnce;
+      expect(writeStub.firstCall.args[0].downloadId).to.equal(versionDownloadId);
+      expect(writeStub.firstCall.args[0].downloadVersionId).to.equal(DOWNLOAD_VERSION_ID);
+    });
+
     it('calls writeFeatureTypeParquet with the properties looked up from schemaLookup for each feature type', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
@@ -154,7 +188,7 @@ describe('process-download-job', () => {
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
       expect(writeStub.firstCall.args[0].featureTypeName).to.equal('observation');
       expect(writeStub.firstCall.args[0].properties).to.deep.equal(obsProps);
@@ -166,8 +200,12 @@ describe('process-download-job', () => {
     it('skips writeFeatureTypeParquet and still transitions to READY when featureTypes is empty', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
@@ -179,7 +217,7 @@ describe('process-download-job', () => {
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
       expect(writeStub).to.not.have.been.called;
 
@@ -189,14 +227,55 @@ describe('process-download-job', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
 
-    it('enters processing cleanly when a mid-job retry finds the download already in PROCESSING', async () => {
+    it('sums per-feature-type row counts and passes featureCount on the READY transition only', async () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
 
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+
+      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      schemaLookup.set('a', []);
+      schemaLookup.set('b', []);
+      schemaLookup.set('c', []);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup,
+        featureTypes: ['a', 'b', 'c'],
+        statements: [createMockStatement('a'), createMockStatement('b'), createMockStatement('c')]
+      });
+
+      // Each per-type write reports the rows it materialized; the handler sums them.
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet');
+      writeStub.onCall(0).resolves(2);
+      writeStub.onCall(1).resolves(3);
+      writeStub.onCall(2).resolves(5);
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // The PROCESSING transition carries no metadata; the READY transition carries the sum.
+      expect(transitionStub).to.have.been.calledTwice;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(transitionStub.firstCall.args[3]).to.be.undefined;
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(transitionStub.secondCall.args[3]).to.deep.equal({ featureCount: 10 });
+    });
+
+    it('passes featureCount 0 to READY when there are no statements (explicit 0, not skipped metadata)', async () => {
+      setupMockConnection();
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
@@ -206,24 +285,57 @@ describe('process-download-job', () => {
         statements: []
       });
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves(0);
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // No writes ran, but the version still materialized (as empty) — READY records an
+      // explicit 0, distinguishing "counted, empty" from the pre-counting NULL.
+      expect(writeStub).to.not.have.been.called;
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(transitionStub.secondCall.args[3]).to.deep.equal({ featureCount: 0 });
+    });
+
+    it('enters processing cleanly when a mid-job retry finds the version already in PROCESSING', async () => {
+      setupMockConnection();
+
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
+
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: [],
+        statements: []
+      });
+
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
       expect(transitionStub).to.have.been.calledTwice;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
     });
 
     for (const terminalStatus of [DownloadStatusEnum.READY, DownloadStatusEnum.FAILED, DownloadStatusEnum.DOWNLOADED]) {
-      it(`skips silently when status is terminal (${terminalStatus})`, async () => {
+      it(`skips silently with no throw when version status is terminal (${terminalStatus})`, async () => {
         setupMockConnection();
 
         sinon
-          .stub(DownloadRepository.prototype, 'findDownloadById')
-          .resolves(createMockDownloadRecord({ download_status: terminalStatus }));
+          .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+          .resolves(createMockDownloadVersionStatusRecord({ status: terminalStatus }));
 
-        const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+        const transitionStub = sinon
+          .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+          .resolves();
         const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
-        await processDownloadJobHandler([createMockJob('dl-1')]);
+        // Must resolve without throwing — a re-fired terminal job is a silent no-op, not a DLQ candidate.
+        await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
         // No work done — guard returned early
         expect(transitionStub).to.not.have.been.called;
@@ -231,19 +343,24 @@ describe('process-download-job', () => {
       });
     }
 
-    it('throws when findDownloadById returns null', async () => {
+    it('propagates the not-found error when the version does not exist', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+      // The handler has no null-guard of its own — the repository's get* throws on a miss,
+      // and that error propagates so the job lands in the DLQ.
+      const notFoundError = new Error('Download version not found');
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').rejects(notFoundError);
 
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
       try {
-        await processDownloadJobHandler([createMockJob('dl-1')]);
+        await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
-        expect((error as Error).message).to.equal('Download dl-1 not found');
+        expect(error).to.equal(notFoundError);
       }
 
       expect(transitionStub).to.not.have.been.called;
@@ -253,8 +370,12 @@ describe('process-download-job', () => {
     it('propagates error from writeFeatureTypeParquet without transitioning to READY', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
@@ -272,7 +393,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').rejects(testError);
 
       try {
-        await processDownloadJobHandler([createMockJob('dl-1')]);
+        await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).to.equal(testError);
@@ -294,8 +415,10 @@ describe('process-download-job', () => {
       setupMockConnection();
       const sendStub = stubPgBoss();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: null });
@@ -305,7 +428,7 @@ describe('process-download-job', () => {
         statements: []
       });
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
       expect(sendStub).to.not.have.been.called;
     });
@@ -314,8 +437,10 @@ describe('process-download-job', () => {
       setupMockConnection();
       const sendStub = stubPgBoss();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 42 });
@@ -325,18 +450,18 @@ describe('process-download-job', () => {
         statements: []
       });
 
-      await processDownloadJobHandler([createMockJob('dl-1')]);
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
       expect(sendStub).to.not.have.been.called;
     });
   });
 
   describe('processDownloadFailedHandler', () => {
-    const createMockFailedJob = (downloadId: string, jobId = 'dlq-job-id', output?: unknown) =>
+    const createMockFailedJob = (downloadVersionId: string, jobId = 'dlq-job-id', output?: unknown) =>
       ({
         id: jobId,
         name: '__state__completed__process-download',
-        data: { downloadId },
+        data: { downloadVersionId },
         output
       } as PgBoss.JobWithMetadata<IProcessDownloadJobData>);
 
@@ -353,19 +478,23 @@ describe('process-download-job', () => {
       return { commitStub, rollbackStub };
     };
 
-    it('transitions to failed with error metadata for a string job output', async () => {
+    it('transitions the version to failed with error metadata for a string job output', async () => {
       setupDLQMocks();
 
       sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
 
-      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'something went wrong')]);
+      await processDownloadFailedHandler([
+        createMockFailedJob(DOWNLOAD_VERSION_ID, 'dlq-job-id', 'something went wrong')
+      ]);
 
       expect(transitionStub).to.have.been.calledOnce;
-      expect(transitionStub.firstCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.firstCall.args[0]).to.equal(DOWNLOAD_VERSION_ID);
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.FAILED);
       expect(transitionStub.firstCall.args[2]).to.deep.equal([
         DownloadStatusEnum.PENDING,
@@ -378,27 +507,31 @@ describe('process-download-job', () => {
       setupDLQMocks();
 
       sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
 
-      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', { whatever: 'obj' })]);
+      await processDownloadFailedHandler([createMockFailedJob(DOWNLOAD_VERSION_ID, 'dlq-job-id', { whatever: 'obj' })]);
 
       expect(transitionStub.firstCall.args[3]).to.deep.equal({ error: 'Job failed after all retries' });
     });
 
     for (const terminalStatus of [DownloadStatusEnum.READY, DownloadStatusEnum.FAILED, DownloadStatusEnum.DOWNLOADED]) {
-      it(`skips silently when the download is already in terminal status (${terminalStatus})`, async () => {
+      it(`skips silently when the version is already in terminal status (${terminalStatus})`, async () => {
         const { commitStub, rollbackStub } = setupDLQMocks();
 
         sinon
-          .stub(DownloadRepository.prototype, 'findDownloadById')
-          .resolves(createMockDownloadRecord({ download_status: terminalStatus }));
+          .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+          .resolves(createMockDownloadVersionStatusRecord({ status: terminalStatus }));
 
-        const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+        const transitionStub = sinon
+          .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+          .resolves();
 
-        await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
+        await processDownloadFailedHandler([createMockFailedJob(DOWNLOAD_VERSION_ID, 'dlq-job-id', 'anything')]);
 
         expect(transitionStub).to.not.have.been.called;
         expect(commitStub).to.have.been.calledOnce;
@@ -406,32 +539,18 @@ describe('process-download-job', () => {
       });
     }
 
-    it('skips silently when the download is not found', async () => {
-      const { commitStub, rollbackStub } = setupDLQMocks();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
-
-      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
-
-      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
-
-      expect(transitionStub).to.not.have.been.called;
-      expect(commitStub).to.have.been.calledOnce;
-      expect(rollbackStub).to.not.have.been.called;
-    });
-
-    it('rethrows unexpected errors from transitionDownloadStatus', async () => {
+    it('rethrows unexpected errors from transitionDownloadVersionStatus', async () => {
       const { commitStub, rollbackStub } = setupDLQMocks();
 
       sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
       const testError = new Error('unexpected');
-      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').rejects(testError);
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').rejects(testError);
 
       try {
-        await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
+        await processDownloadFailedHandler([createMockFailedJob(DOWNLOAD_VERSION_ID, 'dlq-job-id', 'anything')]);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).to.equal(testError);

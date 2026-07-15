@@ -1,0 +1,18 @@
+[
+  {
+    "id": "c21e3c06-054c-4c03-943b-29d71c7398b6",
+    "type": "animal",
+    "properties": {
+      "taxon_id": 180703,
+      "animal_identifier": "SAMPLER-001",
+      "description": "Sampler animal carrying marking, measurement, and mortality children.",
+      "sex": "female"
+    },
+    "content": [
+      "8cd8cc9f-6422-4b5a-acde-cb3a9944b82b",
+      "26cde575-7367-4b33-a832-dfdb0b86f264",
+      "ad6dc187-8734-41f3-8c95-8c2dda898df2"
+    ],
+    "parent": "cc07359b-dd25-4965-98d0-d8b89558432c"
+  }
+]

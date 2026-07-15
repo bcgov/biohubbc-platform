@@ -1,14 +1,13 @@
-import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCartContext, useDialogContext } from 'hooks/useContext';
+import { useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { ApiPaginationResponseParams } from 'types/pagination';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -41,12 +40,10 @@ export const useSearchResultDownload = ({
   const api = useApi();
   const navigate = useNavigate();
   const { auth } = useAuthStateContext();
-  const { checkout } = useCartContext();
   const dialogContext = useDialogContext();
   const isMounted = useIsMounted();
   const { runSerialized } = useSerializedAsync();
 
-  const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
   const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
   const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
 
@@ -86,7 +83,7 @@ export const useSearchResultDownload = ({
    * can monitor status and obtain their export. Failure keeps the dialog open
    * and shows the API error. State updates are skipped after unmount.
    *
-   * @param {ICreateDownloadFormValues} values - User-provided download name, description, and feature types.
+   * @param {ICreateDownloadFormValues} values - User-provided download name and description.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
    */
   const handleCreateDownload = useCallback(
@@ -97,7 +94,6 @@ export const useSearchResultDownload = ({
           const response = await api.download.createDownload({
             name: values.name,
             description: values.description,
-            featureTypes: values.featureTypes,
             expression: expressionTree
           });
           if (!isMounted()) {
@@ -105,7 +101,6 @@ export const useSearchResultDownload = ({
           }
           setIsCreateDownloadDialogOpen(false);
           if (auth.isAuthenticated) {
-            setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
             dialogContext.setSnackbar({
               open: true,
               snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
@@ -131,34 +126,19 @@ export const useSearchResultDownload = ({
   );
 
   /**
-   * Checks out the current cart and moves the sidebar to the Downloads view.
-   * Checkout failures are surfaced through the global snackbar.
-   */
-  const handleCheckout = useCallback(async () => {
-    try {
-      await checkout();
-      setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
-    } catch (error) {
-      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
-    }
-  }, [checkout, dialogContext]);
-
-  /**
    * Closes the create-download dialog without submitting.
-   * Does not reset expression, sidebar tab, or pagination state.
+   * Does not reset expression or pagination state.
    */
   const handleCancelCreateDownload = useCallback(() => {
     setIsCreateDownloadDialogOpen(false);
   }, []);
 
   return {
-    downloadView,
-    setDownloadView,
+    downloadView: 'Downloads',
     isCreateDownloadDialogOpen,
     isSubmittingDownload,
     handleOpenCreateDownload,
     handleCreateDownload,
-    handleCancelCreateDownload,
-    handleCheckout
+    handleCancelCreateDownload
   };
 };

@@ -1,4 +1,11 @@
-import { mdiAlertCircleOutline, mdiChevronDown, mdiChevronUp, mdiDownloadOutline, mdiRefresh } from '@mdi/js';
+import {
+  mdiAlertCircleOutline,
+  mdiChevronDown,
+  mdiChevronUp,
+  mdiCogOutline,
+  mdiDownloadOutline,
+  mdiRefresh
+} from '@mdi/js';
 import Icon from '@mdi/react';
 import { Card, Chip, Collapse, IconButton, Link, Stack, Tooltip, Typography } from '@mui/material';
 import { grey } from '@mui/material/colors';
@@ -7,7 +14,7 @@ import { CustomMenuIconButton, IMenuToolbarItem } from 'components/toolbar/Actio
 import { DOWNLOAD_STATUS_CHIP_PROPS, EXPORT_STATUS_CHIP_PROPS } from 'constants/download';
 import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
-import { isExportReady } from '../downloads/DownloadSidebarDownloads';
+import { isExportReady } from '../downloads/download-export-utils';
 
 interface DownloadFeatureCardProps {
   download: DownloadRecord;
@@ -22,6 +29,8 @@ interface DownloadFeatureCardProps {
   exports: DownloadExport[];
   /** Fired when the user picks a menu item. Sidebar owns the API call + refresh. */
   onCreateExport: (downloadId: string) => void;
+  /** Fired when the user picks "CSV — single combined file". Sidebar opens the combined-export dialog (loads feature types) for this download. */
+  onConfigureExport: (downloadId: string) => void;
   /** Fired when the user clicks a per-part download. Sidebar fetches the presigned URL and triggers the iframe download. */
   onDownloadExportPart: (exportId: string, chunkId: number) => void;
   /** Fired when the user clicks "Download all" on a multi-part ready export. */
@@ -54,7 +63,15 @@ interface ExportRowProps {
  * no `vi.mock('hooks/useApi')` is required for card tests.
  */
 export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
-  const { download, exports, onCreateExport, onDownloadExportPart, onDownloadExportAllParts, onRebuildExport } = props;
+  const {
+    download,
+    exports,
+    onCreateExport,
+    onConfigureExport,
+    onDownloadExportPart,
+    onDownloadExportAllParts,
+    onRebuildExport
+  } = props;
 
   const chipProps = DOWNLOAD_STATUS_CHIP_PROPS[download.download_status];
 
@@ -71,6 +88,11 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
       menuLabel: 'CSV — per feature type',
       menuIcon: <Icon path={mdiDownloadOutline} size={0.8} />,
       menuOnClick: () => onCreateExport(download.download_id)
+    },
+    {
+      menuLabel: 'CSV — single combined file',
+      menuIcon: <Icon path={mdiCogOutline} size={0.8} />,
+      menuOnClick: () => onConfigureExport(download.download_id)
     }
   ];
 
@@ -97,7 +119,7 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
           <Stack spacing={0.5} sx={{ pt: 0.5 }}>
             {exports.map((ex) => (
               <ExportRow
-                key={ex.download_export_id}
+                key={ex.download_version_export_id}
                 exportRecord={ex}
                 onDownloadPart={onDownloadExportPart}
                 onDownloadAllParts={onDownloadExportAllParts}
@@ -125,7 +147,14 @@ export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
  */
 const ExportRow = (props: ExportRowProps) => {
   const { exportRecord, onDownloadPart, onDownloadAllParts, onRebuild } = props;
-  const { download_export_id: exportId, status, started_at, completed_at, error_message, part_count } = exportRecord;
+  const {
+    download_version_export_id: exportId,
+    status,
+    started_at,
+    completed_at,
+    error_message,
+    part_count
+  } = exportRecord;
   const exportChipProps = EXPORT_STATUS_CHIP_PROPS[status];
 
   const [partsOpen, setPartsOpen] = useState(false);

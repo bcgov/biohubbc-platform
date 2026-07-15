@@ -97,6 +97,13 @@ spec:
               value: {{ .Values.app.clamav.host }}
             - name: CLAMAV_PORT
               value: {{ .Values.app.clamav.port | quote }}
+            # ITIS SOLR
+            - name: ITIS_SOLR_URL
+              value: {{ .Values.app.itisSolr }}
+            - name: ITIS_TSN_LOOKUP_BATCH_SIZE
+              value: {{ .Values.app.itisTsnLookupBatchSize | quote }}
+            - name: ITIS_TSN_LOOKUP_DELAY_MS
+              value: {{ .Values.app.itisTsnLookupDelayMs | quote }}
             # Database
             - name: TZ
               value: {{ .Values.app.timezone }}

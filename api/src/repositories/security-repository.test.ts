@@ -182,7 +182,7 @@ describe('SecurityRepository', () => {
 
       const response = await securityRepository.deleteSecurityRuleFromArtifact(1, 1);
 
-      expect(response).to.eql(undefined);
+      expect(response).to.be.undefined;
     });
   });
 
@@ -344,7 +344,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.applySecurityRulesToSubmissionFeatures([1, 2, 3], [1, 2]);
-      expect(response.length).to.equal(6);
+      expect(response).to.have.lengthOf(6);
     });
   });
 
@@ -432,7 +432,40 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.applySecurityToSubmission(1, [1, 2]);
-      expect(response.length).to.equal(6);
+      expect(response).to.have.lengthOf(6);
+    });
+  });
+
+  describe('insertDraftSecurityForTriggers', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns 0 and does not query when there are no trigger feature ids', async () => {
+      const queryStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.insertDraftSecurityForTriggers([], 1, 'upload-uuid-1', 99);
+
+      expect(response).to.equal(0);
+      expect(queryStub).to.not.have.been.called;
+    });
+
+    it('inserts draft rows linked to the scan event and returns the inserted count', async () => {
+      const queryStub = sinon
+        .stub()
+        .resolves({ rowCount: 2, rows: [{ submission_feature_id: 10 }, { submission_feature_id: 20 }] });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.insertDraftSecurityForTriggers([10], 1, 'upload-uuid-1', 99);
+
+      expect(response).to.equal(2);
+      // The scan-event id is passed as the 4th bind parameter and written into submission_upload_security_id.
+      expect(queryStub).to.have.been.calledOnce;
+      const [, params] = queryStub.firstCall.args;
+      expect(params).to.deep.equal([[10], 1, 'upload-uuid-1', 99]);
     });
   });
 
@@ -472,7 +505,7 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeSecurityFromSubmission(1, [1]);
-      expect(response.length).to.equal(2);
+      expect(response).to.have.lengthOf(2);
     });
 
     it('should succeed at removing all security rules from a submission when no rule IDs are provided', async () => {
@@ -534,7 +567,7 @@ describe('SecurityRepository', () => {
       });
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeSecurityFromSubmission(1);
-      expect(response.length).to.equal(4);
+      expect(response).to.have.lengthOf(4);
     });
   });
 
@@ -588,7 +621,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.removeAllSecurityRulesFromSubmissionFeatures([1, 2]);
-      expect(response.length).to.equal(3);
+      expect(response).to.have.lengthOf(3);
     });
   });
 
@@ -642,7 +675,7 @@ describe('SecurityRepository', () => {
 
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.getSecurityRulesForSubmissionFeatures([1, 2]);
-      expect(response.length).to.equal(3);
+      expect(response).to.have.lengthOf(3);
     });
   });
 });

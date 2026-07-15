@@ -1,6 +1,11 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { DownloadExport, DownloadExportDetail } from 'interfaces/useDownloadExportApi.interface';
+import {
+  CreateExportPayload,
+  DownloadExport,
+  DownloadExportDetail,
+  DownloadFeatureType
+} from 'interfaces/useDownloadExportApi.interface';
 import { useDownloadExportApi } from './useDownloadExportApi';
 
 describe('useDownloadExportApi', () => {
@@ -15,9 +20,20 @@ describe('useDownloadExportApi', () => {
   });
 
   describe('createExport', () => {
-    it('POSTs to /api/download/{id}/export with empty body when payload omitted', async () => {
+    // Minimal valid payload — the backend now REQUIRES a recipe + download_version_id, so there is
+    // no empty-body path. Reused by the simple status/error-propagation tests below.
+    const minimalPayload: CreateExportPayload = {
+      download_version_id: 'ver-1',
+      version: 1,
+      export_type: 'csv',
+      mode: 'per_feature_type',
+      feature_types: ['telemetry'],
+      merge_steps: []
+    };
+
+    it('POSTs the CreateExportPayload to /api/download/{id}/export', async () => {
       const mockResponse: DownloadExport = {
-        download_export_id: 'exp-1',
+        download_version_export_id: 'exp-1',
         download_id: 'abc-123',
         format: 'csv',
         mode: 'per_feature_type',
@@ -31,16 +47,30 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).createExport('abc-123');
+      const result = await useDownloadExportApi(axios).createExport('abc-123', minimalPayload);
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].url).toBe('/api/download/abc-123/export');
-      expect(mock.history.post[0].data).toBe(JSON.stringify({}));
+      expect(JSON.parse(mock.history.post[0].data)).toEqual(minimalPayload);
     });
 
-    it('forwards the max_part_size_bytes payload', async () => {
+    it('forwards a full per_feature_type CreateExportPayload as the POST body', async () => {
+      // Verifies: createExport serializes the widened config payload verbatim into the POST body
+      // (the hook no longer accepts the old `{ max_part_size_bytes }`-only shape).
+
+      // Step 1: Build a fully-typed per_feature_type payload against the real interface.
+      const payload: CreateExportPayload = {
+        download_version_id: 'ver-1',
+        version: 1,
+        export_type: 'csv',
+        mode: 'per_feature_type',
+        feature_types: ['telemetry'],
+        merge_steps: [],
+        max_part_size_bytes: 1048576
+      };
+
       const mockResponse: DownloadExport = {
-        download_export_id: 'exp-1',
+        download_version_export_id: 'exp-1',
         download_id: 'abc-123',
         format: 'csv',
         mode: 'per_feature_type',
@@ -54,14 +84,67 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      await useDownloadExportApi(axios).createExport('abc-123', { max_part_size_bytes: 1048576 });
+      // Step 2: Invoke the hook with the full payload.
+      await useDownloadExportApi(axios).createExport('abc-123', payload);
 
-      expect(mock.history.post[0].data).toBe(JSON.stringify({ max_part_size_bytes: 1048576 }));
+      // Step 3: Assert the POST went to the right URL and forwarded the payload unchanged.
+      expect(mock.history.post[0].url).toBe('/api/download/abc-123/export');
+      expect(JSON.parse(mock.history.post[0].data)).toEqual(payload);
+    });
+
+    it('POSTs the widened denormalized config (root_feature_type, merge_steps, output_columns)', async () => {
+      // Verifies: createExport forwards the full denormalized recipe — merge_steps and
+      // output_columns survive serialization intact, not just the per_feature_type shape.
+
+      // Step 1: Build a fully-typed denormalized payload against the real interface.
+      const payload: CreateExportPayload = {
+        download_version_id: 'ver-1',
+        version: 1,
+        export_type: 'csv',
+        mode: 'denormalized',
+        root_feature_type: 'animal',
+        feature_types: ['animal', 'telemetry'],
+        merge_steps: [
+          {
+            left_feature_type: 'animal',
+            left_column: 'animal_id',
+            right_feature_type: 'telemetry',
+            right_column: 'animal_id',
+            merge_type: 'left'
+          }
+        ],
+        output_columns: [
+          { feature_type: 'animal', column: 'animal_id' },
+          { feature_type: 'telemetry', column: 'lat', output_column: 'latitude' }
+        ],
+        max_part_size_bytes: 1048576
+      };
+
+      const mockResponse: DownloadExport = {
+        download_version_export_id: 'exp-2',
+        download_id: 'abc-123',
+        format: 'csv',
+        mode: 'denormalized',
+        status: 'pending',
+        max_part_size_bytes: '1048576',
+        part_count: 0,
+        started_at: null,
+        completed_at: null,
+        error_message: null
+      };
+
+      mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
+
+      // Step 2: Invoke the hook with the denormalized payload.
+      await useDownloadExportApi(axios).createExport('abc-123', payload);
+
+      // Step 3: Assert the parsed POST body equals the payload exactly.
+      expect(JSON.parse(mock.history.post[0].data)).toEqual(payload);
     });
 
     it('returns a typed DownloadExport', async () => {
       const mockResponse: DownloadExport = {
-        download_export_id: 'exp-1',
+        download_version_export_id: 'exp-1',
         download_id: 'abc-123',
         format: 'csv',
         mode: 'per_feature_type',
@@ -75,24 +158,24 @@ describe('useDownloadExportApi', () => {
 
       mock.onPost('/api/download/abc-123/export').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).createExport('abc-123');
+      const result = await useDownloadExportApi(axios).createExport('abc-123', minimalPayload);
 
-      expect(result.download_export_id).toBe('exp-1');
+      expect(result.download_version_export_id).toBe('exp-1');
       expect(result.format).toBe('csv');
     });
 
     it('propagates HTTP 409 errors', async () => {
       mock.onPost('/api/download/abc-123/export').reply(409);
 
-      await expect(useDownloadExportApi(axios).createExport('abc-123')).rejects.toThrow();
+      await expect(useDownloadExportApi(axios).createExport('abc-123', minimalPayload)).rejects.toThrow();
     });
   });
 
   describe('getExport', () => {
-    it('GETs /api/download-export/{id} (flat path)', async () => {
+    it('GETs the nested /api/download/{downloadId}/export/{exportId} path', async () => {
       const mockResponse: DownloadExportDetail = {
-        download_export_id: 'exp-1',
-        download_id: 'abc-123',
+        download_version_export_id: 'ex-9',
+        download_id: 'dl-1',
         format: 'csv',
         mode: 'per_feature_type',
         status: 'ready',
@@ -104,18 +187,18 @@ describe('useDownloadExportApi', () => {
         parts: [{ chunk_id: 1, file_size_bytes: '1024', url: 'https://s3.example.com/signed-url' }]
       };
 
-      mock.onGet('/api/download-export/exp-1').reply(200, mockResponse);
+      mock.onGet('/api/download/dl-1/export/ex-9').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).getExport('exp-1');
+      const result = await useDownloadExportApi(axios).getExport('dl-1', 'ex-9');
 
       expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].url).toBe('/api/download-export/exp-1');
+      expect(mock.history.get[0].url).toBe('/api/download/dl-1/export/ex-9');
     });
 
     it('returns detail including parts[]', async () => {
       const mockResponse: DownloadExportDetail = {
-        download_export_id: 'exp-1',
-        download_id: 'abc-123',
+        download_version_export_id: 'ex-9',
+        download_id: 'dl-1',
         format: 'csv',
         mode: 'per_feature_type',
         status: 'ready',
@@ -130,9 +213,9 @@ describe('useDownloadExportApi', () => {
         ]
       };
 
-      mock.onGet('/api/download-export/exp-1').reply(200, mockResponse);
+      mock.onGet('/api/download/dl-1/export/ex-9').reply(200, mockResponse);
 
-      const result = await useDownloadExportApi(axios).getExport('exp-1');
+      const result = await useDownloadExportApi(axios).getExport('dl-1', 'ex-9');
 
       expect(result.parts.length).toBe(2);
       expect(result.parts[0].chunk_id).toBe(1);
@@ -140,9 +223,31 @@ describe('useDownloadExportApi', () => {
     });
 
     it('propagates HTTP 404 errors', async () => {
-      mock.onGet('/api/download-export/missing').reply(404);
+      mock.onGet('/api/download/dl-1/export/missing').reply(404);
 
-      await expect(useDownloadExportApi(axios).getExport('missing')).rejects.toThrow();
+      await expect(useDownloadExportApi(axios).getExport('dl-1', 'missing')).rejects.toThrow();
+    });
+  });
+
+  describe('getDownloadFeatureTypes', () => {
+    it('GETs /api/download/{downloadId}/feature-types and returns the typed feature types', async () => {
+      // Verifies: getDownloadFeatureTypes targets the feature-types sub-resource of a download
+      // and returns the typed DownloadFeatureType[] that drives the export config picker.
+
+      // Step 1: Build a typed mock response against the real interface.
+      const mockResponse: DownloadFeatureType[] = [
+        { feature_type: 'animal', columns: ['animal_id', 'sex'] },
+        { feature_type: 'telemetry', columns: ['lat', 'lon', 'timestamp'] }
+      ];
+
+      mock.onGet('/api/download/abc-123/feature-types').reply(200, mockResponse);
+
+      // Step 2: Invoke the hook.
+      const result = await useDownloadExportApi(axios).getDownloadFeatureTypes('abc-123');
+
+      // Step 3: Assert the request URL and the returned payload.
+      expect(mock.history.get[0].url).toBe('/api/download/abc-123/feature-types');
+      expect(result).toEqual(mockResponse);
     });
   });
 });

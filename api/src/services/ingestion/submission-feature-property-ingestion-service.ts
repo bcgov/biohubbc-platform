@@ -5,7 +5,9 @@ import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
+import { TaxonomyService } from '../taxonomy-service';
 import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
@@ -16,6 +18,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   featureIngestionRepository: FeatureIngestionRepository;
   contributorService: ContributorService;
   submissionUploadReviewService: SubmissionUploadReviewService;
+  submissionUploadService: SubmissionUploadService;
+  taxonomyService: TaxonomyService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -25,6 +29,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
     this.contributorService = new ContributorService(connection);
     this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
+    this.taxonomyService = new TaxonomyService(connection);
   }
 
   /**
@@ -59,6 +65,18 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionId,
         submissionUploadId,
         contributorId: contributor.contributor_id
+      });
+
+      // Resolve the Blueprint pinned to this upload. Property resolution and requiredness checks use
+      // this Blueprint rather than re-selecting the current default (the upload is grandfathered in).
+      currentPhase = 'resolve upload blueprint';
+      const { blueprint_id: blueprintId } = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
+      defaultLog.debug({
+        label: 'indexSubmissionPropertiesBySubmissionUploadId',
+        message: 'resolved blueprint',
+        submissionId,
+        submissionUploadId,
+        blueprintId
       });
       // Cleanup for idempotency.
       currentPhase = 'cleanup existing property records and relationships';
@@ -107,7 +125,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId);
+      await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId, blueprintId);
       await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
         submissionUploadId
       );
@@ -122,7 +140,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         phase: currentPhase
       });
       await this.submissionFeaturePropertyIngestionRepository.recordMissingRequiredPropertyErrorsBySubmissionUploadId(
-        submissionUploadId
+        submissionUploadId,
+        blueprintId
       );
       await this.submissionFeaturePropertyIngestionRepository.recordPrimitiveValidationErrorsBySubmissionUploadId(
         submissionUploadId
@@ -141,6 +160,19 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         contributor.contributor_id
       );
+
+      // Phase 5b: ensure missing taxa and their full ITIS hierarchy exist locally, then resolve any
+      // taxon candidates that were previously unresolved. This runs before taxon resolution errors are
+      // recorded so that valid-but-uncached taxa are fetched from ITIS rather than failing ingestion.
+      currentPhase = 'ensure taxon hierarchy for unresolved taxon candidates';
+      defaultLog.debug({
+        label: 'indexSubmissionPropertiesBySubmissionUploadId',
+        message: 'phase start',
+        submissionId,
+        submissionUploadId,
+        phase: currentPhase
+      });
+      await this.ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(submissionUploadId);
 
       // Phase 6: FK reference validation/resolution diagnostics.
       currentPhase = 'record code, taxon, artifact, and feature resolution errors';
@@ -290,7 +322,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
         submissionUploadId
       );
-      await this.submissionFeaturePropertyIngestionRepository.insertArtifactLinksBySubmissionUploadId(
+      await this.submissionFeaturePropertyIngestionRepository.insertArtifactPropertiesBySubmissionUploadId(
         submissionUploadId
       );
 
@@ -354,15 +386,20 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * validation, and downstream typed inserts.
    *
    * @param {string} submissionUploadId Upload scope.
+   * @param {number} blueprintId The Blueprint pinned to the upload.
    * @returns {Promise<void>}
    */
-  private async populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  private async populateUploadPropertyWorkingSetBySubmissionUploadId(
+    submissionUploadId: string,
+    blueprintId: number
+  ): Promise<void> {
     await this.submissionFeaturePropertyIngestionRepository.clearUploadPropertyWorkingSetStagingBySubmissionUploadId(
       submissionUploadId
     );
 
     await this.submissionFeaturePropertyIngestionRepository.populateResolvedPropertyStagingBySubmissionUploadId(
-      submissionUploadId
+      submissionUploadId,
+      blueprintId
     );
 
     await this.submissionFeaturePropertyIngestionRepository.populateTypedPropertyValueStagingBySubmissionUploadId(
@@ -404,6 +441,36 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
     await this.submissionFeaturePropertyIngestionRepository.populateFeatureCandidateStagingBySubmissionUploadId(
+      submissionUploadId
+    );
+  }
+
+  /**
+   * Ensure missing taxa (and their full ITIS hierarchy) referenced by unresolved taxon candidates exist
+   * locally, then backfill the now-resolvable candidate `taxon_id` values.
+   *
+   * Runs after taxon candidate population and before taxon resolution error recording so that valid taxa
+   * not yet cached locally are fetched from ITIS (with their full lineage and parent links) rather than
+   * failing ingestion.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  private async ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(
+    submissionUploadId: string
+  ): Promise<void> {
+    const unresolvedTsns =
+      await this.submissionFeaturePropertyIngestionRepository.getUnresolvedTaxonTsnsBySubmissionUploadId(
+        submissionUploadId
+      );
+
+    if (!unresolvedTsns.length) {
+      return;
+    }
+
+    await this.taxonomyService.ensureTaxonHierarchyByTsnIds(unresolvedTsns);
+
+    await this.submissionFeaturePropertyIngestionRepository.resolveTaxonCandidateTaxonIdsBySubmissionUploadId(
       submissionUploadId
     );
   }

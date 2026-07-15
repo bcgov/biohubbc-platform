@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
 import { HTTPError } from '../../errors/http-error';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUserExtended } from '../../models/system-user';
 import { AuthorizationService } from '../../services/authorization/authorization-service';
 import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
 import * as authorization from './authorization';

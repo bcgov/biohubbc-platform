@@ -119,8 +119,8 @@ export class PolicyRepository extends BaseRepository {
   /**
    * Returns all policies that authorize access to the given feature URN for the given user.
    *
-   * NOTE: We can optimize queries that use URNs by storing the URN components individually and indexing each.
-   * This query currently repeats split_part as a temporary implementation, but this should be optimized using DB indexes.
+   * Uses normalized URN components on security_scope so reusable scope rows drive
+   * both standing access and authorization lookups.
    *
    * @param {FeatureUrn} urnParts
    * @param {number} systemUserId
@@ -129,16 +129,6 @@ export class PolicyRepository extends BaseRepository {
    */
   async getPoliciesThatAuthorizeFeatureAccessByUrn(urnParts: FeatureUrn, systemUserId: number): Promise<Policy[]> {
     const sql = SQL`
-      WITH policy_urn_parts AS (
-        SELECT
-          ps.*,
-          split_part(ps.submission_feature_urn, ':', 2) AS part1,  -- submissionId
-          split_part(ps.submission_feature_urn, ':', 3) AS part2,  -- featureTypeName
-          split_part(ps.submission_feature_urn, ':', 4) AS part3   -- submissionFeatureId
-        FROM policy_statement ps
-        WHERE ps.record_end_date IS NULL
-          AND ps.effect = ${PolicyEffect.ALLOW}
-      )
       SELECT DISTINCT p.*
       FROM policy p
       INNER JOIN team_policy tp 
@@ -150,14 +140,18 @@ export class PolicyRepository extends BaseRepository {
       INNER JOIN team_member tm 
         ON tm.team_id = tp.team_id 
         AND tm.record_end_date IS NULL
-      INNER JOIN policy_urn_parts ps 
+      INNER JOIN policy_statement ps
         ON ps.policy_id = p.policy_id
+        AND ps.record_end_date IS NULL
+        AND ps.effect = ${PolicyEffect.ALLOW}
+      INNER JOIN security_scope ss
+        ON ss.security_scope_id = ps.security_scope_id
       WHERE tm.system_user_id = ${systemUserId}
         AND (p.record_end_date IS NULL OR p.record_end_date > NOW())
         AND p.status = 'approved'
-        AND (ps.part1 = ${urnParts.submissionId} OR ps.part1 = '*')
-        AND (ps.part2 = ${urnParts.featureTypeName} OR ps.part2 = '*')
-        AND (ps.part3 = ${urnParts.submissionFeatureId} OR ps.part3 = '*')
+        AND (ss.urn_submission_id = ${urnParts.submissionId} OR ss.urn_submission_id = '*')
+        AND (ss.urn_feature_type = ${urnParts.featureTypeName} OR ss.urn_feature_type = '*')
+        AND (ss.urn_feature_id = ${urnParts.submissionFeatureId} OR ss.urn_feature_id = '*')
       `;
 
     const response = await this.connection.sql(sql, Policy);

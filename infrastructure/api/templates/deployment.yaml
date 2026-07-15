@@ -108,6 +108,10 @@ spec:
             # ITIS SOLR
             - name: ITIS_SOLR_URL
               value: {{ .Values.app.itisSolr }}
+            - name: ITIS_TSN_LOOKUP_BATCH_SIZE
+              value: {{ .Values.app.itisTsnLookupBatchSize | quote }}
+            - name: ITIS_TSN_LOOKUP_DELAY_MS
+              value: {{ .Values.app.itisTsnLookupDelayMs | quote }}
             # Clamav
             - name: ENABLE_FILE_VIRUS_SCAN
               value: {{ .Values.app.clamav.enabled | quote }}

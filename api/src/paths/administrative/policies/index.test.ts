@@ -54,6 +54,7 @@ describe('paths/administrative/policies/index', () => {
           name: 'Test Policy',
           description: 'Test description',
           status: 'approved' as const,
+          expressions: [],
           statements: []
         }
       ];
@@ -146,8 +147,22 @@ describe('paths/administrative/policies/index', () => {
 
       const mockPoliciesResponse = {
         policies: [
-          { policy_id: '1', name: 'Alpha Policy', description: null, status: 'approved' as const, statements: [] },
-          { policy_id: '2', name: 'Beta Policy', description: null, status: 'approved' as const, statements: [] }
+          {
+            policy_id: '1',
+            name: 'Alpha Policy',
+            description: null,
+            status: 'approved' as const,
+            statements: [],
+            expressions: []
+          },
+          {
+            policy_id: '2',
+            name: 'Beta Policy',
+            description: null,
+            status: 'approved' as const,
+            statements: [],
+            expressions: []
+          }
         ],
         pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'asc' as const }
       };
@@ -195,8 +210,22 @@ describe('paths/administrative/policies/index', () => {
 
       const mockPoliciesResponse = {
         policies: [
-          { policy_id: '2', name: 'Zebra Policy', description: null, status: 'approved' as const, statements: [] },
-          { policy_id: '1', name: 'Alpha Policy', description: null, status: 'approved' as const, statements: [] }
+          {
+            policy_id: '2',
+            name: 'Zebra Policy',
+            description: null,
+            status: 'approved' as const,
+            statements: [],
+            expressions: []
+          },
+          {
+            policy_id: '1',
+            name: 'Alpha Policy',
+            description: null,
+            status: 'approved' as const,
+            statements: [],
+            expressions: []
+          }
         ],
         pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'desc' as const }
       };
@@ -270,13 +299,13 @@ describe('paths/administrative/policies/index', () => {
         name: 'New Policy',
         description: 'New description',
         status: 'approved',
+        expressions: [],
         statements: [
           {
             policy_statement_id: 's1',
             policy_id: '1',
             effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:*:*',
-            conditions: []
+            submission_feature_urn: 'urn:*:*:*'
           }
         ]
       };
@@ -324,6 +353,7 @@ describe('paths/administrative/policies/index', () => {
         name: 'Empty Policy',
         description: null,
         status: 'approved',
+        expressions: [],
         statements: []
       };
 

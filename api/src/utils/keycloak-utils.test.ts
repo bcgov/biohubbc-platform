@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import * as dbConstants from '../database/db-constants';
-import { SystemUser } from '../repositories/user-repository';
+import { SystemUser } from '../models/system-user';
 import {
   coerceUserIdentitySource,
   getServiceClientSystemUser,

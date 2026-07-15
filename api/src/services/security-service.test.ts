@@ -237,11 +237,13 @@ describe('SecurityService', () => {
     afterEach(() => {
       sinon.restore();
     });
+
     it('should throw an error if user is not admin, and document is pending review (does not have a security review timestamp', async () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
@@ -269,6 +271,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
@@ -305,6 +308,7 @@ describe('SecurityService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
 
       const securityService = new SecurityService(mockDBConnection);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
         .resolves(false);
@@ -341,6 +345,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isArtifactPendingReviewStub = sinon
         .stub(SecurityService.prototype, 'isArtifactPendingReview')
         .resolves(false);
@@ -377,6 +382,7 @@ describe('SecurityService', () => {
 
       const securityService = new SecurityService(mockDBConnection);
 
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
       const isArtifactPendingReviewStub = sinon
@@ -505,16 +511,16 @@ describe('SecurityService', () => {
     });
   });
 
-  describe('isDatasetPendingReview', () => {
+  describe('isSurveyPendingReview', () => {
     afterEach(() => {
       sinon.restore();
     });
 
-    it('should return true if the any artifact in the dataset is pending review', async () => {
+    it('should return true if the any artifact in the survey is pending review', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
-      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      const getArtifactsBySurveyIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsBySurveyId').resolves([
         {
           artifact_id: 1,
           key: 'secured-string-a',
@@ -534,17 +540,17 @@ describe('SecurityService', () => {
         .onSecondCall()
         .resolves(false);
 
-      const result = await securityService.isDatasetPendingReview('datasetId');
+      const result = await securityService.isSurveyPendingReview('surveyId');
 
-      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(getArtifactsBySurveyIdStub).to.be.calledWith('surveyId');
       expect(result).to.eql(true);
     });
 
-    it('should return false if the no artifact in the dataset is pending review', async () => {
+    it('should return false if the no artifact in the survey is pending review', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
-      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      const getArtifactsBySurveyIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsBySurveyId').resolves([
         {
           artifact_id: 1,
           key: 'secured-string-a',
@@ -564,9 +570,9 @@ describe('SecurityService', () => {
         .onSecondCall()
         .resolves(false);
 
-      const result = await securityService.isDatasetPendingReview('datasetId');
+      const result = await securityService.isSurveyPendingReview('surveyId');
 
-      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(getArtifactsBySurveyIdStub).to.be.calledWith('surveyId');
       expect(result).to.eql(false);
     });
   });

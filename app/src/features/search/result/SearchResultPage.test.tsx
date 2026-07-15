@@ -1,14 +1,14 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCodesContext, useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SearchResultPage } from './SearchResultPage';
 
 const mockNavigate = vi.fn();
-const mockUseParams = vi.fn(() => ({ featureType: 'dataset' }));
-const mockUseLocation = vi.fn(() => ({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' }));
+const mockUseParams = vi.fn(() => ({ featureType: 'survey' }));
+const mockUseLocation = vi.fn(() => ({ search: '', pathname: '/search/survey', hash: '', state: null, key: 'k' }));
 const mockSetSearchParams = vi.fn();
 const mockSearchParams = new URLSearchParams();
 
@@ -69,7 +69,6 @@ import { useSearchResults } from './hooks/useSearchResults';
 const mockUseApi = useApi as Mock;
 const mockUseAuthStateContext = useAuthStateContext as Mock;
 const mockUseCodesContext = useCodesContext as Mock;
-const mockUseCartContext = useCartContext as Mock;
 const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
 
@@ -78,10 +77,11 @@ const mockCreateDataRequest = vi.fn();
 const mockGetAvailableUsers = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
+const mockSetResultSearchParams = vi.fn();
 
 const codesPayload = {
   feature_type_with_properties: [
-    { feature_type: { name: 'dataset', display_name: 'Dataset' }, properties: [] },
+    { feature_type: { name: 'survey', display_name: 'Survey' }, properties: [] },
     { feature_type: { name: 'telemetry', display_name: 'Telemetry' }, properties: [] }
   ]
 };
@@ -93,13 +93,13 @@ describe('SearchResultPage', () => {
     vi.clearAllMocks();
 
     // Reset location to default (no search params) before each test.
-    mockUseLocation.mockReturnValue({ search: '', pathname: '/search/dataset', hash: '', state: null, key: 'k' });
+    mockUseLocation.mockReturnValue({ search: '', pathname: '/search/survey', hash: '', state: null, key: 'k' });
 
     // Mirror navigate calls into useLocation so URL-derived state (e.g. the `expr` param)
     // is visible on subsequent renders, matching real router behaviour.
     mockNavigate.mockImplementation((to: unknown) => {
       if (to && typeof to === 'object' && 'search' in to) {
-        const { pathname = '/search/dataset', search = '' } = to as { pathname?: string; search?: string };
+        const { pathname = '/search/survey', search = '' } = to as { pathname?: string; search?: string };
         mockUseLocation.mockReturnValue({ search, pathname, hash: '', state: null, key: 'k' });
       }
     });
@@ -117,22 +117,17 @@ describe('SearchResultPage', () => {
     mockUseCodesContext.mockReturnValue({
       codesDataLoader: { isReady: true, data: codesPayload }
     });
-    mockUseCartContext.mockReturnValue({
-      features: [],
-      pagination: { total: 0 },
-      addToCart: vi.fn(),
-      checkout: vi.fn()
-    });
     mockUseDialogContext.mockReturnValue({
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
     });
-    mockUseParams.mockReturnValue({ featureType: 'dataset' });
+    mockUseParams.mockReturnValue({ featureType: 'survey' });
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
-      setSearchParams: vi.fn(),
+      setSearchParams: mockSetResultSearchParams,
       pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
@@ -144,9 +139,19 @@ describe('SearchResultPage', () => {
     expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
   });
 
+  it('updates the result limit when the rows-per-page control changes', () => {
+    const { getByRole } = renderPage();
+
+    fireEvent.mouseDown(getByRole('combobox', { name: /rows per page/i }));
+    fireEvent.click(getByRole('option', { name: /25/i }));
+
+    expect(mockSetResultSearchParams).toHaveBeenCalledWith({ limit: '25' });
+  });
+
   it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
+      properties: [],
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -178,6 +183,18 @@ describe('SearchResultPage', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
+  it('defaults the download name to feature type plus current timestamp', async () => {
+    const { getByRole, getByLabelText, rerender } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
+    fireEvent.click(getByRole('button', { name: /create download/i }));
+
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
+
+    expect((getByLabelText(/Name/i) as HTMLInputElement).value).toMatch(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
   it('submits the create-download dialog with expression: null when no expression is applied', async () => {
     mockCreateDownload.mockResolvedValue({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
@@ -192,8 +209,7 @@ describe('SearchResultPage', () => {
     await waitFor(() => expect(mockCreateDownload).toHaveBeenCalledTimes(1));
     expect(mockCreateDownload).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: expect.stringMatching(/ download$/),
-        featureTypes: ['dataset'],
+        name: expect.stringMatching(/^survey - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/),
         expression: null
       })
     );
@@ -214,8 +230,10 @@ describe('SearchResultPage', () => {
         })
     );
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -240,6 +258,7 @@ describe('SearchResultPage', () => {
   it('disables Create Download while pagination is still loading (undefined → not zero)', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
+      properties: [],
       isLoading: true,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -271,10 +290,11 @@ describe('SearchResultPage', () => {
     const { getByRole, rerender } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
 
     await waitFor(() => {
       expect(mockUseSearchResults).toHaveBeenLastCalledWith(
-        'dataset',
+        'survey',
         true,
         expect.objectContaining({
           type: 'expression',
@@ -301,22 +321,25 @@ describe('SearchResultPage', () => {
   });
 
   it('refreshes with a null expression when applying no expression filters', async () => {
-    const { getByRole } = renderPage();
+    const { getByRole, rerender } = renderPage();
     const callCountBeforeApply = mockUseSearchResults.mock.calls.length;
 
     fireEvent.click(getByRole('button', { name: /apply empty expression/i }));
+    rerender(<SearchResultPage />);
 
     await waitFor(() => {
       expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
-      expect(mockUseSearchResults).toHaveBeenLastCalledWith('dataset', true, null, expect.any(Number));
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null, expect.any(Number));
     });
   });
 
   it('surfaces the API error message in a snackbar when submit fails', async () => {
     mockCreateDownload.mockRejectedValue({ message: 'Server exploded' });
 
-    const { getByRole, getByLabelText, getByTestId } = renderPage();
+    const { getByRole, getByLabelText, getByTestId, rerender } = renderPage();
 
+    fireEvent.click(getByRole('button', { name: /apply expression/i }));
+    rerender(<SearchResultPage />);
     fireEvent.click(getByRole('button', { name: /create download/i }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -333,9 +356,12 @@ describe('SearchResultPage', () => {
     );
   });
 
-  it('P1: hides the secured-results banner when no rows are secured', () => {
+  it('P1: hides the secured-results banner when there are no hidden secured matches, even if a visible row is secured', () => {
+    // A visible secured row the caller CAN see must not, by itself, surface the banner.
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      properties: [],
+      hasMoreSecuredFeatures: false,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -347,12 +373,11 @@ describe('SearchResultPage', () => {
     expect(queryByRole('button', { name: /request access/i })).not.toBeInTheDocument();
   });
 
-  it('P2: shows the banner and opens the create-data-request dialog without navigating', async () => {
+  it('P2: shows the banner when secured matches are hidden and opens the create-data-request dialog without navigating', async () => {
     mockUseSearchResults.mockReturnValue({
-      rows: [
-        { uuid: 'result-1', submission_feature_id: 1, is_secured: false },
-        { uuid: 'result-2', submission_feature_id: 2, is_secured: true }
-      ],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -370,9 +395,11 @@ describe('SearchResultPage', () => {
 
   it('P3a: submits the canonical lowercase featureType when the route is mixed-case', async () => {
     mockCreateDataRequest.mockResolvedValue({});
-    mockUseParams.mockReturnValue({ featureType: 'DATASET' });
+    mockUseParams.mockReturnValue({ featureType: 'SURVEY' });
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
@@ -390,7 +417,7 @@ describe('SearchResultPage', () => {
     await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
     expect(mockCreateDataRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        featureTypes: ['dataset']
+        featureTypes: ['survey']
       })
     );
   });
@@ -398,7 +425,9 @@ describe('SearchResultPage', () => {
   it('P4: surfaces an API error and keeps the create-data-request dialog open on failure', async () => {
     mockCreateDataRequest.mockRejectedValue({ message: 'Server exploded' });
     mockUseSearchResults.mockReturnValue({
-      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
+      rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
+      properties: [],
+      hasMoreSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),

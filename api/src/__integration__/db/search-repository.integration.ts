@@ -64,6 +64,29 @@ describe('SearchRepository (integration)', function () {
     return result.rows[0].feature_type_property_id;
   }
 
+  /** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
+  async function getBlueprintFeatureTypePropertyId(submissionFeatureId: number, ftpId: number): Promise<number> {
+    const result = await connection.sql(SQL`
+      SELECT bftp.blueprint_feature_type_property_id
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${ftpId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+      LIMIT 1;
+    `);
+
+    if (!result.rows[0]) {
+      throw new Error(`No blueprint_feature_type_property for feature ${submissionFeatureId}, ftp ${ftpId}`);
+    }
+
+    return result.rows[0].blueprint_feature_type_property_id;
+  }
+
   async function addStringProperty(
     submissionFeatureId: number,
     featureTypeName: string,
@@ -72,10 +95,11 @@ describe('SearchRepository (integration)', function () {
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${value}, ${systemUserId});
+      INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${value}, ${systemUserId});
     `);
   }
 
@@ -87,10 +111,11 @@ describe('SearchRepository (integration)', function () {
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, contributor_codeset_code_id, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${contributorCodesetCodeId}, ${systemUserId});
+      INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
+      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
     `);
   }
 
@@ -102,10 +127,11 @@ describe('SearchRepository (integration)', function () {
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
+    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, taxon_id, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${taxonId}, ${systemUserId});
+      INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, taxon_id, create_user)
+      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${taxonId}, ${systemUserId});
     `);
   }
 
@@ -241,8 +267,8 @@ describe('SearchRepository (integration)', function () {
     it('matches string-property values (baseline corpus)', async () => {
       const keyword = `${TOKEN}_stringbase`;
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset alpha' });
-      await addStringProperty(featureId, 'dataset', 'description', `moose habitat near ${keyword}`);
+      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Survey alpha' });
+      await addStringProperty(featureId, 'survey', 'description', `moose habitat near ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -418,20 +444,20 @@ describe('SearchRepository (integration)', function () {
     });
 
     it('counts a code-arm match (records/summary parity)', async () => {
-      // Summary only counts priority types (dataset, species_observation, telemetry, report).
-      // Verify the code corpus widening reaches the summary by seeding a `dataset` feature that
+      // Summary only counts priority types (survey, species_observation, telemetry, report).
+      // Verify the code corpus widening reaches the summary by seeding a `survey` feature that
       // matches only via the code arm.
       const keyword = `${TOKEN}_summary_code`;
       const codeId = await createCodesetCode('summarycode', `${keyword} Agency`, null);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Summary dataset' });
-      await addCodeProperty(featureId, 'dataset', 'description', codeId);
+      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
+      await addCodeProperty(featureId, 'survey', 'description', codeId);
 
       const summary = await repo.findFeatureSummary({ keyword });
       const records = await findFeatures(keyword);
 
-      const dataset = summary.find((s) => s.feature_type_name === 'dataset');
-      expect(dataset?.total).to.equal(1);
+      const survey = summary.find((s) => s.feature_type_name === 'survey');
+      expect(survey?.total).to.equal(1);
       expect(records.total).to.equal(1);
       expect(records.data[0].submission_feature_id).to.equal(featureId);
     });

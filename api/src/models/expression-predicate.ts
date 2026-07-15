@@ -35,6 +35,17 @@ export const PredicateOperator = z.enum([
 export type PredicateOperator = z.infer<typeof PredicateOperator>;
 
 /**
+ * Timestamp comparison value used by normalized search/evaluation predicates.
+ *
+ * Timestamp property rows are physically split into `date_value` and `time_value`, so the normalized internal payload
+ * keeps those parts separate. Date-only, time-only, and date-time predicates set whichever components are applicable.
+ */
+export type InternalTimestampPredicateValue = {
+  date_value: string | null;
+  time_value: string | null;
+};
+
+/**
  * Internal normalized predicate payload used after semantic validation.
  *
  * Public expression predicates are property-driven and scalar-valued. Services resolve property metadata, validate the
@@ -45,7 +56,14 @@ export type InternalTypedPredicate =
   | { type: 'string'; operator: PredicateOperator; value?: string }
   | { type: 'number'; operator: PredicateOperator; value?: number }
   | { type: 'boolean'; operator: PredicateOperator; value?: boolean }
-  | { type: 'timestamp'; operator: PredicateOperator; value?: string }
+  | { type: 'timestamp'; operator: PredicateOperator; value?: InternalTimestampPredicateValue }
   | { type: 'taxon'; operator: PredicateOperator; value?: number }
   | { type: 'geometry'; operator: PredicateOperator; value?: unknown }
   | { type: 'code'; operator: PredicateOperator; value?: number };
+
+/**
+ * Normalized timestamp predicate branch.
+ *
+ * Use this where code needs direct access to split timestamp `date_value` / `time_value` fields.
+ */
+export type TimestampInternalPredicate = Extract<InternalTypedPredicate, { type: 'timestamp' }>;

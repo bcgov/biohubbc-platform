@@ -138,8 +138,7 @@ export class TeamRepository extends BaseRepository {
       .table('team')
       .update({
         name: teamData.name,
-        description: teamData.description,
-        record_end_date: teamData.record_end_date
+        description: teamData.description
       })
       .where('team_id', teamId);
 

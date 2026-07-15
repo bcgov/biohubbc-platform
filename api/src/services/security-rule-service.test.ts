@@ -15,6 +15,37 @@ describe('SecurityRuleService', () => {
     sinon.restore();
   });
 
+  describe('getScreenableSecurityRules', () => {
+    it('delegates to SecurityRuleRepository.getScreenableSecurityRules', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityRuleService(mockDBConnection);
+
+      const mockRules = [
+        {
+          security_rule_id: 1,
+          policy_id: null,
+          name: 'Victoria Rule',
+          description: 'Geometry rule',
+          is_active: true,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        }
+      ];
+
+      const stub = sinon.stub(SecurityRuleRepository.prototype, 'getScreenableSecurityRules').resolves(mockRules);
+
+      const result = await service.getScreenableSecurityRules();
+
+      expect(stub).to.have.been.calledOnce;
+      expect(result).to.eql(mockRules);
+    });
+  });
+
   describe('createSecurityRule', () => {
     it('validates the category exists and inserts the rule', async () => {
       const mockCategory = { security_category_id: 2, name: 'Health', description: 'Health category' };

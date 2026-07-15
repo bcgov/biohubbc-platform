@@ -8,4 +8,5 @@ export interface IDropdownButtonProps extends Omit<
   value: string;
   itemGroups: IDropdownMenuItemGroup[];
   onSelect: (value: string) => void;
+  valueColorMap?: Partial<Record<string, ButtonProps['color']>>;
 }

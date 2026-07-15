@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
 import { SubmissionFeaturePropertyFilters } from '../../../../../../models/submission-feature';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
 import {
@@ -8,7 +8,7 @@ import {
   paginationResponseSchema
 } from '../../../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
-import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
+import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
 import { getLogger } from '../../../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../../utils/pagination';
 
@@ -19,8 +19,7 @@ export const GET: Operation = [
     return {
       and: [
         {
-          discriminator: 'Team',
-          entity: 'submission_feature',
+          discriminator: 'Policy',
           submissionFeatureId: Number(req.params.submissionFeatureId),
           submissionId: Number(req.params.submissionId)
         }
@@ -110,7 +109,10 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatureProperties(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    // Unsecured features are readable anonymously (see the closure-based authorization rule on this
+    // route); fall back to the API user connection when there is no keycloak token, mirroring the
+    // feature list endpoint.
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
     const submissionFeatureId = Number(req.params.submissionFeatureId);
     const pagination = makePaginationOptionsFromRequest(req);
     const filters = { search: req.query.search } as SubmissionFeaturePropertyFilters;
@@ -118,8 +120,8 @@ export function getSubmissionFeatureProperties(): RequestHandler {
     try {
       await connection.open();
 
-      const submissionFeatureService = new SubmissionFeatureService(connection);
-      const result = await submissionFeatureService.getSubmissionFeatureProperties(
+      const submissionFeaturePropertyService = new SubmissionFeaturePropertyService(connection);
+      const result = await submissionFeaturePropertyService.getSubmissionFeatureProperties(
         submissionFeatureId,
         pagination,
         filters

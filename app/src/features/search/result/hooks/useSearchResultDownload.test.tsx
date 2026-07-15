@@ -1,9 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
-import { DOWNLOAD_SIDEBAR_VIEW } from 'constants/download';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCartContext, useDialogContext } from 'hooks/useContext';
+import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { Mock, vi } from 'vitest';
@@ -21,7 +20,6 @@ vi.mock('react-router', async () => {
 });
 
 const mockCreateDownload = vi.fn();
-const mockCheckout = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
 
@@ -47,8 +45,7 @@ const pagination: ApiPaginationResponseParams = {
 
 const formValues: ICreateDownloadFormValues = {
   name: 'My download',
-  description: 'a description',
-  featureTypes: ['observation']
+  description: 'a description'
 };
 
 const setupAuth = (isAuthenticated: boolean) => {
@@ -72,10 +69,6 @@ describe('useSearchResultDownload', () => {
       }
     });
 
-    (useCartContext as Mock).mockReturnValue({
-      checkout: mockCheckout
-    });
-
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
@@ -88,7 +81,7 @@ describe('useSearchResultDownload', () => {
     vi.clearAllMocks();
   });
 
-  it('H1: authenticated success switches to the Downloads view and shows the success snackbar', async () => {
+  it('H1: authenticated success shows the success snackbar', async () => {
     setupAuth(true);
 
     const { result } = renderHook(() =>
@@ -99,7 +92,7 @@ describe('useSearchResultDownload', () => {
       await result.current.handleCreateDownload(formValues);
     });
 
-    expect(result.current.downloadView).toBe(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+    expect(result.current.downloadView).toBe('Downloads');
     expect(mockSetSnackbar).toHaveBeenCalledWith(
       expect.objectContaining({
         open: true,
@@ -108,6 +101,11 @@ describe('useSearchResultDownload', () => {
     );
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
     expect(mockSetOkDialog).not.toHaveBeenCalled();
+    expect(mockCreateDownload).toHaveBeenCalledWith({
+      name: 'My download',
+      description: 'a description',
+      expression: expressionTree
+    });
   });
 
   it('H2: anonymous success navigates to the public download page without dialog or snackbar', async () => {
@@ -130,7 +128,7 @@ describe('useSearchResultDownload', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
     expect(mockSetOkDialog).not.toHaveBeenCalled();
     expect(mockSetSnackbar).not.toHaveBeenCalled();
-    expect(result.current.downloadView).not.toBe(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
+    expect(result.current.downloadView).toBe('Downloads');
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
   });
 

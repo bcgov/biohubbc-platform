@@ -7,6 +7,7 @@ import { IDBConnection } from '../../database/db';
 import { Team } from '../../models/team';
 import { TeamMember, TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamMemberService } from './team-member-service';
 import { TeamService } from './team-service';
 
@@ -59,6 +60,7 @@ describe('TeamService', () => {
       team_member_id: '22222222-2222-2222-2222-222222222222',
       system_user_id: 1,
       user_identifier: 'user_1',
+      display_name: 'User, One WLRS:EX',
       email: 'user_1@test.com'
     };
 
@@ -203,9 +205,13 @@ describe('TeamService', () => {
     expect(result).to.eql(mockTeam);
   });
 
-  it('deleteTeam calls repository.deleteTeam', async () => {
+  it('deleteTeam calls repository.deleteTeam and rebuilds team security scopes', async () => {
     const stub = sinon.stub(TeamRepository.prototype, 'deleteTeam').resolves();
+    const rebuildStub = sinon.stub(SecurityScopeService.prototype, 'rebuildTeamSecurityScopes').resolves();
+
     await service.deleteTeam('11111111-1111-1111-1111-111111111111');
+
     expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+    expect(rebuildStub).to.have.been.calledOnceWith('11111111-1111-1111-1111-111111111111');
   });
 });

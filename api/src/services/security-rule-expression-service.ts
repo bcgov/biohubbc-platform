@@ -4,14 +4,16 @@ import { PolicyEffect } from '../models/policy-statement';
 import { PolicyStatementRepository } from '../repositories/authorization/policy-statement-repository';
 import { SecurityRuleExpressionRepository } from '../repositories/security-rule-expression-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
+import { PolicyExpressionService } from './access-policy/policy-expression-service';
+import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { DBService } from './db-service';
 
 export class SecurityRuleExpressionService extends DBService {
   securityRuleExpressionRepository: SecurityRuleExpressionRepository;
   securityRuleRepository: SecurityRuleRepository;
   policyStatementRepository: PolicyStatementRepository;
-  policyStatementExpressionService: PolicyStatementExpressionService;
+  policyStatementService: PolicyStatementService;
+  policyExpressionService: PolicyExpressionService;
 
   /**
    * Build a security-rule expression service.
@@ -23,7 +25,8 @@ export class SecurityRuleExpressionService extends DBService {
     this.securityRuleExpressionRepository = new SecurityRuleExpressionRepository(connection);
     this.securityRuleRepository = new SecurityRuleRepository(connection);
     this.policyStatementRepository = new PolicyStatementRepository(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
+    this.policyExpressionService = new PolicyExpressionService(connection);
   }
 
   /**
@@ -33,7 +36,7 @@ export class SecurityRuleExpressionService extends DBService {
    * 1. Load active security-rule links.
    * 2. Soft-delete existing links when the target changes.
    * 3. Insert the replacement active link when needed.
-   * 4. Synchronize the mapped `urn:*:*:*` ALLOW policy statement expression link.
+   * 4. Synchronize the mapped `urn:*:*:*` ALLOW policy statement expression.
    *
    * Notes:
    * - Policy synchronization runs regardless of whether the security-rule link was already correct.
@@ -76,10 +79,20 @@ export class SecurityRuleExpressionService extends DBService {
       throw new ApiExecuteSQLError('No mapped policy statement found for security rule policy');
     }
 
-    await this.policyStatementExpressionService.replacePolicyStatementExpression(
-      mappedStatement.policy_statement_id,
+    if (mappedStatement.policy_expression_id) {
+      await this.policyExpressionService.updatePolicyExpression(mappedStatement.policy_expression_id, {
+        expressionId
+      });
+      return;
+    }
+
+    const policyExpression = await this.policyExpressionService.ensurePolicyExpression({
+      policyId: securityRule.policy_id,
       expressionId
-    );
+    });
+    await this.policyStatementService.updatePolicyStatement(mappedStatement.policy_statement_id, {
+      policy_expression_id: policyExpression.policy_expression_id
+    });
   }
 
   /**

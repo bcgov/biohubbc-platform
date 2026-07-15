@@ -1,9 +1,8 @@
-import { CartContext } from 'contexts/cartContext';
-import { ICartContext } from 'contexts/cartContext.interface';
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
 import { IPolicyAutocompleteContext, PolicyAutocompleteContext } from 'contexts/policyAutocompleteContext';
+import { IPolicyContext, PolicyContext } from 'contexts/policyContext';
 import { ITicketContext, TicketContext } from 'contexts/ticketContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
@@ -60,6 +59,23 @@ export const useTicketContext = (): ITicketContext => {
 };
 
 /**
+ * Returns an instance of `IPolicyContext` from `PolicyContext`.
+ *
+ * @return {*}  {IPolicyContext}
+ */
+export const usePolicyContext = (): IPolicyContext => {
+  const context = useContext(PolicyContext);
+
+  if (!context) {
+    throw new Error(
+      'PolicyContext is undefined, please verify you are calling usePolicyContext() as child of an <PolicyContextProvider> component.'
+    );
+  }
+
+  return context;
+};
+
+/**
  * Returns an instance of `ICodesContext` from `CodesContext`.
  *
  * @return {*}  {ICodesContext}
@@ -99,23 +115,6 @@ export const usePolicyAutocompleteContext = (): IPolicyAutocompleteContext => {
   if (!context) {
     throw new Error(
       'PolicyAutocompleteContext is undefined, please verify you are calling usePolicyAutocompleteContext() as child of a <PolicyAutocompleteContextProvider> component.'
-    );
-  }
-
-  return context;
-};
-
-/**
- * Returns an instance of `ICartContext` from `CartContext`.
- *
- * @return {*}  {ICartContext}
- */
-export const useCartContext = (): ICartContext => {
-  const context = useContext(CartContext);
-
-  if (!context) {
-    throw new Error(
-      'CartContext is undefined, please verify you are calling useCartContext() as child of a <CartContextProvider> component.'
     );
   }
 

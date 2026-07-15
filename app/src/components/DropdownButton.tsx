@@ -14,12 +14,13 @@ import { useDropdownMenu } from './menu/useDropdownMenu';
  * @return {*}
  */
 export const DropdownButton = (props: IDropdownButtonProps) => {
-  const { value, itemGroups, onSelect, size = 'medium', ...buttonProps } = props;
+  const { value, itemGroups, onSelect, valueColorMap, size = 'medium', ...buttonProps } = props;
   const { anchorEl, open, selectedLabel, handleClose, handleOpen, handleSelect } = useDropdownMenu(
     value,
     itemGroups,
     onSelect
   );
+  const selectedColor = valueColorMap?.[value];
 
   return (
     <>
@@ -27,13 +28,22 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
         variant="outlined"
         size={size}
         {...buttonProps}
+        color={selectedColor ?? buttonProps.color}
         onClick={(event) => handleOpen(event.currentTarget)}
         endIcon={<Icon path={mdiMenuDown} size={1} />}
         sx={{
           minWidth: size === 'small' ? 128 : 180,
           justifyContent: 'space-between',
           textTransform: 'none',
-          backgroundColor: 'grey.50',
+          backgroundColor: selectedColor ? `${selectedColor}.main` : 'grey.50',
+          borderColor: selectedColor ? `${selectedColor}.main` : undefined,
+          color: selectedColor ? `${selectedColor}.contrastText` : undefined,
+          '&:hover': selectedColor
+            ? {
+                backgroundColor: `${selectedColor}.dark`,
+                borderColor: `${selectedColor}.dark`
+              }
+            : undefined,
           '&.Mui-disabled': {
             color: 'action.disabled',
             backgroundColor: 'action.disabledBackground',

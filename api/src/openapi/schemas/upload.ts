@@ -22,6 +22,11 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     comment: {
       type: 'string',
       description: 'Comments for system administrators about the submission'
+    },
+    blueprint_id: {
+      type: 'integer',
+      description:
+        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -124,6 +129,11 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     comment: {
       type: 'string',
       description: 'Comments for system administrators about the submission.'
+    },
+    blueprint_id: {
+      type: 'integer',
+      description:
+        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };

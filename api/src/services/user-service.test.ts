@@ -7,7 +7,8 @@ import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiError } from '../errors/api-error';
 import { HTTP401 } from '../errors/http-error';
-import { SystemRoles, SystemUser, SystemUserExtended, UserRepository } from '../repositories/user-repository';
+import { SystemRoles, SystemUser, SystemUserExtended } from '../models/system-user';
+import { UserRepository } from '../repositories/user-repository';
 import { IUserProfile, UserService } from './user-service';
 
 chai.use(sinonChai);
@@ -206,6 +207,25 @@ describe('UserService', () => {
     });
   });
 
+  describe('getSystemUsersCount', function () {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns the system users count', async function () {
+      const mockDBConnection = getMockDBConnection();
+      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getSystemUsersCount');
+      mockUserRepository.resolves(3);
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getSystemUsersCount('search');
+
+      expect(result).to.equal(3);
+      expect(mockUserRepository).to.have.been.calledOnceWith('search');
+    });
+  });
+
   describe('ensureSystemUser', () => {
     afterEach(() => {
       sinon.restore();
@@ -218,8 +238,6 @@ describe('UserService', () => {
       const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
-      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
-
       const userIdentifier = 'username';
       const userGuid = '123-456-789';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
@@ -235,7 +253,6 @@ describe('UserService', () => {
 
       expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
-      expect(activateSystemUserStub).not.to.have.been.called;
     });
 
     it('adds a new system user if one does not already exist', async () => {
@@ -248,8 +265,6 @@ describe('UserService', () => {
       const addSystemUserStub = sinon
         .stub(UserService.prototype, 'addSystemUser')
         .resolves(addedSystemUser as unknown as SystemUser);
-
-      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
 
       const getUserById = sinon
         .stub(UserService.prototype, 'getUserById')
@@ -269,7 +284,6 @@ describe('UserService', () => {
       expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).to.have.been.calledOnce;
       expect(getUserById).to.have.been.calledOnce;
-      expect(activateSystemUserStub).not.to.have.been.called;
     });
 
     it('gets an existing system user that is already activate', async () => {
@@ -302,8 +316,6 @@ describe('UserService', () => {
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
-      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
-
       const userIdentifier = 'username';
       const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
@@ -317,10 +329,9 @@ describe('UserService', () => {
 
       expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
-      expect(activateSystemUserStub).not.to.have.been.called;
     });
 
-    it('gets an existing system user that is not already active and re-activates it', async () => {
+    it('throws HTTP401 for an existing system user that is blocked', async () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
 
       const existingSystemUser: SystemUserExtended = {
@@ -350,32 +361,7 @@ describe('UserService', () => {
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
-      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
-
-      const activatedSystemUser: SystemUserExtended = {
-        system_user_id: 2,
-        user_identity_source_id: 2,
-        user_identifier: 'username',
-        identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
-        user_guid: '',
-        record_effective_date: '2020-10-10',
-        record_end_date: null,
-        create_user: 1,
-        create_date: '',
-        update_user: null,
-        update_date: null,
-        revision_count: 0,
-        role_ids: [1],
-        role_names: ['Collaborator'],
-        display_name: null,
-        given_name: null,
-        family_name: null,
-        email: null,
-        agency: null,
-        notes: null
-      };
-
-      const getUserByIdStub = sinon.stub(UserService.prototype, 'getUserById').resolves(activatedSystemUser);
+      const getUserByIdStub = sinon.stub(UserService.prototype, 'getUserById');
 
       const userIdentifier = 'username';
       const userGuid = 'aaaa';
@@ -383,51 +369,37 @@ describe('UserService', () => {
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
-
-      expect(result.system_user_id).to.equal(2);
-      expect(result.record_end_date).to.equal(null);
+      try {
+        await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
+        expect.fail('Expected HTTP401 to be thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP401);
+        expect((error as HTTP401).message).to.equal('User account is inactive');
+      }
 
       expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
-      expect(activateSystemUserStub).to.have.been.calledOnce;
-      expect(getUserByIdStub).to.have.been.calledOnce;
+      expect(getUserByIdStub).not.to.have.been.called;
     });
   });
 
-  describe('activateSystemUser', function () {
+  describe('updateSystemUser', function () {
     afterEach(() => {
       sinon.restore();
     });
 
     it('returns nothing on success', async function () {
       const mockDBConnection = getMockDBConnection();
-      const mockUserRepository = sinon.stub(UserRepository.prototype, 'activateSystemUser');
+      const mockUserRepository = sinon.stub(UserRepository.prototype, 'updateSystemUser');
       mockUserRepository.resolves();
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.activateSystemUser(1);
+      const updates = { record_end_date: null };
+      const result = await userService.updateSystemUser(1, updates);
 
       expect(result).to.be.undefined;
-    });
-  });
-
-  describe('deactivateSystemUser', function () {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('returns nothing on success', async function () {
-      const mockDBConnection = getMockDBConnection();
-      const mockUserRepository = sinon.stub(UserRepository.prototype, 'deactivateSystemUser');
-      mockUserRepository.resolves();
-
-      const userService = new UserService(mockDBConnection);
-
-      const result = await userService.deactivateSystemUser(1);
-
-      expect(result).to.be.undefined;
+      expect(mockUserRepository).to.have.been.calledOnceWith(1, updates);
     });
   });
 
@@ -688,15 +660,15 @@ describe('UserService', () => {
       expect(getUserByIdStub).to.have.been.calledOnceWith(456);
     });
 
-    it('throws HTTP401 for expired user', async function () {
+    it('throws HTTP401 for inactive user', async function () {
       const mockDBConnection = getMockDBConnection();
 
-      const expiredUser: SystemUserExtended = {
+      const inactiveUser: SystemUserExtended = {
         system_user_id: 789,
-        user_identifier: 'expired',
+        user_identifier: 'inactive',
         user_identity_source_id: 1,
         identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
-        user_guid: 'guid-expired',
+        user_guid: 'guid-inactive',
         record_effective_date: '2024-01-01',
         record_end_date: '2024-06-01',
         role_ids: [],
@@ -706,34 +678,34 @@ describe('UserService', () => {
         update_user: null,
         update_date: null,
         revision_count: 0,
-        display_name: 'Expired User',
-        given_name: 'Expired',
+        display_name: 'Inactive User',
+        given_name: 'Inactive',
         family_name: 'User',
-        email: 'expired@example.com',
+        email: 'inactive@example.com',
         agency: null,
         notes: null
       };
-      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(expiredUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(inactiveUser);
 
       const userService = new UserService(mockDBConnection);
 
       const profile: IUserProfile = {
-        displayName: 'Expired User',
-        email: 'expired@example.com',
-        givenName: 'Expired',
+        displayName: 'Inactive User',
+        email: 'inactive@example.com',
+        givenName: 'Inactive',
         familyName: 'User',
         agency: null
       };
 
       try {
-        await userService.upsertSelf('guid-expired', 'expired', 'IDIR', profile);
+        await userService.upsertSelf('guid-inactive', 'inactive', 'IDIR', profile);
         expect.fail('Expected HTTP401 to be thrown');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP401);
-        expect((error as HTTP401).message).to.equal('User account is expired or inactive');
+        expect((error as HTTP401).message).to.equal('User account is inactive');
       }
 
-      expect(getUserByGuidStub).to.have.been.calledOnceWith('guid-expired');
+      expect(getUserByGuidStub).to.have.been.calledOnceWith('guid-inactive');
     });
   });
 });

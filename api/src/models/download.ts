@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { DownloadExportListRow } from './download-export';
 import { DownloadStatusZod } from './download-status';
+import { DownloadVersionExportListRow } from './download-version-export';
 import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
+  download_version_id: z.string().uuid(), // resolved most-recent version (a committed download always has one)
   download_status: DownloadStatusZod,
   format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
@@ -18,10 +19,9 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
 /**
  * Detail-row shape returned by `DownloadRepository.findDownloadById`. Extends
  * `DownloadRecord` with the owning policy's display fields (`name`,
- * `description`), which are joined in via `LEFT JOIN biohub.policy` on the
- * detail query only. The LIST query does not join `policy`, so the base
- * `DownloadRecord` stays untouched and the list-row schemas (built off
- * `DownloadListRecordBase = DownloadRecord`) continue to parse cleanly.
+ * `description`), joined in via `LEFT JOIN biohub.policy`. Both the detail read
+ * and the paginated list read carry these fields, so every download read parses
+ * against `name`/`description`.
  */
 export const DownloadDetailRecord = DownloadRecord.extend({
   name: z.string(),
@@ -30,22 +30,14 @@ export const DownloadDetailRecord = DownloadRecord.extend({
 export type DownloadDetailRecord = z.infer<typeof DownloadDetailRecord>;
 
 /**
- * Repo-layer list-row shape, returned by `DownloadRepository.getDownloadsByTeamMembership`
- * before service-layer enrichment. Service adds `exports[]` to produce `DownloadListRecord`.
+ * Service-layer (and public API) private download-list shape. Extends
+ * `DownloadDetailRecord` (base download + the owning policy's `name`/`description`)
+ * with `exports[]`, attached by `DownloadService.getDownloadsByTeamMembership`
+ * via a batch-fetch from `DownloadVersionExportRepository` and grouped by
+ * download_id in JS.
  */
-export const DownloadListRecordBase = DownloadRecord;
-export type DownloadListRecordBase = z.infer<typeof DownloadListRecordBase>;
-
-/**
- * Service-layer (and public API) list-row shape. `exports[]` is attached by
- * `DownloadService.getDownloadsByTeamMembership` via a parallel batch-fetch from
- * `DownloadExportService` and grouped by download_id in JS. Mirrors the assembly
- * pattern used by `TicketService.getTicket` (`ticket-service.ts`) — composed at
- * the service layer rather than via SQL aggregation so repositories stay
- * single-SQL CRUD.
- */
-export const DownloadListRecord = DownloadListRecordBase.extend({
-  exports: z.array(DownloadExportListRow)
+export const DownloadListRecord = DownloadDetailRecord.extend({
+  exports: z.array(DownloadVersionExportListRow)
 });
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
@@ -54,7 +46,7 @@ export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
  * from the COUNT(*) OVER() window — stripped before returning to callers. Does
  * NOT carry `exports`; those are fetched separately and attached in the service.
  */
-export const DownloadListRow = DownloadListRecordBase.extend({
+export const DownloadListRow = DownloadDetailRecord.extend({
   total_count: z.number()
 });
 export type DownloadListRow = z.infer<typeof DownloadListRow>;
@@ -132,7 +124,6 @@ export const CreateDownloadRequestBody = z
   .object({
     name: z.string().min(1).max(100),
     description: z.string().max(1000).nullable().optional(),
-    featureTypes: z.array(z.string()).min(1),
     expression: ExpressionTree.nullable()
   })
   .strict();
@@ -153,6 +144,21 @@ export const DownloadArtifactInfo = z.object({
   object_key: z.string()
 });
 export type DownloadArtifactInfo = z.infer<typeof DownloadArtifactInfo>;
+
+/**
+ * A single entry in the presigned-URL endpoint's `parts[]` response.
+ *
+ * - `feature_type` — feature type name for the Parquet file, parsed from the S3
+ *   object key shape `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+ * - `url` — presigned S3 URL minted at request time; clients must not cache it.
+ * - `expires_at` — ISO timestamp when the URL expires (30 minutes from request time).
+ */
+export const DownloadParquetPart = z.object({
+  feature_type: z.string(),
+  url: z.string(),
+  expires_at: z.string()
+});
+export type DownloadParquetPart = z.infer<typeof DownloadParquetPart>;
 
 /**
  * Row shape for the Parquet download pipeline.

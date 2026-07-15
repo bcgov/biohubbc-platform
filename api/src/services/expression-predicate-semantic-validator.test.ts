@@ -90,17 +90,17 @@ describe('ExpressionPredicateSemanticValidator', () => {
     expect(date.clauses[0].type === 'predicate' && date.clauses[0].internal_predicate).to.deep.include({
       type: 'timestamp',
       operator: 'After',
-      value: '2020-01-01'
+      value: { date_value: '2020-01-01', time_value: null }
     });
     expect(time.clauses[0].type === 'predicate' && time.clauses[0].internal_predicate).to.deep.include({
       type: 'timestamp',
       operator: 'After',
-      value: '14:30:00-07:00'
+      value: { date_value: null, time_value: '14:30:00-07:00' }
     });
     expect(dateTime.clauses[0].type === 'predicate' && dateTime.clauses[0].internal_predicate).to.deep.include({
       type: 'timestamp',
       operator: 'After',
-      value: '2020-01-01T14:30:00-07:00'
+      value: { date_value: '2020-01-01', time_value: '14:30:00-07:00' }
     });
   });
 

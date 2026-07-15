@@ -1,10 +1,8 @@
 import type { Knex } from 'knex';
-import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import type { InternalTypedPredicate } from '../models/expression-predicate';
 import { Predicate, PredicateResolveInput, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
-import { parseTimestamp } from '../utils/timestamp';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -14,40 +12,32 @@ export class PredicateRepository extends BaseRepository {
   /**
    * Insert a predicate anchor by normalized predicate hash.
    *
+   * Callers are expected to pre-read by hash and reuse existing anchors. The
+   * active-hash uniqueness constraint remains the final guard for concurrent
+   * duplicate writes.
+   *
    * @param {PredicateResolveInput} payload - Predicate attributes including normalized hash.
-   * @return {(Promise<ResolvedPredicateAnchor>)} Resolved predicate row with insert-state flag.
-   * @throws {ApiExecuteSQLError} If upsert returns an unexpected row count.
+   * @return {(Promise<ResolvedPredicateAnchor>)} Inserted predicate row with insert-state flag.
+   * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
    */
   async insertPredicateAnchor(payload: PredicateResolveInput): Promise<ResolvedPredicateAnchor> {
-    const sql = SQL`
-      INSERT INTO predicate (
-        feature_property_id,
-        feature_type_property_id,
-        feature_property_type_id,
-        predicate_hash
-      )
-      VALUES (
-        ${payload.feature_property_id},
-        ${payload.feature_type_property_id},
-        ${payload.feature_property_type_id},
-        ${payload.predicate_hash}
-      )
-      ON CONFLICT (predicate_hash) WHERE record_end_date IS NULL
-      DO UPDATE SET
-        predicate_hash = EXCLUDED.predicate_hash
-      RETURNING
-        predicate_id,
-        feature_property_id,
-        feature_type_property_id,
-        feature_property_type_id,
-        predicate_hash,
-        (xmax = 0) AS inserted;
-    `;
-    const response = await this.connection.sql(sql, ResolvedPredicateAnchor);
+    const knex = getKnex();
+    const query = knex('predicate')
+      .insert(payload)
+      .returning([
+        'predicate_id',
+        'feature_property_id',
+        'feature_type_property_id',
+        'feature_property_type_id',
+        'predicate_hash',
+        knex.raw('true AS inserted')
+      ]);
+
+    const response = await this.connection.knex(query, ResolvedPredicateAnchor);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to resolve predicate anchor', [
+      throw new ApiExecuteSQLError('Failed to insert predicate anchor', [
         'PredicateRepository->insertPredicateAnchor',
         `rowCount was ${rowCount}, expected 1`
       ]);
@@ -353,18 +343,15 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<InternalTypedPredicate, { type: 'timestamp' }>
   ): Knex.QueryBuilder {
-    const parsedValue =
-      predicate.operator === 'Exists' || predicate.value === undefined ? null : parseTimestamp(predicate.value);
-
-    if (predicate.operator !== 'Exists' && !parsedValue) {
-      throw new ApiGeneralError('Timestamp predicate value is not a supported temporal literal', [
+    if (predicate.operator !== 'Exists' && predicate.value === undefined) {
+      throw new ApiGeneralError('Timestamp predicate value is required', [
         'PredicateRepository->buildTimestampPredicateInsert',
-        { value: predicate.value }
+        { predicate }
       ]);
     }
 
-    const dateValue = parsedValue?.date_value ?? null;
-    const timeValue = parsedValue?.time_value ?? null;
+    const dateValue = predicate.operator === 'Exists' ? null : predicate.value?.date_value ?? null;
+    const timeValue = predicate.operator === 'Exists' ? null : predicate.value?.time_value ?? null;
 
     return knex('predicate_timestamp').insert({
       predicate_id: predicateId,

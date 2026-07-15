@@ -8,6 +8,7 @@ import * as db from '../../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
 import { DownloadDetailRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
+import { UserService } from '../../../services/user-service';
 
 chai.use(sinonChai);
 
@@ -20,6 +21,7 @@ const makeDownloadRecord = (overrides: Partial<DownloadDetailRecord> = {}): Down
   completed_at: '2025-01-01T00:01:00Z',
   downloaded_at: null,
   create_date: '2025-01-01T00:00:00Z',
+  download_version_id: 'dddd0000-0000-0000-0000-000000000001',
   name: 'Test download',
   description: 'Test description',
   ...overrides
@@ -35,6 +37,7 @@ describe('paths/download/{downloadId}/index', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
 
       const mockDownload = makeDownloadRecord();
 
@@ -52,6 +55,7 @@ describe('paths/download/{downloadId}/index', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
+        download_version_id: 'dddd0000-0000-0000-0000-000000000001',
         status: 'ready',
         name: 'Test download',
         description: 'Test description',
@@ -59,6 +63,9 @@ describe('paths/download/{downloadId}/index', () => {
         completed_at: '2025-01-01T00:01:00Z',
         downloaded_at: null
       });
+
+      // The handler surfaces the version id resolved from the authorized download record
+      expect(mockRes.jsonValue.download_version_id).to.equal(mockDownload.download_version_id);
     });
 
     it('should return 200 with description: null when policy description is null', async () => {

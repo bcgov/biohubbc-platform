@@ -13,6 +13,7 @@ export type DownloadStatus = 'pending' | 'processing' | 'ready' | 'downloaded' |
  */
 export interface DownloadRecord {
   download_id: string;
+  download_version_id: string;
   download_status: DownloadStatus;
   create_date: string;
   feature_count: number;
@@ -36,6 +37,7 @@ export interface DownloadRecord {
  */
 export interface DownloadDetail {
   download_id: string;
+  download_version_id: string;
   status: DownloadStatus;
   name: string;
   description: string | null;
@@ -56,13 +58,11 @@ export interface DownloadListResponse {
 /**
  * Body for POST /api/download.
  *
- * `expression` is sent as a literal `null` when no filter expression is applied. The backend
- * schema marks the key `.nullable()` (not `.optional()`), so omitting it yields a 400.
+ * `expression` is nullable. `null` means materialize the full visible graph.
  */
 export interface CreateDownloadRequest {
   name: string;
   description?: string | null;
-  featureTypes: string[];
   expression: ExpressionTreeExpression | null;
 }
 

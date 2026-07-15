@@ -1,5 +1,5 @@
 export enum PRIORITY_FEATURE_TYPE {
-  DATASET = 'dataset',
+  SURVEY = 'survey',
   SPECIES_OBSERVATION = 'species_observation',
   TELEMETRY = 'telemetry',
   REPORT = 'report'
@@ -33,7 +33,7 @@ export enum PRIORITY_FEATURE_TYPE {
  */
 export const LANDING_PAGE_FEATURE_TYPES = [
   'block',
-  'dataset',
+  'survey',
   'habitat_feature',
   'report',
   'sample_site',

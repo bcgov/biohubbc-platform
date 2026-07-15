@@ -25,7 +25,7 @@ describe('useFeaturesApi', () => {
           data: {
             timestamp: '2020-01-01'
           },
-          feature_type_name: 'dataset',
+          feature_type_name: 'survey',
           secured: false
         }
       };

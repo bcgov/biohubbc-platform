@@ -1,16 +1,19 @@
 import { ParquetWriter } from '@dsnp/parquetjs';
 import { Knex } from 'knex';
 import { PassThrough } from 'node:stream';
-import { IDBConnection } from '../../database/db';
+import { getKnex, IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
-import { DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
+import { DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { PolicyEffect } from '../../models/policy-statement';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { buildParquetKey } from '../../utils/export-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
@@ -20,6 +23,32 @@ import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
+
+/**
+ * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
+ *
+ * `downloadId` keys the deterministic S3 object key; `downloadVersionId` is the
+ * temporal axis the produced artifact is linked to in `download_version_artifact`,
+ * so the export pipeline can rediscover the version's Parquet files without
+ * re-running the original search.
+ */
+export interface WriteFeatureTypeParquetPayload {
+  downloadId: string;
+  downloadVersionId: string;
+  source: DownloadSource;
+  properties: CsvPropertyDefinition[];
+  featureTypeName: string;
+  statement: EffectiveDownloadStatement;
+}
+
+/**
+ * A policy statement after resolving wildcard and overlapping ALLOW rules for a
+ * concrete feature type.
+ */
+export type EffectiveDownloadStatement = ActivePolicyStatementWithExpression & {
+  /** Multiple filtered ALLOW expressions for the same feature type are UNIONed. */
+  expression_ids?: string[];
+};
 
 /**
  * Background processing pipeline for downloads.
@@ -36,6 +65,7 @@ import { ArtifactService } from '../upload/artifact-service';
  */
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
+  downloadVersionRepository: DownloadVersionRepository;
   expressionTreeService: ExpressionTreeService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
@@ -43,6 +73,7 @@ export class DownloadPipelineService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
+    this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
@@ -53,8 +84,8 @@ export class DownloadPipelineService extends DBService {
    *
    * Pure business-rule assertion; no I/O.
    *
-   * @param {string} downloadId - The download ID (for error context).
-   * @param {DownloadRecord['download_status']} currentStatus - The download's current status.
+   * @param {string} downloadVersionId - The download version ID (for error context).
+   * @param {DownloadStatusEnum} currentStatus - The version's current status.
    * @param {DownloadStatusEnum} nextStatus - The status being transitioned to.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
    * @return {void}
@@ -62,57 +93,83 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   private assertDownloadStatusTransition(
-    downloadId: string,
-    currentStatus: DownloadRecord['download_status'],
+    downloadVersionId: string,
+    currentStatus: DownloadStatusEnum,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[]
   ): void {
-    if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
+    if (!allowedCurrentStatuses.includes(currentStatus)) {
       throw new ApiConflictError('Invalid download status transition', [
-        'DownloadPipelineService->transitionDownloadStatus',
-        { downloadId, currentStatus, nextStatus, allowedCurrentStatuses }
+        'DownloadPipelineService->transitionDownloadVersionStatus',
+        { downloadVersionId, currentStatus, nextStatus, allowedCurrentStatuses }
       ]);
     }
   }
 
   /**
-   * Transition a download from one of `allowedCurrentStatuses` to `nextStatus`.
+   * Transition a download version from one of `allowedCurrentStatuses` to `nextStatus`.
    *
-   * Fetches the download, asserts the transition is allowed, then writes the new status
-   * plus timestamps via the existing generic `updateDownloadStatus`. The state machine
-   * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
-   * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
-   * to the pg-boss DLQ.
+   * The version IS the unit of materialization, and the materialization lifecycle
+   * (status, timing, error) lives on `download_version` — so the transition reads the
+   * version's current status and writes the new status back onto the version directly.
+   * The state machine lives in the service; the repository stays a thin CRUD wrapper.
+   * Illegal transitions (including retries of already-terminal jobs) throw
+   * `ApiConflictError` and bubble up to the pg-boss DLQ.
    *
-   * @param {string} downloadId - The download ID.
+   * @param {string} downloadVersionId - The download version ID.
    * @param {DownloadStatusEnum} nextStatus - Target status.
    * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
-   * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
+   * @param {{ error?: string; featureCount?: number }} [metadata] - Optional transition metadata: `error`
+   *   is used for FAILED transitions; `featureCount` (the total features materialized into the version's
+   *   artifacts) is only ever passed on the READY transition.
    * @return {Promise<void>}
-   * @throws {ApiNotFoundError} if the download does not exist.
+   * @throws {ApiNotFoundError} if the download version does not exist.
    * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
    * @memberof DownloadPipelineService
    */
-  async transitionDownloadStatus(
-    downloadId: string,
+  async transitionDownloadVersionStatus(
+    downloadVersionId: string,
     nextStatus: DownloadStatusEnum,
     allowedCurrentStatuses: DownloadStatusEnum[],
-    errorMetadata?: { error?: string }
+    metadata?: { error?: string; featureCount?: number }
   ): Promise<void> {
-    const download = await this.downloadRepository.getDownloadById(downloadId);
+    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
 
-    this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
+    this.assertDownloadStatusTransition(
+      downloadVersionId,
+      version.status as DownloadStatusEnum,
+      nextStatus,
+      allowedCurrentStatuses
+    );
 
     const now = new Date().toISOString();
-    const timestamps: { started_at?: string; completed_at?: string } = {};
+    const updateFields: {
+      started_at?: string;
+      completed_at?: string;
+      materialized_at?: string;
+      error_message?: string;
+      feature_count?: number;
+    } = {};
     if (nextStatus === DownloadStatusEnum.PROCESSING) {
-      timestamps.started_at = now;
+      updateFields.started_at = now;
     }
     if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
-      timestamps.completed_at = now;
+      updateFields.completed_at = now;
+    }
+    // materialized_at is the data watermark — when this version's snapshot was captured.
+    if (nextStatus === DownloadStatusEnum.READY) {
+      updateFields.materialized_at = now;
+    }
+    if (metadata?.error !== undefined) {
+      updateFields.error_message = metadata.error;
+    }
+    // Strict undefined check — a legitimate count of 0 (empty policy scope) must
+    // still be persisted; a truthiness guard would silently drop it.
+    if (metadata?.featureCount !== undefined) {
+      updateFields.feature_count = metadata.featureCount;
     }
 
-    await this.downloadRepository.updateDownloadStatus(downloadId, nextStatus, { ...errorMetadata, ...timestamps });
+    await this.downloadVersionRepository.updateDownloadVersionStatus(downloadVersionId, nextStatus, updateFields);
   }
 
   /**
@@ -140,15 +197,16 @@ export class DownloadPipelineService extends DBService {
   }> {
     const schemaLookup = await this.buildSchemaLookup();
     const statements = await this.policyStatementService.getActiveStatementsWithExpressionByPolicyId(source.policy_id);
-    const featureTypes = statements.map((statement) => statement.urn_feature_type);
-    return { schemaLookup, featureTypes, statements };
+    const expandedStatements = resolveEffectiveDownloadStatements(statements, Array.from(schemaLookup.keys()));
+    const featureTypes = expandedStatements.map((statement) => statement.urn_feature_type);
+    return { schemaLookup, featureTypes, statements: expandedStatements };
   }
 
   /**
    * Stream a single feature type to a Parquet file on S3, recording the artifact
    * with authoritative checksum and byte size.
    *
-   * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+   * The S3 key is deterministic: `downloads/{downloadId}/versions/{downloadVersionId}/{featureTypeName}/data.parquet`.
    * Retries overwrite the same key — S3 is idempotent on overwrites, and the
    * artifact / download_artifact inserts are idempotent on unique keys. A retried
    * feature type converges to the same DB + S3 state as a first-time success.
@@ -159,9 +217,12 @@ export class DownloadPipelineService extends DBService {
    * would require re-downloading the S3 object.
    *
    * Writes the artifact row (`format='parquet'`, `artifact_status='uploaded'`, real
-   * checksum + byte_size + uploaded_at) and the download_artifact link inside the
-   * caller's transaction — the worker wraps each feature type in its own
-   * `withConnection`, so a mid-job retry replays the whole per-type transaction.
+   * checksum + byte_size + uploaded_at) and the download_version_artifact link inside
+   * the caller's transaction — the worker wraps each feature type in its own
+   * `withConnection`, so a mid-job retry replays the whole per-type transaction. The
+   * artifact is linked to `downloadVersionId` (the download's materialized version),
+   * not the download directly, so the export pipeline can rediscover the version's
+   * Parquet files.
    *
    * Code and taxon properties arrive pre-resolved from the cursor JOIN. Parquet
    * files are standalone — GIS consumers have no database access.
@@ -176,29 +237,27 @@ export class DownloadPipelineService extends DBService {
    * requesting user's authorization scope — not the audit `create_user` or the
    * worker's own connection grants.
    *
-   * @param {object} payload
+   * @param {WriteFeatureTypeParquetPayload} payload
    * @param {string} payload.downloadId - The download ID.
+   * @param {string} payload.downloadVersionId - The download's materialized version; the produced artifact is linked to it.
    * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
-   * @param {ActivePolicyStatementWithExpression} payload.statement - The active policy statement for this feature type.
-   * @return {Promise<void>}
+   * @param {EffectiveDownloadStatement} payload.statement - The effective policy statement for this feature type.
+   * @return {Promise<number>} The number of hydrated feature rows written to the Parquet file. Counted
+   *   during the streaming write so the caller can store the version's total feature count at
+   *   materialization time — computing it live per landing view would put a large COUNT over the policy
+   *   scope on a public request path.
    * @memberof DownloadPipelineService
    */
-  async writeFeatureTypeParquet(payload: {
-    downloadId: string;
-    source: DownloadSource;
-    properties: CsvPropertyDefinition[];
-    featureTypeName: string;
-    statement: ActivePolicyStatementWithExpression;
-  }): Promise<void> {
-    const { downloadId, source, properties, featureTypeName, statement } = payload;
+  async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<number> {
+    const { downloadId, downloadVersionId, source, properties, featureTypeName, statement } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
       .map((p) => p.feature_property_name);
     const schema = buildParquetSchema(properties);
-    const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
+    const s3Key = buildParquetKey(downloadId, downloadVersionId, featureTypeName);
 
     // Resolve every precondition (expression read, semantic validation, subquery
     // build, cursor setup) BEFORE starting the S3 multipart upload. The upload
@@ -211,17 +270,27 @@ export class DownloadPipelineService extends DBService {
     // returns the public API tree, so we re-normalize through the same semantic
     // validator the search path uses — keeping read-time SQL semantics identical
     // for the two consumers of the evaluator.
+    const expressionIds =
+      statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
+
     let subquery: Knex.QueryBuilder;
     if (statement.expression_id === null) {
       subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by);
     } else {
-      const tree = await this.expressionTreeService.readExpressionTree(statement.expression_id);
-      const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
-      subquery = expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-        featureTypeName,
-        normalizedTree,
-        source.requested_by
-      );
+      const expressionSubqueries = [];
+      for (const expressionId of expressionIds) {
+        const tree = await this.expressionTreeService.readExpressionTree(expressionId);
+        const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
+        expressionSubqueries.push(
+          expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+            featureTypeName,
+            normalizedTree,
+            source.requested_by
+          )
+        );
+      }
+      subquery =
+        expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true);
     }
 
     const { sql, bindings } = subquery.toSQL().toNative();
@@ -254,6 +323,7 @@ export class DownloadPipelineService extends DBService {
       s3Key
     );
 
+    let rowCount = 0;
     let streamingSucceeded = false;
     try {
       // PassThrough implements write()/end() but @dsnp/parquetjs types expect
@@ -272,8 +342,10 @@ export class DownloadPipelineService extends DBService {
       }
 
       // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
+      // Count hydrated rows (what actually lands in the file), not base cursor rows.
       for await (const baseBatch of cursor) {
         const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
+        rowCount += hydrated.length;
         for (const feature of hydrated) {
           await writer.appendRow(featureToRow(feature, properties));
         }
@@ -326,7 +398,9 @@ export class DownloadPipelineService extends DBService {
       format: 'parquet'
     });
 
-    await this.downloadRepository.createDownloadArtifact(downloadId, artifact_id);
+    await this.downloadVersionRepository.createDownloadVersionArtifact(downloadVersionId, artifact_id, featureTypeName);
+
+    return rowCount;
   }
 
   /**
@@ -335,9 +409,9 @@ export class DownloadPipelineService extends DBService {
    * Fetches values from typed `submission_feature_property_*` tables via the
    * repository, then assembles them into `ParquetFeatureData` records.
    *
-   * Properties without typed tables (array, object, artifact_key) fall back to
-   * `submission_feature.data.properties` — these types have dynamic internal
-   * structure that can't be represented as a single typed value.
+   * Properties without indexed storage are emitted as null. The hydrator must
+   * not read `submission_feature.data`; that JSONB is pre-indexing input and
+   * can differ from the canonical indexed values.
    *
    * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
    * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
@@ -348,12 +422,11 @@ export class DownloadPipelineService extends DBService {
     baseBatch: BaseFeatureRow[],
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
-    // Types that live in the JSONB blob rather than typed tables
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+    const unsupportedPropertyTypes = new Set(['array', 'object']);
 
     // Determine which typed tables need querying
     const typedPropertyTypes = [
-      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
+      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !unsupportedPropertyTypes.has(t)))
     ];
 
     const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
@@ -381,9 +454,8 @@ export class DownloadPipelineService extends DBService {
       for (const prop of properties) {
         const propName = prop.feature_property_name;
 
-        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
-          // Array/object/artifact_key: fall back to JSONB data.properties
-          data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        if (unsupportedPropertyTypes.has(prop.feature_property_type_name)) {
+          data[propName] = null;
         } else if (prop.feature_property_type_name === 'datetime') {
           // `datetime` properties are projected as two synthetic rows by
           // `fetchTypedPropertyRows` with suffixed `name` values
@@ -432,4 +504,104 @@ export class DownloadPipelineService extends DBService {
     }
     return lookup;
   }
+}
+
+/**
+ * Resolve the effective download-driving statements for a policy.
+ *
+ * Download materialization only exports ALLOW scopes. An unfiltered broad
+ * `urn:*:*:*` ALLOW statement dominates narrower ALLOW statements because it
+ * already covers every materialized feature type. A filtered wildcard ALLOW
+ * does not dominate: for example, `*:*:* WHERE species = moose` must still be
+ * combined with `*:telemetry:* WHERE description contains cow`, because the
+ * two statements describe different result sets. Overlapping filtered
+ * statements for a feature type are collapsed into one effective statement so
+ * the writer can UNION the expression subqueries into one Parquet file.
+ *
+ * @param {ActivePolicyStatementWithExpression[]} statements - Active policy statements with optional expression ids.
+ * @param {string[]} featureTypes - Materialized feature type names available for wildcard expansion.
+ * @return {ActivePolicyStatementWithExpression[]} Effective statements, one per exported feature type.
+ */
+export function resolveEffectiveDownloadStatements(
+  statements: ActivePolicyStatementWithExpression[],
+  featureTypes: string[]
+): EffectiveDownloadStatement[] {
+  const allowStatements = statements.filter((statement) => statement.effect === PolicyEffect.ALLOW);
+  const sortedFeatureTypes = [...featureTypes].sort((a, b) => a.localeCompare(b));
+  const broadWildcardAllow = allowStatements.find(
+    (statement) => statement.urn_feature_type === '*' && statement.expression_id === null
+  );
+
+  // This is the only global short-circuit: an unfiltered ALLOW over `*:*:*`
+  // already grants every materialized feature type in full, so no narrower
+  // statement can add rows to the download.
+  if (broadWildcardAllow !== undefined) {
+    return sortedFeatureTypes.map((featureType) => ({
+      ...broadWildcardAllow,
+      urn_feature_type: featureType
+    }));
+  }
+
+  const statementsByFeatureType = new Map<string, ActivePolicyStatementWithExpression[]>();
+  for (const statement of allowStatements) {
+    if (statement.urn_feature_type !== '*') {
+      // Concrete statements target one feature type. Keep all of them for now:
+      // buildEffectiveDownloadStatement decides whether a broad concrete ALLOW
+      // dominates filtered statements, or whether filtered expressions must be
+      // UNIONed.
+      const featureStatements = statementsByFeatureType.get(statement.urn_feature_type) ?? [];
+      featureStatements.push(statement);
+      statementsByFeatureType.set(statement.urn_feature_type, featureStatements);
+      continue;
+    }
+
+    // A wildcard ALLOW with an expression is not a short-circuit. It is a
+    // filtered rule that must be evaluated for each materialized feature type
+    // and combined with any concrete statements for that same feature type.
+    for (const featureType of sortedFeatureTypes) {
+      const featureStatements = statementsByFeatureType.get(featureType) ?? [];
+      featureStatements.push({ ...statement, urn_feature_type: featureType });
+      statementsByFeatureType.set(featureType, featureStatements);
+    }
+  }
+
+  // Each feature type must produce at most one Parquet file. Collapse overlapping
+  // ALLOW statements per feature type before the writer runs.
+  return Array.from(statementsByFeatureType.entries()).map(([, featureStatements]) =>
+    buildEffectiveDownloadStatement(featureStatements)
+  );
+}
+
+/**
+ * Collapse all ALLOW statements that target one concrete feature type into one
+ * effective statement.
+ *
+ * A broad concrete ALLOW (`expression_id === null`) covers every row for that
+ * feature type, so narrower filtered statements do not add anything. Otherwise,
+ * all expression ids are retained so `writeFeatureTypeParquet` can UNION them.
+ *
+ * @param {ActivePolicyStatementWithExpression[]} featureStatements - ALLOW statements for a single concrete feature type.
+ * @return {EffectiveDownloadStatement} One effective statement for the feature type.
+ */
+function buildEffectiveDownloadStatement(
+  featureStatements: ActivePolicyStatementWithExpression[]
+): EffectiveDownloadStatement {
+  const broadFeatureAllow = featureStatements.find((statement) => statement.expression_id === null);
+  if (broadFeatureAllow !== undefined) {
+    // Within a single concrete feature type, an unfiltered ALLOW covers all rows
+    // for that type, so filtered statements cannot add anything.
+    return broadFeatureAllow;
+  }
+
+  const [firstStatement] = featureStatements;
+  if (featureStatements.length === 1) {
+    return firstStatement;
+  }
+
+  return {
+    ...firstStatement,
+    // Multiple filtered ALLOW statements for the same feature type are additive:
+    // export rows matching any expression by UNIONing their subqueries.
+    expression_ids: featureStatements.map((statement) => statement.expression_id as string)
+  };
 }

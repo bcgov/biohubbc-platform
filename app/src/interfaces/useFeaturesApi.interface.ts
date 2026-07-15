@@ -19,6 +19,7 @@ export interface ISubmissionFeature {
   source_id: string | null;
   data: Record<string, any>;
   secured: boolean;
+  security_reasons: string[];
 }
 
 export interface ISubmissionFeatureResponse {

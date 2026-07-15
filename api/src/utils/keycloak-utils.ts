@@ -1,6 +1,6 @@
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { getDBConstants } from '../database/db-constants';
-import { SystemUser } from '../repositories/user-repository';
+import { SystemUser } from '../models/system-user';
 
 /**
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.

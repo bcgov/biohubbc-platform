@@ -1,6 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useArtifactApi.interface';
 import { IGetSubmissionsForUserResponse } from 'interfaces/useSubmissionsApi.interface';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import useSubmissionsApi from './useSubmissionsApi';

@@ -7,6 +7,7 @@ export interface ITeamMember {
   team_member_id: string;
   system_user_id: number;
   user_identifier: string;
+  display_name: string | null;
   email?: string | null;
 }
 
@@ -52,6 +53,7 @@ export interface IUpdateTeamRequest {
 export interface IAvailableUser {
   system_user_id: number;
   user_identifier: string;
+  display_name: string | null;
 }
 
 /**

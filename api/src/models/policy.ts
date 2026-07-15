@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { CreatePolicyStatementPayload } from './policy-statement';
 
 export const PolicyStatus = z.enum(['requested', 'reviewed', 'approved', 'denied']);
 export type PolicyStatus = z.infer<typeof PolicyStatus>;
@@ -23,10 +22,3 @@ export type CreatePolicy = z.infer<typeof CreatePolicy>;
 
 export const UpdatePolicy = CreatePolicy.partial();
 export type UpdatePolicy = z.infer<typeof UpdatePolicy>;
-
-export interface CreatePolicyDefinition {
-  name: string;
-  description?: string;
-  status?: PolicyStatus;
-  statements: CreatePolicyStatementPayload[];
-}
