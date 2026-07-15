@@ -5,7 +5,7 @@
 // database and asserts on the rows the recompute writes into submission_feature_closure. The
 // closure is the "evidence" reach used by search: reachability over the UNION of two edge kinds —
 // parent (submission_feature.parent_*) and property (submission_feature_property_feature) — plus a
-// self row for every non-ended feature of the SUBMISSION, across all its uploads (reconciled
+// self row for every active feature of the SUBMISSION, across all its uploads (reconciled
 // uploads only carry new/changed features, so cross-upload edges are part of the reach). Content
 // edges (submission_feature_feature) are intentionally EXCLUDED from the reach: content is the
 // parent tree reversed, so closing over parent + content yields the complete digraph (O(N^2)); the
@@ -86,6 +86,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     submissionUploadId: string;
     parentFeatureId?: number;
     recordEndDate?: boolean;
+    pending?: boolean;
   }): Promise<number> {
     const systemUserId = connection.systemUserId();
 
@@ -108,7 +109,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
-        now(),
+        ${params.pending ? null : 'now()'},
         ${params.recordEndDate ? 'now()' : null},
         ${systemUserId}
       )
@@ -322,8 +323,23 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     expect(bRows.rows).to.have.lengthOf(0);
   });
 
+  it('4b: pending feature excluded — appears in no closure row', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const propertyLabelId = await createPropertyEdgeLabel();
+
+    const active = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
+    const pending = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, pending: true });
+    await insertPropertyEdge(active, pending, propertyLabelId);
+
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
+
+    expect(insertedCount).to.equal(1);
+    expect(await getScopedClosurePairs([active, pending])).to.deep.equal(expectedPairs([[active, active]]));
+  });
+
   // Cross-upload reach: a property edge from A (in U1) to X (in U2) crosses uploads within ONE
-  // submission. The closure universe is the submission's live rows across all uploads (reconciled
+  // submission. The closure universe is the submission's active rows across all uploads (reconciled
   // uploads only carry new/changed features, so a reference may target an unchanged feature owned by
   // an earlier upload), so the recompute includes both features' self rows AND the cross-upload pair
   // (A, X). Guards the submission-wide universe of the edge CTEs.
@@ -366,7 +382,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
 
   // Stale-row removal: a feature with closure rows is deactivated, then the closure is recomputed. The
   // leading DELETE scopes by submission_id (not live-only), so the now-inactive feature's
-  // prior rows are removed even though it is no longer in the live universe.
+  // prior rows are removed even though it is no longer in the active universe.
   it('7: recompute removes a deactivated feature’s stale rows', async () => {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);

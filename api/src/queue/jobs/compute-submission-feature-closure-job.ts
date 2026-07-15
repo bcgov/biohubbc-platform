@@ -50,13 +50,11 @@ export interface IComputeSubmissionFeatureClosureJobData {
  * the `(source, target)` primary key serves the forward probe (what an evidence feature reaches), and
  * the secondary `(target, source)` index serves search's reverse "who reaches Y" down-probe.
  *
- * Each submission's recompute is single-flight: a `pg_try_advisory_xact_lock` on the shared
- * per-submission active-state key guards the DELETE-all + recursive-CTE INSERT, so an expiry-retry
- * that overlaps its own still-running original skips rather than contending. Upload activation
- * (reconciliation at approval) takes the blocking form of the same lock and recomputes the closure
- * itself, so skipping while an activation holds the lock is also correct. On failure the handler logs
- * and rethrows so pg-boss applies its retry policy — the recompute is idempotent (it deletes the
- * submission's prior closure rows before reinserting), so a retry is safe.
+ * Each submission's recompute takes the shared blocking active-state lock. This serializes closure
+ * with feature activation and guarantees that a queued recompute is not silently skipped while
+ * another writer holds the lock. On failure the handler logs and rethrows so pg-boss applies its
+ * retry policy — the recompute is idempotent (it deletes the submission's prior closure rows before
+ * reinserting), so a retry is safe.
  *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -77,24 +75,13 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
 
     try {
       await withConnection(async (conn) => {
-        // Single-flight per submission — the recompute is DELETE-all + recursive-CTE INSERT in one
-        // transaction. An expiry-retry overlapping its own still-running original would contend/corrupt.
-        // xact-scoped advisory lock on the shared per-submission active-state key; skip if another
-        // recompute (or an upload activation, which recomputes the closure itself) holds it.
-        const lock = await conn.query(
-          "SELECT pg_try_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3)) AS locked",
-          [SUBMISSION_ACTIVE_STATE_LOCK_PREFIX, submissionId, SUBMISSION_ACTIVE_STATE_LOCK_SEED]
-        );
-        if (!lock.rows[0].locked) {
-          defaultLog.warn({
-            label: 'computeSubmissionFeatureClosureJobHandler',
-            message: 'another writer holds the active-state advisory lock for this submission; skipping',
-            jobId: job.id,
-            submissionId,
-            submissionUploadId
-          });
-          return;
-        }
+        // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
+        // feature-state writer on this submission so this durable job always observes a complete state.
+        await conn.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
+          SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+          submissionId,
+          SUBMISSION_ACTIVE_STATE_LOCK_SEED
+        ]);
 
         const result = await new SubmissionFeatureClosureService(conn).computeClosureForSubmission(submissionId);
 

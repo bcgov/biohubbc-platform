@@ -25,6 +25,20 @@ import {
 chai.use(sinonChai);
 
 describe('SubmissionRepository', () => {
+  describe('submission feature state lock', () => {
+    afterEach(() => sinon.restore());
+
+    it('locks the submission feature state with one repository call', async () => {
+      const sql = sinon.stub().resolves({ rowCount: 1, rows: [{}] });
+      const repository = new SubmissionRepository(getMockDBConnection({ sql }));
+
+      await repository.lockSubmissionFeatureStateForSubmissionId(12);
+
+      expect(sql).to.have.been.calledOnce;
+      expect(sql.firstCall.args[0].text).to.include('pg_advisory_xact_lock');
+    });
+  });
+
   describe('insertSubmissionRecord', () => {
     afterEach(() => {
       sinon.restore();
@@ -1093,58 +1107,6 @@ describe('SubmissionRepository', () => {
       const response = await submissionFeatureRepository.getSubmissionFeatureByUuid(submissionUuid);
 
       expect(response).to.eql(submissionFeatureRecord);
-    });
-  });
-
-  describe('submission feature lifecycle dates', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should activate features for an approved upload', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ submission_feature_id: 1 }]
-      } as any as Promise<QueryResult<any>>;
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.activateSubmissionFeaturesForSubmissionUploadId(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
-
-      expect(sqlStub.calledOnce).to.be.true;
-      const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.contain('record_effective_date = now()');
-      expect(sqlText).to.contain('submission_upload_id = $1');
-      expect(sqlText).to.contain('record_end_date = NULL');
-    });
-
-    it('should deactivate features for a denied upload', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.deactivateSubmissionFeaturesForSubmissionUploadId(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
-
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
-    });
-
-    it('should reset features to pending for a resubmitted upload', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.resetSubmissionFeaturesToPendingForSubmissionUploadId(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
-
-      const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.contain('record_effective_date = NULL');
-      expect(sqlText).to.contain('record_end_date = NULL');
     });
   });
 

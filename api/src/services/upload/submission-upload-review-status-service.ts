@@ -1,17 +1,13 @@
 import { IDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
 import {
   CreateSubmissionUploadReviewStatus,
-  SubmissionUploadReviewStatus,
-  UpdateSubmissionUploadReviewStatus
+  SubmissionUploadReviewStatus
 } from '../../models/submission-upload-review-status';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { DBService } from '../db-service';
-import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
-import { SubmissionValidationService } from '../submission-validation-service';
 
-export interface SubmissionHistoryResponse {
+interface SubmissionHistoryResponse {
   submissionId: number;
   history: Array<{
     submissionUploadId: string;
@@ -22,12 +18,10 @@ export interface SubmissionHistoryResponse {
 
 export class SubmissionUploadReviewStatusService extends DBService {
   submissionUploadReviewStatusRepository: SubmissionUploadReviewStatusRepository;
-  submissionFeatureService: SubmissionFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadReviewStatusRepository = new SubmissionUploadReviewStatusRepository(connection);
-    this.submissionFeatureService = new SubmissionFeatureService(connection);
   }
 
   /**
@@ -51,55 +45,6 @@ export class SubmissionUploadReviewStatusService extends DBService {
    */
   async getSubmissionUploadReviewStatus(submissionUploadId: string): Promise<SubmissionUploadReviewStatus> {
     return this.submissionUploadReviewStatusRepository.getSubmissionUploadReviewStatus(submissionUploadId);
-  }
-
-  /**
-   * Record a new review status decision for a submission upload.
-   * Only callable by system administrators.
-   *
-   * @param {string} submissionUploadId
-   * @param {UpdateSubmissionUploadReviewStatus} data
-   * @returns {Promise<SubmissionUploadReviewStatus>}
-   */
-  async updateSubmissionUploadReviewStatus(
-    submissionUploadId: string,
-    data: UpdateSubmissionUploadReviewStatus
-  ): Promise<SubmissionUploadReviewStatus> {
-    if (data.status === 'approved') {
-      await this.assertSubmissionUploadCanBeApproved(submissionUploadId);
-      await this.submissionFeatureService.activateSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
-    }
-
-    if (data.status === 'denied') {
-      await this.submissionFeatureService.deactivateSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
-    }
-
-    if (data.status === 'submitted') {
-      await this.submissionFeatureService.resetSubmissionFeaturesToPendingForSubmissionUploadId(submissionUploadId);
-    }
-
-    return this.submissionUploadReviewStatusRepository.insertSubmissionUploadReviewStatus({
-      submission_upload_id: submissionUploadId,
-      status: data.status
-    });
-  }
-
-  /**
-   * Assert that a submission upload has completed automated validation for approval.
-   *
-   * @param {string} submissionUploadId
-   * @returns {Promise<void>}
-   * @throws {HTTP400} If automated validation is unresolved.
-   */
-  async assertSubmissionUploadCanBeApproved(submissionUploadId: string): Promise<void> {
-    const submissionValidationService = new SubmissionValidationService(this.connection);
-    const validation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
-      submissionUploadId
-    );
-
-    if (validation?.status !== 'completed') {
-      throw new HTTP400('Submission upload validation must be completed before approval');
-    }
   }
 
   /**

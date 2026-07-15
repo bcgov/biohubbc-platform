@@ -58,15 +58,29 @@ describe('SubmissionFeatureClosureRepository', () => {
       expect(sqlText).to.not.include('submission_upload_id =');
     });
 
-    it('does not require record_effective_date when selecting features for closure', async () => {
+    it('selects only active submission features for closure', async () => {
       const sqlSpy = sinon.stub().resolves(mockQueryResult([], 1));
       const repository = new SubmissionFeatureClosureRepository(getMockDBConnection({ sql: sqlSpy }));
 
       await repository.computeClosureForSubmission(42);
 
       const sqlText = sqlSpy.firstCall.args[0].text;
-      expect(sqlText).to.include('record_end_date IS NULL');
-      expect(sqlText).to.not.include('record_effective_date <= now()');
+      expect(sqlText).to.include('record_effective_date <= now()');
+      expect(sqlText).to.include('record_end_date IS NULL OR now() < record_end_date');
+    });
+
+    it('uses stored parent and property references without natural-key resolution', async () => {
+      const sqlSpy = sinon.stub().resolves(mockQueryResult([], 1));
+      const repository = new SubmissionFeatureClosureRepository(getMockDBConnection({ sql: sqlSpy }));
+
+      await repository.computeClosureForSubmission(42);
+
+      const sqlText = sqlSpy.firstCall.args[0].text;
+      expect(sqlText).to.include('child.parent_submission_feature_id AS target');
+      expect(sqlText).to.include('property.referenced_submission_feature_id AS target');
+      expect(sqlText).to.not.include('JOIN LATERAL');
+      expect(sqlText).to.not.include('source_id');
+      expect(sqlText).to.not.include('submission_upload_feature');
     });
   });
 });

@@ -26,3 +26,9 @@ export const PROCESS_START_STATUSES: SubmissionUpload['status'][] = ['uploaded',
  * and idempotent resume (`indexing`) while rejecting terminal states.
  */
 export const INDEX_START_STATUSES: SubmissionUpload['status'][] = ['ingested', 'indexing'];
+
+/** Upload statuses from which reconciliation may start or resume. */
+export const RECONCILE_START_STATUSES: SubmissionUpload['status'][] = ['ingested', 'reconciling'];
+
+/** Upload statuses from which promotion may start or resume. */
+export const PROMOTE_START_STATUSES: SubmissionUpload['status'][] = ['reconciled', 'promoting'];

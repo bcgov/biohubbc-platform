@@ -5,7 +5,19 @@ import { TicketSystemUserWithUserSchema } from './ticket-system-user';
 
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
-const SubmissionUploadJobStatusEnum = ['uploaded', 'ingesting', 'ingested', 'indexing', 'indexed', 'invalid', 'failed'];
+const SubmissionUploadJobStatusEnum = [
+  'uploaded',
+  'ingesting',
+  'ingested',
+  'reconciling',
+  'reconciled',
+  'promoting',
+  'promoted',
+  'indexing',
+  'indexed',
+  'invalid',
+  'failed'
+];
 const SubmissionUploadReviewStatusEnum = ['submitted', 'approved', 'denied', 'deleted'];
 const SubmissionValidationStatusEnum = ['pending', 'started', 'completed', 'invalid', 'failed'];
 const SubmissionUploadReviewScopeEnum = ['validation', 'security'];

@@ -91,7 +91,10 @@ export function deleteSubmissionUpload(): RequestHandler {
 
       await submissionUploadService.softDeleteSubmissionUpload(submissionUploadId);
 
-      await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status: 'deleted' });
+      await reviewStatusService.insertSubmissionUploadReviewStatus({
+        submission_upload_id: submissionUploadId,
+        status: 'deleted'
+      });
 
       await connection.commit();
 

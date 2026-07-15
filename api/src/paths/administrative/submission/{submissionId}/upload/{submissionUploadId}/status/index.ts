@@ -8,7 +8,6 @@ import {
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
@@ -63,8 +62,7 @@ PATCH.apiDoc = {
   },
   responses: {
     200: {
-      description:
-        'Submission upload review status updated successfully. When the status is approved, the response includes the per-outcome reconciliation counts describing how the upload changed the submission state.',
+      description: 'Submission upload review status updated successfully.',
       content: {
         'application/json': {
           schema: SubmissionUploadReviewStatusResponseSchema
@@ -74,7 +72,7 @@ PATCH.apiDoc = {
     ...defaultErrorResponses,
     400: {
       description:
-        'Approval preconditions not met: automated validation has not completed, or the upload has not reached the indexed status.'
+        'Approval preconditions not met: automated validation has not completed, or indexing has not completed.'
     },
     404: {
       description:
@@ -82,7 +80,7 @@ PATCH.apiDoc = {
     },
     409: {
       description:
-        'The upload contains multiple pending features sharing the same feature type and source id, so it cannot be safely activated.'
+        'The upload contains reconciliation conflicts or its prepared unchanged classification is stale, so it cannot be safely activated.'
     }
   }
 };
@@ -106,8 +104,7 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
       const submissionUploadService = new SubmissionUploadService(connection);
       await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
 
-      const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
-      const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
+      const result = await submissionUploadService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
 
       await connection.commit();
 

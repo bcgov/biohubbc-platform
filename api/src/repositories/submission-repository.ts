@@ -1,6 +1,10 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+  SUBMISSION_ACTIVE_STATE_LOCK_SEED
+} from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview, SubmissionFilters } from '../models/submission';
@@ -322,6 +326,24 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  */
 export class SubmissionRepository extends BaseRepository {
   /**
+   * Lock the submission's active feature state for the current transaction.
+   *
+   * Reconciliation and activation use the same submission-scoped advisory lock so
+   * that a baseline cannot change while an upload is being classified or published.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.connection.sql(SQL`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_ACTIVE_STATE_LOCK_PREFIX} || ':' || ${submissionId}::text, ${SUBMISSION_ACTIVE_STATE_LOCK_SEED})
+      );
+    `);
+  }
+
+  /**
    * Insert a new submission record.
    *
    * @param {ICreateSubmission} submissionData
@@ -431,7 +453,10 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Delete all feature relationships for one upload attempt.
+   * Delete feature relationships owned by one upload attempt.
+   *
+   * Relationship ownership follows the source feature. Inbound edges from features
+   * belonging to other uploads must survive a re-index of their target.
    *
    * @param {string} submissionUploadId
    * @return {Promise<void>}
@@ -441,11 +466,6 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       DELETE FROM submission_feature_feature
       WHERE source_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      )
-      OR target_feature_id IN (
         SELECT submission_feature_id
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}

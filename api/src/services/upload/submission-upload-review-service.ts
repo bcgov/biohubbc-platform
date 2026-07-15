@@ -140,8 +140,7 @@ export class SubmissionUploadReviewService extends DBService {
    * Update an active review row.
    *
    * This changes the human-review workflow state only. It does not approve or
-   * deny the upload; final disposition remains owned by
-   * `SubmissionUploadReviewStatusService`.
+   * deny the upload; final disposition remains owned by `SubmissionUploadService`.
    *
    * @param {string} submissionUuid - The submission UUID.
    * @param {string} submissionUploadId - The submission upload ID.
