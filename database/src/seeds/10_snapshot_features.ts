@@ -149,8 +149,20 @@ interface FkChain {
   artifactIdByObjectKey: Map<string, string>;
 }
 
+/** Minimal ITIS-backed taxonomy records referenced by the committed snapshot features. */
+const SNAPSHOT_TAXA = [
+  { itisTsn: 177925, scientificName: 'Strix occidentalis', commonName: 'Spotted Owl' },
+  { itisTsn: 180702, scientificName: 'Alces', commonName: 'Moose' },
+  { itisTsn: 180703, scientificName: 'Alces alces', commonName: 'Moose' },
+  { itisTsn: 625197, scientificName: 'Rangifer tarandus tarandus', commonName: 'Caribou' }
+] as const;
+
 export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`SET SCHEMA 'biohub'; SET SEARCH_PATH = 'biohub','public';`);
+
+  // Taxa are cached by the application during normal ingestion. Snapshot replay bypasses that API path,
+  // so seed the referenced cache records explicitly before replaying (or skipping) the submissions.
+  await seedSnapshotTaxa(knex);
 
   for (const fixtureName of loadFixtureIndex()) {
     const fixture = loadFixture(fixtureName);
@@ -176,6 +188,50 @@ export async function seed(knex: Knex): Promise<void> {
       await insertAnchors(trx, fixture, idMap);
 
       await assertReplayedCounts(trx, fixture, chain.submissionId);
+    });
+  }
+}
+
+/**
+ * Seed the taxonomy cache entries referenced by snapshot feature payloads.
+ *
+ * This runs before the snapshot idempotency check so an existing local snapshot can acquire missing
+ * taxonomy data simply by rerunning the seeds. Existing active cache records are always preserved.
+ */
+async function seedSnapshotTaxa(knex: Knex): Promise<void> {
+  const systemUser = await knex('system_user')
+    .select('system_user_id')
+    .whereNull('record_end_date')
+    .orderBy('system_user_id')
+    .first();
+
+  if (!systemUser) {
+    throw new Error('seed 10: no active system user was found for snapshot taxonomy');
+  }
+
+  for (const taxon of SNAPSHOT_TAXA) {
+    const existing = await knex('taxon')
+      .select('taxon_id')
+      .where({ itis_tsn: taxon.itisTsn })
+      .whereNull('record_end_date')
+      .first();
+
+    if (existing) {
+      continue;
+    }
+
+    await knex('taxon').insert({
+      itis_tsn: taxon.itisTsn,
+      itis_scientific_name: taxon.scientificName,
+      common_name: taxon.commonName,
+      itis_data: JSON.stringify({
+        tsn: String(taxon.itisTsn),
+        scientificName: taxon.scientificName,
+        commonName: taxon.commonName,
+        source: 'ITIS snapshot seed'
+      }),
+      itis_update_date: knex.fn.now(),
+      create_user: systemUser.system_user_id
     });
   }
 }
