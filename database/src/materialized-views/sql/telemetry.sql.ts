@@ -7,8 +7,10 @@ WITH candidate_features AS (
 deployments AS (
     SELECT
         dep.submission_feature_id,
-        dep.data->>'device_key' AS device_key,
-        dep.data->>'animal_identifier' AS animal_id
+        dep.submission_upload_id,
+        dep.parent_submission_feature_id AS survey_submission_feature_id,
+        dep.data#>>'{properties,device_key}' AS device_key,
+        dep.data#>>'{properties,animal_identifier}' AS animal_id
     FROM biohub.submission_feature dep
     JOIN candidate_features cf
       ON cf.submission_feature_id = dep.submission_feature_id
@@ -17,55 +19,50 @@ deployments AS (
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
       AND dep.record_effective_date IS NOT NULL
-      AND dep.record_effective_date <= NOW()::date
+      AND dep.record_effective_date <= NOW()
 ),
 
-related_features AS (
+telemetry_locations AS (
     SELECT
-        c.source_submission_feature_id AS deployment_id,
-        c.target_submission_feature_id AS related_feature_id
-    FROM biohub.submission_feature_closure c
-    JOIN deployments d
-      ON c.source_submission_feature_id = d.submission_feature_id
-
-    UNION
-
-    SELECT
-        sff.source_feature_id AS deployment_id,
-        sff.target_feature_id AS related_feature_id
-    FROM biohub.submission_feature_feature sff
-    JOIN deployments d
-      ON sff.source_feature_id = d.submission_feature_id
-
-    UNION
-
-    SELECT
-        sff.target_feature_id AS deployment_id,
-        sff.source_feature_id AS related_feature_id
-    FROM biohub.submission_feature_feature sff
-    JOIN deployments d
-      ON sff.target_feature_id = d.submission_feature_id
+        sf_telemetry.submission_feature_id,
+        biohub.try_geom_from_geojson(
+          CASE
+            WHEN sf_telemetry.data#>>'{properties,geometry,type}' = 'FeatureCollection'
+              THEN sf_telemetry.data#>>'{properties,geometry,features,0,geometry}'
+            WHEN sf_telemetry.data#>>'{properties,geometry,type}' = 'Feature'
+              THEN sf_telemetry.data#>>'{properties,geometry,geometry}'
+            ELSE sf_telemetry.data#>>'{properties,geometry}'
+          END
+        ) AS geometry
+    FROM biohub.submission_feature sf_telemetry
+    JOIN candidate_features cf
+      ON cf.submission_feature_id = sf_telemetry.submission_feature_id
 ),
 
 related_animals AS (
     SELECT
-        rf.deployment_id,
+        d.submission_feature_id AS deployment_id,
         sf.submission_feature_id AS animal_feature_id,
         sf.parent_submission_feature_id AS dataset_submission_feature_id,
-        sf.data->>'taxon_id' AS taxon_id,
-        COALESCE(ccc.label, sf.data->>'sex') AS sex,
-        sf.data->>'animal_identifier' AS animal_identifier
-    FROM related_features rf
+        sf.data#>>'{properties,taxon_id}' AS taxon_id,
+        COALESCE(ccc.label, sf.data#>>'{properties,sex}') AS sex,
+        sf.data#>>'{properties,animal_identifier}' AS animal_identifier
+    FROM deployments d
     JOIN biohub.submission_feature sf
-      ON sf.submission_feature_id = rf.related_feature_id
+      ON sf.submission_upload_id = d.submission_upload_id
+      AND sf.parent_submission_feature_id = d.survey_submission_feature_id
+      AND sf.data#>>'{properties,animal_identifier}' = d.animal_id
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
     LEFT JOIN biohub.contributor_codeset_code ccc
-      ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
+      ON CASE
+        WHEN sf.data#>>'{properties,sex}' ~ '^\d+$'
+          THEN (sf.data#>>'{properties,sex}')::int
+      END = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
       AND sf.record_effective_date IS NOT NULL
-      AND sf.record_effective_date <= NOW()::date
+      AND sf.record_effective_date <= NOW()
 ),
 
 submissions AS (
@@ -83,10 +80,10 @@ related_ecological_units AS (
         deployment_id,
         string_agg(DISTINCT ecological_unit, ';' ORDER BY ecological_unit) AS ecological_unit
     FROM (
-        -- Ecological units linked to animals via submission_feature_feature
+        -- Ecological units linked directly to animals via submission_feature_feature
         SELECT
             ra.deployment_id,
-            (sf_eu.data->>'ecological_unit_type') || '::' || (sf_eu.data->>'ecological_unit_value') AS ecological_unit
+            (sf_eu.data#>>'{properties,ecological_unit_type}') || '::' || (sf_eu.data#>>'{properties,ecological_unit_value}') AS ecological_unit
         FROM related_animals ra
         JOIN biohub.submission_feature_feature sff
           ON (sff.source_feature_id = ra.animal_feature_id AND sff.target_feature_id != ra.animal_feature_id)
@@ -98,14 +95,14 @@ related_ecological_units AS (
           AND ft_eu.name = 'ecological_unit'
         WHERE sf_eu.record_end_date IS NULL
           AND sf_eu.record_effective_date IS NOT NULL
-          AND sf_eu.record_effective_date <= NOW()::date
+          AND sf_eu.record_effective_date <= NOW()
 
         UNION
 
         -- Ecological units with animal as parent
         SELECT
             ra.deployment_id,
-            (sf_eu.data->>'ecological_unit_type') || '::' || (sf_eu.data->>'ecological_unit_value') AS ecological_unit
+            (sf_eu.data#>>'{properties,ecological_unit_type}') || '::' || (sf_eu.data#>>'{properties,ecological_unit_value}') AS ecological_unit
         FROM related_animals ra
         JOIN biohub.submission_feature sf_eu
           ON sf_eu.parent_submission_feature_id = ra.animal_feature_id
@@ -114,7 +111,7 @@ related_ecological_units AS (
           AND ft_eu.name = 'ecological_unit'
         WHERE sf_eu.record_end_date IS NULL
           AND sf_eu.record_effective_date IS NOT NULL
-          AND sf_eu.record_effective_date <= NOW()::date
+          AND sf_eu.record_effective_date <= NOW()
     ) AS combined_ecological_units
     GROUP BY deployment_id
 )
@@ -139,14 +136,17 @@ LEFT JOIN submissions s
 LEFT JOIN related_ecological_units reu
   ON reu.deployment_id = d.submission_feature_id
 
+LEFT JOIN telemetry_locations tl
+  ON tl.submission_feature_id = sf.submission_feature_id
+
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = ra.taxon_id::int
 
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND sf.record_effective_date IS NOT NULL
-  AND sf.record_effective_date <= NOW()::date
-  AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months')
+  AND sf.record_effective_date <= NOW()
+  AND (sf.data#>>'{properties,timestamp}')::timestamptz <= (NOW() - INTERVAL '3 months')
   {taxonExclusionFilter}
   {securityFilter}
 `;
