@@ -377,6 +377,8 @@ export const insertObservationRecord = async (
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const taxonTsn = await getRandomActiveTaxonTsn(knex);
+  const sex = faker.helpers.arrayElement(['female', 'male', 'unknown']);
+  const lifeStage = faker.helpers.arrayElement(['adult', 'juvenile', 'subadult', 'unknown']);
 
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -390,7 +392,12 @@ export const insertObservationRecord = async (
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
         ),
-        count: faker.number.int({ min: 0, max: 100 })
+        timestamp: faker.date.past({ years: 5 }).toISOString(),
+        sign: faker.helpers.arrayElement(['code::observation_sign::1', 'code::observation_sign::2']),
+        count: faker.number.int({ min: 1, max: 100 }),
+        taxon_id: taxonTsn ?? 180703,
+        sex,
+        life_stage: lifeStage
       }
     })}`
   );
@@ -516,7 +523,15 @@ export const insertSubmissionFeature = (options: {
     | 'telemetry_deployment'
     | 'telemetry_device';
   data: { [key: string]: any };
-}) => `
+}) => {
+  const sourceId = faker.string.uuid();
+  const featureData = {
+    id: sourceId,
+    type: options.feature_type,
+    properties: options.data
+  };
+
+  return `
     INSERT INTO submission_feature
     (
         submission_id,
@@ -533,12 +548,13 @@ export const insertSubmissionFeature = (options: {
         '${options.submission_upload_id}',
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
-        public.gen_random_uuid(),
-        ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
+        '${sourceId}',
+        ${options.data ? `$$${JSON.stringify(featureData)}$$` : null},
         now()
     )
     RETURNING submission_feature_id;
 `;
+};
 
 const insertSearchString = (options: { submission_feature_id: number; property_name: string; value: string }) => `
     INSERT INTO submission_feature_property_string
