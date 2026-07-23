@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.fullname" . }}-config
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+data:
+  # Keep in sync with the local development config: env_config/martin/config.yaml
+  config.yaml: |
+    listen_addresses: 0.0.0.0:{{ .Values.service.port }}
+
+    worker_processes: {{ .Values.app.martin.workerProcesses }}
+
+    postgres:
+      # Expanded by Martin from the DATABASE_URL environment variable set on the container.
+      connection_string: ${DATABASE_URL}
+
+      pool_size: {{ .Values.app.martin.poolSize }}
+      {{- if .Values.app.database.useCrunchy }}
+
+      # Crunchy Postgres serves TLS signed by the PGO root CA, mounted from the same secret the api uses.
+      ssl_root_cert: /etc/pg-ssl/{{ .Values.app.database.caSecretKey }}
+      {{- end }}
+
+      # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
+      # function its database role can read. Only the sources listed below are served.
+      auto_publish: false
+
+      functions:
+        {{- range $id, $source := .Values.app.martin.functions }}
+        {{ $id }}:
+          schema: {{ $source.schema }}
+          function: {{ $source.function }}
+          minzoom: {{ $source.minzoom }}
+          maxzoom: {{ $source.maxzoom }}
+          bounds: {{ toJson $source.bounds }}
+        {{- end }}

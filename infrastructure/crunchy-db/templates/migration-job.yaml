@@ -182,6 +182,21 @@ spec:
               " || true
               echo "pgboss ACLs set (skip if schema missing in dump)."
 
+              echo "--- Re-grant ACLs for the martin tile server role (dump used --no-acl) ---"
+              # NOTE: --no-acl also drops the REVOKE on tile functions, which silently restores the
+              # default PUBLIC EXECUTE grant. The REVOKE must be re-applied, not just the GRANTs.
+              # ON_ERROR_STOP=0 because the tile functions may not exist yet at restore time; the
+              # tile function seeds re-apply both the REVOKE and the GRANT on every deploy.
+              psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=0 -c "
+                ALTER ROLE martin SET search_path TO biohub, public;
+                ALTER ROLE martin SET statement_timeout TO '30s';
+                GRANT CONNECT ON DATABASE \"$NEW_DB_NAME\" TO martin;
+                GRANT USAGE ON SCHEMA biohub TO martin;
+                REVOKE ALL ON FUNCTION biohub.tile_fixture(integer, integer, integer) FROM PUBLIC;
+                GRANT EXECUTE ON FUNCTION biohub.tile_fixture(integer, integer, integer) TO martin;
+              " || true
+              echo "martin ACLs set (skip if role or tile functions missing)."
+
               echo "=== Migration complete ==="
           env:
             - name: OLD_DB_HOST

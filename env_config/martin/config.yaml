@@ -1,0 +1,43 @@
+# ------------------------------------------------------------------------------
+# Martin vector tile server configuration (local development)
+#
+# Martin serves vector tiles directly from PostGIS. Tile bytes never pass through
+# the BioHub API.
+#
+#   MapLibre -> tile gateway (auth) -> Martin -> PostGIS
+#
+# IMPORTANT: keep this file in sync with the Helm ConfigMap that renders the same
+# configuration for OpenShift:
+#   infrastructure/martin/templates/configmap.yaml
+#
+# Config reference (pinned version): https://maplibre.org/martin/config-file/
+# Schema: https://github.com/maplibre/martin/blob/main/schemas/config.json
+# ------------------------------------------------------------------------------
+
+# Bind on all interfaces so the port can be published to the host for local development.
+# In OpenShift, Martin binds 127.0.0.1 and is only reachable through the tile gateway sidecar.
+listen_addresses: 0.0.0.0:3000
+
+worker_processes: 2
+
+postgres:
+  # Expanded from the DATABASE_URL environment variable set on the compose service.
+  connection_string: ${DATABASE_URL}
+
+  pool_size: 5
+
+  # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
+  # function its database role can read. Only the sources explicitly listed below are served.
+  auto_publish: false
+
+  functions:
+    # Synthetic source used to validate the tile stack end to end. Reads no tables.
+    # See database/src/procedures/02_tile_fixture.ts
+    fixture:
+      schema: biohub
+      function: tile_fixture
+      minzoom: 0
+      # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+      maxzoom: 15
+      # [west, south, east, north] - British Columbia
+      bounds: [-139.06, 48.30, -114.03, 60.00]

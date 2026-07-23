@@ -119,6 +119,14 @@ make web
 Result of running `make web` (condensed to only show the important parts):  
 ![make web screenshot](readme_screenshots/running_make_start.png "Running `make web`")
 
+## Start the Vector Tile Server (optional)
+
+Starts Martin, which serves map vector tiles directly from PostGIS. Not started by `make web`.
+
+```
+make martin
+```
+
 ## Access the Running Applications
 
 api:
@@ -128,6 +136,12 @@ api:
 app:
 
 - `localhost:7100`
+
+martin (vector tiles, only if started with `make martin`):
+
+- `localhost:3000/health`
+- `localhost:3000/catalog`
+- `localhost:3000/fixture/{z}/{x}/{y}`
 
 # Helpful Makefile Commands
 

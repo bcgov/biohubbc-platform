@@ -298,6 +298,33 @@ services:
     networks:
       - biohubbc-network
 
+  ## Martin vector tile server (serves vector tiles directly from PostGIS)
+  martin:
+    image: ghcr.io/maplibre/martin:${MARTIN_VERSION}
+    container_name: ${DOCKER_PROJECT_NAME}-martin-${DOCKER_NAMESPACE}-container
+    ports:
+      - ${MARTIN_PORT}:3000
+    command: ["--config", "/etc/martin/config.yaml"]
+    environment:
+      # Martin expands ${DATABASE_URL} inside the mounted config file
+      - DATABASE_URL=postgresql://${DB_USER_MARTIN}:${DB_USER_MARTIN_PASS}@${DB_HOST}:5432/${DB_DATABASE}
+    volumes:
+      - ./env_config/martin/config.yaml:/etc/martin/config.yaml:ro
+    networks:
+      - biohubbc-network
+    depends_on:
+      db:
+        condition: service_healthy
+      # The martin role and the tile functions are created by the migrations/seeds
+      db_setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   ## Run the database migrations and seeding
   db_setup:
     image: ${DOCKER_PROJECT_NAME}-db-setup-${DOCKER_NAMESPACE}-img
@@ -315,6 +342,9 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - DB_USER_API=${DB_USER_API}
       - DB_USER_API_PASS=${DB_USER_API_PASS}
+      # Used to create the least-privilege Martin tile server role
+      - DB_USER_MARTIN=${DB_USER_MARTIN}
+      - DB_USER_MARTIN_PASS=${DB_USER_MARTIN_PASS}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
       - CONTRIBUTOR_SYSTEM_USER_GUID=${CONTRIBUTOR_SYSTEM_USER_GUID}
       - ENABLE_MOCK_FEATURE_SEEDING=${ENABLE_MOCK_FEATURE_SEEDING}

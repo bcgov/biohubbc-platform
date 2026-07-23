@@ -23,6 +23,9 @@ database-setup:
 api:
   enabled: true
 
+martin:
+  enabled: true
+
 # Component-specific configurations
 # These will be passed through to the individual charts
 app:
@@ -86,6 +89,17 @@ queue:
     changeId: ""
     ts: ""
   # Add any queue-specific overrides here
+
+# Values passed to the biohub-platform-martin subchart.
+# NOTE: subchart values are routed by CHART NAME, so per-component settings must live under
+# `biohub-platform-martin:`. The `martin:` key above only drives the `martin.enabled` condition.
+biohub-platform-martin:
+  environment:
+    licensePlate: "a0ec71"
+    name: ""
+    id: ""
+    changeId: ""
+    ts: ""
 
 # Values passed to biohub-platform-queue subchart
 # Queue tuning overrides (optional)

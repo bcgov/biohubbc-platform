@@ -79,6 +79,26 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
                   key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
+            # Least-privilege role for the Martin vector tile server.
+            # In Crunchy environments the Postgres Operator owns this role and its password, so only
+            # the name is supplied and the migration applies grants without creating the role. In PR
+            # environments no operator exists, so the password is supplied and the migration creates it.
+            - name: DB_USER_MARTIN
+              {{- if .Values.app.database.useCrunchy }}
+              value: {{ .Values.app.database.martinUser }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dbHost" . }}
+                  key: database-user-martin
+              {{- end }}
+            {{- if not .Values.app.database.useCrunchy }}
+            - name: DB_USER_MARTIN_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dbHost" . }}
+                  key: database-user-martin-password
+            {{- end }}
             - name: DB_PORT
               value: '5432'
             - name: CHANGE_VERSION

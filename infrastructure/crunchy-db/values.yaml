@@ -1,6 +1,11 @@
 # Base values for biohub-platform Crunchy Postgres cluster.
 # Environment-specific overrides are in values-dev.yaml, values-test.yaml, values-prod.yaml.
 # This chart is NOT used for PR preview environments, which use the vanilla database subchart.
+#
+# DEPLOYMENT ORDERING: the PostgresCluster `users` block declares the `martin` role used by the
+# vector tile server. This chart must be upgraded in an environment BEFORE the biohub-platform
+# umbrella chart deploys Martin there, so the operator has created the role and the
+# <cluster>-pguser-martin secret. The database migration fails with an explicit message otherwise.
 
 # Overridden per environment (e.g. biohub-platform-db-dev in values-dev.yaml)
 fullnameOverride: biohub-db

@@ -31,8 +31,9 @@ db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to ru
 
 clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
 minio: | run-minio ## Starts MinIO object storage for local S3
+martin: | build-martin run-martin ## Pulls and runs the Martin vector tile server locally
 
-all: | web queue clamav minio ## Performs all commands necessary to run the full stack (web, queue, clamav, minio) in docker
+all: | web queue clamav minio martin ## Performs all commands necessary to run the full stack (web, queue, clamav, minio, martin) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -215,175 +216,26 @@ run-clamav: ## Run clamav
 	@docker compose up -d clamav
 
 ## ------------------------------------------------------------------------------
-## MinIO commands (S3-compatible object storage for local development)
+## Martin commands (vector tile server)
 ## ------------------------------------------------------------------------------
 
-run-minio: ## Run MinIO and create buckets
+build-martin: ## Pull the martin image
 	@echo "==============================================="
-	@echo "Make: run-minio - running MinIO"
+	@echo "Make: build-martin - pulling martin image"
 	@echo "==============================================="
-	@docker compose up -d minio minio_setup
+	@docker compose pull martin
 
-## ------------------------------------------------------------------------------
-## Run `npm` commands for all projects
-## ------------------------------------------------------------------------------
+run-martin: ## Run martin
+	@echo "==============================================="
+	@echo "Make: run-martin - running martin"
+	@echo "==============================================="
+	@docker compose up -d martin
 
-install: ## Runs `npm install` for all projects
+log-martin: ## Runs `docker logs <container> -f` for the martin container
 	@echo "==============================================="
-	@echo "Running /api install"
+	@echo "Running docker logs for the martin container"
 	@echo "==============================================="
-	@cd api && npm install && cd ..
-	@echo "==============================================="
-	@echo "Running /app install"
-	@echo "==============================================="
-	@cd app && npm install && cd ..
-	@echo "==============================================="
-	@echo "Running /database install"
-	@echo "==============================================="
-	@cd database && npm install && cd ..
-
-test: ## Runs `npm test` for api, and app projects
-	@echo "==============================================="
-	@echo "Running /api tests"
-	@echo "==============================================="
-	@cd api && npm test && cd ..
-	@echo "==============================================="
-	@echo "Running /app tests"
-	@echo "==============================================="
-	@cd app && npm test && cd ..
-
-test-db: ## Runs DB integration tests (transaction/rollback, only needs database)
-	@echo "==============================================="
-	@echo "Running DB integration tests"
-	@echo "==============================================="
-	@docker compose exec api npm run test:db
-
-test-sys: | run-minio run-clamav run-queue ## Runs system integration tests (needs minio, clamav, queue)
-	@echo "==============================================="
-	@echo "Waiting for ClamAV to be healthy..."
-	@echo "==============================================="
-	@until docker inspect --format='{{.State.Health.Status}}' $(DOCKER_PROJECT_NAME)-clamav-$(DOCKER_NAMESPACE)-container 2>/dev/null | grep -q healthy; do sleep 5; echo "  waiting..."; done
-	@echo "==============================================="
-	@echo "Running system integration tests"
-	@echo "==============================================="
-ifdef SPEC
-	@docker compose exec api npm run test:sys:file -- "src/__integration__/system/$(SPEC).integration.ts"
-else
-	@docker compose exec api npm run test:sys
-endif
-
-cypress: ## Runs `npm run test:e2e` for api, and app projects
-	@echo "==============================================="
-	@echo "Running cypress tests"
-	@echo "==============================================="
-	@cd testing/e2e && npm run test:e2e && cd ../..
-
-lint: ## Runs `npm typecheck` and `npm lint` for all projects
-	@echo "==============================================="
-	@echo "Running /api typecheck"
-	@echo "==============================================="
-	@cd api && npm run typecheck && cd ..
-	@echo "==============================================="
-	@echo "Running /api lint"
-	@echo "==============================================="
-	@cd api && npm run lint && cd ..
-	@echo "==============================================="
-	@echo "Running /app typecheck"
-	@echo "==============================================="
-	@cd app && npm run typecheck && cd ..
-	@echo "==============================================="
-	@echo "Running /app lint"
-	@echo "==============================================="
-	@cd app && npm run lint && cd ..
-	@echo "==============================================="
-	@echo "Running /database lint"
-	@echo "==============================================="
-	@cd database && npm run lint && cd ..
-
-lint-fix: ## Runs `npm typecheck` and `npm run lint-fix ` for all projects
-	@echo "==============================================="
-	@echo "Running /api typecheck"
-	@echo "==============================================="
-	@cd api && npm run typecheck && cd ..
-	@echo "==============================================="
-	@echo "Running /api lint-fix"
-	@echo "==============================================="
-	@cd api && npm run lint-fix && cd ..
-	@echo "==============================================="
-	@echo "Running /app typecheck"
-	@echo "==============================================="
-	@cd app && npm run typecheck && cd ..
-	@echo "==============================================="
-	@echo "Running /app lint-fix"
-	@echo "==============================================="
-	@cd app && npm run lint-fix && cd ..
-	@echo "==============================================="
-	@echo "Running /database lint-fix"
-	@echo "==============================================="
-	@cd database && npm run lint-fix && cd ..
-
-format: ## Runs `npm run format` for all projects
-	@echo "==============================================="
-	@echo "Running /api format"
-	@echo "==============================================="
-	@cd api && npm run format && cd ..
-	@echo "==============================================="
-	@echo "Running /app format"
-	@echo "==============================================="
-	@cd app && npm run format && cd ..
-	@echo "==============================================="
-	@echo "Running /database format"
-	@echo "==============================================="
-	@cd database && npm run format && cd ..
-
-format-fix: ## Runs `npm run format-fix` for all projects
-	@echo "==============================================="
-	@echo "Running /api format-fix"
-	@echo "==============================================="
-	@cd api && npm run format-fix && cd ..
-	@echo "==============================================="
-	@echo "Running /app format-fix"
-	@echo "==============================================="
-	@cd app && npm run format-fix && cd ..
-	@echo "==============================================="
-	@echo "Running /database format-fix"
-	@echo "==============================================="
-	@cd database && npm run format-fix && cd ..
-
-## ------------------------------------------------------------------------------
-## Run `docker logs <container> -f` commands for all projects
-## - You can include additional parameters by appaending an `args` param
-## - Ex: `make log-app args="--tail 0"`
-## ------------------------------------------------------------------------------
-log-app: ## Runs `docker logs <container> -f` for the app container
-	@echo "==============================================="
-	@echo "Running docker logs for the app container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-app-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-api: ## Runs `docker logs <container> -f` for the api container
-	@echo "==============================================="
-	@echo "Running docker logs for the api container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-api-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-queue: ## Runs `docker logs <container> -f` for the queue container
-	@echo "==============================================="
-	@echo "Running docker logs for the queue container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-queue-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-db: ## Runs `docker logs <container> -f` for the database container
-	@echo "==============================================="
-	@echo "Running docker logs for the db container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-db-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-db-setup: ## Runs `docker logs <container> -f` for the database setup container
-	@echo "==============================================="
-	@echo "Running docker logs for the db-setup container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
+	@docker logs $(DOCKER_PROJECT_NAME)-martin-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Typescript Trace Commands
