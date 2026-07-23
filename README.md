@@ -119,12 +119,20 @@ make web
 Result of running `make web` (condensed to only show the important parts):  
 ![make web screenshot](readme_screenshots/running_make_start.png "Running `make web`")
 
-## Start the Vector Tile Server (optional)
+## Start the Martin Stack (optional)
 
-Starts Martin, which serves map vector tiles directly from PostGIS. Not started by `make web`.
+Starts Martin (which serves map vector tiles directly from PostGIS) and the Martin Gateway that
+authenticates tile requests. Not started by `make web`.
 
 ```
-make martin
+make martin-gateway
+```
+
+Tile bytes never pass through the API. The API issues a short lived token; the gateway verifies it
+and proxies to Martin:
+
+```
+MapLibre -> Martin Gateway -> Martin -> PostGIS
 ```
 
 ## Access the Running Applications
@@ -137,10 +145,24 @@ app:
 
 - `localhost:7200`
 
-martin (vector tiles, only if started with `make martin`):
+Martin Gateway (authenticated vector tiles, only if started with `make martin-gateway`):
+
+- `localhost:6300/health`
+- `localhost:6300/martin/{source}/{z}/{x}/{y}` (requires a Bearer tile token)
+
+martin (published locally for debugging; internal-only when deployed):
 
 - `localhost:3000/health`
 - `localhost:3000/catalog`
+
+To mint a token and call the gateway (Martin publishes no sources until SIMSBIOHUB-1103, so this
+returns `404` rather than a tile for now):
+
+```
+TOKEN=$(curl -s -X POST http://localhost:6200/api/martin/token | jq -r .token)
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  http://localhost:6300/martin/search/5/5/11
+```
 
 # Helpful Makefile Commands
 

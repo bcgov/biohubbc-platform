@@ -366,6 +366,66 @@ jobs:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
 
+  buildAndPushMartinGateway:
+    name: Build Martin Gateway Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+      APP_NAME: "biohub-platform-martin-gateway"
+    needs:
+      - checkoutRepo
+    steps:
+      # Load repo from cache
+      - name: Cache repo
+        uses: actions/cache@v5
+        id: cache-repo
+        env:
+          cache-name: cache-repo
+        with:
+          path: ${{ github.workspace }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
+
+      # Checkout the branch if not restored via cache
+      - name: Checkout Target Branch
+        if: steps.cache-repo.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+
+      # Authenticate Docker with OpenShift registry.
+      # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
+      # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
+      # failed and successful runs can be correlated with source IPs.
+      - name: Authenticate Docker with OpenShift registry
+        run: |
+          echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
+          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+
+      # Build and push the API image
+      - name: Build and Push Martin Gateway Image
+        working-directory: martin-gateway
+        run: |
+          docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
+          docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-${{ env.APP_NAME }}-results.sarif'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          limit-severities-for-sarif: true
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-${{ env.APP_NAME }}-results
+          path: trivy-${{ env.APP_NAME }}-results.sarif
+
   # Deploy Helm chart
   deployHelmChart:
     name: Deploy Helm Chart
@@ -376,7 +436,8 @@ jobs:
       needs.buildAndPushApp.result == 'success' &&
       needs.buildAndPushDatabase.result == 'success' &&
       needs.buildAndPushDatabaseSetup.result == 'success' &&
-      needs.buildAndPushAPI.result == 'success' }}
+      needs.buildAndPushAPI.result == 'success' &&
+      needs.buildAndPushMartinGateway.result == 'success' }}
     environment: dev
     env:
       PR_NUMBER: ${{ github.event.number }}
@@ -386,6 +447,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
     steps:
       # Load repo from cache
       - name: Cache repo
@@ -487,6 +549,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
     steps:
       - name: Download all Trivy scan results
         uses: actions/download-artifact@v6
@@ -534,10 +597,11 @@ jobs:
             const databaseResults = parseSarifFile('trivy-results/trivy-biohub-platform-db-results/trivy-biohub-platform-db-results.sarif');
             const databaseSetupResults = parseSarifFile('trivy-results/trivy-biohub-platform-db-setup-results/trivy-biohub-platform-db-setup-results.sarif');
             const apiResults = parseSarifFile('trivy-results/trivy-biohub-platform-api-results/trivy-biohub-platform-api-results.sarif');
+            const martinGatewayResults = parseSarifFile('trivy-results/trivy-biohub-platform-martin-gateway-results/trivy-biohub-platform-martin-gateway-results.sarif');
             
             // Calculate totals
-            const totalCritical = appResults.critical + databaseResults.critical + databaseSetupResults.critical + apiResults.critical;
-            const totalHigh = appResults.high + databaseResults.high + databaseSetupResults.high + apiResults.high;
+            const totalCritical = appResults.critical + databaseResults.critical + databaseSetupResults.critical + apiResults.critical + martinGatewayResults.critical;
+            const totalHigh = appResults.high + databaseResults.high + databaseSetupResults.high + apiResults.high + martinGatewayResults.high;
             const totalVulnerabilities = totalCritical + totalHigh;
             
             // Only comment if there are vulnerabilities
@@ -564,6 +628,9 @@ jobs:
               
               **API Image:**
               - Critical: ${apiResults.critical}, High: ${apiResults.high}
+              
+              **Martin Gateway Image:**
+              - Critical: ${martinGatewayResults.critical}, High: ${martinGatewayResults.high}
               
               ---
               
@@ -601,6 +668,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
       - deployHelmChart
       - commentTrivyResults
     steps:
@@ -612,6 +680,7 @@ jobs:
           echo needs.buildAndPushDatabase.result: ${{ needs.buildAndPushDatabase.result }}
           echo needs.buildAndPushDatabaseSetup.result: ${{ needs.buildAndPushDatabaseSetup.result }}
           echo needs.buildAndPushAPI.result: ${{ needs.buildAndPushAPI.result }}
+          echo needs.buildAndPushMartinGateway.result: ${{ needs.buildAndPushMartinGateway.result }}
           echo needs.deployHelmChart.result: ${{ needs.deployHelmChart.result }}
           echo needs.commentTrivyResults.result: ${{ needs.commentTrivyResults.result }}
 

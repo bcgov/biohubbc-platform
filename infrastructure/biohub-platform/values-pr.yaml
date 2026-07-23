@@ -115,6 +115,11 @@ biohub-platform-api:
 
   # API configuration
   app:
+    # Tile token minting. Explicit per-environment opt-in: enabling mounts the martin-token-private
+    # secret, which must exist in the shared a0ec71-dev namespace (PRs reuse the dev secrets) before this is turned on
+    # (see infrastructure/martin/README.md). Chart default is off.
+    martin:
+      enabled: true
     nodeEnv: development
     nodeOptions: --max_old_space_size=2250 # 75% of memoryLimit (bytes)
     # appHost will be dynamically set: "biohub-platform-app-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
@@ -226,3 +231,15 @@ biohub-platform-martin:
     limits:
       cpu: 250m
       memory: 256Mi
+  # route.host intentionally omitted: the chart derives the per-PR app hostname, so /martin always
+  # lands on the same host as that PR's frontend.
+  route:
+    path: /martin
+  gateway:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

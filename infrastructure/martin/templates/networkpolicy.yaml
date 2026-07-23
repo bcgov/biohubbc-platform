@@ -1,0 +1,36 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      deployment: {{ include "app.fullname" . | quote }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Optional hardening. Martin is already unreachable from outside the pod because it binds
+    # loopback, so this only narrows who may reach the GATEWAY port. Disabled by default: the
+    # namespace already applies an allow-same-namespace policy, and a policy that omits the router
+    # would take the public tile route offline.
+    - from:
+        {{- range .Values.networkPolicy.allowedNamespaceSelectors }}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+        {{- range .Values.networkPolicy.allowedPodSelectors }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+{{- end }}

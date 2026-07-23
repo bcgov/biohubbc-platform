@@ -104,6 +104,15 @@ services:
       - LOG_FILE_DATE_PATTERN=${LOG_FILE_DATE_PATTERN}
       - LOG_FILE_MAX_SIZE=${LOG_FILE_MAX_SIZE}
       - LOG_FILE_MAX_FILES=${LOG_FILE_MAX_FILES}
+      # Tile tokens (the api holds the PRIVATE key; only it can mint tokens)
+      - MARTIN_TOKEN_PRIVATE_KEY_PATH=/var/martin-keys/private/${MARTIN_TOKEN_KID}.pem
+      - MARTIN_TOKEN_KID=${MARTIN_TOKEN_KID}
+      - MARTIN_TOKEN_AUD=${MARTIN_TOKEN_AUD}
+      - MARTIN_TOKEN_ISS=${MARTIN_TOKEN_ISS}
+      - MARTIN_TOKEN_TTL_SECONDS=${MARTIN_TOKEN_TTL_SECONDS}
+      - MARTIN_EXTERNAL_URL=${MARTIN_EXTERNAL_URL}
+      - MARTIN_MINT_RATE_LIMIT=${MARTIN_MINT_RATE_LIMIT}
+      - MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES=${MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES}
       # Clamav
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
@@ -121,12 +130,16 @@ services:
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - martin_keys:/var/martin-keys:ro
     networks:
       - biohubbc-network
     depends_on:
       db:
         condition: service_healthy
       db_setup:
+        condition: service_completed_successfully
+      # The api signs tile tokens with the locally generated private key
+      martin_keys_setup:
         condition: service_completed_successfully
 
   ## Build the queue worker docker image
@@ -298,6 +311,67 @@ services:
     networks:
       - biohubbc-network
 
+  ## Generate the local tile token signing keypair (one-shot, idempotent)
+  ## In OpenShift these come from the martin-token-private / martin-token-public Secrets instead.
+  martin_keys_setup:
+    image: alpine/openssl:latest
+    container_name: ${DOCKER_PROJECT_NAME}-martin-keys-setup-${DOCKER_NAMESPACE}-container
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'mkdir -p /keys/private /keys/public;
+        if [ ! -f "/keys/private/${MARTIN_TOKEN_KID}.pem" ]; then
+        echo "Generating tile token keypair (kid=${MARTIN_TOKEN_KID})...";
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "/keys/private/${MARTIN_TOKEN_KID}.pem";
+        openssl rsa -pubout -in "/keys/private/${MARTIN_TOKEN_KID}.pem" -out "/keys/public/${MARTIN_TOKEN_KID}.pem";
+        chmod -R a+r /keys;
+        echo "Tile token keypair generated.";
+        else echo "Tile token keypair already exists, skipping."; fi'
+    volumes:
+      - martin_keys:/keys
+    networks:
+      - biohubbc-network
+
+  ## Authenticating gateway that fronts Martin. The only public entry point for tiles.
+  martin_gateway:
+    image: ${DOCKER_PROJECT_NAME}-martin-gateway-${DOCKER_NAMESPACE}-img
+    container_name: ${DOCKER_PROJECT_NAME}-martin-gateway-${DOCKER_NAMESPACE}-container
+    build:
+      context: ./martin-gateway
+      dockerfile: ./.docker/martin-gateway/Dockerfile
+    ports:
+      - ${MARTIN_GATEWAY_PORT}:${MARTIN_GATEWAY_PORT}
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - MARTIN_GATEWAY_PORT=${MARTIN_GATEWAY_PORT}
+      - MARTIN_URL=http://martin:3000
+      # Only the PUBLIC keys are needed to verify tokens; the gateway can never mint one.
+      - MARTIN_TOKEN_PUBLIC_KEY_DIR=/var/martin-keys/public
+      # The kid the api signs with; startup asserts a matching public key file is present.
+      - MARTIN_TOKEN_KID=${MARTIN_TOKEN_KID}
+      - MARTIN_TOKEN_AUD=${MARTIN_TOKEN_AUD}
+      - MARTIN_TOKEN_ISS=${MARTIN_TOKEN_ISS}
+      - MARTIN_ALLOWED_SOURCES=${MARTIN_ALLOWED_SOURCES}
+      - MARTIN_MIN_ZOOM=${MARTIN_MIN_ZOOM}
+      - MARTIN_MAX_ZOOM=${MARTIN_MAX_ZOOM}
+      - MARTIN_CACHE_TTL_SECONDS=${MARTIN_CACHE_TTL_SECONDS}
+      - MARTIN_CACHE_MAX_BYTES=${MARTIN_CACHE_MAX_BYTES}
+      - MARTIN_SOURCE_VERSION=${MARTIN_SOURCE_VERSION}
+      - RATE_LIMIT_JTI_PER_MIN=${RATE_LIMIT_JTI_PER_MIN}
+      - RATE_LIMIT_IP_PER_MIN=${RATE_LIMIT_IP_PER_MIN}
+      - ALLOWED_ORIGIN=${APP_HOST}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./martin-gateway:/opt/app-root/src
+      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - martin_keys:/var/martin-keys:ro
+    networks:
+      - biohubbc-network
+    depends_on:
+      martin:
+        condition: service_healthy
+      martin_keys_setup:
+        condition: service_completed_successfully
+
   ## Martin vector tile server (serves vector tiles directly from PostGIS)
   martin:
     image: ghcr.io/maplibre/martin:${MARTIN_VERSION}
@@ -416,3 +490,5 @@ volumes:
     name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol
   minio_data:
     name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-vol
+  martin_keys:
+    name: ${DOCKER_PROJECT_NAME}-martin-keys-${DOCKER_NAMESPACE}-vol
