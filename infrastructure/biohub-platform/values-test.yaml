@@ -213,3 +213,15 @@ biohub-platform-martin:
     limits:
       cpu: 250m
       memory: 512Mi
+  # Tile gateway sidecar. Served on /tiles of the app hostname, so tiles are same origin.
+  route:
+    host: test-biohub-platform.apps.silver.devops.gov.bc.ca
+    path: /tiles
+  gateway:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

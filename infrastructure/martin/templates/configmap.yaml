@@ -10,7 +10,10 @@ metadata:
 data:
   # Keep in sync with the local development config: env_config/martin/config.yaml
   config.yaml: |
-    listen_addresses: 0.0.0.0:{{ .Values.service.port }}
+    # Loopback only. Martin shares a pod with the tile gateway, so binding 127.0.0.1 makes it
+    # unreachable from anywhere else in the cluster by construction, not by policy: the only way in
+    # is through the gateway, which authenticates every request.
+    listen_addresses: 127.0.0.1:{{ .Values.app.martin.port }}
 
     worker_processes: {{ .Values.app.martin.workerProcesses }}
 

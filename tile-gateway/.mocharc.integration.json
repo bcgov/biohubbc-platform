@@ -1,0 +1,5 @@
+{
+  "extension": ["ts"],
+  "spec": "src/__integration__/*.integration.ts",
+  "timeout": 30000
+}

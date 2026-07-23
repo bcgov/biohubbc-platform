@@ -86,3 +86,30 @@ DB Host
 {{- define "dbHost" -}}
 biohub-platform-db{{ include "app.suffix" . }}
 {{- end }}
+
+{{/*
+Image tag (tile gateway). Matches the tag pushed by the deploy workflows.
+*/}}
+{{- define "app.imageTag" -}}
+{{- if and .Values.environment.id (eq (toString .Values.environment.id) "deploy") }}
+{{- printf "build-%s-%s-%s" .Chart.AppVersion .Values.environment.changeId .Values.environment.name }}
+{{- else }}
+{{- printf "build-%s-%s" .Chart.AppVersion .Values.environment.changeId }}
+{{- end }}
+{{- end }}
+
+{{/*
+Tiles route host.
+
+The tile gateway is exposed as a PATH on the app's own hostname (/tiles), so tile requests are same
+origin and no CORS preflight occurs. This must therefore resolve to exactly the same host the app
+chart's Route uses - the fallback below mirrors `appHost` in infrastructure/app/templates/_helpers.tpl.
+*/}}
+{{- define "tilesRouteHost" -}}
+{{- if .Values.route.host }}
+{{- printf "%s" .Values.route.host }}
+{{- else }}
+{{- /* toString guards against a numeric changeId, which would otherwise render as %!s(int64=...) */ -}}
+{{- printf "biohub-platform-app-%s-%s-%s.apps.silver.devops.gov.bc.ca" (toString .Values.environment.changeId) .Values.environment.licensePlate .Values.environment.name }}
+{{- end }}
+{{- end }}

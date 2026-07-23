@@ -41,6 +41,27 @@ app:
     caSecretKey: "root.crt"
 
   # Keycloak
+  # Vector tile session tokens (SIMSBIOHUB-1102)
+  tiles:
+    enabled: true
+    # Secret holding the RS256 PRIVATE signing key. Created manually per namespace; see
+    # infrastructure/martin/README.md for the generation and rotation runbook.
+    privateKeySecretName: tile-token-private
+    privateKeySecretKey: private.pem
+    # Key id embedded in the token header, so the gateway can pick the right public key. Rotation:
+    # publish the new public key, change this value, then retire the old key.
+    keyId: "2026-07"
+    audience: biohub-tiles
+    issuer: biohub-api
+    tokenTtlSeconds: 900
+    # Relative: the tile gateway is served on /tiles of this environment's app hostname, so tiles
+    # are same origin and no per-environment host has to be threaded through.
+    externalUrl: /tiles
+    # Per IP budget for the unauthenticated mint endpoint. Coarse on purpose: BC government
+    # networks NAT heavily.
+    mintRateLimit: 60
+    mintRateLimitWindowMinutes: 5
+
   keycloak:
     host: "" # Keycloak login url
     realm: standard # Realm identifier or name

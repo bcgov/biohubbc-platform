@@ -1,7 +1,7 @@
 # biohub-platform-martin
 
 Helm chart for [Martin](https://martin.maplibre.org/), the vector tile server that renders BioHub
-map tiles directly from PostGIS.
+map tiles directly from PostGIS, together with the authenticating tile gateway that fronts it.
 
 ## Request flow
 
@@ -10,10 +10,24 @@ MapLibre -> tile gateway (authentication) -> Martin -> PostGIS
 ```
 
 Tile bytes never pass through the BioHub API. The API only issues short lived tile tokens; the tile
-gateway (SIMSBIOHUB-1102) verifies them and proxies to Martin.
+gateway verifies them locally and proxies to Martin.
 
-Until the gateway lands, Martin is deployed with an internal `ClusterIP` Service **only**. It has no
-OpenShift `Route` and is reachable solely from other pods in the namespace.
+## Topology
+
+The chart deploys **one pod with two containers**:
+
+| Container | Exposure |
+| --- | --- |
+| `tile-gateway` | The only public entry point. Backed by the `ClusterIP` Service and the `/tiles` Route. |
+| `martin` | Binds `127.0.0.1` only. No container port, no Service, no Route. |
+
+Because Martin listens on loopback inside a shared pod, it is unreachable from anywhere else in the
+cluster **by construction** rather than by policy: the only path to it is through the gateway, which
+authenticates every request. That is also why Martin uses `exec` probes here — a kubelet `httpGet`
+probe dials the pod IP, which Martin no longer listens on.
+
+The gateway is exposed by a **path based Route** (`/tiles`) on the environment's app hostname, so
+tile requests are same origin with the frontend and no CORS preflight occurs.
 
 ## Deployment
 
@@ -36,6 +50,14 @@ in the umbrella chart:
 | `app.martin.workerProcesses` / `app.martin.poolSize` | Martin worker threads and Postgres pool size. |
 | `app.martin.functions` | Explicitly published function sources. |
 | `app.database.*` | Database coordinates and secrets (see below). |
+| `gateway.image.*` | Tile gateway image, built and pushed by the deploy workflows. |
+| `gateway.allowedSources` | Sources the gateway will serve. Anything else is rejected regardless of what Martin publishes. |
+| `gateway.minZoom` / `gateway.maxZoom` | Zoom bounds enforced before a request reaches Martin. |
+| `gateway.cache.*` | Tile cache TTL, size cap, and the `sourceVersion` cache buster. |
+| `gateway.rateLimit.*` | Per token and coarse per IP budgets. |
+| `gateway.token.*` | Expected audience/issuer, and the public key secret name. |
+| `route.host` / `route.path` | Public route. Leave `host` empty in PR environments to derive the per-PR app hostname. |
+| `networkPolicy.enabled` | Optional ingress hardening for the gateway port. Off by default. |
 
 Changing any Martin configuration value updates the `ConfigMap` and rolls the pods, via a
 `checksum/config` annotation on the pod template.
@@ -72,35 +94,73 @@ and is a future option for keeping tile bursts off the primary.
 > role and its secret. The database migration fails with an explicit message if the role is missing.
 
 > **Grant restore:** the TEST/PROD cutover restores with `pg_restore --no-acl`, which strips both the
-> `martin` grants and the `REVOKE ... FROM PUBLIC` on the tile function. Both are re-applied by the
+> `martin` grants and the `REVOKE ... FROM PUBLIC` on tile functions. Both are re-applied by the
 > re-grant block in `infrastructure/crunchy-db/templates/migration-job.yaml`, and the tile function
 > seed re-applies them on every deploy.
 
-## Local development
+## Tile tokens and key rotation
 
-Martin runs in Docker Compose on the existing `biohubbc-network`:
+Tokens are RS256. The **private** signing key is mounted only into the api pod
+(`tile-token-private`); the tile gateway holds only the **public** verification keys
+(`tile-token-public`, one `<kid>.pem` per accepted key). The gateway can therefore verify a token but
+can never mint one, and verification is local, so the tile path does not depend on the api being up.
+
+Both secrets are created manually per namespace, before the chart is deployed there:
 
 ```bash
-make martin
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.pem
+openssl rsa -pubout -in private.pem -out 2026-07.pem
+
+oc create secret generic tile-token-private --from-file=private.pem -n <namespace>
+oc create secret generic tile-token-public  --from-file=2026-07.pem -n <namespace>
 ```
 
-It is then available on the host at `http://localhost:${MARTIN_PORT}` (default `3000`):
+PR environments share the dev namespace secrets, matching how the `keycloak` and object store secrets
+are already handled.
 
-- `http://localhost:3000/health` — health endpoint used by the container healthcheck and the pod probes
+To rotate: add the new public key alongside the old one and roll the gateway, then point the api at
+the new private key and `keyId`. Tokens already in flight keep working until they expire, after which
+the retired public key is removed. See `tile-gateway/README.md` for the full runbook.
+
+## Local development
+
+The tile stack runs in Docker Compose on the existing `biohubbc-network`:
+
+```bash
+make tiles   # signing keys, Martin, and the tile gateway
+```
+
+Locally Martin is also published on the host, which is convenient for debugging but is NOT how it is
+exposed in OpenShift (where it binds loopback only):
+
+- `http://localhost:3000/health` — health endpoint used by the container healthcheck
 - `http://localhost:3000/catalog` — published sources (should list only `fixture`)
-- `http://localhost:3000/fixture/{z}/{x}/{y}` — fixture vector tiles
+- `http://localhost:3000/fixture/{z}/{x}/{y}` — fixture vector tiles, unauthenticated
+
+The authenticated path, which mirrors production, goes through the gateway on port `6300`:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:6200/api/tile/token | jq -r .token)
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:6300/tiles/fixture/5/5/11 --output tile.mvt
+```
 
 Local configuration is repository managed in `env_config/martin/config.yaml` and must be kept in step
 with `templates/configmap.yaml`, which renders the same configuration for OpenShift. The relevant
-variables (`MARTIN_VERSION`, `MARTIN_PORT`, `DB_USER_MARTIN`, `DB_USER_MARTIN_PASS`) are documented in
-`env_config/env.docker`.
+variables (`MARTIN_VERSION`, `MARTIN_PORT`, `DB_USER_MARTIN`, `DB_USER_MARTIN_PASS`) and the tile
+gateway variables (`TILE_*`, `RATE_LIMIT_*`) are documented in `env_config/env.docker`.
 
 ## Verifying a deployment
 
 ```bash
-# Martin should be reachable from another pod in the namespace...
-oc rsh <api-pod> curl -s http://<martin-service>:3000/health
+# The gateway is reachable in the namespace and healthy
+oc rsh <api-pod> curl -s http://<martin-service>:6300/health
 
-# ...and must NOT have a Route
-oc get routes | grep martin   # expect no results
+# Martin is NOT reachable: it binds loopback and has no Service of its own
+oc rsh <api-pod> curl -s --max-time 5 http://<martin-service>:3000/health   # expect failure
+
+# Exactly one Route, on the app hostname, path /tiles
+oc get route <release>-martin<suffix> -o jsonpath='{.spec.host}{.spec.path}{"\n"}'
+
+# Tiles require a token
+curl -s -o /dev/null -w '%{http_code}\n' https://<app-host>/tiles/fixture/5/5/11   # expect 401
 ```

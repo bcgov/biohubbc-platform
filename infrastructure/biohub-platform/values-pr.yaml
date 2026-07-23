@@ -226,3 +226,15 @@ biohub-platform-martin:
     limits:
       cpu: 250m
       memory: 256Mi
+  # route.host intentionally omitted: the chart derives the per-PR app hostname, so /tiles always
+  # lands on the same host as that PR's frontend.
+  route:
+    path: /tiles
+  gateway:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

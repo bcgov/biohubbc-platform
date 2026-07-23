@@ -248,6 +248,50 @@ jobs:
           docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
           docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
 
+  buildAndPushTileGateway:
+    name: Build Tile Gateway Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+    env:
+      IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
+      BRANCH: ${{ github.base_ref || github.ref_name }}
+      APP_NAME: "biohub-platform-tile-gateway"
+    needs:
+      - checkoutRepo
+    steps:
+      # Load repo from cache
+      - name: Cache repo
+        uses: actions/cache@v5
+        id: cache-repo
+        env:
+          cache-name: cache-repo
+        with:
+          path: ${{ github.workspace }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Checkout the branch if not restored via cache
+      - name: Checkout Target Branch
+        if: steps.cache-repo.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+
+      # Authenticate Docker with OpenShift registry.
+      # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
+      # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
+      # failed and successful runs can be correlated with source IPs.
+      - name: Authenticate Docker with OpenShift registry
+        run: |
+          echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
+          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+
+      # Build and push the API image using Docker
+      - name: Build and Push Tile Gateway Image
+        working-directory: tile-gateway
+        run: |
+          docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
+          docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
+
   # Deploy Helm chart
   deployHelmChart:
     name: Deploy Helm Chart
@@ -263,6 +307,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushTileGateway
     steps:
       # Load repo from cache
       - name: Cache repo
@@ -363,7 +408,7 @@ jobs:
           set -e
           KEEP=3
           SUFFIX="-$BRANCH"
-          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db biohub-platform-db-setup"
+          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db biohub-platform-db-setup biohub-platform-tile-gateway"
           echo "Pruning image tags for environment $BRANCH in $TOOLS_NAMESPACE (keeping $KEEP most recent by date)"
           for IMAGE in $IMAGES; do
             echo "Checking image stream $IMAGE..."

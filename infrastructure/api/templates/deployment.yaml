@@ -146,6 +146,28 @@ spec:
               value: "/etc/pg-ssl/{{ .Values.app.database.caSecretKey }}"
             {{- end }}
             # Keycloak
+            {{- if .Values.app.tiles.enabled }}
+            # Vector tile tokens. The api holds the PRIVATE signing key; the tile gateway holds only
+            # the matching public key, so it can verify tokens but never mint one.
+            - name: TILE_TOKEN_PRIVATE_KEY_PATH
+              value: "/etc/tile-keys/{{ .Values.app.tiles.privateKeySecretKey }}"
+            - name: TILE_TOKEN_KID
+              value: {{ .Values.app.tiles.keyId | quote }}
+            - name: TILE_TOKEN_AUD
+              value: {{ .Values.app.tiles.audience }}
+            - name: TILE_TOKEN_ISS
+              value: {{ .Values.app.tiles.issuer }}
+            - name: TILE_TOKEN_TTL_SECONDS
+              value: {{ .Values.app.tiles.tokenTtlSeconds | quote }}
+            # Relative, so tiles are same origin: the tile gateway is exposed on /tiles of this
+            # environment's app hostname.
+            - name: TILE_EXTERNAL_URL
+              value: {{ .Values.app.tiles.externalUrl | quote }}
+            - name: TILE_MINT_RATE_LIMIT
+              value: {{ .Values.app.tiles.mintRateLimit | quote }}
+            - name: TILE_MINT_RATE_LIMIT_WINDOW_MINUTES
+              value: {{ .Values.app.tiles.mintRateLimitWindowMinutes | quote }}
+            {{- end }}
             - name: KEYCLOAK_HOST
               value: {{ .Values.app.keycloak.host }}
             - name: KEYCLOAK_REALM
@@ -318,6 +340,11 @@ spec:
               mountPath: /etc/pg-ssl
               readOnly: true
             {{- end }}
+            {{- if .Values.app.tiles.enabled }}
+            - name: tile-token-private
+              mountPath: /etc/tile-keys
+              readOnly: true
+            {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -334,4 +361,10 @@ spec:
             items:
               - key: {{ .Values.app.database.caSecretKey }}
                 path: {{ .Values.app.database.caSecretKey }}
+        {{- end }}
+        {{- if .Values.app.tiles.enabled }}
+        # PRIVATE signing key. Mounted only here, never in the tile gateway pod.
+        - name: tile-token-private
+          secret:
+            secretName: {{ .Values.app.tiles.privateKeySecretName }}
         {{- end }}

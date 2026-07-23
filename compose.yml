@@ -104,6 +104,15 @@ services:
       - LOG_FILE_DATE_PATTERN=${LOG_FILE_DATE_PATTERN}
       - LOG_FILE_MAX_SIZE=${LOG_FILE_MAX_SIZE}
       - LOG_FILE_MAX_FILES=${LOG_FILE_MAX_FILES}
+      # Tile tokens (the api holds the PRIVATE key; only it can mint tokens)
+      - TILE_TOKEN_PRIVATE_KEY_PATH=/var/tile-keys/private/${TILE_TOKEN_KID}.pem
+      - TILE_TOKEN_KID=${TILE_TOKEN_KID}
+      - TILE_TOKEN_AUD=${TILE_TOKEN_AUD}
+      - TILE_TOKEN_ISS=${TILE_TOKEN_ISS}
+      - TILE_TOKEN_TTL_SECONDS=${TILE_TOKEN_TTL_SECONDS}
+      - TILE_EXTERNAL_URL=${TILE_EXTERNAL_URL}
+      - TILE_MINT_RATE_LIMIT=${TILE_MINT_RATE_LIMIT}
+      - TILE_MINT_RATE_LIMIT_WINDOW_MINUTES=${TILE_MINT_RATE_LIMIT_WINDOW_MINUTES}
       # Clamav
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
@@ -121,12 +130,16 @@ services:
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - tile_keys:/var/tile-keys:ro
     networks:
       - biohubbc-network
     depends_on:
       db:
         condition: service_healthy
       db_setup:
+        condition: service_completed_successfully
+      # The api signs tile tokens with the locally generated private key
+      tile_keys_setup:
         condition: service_completed_successfully
 
   ## Build the queue worker docker image
@@ -298,6 +311,65 @@ services:
     networks:
       - biohubbc-network
 
+  ## Generate the local tile token signing keypair (one-shot, idempotent)
+  ## In OpenShift these come from the tile-token-private / tile-token-public Secrets instead.
+  tile_keys_setup:
+    image: alpine/openssl:latest
+    container_name: ${DOCKER_PROJECT_NAME}-tile-keys-setup-${DOCKER_NAMESPACE}-container
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'mkdir -p /keys/private /keys/public;
+        if [ ! -f "/keys/private/${TILE_TOKEN_KID}.pem" ]; then
+        echo "Generating tile token keypair (kid=${TILE_TOKEN_KID})...";
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "/keys/private/${TILE_TOKEN_KID}.pem";
+        openssl rsa -pubout -in "/keys/private/${TILE_TOKEN_KID}.pem" -out "/keys/public/${TILE_TOKEN_KID}.pem";
+        chmod -R a+r /keys;
+        echo "Tile token keypair generated.";
+        else echo "Tile token keypair already exists, skipping."; fi'
+    volumes:
+      - tile_keys:/keys
+    networks:
+      - biohubbc-network
+
+  ## Authenticating gateway that fronts Martin. The only public entry point for tiles.
+  tile_gateway:
+    image: ${DOCKER_PROJECT_NAME}-tile-gateway-${DOCKER_NAMESPACE}-img
+    container_name: ${DOCKER_PROJECT_NAME}-tile-gateway-${DOCKER_NAMESPACE}-container
+    build:
+      context: ./tile-gateway
+      dockerfile: ./.docker/tile-gateway/Dockerfile
+    ports:
+      - ${TILE_GATEWAY_PORT}:${TILE_GATEWAY_PORT}
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - TILE_GATEWAY_PORT=${TILE_GATEWAY_PORT}
+      - MARTIN_URL=http://martin:3000
+      # Only the PUBLIC keys are needed to verify tokens; the gateway can never mint one.
+      - TILE_TOKEN_PUBLIC_KEY_DIR=/var/tile-keys/public
+      - TILE_TOKEN_AUD=${TILE_TOKEN_AUD}
+      - TILE_TOKEN_ISS=${TILE_TOKEN_ISS}
+      - TILE_ALLOWED_SOURCES=${TILE_ALLOWED_SOURCES}
+      - TILE_MIN_ZOOM=${TILE_MIN_ZOOM}
+      - TILE_MAX_ZOOM=${TILE_MAX_ZOOM}
+      - TILE_CACHE_TTL_SECONDS=${TILE_CACHE_TTL_SECONDS}
+      - TILE_CACHE_MAX_BYTES=${TILE_CACHE_MAX_BYTES}
+      - TILE_SOURCE_VERSION=${TILE_SOURCE_VERSION}
+      - RATE_LIMIT_JTI_PER_MIN=${RATE_LIMIT_JTI_PER_MIN}
+      - RATE_LIMIT_IP_PER_MIN=${RATE_LIMIT_IP_PER_MIN}
+      - ALLOWED_ORIGIN=${APP_HOST}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./tile-gateway:/opt/app-root/src
+      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - tile_keys:/var/tile-keys:ro
+    networks:
+      - biohubbc-network
+    depends_on:
+      martin:
+        condition: service_healthy
+      tile_keys_setup:
+        condition: service_completed_successfully
+
   ## Martin vector tile server (serves vector tiles directly from PostGIS)
   martin:
     image: ghcr.io/maplibre/martin:${MARTIN_VERSION}
@@ -369,3 +441,5 @@ volumes:
     name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol
   minio_data:
     name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-vol
+  tile_keys:
+    name: ${DOCKER_PROJECT_NAME}-tile-keys-${DOCKER_NAMESPACE}-vol

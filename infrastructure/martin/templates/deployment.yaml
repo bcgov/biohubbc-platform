@@ -57,9 +57,7 @@ spec:
               value: {{ .Values.app.database.port | quote }}
             - name: DATABASE_URL
               value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode={{ .Values.app.database.sslMode | default (ternary "verify-full" "prefer" .Values.app.database.useCrunchy) }}"
-          ports:
-            - containerPort: {{ .Values.service.port }}
-              protocol: TCP
+          # No containerPort: Martin listens on loopback and is not reachable from outside the pod.
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}
@@ -67,6 +65,94 @@ spec:
             limits:
               cpu: {{ .Values.resources.limits.cpu }}
               memory: {{ .Values.resources.limits.memory }}
+          # NOTE: exec probes, not httpGet. The kubelet dials the pod IP, which Martin no longer
+          # listens on, so an httpGet probe would fail permanently. The official image is Alpine
+          # based, so busybox wget is available.
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - wget --quiet --spider http://127.0.0.1:{{ .Values.app.martin.port }}/health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - wget --quiet --spider http://127.0.0.1:{{ .Values.app.martin.port }}/health
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: martin-config
+              mountPath: /etc/martin
+              readOnly: true
+            {{- if .Values.app.database.useCrunchy }}
+            - name: pg-root-ca
+              mountPath: /etc/pg-ssl
+              readOnly: true
+            {{- end }}
+
+        # Authenticating gateway. The ONLY container in this pod exposed by the Service and Route.
+        - name: tile-gateway
+          image: "{{ .Values.gateway.image.registry }}/{{ .Values.gateway.image.image }}:{{ include "app.imageTag" . }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.gateway.nodeEnv }}
+            - name: TILE_GATEWAY_PORT
+              value: {{ .Values.service.port | quote }}
+            # Loopback: the gateway and Martin share a network namespace.
+            - name: MARTIN_URL
+              value: "http://127.0.0.1:{{ .Values.app.martin.port }}"
+            # Only PUBLIC keys are mounted here. The gateway can verify tokens but never mint one.
+            - name: TILE_TOKEN_PUBLIC_KEY_DIR
+              value: /etc/tile-keys
+            - name: TILE_TOKEN_AUD
+              value: {{ .Values.gateway.token.audience }}
+            - name: TILE_TOKEN_ISS
+              value: {{ .Values.gateway.token.issuer }}
+            - name: TILE_ALLOWED_SOURCES
+              value: {{ .Values.gateway.allowedSources | quote }}
+            - name: TILE_MIN_ZOOM
+              value: {{ .Values.gateway.minZoom | quote }}
+            - name: TILE_MAX_ZOOM
+              value: {{ .Values.gateway.maxZoom | quote }}
+            - name: TILE_CACHE_TTL_SECONDS
+              value: {{ .Values.gateway.cache.ttlSeconds | quote }}
+            - name: TILE_CACHE_MAX_BYTES
+              value: {{ .Values.gateway.cache.maxBytes | quote }}
+            # Bump to invalidate every cached tile at deploy time.
+            - name: TILE_SOURCE_VERSION
+              value: {{ .Values.gateway.cache.sourceVersion | quote }}
+            - name: RATE_LIMIT_JTI_PER_MIN
+              value: {{ .Values.gateway.rateLimit.perTokenPerMinute | quote }}
+            - name: RATE_LIMIT_IP_PER_MIN
+              value: {{ .Values.gateway.rateLimit.perIpPerMinute | quote }}
+            # Same origin in OpenShift (the Route serves /tiles on the app host), so CORS is a no-op.
+            - name: ALLOWED_ORIGIN
+              value: {{ .Values.gateway.allowedOrigin | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.gateway.logLevel }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: {{ .Values.gateway.resources.requests.cpu }}
+              memory: {{ .Values.gateway.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.gateway.resources.limits.cpu }}
+              memory: {{ .Values.gateway.resources.limits.memory }}
           startupProbe:
             httpGet:
               path: /health
@@ -100,18 +186,18 @@ spec:
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-            - name: martin-config
-              mountPath: /etc/martin
+            - name: tile-token-public
+              mountPath: /etc/tile-keys
               readOnly: true
-            {{- if .Values.app.database.useCrunchy }}
-            - name: pg-root-ca
-              mountPath: /etc/pg-ssl
-              readOnly: true
-            {{- end }}
       volumes:
         - name: martin-config
           configMap:
             name: {{ include "app.fullname" . }}-config
+        # Public verification keys only. One file per accepted key id, which is what allows a
+        # rotation window: publish the new key alongside the old, cut the API over, then remove it.
+        - name: tile-token-public
+          secret:
+            secretName: {{ .Values.gateway.token.publicKeySecretName }}
         {{- if .Values.app.database.useCrunchy }}
         - name: pg-root-ca
           secret:
