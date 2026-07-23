@@ -31,8 +31,9 @@ db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to ru
 
 clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
 minio: | run-minio ## Starts MinIO object storage for local S3
+martin: | build-martin run-martin ## Pulls and runs the Martin vector tile server locally
 
-all: | web queue clamav minio ## Performs all commands necessary to run the full stack (web, queue, clamav, minio) in docker
+all: | web queue clamav minio martin ## Performs all commands necessary to run the full stack (web, queue, clamav, minio, martin) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -215,6 +216,22 @@ run-clamav: ## Run clamav
 	@docker compose up -d clamav
 
 ## ------------------------------------------------------------------------------
+## Martin commands (vector tile server)
+## ------------------------------------------------------------------------------
+
+build-martin: ## Pull the martin image
+	@echo "==============================================="
+	@echo "Make: build-martin - pulling martin image"
+	@echo "==============================================="
+	@docker compose pull martin
+
+run-martin: ## Run martin
+	@echo "==============================================="
+	@echo "Make: run-martin - running martin"
+	@echo "==============================================="
+	@docker compose up -d martin
+
+## ------------------------------------------------------------------------------
 ## MinIO commands (S3-compatible object storage for local development)
 ## ------------------------------------------------------------------------------
 
@@ -384,6 +401,12 @@ log-db-setup: ## Runs `docker logs <container> -f` for the database setup contai
 	@echo "Running docker logs for the db-setup container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-martin: ## Runs `docker logs <container> -f` for the martin container
+	@echo "==============================================="
+	@echo "Running docker logs for the martin container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-martin-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Typescript Trace Commands

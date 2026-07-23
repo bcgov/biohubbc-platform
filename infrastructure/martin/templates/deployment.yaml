@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    role: martin
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      deployment: {{ include "app.fullname" . | quote }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        deployment: {{ include "app.fullname" . | quote }}
+        role: martin
+      annotations:
+        # Roll the pods whenever the Martin configuration changes
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.app.martin.functions }}
+      initContainers:
+        # Martin resolves its function sources ONCE, at startup. The functions are created by the
+        # database-setup Job's seeds, and Helm applies that Job and this Deployment in the same pass
+        # — a chart cannot declare an ordering, so without a gate Martin starts first, finds no
+        # sources, and publishes an empty catalog until something restarts it.
+        #
+        # Waiting here is the same shape the api already uses for the database
+        # (infrastructure/api/templates/deployment.yaml), and it holds the pod in Init with a legible
+        # reason rather than crashlooping. Because the wait is transitive, `helm upgrade --wait` now
+        # effectively waits for database-setup too.
+        #
+        # Connects AS THE MARTIN ROLE deliberately: the check then covers the role's CONNECT and
+        # schema USAGE grants as well as the functions, which is exactly the state Martin needs. If
+        # the grants have not run, psql fails and the loop keeps waiting.
+        - name: wait-for-tile-functions
+          image: postgres:15-alpine
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for the Martin tile functions to be created..."
+              {{- $predicates := list }}
+              {{- range $id, $source := .Values.app.martin.functions }}
+              {{- $predicates = append $predicates (printf "to_regprocedure('%s.%s(integer, integer, integer, json)') IS NOT NULL" $source.schema $source.function) }}
+              {{- end }}
+              until PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -tAc \
+                "SELECT {{ join " AND " $predicates }}" | grep -q '^t$'; do
+                echo "Tile functions not created yet, waiting..."
+                sleep 5
+              done
+              echo "Tile functions are ready!"
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinUserKey | default "user" }}{{ else }}database-user-martin{{ end }}
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinPasswordKey | default "password" }}{{ else }}database-user-martin-password{{ end }}
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
+            - name: DB_HOST
+              value: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
+            - name: DB_PORT
+              value: {{ .Values.app.database.port | quote }}
+      {{- end }}
+      containers:
+        - name: martin
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ['--config', '/etc/martin/config.yaml']
+          env:
+            # NOTE: order matters. DATABASE_URL is assembled from the variables above it using
+            # Kubernetes dependent environment variable expansion.
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinUserKey | default "user" }}{{ else }}database-user-martin{{ end }}
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinPasswordKey | default "password" }}{{ else }}database-user-martin-password{{ end }}
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
+            - name: DB_HOST
+              value: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
+            - name: DB_PORT
+              value: {{ .Values.app.database.port | quote }}
+            - name: DATABASE_URL
+              value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode={{ .Values.app.database.sslMode | default (ternary "verify-full" "prefer" .Values.app.database.useCrunchy) }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: martin-config
+              mountPath: /etc/martin
+              readOnly: true
+            {{- if .Values.app.database.useCrunchy }}
+            - name: pg-root-ca
+              mountPath: /etc/pg-ssl
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: martin-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+        {{- if .Values.app.database.useCrunchy }}
+        - name: pg-root-ca
+          secret:
+            secretName: {{ .Values.app.database.caSecretName }}
+            items:
+              - key: {{ .Values.app.database.caSecretKey }}
+                path: {{ .Values.app.database.caSecretKey }}
+        {{- end }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

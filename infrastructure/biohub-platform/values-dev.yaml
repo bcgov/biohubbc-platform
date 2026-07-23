@@ -189,3 +189,29 @@ biohub-platform-queue:
     limits:
       cpu: 200m
       memory: 512Mi
+
+# Values passed to biohub-platform-martin subchart
+biohub-platform-martin:
+  environment:
+    licensePlate: "a0ec71"
+    name: dev
+    id: deploy
+    ts: ""
+  app:
+    database:
+      useCrunchy: true
+      # Use -primary, not pgbouncer: Martin's driver uses prepared statements, which are
+      # incompatible with PgBouncer transaction pooling. A -replicas service also exists and is a
+      # future option for keeping tile bursts off the primary.
+      host: biohub-platform-db-dev-primary
+      martinSecretName: biohub-platform-db-dev-pguser-martin
+      dbNameSecretName: biohub-platform-db-dev-pguser-biohub-platform-db-dev
+  # Openshift Resources
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

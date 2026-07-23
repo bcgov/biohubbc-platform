@@ -10,21 +10,11 @@ global:
     changeId: "" # Change id (PR number)
     ts: "" # Timestamp of the deployment
 
-# Component enablement flags
-app:
-  enabled: true
-
-database:
-  enabled: true
-
-database-setup:
-  enabled: true
-
-api:
-  enabled: true
-
-# Component-specific configurations
-# These will be passed through to the individual charts
+# Component configuration, passed through to the individual charts. Each key also carries the
+# `enabled` flag its Chart.yaml dependency condition reads.
+#
+# NOTE: one block per component. A second `app:`/`database:`/... block would silently win over the
+# first, because YAML keeps only the last occurrence of a duplicated key.
 app:
   enabled: true
   environment:
@@ -86,6 +76,22 @@ queue:
     changeId: ""
     ts: ""
   # Add any queue-specific overrides here
+
+# Drives the `martin.enabled` dependency condition only. Martin's own settings are routed by CHART
+# name, so they live under `biohub-platform-martin:` below.
+martin:
+  enabled: true
+
+# Values passed to the biohub-platform-martin subchart.
+# NOTE: subchart values are routed by CHART NAME, so per-component settings must live under
+# `biohub-platform-martin:`. The `martin:` key above only drives the `martin.enabled` condition.
+biohub-platform-martin:
+  environment:
+    licensePlate: "a0ec71"
+    name: ""
+    id: ""
+    changeId: ""
+    ts: ""
 
 # Values passed to biohub-platform-queue subchart
 # Queue tuning overrides (optional)

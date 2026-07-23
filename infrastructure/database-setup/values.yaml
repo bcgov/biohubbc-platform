@@ -31,6 +31,10 @@ app:
     adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres"
     appSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-api"
     dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+    # Name of the least-privilege Martin tile server role. Crunchy environments only: the role and
+    # its password are created by the Postgres Operator, so the migration only applies grants.
+    # Must match the user declared in the PostgresCluster CR (infrastructure/crunchy-db).
+    martinUser: "martin"
     # Secret keys default in templates: user/password/dbname (override in parent values if needed)
     # PGO root CA for TLS verification (same secret name in all envs)
     caSecretName: "pgo-root-cacert"

@@ -1,0 +1,79 @@
+# Default values for the biohub-platform-martin chart.
+# Environment specific values are supplied by the biohub-platform umbrella chart
+# (infrastructure/biohub-platform/values-{pr,dev,test,prod}.yaml).
+
+# Environment metadata, supplied by the umbrella chart and the deploy workflows
+environment:
+  licensePlate: "a0ec71"
+  name: "" # Environment name (dev, test, prod)
+  id: "" # Environment id (PR number, or "deploy" for static environments)
+  changeId: "" # Change id (PR number, or build tag for static environments)
+  ts: "" # Timestamp of the deployment
+
+# Official Martin image. Public image, so there is no build step in the deploy workflows.
+# To bump: check https://github.com/maplibre/martin/releases and keep the tag in step with
+# MARTIN_VERSION in env_config/env.docker so local and deployed versions stay compatible.
+image:
+  repository: ghcr.io/maplibre/martin
+  tag: "1.12.0"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+app:
+  name: biohub-platform-martin
+
+  martin:
+    # Martin worker threads
+    workerProcesses: 2
+    # Maximum Postgres connections held by Martin
+    poolSize: 5
+
+    # Explicitly published function sources. Automatic publication of tables and functions is
+    # always disabled (see the ConfigMap template), so ONLY the sources listed here are served.
+    # Empty here: this ticket deploys the tile server itself. The search-result source is added by
+    # SIMSBIOHUB-1103, and until then Martin publishes nothing.
+    functions: {}
+
+  database:
+    port: 5432
+    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments
+    # (legacy dbHost secret created by the biohub-platform-db chart).
+    useCrunchy: true
+    # e.g. "<cluster>-primary" (biohub-platform-db-dev-primary for DEV). Use primary, not
+    # pgbouncer: Martin's driver uses prepared statements, which are incompatible with
+    # PgBouncer transaction pooling. A "<cluster>-replicas" service also exists and is a
+    # future option for keeping tile bursts off the primary.
+    host: ""
+    # e.g. "<cluster>-pguser-martin" (biohub-platform-db-dev-pguser-martin for DEV).
+    # Created by the Crunchy Postgres Operator from the users block of the PostgresCluster CR.
+    martinSecretName: ""
+    # e.g. "<cluster>-pguser-<cluster>" (biohub-platform-db-dev-pguser-biohub-platform-db-dev)
+    dbNameSecretName: ""
+    # Secret keys default in the templates: user/password/dbname (override here if needed)
+    martinUserKey: ""
+    martinPasswordKey: ""
+    dbNameKey: ""
+    # PGO root CA for TLS verification (same secret name in all environments)
+    caSecretName: "pgo-root-cacert"
+    caSecretKey: "root.crt"
+    # Postgres sslmode used in the Martin connection string. Left empty, it defaults to
+    # "verify-full" when useCrunchy is true (matching the CA backed verification the api
+    # performs) and "prefer" otherwise, since the legacy PR database serves no TLS.
+    # Set explicitly to dial back to "verify-ca" if a host name mismatch appears.
+    sslMode: ""
+
+# Internal service. Martin has no Route: it is reachable only from other pods in the namespace.
+service:
+  type: ClusterIP
+  name: 3000-tcp
+  port: 3000
+  targetPort: 3000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
