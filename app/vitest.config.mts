@@ -20,7 +20,9 @@ export default defineConfig(({ mode }) => {
     'import.meta.env.VITE_SITEMINDER_LOGOUT_URL': JSON.stringify(env.VITE_SITEMINDER_LOGOUT_URL),
     'import.meta.env.VITE_KEYCLOAK_HOST': JSON.stringify(env.VITE_KEYCLOAK_HOST),
     'import.meta.env.VITE_KEYCLOAK_REALM': JSON.stringify(env.VITE_KEYCLOAK_REALM),
-    'import.meta.env.VITE_KEYCLOAK_CLIENT_ID': JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID)
+    'import.meta.env.VITE_KEYCLOAK_CLIENT_ID': JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
+    'import.meta.env.VITE_BASEMAP_URL': JSON.stringify(env.VITE_BASEMAP_URL),
+    'import.meta.env.VITE_BASEMAP_ATTRIBUTION': JSON.stringify(env.VITE_BASEMAP_ATTRIBUTION)
   };
 
   return {

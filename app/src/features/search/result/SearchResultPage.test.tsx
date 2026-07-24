@@ -35,6 +35,13 @@ vi.mock('hooks/useApi');
 vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 vi.mock('./hooks/useSearchResults');
+// The map layout owns its own Martin session and renders MapLibre; the page test only cares that it is handed the
+// current search, so it is replaced with a marker.
+vi.mock('./layout/map/SearchResultMapLayout', () => ({
+  SearchResultMapLayout: (props: { featureTypeName: string }) => (
+    <div data-testid="search-result-map-layout" data-feature-type={props.featureTypeName} />
+  )
+}));
 vi.mock('./header/SearchResultSearch', () => ({
   SearchResultSearch: ({ onExpressionApply }: { onExpressionApply: (expressionTree: unknown) => void }) => (
     <>

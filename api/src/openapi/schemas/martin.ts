@@ -39,6 +39,7 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
     'token_expires_in',
     'context_expires_in',
     'source',
+    'martin_context_id',
     'martin_url_template',
     'has_more_secured_features'
   ],
@@ -57,6 +58,11 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
       description: 'Remaining lifetime of the underlying authorization context, in seconds.'
     },
     source: { type: 'string', description: 'Tile source this token grants access to.' },
+    martin_context_id: {
+      type: 'string',
+      description:
+        'Opaque tile context identifier. Also present inside the token, so returning it discloses nothing new; the client uses it as a stable cache key that changes only when the underlying session does.'
+    },
     martin_url_template: {
       type: 'string',
       description: 'Tile URL template for MapLibre, e.g. "/martin/search/{z}/{x}/{y}".'

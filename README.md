@@ -135,6 +135,10 @@ and proxies to Martin:
 MapLibre -> Martin Gateway -> Martin -> PostGIS
 ```
 
+The search results page has a Map view that uses this stack. Tiles are requested from `/martin` on the
+app's own origin: the dev server proxies that path to the gateway locally (`VITE_MARTIN_PROXY_TARGET`),
+and an OpenShift route serves it when deployed, so the same relative URL works in both.
+
 ## Access the Running Applications
 
 api:
