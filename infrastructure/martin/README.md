@@ -69,9 +69,12 @@ Martin's automatic discovery is **always disabled** (`auto_publish: false`). Lef
 publishes every table and function its database role can read. Only the function sources listed in
 `app.martin.functions` are served.
 
-This ticket publishes **no** sources: it deploys the tile server itself, so `app.martin.functions` is
-empty and Martin serves an empty catalog. The search-result source (`biohub.martin_search`) is added by
-SIMSBIOHUB-1103, which is the first ticket where a tile can actually be rendered.
+One source is published:
+
+- **`search`** (`biohub.martin_search`) — authorized search-result tiles. Resolves the opaque context id
+  the gateway forwards, then applies the feature security predicate **at serve time**, so securing a
+  feature removes it from tiles within one gateway cache TTL rather than lasting for the life of a
+  session.
 
 ### Tile cache
 
@@ -89,6 +92,10 @@ the upper bound on that takedown window.
 
 Martin connects as a dedicated least-privilege role (`martin`) that has `CONNECT`, `USAGE` on the
 `biohub` schema, and `EXECUTE` on approved tile functions only. It holds **no table privileges**.
+
+That works because `biohub.martin_search` is `SECURITY DEFINER` with a pinned `search_path`: it runs as
+its owner (the migration role), which can read the underlying tables, so the tile SQL never needs the
+martin role to be granted anything beyond executing the one function.
 
 - **DEV/TEST/PROD (`useCrunchy: true`)** — the role and its password are created by the Crunchy
   Postgres Operator from the `users` block of the PostgresCluster CR, which publishes the

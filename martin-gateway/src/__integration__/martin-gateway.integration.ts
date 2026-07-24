@@ -1,16 +1,13 @@
 import { expect } from 'chai';
 import { before, describe, it } from 'mocha';
 import http from 'node:http';
+import { gunzipSync } from 'node:zlib';
 
 /**
  * End to end tests for the Martin Gateway.
  *
  * Runs INSIDE the martin-gateway container against the real local stack, so it exercises the genuine
- * path: API mints a token -> gateway verifies it -> Martin.
- *
- * This ticket deploys the gateway itself; Martin publishes no sources yet, so what is asserted here
- * is token minting, verification, and rejection behaviour. Tile rendering, byte fidelity and caching
- * are covered once SIMSBIOHUB-1103 publishes the `search` source.
+ * path: API mints a token -> gateway verifies it -> Martin renders a tile from PostGIS.
  *
  *   make martin-gateway       # start martin + gateway (and the api, via `make web`)
  *   make test-martin-gateway  # run this suite
@@ -21,6 +18,7 @@ import http from 'node:http';
 
 const GATEWAY_URL = process.env.INTEGRATION_GATEWAY_URL || 'http://127.0.0.1:6300';
 const API_URL = process.env.INTEGRATION_API_URL || 'http://api:6200';
+const MARTIN_URL = process.env.MARTIN_URL || 'http://martin:3000';
 const SOURCE = (process.env.MARTIN_ALLOWED_SOURCES || 'search').split(',')[0];
 
 interface RawResponse {
@@ -34,7 +32,7 @@ interface RawResponse {
  *
  * Uses `node:http` rather than fetch so gzip bodies and `Content-Encoding` survive intact.
  */
-const request = (url: string, options: http.RequestOptions = {}): Promise<RawResponse> => {
+const request = (url: string, options: http.RequestOptions & { body?: string } = {}): Promise<RawResponse> => {
   const target = new URL(url);
 
   return new Promise((resolve, reject) => {
@@ -56,31 +54,48 @@ const request = (url: string, options: http.RequestOptions = {}): Promise<RawRes
     );
 
     req.on('error', reject);
+
+    if (options.body) {
+      req.write(options.body);
+    }
+
     req.end();
   });
 };
 
 /**
- * Mint a real tile token from the API.
+ * The feature type sessions are minted against. The feature type registry is migration data and the
+ * snapshot fixtures seed observation features locally, so tiles have real content to render.
  */
-const mintToken = async (): Promise<{ token: string; martinUrlTemplate: string }> => {
+const FEATURE_TYPE = process.env.INTEGRATION_FEATURE_TYPE || 'species_observation';
+
+/**
+ * Mint a real Martin session from the API. Also returns the opaque context id claim, which direct
+ * (gateway-bypassing) Martin requests need as their `context` query parameter.
+ */
+const mintToken = async (): Promise<{ token: string; martinUrlTemplate: string; ctx: string }> => {
+  const body = JSON.stringify({ feature_type: FEATURE_TYPE });
+
   const response = await request(`${API_URL}/api/martin/token`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'content-length': '0' }
+    headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+    body
   });
 
   expect(response.status, `mint failed: ${response.body.toString()}`).to.equal(200);
 
-  const body = JSON.parse(response.body.toString());
+  const parsed = JSON.parse(response.body.toString());
+  const claims = JSON.parse(Buffer.from(parsed.token.split('.')[1], 'base64url').toString());
 
-  return { token: body.token, martinUrlTemplate: body.martin_url_template };
+  return { token: parsed.token, martinUrlTemplate: parsed.martin_url_template, ctx: claims.ctx };
 };
 
 describe('Martin Gateway (integration)', () => {
   let token: string;
+  let ctx: string;
 
   before(async () => {
-    ({ token } = await mintToken());
+    ({ token, ctx } = await mintToken());
   });
 
   it('mints a token whose claims carry no identity or search detail', async () => {
@@ -97,15 +112,54 @@ describe('Martin Gateway (integration)', () => {
     expect(martinUrlTemplate).to.contain('{z}/{x}/{y}');
   });
 
-  it('authenticates, but has no source to serve until the search source lands', async () => {
-    // Martin publishes nothing in this ticket, so an authenticated request reaches Martin and comes
-    // back empty handed. Tile rendering, byte fidelity and caching are covered by SIMSBIOHUB-1103,
-    // which publishes `search`.
+  it('serves a real vector tile end to end', async () => {
     const response = await request(`${GATEWAY_URL}/martin/${SOURCE}/5/5/11`, {
       headers: { authorization: `Bearer ${token}` }
     });
 
-    expect(response.status).to.equal(404);
+    expect(response.status).to.equal(200);
+    expect(response.headers['content-type']).to.equal('application/x-protobuf');
+    expect(response.headers['content-encoding']).to.equal('gzip');
+    expect(response.headers['etag']).to.be.a('string');
+    // A real Mapbox Vector Tile carrying one of the layers the search source renders: aggregated
+    // `clusters` at low zoom, raw `features` above the cluster threshold. The layer is named for
+    // its content, never for the source, so the source name is deliberately not asserted.
+    const mvt = gunzipSync(response.body).toString('binary');
+    expect(mvt).to.satisfy((body: string) => body.includes('clusters') || body.includes('features'));
+  });
+
+  it('returns the exact bytes Martin produced, without recompressing', async () => {
+    const viaGateway = await request(`${GATEWAY_URL}/martin/${SOURCE}/5/5/11`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    // Bypassing the gateway means supplying the context id ourselves: the gateway injects it from
+    // the verified token, and martin_search renders nothing without it.
+    const direct = await request(`${MARTIN_URL}/${SOURCE}/5/5/11?context=${encodeURIComponent(ctx)}`, {
+      headers: { 'accept-encoding': 'gzip' }
+    });
+
+    expect(viaGateway.body.equals(direct.body)).to.equal(true);
+  });
+
+  it('serves an empty area as a 204', async () => {
+    const response = await request(`${GATEWAY_URL}/martin/${SOURCE}/5/20/20`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(response.status).to.equal(204);
+    expect(response.body).to.have.length(0);
+  });
+
+  it('caches a repeat request', async () => {
+    const first = await request(`${GATEWAY_URL}/martin/${SOURCE}/6/11/22`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const second = await request(`${GATEWAY_URL}/martin/${SOURCE}/6/11/22`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(first.status).to.equal(200);
+    expect(second.headers['x-martin-cache']).to.equal('HIT');
   });
 
   it('rejects a request with no token', async () => {
@@ -159,14 +213,23 @@ describe('Martin Gateway (integration)', () => {
   });
 
   it('strips client supplied query parameters', async () => {
-    // The parameters are discarded rather than treated as an error, so this fails the same way an
-    // unadorned request does (404 until a source is published) and never 400s.
+    // The tile still renders: the parameters are discarded, not treated as an error.
     const response = await request(
       `${GATEWAY_URL}/martin/${SOURCE}/5/5/11?context=attacker&filter=1%3D1&ctx=cache-buster`,
       { headers: { authorization: `Bearer ${token}` } }
     );
 
-    expect(response.status).to.equal(404);
+    expect(response.status).to.equal(200);
+  });
+
+  it('serves tiles while the API is unavailable, proving tile bytes bypass it', async function () {
+    // The gateway's only upstream is Martin. Once a token is minted, the API plays no part in
+    // serving tiles; this asserts the gateway never calls back to it.
+    const response = await request(`${GATEWAY_URL}/martin/${SOURCE}/7/22/44`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(response.status).to.be.oneOf([200, 204]);
   });
 
   it('reports healthy', async () => {

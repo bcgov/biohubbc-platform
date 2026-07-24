@@ -1,32 +1,104 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { featureSearchExpressionTreeSchema } from './search/search-feature';
+
+/**
+ * Request body for creating a Martin session.
+ */
+export const martinSessionRequestBodySchema: OpenAPIV3.RequestBodyObject = {
+  description: 'The feature type and search expression the map should show.',
+  required: true,
+  content: {
+    'application/json': {
+      schema: {
+        type: 'object',
+        required: ['feature_type'],
+        properties: {
+          feature_type: {
+            type: 'string',
+            description: 'Feature type to map. Must match the type the search results are showing.'
+          },
+          expression: {
+            ...featureSearchExpressionTreeSchema,
+            description: 'Search expression. Omit to map an unfiltered view of the feature type.'
+          }
+        },
+        additionalProperties: false
+      }
+    }
+  }
+};
 
 /**
  * Response returned when a Martin session is created.
+ *
+ * Two shapes: a session with a token, or a refusal because the search matched more features than can
+ * be mapped.
  */
-export const martinTokenResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['token', 'token_type', 'token_expires_in', 'source', 'martin_url_template'],
-  properties: {
-    token: {
-      type: 'string',
-      description: 'Short lived RS256 tile token. Attach as a Bearer token on tile requests.'
+export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
+  oneOf: [
+    {
+      type: 'object',
+      required: [
+        'over_cap',
+        'token',
+        'token_type',
+        'token_expires_in',
+        'context_expires_in',
+        'source',
+        'martin_url_template',
+        'has_more_secured_features'
+      ],
+      properties: {
+        over_cap: { type: 'boolean', enum: [false] },
+        token: {
+          type: 'string',
+          description: 'Short lived RS256 tile token. Attach as a Bearer token on tile requests.'
+        },
+        token_type: { type: 'string', enum: ['Bearer'] },
+        token_expires_in: {
+          type: 'integer',
+          description: 'Token lifetime in seconds. Request a new session before this elapses.'
+        },
+        context_expires_in: {
+          type: 'integer',
+          description: 'Remaining lifetime of the underlying authorization context, in seconds.'
+        },
+        source: { type: 'string', description: 'Tile source this token grants access to.' },
+        martin_url_template: {
+          type: 'string',
+          description: 'Tile URL template for MapLibre, e.g. "/martin/search/{z}/{x}/{y}".'
+        },
+        bbox: {
+          type: 'array',
+          nullable: true,
+          description: 'Extent of the matched geometries as [minX, minY, maxX, maxY] in WGS84.',
+          items: { type: 'number' },
+          minItems: 4,
+          maxItems: 4
+        },
+        feature_count: {
+          type: 'integer',
+          nullable: true,
+          description: 'Features matched, or null for an unfiltered session.'
+        },
+        has_more_secured_features: {
+          type: 'boolean',
+          description: 'True when the search matched secured features this caller cannot see.'
+        }
+      },
+      additionalProperties: false
     },
-    token_type: {
-      type: 'string',
-      enum: ['Bearer']
-    },
-    token_expires_in: {
-      type: 'integer',
-      description: 'Token lifetime in seconds. Re-request a session before this elapses.'
-    },
-    source: {
-      type: 'string',
-      description: 'The tile source this token grants access to.'
-    },
-    martin_url_template: {
-      type: 'string',
-      description: 'Tile URL template for MapLibre, e.g. "/martin/{source}/{z}/{x}/{y}".'
+    {
+      type: 'object',
+      required: ['over_cap', 'cap'],
+      properties: {
+        over_cap: { type: 'boolean', enum: [true] },
+        cap: {
+          type: 'integer',
+          description: 'Maximum mappable features. The search matched more, so no token was issued.'
+        }
+      },
+      additionalProperties: false
     }
-  },
-  additionalProperties: false
+  ]
 };

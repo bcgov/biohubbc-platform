@@ -619,4 +619,35 @@ export class SecurityScopeRepository extends BaseRepository {
 
     return response.rows;
   }
+
+  /**
+   * Get the security scopes a system user currently holds, through their active team memberships.
+   *
+   * This is the set that `isAccessibleToUser` resolves inline on the search paths. Martin sessions need
+   * it as a value rather than a join, because the tile function must decide visibility without ever
+   * seeing a user id: the scopes are captured here at mint time and stored on the tile context, and
+   * the tile SQL then tests membership of that stored set.
+   *
+   * The active-team condition mirrors the search fragment exactly, so a caller's map results and
+   * their table results resolve from the same grants.
+   *
+   * @param {number} systemUserId
+   * @return {Promise<SecurityScopeId[]>} Distinct security scope ids.
+   * @memberof SecurityScopeRepository
+   */
+  async getSecurityScopeIdsForSystemUser(systemUserId: number): Promise<SecurityScopeId[]> {
+    const sqlStatement = SQL`
+      SELECT DISTINCT tss.security_scope_id
+      FROM team_member tm
+      JOIN team t ON t.team_id = tm.team_id
+        AND t.record_end_date IS NULL
+      JOIN team_security_scope tss ON tss.team_id = tm.team_id
+      WHERE tm.system_user_id = ${systemUserId}
+        AND tm.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SecurityScopeId);
+
+    return response.rows;
+  }
 }

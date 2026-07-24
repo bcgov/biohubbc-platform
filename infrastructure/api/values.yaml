@@ -68,6 +68,15 @@ app:
     # networks NAT heavily.
     mintRateLimit: 60
     mintRateLimitWindowMinutes: 5
+    # Context lifetime, seconds. Also the staleness bound on a materialized result set.
+    contextTtlSeconds: 1800
+    # Maximum features one Martin session may map. Over-cap searches are refused, not truncated.
+    maxFeatures: 50000
+    # Maximum live (unexpired) MATERIALIZED contexts. Bounds the database growth an anonymous caller
+    # can force by varying the search per mint. At the cap a new context evicts the one closest to
+    # expiry rather than being refused, so no caller can lock the others out of new searches.
+    # Unfiltered browse-all sessions are not materialized and are never capped.
+    contextMaxLive: 200
 
   keycloak:
     host: "" # Keycloak login url
