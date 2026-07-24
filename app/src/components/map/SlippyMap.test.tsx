@@ -15,6 +15,14 @@ const mocks = vi.hoisted(() => {
     resize = vi.fn();
     remove = vi.fn();
 
+    // Sources/layers currently on the map, so tests can assert what was applied and in what order.
+    sources = new Map<string, unknown>();
+    layers = new Map<string, unknown>();
+    // Ordered record of source/layer mutations, for asserting layers are removed before their sources.
+    operations: string[] = [];
+    canvas = { style: { cursor: '' } };
+    renderedFeatures: unknown[] = [];
+
     constructor(options: Record<string, unknown>) {
       this.options = options;
       MockMaplibreMap.instances.push(this);
@@ -28,9 +36,41 @@ const mocks = vi.hoisted(() => {
       (this.handlers[event] ??= []).push(callback);
     });
 
-    fire(event: string) {
+    off = vi.fn((event: string, callback: (...args: unknown[]) => void) => {
+      this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== callback);
+    });
+
+    addSource = vi.fn((sourceId: string, source: unknown) => {
+      this.sources.set(sourceId, source);
+      this.operations.push(`addSource:${sourceId}`);
+    });
+
+    removeSource = vi.fn((sourceId: string) => {
+      this.sources.delete(sourceId);
+      this.operations.push(`removeSource:${sourceId}`);
+    });
+
+    getSource = vi.fn((sourceId: string) => this.sources.get(sourceId));
+
+    addLayer = vi.fn((layer: { id: string }) => {
+      this.layers.set(layer.id, layer);
+      this.operations.push(`addLayer:${layer.id}`);
+    });
+
+    removeLayer = vi.fn((layerId: string) => {
+      this.layers.delete(layerId);
+      this.operations.push(`removeLayer:${layerId}`);
+    });
+
+    getLayer = vi.fn((layerId: string) => this.layers.get(layerId));
+
+    queryRenderedFeatures = vi.fn(() => this.renderedFeatures);
+
+    getCanvas = vi.fn(() => this.canvas);
+
+    fire(event: string, ...args: unknown[]) {
       for (const callback of [...(this.handlers[event] ?? [])]) {
-        callback();
+        callback(...args);
       }
     }
   }
@@ -549,6 +589,210 @@ describe('SlippyMap', () => {
 
       expect(mocks.MockTerraDraw.instances).toHaveLength(0);
       expect(map.remove).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('tile sources and layers', () => {
+    const tileSources = {
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+    const layers = [
+      { id: 'search-points', type: 'circle' as const, source: 'search-results', 'source-layer': 'features' }
+    ];
+
+    it('applies sources and layers once the map has loaded', () => {
+      const { map } = renderSlippyMap({ tileSources, layers });
+
+      // Nothing is applied before load: MapLibre rejects addSource on an unloaded style.
+      expect(map.addSource).not.toHaveBeenCalled();
+
+      loadMap(map);
+
+      expect(map.addSource).toHaveBeenCalledWith('search-results', tileSources['search-results']);
+      expect(map.addLayer).toHaveBeenCalledWith(layers[0]);
+    });
+
+    it('replaces sources and layers when they change, removing layers before their sources', () => {
+      const { map, rerender } = renderSlippyMap({ tileSources, layers });
+      loadMap(map);
+      map.operations.length = 0;
+
+      const nextSources = {
+        'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}?ctx=next'] }
+      };
+
+      act(() => {
+        rerender(<SlippyMap tileSources={nextSources} layers={layers} />);
+      });
+
+      // A source still referenced by a layer cannot be removed, so the layer must go first.
+      expect(map.operations).toEqual([
+        'removeLayer:search-points',
+        'removeSource:search-results',
+        'addSource:search-results',
+        'addLayer:search-points'
+      ]);
+      expect(map.getSource('search-results')).toEqual(nextSources['search-results']);
+    });
+
+    it('does not rebuild the map when the sources change', () => {
+      const { map, rerender } = renderSlippyMap({ tileSources, layers });
+      loadMap(map);
+
+      act(() => {
+        rerender(<SlippyMap tileSources={{}} layers={[]} />);
+      });
+
+      expect(mocks.MockMaplibreMap.instances).toHaveLength(1);
+      expect(map.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('transformRequest', () => {
+    it('uses the latest function, so a rotated credential applies without rebuilding the map', () => {
+      const first = vi.fn(() => ({ url: 'first' }));
+      const second = vi.fn(() => ({ url: 'second' }));
+
+      const { map, rerender } = renderSlippyMap({ transformRequest: first });
+
+      // MapLibre captures this once, at construction.
+      const capturedTransformRequest = map.options.transformRequest as (url: string, type: string) => { url: string };
+
+      expect(capturedTransformRequest('https://example.test/tile', 'Tile')).toEqual({ url: 'first' });
+
+      act(() => {
+        rerender(<SlippyMap transformRequest={second} />);
+      });
+
+      // Same captured function, new behaviour: the map was never rebuilt.
+      expect(capturedTransformRequest('https://example.test/tile', 'Tile')).toEqual({ url: 'second' });
+      expect(mocks.MockMaplibreMap.instances).toHaveLength(1);
+    });
+
+    it('falls back to the unmodified url when no transform is provided', () => {
+      const { map } = renderSlippyMap();
+
+      const capturedTransformRequest = map.options.transformRequest as (url: string, type: string) => { url: string };
+
+      expect(capturedTransformRequest('https://example.test/tile', 'Tile')).toEqual({
+        url: 'https://example.test/tile'
+      });
+    });
+  });
+
+  describe('feature clicks', () => {
+    const tileSources = {
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+    const layers = [
+      { id: 'search-points', type: 'circle' as const, source: 'search-results', 'source-layer': 'features' }
+    ];
+
+    it('reports the rendered features under the cursor', () => {
+      const onFeatureClick = vi.fn();
+      const { map } = renderSlippyMap({
+        tileSources,
+        layers,
+        interactiveLayerIds: ['search-points'],
+        onFeatureClick
+      });
+      loadMap(map);
+
+      const feature = { properties: { submission_feature_id: 7, submission_id: 3 } };
+      map.renderedFeatures = [feature];
+
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
+      });
+
+      expect(map.queryRenderedFeatures).toHaveBeenCalledWith({ x: 10, y: 10 }, { layers: ['search-points'] });
+      expect(onFeatureClick).toHaveBeenCalledWith([feature], { lng: -123, lat: 48 });
+    });
+
+    it('ignores clicks that hit no feature', () => {
+      const onFeatureClick = vi.fn();
+      const { map } = renderSlippyMap({
+        tileSources,
+        layers,
+        interactiveLayerIds: ['search-points'],
+        onFeatureClick
+      });
+      loadMap(map);
+
+      map.renderedFeatures = [];
+
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
+      });
+
+      expect(onFeatureClick).not.toHaveBeenCalled();
+    });
+
+    it('shows a pointer cursor only while over an interactive feature', () => {
+      const { map } = renderSlippyMap({
+        tileSources,
+        layers,
+        interactiveLayerIds: ['search-points'],
+        onFeatureClick: vi.fn()
+      });
+      loadMap(map);
+
+      map.renderedFeatures = [{ properties: {} }];
+      act(() => {
+        map.fire('mousemove', { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
+      });
+      expect(map.canvas.style.cursor).toBe('pointer');
+
+      map.renderedFeatures = [];
+      act(() => {
+        map.fire('mousemove', { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
+      });
+      expect(map.canvas.style.cursor).toBe('');
+    });
+  });
+
+  describe('source errors', () => {
+    const tileSources = {
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+
+    it('reports failures for applied sources', () => {
+      const onSourceError = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, onSourceError });
+      loadMap(map);
+
+      const error = new Error('tile request rejected');
+
+      act(() => {
+        map.fire('error', { sourceId: 'search-results', error });
+      });
+
+      expect(onSourceError).toHaveBeenCalledWith('search-results', error);
+    });
+
+    it('ignores errors from sources it did not apply', () => {
+      const onSourceError = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, onSourceError });
+      loadMap(map);
+
+      act(() => {
+        map.fire('error', { sourceId: 'terra-draw-source', error: new Error('unrelated') });
+      });
+
+      expect(onSourceError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('map load', () => {
+    it('notifies the consumer once the map has loaded', () => {
+      const onMapLoad = vi.fn();
+      const { map } = renderSlippyMap({ onMapLoad });
+
+      expect(onMapLoad).not.toHaveBeenCalled();
+
+      loadMap(map);
+
+      expect(onMapLoad).toHaveBeenCalledTimes(1);
     });
   });
 });

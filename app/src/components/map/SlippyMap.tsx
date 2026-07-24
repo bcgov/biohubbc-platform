@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
-import { Map as MapLibreMap } from 'maplibre-gl';
+import { Map as MapLibreMap, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -57,7 +57,23 @@ const SELECT_MODE_FLAGS = {
  * @return {JSX.Element}
  */
 export const SlippyMap = (props: ISlippyMapProps) => {
-  const { id, features, drawControls, readOnly, onDrawCreate, onDrawUpdate, onDrawDelete, sx } = props;
+  const {
+    id,
+    features,
+    drawControls,
+    readOnly,
+    onDrawCreate,
+    onDrawUpdate,
+    onDrawDelete,
+    tileSources,
+    layers,
+    transformRequest,
+    interactiveLayerIds,
+    onFeatureClick,
+    onMapLoad,
+    onSourceError,
+    sx
+  } = props;
 
   const isEditable = hasEnabledDrawControl(drawControls) && !readOnly;
 
@@ -71,9 +87,17 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const realFeatureIdsRef = useRef<Set<string | number>>(new Set());
   const selectedFeatureIdRef = useRef<string | number | null>(null);
   // Latest props, so drawing event handlers (bound once on map load) never read stale values
-  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete });
+  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onFeatureClick, onMapLoad, onSourceError });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
+  // Source/layer ids this component applied, so replacing them never touches the drawing library's own
+  const appliedSourceIdsRef = useRef<string[]>([]);
+  const appliedLayerIdsRef = useRef<string[]>([]);
+  const mapContentRef = useRef({ tileSources, layers });
+  const interactiveLayerIdsRef = useRef(interactiveLayerIds);
+  // Read per request rather than captured at mount, so a rotated credential applies without rebuilding the map
+  const transformRequestRef = useRef(transformRequest);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   // Display options are applied on mount only
   const initialViewRef = useRef({
     initialCenter: props.initialCenter,
@@ -86,10 +110,49 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
 
   useEffect(() => {
-    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete };
+    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onFeatureClick, onMapLoad, onSourceError };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
+    mapContentRef.current = { tileSources, layers };
+    interactiveLayerIdsRef.current = interactiveLayerIds;
+    transformRequestRef.current = transformRequest;
   });
+
+  /**
+   * Replaces the sources and layers this component applied with the current props.
+   *
+   * Layers are removed before their sources (MapLibre rejects removing a source still in use), then re-added in the
+   * order given so the consumer controls draw order. Only ids this component added are removed, so the drawing
+   * library's own sources and layers are left untouched.
+   */
+  const applyMapContent = useCallback((map: MapLibreMap) => {
+    const { tileSources: currentSources, layers: currentLayers } = mapContentRef.current;
+
+    for (const layerId of appliedLayerIdsRef.current) {
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+      }
+    }
+
+    for (const sourceId of appliedSourceIdsRef.current) {
+      if (map.getSource(sourceId)) {
+        map.removeSource(sourceId);
+      }
+    }
+
+    appliedLayerIdsRef.current = [];
+    appliedSourceIdsRef.current = [];
+
+    for (const [sourceId, source] of Object.entries(currentSources ?? {})) {
+      map.addSource(sourceId, source);
+      appliedSourceIdsRef.current.push(sourceId);
+    }
+
+    for (const layer of currentLayers ?? []) {
+      map.addLayer(layer);
+      appliedLayerIdsRef.current.push(layer.id);
+    }
+  }, []);
 
   /**
    * Replaces the features displayed on the map with the provided features, skipping the update when the provided
@@ -156,6 +219,9 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       style: mapStyle ?? SLIPPY_MAP_DEFAULT_STYLE,
       center: initialCenter ?? [0, 0],
       zoom: initialZoom ?? 0,
+      // Stable wrapper around the latest `transformRequest`. MapLibre captures this once, but it reads the ref on
+      // every request, so a consumer can rotate a short-lived credential without the map being rebuilt.
+      transformRequest: (url, resourceType) => transformRequestRef.current?.(url, resourceType) ?? { url },
       // Resizing is handled by the ResizeObserver below; keep this last so `mapOptions` cannot re-enable it
       trackResize: false
     });
@@ -244,6 +310,53 @@ export const SlippyMap = (props: ISlippyMapProps) => {
      * Initializes the drawing library once the map style has loaded (the drawing library adds sources/layers to the
      * map and requires a loaded style).
      */
+    /**
+     * Emits the feature click callback with the rendered features under the cursor.
+     */
+    const handleMapClick = (event: MapMouseEvent) => {
+      const layerIds = (interactiveLayerIdsRef.current ?? []).filter((layerId) => map.getLayer(layerId));
+
+      if (!layerIds.length || !callbacksRef.current.onFeatureClick) {
+        return;
+      }
+
+      const renderedFeatures = map.queryRenderedFeatures(event.point, { layers: layerIds });
+
+      if (!renderedFeatures.length) {
+        return;
+      }
+
+      callbacksRef.current.onFeatureClick(renderedFeatures, { lng: event.lngLat.lng, lat: event.lngLat.lat });
+    };
+
+    /**
+     * Shows a pointer cursor over interactive layers, so clickable features look clickable.
+     */
+    const handleMapMouseMove = (event: MapMouseEvent) => {
+      const layerIds = (interactiveLayerIdsRef.current ?? []).filter((layerId) => map.getLayer(layerId));
+
+      if (!layerIds.length) {
+        return;
+      }
+
+      const isOverFeature = map.queryRenderedFeatures(event.point, { layers: layerIds }).length > 0;
+      map.getCanvas().style.cursor = isOverFeature ? 'pointer' : '';
+    };
+
+    /**
+     * Surfaces source load failures, which is how a consumer learns that a tile request was rejected:
+     * `transformRequest` only sees outgoing requests, never responses.
+     */
+    const handleMapError = (event: ErrorEvent & { sourceId?: string }) => {
+      const sourceId = event.sourceId;
+
+      if (!sourceId || !appliedSourceIdsRef.current.includes(sourceId)) {
+        return;
+      }
+
+      callbacksRef.current.onSourceError?.(sourceId, event.error);
+    };
+
     const handleMapLoad = () => {
       const adapter = new TerraDrawMapLibreGLAdapter({ map });
 
@@ -267,8 +380,17 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       draw.setMode(isEditableRef.current ? 'select' : 'static');
 
       syncFeaturesIntoDraw(featuresRef.current);
+
+      // Applied after the drawing library starts, so consumer layers render above the drawing layers.
+      applyMapContent(map);
+
+      setIsMapLoaded(true);
+      callbacksRef.current.onMapLoad?.();
     };
     map.once('load', handleMapLoad);
+    map.on('click', handleMapClick);
+    map.on('mousemove', handleMapMouseMove);
+    map.on('error', handleMapError);
 
     let resizeObserver: ResizeObserver | undefined;
 
@@ -281,6 +403,14 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
     return () => {
       resizeObserver?.disconnect();
+
+      map.off('click', handleMapClick);
+      map.off('mousemove', handleMapMouseMove);
+      map.off('error', handleMapError);
+
+      appliedLayerIdsRef.current = [];
+      appliedSourceIdsRef.current = [];
+      setIsMapLoaded(false);
 
       const draw = drawRef.current;
 
@@ -297,11 +427,23 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       map.remove();
       mapRef.current = null;
     };
-  }, [syncFeaturesIntoDraw]);
+    // Both dependencies are stable (`useCallback` with no dependencies), so the map is created once
+  }, [syncFeaturesIntoDraw, applyMapContent]);
 
   useDeepCompareEffect(() => {
     syncFeaturesIntoDraw(features ?? []);
   }, [features ?? []]);
+
+  useDeepCompareEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapLoaded) {
+      // The map has not loaded yet; the load handler performs the initial apply
+      return;
+    }
+
+    applyMapContent(map);
+  }, [tileSources ?? {}, layers ?? [], isMapLoaded, applyMapContent]);
 
   useEffect(() => {
     const draw = drawRef.current;

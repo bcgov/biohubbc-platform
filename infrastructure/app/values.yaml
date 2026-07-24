@@ -17,6 +17,11 @@ app:
 
   # Siteminder
   siteminderLogoutURL: "" # Siteminder URL to log out and clear the session for the logged in user
+  # Raster basemap drawn beneath the search-result vector layers. Configurable so the provider can be
+  # changed without a code change.
+  basemap:
+    url: "https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}"
+    attribution: "© Province of British Columbia"
 
   # Keycloak
   keycloak:

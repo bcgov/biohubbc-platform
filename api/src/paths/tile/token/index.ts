@@ -111,6 +111,7 @@ export function createTileSession(): RequestHandler {
         token_expires_in: expiresIn,
         context_expires_in: context.expiresInSeconds,
         source: TILE_SOURCE,
+        tile_context_id: context.tileContextId,
         tile_url_template: tokenService.getTileUrlTemplate(TILE_SOURCE),
         bbox: context.boundingBox,
         feature_count: context.featureCount,

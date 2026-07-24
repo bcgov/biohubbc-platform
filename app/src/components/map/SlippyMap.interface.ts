@@ -1,6 +1,13 @@
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { Feature } from 'geojson';
-import type { MapOptions, StyleSpecification } from 'maplibre-gl';
+import type {
+  LayerSpecification,
+  MapGeoJSONFeature,
+  MapOptions,
+  RequestTransformFunction,
+  SourceSpecification,
+  StyleSpecification
+} from 'maplibre-gl';
 
 /**
  * Draw modes supported by the `SlippyMap` drawing toolbar, one per supported GeoJSON geometry type.
@@ -80,6 +87,43 @@ export interface ISlippyMapProps {
    * Fired when feature(s) are deleted (trash control or keyboard `Delete`). Receives the full remaining feature set.
    */
   onDrawDelete?: (remainingFeatures: Feature[]) => void;
+  /**
+   * Map sources to display, keyed by source id. Applied once the map has loaded, and replaced when this prop changes.
+   *
+   * Generic on purpose: the map treats these as opaque MapLibre sources and knows nothing about what they contain, so
+   * concerns like session creation, authorization and refresh stay with the consumer.
+   */
+  tileSources?: Record<string, SourceSpecification>;
+  /**
+   * Layers to render, in draw order (first is drawn lowest). Each layer's `source` must name an entry in
+   * `tileSources`. Applied and replaced alongside `tileSources`.
+   */
+  layers?: LayerSpecification[];
+  /**
+   * Hook applied to every request the map makes, used to attach headers such as `Authorization`.
+   *
+   * The latest function is always used, including for requests made long after mount, so a consumer can rotate a
+   * short-lived credential without rebuilding the map.
+   */
+  transformRequest?: RequestTransformFunction;
+  /**
+   * Layer ids that respond to clicks and show a pointer cursor. Layers not listed here are display-only.
+   */
+  interactiveLayerIds?: string[];
+  /**
+   * Fired when a rendered feature in an interactive layer is clicked. Receives the features under the cursor
+   * (topmost first) and the clicked position.
+   */
+  onFeatureClick?: (features: MapGeoJSONFeature[], lngLat: { lng: number; lat: number }) => void;
+  /**
+   * Fired once the map style has loaded and any sources/layers have been applied.
+   */
+  onMapLoad?: () => void;
+  /**
+   * Fired when one of the applied sources fails to load, e.g. because a tile request was rejected. Lets the consumer
+   * react to an expired credential, which `transformRequest` cannot observe because it never sees responses.
+   */
+  onSourceError?: (sourceId: string, error: unknown) => void;
   /**
    * Styling for the map container. The consumer is responsible for providing a height.
    */
