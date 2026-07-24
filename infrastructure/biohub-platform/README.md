@@ -121,7 +121,11 @@ the tile gateway (SIMSBIOHUB-1102) verifies them and proxies the request to Mart
 - The gateway is exposed by a **path based `Route` on the app's own hostname** (`/tiles`), so tile
   requests are same origin with the frontend and need no CORS handling.
 - Automatic publication of PostgreSQL tables and functions is disabled. Only explicitly configured
-  function sources are served — currently a synthetic `fixture` source used to validate the stack.
+  function sources are served: `search` (authorized search-result tiles) and a synthetic `fixture`
+  source used to validate the stack, which is excluded from the gateway's allowlist.
+- Data visibility is enforced in SQL when a tile is generated, not by the gateway. A tile token
+  carries only an opaque context id; the access class, security scopes and matching feature ids stay
+  server-side, so a client cannot widen its own access by editing a token.
 - Connects as a dedicated least-privilege `martin` role with no table privileges.
 - Tile tokens are RS256. The api mounts the **private** signing key (`tile-token-private`); the
   gateway mounts only the **public** verification keys (`tile-token-public`). Both secrets are created

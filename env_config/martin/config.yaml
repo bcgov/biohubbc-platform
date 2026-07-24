@@ -31,13 +31,25 @@ postgres:
   auto_publish: false
 
   functions:
+    # Authorized search-result tiles. Resolves the opaque context id the gateway forwards and
+    # applies the feature security predicate at serve time.
+    # See database/src/procedures/03_tile_search.ts
+    search:
+      schema: biohub
+      function: tile_search
+      minzoom: 0
+      # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+      maxzoom: 15
+      # [west, south, east, north] - British Columbia
+      bounds: [-139.06, 48.30, -114.03, 60.00]
+
     # Synthetic source used to validate the tile stack end to end. Reads no tables.
+    # Published for in-network smoke tests only; it is NOT in the gateway's allowlist, so it is not
+    # reachable from outside the cluster.
     # See database/src/procedures/02_tile_fixture.ts
     fixture:
       schema: biohub
       function: tile_fixture
       minzoom: 0
-      # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
       maxzoom: 15
-      # [west, south, east, north] - British Columbia
       bounds: [-139.06, 48.30, -114.03, 60.00]

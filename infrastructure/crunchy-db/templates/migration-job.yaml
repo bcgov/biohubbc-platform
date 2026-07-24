@@ -194,6 +194,9 @@ spec:
                 GRANT USAGE ON SCHEMA biohub TO martin;
                 REVOKE ALL ON FUNCTION biohub.tile_fixture(integer, integer, integer) FROM PUBLIC;
                 GRANT EXECUTE ON FUNCTION biohub.tile_fixture(integer, integer, integer) TO martin;
+                REVOKE ALL ON FUNCTION biohub.tile_search(integer, integer, integer, json) FROM PUBLIC;
+                REVOKE ALL ON FUNCTION biohub.tile_search_visible_geometries(uuid, boolean, integer, text, uuid[], public.geometry) FROM PUBLIC;
+                GRANT EXECUTE ON FUNCTION biohub.tile_search(integer, integer, integer, json) TO martin;
               " || true
               echo "martin ACLs set (skip if role or tile functions missing)."
 

@@ -12,6 +12,11 @@ import {
   IComputeSubmissionFeatureClosureJobData
 } from './jobs/compute-submission-feature-closure-job';
 import {
+  deleteExpiredTileContextsFailedHandler,
+  deleteExpiredTileContextsJobHandler,
+  IDeleteExpiredTileContextsJobData
+} from './jobs/delete-expired-tile-contexts-job';
+import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
   indexSubmissionFeaturesJobHandler
@@ -69,6 +74,8 @@ export interface WorkerDependencies {
   computeSubmissionFeatureClosureFailedHandler: typeof computeSubmissionFeatureClosureFailedHandler;
   pollDownloadSchedulesJobHandler: typeof pollDownloadSchedulesJobHandler;
   pollDownloadSchedulesFailedHandler: typeof pollDownloadSchedulesFailedHandler;
+  deleteExpiredTileContextsJobHandler: typeof deleteExpiredTileContextsJobHandler;
+  deleteExpiredTileContextsFailedHandler: typeof deleteExpiredTileContextsFailedHandler;
   submissionUploadSecurityJobHandler: typeof submissionUploadSecurityJobHandler;
   submissionUploadSecurityFailedHandler: typeof submissionUploadSecurityFailedHandler;
 }
@@ -91,6 +98,8 @@ export const workerDependencies: WorkerDependencies = {
   computeSubmissionFeatureClosureFailedHandler,
   pollDownloadSchedulesJobHandler,
   pollDownloadSchedulesFailedHandler,
+  deleteExpiredTileContextsJobHandler,
+  deleteExpiredTileContextsFailedHandler,
   submissionUploadSecurityJobHandler,
   submissionUploadSecurityFailedHandler
 };
@@ -327,6 +336,38 @@ export const registerWorkers = async (): Promise<void> => {
     JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED,
     workerDependencies.submissionUploadSecurityFailedHandler
   );
+
+  // Hourly UTC sweep of expired map tile contexts. Offset from the download poll so the two
+  // recurring ticks do not fire together. Housekeeping only: the tile SQL enforces expiry on every
+  // request, so a missed sweep cannot expose an expired context.
+  const DELETE_EXPIRED_TILE_CONTEXTS_CRON = '15 * * * *';
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.DELETE_EXPIRED_TILE_CONTEXTS_FAILED);
+
+  // No policy:'short' — the tick carries no singletonKey, so the default 'standard' policy is
+  // correct; the next interval collects whatever a missed tick left behind.
+  await boss.createQueue(JobQueues.DELETE_EXPIRED_TILE_CONTEXTS, {
+    deadLetter: JobQueues.DELETE_EXPIRED_TILE_CONTEXTS_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+
+  // Register delete expired tile contexts job handler
+  await boss.work<IDeleteExpiredTileContextsJobData>(
+    JobQueues.DELETE_EXPIRED_TILE_CONTEXTS,
+    workerDependencies.deleteExpiredTileContextsJobHandler
+  );
+
+  // Register dead letter queue handler for failed sweeps
+  await boss.work<IDeleteExpiredTileContextsJobData>(
+    JobQueues.DELETE_EXPIRED_TILE_CONTEXTS_FAILED,
+    workerDependencies.deleteExpiredTileContextsFailedHandler
+  );
+
+  // Schedule the recurring sweep. The queue must already exist (created + worked above).
+  await boss.schedule(JobQueues.DELETE_EXPIRED_TILE_CONTEXTS, DELETE_EXPIRED_TILE_CONTEXTS_CRON, {}, { tz: 'UTC' });
 
   defaultLog.info({
     label: 'registerWorkers',

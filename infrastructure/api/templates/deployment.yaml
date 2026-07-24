@@ -167,6 +167,10 @@ spec:
               value: {{ .Values.app.tiles.mintRateLimit | quote }}
             - name: TILE_MINT_RATE_LIMIT_WINDOW_MINUTES
               value: {{ .Values.app.tiles.mintRateLimitWindowMinutes | quote }}
+            - name: TILE_CONTEXT_TTL_SECONDS
+              value: {{ .Values.app.tiles.contextTtlSeconds | quote }}
+            - name: TILE_CONTEXT_MAX_FEATURES
+              value: {{ .Values.app.tiles.maxFeatures | quote }}
             {{- end }}
             - name: KEYCLOAK_HOST
               value: {{ .Values.app.keycloak.host }}

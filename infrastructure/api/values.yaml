@@ -61,6 +61,10 @@ app:
     # networks NAT heavily.
     mintRateLimit: 60
     mintRateLimitWindowMinutes: 5
+    # Context lifetime, seconds. Also the staleness bound on a materialized result set.
+    contextTtlSeconds: 1800
+    # Maximum features one tile session may map. Over-cap searches are refused, not truncated.
+    maxFeatures: 50000
 
   keycloak:
     host: "" # Keycloak login url
