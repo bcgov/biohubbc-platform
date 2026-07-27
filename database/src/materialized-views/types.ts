@@ -14,6 +14,7 @@ export interface MaterializedViewDefinition {
   columns: MaterializedViewColumn[];
   securityMode: MaterializedViewSecurityMode;
   featureTableAlias: string;
+  taxonRuleNames?: string[];
 
   enabled?: boolean;
 
@@ -34,11 +35,14 @@ export interface MaterializedViewSecurityConfig {
   securedWhitelist: string[];
 }
 
-export interface TaxonExclusionBranchConfig {
-  rootScientificName: string;
-  exceptDescendantScientificNames?: string[];
+export interface TaxonRuleBranch {
+  rootItisTsn: number;
+  exceptDescendantItisTsns?: number[];
 }
 
-export interface MaterializedViewTaxonExclusionConfig {
-  excludedBranches: TaxonExclusionBranchConfig[];
+export interface MaterializedViewTaxonRule {
+  effect: 'include' | 'exclude';
+  branches: TaxonRuleBranch[];
 }
+
+export type MaterializedViewTaxonRuleRegistry = Record<string, MaterializedViewTaxonRule>;

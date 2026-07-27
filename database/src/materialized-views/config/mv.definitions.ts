@@ -10,6 +10,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: TELEMETRY_COLUMNS,
     securityMode: 'all',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: TELEMETRY_COMMENTS,
     enabled: true
   },
@@ -20,6 +21,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: TELEMETRY_COLUMNS,
     securityMode: 'public',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: TELEMETRY_COMMENTS,
     enabled: true
   },
@@ -30,6 +32,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: OBSERVATIONS_COLUMNS,
     securityMode: 'all',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: OBSERVATIONS_COMMENTS,
     enabled: true
   },
@@ -40,6 +43,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: OBSERVATIONS_COLUMNS,
     securityMode: 'public',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: OBSERVATIONS_COMMENTS,
     enabled: true
   },
@@ -50,6 +54,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: OBSERVATIONS_COLUMNS, // Same columns as observations
     securityMode: 'all',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: OBSERVATIONS_COMMENTS,
     enabled: true
   },
@@ -60,6 +65,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
     columns: OBSERVATIONS_COLUMNS, // Same columns as observations
     securityMode: 'public',
     featureTableAlias: 'sf',
+    taxonRuleNames: ['excludeFish'],
     comments: OBSERVATIONS_COMMENTS,
     enabled: true
   }
