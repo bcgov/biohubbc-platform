@@ -271,23 +271,16 @@ async function seedSnapshotTaxa(knex: Knex): Promise<void> {
     UPDATE taxon AS child
     SET parent_itis_tsn = NULLIF(child.itis_data->>'parentTSN', '')::integer
     WHERE child.record_end_date IS NULL
-      AND child.itis_data ? 'parentTSN'
+      AND child.itis_data->>'parentTSN' IS NOT NULL
       AND child.parent_itis_tsn IS DISTINCT FROM NULLIF(child.itis_data->>'parentTSN', '')::integer;
 
     UPDATE taxon AS child
-    SET parent_taxon_id = (
-      SELECT parent.taxon_id
-      FROM taxon AS parent
-      WHERE parent.itis_tsn = child.parent_itis_tsn
-        AND parent.record_end_date IS NULL
-    )
-    WHERE child.record_end_date IS NULL
-      AND child.parent_taxon_id IS DISTINCT FROM (
-        SELECT parent.taxon_id
-        FROM taxon AS parent
-        WHERE parent.itis_tsn = child.parent_itis_tsn
-          AND parent.record_end_date IS NULL
-      );
+    SET parent_taxon_id = parent.taxon_id
+    FROM taxon AS parent
+    WHERE child.parent_itis_tsn = parent.itis_tsn
+      AND child.record_end_date IS NULL
+      AND parent.record_end_date IS NULL
+      AND child.parent_taxon_id IS DISTINCT FROM parent.taxon_id;
   `);
 }
 
