@@ -5,7 +5,7 @@ import { OBSERVATIONS_COMMENTS, TELEMETRY_COMMENTS } from './mv.comments';
 export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   {
     schema: 'bcgw',
-    name: 'telemetry_all',
+    name: 'wld_telemetry_all',
     baseQuery: '', // Will be set by SQL builders
     columns: TELEMETRY_COLUMNS,
     securityMode: 'all',
@@ -16,7 +16,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   },
   {
     schema: 'bcgw',
-    name: 'telemetry_public',
+    name: 'wld_telemetry_public',
     baseQuery: '', // Will be set by SQL builders
     columns: TELEMETRY_COLUMNS,
     securityMode: 'public',
@@ -27,7 +27,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   },
   {
     schema: 'bcgw',
-    name: 'observations_all',
+    name: 'wld_observations_all',
     baseQuery: '', // Will be set by SQL builders
     columns: OBSERVATIONS_COLUMNS,
     securityMode: 'all',
@@ -38,7 +38,7 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   },
   {
     schema: 'bcgw',
-    name: 'observations_public',
+    name: 'wld_observations_public',
     baseQuery: '', // Will be set by SQL builders
     columns: OBSERVATIONS_COLUMNS,
     securityMode: 'public',
@@ -49,9 +49,9 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   },
   {
     schema: 'bcgw',
-    name: 'incidental_all',
+    name: 'wld_incidental_all',
     baseQuery: '', // Will be set by SQL builders
-    columns: OBSERVATIONS_COLUMNS, // Same columns as observations
+    columns: OBSERVATIONS_COLUMNS,
     securityMode: 'all',
     featureTableAlias: 'sf',
     taxonRuleNames: ['excludeFish'],
@@ -60,9 +60,9 @@ export const MATERIALIZED_VIEW_DEFINITIONS: MaterializedViewDefinition[] = [
   },
   {
     schema: 'bcgw',
-    name: 'incidental_public',
+    name: 'wld_incidental_public',
     baseQuery: '', // Will be set by SQL builders
-    columns: OBSERVATIONS_COLUMNS, // Same columns as observations
+    columns: OBSERVATIONS_COLUMNS,
     securityMode: 'public',
     featureTableAlias: 'sf',
     taxonRuleNames: ['excludeFish'],

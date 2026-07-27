@@ -29,12 +29,12 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
 ];
 
 export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
+  { alias: 'Feature_ID', expression: 'sf.submission_feature_id' },
   {
     alias: 'group_id',
     expression:
       "CASE WHEN NULLIF(sf.data#>>'{properties,observation_id}', '') IS NULL THEN NULL ELSE sub.contributor_client_id || '::' || (sf.data#>>'{properties,observation_id}') END"
   },
-  { alias: 'Feature_ID', expression: 'sf.submission_feature_id' },
   {
     alias: 'date',
     expression:
