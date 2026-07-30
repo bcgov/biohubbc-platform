@@ -13,38 +13,80 @@ import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } 
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
-   * Un-publish the upload's live features by clearing record_effective_date.
-   *
-   * Used when an upload is denied or returned to the submitted state: its live rows go
-   * back to pending (invisible to search) and can be re-classified at a later approval.
-   * `record_end_date` is never cleared — rows ended by reconciliation (superseded
-   * predecessors, unchanged duplicates) stay ended, and resurrecting them could violate
-   * the one-published-row-per-key unique index.
-   *
-   * A no-op for uploads whose rows are already pending (e.g. denying a never-approved
-   * upload), so a zero row count is a valid result.
+   * Activate all features belonging to a submission upload.
    *
    * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<number>} Number of rows un-published.
+   * @returns {Promise<void>}
    * @memberof SubmissionFeatureRepository
    */
-  async unpublishLiveSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_feature
-      SET
-        record_effective_date = NULL
-      WHERE
-        submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL
-        AND record_effective_date IS NOT NULL
-      RETURNING
-        submission_feature_id;
+  async activateSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_feature
+      SET record_effective_date = now(),
+          record_end_date = NULL
+      WHERE submission_upload_id = ${submissionUploadId}
+      RETURNING submission_feature_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sql);
 
-    return response.rowCount ?? 0;
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record effective dates', [
+        'SubmissionFeatureRepository->activateSubmissionFeaturesForSubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Deactivate all features belonging to a denied submission upload.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async deactivateSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_feature
+      SET record_end_date = now()
+      WHERE submission_upload_id = ${submissionUploadId}
+      RETURNING submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to set submission feature record end dates', [
+        'SubmissionFeatureRepository->deactivateSubmissionFeaturesForSubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
+  }
+
+  /**
+   * Reset all features belonging to a resubmitted upload to pending.
+   *
+   * @param {string} submissionUploadId The submission upload scope.
+   * @returns {Promise<void>}
+   * @memberof SubmissionFeatureRepository
+   */
+  async resetSubmissionFeaturesToPendingForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_feature
+      SET record_effective_date = NULL,
+          record_end_date = NULL
+      WHERE submission_upload_id = ${submissionUploadId}
+      RETURNING submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to unset submission feature record dates', [
+        'SubmissionFeatureRepository->resetSubmissionFeaturesToPendingForSubmissionUploadId',
+        'rowCount was null, undefined, or 0'
+      ]);
+    }
   }
 
   /**
