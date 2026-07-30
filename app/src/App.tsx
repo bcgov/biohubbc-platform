@@ -26,7 +26,6 @@ const App = () => {
             const authConfig: AuthProviderProps = {
               authority: `${config.KEYCLOAK_CONFIG.authority}/realms/${config.KEYCLOAK_CONFIG.realm}/`,
               client_id: config.KEYCLOAK_CONFIG.clientId,
-              resource: config.KEYCLOAK_CONFIG.clientId,
               // Default sign in redirect
               redirect_uri: buildUrl(window.location.origin),
               // Default sign out redirect
