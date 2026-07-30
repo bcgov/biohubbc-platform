@@ -6,7 +6,13 @@ fullnameOverride: biohub-platform-db-prod
 instances:
   replicas: 2
   dataVolumeClaimSpec:
-    storage: 20Gi
+    # Sized to fit the namespace storage quota (32Gi total across all classes).
+    # Two instances at 20Gi requires 40Gi and can never be satisfied; that
+    # unsatisfiable request left the operator retry-looping on PVC expansion
+    # from 2026-03-20 onward. Actual usage is under 1Gi per instance, so 10Gi
+    # is ~15x headroom and matches dev/test. Note that PVCs cannot shrink in
+    # place: lowering this value requires recreating the instance's volume.
+    storage: 10Gi
   requests:
     cpu: 100m
     memory: 512Mi

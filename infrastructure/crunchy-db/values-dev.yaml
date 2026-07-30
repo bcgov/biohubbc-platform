@@ -6,7 +6,14 @@ fullnameOverride: biohub-platform-db-dev
 instances:
   replicas: 1
   dataVolumeClaimSpec:
-    storage: 10Gi
+    # Intentionally 20Gi while test/prod are 10Gi: this matches the volume dev
+    # already has. PVCs cannot shrink in place, so a lower value here is never
+    # applied - it just leaves the operator retry-looping on a rejected resize
+    # (PersistentVolumeResizing=False/Invalid). Dev is a single instance with no
+    # replica, so reclaiming the extra 10Gi means recreating the only database
+    # volume, which needs quota headroom the namespace does not currently have.
+    # Revisit once the stale PR-preview releases are cleaned up.
+    storage: 20Gi
   requests:
     cpu: 50m
     memory: 256Mi
