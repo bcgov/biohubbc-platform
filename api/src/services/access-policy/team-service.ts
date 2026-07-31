@@ -41,20 +41,27 @@ export class TeamService extends DBService {
       description: teamData.description
     });
 
-    const systemUserIds = teamData.system_user_ids ?? [];
-
-    if (systemUserIds.length > 0) {
-      await Promise.all(
-        systemUserIds.map((systemUserId) =>
-          this.teamMemberService.createTeamMember({
-            team_id: team.team_id,
-            system_user_id: systemUserId
-          })
-        )
-      );
-    }
+    await this.addTeamMembers(team.team_id, teamData.system_user_ids ?? []);
 
     return this.teamRepository.getTeam(team.team_id);
+  }
+
+  /**
+   * Add system users to a team without replacing its existing members.
+   *
+   * @param {string} teamId - Team identifier.
+   * @param {number[]} systemUserIds - System users to add.
+   * @returns {Promise<void>}
+   */
+  async addTeamMembers(teamId: string, systemUserIds: number[]): Promise<void> {
+    await Promise.all(
+      [...new Set(systemUserIds)].map((systemUserId) =>
+        this.teamMemberService.createTeamMember({
+          team_id: teamId,
+          system_user_id: systemUserId
+        })
+      )
+    );
   }
 
   /**
@@ -65,17 +72,6 @@ export class TeamService extends DBService {
    */
   getTeam(teamId: string): Promise<Team> {
     return this.teamRepository.getTeam(teamId);
-  }
-
-  /**
-   * Find a single active team by its exact name, or `null` if none exists.
-   *
-   * @param {string} name - Exact team name.
-   * @return {Promise<Team | null>} Matching team or `null`.
-   * @memberof TeamService
-   */
-  findTeamByName(name: string): Promise<Team | null> {
-    return this.teamRepository.findTeamByName(name);
   }
 
   /**

@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
@@ -11,24 +12,32 @@ import { UploadIngestionService } from '../../../../services/upload/upload-inges
 import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/upload');
+const defaultLog = getLogger('paths/submission/{submissionUuid}/upload');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'Contributor' }]
+  authorizeRequestHandler((req) => ({
+    or: [
+      {
+        discriminator: 'Team',
+        entity: 'submission',
+        submissionUuid: req.params.submissionUuid
+      },
+      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+    ]
   })),
   createSubmissionUpload()
 ];
 
 POST.apiDoc = {
-  description: 'Initialize a new archive upload for an existing submission and get presigned URLs.',
+  description:
+    'Initialize a new archive upload for an existing submission. The authenticated user must belong to the submission team and is granted access to the new upload. Optional submitters are added to the submission and upload teams.',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
     {
       description: 'Submission UUID.',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: {
         type: 'string',
         format: 'uuid'
@@ -71,23 +80,30 @@ export function createSubmissionUpload(): RequestHandler {
     try {
       await connection.open();
 
-      // The request is authenticated as the submitting service client (Contributor). The human
-      // submitter on whose behalf the upload is appended is supplied in the request body. Resolve
-      // them, creating or reactivating their system_user record as needed; any failure throws and
-      // rolls back the transaction so no records are created.
-      const { guid, identifier, identitySource } = req.body.submitter;
-
+      // The authenticated user is always added to both teams. Resolve every additional submitter
+      // and add all of them as well.
+      const submitterSystemUserIds: number[] = [];
       const userService = new UserService(connection);
-      const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
+      const resolvedSubmitterGuids = new Set<string>();
+      for (const { guid, identifier, identitySource } of req.body.submitters ?? []) {
+        const normalizedGuid = guid.toLowerCase();
+        if (resolvedSubmitterGuids.has(normalizedGuid)) {
+          continue;
+        }
+        resolvedSubmitterGuids.add(normalizedGuid);
 
-      const submissionUuid = req.params.submissionId as string;
+        const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
+        submitterSystemUserIds.push(submitter.system_user_id);
+      }
+
+      const submissionUuid = req.params.submissionUuid;
       const { bytes, blueprint_id } = req.body;
 
       const uploadIngestionService = new UploadIngestionService(connection);
       const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(
         bytes,
         submissionUuid,
-        submitter.system_user_id,
+        submitterSystemUserIds,
         blueprint_id
       );
 

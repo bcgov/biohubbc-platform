@@ -10,12 +10,12 @@ import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDat
 import { PageSection } from 'components/section/PageSection';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SECURITY_LABEL } from 'constants/security';
-import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionSummary } from 'interfaces/useSubmissionsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { getFormattedDate } from 'utils/Utils';
 
 interface IPortalSubmissionsContainerProps extends IServerPaginationProps {
-  rows: SubmissionRecordWithSecurityAndRootFeature[];
+  rows: SubmissionSummary[];
   rowCount: number;
   onRowClick: (submissionId: number) => void;
   searchTerm: string;
@@ -27,10 +27,11 @@ const securityColorMap: Record<string, 'success' | 'warning' | 'error'> = {
   PUBLISHED: 'success',
   PENDING: 'warning',
   SECURED: 'error',
+  'PARTIALLY SECURED': 'error',
   REJECTED: 'error'
 };
 
-const columns: GridColDef<SubmissionRecordWithSecurityAndRootFeature>[] = [
+const columns: GridColDef<SubmissionSummary>[] = [
   {
     field: 'name',
     headerName: 'Name',
@@ -109,7 +110,7 @@ export const PortalSubmissionsContainer = (props: IPortalSubmissionsContainerPro
           />
         </Stack>
       }>
-      <ServerPaginatedDataGrid<SubmissionRecordWithSecurityAndRootFeature>
+      <ServerPaginatedDataGrid<SubmissionSummary>
         dataTestId="portal-submissions-table"
         rows={rows}
         columns={columns}

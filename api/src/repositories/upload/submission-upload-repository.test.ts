@@ -5,7 +5,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
+import {
+  CreateSubmissionUploadWithTeam,
+  SubmissionUpload,
+  UpdateSubmissionUpload
+} from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
 import { SubmissionUploadRepository } from './submission-upload-repository';
 
@@ -36,6 +40,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'id-1',
         submission_id: 123,
         upload_id: 'upload-id',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
@@ -68,6 +73,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'upload-id',
         submission_id: 123,
         upload_id: 'upload-uuid',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
@@ -89,6 +95,7 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
+            team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             status: 'uploaded',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           },
@@ -96,6 +103,7 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-2',
             submission_id: 123,
             upload_id: 'a-2',
+            team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
             status: 'uploaded',
             ticket_id: '22222222-2222-2222-2222-222222222222'
           }
@@ -114,6 +122,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
@@ -121,6 +130,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
+          team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           status: 'uploaded',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
@@ -135,6 +145,7 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
+            team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             status: 'uploaded',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           }
@@ -153,6 +164,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         }
@@ -165,6 +177,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
@@ -172,6 +185,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
+          team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           status: 'uploaded',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
@@ -244,9 +258,10 @@ describe('SubmissionUploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
-      const payload: CreateSubmissionUpload = {
+      const payload: CreateSubmissionUploadWithTeam = {
         submission_id: 123,
         upload_id: 'a-1',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         status: 'uploaded',
         blueprint_id: 7,
@@ -269,9 +284,10 @@ describe('SubmissionUploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
-      const payload: CreateSubmissionUpload = {
+      const payload: CreateSubmissionUploadWithTeam = {
         submission_id: 123,
         upload_id: 'a-1',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         status: 'uploaded',
         blueprint_id: 7
@@ -283,6 +299,8 @@ describe('SubmissionUploadRepository', () => {
       // The pinned Blueprint is persisted with the upload.
       expect(sqlStub.firstCall.args[0].text).to.contain('blueprint_id');
       expect(sqlStub.firstCall.args[0].values).to.include(7);
+      expect(sqlStub.firstCall.args[0].text).to.contain('team_id');
+      expect(sqlStub.firstCall.args[0].values).to.include('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
     });
   });
 

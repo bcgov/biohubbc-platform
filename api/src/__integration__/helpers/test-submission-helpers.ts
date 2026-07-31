@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { IDBConnection } from '../../database/db';
 
@@ -19,11 +20,14 @@ export async function createTestSubmission(connection: IDBConnection): Promise<n
     );
   `);
 
+  const submissionTeamId = await createIntegrationSubmissionTeam(connection, systemUserId);
+
   const result = await connection.sql(SQL`
-    INSERT INTO submission (uuid, system_user_id, contributor_id, name, description, comment, create_user)
+    INSERT INTO submission (uuid, system_user_id, team_id, contributor_id, name, description, comment, create_user)
     VALUES (
       gen_random_uuid(),
       ${systemUserId},
+      ${submissionTeamId},
       (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1),
       'Integration Test Submission',
       'Test description',
@@ -34,6 +38,32 @@ export async function createTestSubmission(connection: IDBConnection): Promise<n
   `);
 
   return result.rows[0].submission_id;
+}
+
+/**
+ * Create a dedicated access team for an integration-test submission.
+ */
+export async function createIntegrationSubmissionTeam(
+  connection: IDBConnection,
+  systemUserId: number
+): Promise<string> {
+  const teamResult = await connection.sql(SQL`
+    INSERT INTO team (name, description, create_user)
+    VALUES (
+      ${`Integration Submission Team ${randomUUID()}`},
+      'Dedicated submission access team for integration testing.',
+      ${systemUserId}
+    )
+    RETURNING team_id;
+  `);
+  const teamId = teamResult.rows[0].team_id as string;
+
+  await connection.sql(SQL`
+    INSERT INTO team_member (system_user_id, team_id, create_user)
+    VALUES (${systemUserId}, ${teamId}, ${systemUserId});
+  `);
+
+  return teamId;
 }
 
 /**
@@ -52,6 +82,33 @@ export async function getActiveDefaultBlueprintId(connection: IDBConnection): Pr
   `);
 
   return result.rows[0].blueprint_id;
+}
+
+/**
+ * Create a dedicated access team for an integration-test submission upload.
+ */
+export async function createIntegrationUploadTeam(
+  connection: IDBConnection,
+  uploadId: string,
+  systemUserId: number
+): Promise<string> {
+  const teamResult = await connection.sql(SQL`
+    INSERT INTO team (name, description, create_user)
+    VALUES (
+      ${`Integration Submission Upload Team ${uploadId}`},
+      'Dedicated submission upload access team for integration testing.',
+      ${systemUserId}
+    )
+    RETURNING team_id;
+  `);
+  const teamId = teamResult.rows[0].team_id as string;
+
+  await connection.sql(SQL`
+    INSERT INTO team_member (system_user_id, team_id, create_user)
+    VALUES (${systemUserId}, ${teamId}, ${systemUserId});
+  `);
+
+  return teamId;
 }
 
 /**
@@ -77,13 +134,15 @@ export async function createTestFeature(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const teamId = await createIntegrationUploadTeam(connection, uploadId, systemUserId);
   const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
+    INSERT INTO submission_upload (submission_id, upload_id, team_id, ticket_id, blueprint_id, create_user)
     VALUES (
       ${submissionId},
       ${uploadId},
+      ${teamId},
       ${ticket_id},
       ${blueprintId},
       ${systemUserId}
@@ -151,11 +210,12 @@ export async function createTestFeaturesInBulk(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const teamId = await createIntegrationUploadTeam(connection, uploadId, systemUserId);
   const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, team_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${teamId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
@@ -221,11 +281,12 @@ export async function createTestUploadWithFeatures(
   const uploadId = uploadResult.rows[0].upload_id;
 
   const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+  const teamId = await createIntegrationUploadTeam(connection, uploadId, systemUserId);
   const blueprintId = await getActiveDefaultBlueprintId(connection);
 
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, team_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${teamId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id as string;

@@ -103,6 +103,87 @@ describe('TeamAuthorizationService', () => {
         expect(result).to.be.false;
       });
     });
+
+    describe('entity: submission_upload', () => {
+      const submissionUploadId = '11111111-1111-1111-1111-111111111111';
+
+      it('returns true when the user has active team access to the submission upload', async () => {
+        const mockConnection = getMockDBConnection();
+        const repositoryStub = sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipBySubmissionUpload')
+          .resolves({ submission_upload_id: submissionUploadId, record_end_date: null });
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(1, {
+          entity: 'submission_upload',
+          submissionUploadId
+        });
+
+        expect(result).to.be.true;
+        expect(repositoryStub).to.have.been.calledOnceWith(1, submissionUploadId);
+      });
+
+      it('returns false when the user does not have team access to the submission upload', async () => {
+        const mockConnection = getMockDBConnection();
+        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipBySubmissionUpload').resolves(null);
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(1, {
+          entity: 'submission_upload',
+          submissionUploadId
+        });
+
+        expect(result).to.be.false;
+      });
+    });
+
+    describe('entity: submission', () => {
+      it('returns true when the user has active team access to the submission', async () => {
+        const mockConnection = getMockDBConnection();
+        const repositoryStub = sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipBySubmissionId')
+          .resolves({ submission_id: 10, record_end_date: null });
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(1, {
+          entity: 'submission',
+          submissionId: 10
+        });
+
+        expect(result).to.be.true;
+        expect(repositoryStub).to.have.been.calledOnceWith(1, 10);
+      });
+
+      it('returns false when the user does not have team access to the submission', async () => {
+        const mockConnection = getMockDBConnection();
+        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipBySubmissionId').resolves(null);
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(1, {
+          entity: 'submission',
+          submissionId: 10
+        });
+
+        expect(result).to.be.false;
+      });
+
+      it('resolves submission-team access by UUID when explicitly provided a submission UUID', async () => {
+        const submissionUuid = '11111111-1111-1111-1111-111111111111';
+        const mockConnection = getMockDBConnection();
+        const repositoryStub = sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipBySubmissionUuid')
+          .resolves({ submission_id: 10, record_end_date: null });
+
+        const service = new TeamAuthorizationService(mockConnection);
+        const result = await service.isUserAuthorizedForTeamEntity(1, {
+          entity: 'submission',
+          submissionUuid
+        });
+
+        expect(result).to.be.true;
+        expect(repositoryStub).to.have.been.calledOnceWith(1, submissionUuid);
+      });
+    });
   });
 
   describe('isSubmissionFeatureAccessibleToUser', () => {

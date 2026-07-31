@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { SubmissionUploadStatusHistoryResponseSchema } from '../../../../openapi/schemas/upload';
@@ -7,25 +8,32 @@ import { authorizeRequestHandler } from '../../../../request-handlers/security/a
 import { SubmissionUploadReviewStatusService } from '../../../../services/upload/submission-upload-review-status-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/history');
+const defaultLog = getLogger('paths/submission/{submissionUuid}/history');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'Contributor' }]
+  authorizeRequestHandler((req) => ({
+    or: [
+      {
+        discriminator: 'Team',
+        entity: 'submission',
+        submissionUuid: req.params.submissionUuid
+      },
+      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+    ]
   })),
   getSubmissionHistory()
 ];
 
 GET.apiDoc = {
   description:
-    'Return publish history for the submission from submission_upload_status (all status records, newest first).',
+    'Return all upload status history for a submission. Available to submission-team members and system administrators.',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
     {
       description: 'Submission UUID.',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: {
         type: 'string',
         format: 'uuid'
@@ -61,7 +69,7 @@ export function getSubmissionHistory(): RequestHandler {
     try {
       await connection.open();
 
-      const submissionUuid = req.params.submissionId as string;
+      const submissionUuid = req.params.submissionUuid;
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       const result = await reviewStatusService.getSubmissionHistoryByUuid(submissionUuid);
 

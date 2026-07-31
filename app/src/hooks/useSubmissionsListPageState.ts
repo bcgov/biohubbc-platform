@@ -2,7 +2,7 @@ import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import {
   IGetSubmissionsForUserResponse,
   SubmissionFilters,
-  SubmissionRecordWithSecurityAndRootFeature
+  SubmissionSummary
 } from 'interfaces/useSubmissionsApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -20,7 +20,7 @@ const DEFAULT_PAGE_SIZE = 10;
  * @returns {*}
  */
 export const useSubmissionsListPageState = (fetchSubmissions: SubmissionListFetcher) => {
-  return useServerPaginatedDataGrid<SubmissionRecordWithSecurityAndRootFeature, IGetSubmissionsForUserResponse>({
+  return useServerPaginatedDataGrid<SubmissionSummary, IGetSubmissionsForUserResponse>({
     fetcher: (search, pagination) => fetchSubmissions({ search }, pagination),
     extractData: (response) => response.submissions,
     extractTotal: (response) => response.pagination.total,

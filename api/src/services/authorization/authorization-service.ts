@@ -46,6 +46,18 @@ export type TeamAuthorizationEntity =
   | {
       entity: 'data_request';
       dataRequestId: string;
+    }
+  | {
+      entity: 'submission_upload';
+      submissionUploadId: string;
+    }
+  | {
+      entity: 'submission';
+      submissionId: number;
+    }
+  | {
+      entity: 'submission';
+      submissionUuid: string;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {

@@ -12,7 +12,7 @@ import { SubmissionUploadReviewStatusService } from '../../../../../../../servic
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');
+const defaultLog = getLogger('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status');
 
 export const PATCH: Operation = [
   authorizeRequestHandler(() => ({
@@ -33,9 +33,9 @@ PATCH.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission ID (UUID).',
+      description: 'Submission UUID.',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: {
         type: 'string',
         format: 'uuid'
@@ -73,7 +73,7 @@ PATCH.apiDoc = {
     ...defaultErrorResponses,
     404: {
       description:
-        'Submission not found (invalid submissionId) or submission upload not found (submissionUploadId does not belong to this submission).'
+        'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
     }
   }
 };
@@ -91,11 +91,11 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
+      const { submissionUuid, submissionUploadId } = req.params;
       const { status } = req.body;
 
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
+      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });

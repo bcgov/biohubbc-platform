@@ -13,7 +13,7 @@ import { deleteSubmissionUploadReview, updateSubmissionUploadReview } from './in
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
+describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -31,7 +31,7 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
@@ -60,7 +60,7 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };

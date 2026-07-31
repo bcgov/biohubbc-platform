@@ -5,6 +5,7 @@
 // The committed deliverable is the fixture dumped from the rows this produces, not the generator
 // itself — running it requires DB + MinIO (not the queue). It is intentionally NOT wired into any
 // build or request flow.
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import SQL from 'sql-template-strings';
@@ -98,6 +99,7 @@ interface SeededFkChain {
   uploadId: string;
   submissionUploadId: string;
   ticketId: string;
+  teamId: string;
   blueprintId: number;
 }
 
@@ -191,6 +193,7 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
     submission_upload_id: chain.submissionUploadId,
     submission_id: chain.submissionId,
     upload_id: chain.uploadId,
+    team_id: chain.teamId,
     status: 'uploaded',
     ticket_id: chain.ticketId,
     blueprint_id: chain.blueprintId
@@ -357,11 +360,28 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
   const recordEndDate = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const bucket = process.env.OBJECT_STORE_BUCKET_NAME ?? null;
 
+  const submissionTeamResult = await connection.sql(SQL`
+    INSERT INTO team (name, description, create_user)
+    VALUES (
+      ${`${SEED_SNAPSHOT_PREFIX} submission team ${randomUUID()}`},
+      'Auto-created access team for a seed snapshot submission.',
+      ${systemUserId}
+    )
+    RETURNING team_id;
+  `);
+  const submissionTeamId: string = submissionTeamResult.rows[0].team_id;
+
+  await connection.sql(SQL`
+    INSERT INTO team_member (system_user_id, team_id, create_user)
+    VALUES (${systemUserId}, ${submissionTeamId}, ${systemUserId});
+  `);
+
   const submissionResult = await connection.sql(SQL`
-    INSERT INTO submission (uuid, system_user_id, contributor_id, name, description, comment, create_user)
+    INSERT INTO submission (uuid, system_user_id, team_id, contributor_id, name, description, comment, create_user)
     VALUES (
       gen_random_uuid(),
       ${systemUserId},
+      ${submissionTeamId},
       ${contributorId},
       ${payload.submissionName},
       ${SEED_SNAPSHOT_PREFIX},
@@ -392,10 +412,25 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
   `);
 
   const ticketId = await createSnapshotTicket(connection, submissionId, uploadId, systemUserId);
+  const teamResult = await connection.sql(SQL`
+    INSERT INTO team (name, description, create_user)
+    VALUES (
+      ${`${SEED_SNAPSHOT_PREFIX} upload team ${uploadId}`},
+      'Auto-created access team for a seed snapshot upload.',
+      ${systemUserId}
+    )
+    RETURNING team_id;
+  `);
+  const teamId: string = teamResult.rows[0].team_id;
+
+  await connection.sql(SQL`
+    INSERT INTO team_member (system_user_id, team_id, create_user)
+    VALUES (${systemUserId}, ${teamId}, ${systemUserId});
+  `);
 
   const submissionUploadResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, blueprint_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${blueprintId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, team_id, ticket_id, blueprint_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${teamId}, ${ticketId}, ${blueprintId}, ${systemUserId})
     RETURNING submission_upload_id;
   `);
   const submissionUploadId: string = submissionUploadResult.rows[0].submission_upload_id;
@@ -414,7 +449,7 @@ async function seedFkChain(connection: IDBConnection, payload: SeedFkChainPayloa
       (${submissionUploadId}, 'security', 'pending', ${systemUserId}, ${systemUserId});
   `);
 
-  return { submissionId, uploadId, submissionUploadId, ticketId, blueprintId };
+  return { submissionId, uploadId, submissionUploadId, ticketId, teamId, blueprintId };
 }
 
 /**

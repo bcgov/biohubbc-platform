@@ -13,7 +13,7 @@ import { getSubmissionUploadReviews, insertSubmissionUploadReview } from './inde
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review', () => {
+describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -30,7 +30,7 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
     };
 
@@ -56,7 +56,7 @@ describe('paths/administrative/submission/{submissionId}/upload/{submissionUploa
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
     };
     mockReq.body = { scope: 'security', status: 'requested' };

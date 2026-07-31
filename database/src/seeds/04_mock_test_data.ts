@@ -128,7 +128,31 @@ export const insertSubmissionRecord = async (
   includeSecurityReview = false,
   includePublishTimestamp = false
 ): Promise<number> => {
-  const response = await knex.raw(`${insertSubmission(includeSecurityReview, includePublishTimestamp)}`);
+  const owner = await knex('contributor_system_user as csu')
+    .join('contributor as c', 'c.contributor_id', 'csu.contributor_id')
+    .whereRaw('LOWER(c.client_id) = LOWER(?)', [CONTRIBUTOR_CLIENT_ID])
+    .whereNull('c.record_end_date')
+    .whereNull('csu.record_end_date')
+    .select('csu.system_user_id')
+    .first();
+
+  const [submissionTeam] = await knex('team')
+    .insert({
+      name: `Seed Submission Team ${faker.string.uuid()}`,
+      description: 'Dedicated access team for a seeded submission.',
+      create_user: owner.system_user_id
+    })
+    .returning('team_id');
+
+  await knex('team_member').insert({
+    system_user_id: owner.system_user_id,
+    team_id: submissionTeam.team_id,
+    create_user: owner.system_user_id
+  });
+
+  const response = await knex.raw(
+    `${insertSubmission(includeSecurityReview, includePublishTimestamp, submissionTeam.team_id)}`
+  );
   const submission_id = response.rows[0].submission_id;
 
   return submission_id;
@@ -197,6 +221,14 @@ export const insertSubmissionUploadRecord = async (
   upload_id: string
 ): Promise<string> => {
   const ticket_id = await ensureTicketForSubmissionUpload(knex, { submission_id, upload_id });
+  const [{ team_id }] = await knex('team')
+    .insert({
+      name: `Seed Submission Upload Team ${upload_id}`,
+      description: 'Dedicated access team for a seeded submission upload.',
+      create_user: 1
+    })
+    .returning('team_id');
+  await knex('team_member').insert({ system_user_id: 1, team_id, create_user: 1 });
 
   // Pin the upload to the active default Blueprint (seeded by the initial-blueprint migration).
   const blueprintRow = await knex('blueprint')
@@ -209,6 +241,7 @@ export const insertSubmissionUploadRecord = async (
     .insert({
       submission_id,
       upload_id,
+      team_id,
       create_user: 1,
       ticket_id,
       blueprint_id: blueprintRow.blueprint_id
@@ -228,18 +261,29 @@ const ensureTicketForSubmissionUpload = async (
 
   // Keep a stable team across seed runs so we only need one FK target.
   const teamName = 'Seed Submission Upload Team';
-  const team = await knex('team').where({ name: teamName }).whereNull('record_end_date').first();
-  const team_id =
-    team?.team_id ??
-    (
-      await knex('team')
-        .insert({
-          name: teamName,
-          description: 'Auto-generated team for submission_upload seed tickets.',
-          create_user
-        })
-        .returning(['team_id'])
-    )[0].team_id;
+  let team = await knex('team').where({ name: teamName }).whereNull('record_end_date').select('team_id').first();
+
+  if (!team) {
+    const [insertedTeam] = await knex('team')
+      .insert({
+        name: teamName,
+        description: 'Auto-generated team for submission_upload seed tickets.',
+        create_user
+      })
+      .onConflict()
+      .ignore()
+      .returning(['team_id']);
+
+    team =
+      insertedTeam ??
+      (await knex('team').where({ name: teamName }).whereNull('record_end_date').select('team_id').first());
+  }
+
+  if (!team) {
+    throw new Error(`Failed to resolve seed team '${teamName}'`);
+  }
+
+  const team_id = team.team_id;
 
   // Make subject unique per upload UUID so rerunning seeds can reuse the same ticket.
   const subject = `Submission Upload - ${input.upload_id}`;
@@ -422,7 +466,11 @@ const insertAnimalRecord = async (
   return submission_feature_id;
 };
 
-export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includePublishTimestamp: boolean) => {
+export const insertSubmission = (
+  includeSecurityReviewTimestamp: boolean,
+  includePublishTimestamp: boolean,
+  teamId: string
+) => {
   const securityReviewTimestamp = includeSecurityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
   // Only generate a non-null publish timestamp if the security timestamp is non-null (to confirm to database constraints)
   const publishTimestamp =
@@ -438,6 +486,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       security_review_timestamp,
       publish_timestamp,
       system_user_id,
+      team_id,
       contributor_id
   )
   values
@@ -457,6 +506,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
           AND csu.record_end_date IS NULL
         LIMIT 1
       ),
+      '${teamId}',
       (
         SELECT contributor_id
         FROM contributor

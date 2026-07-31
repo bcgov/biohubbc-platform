@@ -6,8 +6,8 @@ import { getSubmissions } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
+import { SubmissionSummary } from '../../models/submission';
 import { SECURITY_APPLIED_STATUS } from '../../repositories/security-repository';
-import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../repositories/submission-repository';
 import { SubmissionService } from '../../services/submission-service';
 
 chai.use(sinonChai);
@@ -19,7 +19,7 @@ describe('submission index', () => {
 
   const systemUserId = 42;
 
-  const mockSubmission: SubmissionRecordWithSecurityAndRootFeatureType = {
+  const mockSubmission: SubmissionSummary = {
     submission_id: 1,
     uuid: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     publish_timestamp: null,
@@ -32,8 +32,6 @@ describe('submission index', () => {
     create_user: 10,
     update_user: null,
     security: SECURITY_APPLIED_STATUS.PENDING,
-    root_feature_type_id: 3,
-    root_feature_type_name: 'Species',
     regions: ['Region A']
   };
 
