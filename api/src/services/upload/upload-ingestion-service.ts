@@ -11,6 +11,7 @@ import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../uti
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
+import { SubmissionTeamService } from '../submission-team-service';
 import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
@@ -41,6 +42,7 @@ export class UploadIngestionService extends DBService {
   submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
+  submissionTeamService = new SubmissionTeamService(this.connection);
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -57,6 +59,8 @@ export class UploadIngestionService extends DBService {
    *
    * @param {number} bytes
    * @param {ICreateSubmission} submission
+   * @param {number} submitterSystemUserId The system user (resolved from the authenticated token) to grant
+   * submission access to via `submission_team`.
    * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
    * the system default Blueprint when omitted (new submissions have no prior upload to inherit from).
    * @returns {Promise<PresignedUploadUrlResponse>}
@@ -64,6 +68,7 @@ export class UploadIngestionService extends DBService {
   async startArchiveUpload(
     bytes: number,
     submission: ICreateSubmission,
+    submitterSystemUserId: number,
     requestedBlueprintId?: number | null
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create submission (intent)
@@ -78,6 +83,7 @@ export class UploadIngestionService extends DBService {
       submission_id,
       submissionUuidFromTable,
       [submission.system_user_id],
+      submitterSystemUserId,
       submission.comment,
       requestedBlueprintId
     );
@@ -89,6 +95,8 @@ export class UploadIngestionService extends DBService {
    *
    * @param {number} bytes
    * @param {string} submissionUuid - Submission UUID (submission.uuid).
+   * @param {number} submitterSystemUserId The system user (resolved from the authenticated token) to grant
+   * submission access to via `submission_team`. For append uploads this is the user performing the append.
    * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
    * the submission's most recent prior upload Blueprint when omitted.
    * @returns {Promise<PresignedUploadUrlResponse>}
@@ -97,6 +105,7 @@ export class UploadIngestionService extends DBService {
   async startArchiveUploadForExistingSubmissionByUuid(
     bytes: number,
     submissionUuid: string,
+    submitterSystemUserId: number,
     requestedBlueprintId?: number | null
   ): Promise<PresignedUploadUrlResponse> {
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
@@ -106,6 +115,7 @@ export class UploadIngestionService extends DBService {
       byUuid.submission_id,
       submissionRecord.uuid,
       [submissionRecord.system_user_id],
+      submitterSystemUserId,
       submissionRecord.comment ?? null,
       requestedBlueprintId
     );
@@ -119,6 +129,8 @@ export class UploadIngestionService extends DBService {
    * @param {number} submissionId - Integer PK for DB operations
    * @param {string} submissionUuid - Submission UUID; used when building response (API returns this as submissionId for client use).
    * @param {number[]} systemUserIds - System users to associate with the upload's ticket.
+   * @param {number} submitterSystemUserId - System user (resolved from the authenticated token) granted
+   * submission access via `submission_team`. Applies to both new and append uploads.
    * @param {string | null} [comment] - Optional upload comment.
    * @param {number | null} [requestedBlueprintId] - Optional Blueprint to pin the upload to; resolved
    * to provided → most recent prior upload → system default.
@@ -129,6 +141,7 @@ export class UploadIngestionService extends DBService {
     submissionId: number,
     submissionUuid: string,
     systemUserIds: number[],
+    submitterSystemUserId: number,
     comment?: string | null,
     requestedBlueprintId?: number | null
   ): Promise<PresignedUploadUrlResponse> {
@@ -162,6 +175,10 @@ export class UploadIngestionService extends DBService {
       blueprint_id,
       comment: comment ?? null
     });
+
+    // 3a. Grant the submitting user access to the submission via submission_team.
+    // This is independent of the ticket team above, and applies to both new and append uploads.
+    await this.submissionTeamService.grantSubmissionAccessToUser(submissionId, submitterSystemUserId);
 
     // 4. Create pending validation/security review tasks for this upload
     await this.submissionUploadReviewService.createDefaultReviewsForUpload(

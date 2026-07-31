@@ -15,6 +15,7 @@ import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ICreateSubmission, ISubmissionModel } from '../../repositories/submission-repository';
 import { SubmissionService } from '../submission-service';
+import { SubmissionTeamService } from '../submission-team-service';
 import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
@@ -42,11 +43,14 @@ describe('UploadIngestionService', () => {
 
   const mockBlueprintId = 7;
 
+  let grantSubmissionAccessStub: sinon.SinonStub;
+
   beforeEach(() => {
     mockConnection = getMockDBConnection({ systemUserId: () => 1 });
     service = new UploadIngestionService(mockConnection);
     sinon.stub(SubmissionUploadReviewService.prototype, 'createDefaultReviewsForUpload').resolves([]);
     sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForUpload').resolves(mockBlueprintId);
+    grantSubmissionAccessStub = sinon.stub(SubmissionTeamService.prototype, 'grantSubmissionAccessToUser').resolves();
   });
 
   afterEach(() => {
@@ -97,8 +101,10 @@ describe('UploadIngestionService', () => {
 
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
 
-      const result = await service.startArchiveUpload(mockBytes, mockSubmission);
+      const result = await service.startArchiveUpload(mockBytes, mockSubmission, 1);
 
+      // Grants the submitting user access to the new submission via submission_team.
+      expect(grantSubmissionAccessStub).to.have.been.calledOnceWith(mockSubmissionId, 1);
       expect(createTicketStub).to.have.been.calledWith(
         sinon.match({
           subject: 'New Submission',
@@ -133,7 +139,7 @@ describe('UploadIngestionService', () => {
         .rejects(new Error('Database error: submission insert failed'));
 
       try {
-        await service.startArchiveUpload(5_000_000, mockSubmission);
+        await service.startArchiveUpload(5_000_000, mockSubmission, 1);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.include('submission insert failed');
@@ -148,7 +154,7 @@ describe('UploadIngestionService', () => {
       sinon.stub(UploadService.prototype, 'insertUpload').rejects(new Error('Database error: upload insert failed'));
 
       try {
-        await service.startArchiveUpload(5_000_000, mockSubmission);
+        await service.startArchiveUpload(5_000_000, mockSubmission, 1);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.include('upload insert failed');
@@ -177,7 +183,7 @@ describe('UploadIngestionService', () => {
         .rejects(new Error('Database error: artifact insert failed'));
 
       try {
-        await service.startArchiveUpload(5_000_000, mockSubmission);
+        await service.startArchiveUpload(5_000_000, mockSubmission, 1);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.include('artifact insert failed');
@@ -210,7 +216,7 @@ describe('UploadIngestionService', () => {
         .rejects(new Error('S3 error: failed to generate presigned URLs'));
 
       try {
-        await service.startArchiveUpload(5_000_000, mockSubmission);
+        await service.startArchiveUpload(5_000_000, mockSubmission, 1);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.include('presigned URLs');
@@ -260,8 +266,18 @@ describe('UploadIngestionService', () => {
       });
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
 
-      const result = await service.startArchiveUploadForExistingSubmissionByUuid(mockBytes, submissionUuid);
+      // The appending user (resolved from the token) differs from the original submission owner.
+      const appendingSystemUserId = 42;
 
+      const result = await service.startArchiveUploadForExistingSubmissionByUuid(
+        mockBytes,
+        submissionUuid,
+        appendingSystemUserId
+      );
+
+      // Grant goes to the appending user, not the original owner.
+      expect(grantSubmissionAccessStub).to.have.been.calledOnceWith(existingSubmissionId, appendingSystemUserId);
+      // Ticket team still uses the original owner (unchanged behavior).
       expect(createTicketStub).to.have.been.calledWith(
         sinon.match({
           subject: 'New Submission',

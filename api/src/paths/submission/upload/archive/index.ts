@@ -10,6 +10,7 @@ import {
 import { ICreateSubmission } from '../../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
+import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/upload/archive');
@@ -60,14 +61,30 @@ export function startUpload(): RequestHandler {
     try {
       await connection.open();
 
-      const system_user_id = req.system_user!.system_user_id;
+      // The request is authenticated as the submitting service client (Contributor). The human
+      // submitter on whose behalf the submission is created is supplied in the request body.
+      // Resolve them, creating or reactivating their system_user record as needed; any failure
+      // throws and rolls back the transaction so no records are created.
+      const { guid, identifier, identitySource } = req.body.submitter;
+
+      const userService = new UserService(connection);
+      const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
+
+      const system_user_id = submitter.system_user_id;
       const contributorId = req.contributor_id!;
 
-      const { bytes, blueprint_id, ...rest } = req.body;
-      const submission = { ...rest, uuid: v4(), system_user_id, contributor_id: contributorId } as ICreateSubmission;
+      const { bytes, blueprint_id, name, description, comment } = req.body;
+      const submission: ICreateSubmission = {
+        uuid: v4(),
+        system_user_id,
+        contributor_id: contributorId,
+        name,
+        description,
+        comment
+      };
       const uploadIngestionService = new UploadIngestionService(connection);
 
-      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, blueprint_id);
+      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, system_user_id, blueprint_id);
 
       await connection.commit();
 
