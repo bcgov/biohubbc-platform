@@ -61,16 +61,23 @@ export function startUpload(): RequestHandler {
     try {
       await connection.open();
 
-      // The request is authenticated as the submitting service client (Contributor). The human
-      // submitter on whose behalf the submission is created is supplied in the request body.
-      // Resolve them, creating or reactivating their system_user record as needed; any failure
-      // throws and rolls back the transaction so no records are created.
-      const { guid, identifier, identitySource } = req.body.submitter;
-
+      // The authenticated user always owns the submission and belongs to both teams. Resolve every
+      // additional submitter and add all of them to both teams as well.
+      const submitterSystemUserIds: number[] = [];
       const userService = new UserService(connection);
-      const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
+      const resolvedSubmitterGuids = new Set<string>();
+      for (const { guid, identifier, identitySource } of req.body.submitters ?? []) {
+        const normalizedGuid = guid.toLowerCase();
+        if (resolvedSubmitterGuids.has(normalizedGuid)) {
+          continue;
+        }
+        resolvedSubmitterGuids.add(normalizedGuid);
 
-      const system_user_id = submitter.system_user_id;
+        const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
+        submitterSystemUserIds.push(submitter.system_user_id);
+      }
+
+      const system_user_id = connection.systemUserId();
       const contributorId = req.contributor_id!;
 
       const { bytes, blueprint_id, name, description, comment } = req.body;
@@ -84,7 +91,12 @@ export function startUpload(): RequestHandler {
       };
       const uploadIngestionService = new UploadIngestionService(connection);
 
-      const result = await uploadIngestionService.startArchiveUpload(bytes, submission, system_user_id, blueprint_id);
+      const result = await uploadIngestionService.startArchiveUpload(
+        bytes,
+        submission,
+        submitterSystemUserIds,
+        blueprint_id
+      );
 
       await connection.commit();
 

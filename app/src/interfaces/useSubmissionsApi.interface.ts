@@ -30,6 +30,24 @@ export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
   regions: string[];
 };
 
+export type SubmissionSummary = Pick<
+  SubmissionRecord,
+  | 'submission_id'
+  | 'uuid'
+  | 'publish_timestamp'
+  | 'submitted_timestamp'
+  | 'contributor_id'
+  | 'name'
+  | 'description'
+  | 'comment'
+  | 'create_user'
+  | 'update_user'
+> & {
+  system_user_id: number;
+  security: SECURITY_APPLIED_STATUS;
+  regions: string[];
+};
+
 export type SubmissionRecordPublishedForPublic = Omit<SubmissionRecord, 'comment'> & {
   security: SECURITY_APPLIED_STATUS;
   root_feature_type_id: number;
@@ -98,7 +116,7 @@ export interface ISubmissionFeatureForReviewResponse {
 }
 
 export interface IGetSubmissionsForUserResponse {
-  submissions: SubmissionRecordWithSecurityAndRootFeature[];
+  submissions: SubmissionSummary[];
   pagination: ApiPaginationResponseParams;
 }
 
@@ -120,7 +138,8 @@ export interface PresignedUrl {
   partSizeBytes: number;
 }
 export interface PresignedUploadUrlResponse {
-  submissionId: number;
+  submissionUuid: string;
+  submissionUploadId: string;
   uploadId: string;
   s3UploadId: string;
   uploadArchiveId: string;

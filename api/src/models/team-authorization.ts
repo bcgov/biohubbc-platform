@@ -13,3 +13,17 @@ export const TicketRecord = z.object({
 });
 
 export type TicketRecord = z.infer<typeof TicketRecord>;
+
+export const SubmissionUploadRecord = z.object({
+  submission_upload_id: z.string().uuid(),
+  record_end_date: z.string().nullable()
+});
+
+export type SubmissionUploadRecord = z.infer<typeof SubmissionUploadRecord>;
+
+export const SubmissionRecord = z.object({
+  submission_id: z.number(),
+  record_end_date: z.string().nullable()
+});
+
+export type SubmissionRecord = z.infer<typeof SubmissionRecord>;

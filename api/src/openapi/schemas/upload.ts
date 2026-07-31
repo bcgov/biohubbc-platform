@@ -2,9 +2,9 @@ import { OpenAPIV3 } from 'openapi-types';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 
 /**
- * Identity of the human user on whose behalf a service client (e.g. SIMS) is creating a submission
- * upload. BioHub resolves this user (creating or reactivating their `system_user` record as needed)
- * and grants them access to the submission via `submission_team`.
+ * Optional identity claims for a person on whose behalf an upload is initiated. The authenticated
+ * user is always added to the submission and upload teams. When these claims are supplied, BioHub
+ * also finds or creates those people and adds them to both teams.
  */
 export const SubmitterSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -13,10 +13,12 @@ export const SubmitterSchema: OpenAPIV3.SchemaObject = {
   properties: {
     guid: {
       type: 'string',
+      minLength: 1,
       description: "The submitting user's identity provider GUID."
     },
     identifier: {
       type: 'string',
+      minLength: 1,
       description: "The submitting user's username (e.g. IDIR or BCeID username)."
     },
     identitySource: {
@@ -30,7 +32,7 @@ export const SubmitterSchema: OpenAPIV3.SchemaObject = {
 export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['bytes', 'name', 'description', 'comment', 'submitter'],
+  required: ['bytes', 'name', 'description', 'comment'],
   properties: {
     bytes: {
       type: 'integer',
@@ -50,7 +52,12 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'Comments for system administrators about the submission'
     },
-    submitter: SubmitterSchema,
+    submitters: {
+      type: 'array',
+      description: 'Optional people to add to the submission and upload teams.',
+      maxItems: 100,
+      items: SubmitterSchema
+    },
     blueprint_id: {
       type: 'integer',
       description:
@@ -63,7 +70,7 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'submissionId',
+    'submissionUuid',
     'submissionUploadId',
     'uploadId',
     's3UploadId',
@@ -73,7 +80,7 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
     'presignedUrls'
   ],
   properties: {
-    submissionId: {
+    submissionUuid: {
       type: 'string',
       format: 'uuid',
       description: 'UUID of the submission (globally unique identifier).'
@@ -133,12 +140,12 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Request body for creating a submission upload (POST /submission/:submissionId/upload)
+ * Request body for creating a submission upload (POST /submission/:submissionUuid/upload)
  */
 export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['bytes', 'submitter'],
+  required: ['bytes'],
   properties: {
     bytes: {
       type: 'integer',
@@ -158,7 +165,12 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'Comments for system administrators about the submission.'
     },
-    submitter: SubmitterSchema,
+    submitters: {
+      type: 'array',
+      description: 'Optional people to add to the submission and upload teams.',
+      maxItems: 100,
+      items: SubmitterSchema
+    },
     blueprint_id: {
       type: 'integer',
       description:
@@ -193,12 +205,12 @@ export const SubmissionUploadReviewStatusResponseSchema: OpenAPIV3.SchemaObject 
 };
 
 /**
- * Response for GET /submission/{submissionId}/history (publish history from submission_upload_status).
+ * Response for GET /submission/{submissionUuid}/history (publish history from submission_upload_status).
  */
 export const SubmissionUploadStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['submissionUploadId', 'status'],
+  required: ['submissionUploadId', 'status', 'createDate'],
   properties: {
     submissionUploadId: {
       type: 'string',

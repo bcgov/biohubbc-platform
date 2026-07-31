@@ -74,28 +74,6 @@ describe('TeamRepository', () => {
     });
   });
 
-  describe('findTeamByName', () => {
-    it('returns a team when one matches the name', async () => {
-      const mockRows = [{ team_id: '1', name: 'Submission Owner 7', description: null, member_count: 1 }];
-      const mockResponse = { rowCount: 1, rows: mockRows } as unknown as Promise<QueryResult<any>>;
-
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
-      const repository = new TeamRepository(mockConnection);
-
-      const result = await repository.findTeamByName('Submission Owner 7');
-      expect(result).to.eql(mockRows[0]);
-    });
-
-    it('returns null when no team matches the name', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
-      const repository = new TeamRepository(mockConnection);
-
-      const result = await repository.findTeamByName('Submission Owner 7');
-      expect(result).to.be.null;
-    });
-  });
-
   describe('getTeams', () => {
     it('returns all teams with member_count', async () => {
       const mockRows = [
