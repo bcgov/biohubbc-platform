@@ -1,11 +1,11 @@
 import CircularProgress from '@mui/material/CircularProgress';
 import { ThemeProvider } from '@mui/material/styles';
-import { AppRouter } from 'router/AppRouter';
 import { AuthStateContext, AuthStateContextProvider } from 'contexts/authStateContext';
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
 import { BrowserRouter } from 'react-router-dom';
+import { AppRouter } from 'router/AppRouter';
 import appTheme from 'themes/appTheme';
 import { buildUrl, getPostLoginReturnTo, stripOidcParams } from 'utils/Utils';
 
@@ -26,7 +26,7 @@ const App = () => {
             const authConfig: AuthProviderProps = {
               authority: `${config.KEYCLOAK_CONFIG.authority}/realms/${config.KEYCLOAK_CONFIG.realm}/`,
               client_id: config.KEYCLOAK_CONFIG.clientId,
-              resource: config.KEYCLOAK_CONFIG.clientId,
+              //resource: config.KEYCLOAK_CONFIG.clientId,
               // Default sign in redirect
               redirect_uri: buildUrl(window.location.origin),
               // Default sign out redirect
