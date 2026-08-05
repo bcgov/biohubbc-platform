@@ -2,8 +2,9 @@ import { MaterializedViewColumn } from '../types';
 
 export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'Feature_ID', expression: 'sf.submission_feature_id' },
-  { alias: 'common_name', expression: 't.common_name' },
+  { alias: 'taxon_id', expression: 'ra.taxon_id::int' },
   { alias: 'scientific_name', expression: 't.itis_scientific_name' },
+  { alias: 'common_name', expression: 't.common_name' },
   { alias: 'animal_id', expression: 'd.animal_id' },
   { alias: 'sex', expression: 'ra.sex' },
   { alias: 'eco_unit', expression: 'reu.ecological_unit' },
@@ -30,10 +31,23 @@ export const TELEMETRY_COLUMNS: MaterializedViewColumn[] = [
 
 export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'Feature_ID', expression: 'sf.submission_feature_id' },
+  { alias: 'taxon_id', expression: "(sf.data#>>'{properties,taxon_id}')::int" },
+  { alias: 'scientific_name', expression: 't.itis_scientific_name' },
+  { alias: 'common_name', expression: 't.common_name' },
+  { alias: 'sign', expression: "(sf.data#>>'{properties,sign}')::text" },
   {
     alias: 'group_id',
     expression:
       "CASE WHEN NULLIF(sf.data#>>'{properties,observation_id}', '') IS NULL THEN NULL ELSE sub.contributor_client_id || '::' || (sf.data#>>'{properties,observation_id}') END"
+  },
+  { alias: 'sex', expression: "COALESCE(ccc_sex.label, (sf.data#>>'{properties,sex}')::text)" },
+  {
+    alias: 'life_stage',
+    expression: "COALESCE(ccc_life_stage.label, (sf.data#>>'{properties,life_stage}')::text)"
+  },
+  {
+    alias: 'count',
+    expression: "COALESCE((sf.data#>>'{properties,subcount_count}')::int, (sf.data#>>'{properties,count}')::int)"
   },
   {
     alias: 'date',
@@ -52,21 +66,8 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   },
   { alias: 'Latitude', expression: 'public.ST_Y(ol.location_point)' },
   { alias: 'Longitude', expression: 'public.ST_X(ol.location_point)' },
-  { alias: 'sign', expression: "(sf.data#>>'{properties,sign}')::text" },
-  {
-    alias: 'count',
-    expression: "COALESCE((sf.data#>>'{properties,subcount_count}')::int, (sf.data#>>'{properties,count}')::int)"
-  },
-  { alias: 'taxon_id', expression: "(sf.data#>>'{properties,taxon_id}')::int" },
-  { alias: 'scientific_name', expression: 't.itis_scientific_name' },
-  { alias: 'common_name', expression: 't.common_name' },
   { alias: 'submission_id', expression: 'sub.submission_id' },
   { alias: 'submission_name', expression: 'sub.submission_name' },
-  { alias: 'sex', expression: "COALESCE(ccc_sex.label, (sf.data#>>'{properties,sex}')::text)" },
-  {
-    alias: 'life_stage',
-    expression: "COALESCE(ccc_life_stage.label, (sf.data#>>'{properties,life_stage}')::text)"
-  },
   {
     alias: 'SECURED',
     expression:
