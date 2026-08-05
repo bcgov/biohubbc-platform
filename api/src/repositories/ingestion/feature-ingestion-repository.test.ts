@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { isSubmissionFeatureActive } from '../sql-fragments';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
 
 chai.use(sinonChai);
@@ -58,11 +59,10 @@ describe('FeatureIngestionRepository', () => {
     });
   });
 
-  describe('insertSubmissionFeatureRecordsByTypeId', () => {
-    it('should build SQL with direct feature_type_id insert, bigint data_byte_size cast, and content_hash column', async () => {
+  describe('insertSubmissionUploadFeatures', () => {
+    it('inserts raw features into durable staging with reconciliation identity fields', async () => {
       const records = [
         {
-          submissionId: 1,
           submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
           sourceId: 'feature-1',
           featureTypeId: 77,
@@ -74,21 +74,25 @@ describe('FeatureIngestionRepository', () => {
             parent: null
           },
           dataByteSize: 123,
-          contentHash: 'a'.repeat(64)
+          contentHash: 'a'.repeat(64),
+          universalId: 'universal-feature-1'
         }
       ];
 
       const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
         expect(sqlStatement.text).to.include('::integer[]');
         expect(sqlStatement.text).to.include('::bigint[]');
+        expect(sqlStatement.text).to.include('INSERT INTO submission_upload_feature');
+        expect(sqlStatement.text).to.not.include('submission_id');
         expect(sqlStatement.text).to.include('content_hash');
+        expect(sqlStatement.text).to.include('universal_id');
         expect(sqlStatement.text).to.not.include('INNER JOIN feature_type');
         return Promise.resolve({ rowCount: 1, rows: [], command: '', oid: 0, fields: [] });
       });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      await ingestionRepository.insertSubmissionFeatureRecordsByTypeId(records);
+      await ingestionRepository.insertSubmissionUploadFeatures(records);
 
       expect(sqlStub).to.have.been.calledOnce;
     });
@@ -110,27 +114,49 @@ describe('FeatureIngestionRepository', () => {
       expect(sqlText).to.include('SET parent_submission_feature_id');
       expect(sqlText).to.include('parent.submission_id =');
       expect(sqlText).to.include("parent.source_id = child.data->>'parent'");
-      expect(sqlText).to.include('parent.record_effective_date IS NOT NULL');
-      expect(sqlText).to.include('parent.submission_upload_id = child.submission_upload_id');
+      expect(sqlText).to.include(isSubmissionFeatureActive('parent'));
+      expect(sqlText).to.include(isSubmissionFeatureActive('child'));
+      expect(sqlText).to.include('FROM submission_upload_feature staged');
+      expect(sqlText).to.include('staged.submission_feature_id = child.submission_feature_id');
+      expect(sqlText).to.not.include('child.submission_upload_id');
       expect(sqlText).to.include('LIMIT 1');
     });
   });
 
-  describe('deleteSubmissionFeaturesBySubmissionUploadId', () => {
-    it('should scope WHERE by submission_upload_id and pending effective rows', async () => {
+  describe('deleteSubmissionUploadFeaturesForSubmissionUploadId', () => {
+    it('deletes only raw staging rows scoped to the submission upload', async () => {
       const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('DELETE FROM submission_upload_feature');
         expect(sqlStatement.text).to.include('submission_upload_id');
-        expect(sqlStatement.text).to.include('record_effective_date IS NULL');
-        expect(sqlStatement.text).to.include('record_end_date IS NULL');
         return Promise.resolve({ rowCount: 2, rows: [], command: '', oid: 0, fields: [] });
       });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      await ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await ingestionRepository.deleteSubmissionUploadFeaturesForSubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
 
       expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('hasSubmissionFeaturesForSubmissionUploadId', () => {
+    it('checks whether retained upload features are referenced by any produced submission features', async () => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('SELECT EXISTS');
+        expect(sqlStatement.text).to.include('JOIN submission_upload_feature staged');
+        expect(sqlStatement.text).to.include('feature.submission_upload_feature_id');
+        expect(sqlStatement.text).to.not.include('feature.record_end_date');
+        return Promise.resolve({ rowCount: 1, rows: [{ exists: true }], command: '', oid: 0, fields: [] });
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
+
+      expect(
+        await ingestionRepository.hasSubmissionFeaturesForSubmissionUploadId('550e8400-e29b-41d4-a716-446655440000')
+      ).to.equal(true);
     });
   });
 });

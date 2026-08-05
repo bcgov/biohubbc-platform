@@ -3,9 +3,14 @@ import { RECONCILE_START_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
+import { publishPromoteSubmissionFeaturesJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/reconcile-submission-features-job');
+
+export const reconcileSubmissionFeaturesJobDependencies = {
+  publishPromoteSubmissionFeaturesJob
+};
 
 export interface IReconcileSubmissionFeaturesJobData {
   submissionUploadId: string;
@@ -38,6 +43,9 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
       }
 
       await uploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
+      await reconcileSubmissionFeaturesJobDependencies.publishPromoteSubmissionFeaturesJob(connection, {
+        submissionUploadId
+      });
     });
   }
 };

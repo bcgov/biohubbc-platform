@@ -71,11 +71,8 @@ export const submissionUploadSecurityJobHandler: PgBoss.WorkHandler<ISubmissionU
           return;
         }
 
-        await new SubmissionUploadSecurityService(conn).screenSubmissionUpload(
-          submissionUploadId,
-          submissionId,
-          job.id
-        );
+        const submissionUploadSecurityService = new SubmissionUploadSecurityService(conn);
+        await submissionUploadSecurityService.screenSubmissionUpload(submissionUploadId, submissionId, job.id);
       });
 
       defaultLog.info({
@@ -119,7 +116,8 @@ export const submissionUploadSecurityFailedHandler: PgBoss.WorkHandler<ISubmissi
     const jobOutput = (job as PgBoss.JobWithMetadata<ISubmissionUploadSecurityJobData>).output;
 
     await withConnection(async (connection) => {
-      await new SubmissionUploadSecurityService(connection).recordScreeningFailure(submissionUploadId, job.id);
+      const submissionUploadSecurityService = new SubmissionUploadSecurityService(connection);
+      await submissionUploadSecurityService.recordScreeningFailure(submissionUploadId, job.id);
     });
 
     defaultLog.warn({

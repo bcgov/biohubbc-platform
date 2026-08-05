@@ -8,6 +8,7 @@ export const SubmissionUploadFeature = z.object({
   submission_upload_feature_id: z.string().uuid(),
   submission_upload_id: z.string().uuid(),
   source_id: z.string().nullable(),
+  submission_feature_id: z.number().nullable(),
   feature_type_id: z.number(),
   data: z.record(z.unknown()),
   data_byte_size: z.coerce.number(),
@@ -39,6 +40,7 @@ export type CreateSubmissionUploadFeature = z.infer<typeof CreateSubmissionUploa
  */
 export const UpdateSubmissionUploadFeature = SubmissionUploadFeature.pick({
   reconciliation: true,
+  submission_feature_id: true,
   metadata: true
 }).partial();
 
@@ -47,11 +49,10 @@ export type UpdateSubmissionUploadFeature = z.infer<typeof UpdateSubmissionUploa
 /**
  * Whether a prepared upload no longer matches the active feature projection.
  *
- * Reconciliation records `unchanged` relative to a point-in-time baseline. The
- * result becomes stale when, before activation, another upload removes that
- * baseline feature or publishes different content for the same reconciliation
- * key `(submission_id, feature_type_id, source_id)`. In either case the prepared
- * upload can no longer safely rely on its earlier `unchanged` classification.
+ * Reconciliation records `unchanged` against a point-in-time target feature. The
+ * result becomes stale when, before activation, that exact target is removed or
+ * replaced. In either case the prepared upload can no longer safely rely on its
+ * earlier `unchanged` classification.
  */
 export const SubmissionUploadFeaturesStaleResult = z.object({
   /** True when at least one `unchanged` row has no active feature with the same content hash. */

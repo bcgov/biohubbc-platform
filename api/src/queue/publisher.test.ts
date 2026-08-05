@@ -523,7 +523,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const data = { submissionId: 777, submissionUploadId: 'sub-upload-uuid-idx-1' };
+      const data = { submissionUploadId: 'sub-upload-uuid-idx-1' };
       const result = await publishIndexSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -544,7 +544,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
@@ -564,7 +563,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
@@ -582,7 +580,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 456,
         submissionUploadId: 'sub-upload-uuid-idx-2'
       });
 
@@ -599,7 +596,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-idx-1'
       });
 
@@ -615,7 +611,6 @@ describe('publisher', () => {
 
       try {
         await publishIndexSubmissionFeaturesJob(mockConnection, {
-          submissionId: 777,
           submissionUploadId: 'sub-upload-uuid-idx-1'
         });
         expect.fail('expected publisher to throw');
@@ -1005,7 +1000,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const data = { submissionId: 777, submissionUploadId: 'sub-upload-uuid-closure-1' };
+      const data = { submissionUploadId: 'sub-upload-uuid-closure-1' };
       await publishComputeSubmissionFeatureClosureJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -1043,7 +1038,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishComputeSubmissionFeatureClosureJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
 
@@ -1064,7 +1058,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       await publishComputeSubmissionFeatureClosureJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
 
@@ -1085,7 +1078,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishComputeSubmissionFeatureClosureJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
 
@@ -1102,7 +1094,6 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
       const result = await publishComputeSubmissionFeatureClosureJob(mockConnection, {
-        submissionId: 777,
         submissionUploadId: 'sub-upload-uuid-closure-1'
       });
 
@@ -1118,7 +1109,6 @@ describe('publisher', () => {
 
       try {
         await publishComputeSubmissionFeatureClosureJob(mockConnection, {
-          submissionId: 777,
           submissionUploadId: 'sub-upload-uuid-closure-1'
         });
         expect.fail('expected publisher to throw');

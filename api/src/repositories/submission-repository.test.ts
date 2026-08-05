@@ -7,6 +7,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 import {
   ISourceTransformModel,
@@ -1371,7 +1372,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should delete relationship rows for features belonging to submission upload', async () => {
+    it('should delete relationship rows for the upload staged feature scope', async () => {
       const mockQueryResponse: QueryResult<never> = {
         rowCount: 5,
         rows: [],
@@ -1392,7 +1393,9 @@ describe('SubmissionRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
       const calledSql = sqlStub.args[0][0];
       expect(calledSql.text).to.include('submission_feature_feature');
-      expect(calledSql.text).to.include('submission_upload_id');
+      expect(calledSql.text).to.include('FROM submission_upload_feature staged');
+      expect(calledSql.text).to.include('staged.submission_feature_id');
+      expect(calledSql.text).to.include(isSubmissionFeatureActive('feature'));
     });
   });
 

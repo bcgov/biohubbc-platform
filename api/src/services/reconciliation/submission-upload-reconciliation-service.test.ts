@@ -63,16 +63,14 @@ describe('SubmissionUploadReconciliationService', () => {
     sinon
       .stub(SubmissionUploadFeatureRepository.prototype, 'updateSubmissionUploadFeaturesWithReconciliation')
       .resolves({ reconciliation: { new: 2, unchanged: 3, superseded: 1, conflict: 0 } });
-    sinon
-      .stub(SubmissionFeatureErrorRepository.prototype, 'deleteSubmissionFeatureErrorsForSubmissionUploadId')
-      .resolves();
-    sinon
+    const insertErrors = sinon
       .stub(SubmissionFeatureErrorRepository.prototype, 'insertSubmissionFeatureErrorForSubmissionUploadId')
       .resolves();
 
     const result = await service.reconcileSubmissionUploadFeatures(UPLOAD_ID);
 
     expect(result).to.eql({ new: 2, unchanged: 3, superseded: 1, conflict: 0 });
+    expect(insertErrors).to.have.been.calledOnceWith(UPLOAD_ID);
   });
 
   it('promotes only conflict-free reconciliations', async () => {
@@ -83,12 +81,19 @@ describe('SubmissionUploadReconciliationService', () => {
     const promote = sinon
       .stub(SubmissionFeatureRepository.prototype, 'insertPendingSubmissionFeaturesForSubmissionUploadId')
       .resolves({ count: 2 });
+    const link = sinon
+      .stub(
+        SubmissionUploadFeatureRepository.prototype,
+        'updateSubmissionFeatureIdsForPromotedFeaturesBySubmissionUploadId'
+      )
+      .resolves();
     sinon
       .stub(SubmissionFeatureRepository.prototype, 'getPendingSubmissionFeatureCountForSubmissionUploadId')
       .resolves({ count: 2 });
 
     expect(await service.promoteSubmissionUploadFeatures(UPLOAD_ID)).to.equal(2);
     expect(promote).to.have.been.calledOnceWith(UPLOAD_ID);
+    expect(link).to.have.been.calledOnceWith(UPLOAD_ID);
   });
 
   it('rejects promotion when reconciliation contains a conflict', async () => {

@@ -290,6 +290,7 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
     });
 
     it('configures dead letter queue + policy:short for process-download-version-export', async () => {

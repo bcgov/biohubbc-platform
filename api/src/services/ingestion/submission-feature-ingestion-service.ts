@@ -62,13 +62,13 @@ export class SubmissionFeatureIngestionService extends DBService {
       }
 
       return {
-        submissionId,
         submissionUploadId,
         sourceId: feature.id,
         featureTypeId,
         data: feature,
         dataByteSize: Buffer.byteLength(JSON.stringify(feature)),
-        contentHash: computeSubmissionFeatureContentHash(feature)
+        contentHash: computeSubmissionFeatureContentHash(feature),
+        universalId: feature.universal_id
       };
     });
 
@@ -86,7 +86,7 @@ export class SubmissionFeatureIngestionService extends DBService {
       return;
     }
 
-    const insertedCount = await this.ingestionRepository.insertSubmissionFeatureRecordsByTypeId(records);
+    const insertedCount = await this.ingestionRepository.insertSubmissionUploadFeatures(records);
     const expectedCount = records.length;
 
     if (insertedCount < expectedCount) {
@@ -118,13 +118,24 @@ export class SubmissionFeatureIngestionService extends DBService {
   }
 
   /**
-   * Soft-delete features for one upload attempt.
+   * Delete raw upload features before rebuilding an upload's retained feature set.
    *
    * @param {string} submissionUploadId
    * @returns {Promise<void>}
    * @memberof SubmissionFeatureIngestionService
    */
-  async deleteFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    await this.ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
+  async deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.ingestionRepository.deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Return whether retained upload features have already produced submission_feature rows.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<boolean>}
+   * @memberof SubmissionFeatureIngestionService
+   */
+  async hasSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<boolean> {
+    return this.ingestionRepository.hasSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
   }
 }

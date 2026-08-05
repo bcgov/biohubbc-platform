@@ -316,7 +316,7 @@ export class SubmissionUploadService extends DBService {
 
   /**
    * Transition to indexing when the indexing stage starts.
-   * - ingested -> indexing
+   * - promoted -> indexing
    * - indexing -> indexing (no-op)
    * - all other statuses -> conflict
    *
@@ -330,7 +330,7 @@ export class SubmissionUploadService extends DBService {
       return;
     }
 
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['ingested']);
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['promoted']);
     await this.updateSubmissionUpload(submissionUploadId, { status: 'indexing' });
   }
 
@@ -475,7 +475,6 @@ export class SubmissionUploadService extends DBService {
     await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(
       this.connection,
       {
-        submissionId: upload.submission_id,
         submissionUploadId: upload.submission_upload_id
       },
       { singletonKey: `closure-recompute-${upload.submission_upload_id}-${closureRevision}` }

@@ -9,6 +9,7 @@ import { SubmissionUploadService } from '../../services/upload/submission-upload
 import {
   IReconcileSubmissionFeaturesJobData,
   reconcileSubmissionFeaturesFailedHandler,
+  reconcileSubmissionFeaturesJobDependencies,
   reconcileSubmissionFeaturesJobHandler
 } from './reconcile-submission-features-job';
 
@@ -53,6 +54,10 @@ describe('reconcile-submission-features-job', () => {
     sinon
       .stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionUploadFeatures')
       .resolves({ new: 1, unchanged: 2, superseded: 3, conflict: 0 });
+    const publish = sinon
+      .stub(reconcileSubmissionFeaturesJobDependencies, 'publishPromoteSubmissionFeaturesJob')
+      .resolves({ status: 'published', jobId: 'promote-1' });
+
     await reconcileSubmissionFeaturesJobHandler([createJob()]);
 
     expect(SubmissionUploadService.prototype.transitionSubmissionUploadToReconciling).to.have.been.calledOnceWith(
@@ -61,6 +66,8 @@ describe('reconcile-submission-features-job', () => {
     expect(SubmissionUploadService.prototype.transitionSubmissionUploadToReconciled).to.have.been.calledOnceWith(
       'upload-1'
     );
+    expect(publish).to.have.been.calledOnce;
+    expect(publish.firstCall.args[1]).to.eql(JOB_DATA);
   });
 
   it('marks a conflicted reconciliation invalid', async () => {
@@ -69,12 +76,15 @@ describe('reconcile-submission-features-job', () => {
     sinon
       .stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionUploadFeatures')
       .resolves({ new: 1, unchanged: 0, superseded: 0, conflict: 1 });
+    const publish = sinon.stub(reconcileSubmissionFeaturesJobDependencies, 'publishPromoteSubmissionFeaturesJob');
+
     await reconcileSubmissionFeaturesJobHandler([createJob()]);
 
     expect(SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid).to.have.been.calledOnceWith(
       'upload-1'
     );
     expect(SubmissionUploadService.prototype.transitionSubmissionUploadToReconciled).not.to.have.been.called;
+    expect(publish).not.to.have.been.called;
   });
 
   it('skips uploads outside the reconciliation start states', async () => {
@@ -85,6 +95,25 @@ describe('reconcile-submission-features-job', () => {
     await reconcileSubmissionFeaturesJobHandler([createJob()]);
 
     expect(reconcile).not.to.have.been.called;
+  });
+
+  it('rolls back and retries when promotion enqueue fails', async () => {
+    const connection = stubConnection();
+    stubUpload();
+    sinon
+      .stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionUploadFeatures')
+      .resolves({ new: 1, unchanged: 0, superseded: 0, conflict: 0 });
+    sinon
+      .stub(reconcileSubmissionFeaturesJobDependencies, 'publishPromoteSubmissionFeaturesJob')
+      .rejects(new Error('queue unavailable'));
+
+    try {
+      await reconcileSubmissionFeaturesJobHandler([createJob()]);
+      expect.fail('Expected enqueue failure');
+    } catch (error) {
+      expect((error as Error).message).to.equal('queue unavailable');
+    }
+    expect(connection.rollback).to.have.been.calledOnce;
   });
 
   it('marks exhausted reconciliation work failed from resumable states', async () => {

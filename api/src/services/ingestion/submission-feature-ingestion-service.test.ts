@@ -14,9 +14,7 @@ describe('SubmissionFeatureIngestionService', () => {
   describe('ingestFeatureBatch', () => {
     it('persists shallow-validated feature rows with raw payload and byte size', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
-        .resolves(2);
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionUploadFeatures').resolves(2);
       const knownFeatureTypeMap = new Map<string, number>([
         ['survey', 1],
         ['sample_site', 2]
@@ -28,7 +26,8 @@ describe('SubmissionFeatureIngestionService', () => {
           type: 'survey',
           properties: { name: 'Test Survey' },
           content: ['feature-2'],
-          parent: null
+          parent: null,
+          universal_id: 'external-survey-1'
         },
         {
           id: 'feature-2',
@@ -43,28 +42,29 @@ describe('SubmissionFeatureIngestionService', () => {
 
       expect(insertStub.calledOnce).to.be.true;
       const insertedRows = insertStub.firstCall.args[0] as Array<{
-        submissionId: number;
         submissionUploadId: string;
         sourceId: string;
         featureTypeId: number;
         data: IFlattenedBlock;
         dataByteSize: number;
         contentHash: string;
+        universalId?: string;
       }>;
       expect(insertedRows).to.have.length(2);
 
       expect(insertedRows[0]).to.include({
-        submissionId: 42,
         submissionUploadId: 'submission-upload-1',
         sourceId: 'feature-1',
-        featureTypeId: 1
+        featureTypeId: 1,
+        universalId: 'external-survey-1'
       });
       expect(insertedRows[0].data).to.deep.equal({
         id: 'feature-1',
         type: 'survey',
         properties: { name: 'Test Survey' },
         content: ['feature-2'],
-        parent: null
+        parent: null,
+        universal_id: 'external-survey-1'
       });
       expect(insertedRows[0].dataByteSize).to.be.a('number').and.greaterThan(0);
       expect(insertedRows[0].contentHash).to.match(/^[0-9a-f]{64}$/);
@@ -74,9 +74,7 @@ describe('SubmissionFeatureIngestionService', () => {
 
     it('returns early when batch is empty', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
-        .resolves(0);
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionUploadFeatures').resolves(0);
 
       await service.ingestFeatureBatch(42, 'submission-upload-1', [], new Map([['survey', 1]]));
 
@@ -85,9 +83,7 @@ describe('SubmissionFeatureIngestionService', () => {
 
     it('inserts a retired feature type using its original feature type id', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
-        .resolves(1);
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionUploadFeatures').resolves(1);
       const knownFeatureTypeMap = new Map<string, number>([
         ['dataset', 1],
         ['survey', 2]
@@ -104,7 +100,6 @@ describe('SubmissionFeatureIngestionService', () => {
 
       expect(insertStub.calledOnce).to.be.true;
       const insertedRows = insertStub.firstCall.args[0] as Array<{
-        submissionId: number;
         submissionUploadId: string;
         sourceId: string;
         featureTypeId: number;
@@ -112,7 +107,6 @@ describe('SubmissionFeatureIngestionService', () => {
       }>;
       expect(insertedRows).to.have.length(1);
       expect(insertedRows[0]).to.include({
-        submissionId: 42,
         submissionUploadId: 'submission-upload-1',
         sourceId: 'legacy-feature',
         featureTypeId: 1
@@ -122,9 +116,7 @@ describe('SubmissionFeatureIngestionService', () => {
 
     it('skips unknown feature types and only inserts known feature rows', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
-        .resolves(1);
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionUploadFeatures').resolves(1);
       const knownFeatureTypeMap = new Map<string, number>([['survey', 1]]);
 
       const features: IFlattenedBlock[] = [
@@ -152,16 +144,45 @@ describe('SubmissionFeatureIngestionService', () => {
       expect(insertedRows[0]).to.include({ sourceId: 'feature-1', featureTypeId: 1 });
     });
   });
-  describe('deleteFeaturesBySubmissionUploadId', () => {
-    it('soft-deletes features scoped to one submission upload attempt', async () => {
+  describe('deleteSubmissionUploadFeaturesForSubmissionUploadId', () => {
+    it('deletes raw staged features scoped to one submission upload attempt', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
       const deleteStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+        .stub(FeatureIngestionRepository.prototype, 'deleteSubmissionUploadFeaturesForSubmissionUploadId')
         .resolves();
 
-      await service.deleteFeaturesBySubmissionUploadId('submission-upload-1');
+      await service.deleteSubmissionUploadFeaturesForSubmissionUploadId('submission-upload-1');
 
       expect(deleteStub.calledOnceWithExactly('submission-upload-1')).to.be.true;
+    });
+  });
+
+  describe('hasSubmissionFeaturesForSubmissionUploadId', () => {
+    it('delegates promoted-feature detection to the ingestion repository', async () => {
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      const hasStub = sinon
+        .stub(FeatureIngestionRepository.prototype, 'hasSubmissionFeaturesForSubmissionUploadId')
+        .resolves(true);
+
+      expect(await service.hasSubmissionFeaturesForSubmissionUploadId('submission-upload-1')).to.equal(true);
+      expect(hasStub.calledOnceWithExactly('submission-upload-1')).to.be.true;
+    });
+  });
+
+  describe('getKnownFeatureTypeMap', () => {
+    it('maps active and retired feature type names to identifiers', async () => {
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      sinon.stub(FeatureIngestionRepository.prototype, 'getKnownFeatureTypeMap').resolves([
+        { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
+        { feature_type_id: 2, name: 'dataset', display_name: 'Dataset', description: null }
+      ]);
+
+      expect(await service.getKnownFeatureTypeMap()).to.eql(
+        new Map([
+          ['survey', 1],
+          ['dataset', 2]
+        ])
+      );
     });
   });
 });

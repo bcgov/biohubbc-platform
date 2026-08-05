@@ -185,10 +185,8 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(outcome).to.eql({ status: 'ok' });
 
     sinon.assert.callOrder(
-      deleteDerivedPropertiesStub,
-      deleteRelationshipsStub,
-      stageStub,
       deleteErrorsStub,
+      stageStub,
       requiredStub,
       primitiveStub,
       getUnresolvedTaxonStub,
@@ -201,6 +199,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       datetimeErrorsStub,
       spatialErrorsStub,
       errorCountStub,
+      deleteDerivedPropertiesStub,
       updateParentsStub,
       insertStringStub,
       insertTimestampStub,
@@ -208,6 +207,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       insertCodeStub,
       insertTaxonStub,
       insertArtifactStub,
+      deleteRelationshipsStub,
       insertReferencesStub,
       requestDefaultReviewsStub
     );
@@ -231,7 +231,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
       .resolves();
-    sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId').resolves();
+    const deleteRelationshipsStub = sinon
+      .stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId')
+      .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
       .resolves();
@@ -376,6 +378,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
 
     expect(insertStringStub.called).to.equal(false);
     expect(insertRelationshipsStub.called).to.equal(false);
+    expect(deleteRelationshipsStub.called).to.equal(false);
     expect(requestDefaultReviewsStub.called).to.equal(false);
     expect(outcome.status).to.equal('invalid');
     if (outcome.status === 'invalid') {
