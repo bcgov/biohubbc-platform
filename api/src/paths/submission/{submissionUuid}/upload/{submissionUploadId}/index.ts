@@ -2,19 +2,21 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { HTTP409 } from '../../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../../services/upload/submission-upload-review-status-service';
 import { SubmissionUploadService } from '../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/upload/{submissionUploadId}');
+const defaultLog = getLogger('paths/submission/{submissionUuid}/upload/{submissionUploadId}');
 
 export const DELETE: Operation = [
-  authorizeRequestHandler(() => ({
+  authorizeRequestHandler((req) => ({
     or: [
-      { discriminator: 'Contributor' },
+      {
+        discriminator: 'Team',
+        entity: 'submission_upload',
+        submissionUploadId: req.params.submissionUploadId
+      },
       { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
     ]
   })),
@@ -23,14 +25,14 @@ export const DELETE: Operation = [
 
 DELETE.apiDoc = {
   description:
-    'Soft-delete a submission upload. Only allowed when the upload has a status of "submitted" (unreviewed). Deletion is blocked if the upload has already been approved or denied.',
+    'Soft-delete a submission upload. The bearer token must identify a member of the upload team, or a system administrator. Deletion is only allowed when the upload has a status of "submitted" (unreviewed).',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission ID (UUID).',
+      description: 'Submission UUID.',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: {
         type: 'string',
         format: 'uuid'
@@ -55,7 +57,7 @@ DELETE.apiDoc = {
     ...defaultErrorResponses,
     404: {
       description:
-        'Submission not found (invalid submissionId) or submission upload not found (invalid submissionUploadId, no status record, or upload does not belong to this submission).'
+        'Submission not found (invalid submissionUuid) or submission upload not found (invalid submissionUploadId, no status record, or upload does not belong to this submission).'
     },
     409: {
       description: 'Cannot delete a submission upload that has already been reviewed (approved or denied).'
@@ -75,23 +77,10 @@ export function deleteSubmissionUpload(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
+      const { submissionUuid, submissionUploadId } = req.params;
 
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
-
-      const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
-      const reviewStatus = await reviewStatusService.getSubmissionUploadReviewStatus(submissionUploadId);
-
-      if (reviewStatus.status !== 'submitted') {
-        throw new HTTP409(
-          `Cannot delete a submission upload with status "${reviewStatus.status}". Only uploads with status "submitted" may be deleted.`
-        );
-      }
-
-      await submissionUploadService.softDeleteSubmissionUpload(submissionUploadId);
-
-      await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status: 'deleted' });
+      await submissionUploadService.deleteSubmissionUpload(submissionUuid, submissionUploadId);
 
       await connection.commit();
 

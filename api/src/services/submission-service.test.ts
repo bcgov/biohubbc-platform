@@ -21,6 +21,7 @@ import {
   SubmissionRepository
 } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { TeamService } from './access-policy/team-service';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
@@ -35,17 +36,36 @@ describe('SubmissionService', () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
+      const createTeam = sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: '11111111-1111-1111-1111-111111111111',
+        name: 'Submission Team',
+        description: null,
+        member_count: 1
+      });
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord({
-        uuid: '',
-        comment: 'comment',
-        description: 'description',
-        name: 'name',
-        contributor_id: 1,
-        system_user_id: 1
-      });
+      const response = await submissionService.insertSubmissionRecord(
+        {
+          uuid: '',
+          comment: 'comment',
+          description: 'description',
+          name: 'name',
+          contributor_id: 1,
+          system_user_id: 1
+        },
+        [2, 1]
+      );
 
+      expect(createTeam).to.have.been.calledOnceWith(
+        sinon.match({
+          system_user_ids: [1, 2]
+        })
+      );
+      expect(repo).to.have.been.calledOnceWith(
+        sinon.match({
+          team_id: '11111111-1111-1111-1111-111111111111'
+        })
+      );
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
     });
@@ -62,6 +82,7 @@ describe('SubmissionService', () => {
         security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         system_user_id: 3,
+        team_id: '11111111-1111-1111-1111-111111111111',
         contributor_id: 1,
         name: 'name',
         description: 'description',
@@ -78,6 +99,12 @@ describe('SubmissionService', () => {
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves(mockSubmissionRecord);
+      const createTeam = sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: '11111111-1111-1111-1111-111111111111',
+        name: 'Submission Team',
+        description: null,
+        member_count: 1
+      });
 
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
         '123-456-789',
@@ -88,7 +115,20 @@ describe('SubmissionService', () => {
         1
       );
 
-      expect(repo).to.be.calledOnce;
+      expect(createTeam).to.have.been.calledOnceWith(
+        sinon.match({
+          system_user_ids: [3]
+        })
+      );
+      expect(repo).to.have.been.calledOnceWith(
+        '123-456-789',
+        'submission name',
+        'submission desc',
+        'submission comment',
+        3,
+        1,
+        '11111111-1111-1111-1111-111111111111'
+      );
       expect(response).to.be.eql(mockSubmissionRecord);
     });
   });

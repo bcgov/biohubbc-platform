@@ -77,6 +77,20 @@ describe('SubmissionUploadReviewStatusRepository', () => {
       }
     });
   });
+
+  describe('getStatusHistoryBySubmissionUuid', () => {
+    it('queries status history using the submission UUID', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<any>);
+      const repository = new SubmissionUploadReviewStatusRepository(getMockDBConnection({ sql: sqlStub }));
+      const submissionUuid = '11111111-1111-1111-1111-111111111111';
+
+      const result = await repository.getStatusHistoryBySubmissionUuid(submissionUuid);
+
+      expect(result).to.eql([]);
+      expect(sqlStub.firstCall.args[0].text).to.contain('s.uuid =');
+      expect(sqlStub.firstCall.args[0].values).to.eql([submissionUuid]);
+    });
+  });
 });
 
 const buildStatus = (params: {

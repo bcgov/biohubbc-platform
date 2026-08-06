@@ -15,7 +15,7 @@ import { authorizeRequestHandler } from '../../../../../../../request-handlers/s
 import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review');
+const defaultLog = getLogger('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -30,9 +30,9 @@ GET.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission ID',
+      description: 'Submission UUID',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: { type: 'string', format: 'uuid' },
       required: true
     },
@@ -73,9 +73,9 @@ POST.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission ID',
+      description: 'Submission UUID',
       in: 'path',
-      name: 'submissionId',
+      name: 'submissionUuid',
       schema: { type: 'string', format: 'uuid' },
       required: true
     },
@@ -115,11 +115,11 @@ export function getSubmissionUploadReviews(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionId, submissionUploadId } = req.params;
+      const { submissionUuid, submissionUploadId } = req.params;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       const result = await submissionUploadReviewService.findReviewsBySubmissionUploadId(
-        submissionId,
+        submissionUuid,
         submissionUploadId
       );
 
@@ -147,11 +147,11 @@ export function insertSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionId, submissionUploadId } = req.params;
+      const { submissionUuid, submissionUploadId } = req.params;
       const { scope, status }: { scope: SubmissionUploadReviewScope; status: SubmissionUploadReviewStatus } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      const result = await submissionUploadReviewService.insertSubmissionUploadReview(submissionId, {
+      const result = await submissionUploadReviewService.insertSubmissionUploadReview(submissionUuid, {
         submission_upload_id: submissionUploadId,
         scope,
         status,

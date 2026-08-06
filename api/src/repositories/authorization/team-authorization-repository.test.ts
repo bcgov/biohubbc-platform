@@ -86,6 +86,103 @@ describe('TeamAuthorizationRepository', () => {
     });
   });
 
+  describe('findTeamMembershipBySubmissionUpload', () => {
+    const submissionUploadId = '11111111-1111-1111-1111-111111111111';
+
+    it('returns a record when the user has team access to the submission upload', async () => {
+      const mockRow = { submission_upload_id: submissionUploadId, record_end_date: null };
+      const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamMembershipBySubmissionUpload(1, submissionUploadId);
+
+      expect(result).to.eql(mockRow);
+    });
+
+    it('returns null when the user does not have team access to the submission upload', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamMembershipBySubmissionUpload(1, submissionUploadId);
+
+      expect(result).to.be.null;
+    });
+
+    it('joins through submission_upload.team_id and requires active records', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const sql = query.toSQL().sql.toLowerCase();
+          expect(sql).to.include('join "team" as "team" on "team"."team_id" = "su"."team_id"');
+          expect(sql).to.include('join "team_member" as "tm" on "tm"."team_id" = "su"."team_id"');
+          expect(sql).to.include('"su"."record_end_date" is null');
+          expect(sql).to.include('"team"."record_end_date" is null');
+          expect(sql).to.include('"tm"."record_end_date" is null');
+          return { rowCount: 0, rows: [] } as QueryResult<any>;
+        }
+      });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      await repository.findTeamMembershipBySubmissionUpload(1, submissionUploadId);
+    });
+  });
+
+  describe('findTeamMembershipBySubmissionId', () => {
+    it('returns a record when the user has team access to the submission', async () => {
+      const mockRow = { submission_id: 10, record_end_date: null };
+      const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamMembershipBySubmissionId(1, 10);
+
+      expect(result).to.eql(mockRow);
+    });
+
+    it('returns null when the user does not have team access to the submission', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamMembershipBySubmissionId(1, 10);
+
+      expect(result).to.be.null;
+    });
+
+    it('joins through submission.team_id and requires active records', async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const sql = query.toSQL().sql.toLowerCase();
+          expect(sql).to.include('join "team" as "team" on "team"."team_id" = "s"."team_id"');
+          expect(sql).to.include('join "team_member" as "tm" on "tm"."team_id" = "s"."team_id"');
+          expect(sql).to.include('"s"."record_end_date" is null');
+          expect(sql).to.include('"team"."record_end_date" is null');
+          expect(sql).to.include('"tm"."record_end_date" is null');
+          return { rowCount: 0, rows: [] } as QueryResult<any>;
+        }
+      });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      await repository.findTeamMembershipBySubmissionId(1, 10);
+    });
+
+    it('looks up submission-team membership by UUID when a UUID is provided', async () => {
+      const submissionUuid = '11111111-1111-1111-1111-111111111111';
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const compiled = query.toSQL();
+          expect(compiled.sql.toLowerCase()).to.include('"s"."uuid" = ?');
+          expect(compiled.bindings).to.include(submissionUuid);
+          return { rowCount: 0, rows: [] } as QueryResult<any>;
+        }
+      });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      await repository.findTeamMembershipBySubmissionUuid(1, submissionUuid);
+    });
+  });
+
   describe('isSubmissionFeatureAccessibleToUser', () => {
     it('returns true when an accessible matching feature row exists', async () => {
       const mockResponse = { rowCount: 1, rows: [{ '1': 1 }] } as unknown as Promise<QueryResult<any>>;
