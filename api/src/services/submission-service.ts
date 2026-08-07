@@ -1,6 +1,6 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { SubmissionFeatureForReview, SubmissionFilters } from '../models/submission';
+import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
 import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 
 const defaultLog = getLogger('submission-service');
@@ -29,23 +30,49 @@ const defaultLog = getLogger('submission-service');
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
   ingestionRepository: FeatureIngestionRepository;
+  teamService: TeamService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
     this.ingestionRepository = new FeatureIngestionRepository(connection);
+    this.teamService = new TeamService(connection);
   }
 
   /**
    * Insert a new submission record.
    *
    * @param {ICreateSubmission} submissionData
+   * @param {number[]} [additionalSystemUserIds] Additional users to add to the submission team
    * @returns {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecord(submissionData);
+  async insertSubmissionRecord(
+    submissionData: ICreateSubmission,
+    additionalSystemUserIds: number[] = []
+  ): Promise<{ submission_id: number }> {
+    const team = await this.teamService.createTeam({
+      name: `Submission Team ${submissionData.uuid}`,
+      description: `Auto-generated upload-creation team for submission ${submissionData.uuid}.`,
+      system_user_ids: [...new Set([submissionData.system_user_id, ...additionalSystemUserIds])]
+    });
+
+    return this.submissionRepository.insertSubmissionRecord({
+      ...submissionData,
+      team_id: team.team_id
+    });
+  }
+
+  /**
+   * Add users to a submission's owning team without replacing existing members.
+   *
+   * @param {string} teamId Submission team identifier.
+   * @param {number[]} systemUserIds System users to add.
+   * @returns {Promise<void>}
+   */
+  async addSubmissionTeamMembers(teamId: string, systemUserIds: number[]): Promise<void> {
+    await this.teamService.addTeamMembers(teamId, systemUserIds);
   }
 
   /**
@@ -70,13 +97,20 @@ export class SubmissionService extends DBService {
     systemUserId: number,
     contributorId: number
   ): Promise<SubmissionRecord> {
+    const team = await this.teamService.createTeam({
+      name: `Submission Team ${uuid}`,
+      description: `Auto-generated upload-creation team for submission ${uuid}.`,
+      system_user_ids: [systemUserId]
+    });
+
     return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
       uuid,
       name,
       description,
       comment,
       systemUserId,
-      contributorId
+      contributorId,
+      team.team_id
     );
   }
 
@@ -288,19 +322,19 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get all submissions accessible to the given system user via their submission team membership.
+   * Get all submissions accessible to the given system user through submission-team membership.
    *
    * @param {number} systemUserId - The system user ID to fetch submissions for.
    * @param {ApiPaginationOptions} pagination
    * @param {SubmissionFilters} [filters]
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionSummary[]>}
    * @memberof SubmissionService
    */
   async getSubmissionsByUserId(
     systemUserId: number,
     pagination: ApiPaginationOptions,
     filters?: SubmissionFilters
-  ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+  ): Promise<SubmissionSummary[]> {
     return this.submissionRepository.getSubmissionsByUserId(systemUserId, pagination, filters);
   }
 

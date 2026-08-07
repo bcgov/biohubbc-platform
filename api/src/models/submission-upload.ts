@@ -23,6 +23,7 @@ export const SubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
   submission_id: z.number(),
   upload_id: z.string().uuid(),
+  team_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
   ticket_id: z.string().uuid(),
   blueprint_id: z.number(),
@@ -43,6 +44,14 @@ export const CreateSubmissionUpload = z.object({
   comment: z.string().nullable().optional()
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
+
+/**
+ * SubmissionUpload payload after its owning team has been created.
+ */
+export const CreateSubmissionUploadWithTeam = CreateSubmissionUpload.extend({
+  team_id: z.string().uuid()
+});
+export type CreateSubmissionUploadWithTeam = z.infer<typeof CreateSubmissionUploadWithTeam>;
 
 /**
  * Payload for updating an existing SubmissionUpload

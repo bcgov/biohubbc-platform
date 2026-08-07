@@ -2,7 +2,7 @@ import { SQL } from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
-  CreateSubmissionUpload,
+  CreateSubmissionUploadWithTeam,
   SubmissionUpload,
   SubmissionUploadFilters,
   TicketSubmissionUpload,
@@ -26,6 +26,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        team_id,
         status,
         ticket_id,
         blueprint_id,
@@ -71,6 +72,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        team_id,
         status,
         ticket_id,
         blueprint_id,
@@ -119,6 +121,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.submission_upload_id,
         su.submission_id,
         su.upload_id,
+        su.team_id,
         su.status,
         su.ticket_id,
         su.blueprint_id,
@@ -171,6 +174,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_upload_id',
         'submission_upload.submission_id',
         'submission_upload.upload_id',
+        'submission_upload.team_id',
         'submission_upload.status',
         'submission_upload.ticket_id',
         'submission_upload.blueprint_id',
@@ -306,15 +310,18 @@ export class SubmissionUploadRepository extends BaseRepository {
   /**
    * Insert a new submission_upload record.
    *
-   * @param {CreateSubmissionUpload} submissionUpload - The data to create a new submission_upload.
+   * @param {CreateSubmissionUploadWithTeam} submissionUpload - The data to create a new submission_upload.
    * @returns {Promise<{ submission_upload_id: string }>} - The ID of the newly created submission_upload.
    * @throws {ApiExecuteSQLError} - If the insert fails.
    */
-  async insertSubmissionUpload(submissionUpload: CreateSubmissionUpload): Promise<{ submission_upload_id: string }> {
+  async insertSubmissionUpload(
+    submissionUpload: CreateSubmissionUploadWithTeam
+  ): Promise<{ submission_upload_id: string }> {
     const sqlStatement = SQL`
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
+        team_id,
         ticket_id,
         status,
         blueprint_id,
@@ -322,6 +329,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
+        ${submissionUpload.team_id},
         ${submissionUpload.ticket_id},
         ${submissionUpload.status},
         ${submissionUpload.blueprint_id},
@@ -370,54 +378,6 @@ export class SubmissionUploadRepository extends BaseRepository {
     const response = await this.connection.sql<{ blueprint_id: number }>(sqlStatement);
 
     return response.rows[0]?.blueprint_id ?? null;
-  }
-
-  /**
-   * Insert submission_upload records for a given upload_id.
-   *
-   * @param {number} submissionId - The ID of the submission.
-   * @param {string} uploadId - The ID of the upload.
-   * @param {string} ticketId - The ID of the associated ticket.
-   * @returns {Promise<{ submission_upload_id: string }[]>} - The list of newly created submission_upload records.
-   * @throws {ApiExecuteSQLError} - If the insert fails.
-   */
-  async insertSubmissionUploadsForUploadId(
-    submissionId: number,
-    uploadId: string,
-    ticketId: string
-  ): Promise<{ submission_upload_id: string }[]> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_upload (
-        submission_id,
-        upload_id,
-        ticket_id,
-        status,
-        comment
-      )
-      SELECT
-        ${submissionId},
-        ua.upload_id,
-        ${ticketId},
-        'uploaded'::submission_upload_job_status,
-        NULL
-      FROM upload_artifact ua
-      WHERE ua.upload_id = ${uploadId}
-        AND ua.record_end_date IS NULL
-      RETURNING submission_upload_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to insert submission_upload records', [
-        'SubmissionUploadRepository->insertSubmissionUploadsForUploadId',
-        `rowCount was ${response.rowCount}, expected >= 1`,
-        `upload_id = ${uploadId}`,
-        `submission_id = ${submissionId}`
-      ]);
-    }
-
-    return response.rows;
   }
 
   /**
@@ -470,6 +430,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        team_id,
         status,
         ticket_id,
         blueprint_id,

@@ -17,8 +17,6 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
     'create_user',
     'update_user',
     'security',
-    'root_feature_type_id',
-    'root_feature_type_name',
     'regions'
   ],
   additionalProperties: false,
@@ -80,17 +78,13 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
     },
     security: {
       type: 'string',
-      enum: [SECURITY_APPLIED_STATUS.PENDING, SECURITY_APPLIED_STATUS.SECURED, SECURITY_APPLIED_STATUS.UNSECURED],
+      enum: [
+        SECURITY_APPLIED_STATUS.PENDING,
+        SECURITY_APPLIED_STATUS.SECURED,
+        SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+        SECURITY_APPLIED_STATUS.UNSECURED
+      ],
       description: 'Security status of the submission'
-    },
-    root_feature_type_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'ID of the root feature type'
-    },
-    root_feature_type_name: {
-      type: 'string',
-      description: 'Name of the root feature type'
     },
     regions: {
       type: 'array',

@@ -22,7 +22,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get all submissions that the current user has access to via their submission team membership.',
+  description: 'Get all submissions accessible to the current user through submission-team membership.',
   tags: ['submission'],
   security: [
     {
@@ -55,7 +55,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get all submissions accessible to the current user via their submission team membership.
+ * Get all submissions accessible to the current user through submission-team membership.
  *
  * @returns {RequestHandler}
  */

@@ -3,7 +3,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SubmissionFeatureForReview, SubmissionFilters } from '../models/submission';
+import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
 import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -44,6 +44,10 @@ export interface ICreateSubmission {
   name: string;
   description: string;
   comment: string;
+}
+
+export interface ICreateSubmissionWithTeam extends ICreateSubmission {
+  team_id: string;
 }
 
 export const SubmissionFeatureRecord = z.object({
@@ -143,6 +147,7 @@ export interface ISubmissionModel {
   submission_id?: number;
   uuid: string;
   system_user_id: number;
+  team_id: string;
   comment?: string | null;
   security_review_timestamp?: string | null;
   create_date?: string;
@@ -324,15 +329,16 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {ICreateSubmission} submissionData
+   * @param {ICreateSubmissionWithTeam} submissionData
    * @returns {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ICreateSubmissionWithTeam): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
         system_user_id,
+        team_id,
         contributor_id,
         name,
         description,
@@ -340,6 +346,7 @@ export class SubmissionRepository extends BaseRepository {
       ) VALUES (
         ${submissionData.uuid},
         ${submissionData.system_user_id},
+        ${submissionData.team_id},
         ${submissionData.contributor_id},
         ${submissionData.name},
         ${submissionData.description},
@@ -370,6 +377,7 @@ export class SubmissionRepository extends BaseRepository {
    * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
    * sensitive information. Should never be shared with the general public.
    * @param {number} contributorId
+   * @param {string} teamId
    * @returns {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
@@ -379,7 +387,8 @@ export class SubmissionRepository extends BaseRepository {
     description: string,
     comment: string,
     systemUserId: number,
-    contributorId: number
+    contributorId: number,
+    teamId: string
   ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
@@ -389,6 +398,7 @@ export class SubmissionRepository extends BaseRepository {
         description,
         comment,
         system_user_id,
+        team_id,
         contributor_id
       ) VALUES (
         ${uuid},
@@ -397,6 +407,7 @@ export class SubmissionRepository extends BaseRepository {
         ${description},
         ${comment},
         ${systemUserId},
+        ${teamId},
         ${contributorId}
       )
       RETURNING
@@ -1141,19 +1152,19 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all submissions accessible to the given system user via their submission team membership.
+   * Get all submissions accessible through submission-team membership.
    *
    * @param {number} systemUserId - The system user ID to fetch submissions for.
    * @param {ApiPaginationOptions} pagination
    * @param {SubmissionFilters} [filters]
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionSummary[]>}
    * @memberof SubmissionRepository
    */
   async getSubmissionsByUserId(
     systemUserId: number,
     pagination: ApiPaginationOptions,
     filters?: SubmissionFilters
-  ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+  ): Promise<SubmissionSummary[]> {
     const knex = getKnex();
     const sort = pagination.sort;
     const order = pagination.order;
@@ -1174,16 +1185,12 @@ export class SubmissionRepository extends BaseRepository {
       .innerJoin('team as t', function () {
         this.on('t.team_id', '=', 'tm.team_id').andOnNull('t.record_end_date');
       })
-      .innerJoin('submission_team as st', function () {
-        this.on('st.team_id', '=', 'tm.team_id').andOnNull('st.record_end_date');
-      })
       .innerJoin('submission as s', function () {
-        this.on('s.submission_id', '=', 'st.submission_id').andOnNull('s.record_end_date');
+        this.on('s.team_id', '=', 'tm.team_id').andOnNull('s.record_end_date');
       })
-      .innerJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', '=', 's.submission_id').andOnNull('sf.parent_submission_feature_id');
+      .leftJoin('submission_feature as sf', function () {
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
       })
-      .innerJoin('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .leftJoin('submission_feature_security as sfs', function () {
         this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
       })
@@ -1203,12 +1210,10 @@ export class SubmissionRepository extends BaseRepository {
         's.comment',
         's.create_user',
         's.update_user',
-        knex.raw('sf.feature_type_id AS root_feature_type_id'),
-        knex.raw('ft.name AS root_feature_type_name'),
         knex.raw(
           `
           CASE
-            WHEN s.security_review_timestamp IS NULL THEN ?
+            WHEN COUNT(sf.submission_feature_id) = 0 OR s.security_review_timestamp IS NULL THEN ?
             WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN ?
             WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) THEN ?
             ELSE ?
@@ -1235,9 +1240,7 @@ export class SubmissionRepository extends BaseRepository {
         's.description',
         's.comment',
         's.create_user',
-        's.update_user',
-        'sf.feature_type_id',
-        'ft.name'
+        's.update_user'
       ]);
 
     if (normalizedSearch) {
@@ -1250,13 +1253,13 @@ export class SubmissionRepository extends BaseRepository {
       order: resolvedOrder
     });
 
-    const response = await this.connection.knex(queryBuilder, SubmissionRecordWithSecurityAndRootFeatureType);
+    const response = await this.connection.knex<SubmissionSummary>(queryBuilder);
 
     return response.rows;
   }
 
   /**
-   * Count submissions accessible to the given system user with optional server-side search.
+   * Count submissions accessible to the given system user through submission-team membership.
    *
    * @param {number} systemUserId
    * @param {SubmissionFilters} [filters]
@@ -1275,11 +1278,8 @@ export class SubmissionRepository extends BaseRepository {
         INNER JOIN team t
           ON  t.team_id = tm.team_id
           AND t.record_end_date IS NULL
-        INNER JOIN submission_team st
-          ON  st.team_id = tm.team_id
-          AND st.record_end_date IS NULL
         INNER JOIN submission s
-          ON  s.submission_id = st.submission_id
+          ON  s.team_id = tm.team_id
           AND s.record_end_date IS NULL
         WHERE
           tm.system_user_id = ${systemUserId}

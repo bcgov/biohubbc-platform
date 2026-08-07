@@ -24,6 +24,8 @@ export class TeamAuthorizationService extends DBService {
    * Entity semantics:
    * - `ticket`: membership in the ticket visibility team.
    * - `data_request`: membership in the data-request visibility team.
+   * - `submission_upload`: membership in the upload's dedicated access team.
+   * - `submission`: membership in the submission's team, resolved by its explicitly named ID or UUID.
    *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
@@ -43,6 +45,23 @@ export class TeamAuthorizationService extends DBService {
           systemUserId,
           entity.dataRequestId
         );
+        break;
+
+      case 'submission_upload':
+        record = await this.teamAuthorizationRepository.findTeamMembershipBySubmissionUpload(
+          systemUserId,
+          entity.submissionUploadId
+        );
+        break;
+
+      case 'submission':
+        record =
+          'submissionId' in entity
+            ? await this.teamAuthorizationRepository.findTeamMembershipBySubmissionId(systemUserId, entity.submissionId)
+            : await this.teamAuthorizationRepository.findTeamMembershipBySubmissionUuid(
+                systemUserId,
+                entity.submissionUuid
+              );
         break;
 
       default:

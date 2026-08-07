@@ -1,11 +1,13 @@
 import chai, { expect } from 'chai';
+import { RequestHandler } from 'express';
 import { afterEach, beforeEach, describe, it } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { startUpload } from '.';
+import { createSubmissionUpload, POST } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { SystemUserExtended } from '../../../../repositories/user-repository';
+import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from '../../../../services/upload/upload-ingestion-service.interface';
 import { UserService } from '../../../../services/user-service';
@@ -19,28 +21,17 @@ const mockUploadResponse: PresignedUploadUrlResponse = {
   s3UploadId: 'mock-s3-upload-id',
   uploadArchiveId: 'mock-archive-id',
   key: 'mock-key',
-  partCount: 2,
-  presignedUrls: [
-    { partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 5242880 },
-    { partNumber: 2, url: 'https://example.com/part2', partSizeBytes: 1234 }
-  ]
+  partCount: 1,
+  presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 12345 }]
 };
 
 const mockSubmitters = [
   { guid: '42-guid', identifier: 'jsmith', identitySource: 'IDIR' },
   { guid: '43-guid', identifier: 'adoe', identitySource: 'BCEIDBUSINESS' }
 ];
-const contributorServiceSystemUserId = 7;
+const submissionUuid = '11111111-1111-1111-1111-111111111111';
 
-const mockBody = {
-  bytes: 12345,
-  name: 'name',
-  description: 'description',
-  comment: 'comment',
-  submitters: mockSubmitters
-};
-
-describe('archive upload handler', () => {
+describe('append submission upload handler', () => {
   let ensureSystemUserStub: sinon.SinonStub;
 
   beforeEach(() => {
@@ -53,25 +44,41 @@ describe('archive upload handler', () => {
     sinon.restore();
   });
 
-  it('should resolve all body submitters, initialize the upload, and return 201 on success', async () => {
+  it('authorizes submission-team members and system administrators before handling the request', async () => {
+    sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.params = { submissionUuid };
+
+    await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+
+    expect(mockReq.authorization_scheme).to.eql({
+      or: [
+        { discriminator: 'Team', entity: 'submission', submissionUuid },
+        { validSystemRoles: ['System Administrator'], discriminator: 'SystemRole' }
+      ]
+    });
+    expect(mockNext).to.have.been.calledOnce;
+  });
+
+  it('should resolve all body submitters, initialize the append upload, and forward their ids', async () => {
     const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    const startArchiveUploadStub = sinon
-      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
+    const startAppendStub = sinon
+      .stub(UploadIngestionService.prototype, 'startArchiveUploadForExistingSubmissionByUuid')
       .resolves(mockUploadResponse);
 
-    const requestHandler = startUpload();
+    const requestHandler = createSubmissionUpload();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { ...mockBody };
+    mockReq.params = { submissionUuid };
+    mockReq.body = { bytes: 12345, submitters: mockSubmitters };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -79,102 +86,85 @@ describe('archive upload handler', () => {
     expect(ensureSystemUserStub.firstCall).to.have.been.calledWith('42-guid', 'jsmith', 'IDIR');
     expect(ensureSystemUserStub.secondCall).to.have.been.calledWith('43-guid', 'adoe', 'BCEIDBUSINESS');
 
-    expect(startArchiveUploadStub).to.have.been.calledOnce;
-    expect(startArchiveUploadStub.getCall(0).args[0]).to.equal(12345);
-    expect(startArchiveUploadStub.getCall(0).args[1]).to.include({
-      name: 'name',
-      description: 'description',
-      comment: 'comment',
-      system_user_id: contributorServiceSystemUserId,
-      contributor_id: 11
-    });
-    expect(startArchiveUploadStub.getCall(0).args[2]).to.deep.equal([42, 43]);
+    expect(startAppendStub).to.have.been.calledOnce;
+    expect(startAppendStub.getCall(0).args[0]).to.equal(12345);
+    expect(startAppendStub.getCall(0).args[1]).to.equal(submissionUuid);
+    expect(startAppendStub.getCall(0).args[2]).to.deep.equal([42, 43]);
+
     expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.deep.equal(mockUploadResponse);
-
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
     expect(dbConnectionObj.release).to.have.been.calledOnce;
   });
 
-  it('should initialize the upload without resolving an optional submitter', async () => {
+  it('should initialize the append upload when submitters is empty', async () => {
     const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    const startArchiveUploadStub = sinon
-      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
+    const startAppendStub = sinon
+      .stub(UploadIngestionService.prototype, 'startArchiveUploadForExistingSubmissionByUuid')
       .resolves(mockUploadResponse);
 
-    const requestHandler = startUpload();
+    const requestHandler = createSubmissionUpload();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = {
-      bytes: mockBody.bytes,
-      name: mockBody.name,
-      description: mockBody.description,
-      comment: mockBody.comment
-    };
+    mockReq.params = { submissionUuid };
+    mockReq.body = { bytes: 12345, submitters: [] };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
 
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(ensureSystemUserStub).not.to.have.been.called;
-    expect(startArchiveUploadStub.getCall(0).args[1]).to.include({
-      system_user_id: contributorServiceSystemUserId
-    });
-    expect(startArchiveUploadStub.getCall(0).args[2]).to.deep.equal([]);
+    expect(startAppendStub).to.have.been.calledOnceWith(12345, submissionUuid, [], undefined);
     expect(mockRes.statusValue).to.equal(201);
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
   });
 
   it('should resolve duplicate submitter claims only once', async () => {
     const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-    const startArchiveUploadStub = sinon
-      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
+    const startAppendStub = sinon
+      .stub(UploadIngestionService.prototype, 'startArchiveUploadForExistingSubmissionByUuid')
       .resolves(mockUploadResponse);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionUuid };
     mockReq.body = {
-      ...mockBody,
+      bytes: 12345,
       submitters: [mockSubmitters[0], { ...mockSubmitters[0], guid: '42-GUID', identitySource: 'BCEIDBUSINESS' }]
     };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
 
-    await startUpload()(mockReq, mockRes, mockNext);
+    await createSubmissionUpload()(mockReq, mockRes, mockNext);
 
     expect(ensureSystemUserStub).to.have.been.calledOnce;
-    expect(startArchiveUploadStub.getCall(0).args[2]).to.deep.equal([42]);
+    expect(startAppendStub).to.have.been.calledOnceWith(12345, submissionUuid, [42], undefined);
   });
 
-  it('should rollback and throw error if upload service fails', async () => {
+  it('should rollback and rethrow if the upload service fails', async () => {
     const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    const error = new Error('Upload failed');
-    sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
+    const error = new Error('Append failed');
+    sinon.stub(UploadIngestionService.prototype, 'startArchiveUploadForExistingSubmissionByUuid').rejects(error);
 
-    const requestHandler = startUpload();
+    const requestHandler = createSubmissionUpload();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { ...mockBody };
+    mockReq.params = { submissionUuid };
+    mockReq.body = { bytes: 12345, submitters: mockSubmitters };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -188,66 +178,33 @@ describe('archive upload handler', () => {
 
   it('should rollback and create no records when the submitter cannot be resolved', async () => {
     const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    // ensureSystemUser rejects (e.g. invalid identity source) -> nothing should be created.
     ensureSystemUserStub.rejects(new Error('Failed to resolve submitter'));
-    const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload');
+    const startAppendStub = sinon.stub(
+      UploadIngestionService.prototype,
+      'startArchiveUploadForExistingSubmissionByUuid'
+    );
 
-    const requestHandler = startUpload();
+    const requestHandler = createSubmissionUpload();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { ...mockBody };
+    mockReq.params = { submissionUuid };
+    mockReq.body = { bytes: 12345, submitters: mockSubmitters };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
       expect.fail('Expected error to be thrown');
     } catch {
-      expect(startArchiveUploadStub).to.not.have.been.called;
+      expect(startAppendStub).to.not.have.been.called;
       expect(dbConnectionObj.commit).to.not.have.been.called;
       expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
-  });
-
-  it('should generate a UUID for the submission object', async () => {
-    const dbConnectionObj = getMockDBConnection({
-      systemUserId: () => contributorServiceSystemUserId,
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-    const startArchiveUploadStub = sinon
-      .stub(UploadIngestionService.prototype, 'startArchiveUpload')
-      .resolves(mockUploadResponse);
-
-    const requestHandler = startUpload();
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.body = { ...mockBody };
-    mockReq.keycloak_token = { clientId: 'sims-service-client' };
-    mockReq.contributor_id = 11;
-
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    const submissionArg = startArchiveUploadStub.getCall(0).args[1];
-    expect(submissionArg.uuid).to.be.a('string');
-    expect(submissionArg).to.include({
-      name: 'name',
-      description: 'description',
-      comment: 'comment',
-      system_user_id: contributorServiceSystemUserId,
-      contributor_id: 11
-    });
-    expect(startArchiveUploadStub.getCall(0).args[2]).to.deep.equal([42, 43]);
   });
 });
