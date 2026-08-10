@@ -15,6 +15,30 @@ import type {
 export type SlippyMapDrawMode = 'point' | 'linestring' | 'polygon';
 
 /**
+ * Where a map click landed: `point` in container-relative screen pixels (suitable for anchoring an overlay inside
+ * the map container), `lngLat` in geographic coordinates.
+ */
+export interface MapClickPosition {
+  point: { x: number; y: number };
+  lngLat: { lng: number; lat: number };
+}
+
+/**
+ * Imperative camera handle exposed through the component ref. Deliberately narrow: the map instance itself stays
+ * inside the component.
+ */
+export interface SlippyMapHandle {
+  /**
+   * Smoothly move the camera. `zoom` is absolute and left unchanged when omitted.
+   */
+  easeTo: (options: { center: [number, number]; zoom?: number }) => void;
+  /**
+   * Current zoom level, or undefined before the map exists.
+   */
+  getZoom: () => number | undefined;
+}
+
+/**
  * A layer to render, together with how it responds to a click.
  *
  * Styling and behaviour travel together so a layer cannot be made interactive in one prop and styled in another. A
@@ -27,8 +51,10 @@ export interface ISlippyMapLayer {
   specification: LayerSpecification;
   /**
    * Fired when a rendered feature in this layer is clicked. Where layers overlap, the topmost rendered feature wins.
+   *
+   * Receives the clicked position as well, so an overlay can be anchored to it.
    */
-  onClick?: (feature: MapGeoJSONFeature) => void;
+  onClick?: (feature: MapGeoJSONFeature, position: MapClickPosition) => void;
 }
 
 /**
@@ -122,6 +148,15 @@ export interface ISlippyMapProps {
    * short-lived credential without rebuilding the map.
    */
   transformRequest?: RequestTransformFunction;
+  /**
+   * Fired when the map is clicked and no interactive feature is under the cursor, so a consumer can dismiss
+   * anything anchored to a previous selection.
+   */
+  onEmptyMapClick?: (position: MapClickPosition) => void;
+  /**
+   * Fired when the map camera starts moving for any reason (pan or zoom, user or programmatic).
+   */
+  onMoveStart?: () => void;
   /**
    * Fired once the map style has loaded and any sources/layers have been applied.
    */

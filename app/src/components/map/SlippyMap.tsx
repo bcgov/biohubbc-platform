@@ -3,7 +3,7 @@ import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
 import { Map as MapLibreMap, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   TerraDraw,
   TerraDrawLineStringMode,
@@ -13,7 +13,7 @@ import {
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { SlippyMapDrawToolbar } from './components/SlippyMapDrawToolbar';
-import type { ISlippyMapLayer, ISlippyMapProps, SlippyMapDrawMode } from './SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapProps, SlippyMapDrawMode, SlippyMapHandle } from './SlippyMap.interface';
 import {
   areFeatureSetsEqual,
   extractSnapshotFeatures,
@@ -61,10 +61,13 @@ const TERRA_DRAW_LAYER_PREFIX = 'td';
  *   onDrawDelete={(remainingFeatures) => setFeatures(remainingFeatures)}
  * />
  *
+ * An optional ref exposes a deliberately narrow imperative camera handle (`SlippyMapHandle`); the map instance
+ * itself is never handed out.
+ *
  * @param {ISlippyMapProps} props
  * @return {JSX.Element}
  */
-export const SlippyMap = (props: ISlippyMapProps) => {
+export const SlippyMap = forwardRef<SlippyMapHandle, ISlippyMapProps>(function SlippyMap(props, ref) {
   const {
     id,
     features,
@@ -76,6 +79,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     tileSources,
     layers,
     transformRequest,
+    onEmptyMapClick,
+    onMoveStart,
     onMapLoad,
     onSourceError,
     sx
@@ -93,7 +98,15 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const realFeatureIdsRef = useRef<Set<string | number>>(new Set());
   const selectedFeatureIdRef = useRef<string | number | null>(null);
   // Latest props, so drawing event handlers (bound once on map load) never read stale values
-  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError });
+  const callbacksRef = useRef({
+    onDrawCreate,
+    onDrawUpdate,
+    onDrawDelete,
+    onEmptyMapClick,
+    onMoveStart,
+    onMapLoad,
+    onSourceError
+  });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
   // Source/layer ids this component applied, so replacing them never touches the drawing library's own
@@ -116,8 +129,27 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const [activeDrawMode, setActiveDrawMode] = useState<SlippyMapDrawMode | null>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      easeTo: (options) => {
+        mapRef.current?.easeTo(options);
+      },
+      getZoom: () => mapRef.current?.getZoom()
+    }),
+    []
+  );
+
   useEffect(() => {
-    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError };
+    callbacksRef.current = {
+      onDrawCreate,
+      onDrawUpdate,
+      onDrawDelete,
+      onEmptyMapClick,
+      onMoveStart,
+      onMapLoad,
+      onSourceError
+    };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
     mapContentRef.current = { tileSources, layers };
@@ -325,25 +357,38 @@ export const SlippyMap = (props: ISlippyMapProps) => {
      * map and requires a loaded style).
      */
     /**
-     * Routes a click to the handler of the layer that rendered the topmost feature under the cursor.
+     * Routes a click to the handler of the layer that rendered the topmost feature under the cursor, or reports an
+     * empty click when nothing interactive is there.
      */
     const handleMapClick = (event: MapMouseEvent) => {
+      const position = {
+        point: { x: event.point.x, y: event.point.y },
+        lngLat: { lng: event.lngLat.lng, lat: event.lngLat.lat }
+      };
+
       const interactiveLayers = interactiveLayersRef.current.filter((layer) => map.getLayer(layer.specification.id));
 
-      if (!interactiveLayers.length) {
-        return;
-      }
-
       // Topmost first, so where interactive layers overlap the one drawn on top wins.
-      const [topmost] = map.queryRenderedFeatures(event.point, {
-        layers: interactiveLayers.map((layer) => layer.specification.id)
-      });
+      const [topmost] = interactiveLayers.length
+        ? map.queryRenderedFeatures(event.point, {
+            layers: interactiveLayers.map((layer) => layer.specification.id)
+          })
+        : [];
 
       if (!topmost) {
+        callbacksRef.current.onEmptyMapClick?.(position);
         return;
       }
 
-      interactiveLayers.find((layer) => layer.specification.id === topmost.layer.id)?.onClick?.(topmost);
+      interactiveLayers.find((layer) => layer.specification.id === topmost.layer.id)?.onClick?.(topmost, position);
+    };
+
+    /**
+     * Relays the start of any camera movement (pan or zoom, user or programmatic), so a consumer can dismiss
+     * anything anchored to screen coordinates before it drifts away from its geography.
+     */
+    const handleMoveStart = () => {
+      callbacksRef.current.onMoveStart?.();
     };
 
     /**
@@ -417,6 +462,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     map.once('load', handleMapLoad);
     map.on('click', handleMapClick);
     map.on('mousemove', handleMapMouseMove);
+    map.on('movestart', handleMoveStart);
     map.on('error', handleMapError);
 
     let resizeObserver: ResizeObserver | undefined;
@@ -443,6 +489,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
       map.off('click', handleMapClick);
       map.off('mousemove', handleMapMouseMove);
+      map.off('movestart', handleMoveStart);
       map.off('error', handleMapError);
 
       appliedLayerIdsRef.current = [];
@@ -583,4 +630,4 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       )}
     </Box>
   );
-};
+});

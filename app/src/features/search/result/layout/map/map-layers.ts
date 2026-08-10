@@ -67,11 +67,13 @@ export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: s
  *
  * Ordered so areas sit beneath lines, and lines beneath points; the basemap is added by the caller before these.
  *
- * All of them are display-only: tiles carry geometry alone, so there is nothing a click could resolve to.
+ * Only the cluster layer is interactive: selecting a cluster offers a zoom-in. Feature tiles are geometry only — they
+ * carry nothing a click could resolve — so the raw feature layers stay display-only and take no part in hit testing.
  *
+ * @param {ISlippyMapLayer['onClick']} onClusterClick - Called with the clicked cluster.
  * @return {*}  {ISlippyMapLayer[]}
  */
-export const buildSearchResultLayers = (): ISlippyMapLayer[] => [
+export const buildSearchResultLayers = (onClusterClick: ISlippyMapLayer['onClick']): ISlippyMapLayer[] => [
   {
     specification: {
       id: FILL_LAYER_ID,
@@ -135,11 +137,23 @@ export const buildSearchResultLayers = (): ISlippyMapLayer[] => [
       source: SEARCH_RESULTS_SOURCE_ID,
       'source-layer': CLUSTERS_SOURCE_LAYER,
       paint: {
-        'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 1, 6, 10, 12, 100, 18, 1000, 26] as never,
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['get', 'feature_count'],
+          1,
+          6,
+          10,
+          12,
+          100,
+          18,
+          1000,
+          26
+        ] as never,
         'circle-color': [
           'interpolate',
           ['linear'],
-          ['get', 'count'],
+          ['get', 'feature_count'],
           1,
           '#7fb2d9',
           100,
@@ -151,7 +165,8 @@ export const buildSearchResultLayers = (): ISlippyMapLayer[] => [
         'circle-stroke-width': 1,
         'circle-stroke-color': '#ffffff'
       }
-    }
+    },
+    onClick: onClusterClick
   }
 ];
 

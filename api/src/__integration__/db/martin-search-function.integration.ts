@@ -203,6 +203,52 @@ describe('Tile search function (integration)', function () {
   };
 
   /**
+   * Ask the tile function for the tile containing the test point, and return the raw MVT bytes.
+   */
+  const renderTileBuffer = async (martinContextId: string, zoom: number): Promise<Buffer | null> => {
+    const result = await connection.sql(
+      SQL`
+        WITH t AS (
+          SELECT
+            ${zoom}::integer AS z,
+            floor((${TEST_LNG}::double precision + 180.0) / 360.0 * (2 ^ ${zoom}))::integer AS x,
+            floor(
+              (1.0 - ln(tan(radians(${TEST_LAT}::double precision)) + 1.0 / cos(radians(${TEST_LAT}::double precision))) / pi())
+              / 2.0 * (2 ^ ${zoom})
+            )::integer AS y
+        )
+        SELECT biohub.martin_search(t.z, t.x, t.y, ${JSON.stringify({
+          context: martinContextId
+        })}::json) AS tile FROM t;
+      `,
+      z.object({ tile: z.instanceof(Buffer).nullable() })
+    );
+
+    return result.rows[0].tile;
+  };
+
+  /**
+   * Decode an MVT into its layers: each feature as its MVT feature id plus decoded properties.
+   */
+  const decodeTile = (
+    tile: Buffer
+  ): Record<string, { id: number | undefined; properties: Record<string, unknown> }[]> => {
+    const vectorTile = new VectorTile(new Protobuf(tile));
+    const layers: Record<string, { id: number | undefined; properties: Record<string, unknown> }[]> = {};
+
+    for (const [name, layer] of Object.entries(vectorTile.layers)) {
+      layers[name] = [];
+
+      for (let index = 0; index < layer.length; index++) {
+        const feature = layer.feature(index);
+        layers[name].push({ id: feature.id, properties: feature.properties });
+      }
+    }
+
+    return layers;
+  };
+
+  /**
    * Ask the resolver directly whether a context can see a specific feature.
    */
   const canSee = async (martinContextId: string, featureId: number, zoom = 12): Promise<boolean> => {
@@ -862,6 +908,150 @@ describe('Tile search function (integration)', function () {
       expect(after).to.not.be.null;
       // A delta rather than an absolute, so seeded features sharing the tile cannot affect it.
       expect(sumClusterCounts(after as Buffer) - sumClusterCounts(before as Buffer)).to.equal(1);
+    });
+  });
+
+  describe('tile contract', () => {
+    it('encodes an individual result as render_kind=feature with its ids, keyed by MVT feature id', async () => {
+      const featureId = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const contextId = await createContext({ accessClass: 'anon' });
+
+      const tile = await renderTileBuffer(contextId, 12);
+      expect(tile).to.not.be.null;
+
+      const layers = decodeTile(tile as Buffer);
+      expect(Object.keys(layers)).to.deep.equal(['features']);
+
+      const encoded = layers.features.find((feature) => feature.properties.submission_feature_id === featureId);
+      expect(encoded, 'the created feature should be encoded in the tile').to.not.be.undefined;
+
+      expect(encoded?.properties.render_kind).to.equal('feature');
+      expect(encoded?.properties.submission_id).to.be.a('number');
+      expect(encoded?.properties.is_secured).to.equal(false);
+      // The MVT feature id mirrors submission_feature_id, so fragments of one feature share an identity.
+      expect(encoded?.id).to.equal(featureId);
+      // The id column is consumed by ST_AsMVT, never duplicated into the attributes.
+      expect(encoded?.properties).to.not.have.property('mvt_feature_id');
+    });
+
+    it('encodes a cluster as render_kind=cluster with a count and no feature identity', async () => {
+      await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      await createFeatureWithPoint(TEST_LNG + 0.001, TEST_LAT + 0.001);
+      const contextId = await createContext({ accessClass: 'anon' });
+
+      const tile = await renderTileBuffer(contextId, 6);
+      expect(tile).to.not.be.null;
+
+      const layers = decodeTile(tile as Buffer);
+      expect(Object.keys(layers)).to.deep.equal(['clusters']);
+      expect(layers.clusters.length).to.be.greaterThan(0);
+
+      for (const cluster of layers.clusters) {
+        expect(cluster.properties.render_kind).to.equal('cluster');
+        expect(cluster.properties.feature_count).to.be.a('number');
+        expect(cluster.properties.feature_count).to.be.greaterThan(0);
+        // A cluster must never masquerade as a single result.
+        expect(cluster.properties).to.not.have.property('submission_feature_id');
+        expect(cluster.properties).to.not.have.property('submission_id');
+        expect(cluster.id, 'clusters carry no MVT feature id').to.be.undefined;
+      }
+
+      const total = layers.clusters.reduce((sum, cluster) => sum + Number(cluster.properties.feature_count), 0);
+      expect(total).to.be.at.least(2);
+    });
+  });
+
+  describe('cluster grid', () => {
+    /** Render an explicit tile, rather than the one containing the test point. */
+    const renderTileAt = async (
+      martinContextId: string,
+      zoom: number,
+      x: number,
+      y: number
+    ): Promise<Buffer | null> => {
+      const result = await connection.sql(
+        SQL`
+          SELECT biohub.martin_search(${zoom}, ${x}, ${y}, ${JSON.stringify({
+          context: martinContextId
+        })}::json) AS tile;
+        `,
+        z.object({ tile: z.instanceof(Buffer).nullable() })
+      );
+
+      return result.rows[0].tile;
+    };
+
+    /** Decode the clusters layer including each cluster's tile-coordinate position. */
+    const decodeClusterPoints = (tile: Buffer): { x: number; y: number; count: number }[] => {
+      const vectorTile = new VectorTile(new Protobuf(tile));
+      const layer = vectorTile.layers.clusters;
+      const clusters: { x: number; y: number; count: number }[] = [];
+
+      for (let index = 0; index < layer.length; index++) {
+        const feature = layer.feature(index);
+        const [point] = feature.loadGeometry()[0];
+        clusters.push({ x: point.x, y: point.y, count: Number(feature.properties.feature_count) });
+      }
+
+      return clusters;
+    };
+
+    it('never splits a cluster across a tile seam', async () => {
+      // Two adjacent tiles at a cluster zoom, and features hugging their shared edge. With a
+      // min-corner snap origin, a grid NODE lands exactly ON the seam, so the points nearest the
+      // edge break away from their cell-mates into an edge cluster - drawn from both sides with
+      // split counts. Centre-origin snapping makes cell EDGES land on the seam instead: every
+      // point groups with its whole world cell, owned by exactly one tile.
+      const zoom = 6;
+      const leftX = Math.floor(((TEST_LNG + 180) / 360) * 2 ** zoom);
+      const tileY = Math.floor(
+        ((1 - Math.log(Math.tan((TEST_LAT * Math.PI) / 180) + 1 / Math.cos((TEST_LAT * Math.PI) / 180)) / Math.PI) /
+          2) *
+          2 ** zoom
+      );
+      // Longitude of the seam between leftX and leftX + 1, and of one grid cell (an eighth of a tile).
+      const seamLng = ((leftX + 1) / 2 ** zoom) * 360 - 180;
+      const cellLng = 360 / 2 ** zoom / 8;
+
+      // Three points spread across the LAST world cell on the left side of the seam. Under the
+      // broken min-corner grid the two nearest the seam snap to the seam node while the third
+      // snaps a cell inward, splitting one cell into two clusters.
+      const leftFeatureIds = [
+        await createFeatureWithPoint(seamLng - cellLng * 0.05, TEST_LAT),
+        await createFeatureWithPoint(seamLng - cellLng * 0.4, TEST_LAT),
+        await createFeatureWithPoint(seamLng - cellLng * 0.95, TEST_LAT)
+      ];
+      const rightFeatureId = await createFeatureWithPoint(seamLng + cellLng * 0.1, TEST_LAT);
+
+      const contextId = await createContext({
+        accessClass: 'anon',
+        materializedFeatureIds: [...leftFeatureIds, rightFeatureId]
+      });
+
+      const [leftTile, rightTile] = await Promise.all([
+        renderTileAt(contextId, zoom, leftX, tileY),
+        renderTileAt(contextId, zoom, leftX + 1, tileY)
+      ]);
+
+      expect(leftTile, 'both seam tiles should render clusters').to.not.be.null;
+      expect(rightTile, 'both seam tiles should render clusters').to.not.be.null;
+
+      const leftClusters = decodeClusterPoints(leftTile as Buffer);
+      const rightClusters = decodeClusterPoints(rightTile as Buffer);
+
+      // One cell, one cluster: all three left-side points share a world cell, so they must emerge
+      // as a single bubble carrying the full count rather than an edge bubble plus a remainder.
+      expect(leftClusters).to.have.length(1);
+      expect(leftClusters[0].count).to.equal(leftFeatureIds.length);
+      expect(rightClusters).to.have.length(1);
+      expect(rightClusters[0].count).to.equal(1);
+
+      for (const cluster of [...leftClusters, ...rightClusters]) {
+        // And every emitted cluster sits strictly inside its own tile - never on the shared edge,
+        // never duplicated into the neighbour's buffer margin.
+        expect(cluster.x, 'cluster x must be strictly inside the tile').to.be.greaterThan(0).and.lessThan(4096);
+        expect(cluster.y, 'cluster y must be strictly inside the tile').to.be.greaterThan(0).and.lessThan(4096);
+      }
     });
   });
 
