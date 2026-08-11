@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import {
   CreateSubmissionFeaturePropertyGeometry,
+  GeometryBoundingBox,
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
 import { SubmissionFeaturePropertyGeometryRepository } from '../repositories/submission-feature-property-geometry-repository';
@@ -34,6 +35,13 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
     return this.submissionFeaturePropertyGeometryRepository.getSubmissionFeaturePropertyGeometryBySubmissionFeatureId(
       submissionFeatureId
     );
+  }
+
+  getActiveGeometryExtent(
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    return this.submissionFeaturePropertyGeometryRepository.getActiveGeometryExtent(submissionId, submissionFeatureId);
   }
 
   getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(

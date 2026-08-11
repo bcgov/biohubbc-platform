@@ -504,6 +504,19 @@ configs:
             # [west, south, east, north] - British Columbia
             bounds: [-139.06, 48.30, -114.03, 60.00]
 
+          # Spatial properties of a single submission feature. The submission and feature ids are
+          # carried by the token the gateway verifies, so this source needs no context lookup.
+          # See database/src/procedures/04_martin_feature.ts
+          #
+          # No bounds: a feature's extent is its own, and the client frames the map from the bbox
+          # the tile session returns rather than from TileJSON.
+          feature:
+            schema: biohub
+            function: martin_feature
+            minzoom: 0
+            # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+            maxzoom: 15
+
 networks:
   biohubbc-network:
     driver: bridge

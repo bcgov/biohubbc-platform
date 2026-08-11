@@ -2,10 +2,13 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
+  GeometryBoundingBox,
+  SubmissionFeatureGeometryExtentSchema,
   SubmissionFeaturePropertyGeometry,
   SubmissionFeaturePropertyGeometrySchema
 } from '../models/submission-feature-property-geometry';
 import { BaseRepository } from './base-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 
 export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository {
   /**
@@ -109,6 +112,81 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     return response.rows;
+  }
+
+  /**
+   * Get the combined extent and count of a submission feature's active spatial properties.
+   *
+   * The joins here must stay aligned with `biohub.martin_feature`
+   * (`database/src/procedures/04_martin_feature.ts`): this decides whether a map is offered and where
+   * it opens, while that decides what the map actually draws. If they disagree the map either frames
+   * empty space or claims a feature has no spatial properties while tiles still render.
+   *
+   * The geometry values themselves are deliberately not selected. They travel to the browser as
+   * vector tiles from the gateway, never through this API.
+   *
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
+   * @return {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>}
+   * @memberof SubmissionFeaturePropertyGeometryRepository
+   */
+  async getActiveGeometryExtent(
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    const sqlStatement = SQL`
+      SELECT
+        public.ST_XMin(extent.bounds) AS min_x,
+        public.ST_YMin(extent.bounds) AS min_y,
+        public.ST_XMax(extent.bounds) AS max_x,
+        public.ST_YMax(extent.bounds) AS max_y,
+        extent.geometry_count
+      FROM (
+        SELECT
+          public.ST_Extent(g.value)::public.geometry AS bounds,
+          count(*)::integer AS geometry_count
+        FROM submission_feature_property_geometry g
+        JOIN submission_feature sf
+          ON sf.submission_feature_id = g.submission_feature_id
+         AND sf.submission_id = ${submissionId}
+    `;
+
+    sqlStatement.append(`
+         AND ${isSubmissionFeatureActive('sf')}
+        JOIN feature_type_property ftp
+          ON ftp.feature_type_property_id = g.feature_type_property_id
+         AND ftp.feature_type_id = sf.feature_type_id
+         AND ftp.record_end_date IS NULL
+        JOIN feature_property fp
+          ON fp.feature_property_id = ftp.feature_property_id
+         AND fp.record_end_date IS NULL
+    `);
+
+    sqlStatement.append(SQL`
+        WHERE g.submission_feature_id = ${submissionFeatureId}
+      ) extent;
+    `);
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureGeometryExtentSchema);
+
+    const row = response.rows[0];
+
+    // The aggregate always returns a row, with null bounds and a zero count when nothing matched.
+    if (
+      !row ||
+      row.geometry_count === 0 ||
+      row.min_x === null ||
+      row.min_y === null ||
+      row.max_x === null ||
+      row.max_y === null
+    ) {
+      return { bbox: null, geometry_count: 0 };
+    }
+
+    return {
+      bbox: [row.min_x, row.min_y, row.max_x, row.max_y],
+      geometry_count: row.geometry_count
+    };
   }
 
   /**

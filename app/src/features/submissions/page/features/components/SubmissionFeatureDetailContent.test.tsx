@@ -4,6 +4,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
+// The map owns its own data loading and is covered by its own suite; this one is about the page layout.
+vi.mock('./map/SubmissionFeatureMap', () => ({
+  SubmissionFeatureMap: (props: { submissionId: number; submissionFeatureId: number }) => (
+    <div data-testid="submission-feature-map-stub" data-props={JSON.stringify(props)} />
+  )
+}));
+
 const mockFeature: ISubmissionFeature = {
   submission_feature_id: 10,
   uuid: 'feat-uuid-1',
@@ -76,5 +83,24 @@ describe('SubmissionFeatureDetailContent', () => {
 
     expect(getByText('No data available')).toBeInTheDocument();
     expect(queryByText(/This feature is secured/i)).toBeNull();
+  });
+
+  describe('map section', () => {
+    it('places the map between Properties and Related', () => {
+      const { getAllByRole } = renderComponent();
+
+      const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+
+      expect(sectionLabels).toEqual(['Properties', 'Map', 'Related']);
+    });
+
+    it('maps the feature being viewed', () => {
+      const { getByTestId } = renderComponent();
+
+      expect(JSON.parse(getByTestId('submission-feature-map-stub').dataset.props ?? '{}')).toEqual({
+        submissionId: mockFeature.submission_id,
+        submissionFeatureId: mockFeature.submission_feature_id
+      });
+    });
   });
 });

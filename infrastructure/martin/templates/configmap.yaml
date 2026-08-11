@@ -55,6 +55,8 @@ data:
           function: {{ $source.function }}
           minzoom: {{ $source.minzoom }}
           maxzoom: {{ $source.maxzoom }}
+          {{- if $source.bounds }}
           bounds: {{ toJson $source.bounds }}
+          {{- end }}
         {{- end }}
       {{- end }}

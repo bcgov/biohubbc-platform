@@ -16,6 +16,7 @@ import { PageSection } from 'components/section/PageSection';
 import { IRelatedSubmissionFeature, ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 import { SubmissionFeatureProperties } from './SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './SubmissionFeatureRelated';
 
@@ -103,6 +104,14 @@ export const SubmissionFeatureDetailContent = ({
         <Stack spacing={3} py={4}>
           <PageSection id="submission-feature-properties" label="Properties">
             <SubmissionFeatureProperties data={feature?.data ?? {}} />
+          </PageSection>
+          <PageSection id="submission-feature-map" label="Map">
+            {feature && (
+              <SubmissionFeatureMap
+                submissionId={feature.submission_id}
+                submissionFeatureId={feature.submission_feature_id}
+              />
+            )}
           </PageSection>
           <PageSection id="submission-feature-related" label="Related">
             <SubmissionFeatureRelated

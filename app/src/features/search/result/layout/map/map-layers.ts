@@ -2,10 +2,17 @@ import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { SourceSpecification } from 'maplibre-gl';
 
-export const BASEMAP_SOURCE_ID = 'basemap';
+// The basemap is shared with every other map in the app, so it is defined once alongside the map component.
+// Re-exported here because this module is the map view's single point of import for sources and layers.
+export {
+  BASEMAP_LAYER_ID,
+  BASEMAP_SOURCE_ID,
+  buildBasemapLayer,
+  buildBasemapSource
+} from 'components/map/basemap-layers';
+
 export const SEARCH_RESULTS_SOURCE_ID = 'search-results';
 
-export const BASEMAP_LAYER_ID = 'basemap';
 export const CLUSTER_LAYER_ID = 'search-clusters';
 export const POINT_LAYER_ID = 'search-points';
 export const LINE_LAYER_ID = 'search-lines';
@@ -18,20 +25,6 @@ const FEATURES_SOURCE_LAYER = 'features';
 
 /** Single result colour: feature tiles are geometry only and carry no styling properties. */
 const RESULT_COLOR = '#1f6fb2';
-
-/**
- * Build the raster basemap source.
- *
- * @param {string} basemapUrl - Tile URL template from app config.
- * @param {string} attribution - Attribution text required by the basemap provider.
- * @return {*}  {SourceSpecification}
- */
-export const buildBasemapSource = (basemapUrl: string, attribution: string): SourceSpecification => ({
-  type: 'raster',
-  tiles: [basemapUrl],
-  tileSize: 256,
-  attribution
-});
 
 /**
  * Build the search-result vector tile source.
@@ -169,16 +162,3 @@ export const buildSearchResultLayers = (renderClusterPopup: ISlippyMapLayer['pop
     popupRender: renderClusterPopup
   }
 ];
-
-/**
- * Build the basemap layer.
- *
- * @return {*}  {ISlippyMapLayer}
- */
-export const buildBasemapLayer = (): ISlippyMapLayer => ({
-  specification: {
-    id: BASEMAP_LAYER_ID,
-    type: 'raster',
-    source: BASEMAP_SOURCE_ID
-  }
-});
