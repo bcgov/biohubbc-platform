@@ -1145,5 +1145,41 @@ describe('parquet-utils', () => {
       const row = await roundTrip(properties, { child_features: 'urn:1:observation:42' });
       expect(row['child_features']).to.deep.equal(['urn:1:observation:42']);
     });
+
+    // A UTF8 column accepts only strings (the writer's converter is `Buffer.from(value,
+    // 'utf8')`, which throws on anything else), but values can legitimately arrive
+    // non-string: the hydrator carries scalars stored under a property's previous declared
+    // type. The encoder coerces rather than crashing the whole file.
+    it('a number value in a taxon (UTF8) column round-trips as its string form', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'taxon_id', feature_property_type_name: 'taxon' }
+      ];
+      const row = await roundTrip(properties, { taxon_id: 625197 });
+      expect(row['taxon_id']).to.equal('625197');
+    });
+
+    it('a boolean value in a string (UTF8) column round-trips as its string form', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'flag_note', feature_property_type_name: 'string' }
+      ];
+      const row = await roundTrip(properties, { flag_note: true });
+      expect(row['flag_note']).to.equal('true');
+    });
+
+    it('a number value in a code (UTF8) column round-trips as its string form', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'method_code', feature_property_type_name: 'code' }
+      ];
+      const row = await roundTrip(properties, { method_code: 7 });
+      expect(row['method_code']).to.equal('7');
+    });
+
+    it('a native number in a number (DOUBLE) column still round-trips as a number', async () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      ];
+      const row = await roundTrip(properties, { count: 42.5 });
+      expect(row['count']).to.equal(42.5);
+    });
   });
 });

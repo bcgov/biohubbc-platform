@@ -32,14 +32,72 @@ export interface BaseFeatureRow {
 
 /**
  * Row shape for typed-table hydration queries.
- * Each typed table returns (submission_feature_id, name, value) tuples
+ * Each typed table returns (submission_feature_id, name, value, storage_type) tuples
  * that are merged into the base row's data record.
  */
 export interface TypedPropertyRow {
   submission_feature_id: number;
   name: string;
   value: any;
+  /**
+   * The property-type name of the storage table the row came from.
+   *
+   * A `submission_feature_property_*` table records where a value was stored;
+   * `feature_property_type` records what the property is currently declared as. The two are
+   * independent — a property can be redeclared while its existing rows stay put — and the
+   * table a row sits in is the only surviving record of the type it was written under. The
+   * merge layer needs both to decide whether and how a value can be carried into an output
+   * column, so every query tags its rows with the table's type.
+   */
+  storage_type: string;
 }
+
+/**
+ * Property types whose storage tables resolve to a single scalar value per row.
+ *
+ * `string`/`number`/`boolean` store the value directly; `code` and `taxon` store FKs that the
+ * queries resolve to their display value (`contributor_codeset_code.label`,
+ * `taxon.itis_scientific_name`). Because every member yields one scalar per row, a value from
+ * any of these tables is a candidate for a column declared as another member — subject to the
+ * merge layer's encodability rules. The remaining types (datetime, spatial, feature,
+ * artifact_key) have structural shapes (two columns, WKB, repeated list, aggregated array)
+ * and never exchange values across tables.
+ */
+export const SCALAR_PROPERTY_TYPES = ['string', 'number', 'boolean', 'code', 'taxon'] as const;
+
+/**
+ * Build the join that scopes a typed-property query to properties declared as `typeName`.
+ *
+ * Used only by the structurally-typed queries (datetime, spatial, feature), whose value shape
+ * exists solely for their declared type — a row for a property declared as anything else could
+ * not be assembled into that shape, so it is excluded entirely. Scalar-family queries
+ * deliberately do NOT use this join: they return rows regardless of the property's declared
+ * type, tagged with their storage type, and the merge layer decides what to do with them.
+ *
+ * Expects the outer query to alias `feature_property` as `fp`. `typeName` is an internal key
+ * of the query map, never caller input, so interpolating it is safe.
+ *
+ * @param {string} typeName - The `feature_property_type.name` to scope the query to.
+ * @return {string} A SQL `INNER JOIN` clause.
+ */
+const declaredAs = (typeName: string): string => `INNER JOIN feature_property_type fpt
+                 ON fpt.feature_property_type_id = fp.feature_property_type_id
+                 AND fpt.name = '${typeName}'
+                 AND fpt.record_end_date IS NULL`;
+
+/**
+ * Join fragment scoping a typed-property query to the active properties of one feature type
+ * (bound as `$2`).
+ *
+ * Every typed query carries this: a Parquet file holds exactly one feature type, so rows for
+ * another feature type's properties must never leak in even when a property name collides.
+ * The explicit `record_end_date` guards on `ftp`/`fp` keep end-dated property assignments out
+ * of read paths regardless of which other joins a query composes.
+ */
+const scopedToFeatureType = `INNER JOIN feature_type ft
+                 ON ft.feature_type_id = ftp.feature_type_id
+                 AND ft.name = $2
+                 AND ft.record_end_date IS NULL`;
 
 /**
  * A repository class for accessing download data.
@@ -466,42 +524,66 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Fetch typed property values for a batch of features from typed tables.
    *
-   * Queries the typed `submission_feature_property_*` tables in parallel for
-   * only the property types present in the schema. Returns raw (id, name, value)
-   * tuples — the service layer handles assembly and JSONB fallback logic.
+   * Queries the typed `submission_feature_property_*` tables in parallel, scoped to the given
+   * feature type's active properties. Returns raw (id, name, value, storage_type) tuples —
+   * the service layer handles assembly, cross-type precedence, and encodability.
+   *
+   * Scalar-family tables ({@link SCALAR_PROPERTY_TYPES}) are all queried whenever the schema
+   * declares at least one scalar-family property, with no declared-type filter: a property's
+   * rows can live in a table that no longer matches its declared type (redeclaring a property
+   * does not relocate its rows), and those values are still real data. Each row's
+   * `storage_type` tells the merge layer which table it came from. Structurally-typed tables
+   * (datetime, spatial, feature, artifact_key) are queried only for their declared properties —
+   * their value shapes exist solely for their own type.
    *
    * - Code properties resolve to `contributor_codeset_code.label` — Parquet files
    *   are standalone, so the human-readable label must be materialized at read time.
    * - Taxon properties resolve to `taxon.itis_scientific_name`.
    * - Geometry properties use `ST_AsGeoJSON()` for GeoJSON output.
+   * - Scalar queries are ordered by their table PK so that when a property has multiple rows
+   *   for one feature, the merge outcome is stable across reruns.
    *
    * @param {number[]} submissionFeatureIds - IDs of features in this batch.
-   * @param {string[]} propertyTypeNames - Distinct property type names to query.
-   * @return {Promise<TypedPropertyRow[]>} Flat list of (id, name, value) tuples.
+   * @param {string[]} propertyTypeNames - Distinct declared property type names in the schema.
+   * @param {string} featureTypeName - The feature type whose properties are being hydrated.
+   * @return {Promise<TypedPropertyRow[]>} Flat list of (id, name, value, storage_type) tuples.
    * @memberof DownloadRepository
    */
   async fetchTypedPropertyRows(
     submissionFeatureIds: number[],
-    propertyTypeNames: string[]
+    propertyTypeNames: string[],
+    featureTypeName: string
   ): Promise<TypedPropertyRow[]> {
     // Typed-table query definitions keyed by property type name.
     // Each entry maps a logical type to its SQL query against the corresponding typed table.
     const TYPED_TABLE_QUERIES: Record<string, string> = {
-      string: `SELECT p.submission_feature_id, fp.name, p.value
+      string: `SELECT p.submission_feature_id, fp.name, p.value, 'string' AS storage_type
                FROM submission_feature_property_string p
                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                 AND ftp.record_end_date IS NULL
                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-               WHERE p.submission_feature_id = ANY($1)`,
-      number: `SELECT p.submission_feature_id, fp.name, p.value
+                 AND fp.record_end_date IS NULL
+               ${scopedToFeatureType}
+               WHERE p.submission_feature_id = ANY($1)
+               ORDER BY p.submission_feature_property_string_id`,
+      number: `SELECT p.submission_feature_id, fp.name, p.value, 'number' AS storage_type
                FROM submission_feature_property_number p
                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                 AND ftp.record_end_date IS NULL
                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-               WHERE p.submission_feature_id = ANY($1)`,
-      boolean: `SELECT p.submission_feature_id, fp.name, p.value
+                 AND fp.record_end_date IS NULL
+               ${scopedToFeatureType}
+               WHERE p.submission_feature_id = ANY($1)
+               ORDER BY p.submission_feature_property_number_id`,
+      boolean: `SELECT p.submission_feature_id, fp.name, p.value, 'boolean' AS storage_type
                 FROM submission_feature_property_boolean p
                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                  AND ftp.record_end_date IS NULL
                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-                WHERE p.submission_feature_id = ANY($1)`,
+                  AND fp.record_end_date IS NULL
+                ${scopedToFeatureType}
+                WHERE p.submission_feature_id = ANY($1)
+                ORDER BY p.submission_feature_property_boolean_id`,
       // `datetime` emits up to two synthetic rows per source row, with the
       // property name suffixed `_date` / `_time`. A row with both components
       // populated produces two rows; a partial-component row produces one.
@@ -520,33 +602,47 @@ export class DownloadRepository extends BaseRepository {
       // Suffix constants live in `models/datetime-column.ts` and are shared
       // with `parquet-utils.ts`. The two sites must produce identical column
       // names — drift silently nulls cells.
-      datetime: `SELECT p.submission_feature_id, fp.name || '${DATETIME_DATE_SUFFIX}' AS name, to_char(p.date_value, 'YYYY-MM-DD') AS value
+      datetime: `SELECT p.submission_feature_id, fp.name || '${DATETIME_DATE_SUFFIX}' AS name, to_char(p.date_value, 'YYYY-MM-DD') AS value, 'datetime' AS storage_type
                  FROM submission_feature_property_timestamp p
                  INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
                  INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 ${declaredAs('datetime')}
+                 ${scopedToFeatureType}
                  WHERE p.submission_feature_id = ANY($1) AND p.date_value IS NOT NULL
                  UNION ALL
-                 SELECT p.submission_feature_id, fp.name || '${DATETIME_TIME_SUFFIX}' AS name, to_char(p.time_value, 'HH24:MI:SS') AS value
+                 SELECT p.submission_feature_id, fp.name || '${DATETIME_TIME_SUFFIX}' AS name, to_char(p.time_value, 'HH24:MI:SS') AS value, 'datetime' AS storage_type
                  FROM submission_feature_property_timestamp p
                  INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
                  INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 ${declaredAs('datetime')}
+                 ${scopedToFeatureType}
                  WHERE p.submission_feature_id = ANY($1) AND p.time_value IS NOT NULL`,
-      code: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
+      code: `SELECT p.submission_feature_id, fp.name, ccc.label AS value, 'code' AS storage_type
              FROM submission_feature_property_code p
              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+               AND ftp.record_end_date IS NULL
              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+               AND fp.record_end_date IS NULL
+             ${scopedToFeatureType}
              INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
-             WHERE p.submission_feature_id = ANY($1)`,
-      taxon: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
+             WHERE p.submission_feature_id = ANY($1)
+             ORDER BY p.submission_feature_property_code_id`,
+      taxon: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value, 'taxon' AS storage_type
               FROM submission_feature_property_taxon p
               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                AND ftp.record_end_date IS NULL
               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                AND fp.record_end_date IS NULL
+              ${scopedToFeatureType}
               INNER JOIN taxon t ON p.taxon_id = t.taxon_id
-              WHERE p.submission_feature_id = ANY($1)`,
-      spatial: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
+              WHERE p.submission_feature_id = ANY($1)
+              ORDER BY p.submission_feature_property_taxon_id`,
+      spatial: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value, 'spatial' AS storage_type
                 FROM submission_feature_property_geometry p
                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                ${declaredAs('spatial')}
+                ${scopedToFeatureType}
                 WHERE p.submission_feature_id = ANY($1)`,
       /**
        * - `jsonb_agg` (not `array_agg`) so pg's JSONB deserializer yields a native `string[]`,
@@ -560,21 +656,33 @@ export class DownloadRepository extends BaseRepository {
       feature: `SELECT
         p.submission_feature_id,
         fp.name,
-        jsonb_agg(sf.urn ORDER BY sf.submission_feature_id) AS value
+        jsonb_agg(sf.urn ORDER BY sf.submission_feature_id) AS value,
+        'feature' AS storage_type
       FROM submission_feature_property_feature p
       INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
       INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      ${declaredAs('feature')}
+      ${scopedToFeatureType}
       INNER JOIN submission_feature sf
         ON sf.submission_feature_id = p.referenced_submission_feature_id
         AND ${isSubmissionFeatureActive('sf')}
       WHERE p.submission_feature_id = ANY($1)
       GROUP BY p.submission_feature_id, fp.name`,
+      // No `declaredAs` here: this query derives its `feature_type_property` from the
+      // `artifact_ftp` subquery below, which already constrains `fpt.name = 'artifact_key'`,
+      // so it is scoped to the declared type by construction. Feature-type scoping is via
+      // `ft` on the owning feature's own feature_type_id.
       artifact_key: `SELECT
         sfa.submission_feature_id,
         fp.name,
-        jsonb_agg(a.object_key ORDER BY a.object_key) AS value
+        jsonb_agg(a.object_key ORDER BY a.object_key) AS value,
+        'artifact_key' AS storage_type
       FROM submission_feature_artifact sfa
       INNER JOIN submission_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
+      INNER JOIN feature_type ft
+        ON ft.feature_type_id = sf.feature_type_id
+        AND ft.name = $2
+        AND ft.record_end_date IS NULL
       INNER JOIN artifact a
         ON a.artifact_id = sfa.artifact_id
         AND a.artifact_status = 'uploaded'
@@ -603,14 +711,23 @@ export class DownloadRepository extends BaseRepository {
       GROUP BY sfa.submission_feature_id, fp.name`
     };
 
-    // Query only the typed tables for property types present in this batch
-    const queries = propertyTypeNames
-      .filter((typeName) => typeName in TYPED_TABLE_QUERIES)
-      .map((typeName) =>
-        this.connection
-          .query<TypedPropertyRow>(TYPED_TABLE_QUERIES[typeName], [submissionFeatureIds])
-          .then((r) => r.rows)
-      );
+    // Structurally-typed tables are queried only when the schema declares that type. If ANY
+    // scalar-family property is declared, every scalar table is queried — a scalar property's
+    // rows can live in any scalar table, so limiting the scan to declared types would hide
+    // exactly the rows the storage_type tag exists to surface.
+    const requestedTypeNames = new Set(propertyTypeNames.filter((typeName) => typeName in TYPED_TABLE_QUERIES));
+
+    if (propertyTypeNames.some((typeName) => (SCALAR_PROPERTY_TYPES as readonly string[]).includes(typeName))) {
+      for (const scalarTypeName of SCALAR_PROPERTY_TYPES) {
+        requestedTypeNames.add(scalarTypeName);
+      }
+    }
+
+    const queries = [...requestedTypeNames].map((typeName) =>
+      this.connection
+        .query<TypedPropertyRow>(TYPED_TABLE_QUERIES[typeName], [submissionFeatureIds, featureTypeName])
+        .then((r) => r.rows)
+    );
 
     const results = await Promise.all(queries);
 

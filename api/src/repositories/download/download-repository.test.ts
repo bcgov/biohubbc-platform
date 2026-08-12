@@ -499,27 +499,35 @@ describe('DownloadRepository', () => {
   });
 
   describe('fetchTypedPropertyRows', () => {
-    it('returns raw typed rows for string properties', async () => {
+    it('returns raw typed rows tagged with their storage type', async () => {
       const queryStub = sinon.stub();
-      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'site_name', value: 'Alpha Site' }] });
+      queryStub.resolves({ rows: [] });
+      queryStub.withArgs(sinon.match(/submission_feature_property_string/)).resolves({
+        rows: [{ submission_feature_id: 1, name: 'site_name', value: 'Alpha Site', storage_type: 'string' }]
+      });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([1], ['string']);
+      const result = await repo.fetchTypedPropertyRows([1], ['string'], 'observation');
 
       expect(result).to.have.length(1);
-      expect(result[0]).to.deep.equal({ submission_feature_id: 1, name: 'site_name', value: 'Alpha Site' });
+      expect(result[0]).to.deep.equal({
+        submission_feature_id: 1,
+        name: 'site_name',
+        value: 'Alpha Site',
+        storage_type: 'string'
+      });
     });
 
     it('queries contributor_codeset_code for code properties', async () => {
       const queryStub = sinon.stub();
-      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'status', value: 'Active' }] });
+      queryStub.resolves({ rows: [] });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([1], ['code']);
+      await repo.fetchTypedPropertyRows([1], ['code'], 'observation');
 
       const codeQuery = queryStub.getCalls().find((c) => String(c.args[0]).includes('contributor_codeset_code'));
       expect(codeQuery).to.not.be.undefined;
@@ -527,12 +535,12 @@ describe('DownloadRepository', () => {
 
     it('queries taxon table for taxon properties', async () => {
       const queryStub = sinon.stub();
-      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'species', value: 'Alces alces' }] });
+      queryStub.resolves({ rows: [] });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([1], ['taxon']);
+      await repo.fetchTypedPropertyRows([1], ['taxon'], 'observation');
 
       const taxonQuery = queryStub.getCalls().find((c) => String(c.args[0]).includes('itis_scientific_name'));
       expect(taxonQuery).to.not.be.undefined;
@@ -545,7 +553,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([1], ['datetime']);
+      await repo.fetchTypedPropertyRows([1], ['datetime'], 'observation');
 
       const datetimeQuery = queryStub
         .getCalls()
@@ -563,15 +571,102 @@ describe('DownloadRepository', () => {
       expect(/\bp\.value\b/.test(datetimeQuery!), 'datetime SQL must not reference p.value').to.be.false;
     });
 
-    it('uses ST_AsGeoJSON for spatial properties', async () => {
+    // A typed table records where a value was stored, not what the property is declared as —
+    // redeclaring a property does not relocate its rows. Scalar tables are therefore read
+    // WITHOUT a declared-type filter (the merge layer decides what a foreign-stored value can
+    // become), while structurally-typed tables keep it: their value shapes exist solely for
+    // their own declared type.
+    for (const [typeName, table] of [
+      ['string', 'submission_feature_property_string'],
+      ['number', 'submission_feature_property_number'],
+      ['boolean', 'submission_feature_property_boolean'],
+      ['code', 'submission_feature_property_code'],
+      ['taxon', 'submission_feature_property_taxon']
+    ] as const) {
+      it(`reads the ${typeName} table without a declared-type filter, scoped to the feature type`, async () => {
+        const queryStub = sinon.stub();
+        queryStub.resolves({ rows: [] });
+
+        const mockDBConnection = getMockDBConnection({ query: queryStub });
+        const repo = new DownloadRepository(mockDBConnection);
+
+        await repo.fetchTypedPropertyRows([1], [typeName], 'observation');
+
+        const call = queryStub.getCalls().find((candidate) => String(candidate.args[0]).includes(table));
+        expect(call, `expected a query against ${table}`).to.not.be.undefined;
+
+        const sql = String(call!.args[0]);
+        expect(sql).to.not.include(`fpt.name = '${typeName}'`);
+        expect(sql).to.include(`'${typeName}' AS storage_type`);
+        // Scoped to one feature type's active properties, never by declared type.
+        expect(sql).to.include('ft.name = $2');
+        expect(sql).to.include('ft.record_end_date IS NULL');
+        expect(sql).to.include('ftp.record_end_date IS NULL');
+        expect(sql).to.include('fp.record_end_date IS NULL');
+        // PK ordering keeps multi-row merges stable across reruns.
+        expect(sql).to.match(/ORDER BY p\.submission_feature_property_\w+_id/);
+        expect(call!.args[1]).to.deep.equal([[1], 'observation']);
+      });
+    }
+
+    for (const [typeName, table] of [
+      ['datetime', 'submission_feature_property_timestamp'],
+      ['spatial', 'submission_feature_property_geometry'],
+      ['feature', 'submission_feature_property_feature']
+    ] as const) {
+      it(`constrains the ${typeName} query to properties declared as '${typeName}'`, async () => {
+        const queryStub = sinon.stub();
+        queryStub.resolves({ rows: [] });
+
+        const mockDBConnection = getMockDBConnection({ query: queryStub });
+        const repo = new DownloadRepository(mockDBConnection);
+
+        await repo.fetchTypedPropertyRows([1], [typeName], 'observation');
+
+        const sql = queryStub
+          .getCalls()
+          .map((call) => String(call.args[0]))
+          .find((candidate) => candidate.includes(table));
+
+        expect(sql, `expected a query against ${table}`).to.not.be.undefined;
+        expect(sql).to.include('feature_property_type fpt');
+        expect(sql).to.include(`fpt.name = '${typeName}'`);
+        expect(sql).to.include('fpt.record_end_date IS NULL');
+        expect(sql).to.include('ft.name = $2');
+      });
+    }
+
+    it('scopes artifact_key to its declared type through the artifact_ftp subquery', async () => {
+      // This one derives its feature_type_property from a subquery that already filters on
+      // the type, so it needs no `declaredAs` join — but it must still be type-scoped.
       const queryStub = sinon.stub();
-      const geoJson = { type: 'Point', coordinates: [-123.5, 48.4] };
-      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'location', value: geoJson }] });
+      queryStub.resolves({ rows: [] });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([1], ['spatial']);
+      await repo.fetchTypedPropertyRows([1], ['artifact_key'], 'file');
+
+      const sql = queryStub
+        .getCalls()
+        .map((call) => String(call.args[0]))
+        .find((candidate) => candidate.includes('submission_feature_artifact'));
+
+      expect(sql).to.not.be.undefined;
+      expect(sql).to.include(`fpt.name = 'artifact_key'`);
+    });
+
+    it('uses ST_AsGeoJSON for spatial properties', async () => {
+      const queryStub = sinon.stub();
+      const geoJson = { type: 'Point', coordinates: [-123.5, 48.4] };
+      queryStub.resolves({
+        rows: [{ submission_feature_id: 1, name: 'location', value: geoJson, storage_type: 'spatial' }]
+      });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const result = await repo.fetchTypedPropertyRows([1], ['spatial'], 'observation');
 
       expect(result[0].value).to.deep.equal(geoJson);
 
@@ -579,29 +674,55 @@ describe('DownloadRepository', () => {
       expect(spatialQuery).to.not.be.undefined;
     });
 
-    it('queries only typed tables for property types requested', async () => {
+    it('queries every scalar table when any scalar-family property type is requested', async () => {
+      // A scalar property's rows can live in any scalar table (redeclaring a property does
+      // not relocate rows), so limiting the scan to the declared types would hide exactly
+      // the rows the storage_type tag exists to surface.
       const queryStub = sinon.stub();
       queryStub.resolves({ rows: [] });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([1], ['string', 'number']);
+      await repo.fetchTypedPropertyRows([1], ['string', 'number'], 'observation');
 
-      expect(queryStub.callCount).to.equal(2);
+      expect(queryStub.callCount).to.equal(5);
 
       const queryTexts = queryStub.getCalls().map((c) => String(c.args[0]));
-      expect(queryTexts.some((t) => t.includes('submission_feature_property_string'))).to.be.true;
-      expect(queryTexts.some((t) => t.includes('submission_feature_property_number'))).to.be.true;
-      expect(queryTexts.some((t) => t.includes('submission_feature_property_code'))).to.be.false;
-      // When `feature` is absent from the requested property types, the feature-arm SQL must not run.
+      for (const table of [
+        'submission_feature_property_string',
+        'submission_feature_property_number',
+        'submission_feature_property_boolean',
+        'submission_feature_property_code',
+        'submission_feature_property_taxon'
+      ]) {
+        expect(
+          queryTexts.some((t) => t.includes(table)),
+          `expected a query against ${table}`
+        ).to.be.true;
+      }
+      // Structurally-typed tables still run only when their type is declared.
       expect(queryTexts.some((t) => t.includes('submission_feature_property_feature'))).to.be.false;
+      expect(queryTexts.some((t) => t.includes('submission_feature_property_timestamp'))).to.be.false;
 
       // When `feature` is present, the feature-arm SQL is included.
       queryStub.resetHistory();
-      await repo.fetchTypedPropertyRows([1], ['string', 'feature']);
+      await repo.fetchTypedPropertyRows([1], ['string', 'feature'], 'observation');
       const featureQueryTexts = queryStub.getCalls().map((c) => String(c.args[0]));
       expect(featureQueryTexts.some((t) => t.includes('submission_feature_property_feature'))).to.be.true;
+    });
+
+    it('does not query scalar tables when only structural types are requested', async () => {
+      const queryStub = sinon.stub();
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      await repo.fetchTypedPropertyRows([1], ['spatial'], 'observation');
+
+      expect(queryStub.callCount).to.equal(1);
+      expect(String(queryStub.getCall(0).args[0])).to.include('submission_feature_property_geometry');
     });
 
     it('returns a single-element string array for a feature property with one referenced feature', async () => {
@@ -613,7 +734,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([100], ['feature']);
+      const result = await repo.fetchTypedPropertyRows([100], ['feature'], 'observation');
 
       expect(result).to.deep.include({
         submission_feature_id: 100,
@@ -636,7 +757,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([100], ['feature']);
+      const result = await repo.fetchTypedPropertyRows([100], ['feature'], 'observation');
 
       expect(result[0].value).to.deep.equal(['urn:1:obs:42', 'urn:1:obs:43']);
     });
@@ -648,7 +769,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([100], ['feature']);
+      await repo.fetchTypedPropertyRows([100], ['feature'], 'observation');
 
       const sqlText = String(queryStub.getCall(0).args[0]);
       expect(sqlText).to.include('sf.record_effective_date <= now()');
@@ -664,7 +785,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      await repo.fetchTypedPropertyRows([100], ['artifact_key']);
+      await repo.fetchTypedPropertyRows([100], ['artifact_key'], 'file');
 
       const sqlText = String(queryStub.getCall(0).args[0]);
       expect(sqlText).to.include('submission_feature_artifact sfa');
@@ -681,7 +802,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([1], ['unknown_type']);
+      const result = await repo.fetchTypedPropertyRows([1], ['unknown_type'], 'observation');
 
       expect(queryStub.callCount).to.equal(0);
       expect(result).to.have.length(0);
@@ -689,13 +810,18 @@ describe('DownloadRepository', () => {
 
     it('flattens results from multiple typed tables into a single array', async () => {
       const queryStub = sinon.stub();
-      queryStub.onFirstCall().resolves({ rows: [{ submission_feature_id: 1, name: 'site_name', value: 'Alpha' }] });
-      queryStub.onSecondCall().resolves({ rows: [{ submission_feature_id: 1, name: 'count', value: 42 }] });
+      queryStub.resolves({ rows: [] });
+      queryStub
+        .withArgs(sinon.match(/submission_feature_property_string/))
+        .resolves({ rows: [{ submission_feature_id: 1, name: 'site_name', value: 'Alpha', storage_type: 'string' }] });
+      queryStub
+        .withArgs(sinon.match(/submission_feature_property_number/))
+        .resolves({ rows: [{ submission_feature_id: 1, name: 'count', value: 42, storage_type: 'number' }] });
 
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const result = await repo.fetchTypedPropertyRows([1], ['string', 'number']);
+      const result = await repo.fetchTypedPropertyRows([1], ['string', 'number'], 'observation');
 
       expect(result).to.have.length(2);
       expect(result.find((r) => r.name === 'site_name')?.value).to.equal('Alpha');

@@ -9,13 +9,19 @@ import { DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { PolicyEffect } from '../../models/policy-statement';
 import { ActivePolicyStatementWithExpression } from '../../repositories/authorization/policy-statement-repository';
-import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
+import {
+  BaseFeatureRow,
+  DownloadRepository,
+  SCALAR_PROPERTY_TYPES,
+  TypedPropertyRow
+} from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { buildParquetKey } from '../../utils/export-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
+import { getLogger } from '../../utils/logger';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { CodeService } from '../code-service';
@@ -23,6 +29,38 @@ import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
+
+const defaultLog = getLogger('services/download/download-pipeline-service');
+
+/**
+ * Declared property types whose Parquet column accepts any scalar after string coercion.
+ *
+ * These all map to UTF8 columns, and any scalar value has a faithful string form — so a value
+ * stored under a different scalar type can be carried into the column. `number` and `boolean`
+ * are deliberately absent: their columns are DOUBLE/BOOLEAN, and the Parquet writer coerces
+ * rather than validates on those paths (`parseFloat` turns a non-numeric string into NaN
+ * silently; boolean conversion is truthiness, so the string 'false' becomes true). A foreign
+ * value bound for one of those columns is dropped instead — a null cell over silent corruption.
+ */
+const STRING_COERCIBLE_DECLARED_TYPES = new Set(['string', 'code', 'taxon']);
+
+/**
+ * Property types with no indexed storage of their own. They are emitted as null rather than
+ * read from `submission_feature.data`, which is pre-indexing input and can differ from the
+ * canonical indexed values.
+ */
+const UNSUPPORTED_PROPERTY_TYPES = new Set(['array', 'object']);
+
+/**
+ * One property value resolved for one feature, with the provenance the merge decided it on.
+ *
+ * `foreign` marks a value carried from a storage table other than the property's declared one —
+ * the caller reports these so stranded-typed data stays visible.
+ */
+interface MergedCell {
+  value: any;
+  foreign: boolean;
+}
 
 /**
  * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
@@ -343,8 +381,10 @@ export class DownloadPipelineService extends DBService {
 
       // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
       // Count hydrated rows (what actually lands in the file), not base cursor rows.
+      const foreignUsage: Record<string, number> = {};
+
       for await (const baseBatch of cursor) {
-        const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
+        const hydrated = await this.hydrateFeatureBatch(baseBatch, properties, foreignUsage);
         rowCount += hydrated.length;
         for (const feature of hydrated) {
           await writer.appendRow(featureToRow(feature, properties));
@@ -354,6 +394,20 @@ export class DownloadPipelineService extends DBService {
       await writer.close();
       await uploadPromise;
       streamingSucceeded = true;
+
+      // One line per file, not per cell: these are values stored under a property's previous
+      // declared type. They export fine (string-coerced), but they are invisible to
+      // declared-type consumers (e.g. policy expression filters), so a data relocation is the
+      // durable fix — this is the signal for it.
+      if (Object.keys(foreignUsage).length > 0) {
+        defaultLog.warn({
+          label: 'writeFeatureTypeParquet',
+          message: 'Exported values stored under a different type than their property declares',
+          featureTypeName,
+          downloadVersionId,
+          foreignCellCountsByProperty: foreignUsage
+        });
+      }
     } finally {
       if (!streamingSucceeded) {
         // The upload consumer sees abort via the rejected uploadPromise. The
@@ -409,80 +463,150 @@ export class DownloadPipelineService extends DBService {
    * Fetches values from typed `submission_feature_property_*` tables via the
    * repository, then assembles them into `ParquetFeatureData` records.
    *
+   * A property's rows can arrive from more than one storage table — redeclaring a property
+   * does not relocate rows written under its previous type — so the merge works on
+   * (property, storage type), not property name alone:
+   *
+   * - A row whose storage type matches the property's declared type always wins.
+   * - A foreign-stored row is used only when the declared column can faithfully carry it as
+   *   a string ({@link STRING_COERCIBLE_DECLARED_TYPES}); otherwise it is dropped and the
+   *   cell reads null.
+   * - Ties at the same precedence keep the first row encountered; the repository orders each
+   *   scalar query by its table PK, so the outcome is stable across reruns.
+   *
    * Properties without indexed storage are emitted as null. The hydrator must
    * not read `submission_feature.data`; that JSONB is pre-indexing input and
    * can differ from the canonical indexed values.
    *
    * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
    * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
+   * @param {Record<string, number>} [foreignUsage] - Optional accumulator; for each property
+   *   whose merged value came from a foreign storage table, its cell count is added under the
+   *   property name. Lets the caller report stranded-typed data once per file.
    * @return {Promise<ParquetFeatureData[]>}
    * @memberof DownloadPipelineService
    */
   async hydrateFeatureBatch(
     baseBatch: BaseFeatureRow[],
-    properties: CsvPropertyDefinition[]
+    properties: CsvPropertyDefinition[],
+    foreignUsage?: Record<string, number>
   ): Promise<ParquetFeatureData[]> {
-    const unsupportedPropertyTypes = new Set(['array', 'object']);
+    if (baseBatch.length === 0) {
+      return [];
+    }
 
     // Determine which typed tables need querying
     const typedPropertyTypes = [
-      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !unsupportedPropertyTypes.has(t)))
+      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !UNSUPPORTED_PROPERTY_TYPES.has(t)))
     ];
 
     const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
 
+    // The cursor is scoped to a single feature type, so every base row carries the same name.
+    const featureTypeName = baseBatch[0].feature_type_name;
+
     // Fetch raw typed rows from the repository
     const typedRows =
       typedPropertyTypes.length > 0
-        ? await this.downloadRepository.fetchTypedPropertyRows(submissionFeatureIds, typedPropertyTypes)
+        ? await this.downloadRepository.fetchTypedPropertyRows(
+            submissionFeatureIds,
+            typedPropertyTypes,
+            featureTypeName
+          )
         : [];
 
-    // Build property map: submission_feature_id → { propName: value }
-    const propertyMap = new Map<number, Record<string, any>>();
-    for (const row of typedRows) {
-      if (!propertyMap.has(row.submission_feature_id)) {
-        propertyMap.set(row.submission_feature_id, {});
-      }
-      propertyMap.get(row.submission_feature_id)![row.name] = row.value;
+    const declaredTypeByName = new Map(properties.map((p) => [p.feature_property_name, p.feature_property_type_name]));
+    const propertyMap = this.buildMergedCellMap(typedRows, declaredTypeByName);
+
+    if (foreignUsage) {
+      countForeignCells(propertyMap, foreignUsage);
     }
 
-    // Assemble ParquetFeatureData for each base row
-    return baseBatch.map((baseRow) => {
-      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
-      const data: Record<string, any> = {};
+    return baseBatch.map((baseRow) =>
+      assembleFeatureData(baseRow, properties, propertyMap.get(baseRow.submission_feature_id) ?? {})
+    );
+  }
 
-      for (const prop of properties) {
-        const propName = prop.feature_property_name;
+  /**
+   * Reduce typed rows to one merged cell per (feature, property).
+   *
+   * A property's rows can arrive from several storage tables, so which row wins is decided by
+   * {@link resolveMergedCell} rather than by arrival order.
+   *
+   * @param {TypedPropertyRow[]} typedRows - Raw typed rows for the batch.
+   * @param {Map<string, string>} declaredTypeByName - Property name → declared type.
+   * @return {Map<number, Record<string, MergedCell>>} submission_feature_id → merged cells by
+   *   property name.
+   * @memberof DownloadPipelineService
+   */
+  private buildMergedCellMap(
+    typedRows: TypedPropertyRow[],
+    declaredTypeByName: Map<string, string>
+  ): Map<number, Record<string, MergedCell>> {
+    const propertyMap = new Map<number, Record<string, MergedCell>>();
 
-        if (unsupportedPropertyTypes.has(prop.feature_property_type_name)) {
-          data[propName] = null;
-        } else if (prop.feature_property_type_name === 'datetime') {
-          // `datetime` properties are projected as two synthetic rows by
-          // `fetchTypedPropertyRows` with suffixed `name` values
-          // (`<prop>_date`, `<prop>_time`). The hydrator mirrors that
-          // expansion: each datetime property writes two `data` keys, one or
-          // both of which may be null for partial-component rows. Suffix
-          // constants live in `models/datetime-column.ts`; the SQL projection
-          // uses the same constants — drift silently nulls cells.
-          const dateKey = `${propName}${DATETIME_DATE_SUFFIX}`;
-          const timeKey = `${propName}${DATETIME_TIME_SUFFIX}`;
-          data[dateKey] = typedProps[dateKey] ?? null;
-          data[timeKey] = typedProps[timeKey] ?? null;
-        } else if (propName in typedProps) {
-          data[propName] = typedProps[propName];
-        } else {
-          data[propName] = null;
-        }
+    for (const row of typedRows) {
+      const cells = propertyMap.get(row.submission_feature_id) ?? {};
+      const merged = this.resolveMergedCell(row, declaredTypeByName, cells);
+
+      if (merged) {
+        cells[row.name] = merged;
+        propertyMap.set(row.submission_feature_id, cells);
       }
+    }
 
-      return {
-        submission_feature_id: baseRow.submission_feature_id,
-        uuid: baseRow.uuid,
-        feature_type_name: baseRow.feature_type_name,
-        data,
-        parent_uuid: baseRow.parent_uuid
-      };
-    });
+    return propertyMap;
+  }
+
+  /**
+   * Decide whether a typed row becomes (or replaces) the merged cell for its property.
+   *
+   * Precedence is (property, storage type)-aware:
+   *
+   * - Structurally-typed rows (datetime, spatial, feature, artifact_key) were already scoped
+   *   to their declared properties in SQL — accepted as declared matches.
+   * - A scalar row from the property's declared storage table is a declared match and always
+   *   beats a foreign one.
+   * - A scalar row from any other table is foreign. It is accepted only when the declared
+   *   column can carry it as a string ({@link STRING_COERCIBLE_DECLARED_TYPES}); a foreign
+   *   value bound for a DOUBLE/BOOLEAN column is dropped — see the constant's note on the
+   *   writer's silent-coercion hazard.
+   * - An existing cell of equal-or-better precedence is kept (first row wins on ties).
+   *
+   * @param {TypedPropertyRow} row - The candidate typed row.
+   * @param {Map<string, string>} declaredTypeByName - Property name → declared type.
+   * @param {Record<string, MergedCell>} [existingCells] - Cells merged so far for the row's
+   *   feature.
+   * @return {MergedCell | undefined} The cell to store, or undefined to keep the current state.
+   * @memberof DownloadPipelineService
+   */
+  private resolveMergedCell(
+    row: TypedPropertyRow,
+    declaredTypeByName: Map<string, string>,
+    existingCells?: Record<string, MergedCell>
+  ): MergedCell | undefined {
+    const isScalarStorage = (SCALAR_PROPERTY_TYPES as readonly string[]).includes(row.storage_type);
+
+    // `datetime` rows arrive under suffixed names that are not schema property names, so the
+    // declared-type lookup only applies to scalar rows.
+    const declaredType = declaredTypeByName.get(row.name);
+    const isDeclaredMatch = !isScalarStorage || declaredType === row.storage_type;
+
+    if (isScalarStorage && !isDeclaredMatch) {
+      // Foreign value: only carry it into a column that takes strings.
+      if (declaredType === undefined || !STRING_COERCIBLE_DECLARED_TYPES.has(declaredType)) {
+        return undefined;
+      }
+    }
+
+    const existing = existingCells?.[row.name];
+
+    if (existing && (!existing.foreign || !isDeclaredMatch)) {
+      // Existing cell already has equal or better precedence — first row wins.
+      return undefined;
+    }
+
+    return { value: row.value, foreign: isScalarStorage && !isDeclaredMatch };
   }
 
   /**
@@ -504,6 +628,80 @@ export class DownloadPipelineService extends DBService {
     }
     return lookup;
   }
+}
+
+/**
+ * Add each merged cell whose value came from a foreign storage table to a per-property tally.
+ *
+ * Counted once per cell so the caller can report the total for a whole file rather than logging
+ * per row.
+ *
+ * @param {Map<number, Record<string, MergedCell>>} propertyMap - Merged cells by feature.
+ * @param {Record<string, number>} foreignUsage - Accumulator, keyed by property name.
+ * @return {void}
+ */
+function countForeignCells(
+  propertyMap: Map<number, Record<string, MergedCell>>,
+  foreignUsage: Record<string, number>
+): void {
+  for (const cells of propertyMap.values()) {
+    for (const [name, cell] of Object.entries(cells)) {
+      if (cell.foreign) {
+        foreignUsage[name] = (foreignUsage[name] ?? 0) + 1;
+      }
+    }
+  }
+}
+
+/**
+ * Build the `ParquetFeatureData` record for one base row.
+ *
+ * Every schema property yields a key, so the row shape matches the Parquet schema whether or not
+ * a value was found — a property with no indexed storage reads null rather than being absent.
+ *
+ * @param {BaseFeatureRow} baseRow - The base feature row from the cursor.
+ * @param {CsvPropertyDefinition[]} properties - Schema property definitions for the feature type.
+ * @param {Record<string, MergedCell>} typedProps - Merged cells for this feature, by property name.
+ * @return {ParquetFeatureData} The assembled record.
+ */
+function assembleFeatureData(
+  baseRow: BaseFeatureRow,
+  properties: CsvPropertyDefinition[],
+  typedProps: Record<string, MergedCell>
+): ParquetFeatureData {
+  const data: Record<string, any> = {};
+
+  for (const prop of properties) {
+    const propName = prop.feature_property_name;
+
+    if (UNSUPPORTED_PROPERTY_TYPES.has(prop.feature_property_type_name)) {
+      data[propName] = null;
+    } else if (prop.feature_property_type_name === 'datetime') {
+      // `datetime` properties are projected as two synthetic rows by
+      // `fetchTypedPropertyRows` with suffixed `name` values
+      // (`<prop>_date`, `<prop>_time`). The hydrator mirrors that
+      // expansion: each datetime property writes two `data` keys, one or
+      // both of which may be null for partial-component rows. Suffix
+      // constants live in `models/datetime-column.ts`; the SQL projection
+      // uses the same constants — drift silently nulls cells.
+      const dateKey = `${propName}${DATETIME_DATE_SUFFIX}`;
+      const timeKey = `${propName}${DATETIME_TIME_SUFFIX}`;
+      data[dateKey] = typedProps[dateKey]?.value ?? null;
+      data[timeKey] = typedProps[timeKey]?.value ?? null;
+    } else if (propName in typedProps) {
+      data[propName] = typedProps[propName].value;
+    } else {
+      data[propName] = null;
+    }
+  }
+
+  return {
+    submission_feature_id: baseRow.submission_feature_id,
+    uuid: baseRow.uuid,
+    feature_type_name: baseRow.feature_type_name,
+    data,
+    parent_uuid: baseRow.parent_uuid
+  };
 }
 
 /**

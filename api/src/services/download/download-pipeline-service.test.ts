@@ -640,7 +640,7 @@ describe('DownloadPipelineService', () => {
         .returns(mockBaseCursor([baseBatch]));
       sinon
         .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
-        .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose' }]);
+        .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose', storage_type: 'string' }]);
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
@@ -1026,6 +1026,151 @@ describe('DownloadPipelineService', () => {
 
       expect(result).to.equal(0);
       expect(mockWriter.appendRow).to.not.have.been.called;
+    });
+  });
+
+  describe('hydrateFeatureBatch', () => {
+    // The merge works on (property, storage type), not property name alone: a property's rows
+    // can arrive from more than one storage table, because redeclaring a property does not
+    // relocate rows written under its previous type.
+    const baseBatch = [
+      {
+        submission_feature_id: 1,
+        uuid: 'uuid-1',
+        feature_type_name: 'observation',
+        data: {},
+        parent_uuid: null
+      }
+    ] as any[];
+
+    const taxonProperties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'taxon_id', feature_property_type_name: 'taxon' }
+    ];
+
+    it('passes the batch feature type through to the repository fetch', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const fetchStub = sinon.stub(DownloadRepository.prototype, 'fetchTypedPropertyRows').resolves([]);
+
+      await service.hydrateFeatureBatch(baseBatch, taxonProperties);
+
+      expect(fetchStub).to.have.been.calledOnceWith([1], ['taxon'], 'observation');
+    });
+
+    it('carries a foreign-stored value into a string-coercible declared column', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      // taxon_id declared `taxon` but its value sits in the number table.
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'taxon_id', value: 625197, storage_type: 'number' }]);
+
+      const hydrated = await service.hydrateFeatureBatch(baseBatch, taxonProperties);
+
+      expect(hydrated[0].data['taxon_id']).to.equal(625197);
+    });
+
+    it('prefers the declared-storage value over a foreign one regardless of row order', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'fetchTypedPropertyRows').resolves([
+        { submission_feature_id: 1, name: 'taxon_id', value: 625197, storage_type: 'number' },
+        { submission_feature_id: 1, name: 'taxon_id', value: 'Alces alces', storage_type: 'taxon' }
+      ]);
+
+      const hydrated = await service.hydrateFeatureBatch(baseBatch, taxonProperties);
+
+      expect(hydrated[0].data['taxon_id']).to.equal('Alces alces');
+    });
+
+    it('keeps the declared-storage value when it arrives before the foreign one', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'fetchTypedPropertyRows').resolves([
+        { submission_feature_id: 1, name: 'taxon_id', value: 'Alces alces', storage_type: 'taxon' },
+        { submission_feature_id: 1, name: 'taxon_id', value: 625197, storage_type: 'number' }
+      ]);
+
+      const hydrated = await service.hydrateFeatureBatch(baseBatch, taxonProperties);
+
+      expect(hydrated[0].data['taxon_id']).to.equal('Alces alces');
+    });
+
+    it('keeps the first foreign value when two foreign rows tie', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'fetchTypedPropertyRows').resolves([
+        { submission_feature_id: 1, name: 'taxon_id', value: 625197, storage_type: 'number' },
+        { submission_feature_id: 1, name: 'taxon_id', value: 'stray', storage_type: 'string' }
+      ]);
+
+      const hydrated = await service.hydrateFeatureBatch(baseBatch, taxonProperties);
+
+      expect(hydrated[0].data['taxon_id']).to.equal(625197);
+    });
+
+    it('drops a foreign value bound for a number-declared column (writer coerces, not validates)', async () => {
+      // A DOUBLE column would `parseFloat` a stray string into NaN silently; a BOOLEAN column
+      // truthiness-coerces. A null cell is the honest outcome over silent corruption.
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const numberProperties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      ];
+
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'count', value: 'not-a-number', storage_type: 'string' }]);
+
+      const hydrated = await service.hydrateFeatureBatch(baseBatch, numberProperties);
+
+      expect(hydrated[0].data['count']).to.be.null;
+    });
+
+    it('accumulates foreign cell counts per property when an accumulator is supplied', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'fetchTypedPropertyRows').resolves([
+        { submission_feature_id: 1, name: 'taxon_id', value: 625197, storage_type: 'number' },
+        { submission_feature_id: 2, name: 'taxon_id', value: 180703, storage_type: 'number' },
+        { submission_feature_id: 2, name: 'sign', value: 'tracks', storage_type: 'string' }
+      ]);
+
+      const twoFeatureBatch = [
+        ...baseBatch,
+        { submission_feature_id: 2, uuid: 'uuid-2', feature_type_name: 'observation', data: {}, parent_uuid: null }
+      ] as any[];
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'taxon_id', feature_property_type_name: 'taxon' },
+        { feature_property_name: 'sign', feature_property_type_name: 'string' }
+      ];
+
+      const foreignUsage: Record<string, number> = {};
+      await service.hydrateFeatureBatch(twoFeatureBatch, properties, foreignUsage);
+
+      // Two foreign taxon_id cells; `sign` came from its declared table and is not counted.
+      expect(foreignUsage).to.deep.equal({ taxon_id: 2 });
+    });
+
+    it('does not count declared-storage cells as foreign', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'taxon_id', value: 'Alces alces', storage_type: 'taxon' }]);
+
+      const foreignUsage: Record<string, number> = {};
+      await service.hydrateFeatureBatch(baseBatch, taxonProperties, foreignUsage);
+
+      expect(foreignUsage).to.deep.equal({});
     });
   });
 

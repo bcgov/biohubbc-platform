@@ -21,7 +21,6 @@ import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
-import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { PolicyEffect } from '../../models/policy-statement';
@@ -43,64 +42,6 @@ import {
 } from '../helpers/test-feature-property-helpers';
 import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
-
-/**
- * Helper: assemble ParquetFeatureData from base rows + typed property rows.
- * Mirrors the service-layer hydrateFeatureBatch logic for integration testing.
- * Pure function — extracted to module scope so it is not re-created per test.
- */
-function assembleFeatureData(
-  baseBatch: {
-    submission_feature_id: number;
-    uuid: string;
-    feature_type_name: string;
-    data: Record<string, any>;
-    parent_uuid: string | null;
-  }[],
-  typedRows: { submission_feature_id: number; name: string; value: any }[],
-  properties: CsvPropertyDefinition[]
-): ParquetFeatureData[] {
-  const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
-
-  const propertyMap = new Map<number, Record<string, any>>();
-  for (const row of typedRows) {
-    if (!propertyMap.has(row.submission_feature_id)) {
-      propertyMap.set(row.submission_feature_id, {});
-    }
-    propertyMap.get(row.submission_feature_id)![row.name] = row.value;
-  }
-
-  return baseBatch.map((baseRow) => {
-    const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
-    const data: Record<string, any> = {};
-
-    for (const prop of properties) {
-      const propName = prop.feature_property_name;
-      if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
-        data[propName] = baseRow.data?.properties?.[propName] ?? null;
-      } else if (prop.feature_property_type_name === 'datetime') {
-        // Mirror production hydrator: datetime properties are projected as two
-        // synthetic rows (`<prop>_date`, `<prop>_time`); write both keys.
-        const dateKey = `${propName}${DATETIME_DATE_SUFFIX}`;
-        const timeKey = `${propName}${DATETIME_TIME_SUFFIX}`;
-        data[dateKey] = typedProps[dateKey] ?? null;
-        data[timeKey] = typedProps[timeKey] ?? null;
-      } else if (propName in typedProps) {
-        data[propName] = typedProps[propName];
-      } else {
-        data[propName] = null;
-      }
-    }
-
-    return {
-      submission_feature_id: baseRow.submission_feature_id,
-      uuid: baseRow.uuid,
-      feature_type_name: baseRow.feature_type_name,
-      data,
-      parent_uuid: baseRow.parent_uuid
-    };
-  });
-}
 
 /**
  * Helper: stub @dsnp/parquetjs ParquetWriter.openStream and ObjectStorageService.uploadStream.
@@ -500,24 +441,19 @@ describe('Download Parquet pipeline (integration)', function () {
   }
 
   /**
-   * Helper: consume a base-feature-row stream and hydrate each batch with typed property values.
+   * Helper: consume a base-feature-row stream and hydrate each batch through the REAL
+   * service-layer hydrator, so these tests exercise the production merge (storage-type
+   * precedence, foreign-value handling) rather than a copy of it.
    * Collects the result into a flat array — fine for test-sized data sets.
    */
   async function hydrateFromStream(
     stream: AsyncGenerator<BaseFeatureRow[]>,
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
-    const typedPropertyTypes = [
-      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
-    ];
     const allRows: ParquetFeatureData[] = [];
 
     for await (const baseBatch of stream) {
-      const ids = baseBatch.map((r) => r.submission_feature_id);
-      const typedRows =
-        typedPropertyTypes.length > 0 ? await downloadRepo.fetchTypedPropertyRows(ids, typedPropertyTypes) : [];
-      allRows.push(...assembleFeatureData(baseBatch, typedRows, properties));
+      allRows.push(...(await pipelineService.hydrateFeatureBatch(baseBatch, properties)));
     }
 
     return allRows;
@@ -666,6 +602,65 @@ describe('Download Parquet pipeline (integration)', function () {
       ];
 
       const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-taxon');
+      expect(rows).to.have.length(1);
+      expect(rows[0].data.species).to.be.a('string');
+      expect(rows[0].data.species).to.include('Ursus arctos');
+    });
+
+    it('hydrates a taxon-declared property whose value sits in the number table', async () => {
+      // Redeclaring a property does not relocate rows written under its previous type, so a
+      // taxon-declared property can have its raw TSN sitting in the number table. The value
+      // is real data: it must hydrate (string-coercible declared column), not read as null.
+      const submissionId = await createTestSubmission(connection);
+      const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
+        species: 'legacy TSN'
+      });
+
+      // Declares the property as `taxon`, but the typed row goes into the NUMBER table.
+      const { featureTypePropertyId } = await insertTaxonFeatureProperty('capture', 'species', 'Ursus arctos');
+
+      await insertTypedPropertyRow(
+        'submission_feature_property_number',
+        captureFeatureId,
+        featureTypePropertyId,
+        625197
+      );
+
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'species', feature_property_type_name: 'taxon' }
+      ];
+
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-taxon-foreign');
+      expect(rows).to.have.length(1);
+      expect(rows[0].data.species).to.equal(625197);
+    });
+
+    it('prefers the declared-table value when a property has rows in both its own and a foreign table', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const captureFeatureId = await createTestFeature(connection, submissionId, 'capture', {
+        species: 'both stores'
+      });
+
+      const { featureTypePropertyId, taxonId } = await insertTaxonFeatureProperty('capture', 'species', 'Ursus arctos');
+
+      await insertTypedPropertyRow(
+        'submission_feature_property_taxon',
+        captureFeatureId,
+        featureTypePropertyId,
+        taxonId
+      );
+      await insertTypedPropertyRow(
+        'submission_feature_property_number',
+        captureFeatureId,
+        featureTypePropertyId,
+        625197
+      );
+
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'species', feature_property_type_name: 'taxon' }
+      ];
+
+      const rows = await streamAndHydrateBySubmission(submissionId, 'capture', properties, 'pq-taxon-both');
       expect(rows).to.have.length(1);
       expect(rows[0].data.species).to.be.a('string');
       expect(rows[0].data.species).to.include('Ursus arctos');

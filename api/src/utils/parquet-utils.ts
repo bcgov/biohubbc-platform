@@ -314,8 +314,18 @@ function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unkno
       // array. Defensive normalization: a scalar from upstream contract drift
       // lands as a one-element list rather than crashing the writer mid-file.
       return Array.isArray(value) ? value : [String(value)];
+    case 'string':
+    case 'code':
+    case 'taxon':
+    case 'artifact_key':
+      // These map to UTF8 columns, and a UTF8 column accepts only strings — the writer's
+      // UTF8 converter is `Buffer.from(value, 'utf8')`, which throws on anything else.
+      // Values can legitimately arrive non-string (the hydrator carries scalars stored under
+      // a property's previous declared type), so coerce rather than crash the whole file.
+      return typeof value === 'string' ? value : String(value);
     default:
-      // string, number, boolean, code, taxon, artifact_key — pass through directly
+      // number, boolean — pass through directly; the writer's DOUBLE converter accepts the
+      // number, and BOOLEAN the boolean, that their storage tables produce.
       return value;
   }
 }
