@@ -132,14 +132,19 @@ LEFT JOIN sample_period_start_timestamps spst
   ON spst.submission_feature_id = sf.submission_feature_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (sf.data#>>'{properties,taxon_id}')::int
+LEFT JOIN biohub.contributor_codeset_code ccc_sign
+  ON CASE
+    WHEN sf.data#>>'{properties,sign}' ~ '^code::observation_sign::[0-9]+$'
+      THEN split_part(sf.data#>>'{properties,sign}', '::', 3)::int
+  END = ccc_sign.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_sex
   ON CASE
-    WHEN sf.data#>>'{properties,sex}' ~ '^\d+$'
+    WHEN sf.data#>>'{properties,sex}' ~ '^[0-9]+$'
       THEN (sf.data#>>'{properties,sex}')::int
   END = ccc_sex.contributor_codeset_code_id
 LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
   ON CASE
-    WHEN sf.data#>>'{properties,life_stage}' ~ '^\d+$'
+    WHEN sf.data#>>'{properties,life_stage}' ~ '^[0-9]+$'
       THEN (sf.data#>>'{properties,life_stage}')::int
   END = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'

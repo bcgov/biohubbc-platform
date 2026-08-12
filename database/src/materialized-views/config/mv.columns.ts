@@ -34,7 +34,7 @@ export const OBSERVATIONS_COLUMNS: MaterializedViewColumn[] = [
   { alias: 'taxon_id', expression: "(sf.data#>>'{properties,taxon_id}')::int" },
   { alias: 'scientific_name', expression: 't.itis_scientific_name' },
   { alias: 'common_name', expression: 't.common_name' },
-  { alias: 'sign', expression: "(sf.data#>>'{properties,sign}')::text" },
+  { alias: 'sign', expression: "COALESCE(ccc_sign.label, (sf.data#>>'{properties,sign}')::text)" },
   {
     alias: 'group_id',
     expression:
