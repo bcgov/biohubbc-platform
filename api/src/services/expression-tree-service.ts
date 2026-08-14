@@ -110,26 +110,6 @@ export class ExpressionTreeService extends DBService {
   }
 
   /**
-   * Compute the semantic hash of a normalized expression tree, without persisting anything.
-   *
-   * Exposes the same hashing the write path uses, so two callers that mean the same search agree on
-   * one identity: clause key order is irrelevant, case-insensitive predicates are folded, and typed
-   * values are normalized. Martin sessions use this to recognise a repeated search and reuse its
-   * authorization context, which is what makes anonymous tile caching effective.
-   *
-   * Pass a tree that has already been through
-   * `ExpressionPredicateSemanticValidator.validateExpressionTree`, so the value normalization has
-   * been applied — hashing a raw API tree would produce a different, unstable identity.
-   *
-   * @param {NormalizedExpressionTreeExpression} normalizedTree - Validated, normalized tree.
-   * @return {string} Deterministic SHA-256 hex hash.
-   * @memberof ExpressionTreeService
-   */
-  computeExpressionTreeHash(normalizedTree: NormalizedExpressionTreeExpression): string {
-    return this.buildHashedTreeFromExpression(normalizedTree).hash;
-  }
-
-  /**
    * Read a stored expression tree by root expression id.
    *
    * Storage is normalized across several tables, but callers should receive the

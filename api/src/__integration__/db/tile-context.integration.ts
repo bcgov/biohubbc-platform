@@ -1,5 +1,5 @@
-// Integration test for tile context creation — verifies dedup, the reuse window, the creation cap
-// and its eviction, materialization and expiry cleanup against the real database.
+// Integration test for tile context creation — verifies expression persistence and dedup, the reuse
+// window, the creation cap and its eviction, and expiry cleanup against the real database.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -53,11 +53,17 @@ const resolveNumericProperty = async (connection: IDBConnection): Promise<Proper
   );
 
   if (!result.rows.length) {
-    expect.fail(`no numeric property seeded for ${FEATURE_TYPE}; the cap tests need one to build a filter`);
+    expect.fail(`no numeric property seeded for ${FEATURE_TYPE}; the filter tests need one to build an expression`);
   }
 
   return result.rows[0];
 };
+
+const storedContextSchema = z.object({
+  expression_id: z.string().nullable(),
+  system_user_id: z.number().nullable(),
+  create_user: z.number()
+});
 
 describe('Tile context (integration)', function () {
   this.timeout(20000);
@@ -86,7 +92,7 @@ describe('Tile context (integration)', function () {
   });
 
   /**
-   * Count the contexts currently stored for a hash.
+   * Count the contexts currently stored.
    */
   const countContexts = async (): Promise<number> => {
     const result = await connection.sql(
@@ -97,49 +103,94 @@ describe('Tile context (integration)', function () {
     return result.rows[0].total;
   };
 
-  describe('creation', () => {
-    it('creates a rule-based context for an unfiltered view', async () => {
-      const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
+  /**
+   * Read the stored authorization state of a context.
+   */
+  const readContext = async (martinContextId: string) => {
+    const stored = await connection.sql(
+      SQL`
+        SELECT expression_id, system_user_id, create_user
+        FROM martin_context
+        WHERE martin_context_id = ${martinContextId};
+      `,
+      storedContextSchema
+    );
 
-      expect(result.overCap).to.be.false;
+    return stored.rows[0];
+  };
 
-      if (result.overCap) {
-        return;
+  /**
+   * A filtered search. Varying `value` varies the normalized expression, so each distinct value is a
+   * distinct search rather than a reuse.
+   */
+  const filteredSearch = (value: number): ExpressionTree => ({
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        type: 'predicate',
+        feature_property_id: countProperty.feature_property_id,
+        feature_type_property_id: countProperty.feature_type_property_id,
+        operator: 'GreaterThanOrEqual',
+        value
       }
+    ]
+  });
+
+  describe('creation', () => {
+    it('creates a browse-all context, referencing no expression, for an unfiltered view', async () => {
+      const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
       expect(result.martinContextId).to.be.a('string');
       expect(result.expiresInSeconds).to.be.greaterThan(0);
-      // An unfiltered view is never materialized: it would snapshot the whole feature type.
-      expect(result.featureCount).to.be.null;
 
-      const stored = await connection.sql(
-        SQL`SELECT access_class, is_materialized, expression_hash FROM martin_context WHERE martin_context_id = ${result.martinContextId};`,
-        z.object({
-          access_class: z.string(),
-          is_materialized: z.boolean(),
-          expression_hash: z.string().nullable()
-        })
-      );
+      const stored = await readContext(result.martinContextId);
 
-      expect(stored.rows[0].access_class).to.equal('anon');
-      expect(stored.rows[0].is_materialized).to.be.false;
-      expect(stored.rows[0].expression_hash).to.be.null;
+      // NULL expression is the only browse-all mechanism: the tile function then applies the
+      // caller's authorization and the feature type, nothing else.
+      expect(stored.expression_id).to.be.null;
+      expect(stored.system_user_id).to.be.null;
+      expect(stored.create_user).to.be.a('number');
     });
 
-    it('records an anonymous caller as the anon access class with no scopes', async () => {
-      const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
+    it('persists the search expression and references it from the context', async () => {
+      const result = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900101), null);
 
-      if (result.overCap) {
-        expect.fail('expected a context');
-      }
+      const stored = await readContext(result.martinContextId);
 
-      const stored = await connection.sql(
-        SQL`SELECT access_class, security_scope_ids FROM martin_context WHERE martin_context_id = ${result.martinContextId};`,
-        z.object({ access_class: z.string(), security_scope_ids: z.array(z.string()) })
+      expect(stored.expression_id).to.be.a('string');
+
+      // The referenced expression is a real persisted row, not a hash.
+      const expression = await connection.sql(
+        SQL`SELECT count(*)::integer AS total FROM expression WHERE expression_id = ${stored.expression_id} AND record_end_date IS NULL;`,
+        z.object({ total: z.number() })
       );
 
-      expect(stored.rows[0].access_class).to.equal('anon');
-      expect(stored.rows[0].security_scope_ids).to.eql([]);
+      expect(expression.rows[0].total).to.equal(1);
+    });
+
+    it('resolves an identical search to one persisted expression', async () => {
+      const first = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900102), null);
+
+      // Same normalized search minted by a different identity: a distinct context, but the
+      // persistence layer must dedupe the expression itself.
+      const systemUserId = connection.systemUserId();
+      const second = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900102), systemUserId ?? 1);
+
+      const firstStored = await readContext(first.martinContextId);
+      const secondStored = await readContext(second.martinContextId);
+
+      expect(second.martinContextId).to.not.equal(first.martinContextId);
+      expect(secondStored.expression_id).to.equal(firstStored.expression_id);
+    });
+
+    it('records the caller on the context', async () => {
+      const systemUserId = connection.systemUserId();
+      const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, systemUserId ?? 1);
+
+      const stored = await readContext(result.martinContextId);
+
+      expect(stored.system_user_id).to.equal(systemUserId ?? 1);
     });
   });
 
@@ -151,10 +202,6 @@ describe('Tile context (integration)', function () {
       const second = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
       const after = await countContexts();
 
-      if (first.overCap || second.overCap) {
-        expect.fail('expected contexts');
-      }
-
       // Sharing one context is what lets every anonymous visitor share cached tiles.
       expect(second.martinContextId).to.equal(first.martinContextId);
       expect(after).to.equal(before);
@@ -163,22 +210,14 @@ describe('Tile context (integration)', function () {
     it('does not reuse a context whose remaining life is shorter than a token', async () => {
       const first = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
-      if (first.overCap) {
-        expect.fail('expected a context');
-      }
-
       // Leave it live, but with less life than a freshly minted token would have.
       await connection.sql(SQL`
         UPDATE martin_context
-        SET expires_at = now() + make_interval(secs => 30)
+        SET record_end_date = now() + make_interval(secs => 30)
         WHERE martin_context_id = ${first.martinContextId};
       `);
 
       const second = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
-
-      if (second.overCap) {
-        expect.fail('expected a context');
-      }
 
       // Reusing it would issue a 15 minute token against a context expiring in 30 seconds.
       expect(second.martinContextId).to.not.equal(first.martinContextId);
@@ -187,91 +226,58 @@ describe('Tile context (integration)', function () {
     it('does not extend the expiry of a reused context', async () => {
       const first = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
-      if (first.overCap) {
-        expect.fail('expected a context');
-      }
-
       const before = await connection.sql(
-        SQL`SELECT expires_at FROM martin_context WHERE martin_context_id = ${first.martinContextId};`,
-        z.object({ expires_at: z.any() })
+        SQL`SELECT record_end_date FROM martin_context WHERE martin_context_id = ${first.martinContextId};`,
+        z.object({ record_end_date: z.any() })
       );
 
       await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
       const after = await connection.sql(
-        SQL`SELECT expires_at FROM martin_context WHERE martin_context_id = ${first.martinContextId};`,
-        z.object({ expires_at: z.any() })
+        SQL`SELECT record_end_date FROM martin_context WHERE martin_context_id = ${first.martinContextId};`,
+        z.object({ record_end_date: z.any() })
       );
 
-      // The materialized result set is frozen at creation, so extending the expiry would let a
-      // popular search serve stale results indefinitely.
-      expect(String(after.rows[0].expires_at)).to.equal(String(before.rows[0].expires_at));
+      expect(String(after.rows[0].record_end_date)).to.equal(String(before.rows[0].record_end_date));
     });
 
-    it('does not share a context between different access classes', async () => {
+    it('does not share a context between an anonymous and an authenticated caller', async () => {
       const anonymous = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
-      // A system user id makes this 'scoped', which must hash to a different context.
+      // Authorization is evaluated per user at serve time, so identity is part of the dedup key.
       const systemUserId = connection.systemUserId();
-      const scoped = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, systemUserId ?? 1);
+      const authenticated = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, systemUserId ?? 1);
 
-      if (anonymous.overCap || scoped.overCap) {
-        expect.fail('expected contexts');
-      }
+      expect(authenticated.martinContextId).to.not.equal(anonymous.martinContextId);
 
-      expect(scoped.martinContextId).to.not.equal(anonymous.martinContextId);
+      const stored = await readContext(authenticated.martinContextId);
 
-      const stored = await connection.sql(
-        SQL`SELECT access_class FROM martin_context WHERE martin_context_id = ${scoped.martinContextId};`,
-        z.object({ access_class: z.string() })
-      );
-
-      expect(stored.rows[0].access_class).to.equal('scoped');
+      expect(stored.system_user_id).to.equal(systemUserId ?? 1);
     });
   });
 
   describe('creation cap', () => {
-    /**
-     * A filtered search, which is what produces a MATERIALIZED context. Varying `value` varies the
-     * expression hash, so each call is a distinct search rather than a reuse. The threshold matches
-     * nothing, which keeps materialization cheap without changing what is under test: whether a
-     * context is materialized depends on the presence of an expression, not on its result count.
-     */
-    const filteredSearch = (value: number): ExpressionTree => ({
-      type: 'expression',
-      operator: 'AND',
-      clauses: [
-        {
-          type: 'predicate',
-          feature_property_id: countProperty.feature_property_id,
-          feature_type_property_id: countProperty.feature_type_property_id,
-          operator: 'GreaterThanOrEqual',
-          value
-        }
-      ]
-    });
-
     /**
      * Push every context the database already holds far into the future, so the eviction ordering
      * under test is only ever between the contexts this test creates. Rolled back with everything
      * else.
      */
     const isolateExistingContexts = async (): Promise<void> => {
-      await connection.sql(SQL`UPDATE martin_context SET expires_at = now() + make_interval(days => 1);`);
+      await connection.sql(SQL`UPDATE martin_context SET record_end_date = now() + make_interval(days => 1);`);
     };
 
     /** Force a context to be the next one evicted, by making it the closest to expiry. */
     const expireSoonest = async (martinContextId: string, seconds: number): Promise<void> => {
       await connection.sql(SQL`
         UPDATE martin_context
-        SET expires_at = now() + make_interval(secs => ${seconds})
+        SET record_end_date = now() + make_interval(secs => ${seconds})
         WHERE martin_context_id = ${martinContextId};
       `);
     };
 
-    const countLiveMaterialized = async (): Promise<number> => {
+    const countLive = async (): Promise<number> => {
       const result = await connection.sql(
-        SQL`SELECT count(*)::integer AS live FROM martin_context WHERE expires_at > now() AND is_materialized;`,
+        SQL`SELECT count(*)::integer AS live FROM martin_context WHERE record_end_date > now();`,
         z.object({ live: z.number() })
       );
 
@@ -287,13 +293,9 @@ describe('Tile context (integration)', function () {
       return result.rows[0].total > 0;
     };
 
-    /** Create a materialized context for a distinct search, failing loudly if it was refused. */
-    const createMaterialized = async (value: number): Promise<string> => {
+    /** Create a context for a distinct search. */
+    const createFiltered = async (value: number): Promise<string> => {
       const result = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(value), null);
-
-      if (result.overCap) {
-        expect.fail('expected a context, not an over-cap refusal');
-      }
 
       return result.martinContextId;
     };
@@ -301,91 +303,37 @@ describe('Tile context (integration)', function () {
     it('evicts the context closest to expiry rather than refusing the new search', async () => {
       await isolateExistingContexts();
 
-      const oldest = await createMaterialized(900001);
-      const newer = await createMaterialized(900002);
+      const oldest = await createFiltered(900001);
+      const newer = await createFiltered(900002);
 
       // Deterministic ordering: `oldest` expires first, so it is the one the cap must claim.
       await expireSoonest(oldest, 60);
       await expireSoonest(newer, 600);
 
       // Sized so the next creation is exactly at the cap.
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
+      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLive());
 
-      const created = await createMaterialized(900003);
+      const created = await createFiltered(900003);
 
-      // The point of the change: a caller at the cap gets a working map. Refusing instead would let
-      // anyone hold every slot and lock every other user out of new searches.
+      // The point of the eviction design: a caller at the cap gets a working map. Refusing instead
+      // would let anyone hold every slot and lock every other user out of new searches.
       expect(created).to.not.be.empty;
       expect(await contextExists(oldest), 'the context closest to expiry should have been evicted').to.be.false;
       expect(await contextExists(newer), 'only the closest to expiry should be evicted').to.be.true;
-      expect(await countLiveMaterialized()).to.equal(Number(process.env.MARTIN_CONTEXT_MAX_LIVE));
-    });
-
-    it('drops the evicted context materialized feature ids with it', async () => {
-      await isolateExistingContexts();
-
-      // A predicate that actually matches, so there are rows to cascade.
-      const evicted = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(0), null);
-
-      if (evicted.overCap) {
-        expect.fail('expected a context');
-      }
-
-      const materializedIds = await connection.sql(
-        SQL`SELECT count(*)::integer AS total FROM martin_context_feature WHERE martin_context_id = ${evicted.martinContextId};`,
-        z.object({ total: z.number() })
-      );
-
-      expect(materializedIds.rows[0].total, 'the fixture needs a search that matches something').to.be.greaterThan(0);
-
-      await expireSoonest(evicted.martinContextId, 60);
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
-
-      await createMaterialized(900004);
-
-      const remaining = await connection.sql(
-        SQL`SELECT count(*)::integer AS total FROM martin_context_feature WHERE martin_context_id = ${evicted.martinContextId};`,
-        z.object({ total: z.number() })
-      );
-
-      // Reclaiming the rows is the whole point of the cap; leaving them would bound nothing.
-      expect(remaining.rows[0].total).to.equal(0);
-    });
-
-    it('never caps an unfiltered search, which materializes nothing', async () => {
-      await isolateExistingContexts();
-
-      const materialized = await createMaterialized(900005);
-
-      await expireSoonest(materialized, 60);
-      // Already at the cap, with no headroom at all.
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
-
-      // A browse-all context is one row with no materialized ids behind it, so capping it would cost
-      // availability and save nothing.
-      const browseAll = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
-
-      if (browseAll.overCap) {
-        expect.fail('expected a context');
-      }
-
-      expect(await contextExists(materialized), 'an unfiltered search must not evict anything').to.be.true;
+      expect(await countLive()).to.equal(Number(process.env.MARTIN_CONTEXT_MAX_LIVE));
     });
 
     it('reuses a live context at the cap instead of evicting to replace it', async () => {
       await isolateExistingContexts();
 
-      const first = await createMaterialized(900006);
+      const first = await createFiltered(900006);
 
       await expireSoonest(first, 900);
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
+      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLive());
 
-      // The same search resolves to the same hash, so it never reaches the cap at all.
+      // The same search by the same identity resolves to the same hash, so it never reaches the cap
+      // at all.
       const again = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900006), null);
-
-      if (again.overCap) {
-        expect.fail('expected a context');
-      }
 
       expect(again.martinContextId).to.equal(first);
       expect(await contextExists(first)).to.be.true;
@@ -402,55 +350,31 @@ describe('Tile context (integration)', function () {
       }
     });
 
-    it('never evicts for a search too large to map', async () => {
-      await isolateExistingContexts();
-
-      const victim = await createMaterialized(900008);
-
-      await expireSoonest(victim, 60);
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
-      // Any real search now matches more features than may be mapped.
-      process.env.MARTIN_CONTEXT_MAX_FEATURES = '1';
-
-      // Eviction must come AFTER the over-cap refusal. In the other order, a refused search would
-      // still evict a live context and then discard its own — a free eviction per request for an
-      // attacker who never even occupies a slot.
-      const refused = await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(0), null);
-
-      expect(refused.overCap).to.be.true;
-      expect(await contextExists(victim), 'a refused search must not evict anyone').to.be.true;
-      expect(await countLiveMaterialized()).to.equal(Number(process.env.MARTIN_CONTEXT_MAX_LIVE));
-    });
-
     it('never evicts the context it just created, even when it is the closest to expiry', async () => {
       // Park everything, create one more, park that too: every candidate now expires in a day,
       // so the NEW context (with a much shorter TTL) becomes the closest to expiry — the exact
       // case where "evict the closest to expiry" would otherwise pick itself and return a token
       // whose map can never load.
       await isolateExistingContexts();
-      const other = await createMaterialized(900009);
+      const other = await createFiltered(900009);
       await isolateExistingContexts();
 
       expect(other).to.not.be.empty;
-      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLiveMaterialized());
+      process.env.MARTIN_CONTEXT_MAX_LIVE = String(await countLive());
 
-      const created = await createMaterialized(900010);
+      const created = await createFiltered(900010);
 
       expect(await contextExists(created), 'the new context must never be its own victim').to.be.true;
-      expect(await countLiveMaterialized()).to.equal(Number(process.env.MARTIN_CONTEXT_MAX_LIVE));
+      expect(await countLive()).to.equal(Number(process.env.MARTIN_CONTEXT_MAX_LIVE));
     });
   });
 
   describe('cleanup', () => {
-    it('deletes expired contexts and cascades their materialized ids', async () => {
+    it('deletes expired contexts', async () => {
       const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
-      if (result.overCap) {
-        expect.fail('expected a context');
-      }
-
       await connection.sql(SQL`
-        UPDATE martin_context SET expires_at = now() - make_interval(secs => 60)
+        UPDATE martin_context SET record_end_date = now() - make_interval(secs => 60)
         WHERE martin_context_id = ${result.martinContextId};
       `);
 
@@ -469,10 +393,6 @@ describe('Tile context (integration)', function () {
     it('leaves live contexts alone', async () => {
       const result = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
 
-      if (result.overCap) {
-        expect.fail('expected a context');
-      }
-
       await service.deleteExpiredMartinContexts();
 
       const remaining = await connection.sql(
@@ -481,6 +401,27 @@ describe('Tile context (integration)', function () {
       );
 
       expect(remaining.rows[0].total).to.equal(1);
+    });
+
+    it('does not preserve an expired context for reuse', async () => {
+      const first = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
+
+      await connection.sql(SQL`
+        UPDATE martin_context SET record_end_date = now() - make_interval(secs => 60)
+        WHERE martin_context_id = ${first.martinContextId};
+      `);
+
+      // The mint path opportunistically clears expired rows for its own hash, then creates fresh.
+      const second = await service.createOrReuseMartinContext(FEATURE_TYPE, undefined, null);
+
+      expect(second.martinContextId).to.not.equal(first.martinContextId);
+
+      const remaining = await connection.sql(
+        SQL`SELECT count(*)::integer AS total FROM martin_context WHERE martin_context_id = ${first.martinContextId};`,
+        z.object({ total: z.number() })
+      );
+
+      expect(remaining.rows[0].total).to.equal(0);
     });
   });
 });

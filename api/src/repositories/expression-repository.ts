@@ -8,14 +8,15 @@ export class ExpressionRepository extends BaseRepository {
   /**
    * Insert an expression anchor row for a semantic expression hash.
    *
-   * Callers are expected to pre-read by hash and reuse existing anchors. The
-   * active-hash uniqueness constraint remains the final guard for concurrent
-   * duplicate writes.
+   * Callers are expected to pre-read by hash and reuse existing anchors. Two concurrent writers can
+   * still both miss that pre-read; `ON CONFLICT DO NOTHING` against the active-hash unique index
+   * makes the loser wait for the winner's commit and then adopt its row (`inserted: false`), rather
+   * than aborting the loser's whole transaction with a unique violation.
    *
    * @param {LogicalOperator} operator - Expression logical operator.
    * @param {string} expressionHash - Deterministic semantic expression hash.
    * @return {Promise<ResolvedExpressionAnchor>} Resolved expression row with insert-state flag.
-   * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
+   * @throws {ApiExecuteSQLError} If neither the insert nor the conflict re-read yields a row.
    */
   async insertExpressionAnchor(operator: LogicalOperator, expressionHash: string): Promise<ResolvedExpressionAnchor> {
     const knex = getKnex();
@@ -24,6 +25,8 @@ export class ExpressionRepository extends BaseRepository {
         operator,
         expression_hash: expressionHash
       })
+      .onConflict(knex.raw('(expression_hash) WHERE record_end_date IS NULL'))
+      .ignore()
       .returning([
         'expression_id',
         knex.raw('operator::text AS operator'),
@@ -32,16 +35,22 @@ export class ExpressionRepository extends BaseRepository {
       ]);
 
     const response = await this.connection.knex(query, ResolvedExpressionAnchor);
-    const rowCount = response.rowCount ?? 0;
 
-    if (rowCount !== 1) {
+    if ((response.rowCount ?? 0) === 1) {
+      return response.rows[0];
+    }
+
+    // A concurrent identical write won the race; its committed row is the anchor to reuse.
+    const existing = await this.findExpressionByHash(expressionHash);
+
+    if (!existing) {
       throw new ApiExecuteSQLError('Failed to insert expression anchor', [
         'ExpressionRepository->insertExpressionAnchor',
-        `rowCount was ${rowCount}, expected 1`
+        'insert conflicted but no active row was found for the hash'
       ]);
     }
 
-    return response.rows[0];
+    return { ...existing, inserted: false };
   }
 
   /**

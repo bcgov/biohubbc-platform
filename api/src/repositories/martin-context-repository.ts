@@ -1,34 +1,6 @@
-import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
-import { getKnex } from '../database/db';
 import { CreateMartinContext, MartinContextWithExpiry } from '../models/martin-context';
 import { BaseRepository } from './base-repository';
-
-/** Extent columns returned by the bounding-box queries; each is null when the context has no geometry. */
-const boundingBoxExtentSchema = z.object({
-  min_x: z.number().nullable(),
-  min_y: z.number().nullable(),
-  max_x: z.number().nullable(),
-  max_y: z.number().nullable()
-});
-
-/**
- * Reduce a bounding-box extent row to a `[minx, miny, maxx, maxy]` tuple, or null when the context
- * holds no mappable geometries (an empty extent).
- *
- * @param {(z.infer<typeof boundingBoxExtentSchema> | undefined)} row
- * @return {*}  {([number, number, number, number] | null)}
- */
-const toBoundingBoxTuple = (
-  row: z.infer<typeof boundingBoxExtentSchema> | undefined
-): [number, number, number, number] | null => {
-  if (!row || row.min_x === null || row.min_y === null || row.max_x === null || row.max_y === null) {
-    return null;
-  }
-
-  return [row.min_x, row.min_y, row.max_x, row.max_y];
-};
 
 /**
  * Repository for tile context rows: the server-side authorization state behind a map Martin session.
@@ -37,14 +9,13 @@ export class MartinContextRepository extends BaseRepository {
   /**
    * Find a live context that an identical request can reuse.
    *
-   * Reuse is what makes tile caching effective: every anonymous visitor running the same search
-   * shares one context, and therefore one set of cached tiles.
+   * Reuse is what makes tile caching effective: every caller with the same identity running the same
+   * search shares one context, and therefore one set of cached tiles.
    *
    * A context is only reusable while it still has at least `minRemainingSeconds` of life, which the
    * caller sets to the token lifetime. Handing out a fresh token against a context due to expire
    * sooner would produce a session whose tiles die mid-use. The context's own expiry is never
-   * extended: its materialized result set is frozen at creation, so extending it would let a popular
-   * search serve stale results indefinitely.
+   * extended.
    *
    * @param {string} contextHash
    * @param {number} minRemainingSeconds
@@ -58,11 +29,10 @@ export class MartinContextRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         martin_context_id,
-        is_materialized,
-        floor(extract(epoch FROM (expires_at - now())))::integer AS expires_in_seconds
+        floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds
       FROM martin_context
       WHERE context_hash = ${contextHash}
-        AND expires_at >= now() + make_interval(secs => ${minRemainingSeconds})
+        AND record_end_date >= now() + make_interval(secs => ${minRemainingSeconds})
       ORDER BY create_date DESC
       LIMIT 1;
     `;
@@ -75,6 +45,9 @@ export class MartinContextRepository extends BaseRepository {
   /**
    * Insert a tile context.
    *
+   * `create_user` comes from the connection's audit context (`api_get_context_user_id()`): the
+   * searcher when the request is authenticated, the API service account for anonymous mints.
+   *
    * @param {CreateMartinContext} context
    * @param {number} ttlSeconds
    * @return {Promise<MartinContextWithExpiry>}
@@ -84,135 +57,27 @@ export class MartinContextRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO martin_context (
         context_hash,
-        access_class,
+        expression_id,
         feature_type_id,
-        security_scope_ids,
-        expression_hash,
-        is_materialized,
-        expires_at
+        system_user_id,
+        record_end_date,
+        create_user
       ) VALUES (
         ${context.context_hash},
-        ${context.access_class},
+        ${context.expression_id},
         ${context.feature_type_id},
-        ${context.security_scope_ids}::uuid[],
-        ${context.expression_hash},
-        ${context.is_materialized},
-        now() + make_interval(secs => ${ttlSeconds})
+        ${context.system_user_id},
+        now() + make_interval(secs => ${ttlSeconds}),
+        api_get_context_user_id()
       )
       RETURNING
         martin_context_id,
-        is_materialized,
-        floor(extract(epoch FROM (expires_at - now())))::integer AS expires_in_seconds;
+        floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds;
     `;
 
     const response = await this.connection.sql(sqlStatement, MartinContextWithExpiry);
 
     return response.rows[0];
-  }
-
-  /**
-   * Materialize the search results for a context.
-   *
-   * Takes the unexecuted feature-id subquery the search evaluator builds, so the map resolves its
-   * result set through exactly the same SQL the table view uses.
-   *
-   * Reads one row beyond the cap so the caller can tell "at the limit" from "over it" without
-   * counting the whole result set first.
-   *
-   * @param {string} martinContextId
-   * @param {Knex.QueryBuilder} featureIdsSubquery - Unexecuted, already security filtered.
-   * @param {number} limit - Cap + 1.
-   * @return {Promise<number>} Number of ids materialized.
-   * @memberof MartinContextRepository
-   */
-  async materializeContextFeatures(
-    martinContextId: string,
-    featureIdsSubquery: Knex.QueryBuilder,
-    limit: number
-  ): Promise<number> {
-    const knex = getKnex();
-
-    const queryBuilder = knex
-      .into(knex.raw('martin_context_feature (martin_context_id, submission_feature_id)'))
-      .insert(
-        knex
-          .select(knex.raw('?::uuid', [martinContextId]), 'matches.submission_feature_id')
-          .from(featureIdsSubquery.clone().limit(limit).as('matches'))
-      );
-
-    const response = await this.connection.knex(queryBuilder);
-
-    return response.rowCount ?? 0;
-  }
-
-  /**
-   * Compute and store the extent of a context's materialized geometries.
-   *
-   * Stored rather than recomputed so a reused context returns it for free.
-   *
-   * @param {string} martinContextId
-   * @return {Promise<[number, number, number, number] | null>} [minx, miny, maxx, maxy], or null.
-   * @memberof MartinContextRepository
-   */
-  async updateContextBoundingBox(martinContextId: string): Promise<[number, number, number, number] | null> {
-    const sqlStatement = SQL`
-      UPDATE martin_context
-      SET bbox = (
-        SELECT public.ST_Extent(g.value)
-        FROM martin_context_feature tcf
-        JOIN submission_feature_property_geometry g
-          ON g.submission_feature_id = tcf.submission_feature_id
-        WHERE tcf.martin_context_id = ${martinContextId}
-      )
-      WHERE martin_context_id = ${martinContextId}
-      RETURNING
-        public.ST_XMin(bbox) AS min_x,
-        public.ST_YMin(bbox) AS min_y,
-        public.ST_XMax(bbox) AS max_x,
-        public.ST_YMax(bbox) AS max_y;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, boundingBoxExtentSchema);
-
-    return toBoundingBoxTuple(response.rows[0]);
-  }
-
-  /**
-   * Read the stored extent of a context's materialized geometries.
-   *
-   * The extent is computed once, when the context is created (see {@link updateContextBoundingBox}),
-   * and a context's materialized result set is frozen thereafter. A reused context therefore reads the
-   * stored value back rather than recomputing it and rewriting the shared row.
-   *
-   * @param {string} martinContextId
-   * @return {Promise<[number, number, number, number] | null>} [minx, miny, maxx, maxy], or null.
-   * @memberof MartinContextRepository
-   */
-  async getContextBoundingBox(martinContextId: string): Promise<[number, number, number, number] | null> {
-    const sqlStatement = SQL`
-      SELECT
-        public.ST_XMin(bbox) AS min_x,
-        public.ST_YMin(bbox) AS min_y,
-        public.ST_XMax(bbox) AS max_x,
-        public.ST_YMax(bbox) AS max_y
-      FROM martin_context
-      WHERE martin_context_id = ${martinContextId};
-    `;
-
-    const response = await this.connection.sql(sqlStatement, boundingBoxExtentSchema);
-
-    return toBoundingBoxTuple(response.rows[0]);
-  }
-
-  /**
-   * Delete a tile context. Materialized ids cascade.
-   *
-   * @param {string} martinContextId
-   * @return {Promise<void>}
-   * @memberof MartinContextRepository
-   */
-  async deleteMartinContext(martinContextId: string): Promise<void> {
-    await this.connection.sql(SQL`DELETE FROM martin_context WHERE martin_context_id = ${martinContextId};`);
   }
 
   /**
@@ -227,7 +92,7 @@ export class MartinContextRepository extends BaseRepository {
    */
   async deleteExpiredContextsByHash(contextHash: string): Promise<number> {
     const response = await this.connection.sql(
-      SQL`DELETE FROM martin_context WHERE context_hash = ${contextHash} AND expires_at <= now();`
+      SQL`DELETE FROM martin_context WHERE context_hash = ${contextHash} AND record_end_date <= now();`
     );
 
     return response.rowCount ?? 0;
@@ -240,26 +105,18 @@ export class MartinContextRepository extends BaseRepository {
    * @memberof MartinContextRepository
    */
   async deleteExpiredContexts(): Promise<number> {
-    const response = await this.connection.sql(SQL`DELETE FROM martin_context WHERE expires_at <= now();`);
+    const response = await this.connection.sql(SQL`DELETE FROM martin_context WHERE record_end_date <= now();`);
 
     return response.rowCount ?? 0;
   }
 
   /**
-   * Enforce the materialized-context cap by evicting the contexts closest to expiry, never touching
+   * Enforce the live-context cap by evicting the contexts closest to expiry, never touching
    * `protectedContextId`.
    *
-   * Called AFTER the new context has been inserted and has passed the feature-cap check. The order
-   * is the point: evicting first would let a search that is then refused for matching too many
-   * features evict a live context and throw its own away — turning over-cap requests into a free
-   * eviction attack that blanks one working map per request while never occupying a slot. Because
-   * this runs after the insert, the count below includes the caller's own row, and the LIMIT brings
-   * the total this transaction can see back down to exactly the cap.
-   *
-   * Only MATERIALIZED contexts are counted. A browse-all context is a single row with no
-   * `martin_context_feature` behind it, so bounding those would cost availability and save nothing;
-   * what this bounds is the materialization an anonymous caller can force by varying an expression
-   * per request.
+   * Bounds the database growth a caller can force by varying a search per mint (each mint may also
+   * persist a new expression, but expressions deduplicate and end-date; context rows are the
+   * unbounded part). Reused contexts never reach this: only new inserts do.
    *
    * Evicts rather than refuses. A global refusal is a denial of service handed to anyone willing to
    * spend one request per context: with a cap of N and a context lifetime of T, holding every slot
@@ -284,29 +141,27 @@ export class MartinContextRepository extends BaseRepository {
    * Rows are locked as they are fetched and skipped rows do not count against the LIMIT, so each
    * caller still evicts as many as it needs.
    *
-   * Deleted contexts cascade to `martin_context_feature` (martin_context_feature_fk1), and the
-   * expires_at index (martin_context_idx2) serves both the liveness filter and the ordering.
+   * The record_end_date index (martin_context_idx2) serves both the liveness filter and the
+   * ordering.
    *
-   * @param {number} maxLiveContexts - Maximum live materialized contexts to leave in place.
+   * @param {number} maxLiveContexts - Maximum live contexts to leave in place.
    * @param {string} protectedContextId - The just-created context; never evicted.
    * @return {Promise<number>} Contexts evicted.
    * @memberof MartinContextRepository
    */
-  async enforceMaterializedContextCap(maxLiveContexts: number, protectedContextId: string): Promise<number> {
+  async enforceLiveContextCap(maxLiveContexts: number, protectedContextId: string): Promise<number> {
     const response = await this.connection.sql(SQL`
       WITH live AS (
         SELECT count(*) AS live_count
         FROM martin_context
-        WHERE expires_at > now()
-          AND is_materialized
+        WHERE record_end_date > now()
       ),
       victims AS (
         SELECT martin_context_id
         FROM martin_context
-        WHERE expires_at > now()
-          AND is_materialized
+        WHERE record_end_date > now()
           AND martin_context_id != ${protectedContextId}
-        ORDER BY expires_at ASC
+        ORDER BY record_end_date ASC
         LIMIT greatest((SELECT live_count FROM live) - ${maxLiveContexts}, 0)
         -- Counting and locking must be separate scopes: FOR UPDATE is not allowed alongside a
         -- window function, which is why the count is its own CTE rather than a count(*) OVER ().

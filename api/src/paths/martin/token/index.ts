@@ -27,7 +27,7 @@ POST.apiDoc = {
   requestBody: martinSessionRequestBodySchema,
   responses: {
     200: {
-      description: 'A Martin session, or a refusal if the search matched more features than can be mapped.',
+      description: 'A Martin session.',
       content: {
         'application/json': { schema: martinSessionResponseSchema }
       }
@@ -39,15 +39,16 @@ POST.apiDoc = {
 /**
  * Create a Martin session.
  *
- * Identity is resolved exactly as feature search resolves it, and the authorized result set is
- * derived by the same expression evaluator, so the map can never show something the table view would
- * hide, or the reverse.
+ * Identity is resolved exactly as feature search resolves it, and the search expression is persisted
+ * through the same normalization the search endpoint applies, so the map can never show something
+ * the table view would hide, or the reverse.
  *
- * The token the browser receives carries only an opaque context id. The access class, the resolved
- * security scopes and the matching feature ids all stay server-side, and the tile function re-applies
- * the security predicate every time it generates a tile. A client therefore cannot widen its own
- * access by editing the token, and securing a feature removes it from tiles within one gateway cache
- * TTL rather than lasting for the life of the session.
+ * The token the browser receives carries only an opaque context id. The persisted expression and the
+ * caller's identity stay server-side, and the tile function evaluates both — including live team
+ * membership — every time a tile is generated. A client therefore cannot widen its own access by
+ * editing the token, and securing a feature (or revoking a membership) affects tiles within one
+ * Martin cache expiry rather than lasting for the life of the session. A search of any size can be
+ * mapped: what is stored is the search, not its results.
  *
  * Tile bytes never pass through this API: the browser fetches tiles from the Martin Gateway.
  *
@@ -89,12 +90,6 @@ export function createMartinSession(): RequestHandler {
       // The token is short lived and caller specific, so it must never be cached.
       res.setHeader('Cache-Control', 'no-store');
 
-      if (context.overCap) {
-        // No token issued: a partially mapped result set would be a spatially biased view of the
-        // search, which is more misleading than declining to map it.
-        return res.status(200).json({ over_cap: true, cap: context.cap });
-      }
-
       const tokenService = new MartinTokenService();
 
       const { token, expiresIn } = tokenService.mintToken({
@@ -103,15 +98,12 @@ export function createMartinSession(): RequestHandler {
       });
 
       return res.status(200).json({
-        over_cap: false,
         token,
         token_type: 'Bearer',
         token_expires_in: expiresIn,
         context_expires_in: context.expiresInSeconds,
         source: MARTIN_SOURCE.SEARCH,
         martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH),
-        bbox: context.boundingBox,
-        feature_count: context.featureCount,
         has_more_secured_features: context.hasMoreSecuredFeatures
       });
     } catch (error) {

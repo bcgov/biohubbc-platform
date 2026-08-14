@@ -2,9 +2,6 @@ import { IDBConnection } from '../database/db';
 import { HTTP503 } from '../errors/http-error';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
-import { MartinContextAccessClass } from '../models/martin-context';
-import { SecurityScopeRepository } from '../repositories/authorization/security-scope-repository';
-import { dependencies as expressionEvaluation } from '../repositories/expression-evaluation';
 import { MartinContextRepository } from '../repositories/martin-context-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
@@ -18,32 +15,19 @@ const defaultLog = getLogger('services/martin-context-service');
 
 /** How long a tile context lives, seconds. */
 const DEFAULT_CONTEXT_TTL_SECONDS = 1800;
-/** Maximum features materialized for one context. */
-const DEFAULT_MAX_FEATURES = 50000;
 /** Must match the tile token lifetime, so a reused context always outlives the token issued for it. */
 const DEFAULT_TOKEN_TTL_SECONDS = 900;
 /**
- * Maximum live (unexpired) MATERIALIZED contexts. At the cap a new one evicts the context closest to
- * expiry rather than being refused, so the bound costs the least useful session rather than locking
- * every caller out of new searches. Browse-all contexts are not materialized and are never capped.
+ * Maximum live (unexpired) contexts. At the cap a new one evicts the context closest to expiry
+ * rather than being refused, so the bound costs the least useful session rather than locking every
+ * caller out of new searches.
  */
 const DEFAULT_MAX_LIVE_CONTEXTS = 200;
 
-/** A search too large to map. No token is issued. */
-export interface MartinContextOverCapResult {
-  overCap: true;
-  cap: number;
-}
-
 export interface MartinContextResult {
-  overCap: false;
   martinContextId: string;
   /** Remaining context lifetime, seconds. */
   expiresInSeconds: number;
-  /** Extent of the matched geometries, or null for an unfiltered session. */
-  boundingBox: [number, number, number, number] | null;
-  /** Features materialized, or null when the session is rule-based rather than materialized. */
-  featureCount: number | null;
   /** True when the search matched secured features this caller may not see. */
   hasMoreSecuredFeatures: boolean;
 }
@@ -51,17 +35,17 @@ export interface MartinContextResult {
 /**
  * Service for creating the server-side authorization context behind a map Martin session.
  *
- * The browser never receives anything but an opaque id. Everything that decides what a tile may
- * contain — access class, resolved security scopes, and the materialized result set — is stored here
- * and re-evaluated in SQL when the tile is generated.
+ * The browser never receives anything but an opaque id. A context references the persisted search
+ * expression and the caller's identity; the tile function evaluates both live, in SQL, every time a
+ * tile is generated. Nothing about the result set is materialized, so a search of any size can be
+ * mapped.
  *
- * Identity and result resolution deliberately reuse the feature-search primitives rather than
- * reimplementing them, so the map and the table cannot drift apart.
+ * Expression persistence and identity resolution deliberately reuse the feature-search primitives
+ * rather than reimplementing them, so the map and the table cannot drift apart.
  */
 export class MartinContextService extends DBService {
   martinContextRepository: MartinContextRepository;
   searchFeatureRepository: SearchFeatureRepository;
-  securityScopeRepository: SecurityScopeRepository;
   submissionRepository: SubmissionRepository;
   expressionTreeService: ExpressionTreeService;
   semanticValidator: ExpressionPredicateSemanticValidator;
@@ -71,7 +55,6 @@ export class MartinContextService extends DBService {
 
     this.martinContextRepository = new MartinContextRepository(connection);
     this.searchFeatureRepository = new SearchFeatureRepository(connection);
-    this.securityScopeRepository = new SecurityScopeRepository(connection);
     this.submissionRepository = new SubmissionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.semanticValidator = new ExpressionPredicateSemanticValidator(connection);
@@ -83,44 +66,37 @@ export class MartinContextService extends DBService {
    * @param {string} featureTypeName
    * @param {(ExpressionTree | undefined)} expressionTree - Omitted for an unfiltered browse-all view.
    * @param {(number | null)} systemUserId - As resolved by the search paths: null when anonymous.
-   * @return {Promise<MartinContextResult | MartinContextOverCapResult>}
+   * @return {Promise<MartinContextResult>}
    * @memberof MartinContextService
    */
   async createOrReuseMartinContext(
     featureTypeName: string,
     expressionTree: ExpressionTree | undefined,
     systemUserId: number | null
-  ): Promise<MartinContextResult | MartinContextOverCapResult> {
-    const cap = Number(process.env.MARTIN_CONTEXT_MAX_FEATURES) || DEFAULT_MAX_FEATURES;
+  ): Promise<MartinContextResult> {
     const contextTtlSeconds = Number(process.env.MARTIN_CONTEXT_TTL_SECONDS) || DEFAULT_CONTEXT_TTL_SECONDS;
     const tokenTtlSeconds = Number(process.env.MARTIN_TOKEN_TTL_SECONDS) || DEFAULT_TOKEN_TTL_SECONDS;
 
     // Resolved exactly as feature search resolves it, so an unknown feature type fails identically.
     const { feature_type_id } = await this.submissionRepository.getFeatureTypeIdByName(featureTypeName);
 
-    // Normalization must happen before hashing, or the same search could produce two identities.
+    // Normalized for the secured-results probe below; persistence runs the same validator
+    // internally, so both operate on one identity for the search.
     const normalizedExpression: NormalizedExpressionTreeExpression | undefined = expressionTree
       ? await this.semanticValidator.validateExpressionTree(expressionTree)
       : undefined;
 
-    const accessClass: MartinContextAccessClass = systemUserId ? 'scoped' : 'anon';
-
-    // Captured now and stored on the context, so the tile function never needs a user id.
-    const securityScopeIds = systemUserId
-      ? (await this.securityScopeRepository.getSecurityScopeIdsForSystemUser(systemUserId)).map(
-          (row) => row.security_scope_id
-        )
-      : [];
-
-    const expressionHash = normalizedExpression
-      ? this.expressionTreeService.computeExpressionTreeHash(normalizedExpression)
+    // Persisting (with reuse by semantic hash) is what gives the search a stable id the tile
+    // function can evaluate at serve time. NULL means browse-all: no filtering beyond the feature
+    // type and the caller's authorization.
+    const expressionId = expressionTree
+      ? (await this.expressionTreeService.writeExpressionTree(expressionTree)).expression_id
       : null;
 
     const contextHash = computeMartinContextHash({
-      expressionHash,
+      expressionId,
       featureTypeId: feature_type_id,
-      accessClass,
-      securityScopeIds
+      systemUserId: systemUserId ?? null
     });
 
     await this.martinContextRepository.deleteExpiredContextsByHash(contextHash);
@@ -136,133 +112,74 @@ export class MartinContextService extends DBService {
     const reusable = await this.martinContextRepository.findReusableLiveContext(contextHash, tokenTtlSeconds);
 
     if (reusable) {
-      // NOTE: log the expression hash, never the expression itself.
+      // NOTE: log the expression id, never the expression itself.
       defaultLog.info({
         label: 'createOrReuseMartinContext',
         message: 'reused tile context',
         martin_context_id: reusable.martin_context_id,
-        access_class: accessClass,
-        expression_hash: expressionHash
+        expression_id: expressionId
       });
 
       return {
-        overCap: false,
         martinContextId: reusable.martin_context_id,
         expiresInSeconds: reusable.expires_in_seconds,
-        boundingBox: await this.martinContextRepository.getContextBoundingBox(reusable.martin_context_id),
-        featureCount: null,
         hasMoreSecuredFeatures
       };
     }
 
     const maxLiveContexts = Number(process.env.MARTIN_CONTEXT_MAX_LIVE) || DEFAULT_MAX_LIVE_CONTEXTS;
 
-    if (normalizedExpression && maxLiveContexts < 1) {
+    if (maxLiveContexts < 1) {
       // Misconfiguration, not load: a cap below one leaves no room to evict into. Refusing is the
-      // only honest answer, and it is the only path that still reaches this error. Checked before
-      // any write, so a refused request costs nothing.
+      // only honest answer. Checked before any write, so a refused request costs nothing.
       throw new HTTP503('The map service is busy. Try again shortly.');
     }
 
     const created = await this.martinContextRepository.insertMartinContext(
       {
         context_hash: contextHash,
-        access_class: accessClass,
+        expression_id: expressionId,
         feature_type_id,
-        security_scope_ids: securityScopeIds,
-        expression_hash: expressionHash,
-        // An unfiltered view is rule-based: matching every feature of the type would be pointless to
-        // materialize, and would put a whole-table snapshot in a cache table.
-        is_materialized: Boolean(normalizedExpression)
+        system_user_id: systemUserId ?? null
       },
       contextTtlSeconds
     );
 
-    let featureCount: number | null = null;
-    let boundingBox: [number, number, number, number] | null = null;
+    // Bound the context rows a caller can force by varying a search per mint. Enforced by eviction
+    // rather than refusal, because a global refusal hands anyone a denial of service costing one
+    // request per context. Evicting the context closest to expiry puts the cost on the least useful
+    // session instead, and that caller re-mints on its next refresh. The new context is passed so it
+    // can never be chosen as its own victim.
+    const evicted = await this.martinContextRepository.enforceLiveContextCap(
+      maxLiveContexts,
+      created.martin_context_id
+    );
 
-    if (normalizedExpression) {
-      // The same security-filtered subquery the table view runs, so both resolve one result set.
-      const featureIdsSubquery = expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-        featureTypeName,
-        normalizedExpression,
-        systemUserId
-      );
-
-      featureCount = await this.martinContextRepository.materializeContextFeatures(
-        created.martin_context_id,
-        featureIdsSubquery,
-        cap + 1
-      );
-
-      if (featureCount > cap) {
-        // Refuse rather than truncate. A capped subset would be spatially biased, and a map that
-        // silently shows part of a result set is worse than one that says it cannot show it.
-        //
-        // Nothing has been evicted at this point — the live-context cap is enforced BELOW, only
-        // once this check has passed — so a refused search costs no one else their session.
-        await this.martinContextRepository.deleteMartinContext(created.martin_context_id);
-
-        defaultLog.info({
-          label: 'createOrReuseMartinContext',
-          message: 'tile context over cap, refused',
-          cap,
-          access_class: accessClass,
-          expression_hash: expressionHash
-        });
-
-        return { overCap: true, cap };
-      }
-
-      boundingBox = await this.martinContextRepository.updateContextBoundingBox(created.martin_context_id);
-
-      // Bound the materialization an anonymous caller can force by varying an expression per
-      // request. Scoped to MATERIALIZED contexts, and enforced by eviction rather than refusal,
-      // because both of the obvious alternatives are worse than the problem: a browse-all context
-      // is one row and refusing it buys nothing, and a global refusal hands anyone a denial of
-      // service costing one request per context. Evicting the context closest to expiry puts the
-      // cost on the least useful session instead, and that caller re-mints on its next refresh.
-      //
-      // ORDER MATTERS: this runs only after the over-cap refusal above, so a search too large to
-      // map can never evict a live context and then discard its own — which would make over-cap
-      // requests a free eviction attack, blanking one working map per request while never
-      // occupying a slot. The new context is passed so it can never be chosen as its own victim.
-      const evicted = await this.martinContextRepository.enforceMaterializedContextCap(
-        maxLiveContexts,
-        created.martin_context_id
-      );
-
-      if (evicted) {
-        defaultLog.warn({
-          label: 'createOrReuseMartinContext',
-          message: 'live materialized tile context cap reached; evicted the contexts closest to expiry',
-          evicted,
-          max_live_contexts: maxLiveContexts
-        });
-      }
+    if (evicted) {
+      defaultLog.warn({
+        label: 'createOrReuseMartinContext',
+        message: 'live tile context cap reached; evicted the contexts closest to expiry',
+        evicted,
+        max_live_contexts: maxLiveContexts
+      });
     }
 
     defaultLog.info({
       label: 'createOrReuseMartinContext',
       message: 'created tile context',
       martin_context_id: created.martin_context_id,
-      access_class: accessClass,
-      expression_hash: expressionHash,
-      feature_count: featureCount
+      expression_id: expressionId
     });
 
     return {
-      overCap: false,
       martinContextId: created.martin_context_id,
       expiresInSeconds: created.expires_in_seconds,
-      boundingBox,
-      featureCount,
       hasMoreSecuredFeatures
     };
   }
 
   /**
-   * Delete every expired tile context. Materialized ids cascade.
+   * Delete every expired tile context.
    *
    * @return {Promise<number>} Contexts deleted.
    * @memberof MartinContextService

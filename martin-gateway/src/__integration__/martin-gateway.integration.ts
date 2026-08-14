@@ -150,7 +150,9 @@ describe('Martin Gateway (integration)', () => {
     expect(response.body).to.have.length(0);
   });
 
-  it('caches a repeat request', async () => {
+  it('serves repeat requests identically, while forbidding any client-side store', async () => {
+    // Martin caches the tiles, keyed by the full query string and therefore per context. The
+    // gateway marks every response no-store, because the tile URL does not identify the caller.
     const first = await request(`${GATEWAY_URL}/martin/${SOURCE}/6/11/22`, {
       headers: { authorization: `Bearer ${token}` }
     });
@@ -159,7 +161,9 @@ describe('Martin Gateway (integration)', () => {
     });
 
     expect(first.status).to.equal(200);
-    expect(second.headers['x-martin-cache']).to.equal('HIT');
+    expect(second.status).to.equal(200);
+    expect(second.body.equals(first.body)).to.equal(true);
+    expect(second.headers['cache-control']).to.equal('no-store');
   });
 
   it('rejects a request with no token', async () => {

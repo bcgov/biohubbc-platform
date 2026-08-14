@@ -339,9 +339,9 @@ export const registerWorkers = async (): Promise<void> => {
 
   // Sweep expired map tile contexts every 15 minutes (UTC). Housekeeping only: the tile SQL
   // enforces expiry on every request, so a missed sweep cannot expose an expired context, and the
-  // creation cap counts only unexpired rows, so a missed sweep frees no headroom either. What it
-  // does reclaim is storage - an expired context still holds up to the feature cap of
-  // martin_context_feature rows - so it runs well inside a context lifetime rather than hourly.
+  // creation cap counts only unexpired rows, so a missed sweep frees no headroom either. A context
+  // is one row, so the interval is set to stay well inside a context lifetime rather than to keep
+  // storage down.
   const DELETE_EXPIRED_MARTIN_CONTEXTS_CRON = '*/15 * * * *';
 
   // Create dead letter queue first (must exist before main queue references it)

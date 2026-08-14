@@ -162,6 +162,14 @@ export class HTTP503 extends HTTPError {
     super(HTTPErrorType.SERVICE_UNAVAILABLE, 503, message, errors, stack);
   }
 
+  /**
+   * Wrap an `ApiError` as a 503, preserving its message, errors and stack.
+   *
+   * @static
+   * @param {ApiError} apiError - The error to wrap.
+   * @return {*}  {HTTP503}
+   * @memberof HTTP503
+   */
   static fromApiError(apiError: ApiError) {
     return new HTTP503(apiError.message, apiError.errors, apiError.stack);
   }

@@ -4,47 +4,36 @@ import { computeMartinContextHash } from './martin-context-hash';
 
 describe('computeMartinContextHash', () => {
   const base = {
-    expressionHash: 'expr-1',
+    expressionId: 'f2b4f6b4-1111-4a5a-9a1c-000000000001',
     featureTypeId: 21,
-    accessClass: 'scoped' as const,
-    securityScopeIds: ['b', 'a']
+    systemUserId: 7
   };
 
   it('is stable for identical input', () => {
     expect(computeMartinContextHash(base)).to.equal(computeMartinContextHash({ ...base }));
   });
 
-  it('ignores the ordering of scope ids', () => {
-    // Two callers with the same grants must share a context however their scopes are ordered.
-    expect(computeMartinContextHash({ ...base, securityScopeIds: ['a', 'b'] })).to.equal(
-      computeMartinContextHash({ ...base, securityScopeIds: ['b', 'a'] })
-    );
-  });
-
   it('separates anonymous from authenticated callers', () => {
     // The critical property: an anonymous visitor must never share cached tiles with a signed-in
-    // user, even when they run the same search.
-    const anonymous = computeMartinContextHash({ ...base, accessClass: 'anon', securityScopeIds: [] });
-    const scoped = computeMartinContextHash({ ...base, accessClass: 'scoped', securityScopeIds: [] });
+    // user, even when they run the same search — authorization is evaluated per user at serve time.
+    const anonymous = computeMartinContextHash({ ...base, systemUserId: null });
+    const authenticated = computeMartinContextHash({ ...base, systemUserId: 7 });
 
-    expect(anonymous).to.not.equal(scoped);
+    expect(anonymous).to.not.equal(authenticated);
   });
 
-  it('separates callers whose scope sets differ', () => {
-    const narrow = computeMartinContextHash({ ...base, securityScopeIds: ['a'] });
-    const wide = computeMartinContextHash({ ...base, securityScopeIds: ['a', 'b'] });
-
-    expect(narrow).to.not.equal(wide);
+  it('separates different users', () => {
+    expect(computeMartinContextHash({ ...base, systemUserId: 8 })).to.not.equal(computeMartinContextHash(base));
   });
 
   it('separates different searches', () => {
-    expect(computeMartinContextHash({ ...base, expressionHash: 'expr-2' })).to.not.equal(
+    expect(computeMartinContextHash({ ...base, expressionId: 'f2b4f6b4-1111-4a5a-9a1c-000000000002' })).to.not.equal(
       computeMartinContextHash(base)
     );
   });
 
   it('separates a filtered search from an unfiltered view', () => {
-    expect(computeMartinContextHash({ ...base, expressionHash: null })).to.not.equal(computeMartinContextHash(base));
+    expect(computeMartinContextHash({ ...base, expressionId: null })).to.not.equal(computeMartinContextHash(base));
   });
 
   it('separates different feature types', () => {
