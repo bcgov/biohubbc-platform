@@ -86,29 +86,46 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ['--config', '/etc/martin/config.yaml']
           env:
+            {{- if .Values.app.database.useCrunchy }}
+            # The operator's `uri` secret key is a complete connection URI whose userinfo the
+            # operator percent-encodes when it builds the secret. Consuming it verbatim means
+            # reserved characters in an operator-generated password can never produce an invalid
+            # DATABASE_URL, which hand-assembling from `user`/`password` cannot guarantee. The
+            # operator URI carries no query string, so the sslmode parameter appends cleanly.
+            - name: DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.database.martinSecretName }}
+                  key: {{ .Values.app.database.martinUriKey | default "uri" }}
+            - name: DATABASE_URL
+              value: "$(DB_URI)?sslmode={{ .Values.app.database.sslMode | default "verify-full" }}"
+            {{- else }}
             # NOTE: order matters. DATABASE_URL is assembled from the variables above it using
-            # Kubernetes dependent environment variable expansion.
+            # Kubernetes dependent environment variable expansion. No percent-encoding happens
+            # here, so these project-controlled credentials (infrastructure/database chart) must
+            # stay URL-safe; operator-managed environments consume the pre-encoded `uri` above.
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinUserKey | default "user" }}{{ else }}database-user-martin{{ end }}
+                  name: {{ include "dbHost" . }}
+                  key: database-user-martin
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.martinPasswordKey | default "password" }}{{ else }}database-user-martin-password{{ end }}
+                  name: {{ include "dbHost" . }}
+                  key: database-user-martin-password
             - name: DB_NAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
+                  name: {{ include "dbHost" . }}
+                  key: database-name
             - name: DB_HOST
-              value: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
+              value: {{ include "dbHost" . }}
             - name: DB_PORT
               value: {{ .Values.app.database.port | quote }}
             - name: DATABASE_URL
-              value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode={{ .Values.app.database.sslMode | default (ternary "verify-full" "prefer" .Values.app.database.useCrunchy) }}"
+              value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode={{ .Values.app.database.sslMode | default "prefer" }}"
+            {{- end }}
           ports:
             - containerPort: {{ .Values.service.port }}
               protocol: TCP

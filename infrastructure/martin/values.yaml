@@ -28,6 +28,10 @@ app:
     workerProcesses: 2
     # Maximum Postgres connections held by Martin
     poolSize: 5
+    # Lifetime of Martin's built-in tile cache entries. Tiles are security filtered at render
+    # time, so this is the upper bound on how long a newly secured feature can keep appearing in
+    # already-cached tiles. Keep in step with the `cache.expiry` in compose.yml's martin-config.
+    cacheExpiry: "5m"
 
     # Explicitly published function sources. Automatic publication of tables and functions is
     # always disabled (see the ConfigMap template), so ONLY the sources listed here are served.
@@ -50,7 +54,12 @@ app:
     martinSecretName: ""
     # e.g. "<cluster>-pguser-<cluster>" (biohub-platform-db-dev-pguser-biohub-platform-db-dev)
     dbNameSecretName: ""
-    # Secret keys default in the templates: user/password/dbname (override here if needed)
+    # Secret keys default in the templates: uri/user/password/dbname (override here if needed).
+    # Martin's own connection consumes `uri` — the operator-assembled, percent-encoded
+    # connection URI — so credential characters can never invalidate DATABASE_URL. The
+    # user/password/dbname keys remain in use by the wait-for-tile-functions initContainer,
+    # which passes them to psql as discrete arguments (no URI assembly involved).
+    martinUriKey: ""
     martinUserKey: ""
     martinPasswordKey: ""
     dbNameKey: ""

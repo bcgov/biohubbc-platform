@@ -21,6 +21,14 @@ data:
     # startup probe holds the pod not-ready and restarts it until every configured source resolves.
     on_invalid: warn
 
+    # Martin's built-in tile cache is enabled by default (512 MB) but holds entries with NO
+    # expiry, only size-pressure eviction. Tiles are security filtered at render time, so an
+    # unbounded entry lifetime would let a newly secured feature keep appearing in cached tiles
+    # indefinitely. The expiry bounds that takedown window. Cache keys include the full query
+    # string, so entries never leak across `context` values.
+    cache:
+      expiry: "{{ .Values.app.martin.cacheExpiry }}"
+
     postgres:
       # Expanded by Martin from the DATABASE_URL environment variable set on the container.
       connection_string: ${DATABASE_URL}

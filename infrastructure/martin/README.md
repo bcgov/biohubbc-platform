@@ -34,6 +34,7 @@ in the umbrella chart:
 | `resources.requests` / `resources.limits` | CPU and memory. |
 | `service.type` / `service.port` / `service.targetPort` | Internal service. Always `ClusterIP`. |
 | `app.martin.workerProcesses` / `app.martin.poolSize` | Martin worker threads and Postgres pool size. |
+| `app.martin.cacheExpiry` | Lifetime of Martin's built-in tile cache entries (see below). |
 | `app.martin.functions` | Explicitly published function sources. |
 | `app.database.*` | Database coordinates and secrets (see below). |
 
@@ -50,6 +51,18 @@ This ticket publishes **no** sources: it deploys the tile server itself, so `app
 empty and Martin serves an empty catalog. The search-result source (`biohub.martin_search`) is added by
 SIMSBIOHUB-1103, which is the first ticket where a tile can actually be rendered.
 
+### Tile cache
+
+Martin's built-in tile cache (enabled by default, 512 MB) is the **only** tile cache in the stack: the
+gateway in front of it deliberately adds none. Cache keys include the full request query string, so the
+trusted `context` parameter the gateway injects partitions the cache per authorization context and
+entries can never leak between contexts.
+
+By default Martin evicts entries only under size pressure. Because tiles are security filtered at
+render time, that would let a newly secured feature keep appearing in already-cached tiles
+indefinitely — so both configs set `cache.expiry` (`app.martin.cacheExpiry`, default `5m`), which is
+the upper bound on that takedown window.
+
 ### Database access
 
 Martin connects as a dedicated least-privilege role (`martin`) that has `CONNECT`, `USAGE` on the
@@ -57,11 +70,16 @@ Martin connects as a dedicated least-privilege role (`martin`) that has `CONNECT
 
 - **DEV/TEST/PROD (`useCrunchy: true`)** — the role and its password are created by the Crunchy
   Postgres Operator from the `users` block of the PostgresCluster CR, which publishes the
-  `<cluster>-pguser-martin` secret. Connections use `sslmode=verify-full` against the `pgo-root-cacert`
-  CA, the same one the api uses.
+  `<cluster>-pguser-martin` secret. Martin's `DATABASE_URL` consumes that secret's `uri` key — the
+  operator-assembled connection URI, whose userinfo the operator percent-encodes — so no
+  hand-assembly of credentials happens and reserved characters in the generated password can never
+  produce an invalid connection string (the CR additionally pins the password to `AlphaNumeric`).
+  Connections use `sslmode=verify-full` against the `pgo-root-cacert` CA, the same one the api uses.
 - **PR (`useCrunchy: false`)** — the role is created by the database migration using credentials from
   the legacy `biohub-platform-db` secret, populated from the `DATABASE_USER_MARTIN` /
-  `DATABASE_USER_MARTIN_PASSWORD` GitHub secrets. Connections use `sslmode=prefer`.
+  `DATABASE_USER_MARTIN_PASSWORD` GitHub secrets. Here `DATABASE_URL` **is** assembled from the
+  user/password keys with no encoding, so those project-controlled values must stay URL-safe (the
+  secret template documents this). Connections use `sslmode=prefer`.
 
 Martin points at the Crunchy **primary** service, not PgBouncer: its driver uses prepared statements,
 which are incompatible with PgBouncer transaction pooling. A `<cluster>-replicas` service also exists

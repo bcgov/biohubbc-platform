@@ -1,14 +1,7 @@
 import { Knex } from 'knex';
+import { escapeLiteral } from '../utils/migrations';
 
 const DB_USER_MARTIN = process.env.DB_USER_MARTIN || 'martin';
-
-/**
- * Escape a value for embedding as a SQL string literal inside the dollar-quoted DO block below.
- *
- * @param {string} value
- * @return {*}  {string}
- */
-const escapeLiteral = (value: string): string => value.replace(/'/g, `''`);
 
 /**
  * Apply the martin role's base grants on every deploy.
