@@ -230,13 +230,10 @@ spec:
               value: {{ .Values.gateway.minZoom | quote }}
             - name: MARTIN_MAX_ZOOM
               value: {{ .Values.gateway.maxZoom | quote }}
-            - name: MARTIN_CACHE_TTL_SECONDS
-              value: {{ .Values.gateway.cache.ttlSeconds | quote }}
-            - name: MARTIN_CACHE_MAX_BYTES
-              value: {{ .Values.gateway.cache.maxBytes | quote }}
-            # Bump to invalidate every cached tile at deploy time.
+            # Bump to invalidate every tile Martin has cached at deploy time: the gateway appends
+            # it to the upstream URL, and Martin's cache keys include the query string.
             - name: MARTIN_SOURCE_VERSION
-              value: {{ .Values.gateway.cache.sourceVersion | quote }}
+              value: {{ .Values.gateway.sourceVersion | quote }}
             - name: RATE_LIMIT_JTI_PER_MIN
               value: {{ .Values.gateway.rateLimit.perTokenPerMinute | quote }}
             - name: RATE_LIMIT_IP_PER_MIN

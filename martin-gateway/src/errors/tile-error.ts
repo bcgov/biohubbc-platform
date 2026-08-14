@@ -14,14 +14,34 @@ export class TileError extends Error {
   }
 }
 
-/** The caller did not present a usable token: missing, malformed, expired, or badly signed. */
+/**
+ * The caller did not present a usable token: missing, malformed, expired, or badly signed.
+ *
+ * @param {string} [message] - Client facing message. Defaults to a generic one.
+ * @return {*}  {TileError}
+ */
 export const unauthorized = (message = 'Invalid or expired tile token') => new TileError(401, message);
 
-/** The token is valid but does not grant what was asked for. */
+/**
+ * The token is valid but does not grant what was asked for.
+ *
+ * @param {string} [message] - Client facing message. Defaults to a generic one.
+ * @return {*}  {TileError}
+ */
 export const forbidden = (message = 'Tile token does not permit this request') => new TileError(403, message);
 
-/** The request did not match the single allowlisted tile route. */
+/**
+ * The request did not match the single allowlisted tile route.
+ *
+ * @param {string} [message] - Client facing message. Defaults to a generic one.
+ * @return {*}  {TileError}
+ */
 export const notFound = (message = 'Not found') => new TileError(404, message);
 
-/** Martin is unavailable or failed. */
+/**
+ * Martin is unavailable or failed.
+ *
+ * @param {string} [message] - Client facing message. Defaults to a generic one.
+ * @return {*}  {TileError}
+ */
 export const badGateway = (message = 'Tile service unavailable') => new TileError(502, message);

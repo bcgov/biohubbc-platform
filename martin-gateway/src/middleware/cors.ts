@@ -15,13 +15,13 @@ import { config } from '../config.js';
  * @param {Request} req
  * @param {Response} res
  * @param {NextFunction} next
+ * @return {void}
  */
 export const corsMiddleware = (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', config.allowedOrigin);
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  // Let the browser read the cache validator so conditional requests work.
-  res.setHeader('Access-Control-Expose-Headers', 'ETag, Content-Encoding, X-Martin-Cache');
+  res.setHeader('Access-Control-Expose-Headers', 'ETag, Content-Encoding');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();

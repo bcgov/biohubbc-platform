@@ -1,4 +1,3 @@
-import { getCacheStats } from './cache/tile-cache.js';
 import { config } from './config.js';
 import { getLogger } from './utils/logger.js';
 
@@ -6,47 +5,59 @@ const defaultLog = getLogger('metrics');
 
 const counters = {
   requests: 0,
-  cacheHits: 0,
-  cacheMisses: 0,
+  upstreamFetches: 0,
   upstreamErrors: 0,
   upstreamDurationMsTotal: 0,
   upstreamDurationMsMax: 0
 };
 
-export const recordCacheHit = () => {
+/**
+ * Count one handled tile request, including ones served by a coalesced in-flight fetch.
+ *
+ * @return {void}
+ */
+export const recordRequest = () => {
   counters.requests++;
-  counters.cacheHits++;
 };
 
-export const recordCacheMiss = (upstreamDurationMs: number) => {
-  counters.requests++;
-  counters.cacheMisses++;
+/**
+ * Count one actual round trip to Martin, and fold its duration into the running total and maximum.
+ *
+ * @param {number} upstreamDurationMs - Wall clock duration of the upstream request.
+ * @return {void}
+ */
+export const recordUpstreamFetch = (upstreamDurationMs: number) => {
+  counters.upstreamFetches++;
   counters.upstreamDurationMsTotal += upstreamDurationMs;
   counters.upstreamDurationMsMax = Math.max(counters.upstreamDurationMsMax, upstreamDurationMs);
 };
 
+/**
+ * Count one upstream response that was not a tile, an empty tile, or an unknown source.
+ *
+ * @return {void}
+ */
 export const recordUpstreamError = () => {
   counters.upstreamErrors++;
 };
 
 /**
- * Current metrics snapshot: cache hit ratio and upstream latency.
+ * Current metrics snapshot: request volume and upstream latency.
+ *
+ * The gap between `requests` and `upstreamFetches` is work absorbed by in-flight coalescing. Tile
+ * cache effectiveness is reported by Martin, which is where the tiles are cached.
  *
  * @return {*}
  */
 export const getMetrics = () => {
-  const { cacheHits, cacheMisses } = counters;
-  const total = cacheHits + cacheMisses;
-
   return {
     requests: counters.requests,
-    cacheHits,
-    cacheMisses,
-    cacheHitRatio: total ? Number((cacheHits / total).toFixed(3)) : 0,
+    upstreamFetches: counters.upstreamFetches,
     upstreamErrors: counters.upstreamErrors,
-    upstreamAvgMs: cacheMisses ? Math.round(counters.upstreamDurationMsTotal / cacheMisses) : 0,
-    upstreamMaxMs: counters.upstreamDurationMsMax,
-    ...getCacheStats()
+    upstreamAvgMs: counters.upstreamFetches
+      ? Math.round(counters.upstreamDurationMsTotal / counters.upstreamFetches)
+      : 0,
+    upstreamMaxMs: counters.upstreamDurationMsMax
   };
 };
 
@@ -75,11 +86,12 @@ export const startMetricsReporting = (): NodeJS.Timeout => {
 
 /**
  * Reset all counters. Test seam.
+ *
+ * @return {void}
  */
 export const resetMetrics = () => {
   counters.requests = 0;
-  counters.cacheHits = 0;
-  counters.cacheMisses = 0;
+  counters.upstreamFetches = 0;
   counters.upstreamErrors = 0;
   counters.upstreamDurationMsTotal = 0;
   counters.upstreamDurationMsMax = 0;

@@ -130,7 +130,8 @@ services:
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
-      - martin_keys:/var/martin-keys:ro
+      # Private signing key ONLY; the gateway mounts the separate public-key volume instead.
+      - martin_keys_private:/var/martin-keys/private:ro
     networks:
       - biohubbc-network
     depends_on:
@@ -313,6 +314,9 @@ services:
 
   ## Generate the local tile token signing keypair (one-shot, idempotent)
   ## In OpenShift these come from the martin-token-private / martin-token-public Secrets instead.
+  ## The halves land in SEPARATE volumes, mirroring the OpenShift secret split: the api mounts only
+  ## the private volume and the gateway only the public one, so the gateway's filesystem never
+  ## contains the signing key it must not hold.
   martin_keys_setup:
     image: alpine/openssl:latest
     container_name: ${DOCKER_PROJECT_NAME}-martin-keys-setup-${DOCKER_NAMESPACE}-container
@@ -327,7 +331,8 @@ services:
         echo "Tile token keypair generated.";
         else echo "Tile token keypair already exists, skipping."; fi'
     volumes:
-      - martin_keys:/keys
+      - martin_keys_private:/keys/private
+      - martin_keys_public:/keys/public
     networks:
       - biohubbc-network
 
@@ -353,8 +358,6 @@ services:
       - MARTIN_ALLOWED_SOURCES=${MARTIN_ALLOWED_SOURCES}
       - MARTIN_MIN_ZOOM=${MARTIN_MIN_ZOOM}
       - MARTIN_MAX_ZOOM=${MARTIN_MAX_ZOOM}
-      - MARTIN_CACHE_TTL_SECONDS=${MARTIN_CACHE_TTL_SECONDS}
-      - MARTIN_CACHE_MAX_BYTES=${MARTIN_CACHE_MAX_BYTES}
       - MARTIN_SOURCE_VERSION=${MARTIN_SOURCE_VERSION}
       - RATE_LIMIT_JTI_PER_MIN=${RATE_LIMIT_JTI_PER_MIN}
       - RATE_LIMIT_IP_PER_MIN=${RATE_LIMIT_IP_PER_MIN}
@@ -363,7 +366,9 @@ services:
     volumes:
       - ./martin-gateway:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
-      - martin_keys:/var/martin-keys:ro
+      # Public verification keys ONLY. The private signing key lives in a volume this service
+      # never mounts, so the gateway cannot read it even in local development.
+      - martin_keys_public:/var/martin-keys/public:ro
     networks:
       - biohubbc-network
     depends_on:
@@ -490,5 +495,7 @@ volumes:
     name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol
   minio_data:
     name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-vol
-  martin_keys:
-    name: ${DOCKER_PROJECT_NAME}-martin-keys-${DOCKER_NAMESPACE}-vol
+  martin_keys_private:
+    name: ${DOCKER_PROJECT_NAME}-martin-keys-private-${DOCKER_NAMESPACE}-vol
+  martin_keys_public:
+    name: ${DOCKER_PROJECT_NAME}-martin-keys-public-${DOCKER_NAMESPACE}-vol

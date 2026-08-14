@@ -30,6 +30,8 @@ let cachedPrivateKey: string | null = null;
 
 /**
  * Reset the cached signing key. Test seam.
+ *
+ * @return {void}
  */
 export const resetMartinTokenSigningKey = () => {
   cachedPrivateKey = null;
@@ -77,8 +79,9 @@ export class MartinTokenService {
    * database can resolve. A token is therefore useless for learning anything about the caller, and a
    * client cannot widen its own access by editing it.
    *
-   * @param {MartinTokenClaims} claims
+   * @param {MartinTokenClaims} claims - Source the token is scoped to, and the opaque context id.
    * @return {*}  {MintedMartinToken}
+   * @memberof MartinTokenService
    */
   mintToken(claims: MartinTokenClaims): MintedMartinToken {
     const privateKey = getPrivateKey();
@@ -111,8 +114,9 @@ export class MartinTokenService {
    * app's own hostname, so tiles are same origin; locally the app's dev server proxies `/martin` to
    * the gateway. Keeping it relative means no environment specific host has to be threaded through.
    *
-   * @param {string} source
+   * @param {string} source - Tile source the template addresses, e.g. `MARTIN_SOURCE.SEARCH`.
    * @return {*}  {string}
+   * @memberof MartinTokenService
    */
   getMartinUrlTemplate(source: string): string {
     const baseUrl = process.env.MARTIN_EXTERNAL_URL || '/martin';

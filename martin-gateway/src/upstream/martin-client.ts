@@ -69,15 +69,15 @@ export const fetchTile = (pathname: string): Promise<UpstreamTileResponse> => {
 
           totalBytes += chunk.length;
 
-          // A single tile larger than the entire tile cache is never legitimate. Refuse it rather
-          // than buffering an unbounded response from Martin into gateway memory.
-          if (totalBytes > config.cacheMaxBytes) {
+          // No legitimate tile approaches this size. Refuse it rather than buffering an unbounded
+          // response from Martin into gateway memory.
+          if (totalBytes > config.maxTileBytes) {
             aborted = true;
             request.destroy();
             defaultLog.error({
               message: 'Martin response exceeded the maximum tile size',
               pathname,
-              maxBytes: config.cacheMaxBytes
+              maxBytes: config.maxTileBytes
             });
             reject(badGateway());
             return;

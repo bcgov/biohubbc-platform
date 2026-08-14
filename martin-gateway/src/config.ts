@@ -107,15 +107,13 @@ export const config = {
   minZoom,
   maxZoom,
 
-  /** Tile cache lifetime, seconds. Also bounds how long a revoked feature can linger in a tile. */
-  cacheTtlSeconds: readNumber('MARTIN_CACHE_TTL_SECONDS', 300),
-
-  /** Maximum total size of cached tile bodies, bytes. */
-  cacheMaxBytes: readNumber('MARTIN_CACHE_MAX_BYTES', 52428800),
+  /** Maximum size of a single tile body accepted from Martin, bytes. */
+  maxTileBytes: readNumber('MARTIN_MAX_TILE_BYTES', 52428800),
 
   /**
-   * Opaque version string mixed into every cache key. Bumping it at deploy time invalidates all
-   * cached tiles, which is how a tile function change is rolled out.
+   * Opaque version string appended to every upstream tile URL (`v=`). Martin's tile cache keys
+   * include the query string, so bumping this at deploy time invalidates every tile Martin has
+   * cached, which is how a tile function change is rolled out. The tile function ignores it.
    */
   sourceVersion: process.env.MARTIN_SOURCE_VERSION || '1',
 

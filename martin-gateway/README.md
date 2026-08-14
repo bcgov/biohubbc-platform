@@ -19,8 +19,10 @@ This gateway is the single public entry point for tiles and enforces four things
    and administrative endpoints are unreachable.
 3. **Parameter isolation** — every client supplied query parameter is discarded. Only the trusted
    context identifier from the verified token is forwarded upstream.
-4. **Cache isolation** — cached tiles are keyed by authorization context, so a tile produced for one
-   caller can never be served to another.
+4. **Cache isolation** — every response is marked `Cache-Control: no-store`, because a tile URL does
+   not identify the caller and a stored copy could be replayed to another one. Server side, Martin's
+   cache keys include the query string the gateway rewrites, so a tile rendered for one
+   authorization context is never served to another.
 
 Data visibility itself is enforced in SQL at tile generation time (SIMSBIOHUB-1103), not here. This
 service authenticates; the database decides what a given context may see.
@@ -39,12 +41,12 @@ Everything else returns `404`.
 | Status | Meaning |
 | --- | --- |
 | `200` | Tile body, passed through from Martin with its original gzip encoding and `ETag`. |
-| `204` | Valid request, no features in this tile. Cacheable. |
+| `204` | Valid request, no features in this tile. |
 | `401` | Missing, malformed, expired, wrongly signed, or unknown-key token. The client should re-mint. |
 | `403` | Valid token, but it does not grant this source or lacks the required scope. Re-minting will not help. |
 | `404` | Not an allowlisted tile request, or the zoom/coordinates are out of range. |
 | `429` | Rate limited (per token, or the coarse per IP backstop). |
-| `502` | Martin is unavailable or failed. Normalized: no internal or database detail is exposed. |
+| `502` | Martin is unavailable, failed, or answered with anything other than `200`/`204`/`404`. Normalized: no internal or database detail is exposed. |
 
 ## Configuration
 
@@ -62,9 +64,8 @@ immediately rather than on the first tile request.
 | `MARTIN_TOKEN_SCOPE` | `tiles:read` | Scope the token must carry. |
 | `MARTIN_ALLOWED_SOURCES` | `search` | Comma separated sources this gateway will serve. |
 | `MARTIN_MIN_ZOOM` / `MARTIN_MAX_ZOOM` | `0` / `15` | Inclusive zoom bounds. |
-| `MARTIN_CACHE_TTL_SECONDS` | `300` | Cache lifetime. |
-| `MARTIN_CACHE_MAX_BYTES` | `52428800` | Cache size cap, by total body bytes. |
-| `MARTIN_SOURCE_VERSION` | `1` | Mixed into every cache key. Bump to invalidate all cached tiles. |
+| `MARTIN_MAX_TILE_BYTES` | `52428800` | Per-tile response size cap accepted from Martin. |
+| `MARTIN_SOURCE_VERSION` | `1` | Appended to every upstream tile URL (`v=`). Martin's cache keys include the query string, so bumping this invalidates every tile Martin has cached. |
 | `RATE_LIMIT_JTI_PER_MIN` | `600` | Per token budget. Must absorb a viewport pan. |
 | `RATE_LIMIT_IP_PER_MIN` | `3000` | Coarse per IP backstop. |
 | `ALLOWED_ORIGIN` | `*` | CORS origin. Unused in OpenShift, where tiles are same origin. |
@@ -136,8 +137,9 @@ make test-martin-gateway          # integration suite, against the running compo
 The unit suite covers the full verification matrix (invalid signatures, expired tokens, wrong
 audience/issuer/source, missing scope, unknown key id, rotation, `alg: none`, post-signing payload
 edits), allowlist rejection (catalog, TileJSON, composite sources, traversal, out-of-range
-coordinates), query parameter stripping, response metadata preservation, cache isolation between
-contexts, in-flight deduplication, and that the `Authorization` header is never logged.
+coordinates), query parameter stripping, response metadata preservation, upstream status
+normalization, per-context upstream URLs, in-flight deduplication, and that the `Authorization`
+header is never logged.
 
 The integration suite runs against the real stack and additionally proves that tile bytes are
 byte-for-byte identical to Martin's, and that tiles continue to serve while the API is unavailable.

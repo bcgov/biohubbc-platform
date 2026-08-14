@@ -6,7 +6,7 @@ import { defaultTileResponse, gzippedTileBody, startStubMartin, StubMartin } fro
 import { TEST_SOURCE } from '../__mocks__/test-setup.js';
 import { bearer } from '../__mocks__/token-helpers.js';
 import { app } from '../app.js';
-import { clearTileCache } from '../cache/tile-cache.js';
+import { clearInflight } from '../upstream/inflight.js';
 
 describe('tile route', () => {
   let server: http.Server;
@@ -24,7 +24,7 @@ describe('tile route', () => {
   });
 
   afterEach(() => {
-    clearTileCache();
+    clearInflight();
     martin.requests.length = 0;
     martin.respondWith(defaultTileResponse);
   });
@@ -131,7 +131,9 @@ describe('tile route', () => {
 
       const upstreamUrl = martin.requests[0].url;
 
-      expect(upstreamUrl).to.equal(`/${TEST_SOURCE}/5/5/11?context=trusted-context`);
+      // `v` is the deploy-time source version, part of Martin's cache key; `context` is the only
+      // authorization input. Nothing client supplied survives.
+      expect(upstreamUrl).to.equal(`/${TEST_SOURCE}/5/5/11?context=trusted-context&v=testv1`);
       expect(upstreamUrl).to.not.contain('attacker-context');
       expect(upstreamUrl).to.not.contain('filter');
       expect(upstreamUrl).to.not.contain('user_id');
@@ -157,28 +159,23 @@ describe('tile route', () => {
       expect(response.body.equals(gzippedTileBody)).to.equal(true);
     });
 
-    it("forces a private cache and never forwards Martin's caching directive", async () => {
+    it("forbids storing tiles and never forwards Martin's caching directive", async () => {
       const response = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer() });
 
-      // The stub Martin sends `public, max-age=31536000`; the gateway must replace it so a shared
-      // cache can never store one user's authorized tiles.
-      expect(response.headers['cache-control']).to.equal('private, max-age=300');
+      // The stub Martin sends `public, max-age=31536000`; the gateway must replace it. Tile URLs do
+      // not identify the caller, so any stored copy could be replayed to a different principal on
+      // the same machine without a token check — no cache may hold one.
+      expect(response.headers['cache-control']).to.equal('no-store');
     });
 
-    it('passes an empty tile through as a cacheable 204', async () => {
+    it('passes an empty tile through as a 204 with the same no-store directive', async () => {
       martin.respondWith({ status: 204, headers: { 'content-type': 'application/x-protobuf' } });
 
       const response = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer() });
 
       expect(response.status).to.equal(204);
       expect(response.body).to.have.length(0);
-
-      // Served from cache the second time, without a second upstream request.
-      const second = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer() });
-
-      expect(second.status).to.equal(204);
-      expect(second.headers['x-martin-cache']).to.equal('HIT');
-      expect(martin.requests).to.have.length(1);
+      expect(response.headers['cache-control']).to.equal('no-store');
     });
 
     it('normalizes an upstream failure without leaking internal detail', async () => {
@@ -194,32 +191,57 @@ describe('tile route', () => {
       expect(response.body.toString()).to.not.contain('submission_feature');
       expect(response.body.toString()).to.not.contain('PG::Error');
     });
+
+    it('normalizes an upstream client error instead of passing its body through as a 200', async () => {
+      martin.respondWith({
+        status: 400,
+        body: Buffer.from('{"error":"invalid query parameter"}'),
+        headers: { 'content-type': 'application/json' }
+      });
+
+      const response = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer() });
+
+      expect(response.status).to.equal(502);
+      expect(response.body.toString()).to.not.contain('invalid query parameter');
+    });
+
+    it('normalizes an empty-bodied redirect instead of mistaking it for an empty tile', async () => {
+      // A 3xx has no body; without an explicit status check it would fall into the empty-tile 204
+      // path and MapLibre would treat the area as legitimately featureless, never retrying.
+      martin.respondWith({ status: 302, headers: { location: 'http://example.com/' } });
+
+      const response = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer() });
+
+      expect(response.status).to.equal(502);
+    });
   });
 
-  describe('caching', () => {
-    it('serves a repeat request from cache', async () => {
+  describe('upstream fetching', () => {
+    it('reaches Martin on every request, so a repeat request is never answered locally', async () => {
+      // Martin caches the rendered tiles, keyed by the full query string and therefore per
+      // context. A cache here would sit in front of that one and have to be invalidated with it.
       const authorization = bearer({ ctx: 'ctx-1' });
 
       const first = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization });
       const second = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization });
 
-      expect(first.headers['x-martin-cache']).to.equal('MISS');
-      expect(second.headers['x-martin-cache']).to.equal('HIT');
-      expect(martin.requests).to.have.length(1);
+      expect(first.status).to.equal(200);
+      expect(second.status).to.equal(200);
+      expect(martin.requests).to.have.length(2);
     });
 
-    it('never shares cached tiles between different authorization contexts', async () => {
+    it('requests each authorization context under its own upstream URL', async () => {
+      // The context is part of the upstream query string, which is exactly what partitions
+      // Martin's cache between callers with different access.
       await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer({ ctx: 'ctx-alice' }) });
-      const bob = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer({ ctx: 'ctx-bob' }) });
+      await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, { authorization: bearer({ ctx: 'ctx-bob' }) });
 
-      // Bob's request must reach Martin rather than reuse Alice's tile.
-      expect(bob.headers['x-martin-cache']).to.equal('MISS');
       expect(martin.requests).to.have.length(2);
       expect(martin.requests[0].url).to.contain('ctx-alice');
       expect(martin.requests[1].url).to.contain('ctx-bob');
     });
 
-    it('deduplicates concurrent requests for the same tile', async () => {
+    it('coalesces concurrent requests for the same tile into one upstream fetch', async () => {
       martin.respondWith({ ...defaultTileResponse, delayMs: 50 });
 
       const authorization = bearer({ ctx: 'ctx-concurrent' });
@@ -229,7 +251,7 @@ describe('tile route', () => {
       );
 
       expect(responses.every((response) => response.status === 200)).to.equal(true);
-      // Five concurrent misses, one upstream request.
+      // Five concurrent requests, one upstream fetch.
       expect(martin.requests).to.have.length(1);
     });
   });

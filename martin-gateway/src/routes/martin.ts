@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import { verifyMartinToken } from '../auth/verify-token.js';
-import { buildCacheKey, CachedTile, resolveTile } from '../cache/tile-cache.js';
 import { config } from '../config.js';
 import { badGateway, forbidden, notFound } from '../errors/tile-error.js';
-import { recordCacheHit, recordCacheMiss, recordUpstreamError } from '../metrics.js';
+import { recordRequest, recordUpstreamError, recordUpstreamFetch } from '../metrics.js';
+import { loadTileCoalesced, UpstreamTile } from '../upstream/inflight.js';
 import { fetchTile } from '../upstream/martin-client.js';
 import { getLogger } from '../utils/logger.js';
 
@@ -33,6 +33,7 @@ export interface ParsedTileRequest {
  * @param {Request} req
  * @param {Response} res
  * @param {NextFunction} next
+ * @return {void}
  */
 export const parseTilePath = (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -80,6 +81,7 @@ export const parseTilePath = (req: Request, res: Response, next: NextFunction) =
  * @param {Request} req
  * @param {Response} res
  * @param {NextFunction} next
+ * @return {void}
  */
 export const authenticateTileRequest = (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -94,52 +96,61 @@ export const authenticateTileRequest = (req: Request, res: Response, next: NextF
 };
 
 /**
- * Serve the tile, from cache when possible.
+ * Serve the tile, collapsing concurrent identical fetches into one upstream request.
+ *
+ * Rendered tiles are cached by Martin, whose keys include the trusted query string built below, so
+ * cached entries are already partitioned per authorization context.
  *
  * @param {Request} _req
  * @param {Response} res
  * @param {NextFunction} next
+ * @return {*}  {Promise<void>}
  */
 export const handleTileRequest = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const { source, z, x, y } = res.locals.tile as ParsedTileRequest;
     const claims = res.locals.tokenClaims;
 
-    const cacheKey = buildCacheKey(claims.ctx, source, z, x, y);
+    // The upstream URL is built entirely from validated values plus the trusted context id from
+    // the token. Every client supplied query parameter is discarded: nothing the browser sends can
+    // reach Martin or influence the SQL that generates the tile. The version parameter is inert to
+    // the tile function but part of Martin's cache key, so bumping it at deploy time invalidates
+    // every tile Martin has cached.
+    const upstreamPath = `/${source}/${z}/${x}/${y}?context=${encodeURIComponent(claims.ctx)}&v=${encodeURIComponent(
+      config.sourceVersion
+    )}`;
 
-    const { tile, hit } = await resolveTile(cacheKey, async () => {
-      // The upstream URL is built entirely from validated values plus the trusted context id from
-      // the token. Every client supplied query parameter is discarded: nothing the browser sends can
-      // reach Martin or influence the SQL that generates the tile.
-      const upstreamPath = `/${source}/${z}/${x}/${y}?context=${encodeURIComponent(claims.ctx)}`;
+    recordRequest();
 
+    const tile = await loadTileCoalesced(upstreamPath, async () => {
       const response = await fetchTile(upstreamPath);
 
-      if (response.status >= 500) {
+      // Only 200 (a tile) and 204 (a legitimately empty tile) are results; 404 means the source is
+      // unknown to Martin. Anything else — 5xx, redirects, other 4xx — is an upstream fault, logged
+      // here so coalesced followers of the same fetch do not multiply the count.
+      if (response.status !== 200 && response.status !== 204 && response.status !== 404) {
         recordUpstreamError();
         defaultLog.error({ message: 'Martin returned an error', status: response.status, jti: claims.jti });
       }
 
-      recordCacheMiss(response.durationMs);
+      recordUpstreamFetch(response.durationMs);
 
       return {
         status: response.status,
         headers: response.headers,
         body: response.body
-      } satisfies CachedTile;
+      } satisfies UpstreamTile;
     });
-
-    if (hit) {
-      recordCacheHit();
-    }
-
-    // Upstream failures are normalized so no internal or database detail reaches the browser.
-    if (tile.status >= 500) {
-      throw badGateway();
-    }
 
     if (tile.status === 404) {
       throw notFound('Tile not found');
+    }
+
+    // Only 200 and 204 are successful tile responses. Everything else is normalized to a bad
+    // gateway so no internal or database detail reaches the browser, and so an upstream error page
+    // (or an empty-bodied redirect) can never be mistaken for a valid or empty tile.
+    if (tile.status !== 200 && tile.status !== 204) {
+      throw badGateway();
     }
 
     // Preserve Martin's response metadata verbatim, including Content-Encoding: the body is still
@@ -148,14 +159,13 @@ export const handleTileRequest = async (_req: Request, res: Response, next: Next
       res.setHeader(header, value);
     }
 
-    res.setHeader('X-Martin-Cache', hit ? 'HIT' : 'MISS');
+    // Tiles are per-user authorized content served on a URL that does not identify the user, so no
+    // browser or intermediary may store them: a cached tile could otherwise be replayed to a
+    // different principal on the same machine without any request (or token check) taking place.
+    // Server-side performance is Martin's cache; in-session panning is MapLibre's in-memory cache.
+    res.setHeader('Cache-Control', 'no-store');
 
-    // Tiles are per-user authorized content. Force a private cache so shared or intermediary caches
-    // (CDN, proxy) never store one user's authorized tiles and serve them to another. The max-age
-    // matches the gateway cache TTL, which also bounds how long a revoked feature lingers in a tile.
-    res.setHeader('Cache-Control', `private, max-age=${config.cacheTtlSeconds}`);
-
-    // An empty tile is a legitimate, cacheable answer: the area simply holds no features.
+    // An empty tile is a legitimate answer: the area simply holds no features.
     if (tile.status === 204 || !tile.body.length) {
       // A 204 must not carry a body or a content length.
       res.removeHeader('content-encoding');

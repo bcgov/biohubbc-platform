@@ -42,8 +42,10 @@ let publicKeysByKid: Map<string, string> | null = null;
  * 401s every tile with "unknown key". Failing startup instead surfaces the mismatch as a
  * crashloop with an explicit message. Skipped when no expected kid is configured.
  *
- * @param {Map<string, string>} keys
- * @param {(string | null)} expectedKid
+ * @param {Map<string, string>} keys - Public keys loaded from the key directory, by key id.
+ * @param {(string | null)} expectedKid - Key id the API signs with, or null when unconfigured.
+ * @return {void}
+ * @throws {Error} When the expected key id is configured but absent.
  */
 export const assertExpectedKidPresent = (keys: Map<string, string>, expectedKid: string | null): void => {
   if (!expectedKid) {
@@ -96,6 +98,8 @@ export const loadPublicKeys = (): Map<string, string> => {
 
 /**
  * Reset the cached keys. Test seam.
+ *
+ * @return {void}
  */
 export const resetPublicKeys = () => {
   publicKeysByKid = null;

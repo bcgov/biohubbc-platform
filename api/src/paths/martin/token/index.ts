@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { MARTIN_SOURCE } from '../../../constants/martin';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { martinTokenResponseSchema } from '../../../openapi/schemas/martin';
@@ -9,13 +10,6 @@ import { getLogger } from '../../../utils/logger';
 import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/martin/token');
-
-/**
- * The source tokens are minted against. Must match the gateway's allowlist (`MARTIN_ALLOWED_SOURCES`),
- * which the gateway checks the `source` claim against before proxying. Martin does not publish this
- * source until SIMSBIOHUB-1103, so an authorized request reaches Martin and returns 404 until then.
- */
-const DEFAULT_MARTIN_SOURCE = 'search';
 
 export const POST: Operation = [martinTokenRateLimiter, createMartinSession()];
 
@@ -72,7 +66,7 @@ export function createMartinSession(): RequestHandler {
       const service = new MartinTokenService();
 
       const { token, expiresIn } = service.mintToken({
-        source: DEFAULT_MARTIN_SOURCE,
+        source: MARTIN_SOURCE.SEARCH,
         ctx: systemUserId ? 'placeholder-scoped' : 'placeholder-anonymous'
       });
 
@@ -83,8 +77,8 @@ export function createMartinSession(): RequestHandler {
         token,
         token_type: 'Bearer',
         token_expires_in: expiresIn,
-        source: DEFAULT_MARTIN_SOURCE,
-        martin_url_template: service.getMartinUrlTemplate(DEFAULT_MARTIN_SOURCE)
+        source: MARTIN_SOURCE.SEARCH,
+        martin_url_template: service.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH)
       });
     } catch (error) {
       defaultLog.error({ label: 'createMartinSession', message: 'error', error });
