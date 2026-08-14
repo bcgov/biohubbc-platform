@@ -1,15 +1,8 @@
 import { Knex } from 'knex';
+import { escapeLiteral } from '../utils/migrations';
 
 const DB_USER_MARTIN = process.env.DB_USER_MARTIN || 'martin';
 const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
-
-/**
- * Escape a value for embedding as a SQL string literal inside the dollar-quoted DO block below.
- *
- * @param {string} value
- * @return {*}  {string}
- */
-const escapeLiteral = (value: string): string => value.replace(/'/g, `''`);
 
 /**
  * Create the single-feature spatial property vector tile function.
@@ -66,7 +59,7 @@ export async function seed(knex: Knex): Promise<void> {
       v_submission_id         integer;
       v_submission_feature_id integer;
       v_env_3857              public.geometry;
-      v_env_4326              public.geometry;
+      v_candidates_4326       public.geometry;
       v_mvt                   bytea;
     BEGIN
       -- The gateway strips every client supplied parameter and injects only this one, taken from the
@@ -89,9 +82,19 @@ export async function seed(knex: Knex): Promise<void> {
       END;
 
       v_env_3857 := public.ST_TileEnvelope(z, x, y);
+
+      -- Candidates are selected against a BUFFERED envelope, because ST_AsMVTGeom renders into a
+      -- c_buffer margin beyond the tile: geometry lying just outside the exact bounds still
+      -- contributes to what this tile draws, so selecting on the exact envelope would drop it
+      -- first and clip points and strokes at every tile edge. ST_AsMVTGeom still receives the
+      -- EXACT envelope below, so the rendered output is unchanged.
+      --
       -- Geometry is stored in WGS84, so the envelope is transformed to match rather than
       -- transforming every candidate geometry, which would make the index unusable.
-      v_env_4326 := public.ST_Transform(v_env_3857, 4326);
+      v_candidates_4326 := public.ST_Transform(
+        public.ST_Expand(v_env_3857, (public.ST_XMax(v_env_3857) - public.ST_XMin(v_env_3857)) * c_buffer / c_extent),
+        4326
+      );
 
       -- 'mvt_feature_id' becomes the MVT feature id (5th ST_AsMVT argument): PostGIS consumes that
       -- column as the id and drops it from the attributes, so the geometry id is selected twice —
@@ -138,7 +141,7 @@ export async function seed(knex: Knex): Promise<void> {
         -- submission_feature_property_geometry_idx1 serves, and one feature's geometries are few
         -- enough that filtering them by envelope afterwards costs nothing.
         WHERE g.submission_feature_id = v_submission_feature_id
-          AND g.value && v_env_4326
+          AND g.value && v_candidates_4326
       ) feature_rows
       WHERE feature_rows.geom IS NOT NULL;
 

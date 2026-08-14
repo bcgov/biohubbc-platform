@@ -1,5 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import {
+  MARTIN_FEATURE_MAX_ZOOM,
+  MARTIN_FEATURE_MIN_ZOOM,
+  MARTIN_FEATURE_SOURCE_LAYER,
+  MARTIN_SOURCE
+} from '../../../../../../constants/martin';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
 import { martinFeatureSessionResponseSchema } from '../../../../../../openapi/schemas/martin';
@@ -10,16 +16,6 @@ import { SubmissionFeaturePropertyGeometryService } from '../../../../../../serv
 import { getLogger } from '../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}/tile');
-
-/** Martin source serving one submission feature's spatial properties. */
-const MARTIN_SOURCE = 'feature';
-
-/** Layer name `biohub.martin_feature` encodes into its tiles. */
-const MARTIN_SOURCE_LAYER = 'geometries';
-
-/** Zoom range the `feature` source is published at. Keep in sync with the Martin function source config. */
-const MARTIN_SOURCE_MIN_ZOOM = 0;
-const MARTIN_SOURCE_MAX_ZOOM = 15;
 
 export const POST: Operation = [
   martinTokenRateLimiter,
@@ -123,7 +119,7 @@ export function createSubmissionFeatureTileSession(): RequestHandler {
       const tokenService = new MartinTokenService();
 
       const { token, expiresIn } = tokenService.mintToken({
-        source: MARTIN_SOURCE,
+        source: MARTIN_SOURCE.FEATURE,
         // Parsed back out by biohub.martin_feature. Carrying the identifiers in the signed token,
         // rather than letting the client send them, is what makes them trustworthy at serve time.
         ctx: `sf:${submissionId}:${submissionFeatureId}`
@@ -134,12 +130,12 @@ export function createSubmissionFeatureTileSession(): RequestHandler {
         token,
         token_type: 'Bearer',
         token_expires_in: expiresIn,
-        source: MARTIN_SOURCE,
-        source_layer: MARTIN_SOURCE_LAYER,
-        martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE),
+        source: MARTIN_SOURCE.FEATURE,
+        source_layer: MARTIN_FEATURE_SOURCE_LAYER,
+        martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE.FEATURE),
         bbox: extent.bbox,
-        min_zoom: MARTIN_SOURCE_MIN_ZOOM,
-        max_zoom: MARTIN_SOURCE_MAX_ZOOM
+        min_zoom: MARTIN_FEATURE_MIN_ZOOM,
+        max_zoom: MARTIN_FEATURE_MAX_ZOOM
       });
     } catch (error) {
       defaultLog.error({ label: 'createSubmissionFeatureTileSession', message: 'error', error });

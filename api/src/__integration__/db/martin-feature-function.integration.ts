@@ -384,6 +384,47 @@ describe('Martin feature function (integration)', function () {
       expect(result.rows[0].tile).to.be.null;
     });
 
+    it('still renders geometry just outside the tile, so strokes are not clipped at the edge', async () => {
+      // ST_AsMVTGeom draws into a buffer beyond the tile, so a geometry sitting just outside the
+      // exact bounds still contributes to what this tile shows. Selecting candidates on the exact
+      // envelope would drop it before rendering and clip geometry at every tile seam.
+      const zoom = 12;
+      const { submissionId, featureId } = await createFeatureWithPoint();
+
+      const bounds = await connection.sql(
+        SQL`
+          SELECT
+            public.ST_XMin(env) AS min_x,
+            public.ST_XMax(env) AS max_x,
+            public.ST_YMin(env) AS min_y,
+            public.ST_YMax(env) AS max_y
+          FROM (
+            SELECT public.ST_Transform(
+              public.ST_TileEnvelope(
+                ${zoom},
+                floor((${TEST_LNG}::double precision + 180.0) / 360.0 * (2 ^ ${zoom}))::integer,
+                floor(
+                  (1.0 - ln(tan(radians(${TEST_LAT}::double precision)) + 1.0 / cos(radians(${TEST_LAT}::double precision))) / pi())
+                  / 2.0 * (2 ^ ${zoom})
+                )::integer
+              ),
+              4326
+            ) AS env
+          ) e;
+        `,
+        z.object({ min_x: z.number(), max_x: z.number(), min_y: z.number(), max_y: z.number() })
+      );
+
+      const { min_x, max_x, min_y, max_y } = bounds.rows[0];
+
+      // A short way past the western edge: outside the tile, inside the 64/4096 render buffer.
+      await addGeometry(featureId, `POINT(${min_x - (max_x - min_x) * 0.005} ${(min_y + max_y) / 2})`);
+
+      const geometries = await decodeGeometries(contextFor(submissionId, featureId), zoom);
+
+      expect(geometries, 'a geometry in the buffer margin should still reach the tile').to.have.length(2);
+    });
+
     it('excludes geometry of the same feature that lies outside the requested tile', async () => {
       const { submissionId, featureId } = await createFeatureWithPoint();
       // Far enough away to fall in a different tile at z12.

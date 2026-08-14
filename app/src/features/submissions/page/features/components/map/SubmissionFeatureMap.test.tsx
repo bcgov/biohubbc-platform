@@ -135,8 +135,8 @@ describe('SubmissionFeatureMap', () => {
     it('renders each geometry type from the session source layer', async () => {
       await renderReadyMap();
 
-      const layers: any[] = latestMapProps().layers;
-      const featureLayers = layers.filter((layer) => layer.source === FEATURE_GEOMETRIES_SOURCE_ID);
+      const specifications: any[] = latestMapProps().layers.map((layer: any) => layer.specification);
+      const featureLayers = specifications.filter((layer) => layer.source === FEATURE_GEOMETRIES_SOURCE_ID);
 
       expect(featureLayers.map((layer) => layer.id)).toEqual([
         FEATURE_FILL_LAYER_ID,
@@ -153,8 +153,8 @@ describe('SubmissionFeatureMap', () => {
     it('filters each layer by geometry type, so mixed geometries all stay visible', async () => {
       await renderReadyMap();
 
-      const layers: any[] = latestMapProps().layers;
-      const filterFor = (id: string) => layers.find((layer) => layer.id === id)?.filter;
+      const specifications: any[] = latestMapProps().layers.map((layer: any) => layer.specification);
+      const filterFor = (id: string) => specifications.find((layer) => layer.id === id)?.filter;
 
       expect(filterFor(FEATURE_FILL_LAYER_ID)).toEqual(['==', ['geometry-type'], 'Polygon']);
       expect(filterFor(FEATURE_OUTLINE_LAYER_ID)).toEqual(['==', ['geometry-type'], 'Polygon']);
@@ -165,9 +165,10 @@ describe('SubmissionFeatureMap', () => {
     it('uses the source layer name the session reports rather than a hard coded one', async () => {
       await renderReadyMap(buildSession({ source_layer: 'renamed_layer' }));
 
-      const layers: any[] = latestMapProps().layers;
-      const featureLayers = layers.filter((layer) => layer.source === FEATURE_GEOMETRIES_SOURCE_ID);
+      const specifications: any[] = latestMapProps().layers.map((layer: any) => layer.specification);
+      const featureLayers = specifications.filter((layer) => layer.source === FEATURE_GEOMETRIES_SOURCE_ID);
 
+      expect(featureLayers).not.toHaveLength(0);
       for (const layer of featureLayers) {
         expect(layer['source-layer']).toBe('renamed_layer');
       }
@@ -229,18 +230,27 @@ describe('SubmissionFeatureMap', () => {
       expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     });
 
-    it('surfaces a failure to load tiles, after bounded automatic recovery', async () => {
+    it('surfaces a failure to load tiles, after bounded backoff-paced automatic recovery', async () => {
       await renderReadyMap();
 
+      vi.useFakeTimers();
+
       // transformRequest cannot see responses, so a rejected tile reaches the component as a source
-      // error. Recovery re-mints a possibly-expired token a bounded number of times before giving up.
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // error. Recovery re-mints a possibly-expired token a bounded number of times — each attempt
+      // waiting out an exponential backoff — before giving up.
+      for (const backoffMs of [1000, 2000]) {
         await act(async () => {
           latestMapProps().onSourceError(FEATURE_GEOMETRIES_SOURCE_ID, new Error('tile request failed'));
         });
+        await act(async () => {
+          vi.advanceTimersByTime(backoffMs);
+        });
       }
+      await act(async () => {
+        latestMapProps().onSourceError(FEATURE_GEOMETRIES_SOURCE_ID, new Error('tile request failed'));
+      });
 
-      await waitFor(() => expect(screen.getByTestId('submission-feature-map-error')).toBeInTheDocument());
+      expect(screen.getByTestId('submission-feature-map-error')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
       // Giving up removes the map entirely; there is no stale session left to render.
       expect(screen.queryByTestId('submission-feature-map')).not.toBeInTheDocument();
@@ -259,8 +269,13 @@ describe('SubmissionFeatureMap', () => {
 
       const mountsBeforeFailure = mocks.slippyMapMounts.count;
 
+      vi.useFakeTimers();
+
       await act(async () => {
         latestMapProps().onSourceError(FEATURE_GEOMETRIES_SOURCE_ID, new Error('tile request failed'));
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
       });
 
       // No remount while the re-mint is pending: a remounted map would request its tiles with the
@@ -279,7 +294,7 @@ describe('SubmissionFeatureMap', () => {
       });
 
       // Only after the new token is in the ref does the map remount and re-request its tiles.
-      await waitFor(() => expect(mocks.slippyMapMounts.count).toBe(mountsBeforeFailure + 1));
+      expect(mocks.slippyMapMounts.count).toBe(mountsBeforeFailure + 1);
       expect(latestMapProps().transformRequest('https://biohub.test/martin/feature/5/5/11')).toEqual({
         url: 'https://biohub.test/martin/feature/5/5/11',
         headers: { Authorization: 'Bearer token-2' }

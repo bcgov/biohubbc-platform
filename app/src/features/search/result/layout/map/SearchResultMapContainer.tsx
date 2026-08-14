@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
+import { BASEMAP_SOURCE_ID, buildBasemapLayer, buildBasemapSource } from 'components/map/basemap-layers';
 import { SlippyMap } from 'components/map/SlippyMap';
 import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
 import {
@@ -17,14 +18,7 @@ import { useConfigContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import type { SourceSpecification } from 'maplibre-gl';
 import { PropsWithChildren, useCallback, useMemo } from 'react';
-import {
-  BASEMAP_SOURCE_ID,
-  buildBasemapLayer,
-  buildBasemapSource,
-  buildSearchResultLayers,
-  buildSearchResultsSource,
-  SEARCH_RESULTS_SOURCE_ID
-} from './map-layers';
+import { buildSearchResultLayers, buildSearchResultsSource, SEARCH_RESULTS_SOURCE_ID } from './map-layers';
 import { resolveMapSelection } from './map-selection';
 import { SearchResultMapPopper } from './SearchResultMapPopper';
 import { useMartinSession } from './useMartinSession';

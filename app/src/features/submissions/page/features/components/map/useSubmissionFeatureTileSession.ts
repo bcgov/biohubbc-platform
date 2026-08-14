@@ -1,16 +1,11 @@
+import {
+  MARTIN_AUTO_RECOVERY_BACKOFF_BASE_MS,
+  MARTIN_MAX_AUTO_RECOVERIES,
+  MARTIN_REFRESH_LEAD_SECONDS
+} from 'constants/martin';
 import { useApi } from 'hooks/useApi';
 import { ISubmissionFeatureTileSession } from 'interfaces/useMartinApi.interface';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-/** Refresh this many seconds before the token expires, so a tile request never races the expiry. */
-const REFRESH_LEAD_SECONDS = 60;
-
-/**
- * How many times a tile error may trigger an automatic re-mint before the map gives up and surfaces an
- * error. Bounds a persistent, non-token failure (eg: the gateway is down) to a few attempts rather than
- * an unbounded storm of re-mints.
- */
-const MAX_AUTO_RECOVERIES = 2;
 
 export type SubmissionFeatureTileSessionStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -37,6 +32,13 @@ export interface UseSubmissionFeatureTileSessionResult {
   onTileError: () => void;
 }
 
+/**
+ * Whether an error is the cancellation of a request this hook aborted itself, rather than a failure
+ * worth surfacing.
+ *
+ * @param {unknown} error
+ * @return {*}  {boolean}
+ */
 const isAbortError = (error: unknown) => {
   return error instanceof Error && (error.name === 'CanceledError' || error.message === 'canceled');
 };
@@ -83,6 +85,8 @@ export const useSubmissionFeatureTileSession = (
   const autoRecoveryCountRef = useRef(0);
   // Set by onTileError so the mint effect knows the next mint is a recovery and must not clear the counter.
   const pendingRecoveryRef = useRef(false);
+  // Pending backoff delay before an automatic recovery re-mint fires.
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mintCount, setMintCount] = useState(0);
 
   const apiRef = useRef(api);
@@ -96,10 +100,19 @@ export const useSubmissionFeatureTileSession = (
     setMintCount((count) => count + 1);
   }, []);
 
+  /** Cancel a scheduled automatic recovery, if one is waiting out its backoff. */
+  const clearRecoveryTimer = useCallback(() => {
+    if (recoveryTimerRef.current) {
+      clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  }, []);
+
   /**
    * Report that a tile request failed. `transformRequest` cannot see responses, so an expired token surfaces as a
    * source error rather than a 401 the caller can inspect. Re-mint to recover a likely-expired token, but only up to
-   * `MAX_AUTO_RECOVERIES` times so a persistent failure gives up instead of re-minting forever.
+   * `MARTIN_MAX_AUTO_RECOVERIES` times, each attempt delayed with exponential backoff so a service that is down sees
+   * spaced-out attempts rather than an immediate burst.
    *
    * Deliberately does NOT bump the reload nonce here: the nonce remounts the map, and remounting before the re-mint
    * resolves would issue a fresh round of tile requests with the same rejected token still in the ref. Those failures
@@ -112,7 +125,7 @@ export const useSubmissionFeatureTileSession = (
       return;
     }
 
-    if (autoRecoveryCountRef.current >= MAX_AUTO_RECOVERIES) {
+    if (autoRecoveryCountRef.current >= MARTIN_MAX_AUTO_RECOVERIES) {
       // Give up visibly. Dropping the session is what routes rendering to the error state and its
       // "Try again"; a stale session would keep a dead-token map on screen instead.
       tokenRef.current = null;
@@ -121,33 +134,44 @@ export const useSubmissionFeatureTileSession = (
       return;
     }
 
+    const backoffMs = MARTIN_AUTO_RECOVERY_BACKOFF_BASE_MS * 2 ** autoRecoveryCountRef.current;
+
     autoRecoveryCountRef.current += 1;
     pendingRecoveryRef.current = true;
+    // Claimed now, not when the timer fires, so tile errors arriving during the backoff are absorbed.
     mintInFlightRef.current = true;
-    triggerMint();
+
+    recoveryTimerRef.current = setTimeout(() => {
+      recoveryTimerRef.current = null;
+      triggerMint();
+    }, backoffMs);
   }, [triggerMint]);
 
   /**
-   * Re-request the session from a clean slate. Resets the recovery budget and forces the tiles to be re-requested, so
-   * it recovers even from the error state, where automatic recovery has given up.
+   * Re-request the session from a clean slate, immediately. Resets the recovery budget and forces the tiles to be
+   * re-requested, so it recovers even from the error state, where automatic recovery has given up.
    */
   const retry = useCallback(() => {
+    clearRecoveryTimer();
+    pendingRecoveryRef.current = false;
     autoRecoveryCountRef.current = 0;
     mintInFlightRef.current = true;
     setStatus('loading');
     setReloadNonce((nonce) => nonce + 1);
     triggerMint();
-  }, [triggerMint]);
+  }, [clearRecoveryTimer, triggerMint]);
 
   // Drop the previous feature's session as soon as the route changes, rather than when its replacement arrives.
   // Without this the old feature's tiles stay on screen for the length of the mint request, which reads as the new
   // feature having the old one's geometry. Declared before the mint effect so it runs first on an id change; it does
   // not run for a refresh or a recovery, which reuse the same ids and must leave the rendered map alone.
   useEffect(() => {
+    clearRecoveryTimer();
+    pendingRecoveryRef.current = false;
     tokenRef.current = null;
     setSession(null);
     setStatus('loading');
-  }, [submissionId, submissionFeatureId]);
+  }, [submissionId, submissionFeatureId, clearRecoveryTimer]);
 
   useEffect(() => {
     // Cancel any request still in flight for a previous feature, so a slow response cannot overwrite a newer one.
@@ -233,7 +257,7 @@ export const useSubmissionFeatureTileSession = (
       return;
     }
 
-    const delaySeconds = Math.max(session.token_expires_in - REFRESH_LEAD_SECONDS, 1);
+    const delaySeconds = Math.max(session.token_expires_in - MARTIN_REFRESH_LEAD_SECONDS, 1);
 
     refreshTimerRef.current = setTimeout(() => {
       // A pre-expiry refresh is not a recovery: rotate the token without bumping the reload nonce, so the rendered
@@ -248,6 +272,13 @@ export const useSubmissionFeatureTileSession = (
       }
     };
   }, [session, triggerMint]);
+
+  // Unmounting must leave no timer behind to fire into an unmounted component.
+  useEffect(() => {
+    return () => {
+      clearRecoveryTimer();
+    };
+  }, [clearRecoveryTimer]);
 
   return { status, session, tokenRef, reloadNonce, retry, onTileError };
 };

@@ -1,4 +1,5 @@
-import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import type { SourceSpecification } from 'maplibre-gl';
+import type { ISlippyMapLayer } from './SlippyMap.interface';
 
 export const BASEMAP_SOURCE_ID = 'basemap';
 export const BASEMAP_LAYER_ID = 'basemap';
@@ -23,10 +24,12 @@ export const buildBasemapSource = (basemapUrl: string, attribution: string): Sou
 /**
  * Build the basemap layer. Added before any data layer, so it renders underneath.
  *
- * @return {*}  {LayerSpecification}
+ * @return {*}  {ISlippyMapLayer}
  */
-export const buildBasemapLayer = (): LayerSpecification => ({
-  id: BASEMAP_LAYER_ID,
-  type: 'raster',
-  source: BASEMAP_SOURCE_ID
+export const buildBasemapLayer = (): ISlippyMapLayer => ({
+  specification: {
+    id: BASEMAP_LAYER_ID,
+    type: 'raster',
+    source: BASEMAP_SOURCE_ID
+  }
 });

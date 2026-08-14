@@ -1,4 +1,5 @@
-import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import type { SourceSpecification } from 'maplibre-gl';
 
 export const FEATURE_GEOMETRIES_SOURCE_ID = 'feature-geometries';
 
@@ -55,54 +56,64 @@ export const buildFeatureTileSource = (
  *
  * Ordered so areas sit beneath lines, and lines beneath points; the basemap is added by the caller before these.
  *
+ * All of them are display-only: feature tiles carry geometry alone, so there is nothing a click could resolve to.
+ *
  * @param {string} sourceLayer - Layer name inside the vector tiles, from the tile session.
- * @return {*}  {LayerSpecification[]}
+ * @return {*}  {ISlippyMapLayer[]}
  */
-export const buildFeatureLayers = (sourceLayer: string): LayerSpecification[] => [
+export const buildFeatureLayers = (sourceLayer: string): ISlippyMapLayer[] => [
   {
-    id: FEATURE_FILL_LAYER_ID,
-    type: 'fill',
-    source: FEATURE_GEOMETRIES_SOURCE_ID,
-    'source-layer': sourceLayer,
-    filter: ['==', ['geometry-type'], 'Polygon'],
-    paint: {
-      'fill-color': GEOMETRY_COLOR,
-      'fill-opacity': 0.25
+    specification: {
+      id: FEATURE_FILL_LAYER_ID,
+      type: 'fill',
+      source: FEATURE_GEOMETRIES_SOURCE_ID,
+      'source-layer': sourceLayer,
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: {
+        'fill-color': GEOMETRY_COLOR,
+        'fill-opacity': 0.25
+      }
     }
   },
   {
-    id: FEATURE_OUTLINE_LAYER_ID,
-    type: 'line',
-    source: FEATURE_GEOMETRIES_SOURCE_ID,
-    'source-layer': sourceLayer,
-    filter: ['==', ['geometry-type'], 'Polygon'],
-    paint: {
-      'line-color': GEOMETRY_COLOR,
-      'line-width': 1.5
+    specification: {
+      id: FEATURE_OUTLINE_LAYER_ID,
+      type: 'line',
+      source: FEATURE_GEOMETRIES_SOURCE_ID,
+      'source-layer': sourceLayer,
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: {
+        'line-color': GEOMETRY_COLOR,
+        'line-width': 1.5
+      }
     }
   },
   {
-    id: FEATURE_LINE_LAYER_ID,
-    type: 'line',
-    source: FEATURE_GEOMETRIES_SOURCE_ID,
-    'source-layer': sourceLayer,
-    filter: ['==', ['geometry-type'], 'LineString'],
-    paint: {
-      'line-color': GEOMETRY_COLOR,
-      'line-width': 2
+    specification: {
+      id: FEATURE_LINE_LAYER_ID,
+      type: 'line',
+      source: FEATURE_GEOMETRIES_SOURCE_ID,
+      'source-layer': sourceLayer,
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: {
+        'line-color': GEOMETRY_COLOR,
+        'line-width': 2
+      }
     }
   },
   {
-    id: FEATURE_POINT_LAYER_ID,
-    type: 'circle',
-    source: FEATURE_GEOMETRIES_SOURCE_ID,
-    'source-layer': sourceLayer,
-    filter: ['==', ['geometry-type'], 'Point'],
-    paint: {
-      'circle-radius': 5,
-      'circle-color': GEOMETRY_COLOR,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff'
+    specification: {
+      id: FEATURE_POINT_LAYER_ID,
+      type: 'circle',
+      source: FEATURE_GEOMETRIES_SOURCE_ID,
+      'source-layer': sourceLayer,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 5,
+        'circle-color': GEOMETRY_COLOR,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
+      }
     }
   }
 ];

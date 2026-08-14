@@ -2,15 +2,6 @@ import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { SourceSpecification } from 'maplibre-gl';
 
-// The basemap is shared with every other map in the app, so it is defined once alongside the map component.
-// Re-exported here because this module is the map view's single point of import for sources and layers.
-export {
-  BASEMAP_LAYER_ID,
-  BASEMAP_SOURCE_ID,
-  buildBasemapLayer,
-  buildBasemapSource
-} from 'components/map/basemap-layers';
-
 export const SEARCH_RESULTS_SOURCE_ID = 'search-results';
 
 export const CLUSTER_LAYER_ID = 'search-clusters';

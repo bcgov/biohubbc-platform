@@ -35,6 +35,13 @@ export const MAP_FIT_PADDING = 40;
 export const MAP_VIEW_MIN_HEIGHT = 500;
 
 /**
+ * Height of a map embedded as one section of a page, in pixels. Fixed rather than grown to fit: the section sits
+ * among others that the user scrolls through, so the map takes a predictable share of the page rather than the rest
+ * of it.
+ */
+export const MAP_SECTION_HEIGHT = 400;
+
+/**
  * Zoom levels added when the user zooms into a cluster from its popper. Server-side clusters carry no expansion
  * zoom, so a fixed increment is used; each level doubles the clustering grid's resolution. Always capped at
  * `MAP_MAX_ZOOM`.

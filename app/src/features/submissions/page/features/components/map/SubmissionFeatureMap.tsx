@@ -4,10 +4,11 @@ import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { buildBasemapLayer, buildBasemapSource, BASEMAP_SOURCE_ID } from 'components/map/basemap-layers';
 import { SlippyMap } from 'components/map/SlippyMap';
-import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
+import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SECTION_HEIGHT } from 'constants/spatial';
 import { useConfigContext } from 'hooks/useContext';
-import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
-import { useCallback, useMemo } from 'react';
+import type { SourceSpecification } from 'maplibre-gl';
+import { PropsWithChildren, useCallback, useMemo } from 'react';
 import { buildFeatureLayers, buildFeatureTileSource, FEATURE_GEOMETRIES_SOURCE_ID } from './feature-map-layers';
 import { useSubmissionFeatureTileSession } from './useSubmissionFeatureTileSession';
 
@@ -17,7 +18,20 @@ export interface ISubmissionFeatureMapProps {
 }
 
 /** Height of the map section. Tall enough to give an extent context, short enough to leave the page scannable. */
-const MAP_HEIGHT = 400;
+/**
+ * Fixed frame every state of the map section renders inside.
+ *
+ * The section keeps one footprint whichever state is showing: swapping the map for a loading, empty or error state
+ * would otherwise collapse the section and make the surrounding page jump.
+ *
+ * @param {PropsWithChildren<{ testId: string }>} props
+ * @return {*}
+ */
+const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
+  <Box data-testid={props.testId} sx={{ position: 'relative', display: 'flex', height: MAP_SECTION_HEIGHT }}>
+    {props.children}
+  </Box>
+);
 
 /**
  * Map of a submission feature's spatial properties.
@@ -60,8 +74,8 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
     return sources;
   }, [config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION, session, submissionId, submissionFeatureId]);
 
-  const layers = useMemo((): LayerSpecification[] => {
-    const mapLayers: LayerSpecification[] = [];
+  const layers = useMemo((): ISlippyMapLayer[] => {
+    const mapLayers: ISlippyMapLayer[] = [];
 
     if (config?.BASEMAP_URL) {
       mapLayers.push(buildBasemapLayer());
@@ -104,36 +118,51 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
   );
 
   if (status === 'loading') {
-    return <SkeletonMap />;
+    return (
+      <MapFrame testId="submission-feature-map-loading">
+        <SkeletonMap />
+      </MapFrame>
+    );
   }
 
   if (status === 'empty') {
     return (
-      <Box data-testid="submission-feature-map-empty" sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          This feature has no spatial properties.
-        </Typography>
-      </Box>
+      <MapFrame testId="submission-feature-map-empty">
+        <Box sx={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            This feature has no spatial properties.
+          </Typography>
+        </Box>
+      </MapFrame>
     );
   }
 
   if (status === 'error' || !session) {
     return (
-      <Box
-        data-testid="submission-feature-map-error"
-        sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, p: 4 }}>
-        <Typography variant="body2" color="text.secondary">
-          The map could not be loaded.
-        </Typography>
-        <Button onClick={retry}>Try again</Button>
-      </Box>
+      <MapFrame testId="submission-feature-map-error">
+        <Box
+          sx={{
+            flex: '1 1 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            p: 4
+          }}>
+          <Typography variant="body2" color="text.secondary">
+            The map could not be loaded.
+          </Typography>
+          <Button onClick={retry}>Try again</Button>
+        </Box>
+      </MapFrame>
     );
   }
 
   const [minX, minY, maxX, maxY] = session.bbox;
 
   return (
-    <Box data-testid="submission-feature-map" sx={{ position: 'relative', height: MAP_HEIGHT }}>
+    <MapFrame testId="submission-feature-map">
       <SlippyMap
         // A different feature means different geometry to frame, so the map is rebuilt rather than re-aimed: the
         // initial viewport is a construction-time option. A recovery or manual retry bumps reloadNonce to force a
@@ -155,8 +184,8 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
         layers={layers}
         transformRequest={transformRequest}
         onSourceError={handleSourceError}
-        sx={{ height: '100%' }}
+        sx={{ flex: '1 1 auto' }}
       />
-    </Box>
+    </MapFrame>
   );
 };

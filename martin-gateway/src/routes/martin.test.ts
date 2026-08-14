@@ -126,7 +126,7 @@ describe('tile route', () => {
       });
 
       expect(response.status).to.equal(200);
-      expect(martin.requests[0].url).to.equal(`/${TEST_SECOND_SOURCE}/5/5/11?context=ctx-test`);
+      expect(martin.requests[0].url).to.equal(`/${TEST_SECOND_SOURCE}/5/5/11?context=ctx-test&v=testv1`);
     });
 
     it('rejects a token minted for a different allowlisted source', async () => {
@@ -149,7 +149,7 @@ describe('tile route', () => {
       expect(martin.requests).to.have.length(0);
     });
 
-    it('caches each source separately', async () => {
+    it('requests each source under its own upstream URL', async () => {
       const context = 'sf:12:34';
 
       await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, {
@@ -159,15 +159,15 @@ describe('tile route', () => {
         authorization: bearer({ source: TEST_SECOND_SOURCE, ctx: context })
       });
 
-      // Same context and same tile coordinates: only the source keeps these apart in the cache.
-      // The context is percent encoded on the way out, so Martin decodes it back before the tile
-      // function sees it.
+      // Same context and same tile coordinates: only the source path keeps these apart in Martin's
+      // cache. The context is percent encoded on the way out, so Martin decodes it back before the
+      // tile function sees it.
       const encodedContext = encodeURIComponent(context);
 
       expect(martin.requests).to.have.length(2);
       expect(martin.requests.map((request) => request.url)).to.eql([
-        `/${TEST_SOURCE}/5/5/11?context=${encodedContext}`,
-        `/${TEST_SECOND_SOURCE}/5/5/11?context=${encodedContext}`
+        `/${TEST_SOURCE}/5/5/11?context=${encodedContext}&v=testv1`,
+        `/${TEST_SECOND_SOURCE}/5/5/11?context=${encodedContext}&v=testv1`
       ]);
     });
   });
