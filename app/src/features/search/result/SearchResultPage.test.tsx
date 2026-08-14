@@ -35,11 +35,15 @@ vi.mock('hooks/useApi');
 vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 vi.mock('./hooks/useSearchResults');
-// The map layout owns its own Martin session and renders MapLibre; the page test only cares that it is handed the
+// The map container owns its own Martin session and renders MapLibre; the page test only cares that it is handed the
 // current search, so it is replaced with a marker.
-vi.mock('./layout/map/SearchResultMapLayout', () => ({
-  SearchResultMapLayout: (props: { featureTypeName: string }) => (
-    <div data-testid="search-result-map-layout" data-feature-type={props.featureTypeName} />
+vi.mock('./layout/map/SearchResultMapContainer', () => ({
+  SearchResultMapContainer: (props: { featureTypeName: string; isActive: boolean }) => (
+    <div
+      data-testid="search-result-map-container"
+      data-feature-type={props.featureTypeName}
+      data-is-active={String(props.isActive)}
+    />
   )
 }));
 vi.mock('./header/SearchResultSearch', () => ({
@@ -459,5 +463,19 @@ describe('SearchResultPage', () => {
       )
     );
     expect(getByRole('heading', { level: 2, name: /create data request/i })).toBeInTheDocument();
+  });
+
+  it('tells the map whether its view is the one on screen', () => {
+    const { getByRole, getByTestId } = renderPage();
+
+    fireEvent.click(getByRole('button', { name: 'Map' }));
+
+    // The panel keeps the map mounted across a view switch, so the map only learns it is hidden from this flag: it
+    // is what stops it minting and refreshing a Martin session for a user sitting on the table view.
+    expect(getByTestId('search-result-map-container')).toHaveAttribute('data-is-active', 'true');
+
+    fireEvent.click(getByRole('button', { name: 'Table' }));
+
+    expect(getByTestId('search-result-map-container')).toHaveAttribute('data-is-active', 'false');
   });
 });

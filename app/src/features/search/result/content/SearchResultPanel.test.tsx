@@ -6,27 +6,28 @@ vi.mock('./option/SearchResultOptions', () => ({
   SearchResultOptions: () => <div data-testid="search-result-options" />
 }));
 
-const renderPanel = (view: SEARCH_RESULT_VIEW) =>
-  render(
-    <SearchResultPanel
-      rows={[]}
-      featureTypeProperties={[]}
-      isLoading={false}
-      pagination={{ current_page: 1, per_page: 10, total: 42, last_page: 5, sort: undefined, order: undefined }}
-      sortOptions={[]}
-      activeSort=""
-      view={view}
-      viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-      isCreateDownloadDisabled={false}
-      onCreateDownloadClick={vi.fn()}
-      onSortChange={vi.fn()}
-      onViewChange={vi.fn()}
-      onResultClick={vi.fn()}
-      onPageChange={vi.fn()}
-      onPageSizeChange={vi.fn()}
-      mapContent={<div data-testid="map-content" />}
-    />
-  );
+const panel = (view: SEARCH_RESULT_VIEW) => (
+  <SearchResultPanel
+    rows={[]}
+    featureTypeProperties={[]}
+    isLoading={false}
+    pagination={{ current_page: 1, per_page: 10, total: 42, last_page: 5, sort: undefined, order: undefined }}
+    sortOptions={[]}
+    activeSort=""
+    view={view}
+    viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
+    isCreateDownloadDisabled={false}
+    onCreateDownloadClick={vi.fn()}
+    onSortChange={vi.fn()}
+    onViewChange={vi.fn()}
+    onResultClick={vi.fn()}
+    onPageChange={vi.fn()}
+    onPageSizeChange={vi.fn()}
+    mapContent={<div data-testid="map-content" />}
+  />
+);
+
+const renderPanel = (view: SEARCH_RESULT_VIEW) => render(panel(view));
 
 describe('SearchResultPanel', () => {
   afterEach(() => {
@@ -54,6 +55,30 @@ describe('SearchResultPanel', () => {
 
       expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Table' })).toBeInTheDocument();
+    });
+
+    it('does not build the map until the map view is first opened', () => {
+      const { rerender } = renderPanel(SEARCH_RESULT_VIEW.TABLE);
+
+      expect(screen.queryByTestId('map-content')).not.toBeInTheDocument();
+
+      rerender(panel(SEARCH_RESULT_VIEW.MAP));
+
+      expect(screen.getByTestId('map-content')).toBeInTheDocument();
+    });
+
+    it('keeps the map mounted after switching back, so its session and viewport survive', () => {
+      const { rerender } = renderPanel(SEARCH_RESULT_VIEW.MAP);
+
+      rerender(panel(SEARCH_RESULT_VIEW.TABLE));
+
+      // Hidden, not unmounted: unmounting drops the session and viewport, and re-requests every tile on return.
+      expect(screen.getByTestId('map-content')).toBeInTheDocument();
+      expect(screen.getByTestId('search-result-map-view')).not.toBeVisible();
+
+      rerender(panel(SEARCH_RESULT_VIEW.MAP));
+
+      expect(screen.getByTestId('search-result-map-view')).toBeVisible();
     });
   });
 

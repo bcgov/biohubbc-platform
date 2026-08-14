@@ -1,5 +1,6 @@
+import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
-import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import type { SourceSpecification } from 'maplibre-gl';
 
 export const BASEMAP_SOURCE_ID = 'basemap';
 export const SEARCH_RESULTS_SOURCE_ID = 'search-results';
@@ -11,19 +12,12 @@ export const LINE_LAYER_ID = 'search-lines';
 export const FILL_LAYER_ID = 'search-fills';
 export const OUTLINE_LAYER_ID = 'search-outlines';
 
-/** Layers a click can select a feature from. The cluster layer is display only. */
-export const INTERACTIVE_LAYER_IDS = [FILL_LAYER_ID, LINE_LAYER_ID, POINT_LAYER_ID];
-
 /** Source layers produced by the tile function: aggregated counts at low zoom, raw features above it. */
 const CLUSTERS_SOURCE_LAYER = 'clusters';
 const FEATURES_SOURCE_LAYER = 'features';
 
+/** Single result colour: feature tiles are geometry only and carry no styling properties. */
 const RESULT_COLOR = '#1f6fb2';
-/** Secured features are visible only to callers granted access, so they are called out distinctly. */
-const SECURED_COLOR = '#b35c00';
-
-/** Colour by whether the feature is secured, using the only styling property the tiles carry. */
-const colorBySecured = ['case', ['get', 'is_secured'], SECURED_COLOR, RESULT_COLOR];
 
 /**
  * Build the raster basemap source.
@@ -73,78 +67,90 @@ export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: s
  *
  * Ordered so areas sit beneath lines, and lines beneath points; the basemap is added by the caller before these.
  *
- * @return {*}  {LayerSpecification[]}
+ * All of them are display-only: tiles carry geometry alone, so there is nothing a click could resolve to.
+ *
+ * @return {*}  {ISlippyMapLayer[]}
  */
-export const buildSearchResultLayers = (): LayerSpecification[] => [
+export const buildSearchResultLayers = (): ISlippyMapLayer[] => [
   {
-    id: FILL_LAYER_ID,
-    type: 'fill',
-    source: SEARCH_RESULTS_SOURCE_ID,
-    'source-layer': FEATURES_SOURCE_LAYER,
-    filter: ['==', ['geometry-type'], 'Polygon'],
-    paint: {
-      'fill-color': colorBySecured as never,
-      'fill-opacity': 0.25
+    specification: {
+      id: FILL_LAYER_ID,
+      type: 'fill',
+      source: SEARCH_RESULTS_SOURCE_ID,
+      'source-layer': FEATURES_SOURCE_LAYER,
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: {
+        'fill-color': RESULT_COLOR,
+        'fill-opacity': 0.25
+      }
     }
   },
   {
-    id: OUTLINE_LAYER_ID,
-    type: 'line',
-    source: SEARCH_RESULTS_SOURCE_ID,
-    'source-layer': FEATURES_SOURCE_LAYER,
-    filter: ['==', ['geometry-type'], 'Polygon'],
-    paint: {
-      'line-color': colorBySecured as never,
-      'line-width': 1.5
+    specification: {
+      id: OUTLINE_LAYER_ID,
+      type: 'line',
+      source: SEARCH_RESULTS_SOURCE_ID,
+      'source-layer': FEATURES_SOURCE_LAYER,
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: {
+        'line-color': RESULT_COLOR,
+        'line-width': 1.5
+      }
     }
   },
   {
-    id: LINE_LAYER_ID,
-    type: 'line',
-    source: SEARCH_RESULTS_SOURCE_ID,
-    'source-layer': FEATURES_SOURCE_LAYER,
-    filter: ['==', ['geometry-type'], 'LineString'],
-    paint: {
-      'line-color': colorBySecured as never,
-      'line-width': 2
+    specification: {
+      id: LINE_LAYER_ID,
+      type: 'line',
+      source: SEARCH_RESULTS_SOURCE_ID,
+      'source-layer': FEATURES_SOURCE_LAYER,
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: {
+        'line-color': RESULT_COLOR,
+        'line-width': 2
+      }
     }
   },
   {
-    id: POINT_LAYER_ID,
-    type: 'circle',
-    source: SEARCH_RESULTS_SOURCE_ID,
-    'source-layer': FEATURES_SOURCE_LAYER,
-    filter: ['==', ['geometry-type'], 'Point'],
-    paint: {
-      'circle-radius': 5,
-      'circle-color': colorBySecured as never,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff'
+    specification: {
+      id: POINT_LAYER_ID,
+      type: 'circle',
+      source: SEARCH_RESULTS_SOURCE_ID,
+      'source-layer': FEATURES_SOURCE_LAYER,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 5,
+        'circle-color': RESULT_COLOR,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
+      }
     }
   },
   {
-    // Low zoom aggregate. Counts are encoded as size and colour rather than labels, because text layers need a glyph
-    // endpoint that this stack does not provide.
-    id: CLUSTER_LAYER_ID,
-    type: 'circle',
-    source: SEARCH_RESULTS_SOURCE_ID,
-    'source-layer': CLUSTERS_SOURCE_LAYER,
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 1, 6, 10, 12, 100, 18, 1000, 26] as never,
-      'circle-color': [
-        'interpolate',
-        ['linear'],
-        ['get', 'count'],
-        1,
-        '#7fb2d9',
-        100,
-        RESULT_COLOR,
-        1000,
-        '#0b3f6b'
-      ] as never,
-      'circle-opacity': 0.85,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff'
+    specification: {
+      // Low zoom aggregate. Counts are encoded as size and colour rather than labels, because text layers need a
+      // glyph endpoint that this stack does not provide.
+      id: CLUSTER_LAYER_ID,
+      type: 'circle',
+      source: SEARCH_RESULTS_SOURCE_ID,
+      'source-layer': CLUSTERS_SOURCE_LAYER,
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 1, 6, 10, 12, 100, 18, 1000, 26] as never,
+        'circle-color': [
+          'interpolate',
+          ['linear'],
+          ['get', 'count'],
+          1,
+          '#7fb2d9',
+          100,
+          RESULT_COLOR,
+          1000,
+          '#0b3f6b'
+        ] as never,
+        'circle-opacity': 0.85,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
+      }
     }
   }
 ];
@@ -152,10 +158,12 @@ export const buildSearchResultLayers = (): LayerSpecification[] => [
 /**
  * Build the basemap layer.
  *
- * @return {*}  {LayerSpecification}
+ * @return {*}  {ISlippyMapLayer}
  */
-export const buildBasemapLayer = (): LayerSpecification => ({
-  id: BASEMAP_LAYER_ID,
-  type: 'raster',
-  source: BASEMAP_SOURCE_ID
+export const buildBasemapLayer = (): ISlippyMapLayer => ({
+  specification: {
+    id: BASEMAP_LAYER_ID,
+    type: 'raster',
+    source: BASEMAP_SOURCE_ID
+  }
 });

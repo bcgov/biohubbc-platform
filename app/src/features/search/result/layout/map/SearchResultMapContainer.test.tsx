@@ -1,14 +1,14 @@
 import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { IMartinSession } from 'interfaces/useMartinApi.interface';
 import { act, cleanup, render, screen, waitFor } from 'test-helpers/test-utils';
-import { SearchResultMapLayout } from './SearchResultMapLayout';
+import { SearchResultMapContainer } from './SearchResultMapContainer';
 import { SEARCH_RESULTS_SOURCE_ID } from './map-layers';
 
 const mocks = vi.hoisted(() => ({
   createMartinSession: vi.fn(),
   setSnackbar: vi.fn(),
   slippyMapProps: [] as Record<string, any>[],
-  // Counts MOUNTS, not renders: a keyed remount is how the layout forces tiles to be re-requested,
+  // Counts MOUNTS, not renders: a keyed remount is how the container forces tiles to be re-requested,
   // so the recovery tests assert on when a remount happens, which render counts cannot show.
   slippyMapMounts: { count: 0 }
 }));
@@ -41,7 +41,6 @@ vi.mock('components/map/SlippyMap', async () => {
 });
 
 const buildSession = (overrides: Partial<IMartinSession> = {}): IMartinSession => ({
-  over_cap: false,
   token: 'token-1',
   token_type: 'Bearer',
   token_expires_in: 900,
@@ -49,26 +48,27 @@ const buildSession = (overrides: Partial<IMartinSession> = {}): IMartinSession =
   source: 'search',
   martin_context_id: 'ctx-1',
   martin_url_template: '/martin/search/{z}/{x}/{y}',
-  bbox: [-125, 48, -120, 52],
-  feature_count: 12,
   has_more_secured_features: false,
   ...overrides
 });
 
-const renderLayout = (props: Partial<React.ComponentProps<typeof SearchResultMapLayout>> = {}) =>
-  render(
-    <SearchResultMapLayout
-      featureTypeName="species_observation"
-      expressionTree={null}
-      onResultClick={vi.fn()}
-      {...props}
-    />
-  );
+const renderContainer = (props: Partial<React.ComponentProps<typeof SearchResultMapContainer>> = {}) =>
+  render(<SearchResultMapContainer featureTypeName="species_observation" expressionTree={null} isActive {...props} />);
 
 /** The most recent props SlippyMap was rendered with. */
 const latestMapProps = () => mocks.slippyMapProps[mocks.slippyMapProps.length - 1];
 
-describe('SearchResultMapLayout', () => {
+/** Report one failed tile request, then advance past the recovery backoff so the re-mint fires. */
+const failTilesAndAwaitRecovery = async (backoffMs: number) => {
+  await act(async () => {
+    latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
+  });
+  await act(async () => {
+    vi.advanceTimersByTime(backoffMs);
+  });
+};
+
+describe('SearchResultMapContainer', () => {
   beforeEach(() => {
     mocks.slippyMapProps.length = 0;
     mocks.slippyMapMounts.count = 0;
@@ -89,7 +89,7 @@ describe('SearchResultMapLayout', () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
       const expressionTree = { type: 'expression', operator: 'AND', clauses: [] } as any;
-      renderLayout({ expressionTree });
+      renderContainer({ expressionTree });
 
       await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalled());
 
@@ -103,15 +103,16 @@ describe('SearchResultMapLayout', () => {
     it('shows a loading state until the session resolves', async () => {
       mocks.createMartinSession.mockReturnValue(new Promise(() => undefined));
 
-      renderLayout();
+      renderContainer();
 
+      expect(screen.getByTestId('search-result-map-loading')).toBeInTheDocument();
       expect(screen.queryByTestId('search-result-map')).not.toBeInTheDocument();
     });
 
     it('requests a new session when the search changes', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      const { rerender } = renderLayout();
+      const { rerender } = renderContainer();
       await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(1));
 
       const nextExpression = { type: 'expression', operator: 'OR', clauses: [] } as any;
@@ -120,11 +121,7 @@ describe('SearchResultMapLayout', () => {
 
       await act(async () => {
         rerender(
-          <SearchResultMapLayout
-            featureTypeName="species_observation"
-            expressionTree={nextExpression}
-            onResultClick={vi.fn()}
-          />
+          <SearchResultMapContainer featureTypeName="species_observation" expressionTree={nextExpression} isActive />
         );
       });
 
@@ -138,27 +135,12 @@ describe('SearchResultMapLayout', () => {
   });
 
   describe('viewport', () => {
-    it('fits the extent of the search results', async () => {
-      mocks.createMartinSession.mockResolvedValue(buildSession({ bbox: [-125, 48, -120, 52] }));
+    it('opens on the extent of British Columbia', async () => {
+      // A session carries no extent of its own: nothing about the result set is materialized, so
+      // the map always frames the whole province.
+      mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
-      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
-
-      // Handed to MapLibre as bounds rather than a hand-computed centre and zoom, so the fit
-      // accounts for Mercator distortion and the panel's aspect ratio.
-      expect(latestMapProps().mapOptions.bounds).toEqual([
-        [-125, 48],
-        [-120, 52]
-      ]);
-      expect(latestMapProps().initialCenter).toBeUndefined();
-      expect(latestMapProps().initialZoom).toBeUndefined();
-    });
-
-    it('falls back to the extent of British Columbia when the search has none', async () => {
-      // An unfiltered search is rule-based rather than materialized, so the API returns no bbox.
-      mocks.createMartinSession.mockResolvedValue(buildSession({ bbox: null }));
-
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       const [[west, south], [east, north]] = latestMapProps().mapOptions.bounds;
@@ -168,12 +150,14 @@ describe('SearchResultMapLayout', () => {
       expect(north - south).toBeGreaterThan(10);
       expect(west).toBeLessThan(-130);
       expect(east).toBeGreaterThan(-115);
+      expect(latestMapProps().initialCenter).toBeUndefined();
+      expect(latestMapProps().initialZoom).toBeUndefined();
     });
 
-    it('caps how far the initial fit may zoom in, so a single result keeps its surroundings', async () => {
-      mocks.createMartinSession.mockResolvedValue(buildSession({ bbox: [-125, 48, -125, 48] }));
+    it('caps how far the initial fit may zoom in', async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       expect(latestMapProps().mapOptions.fitBoundsOptions).toEqual({
@@ -185,7 +169,7 @@ describe('SearchResultMapLayout', () => {
     it('lets the user zoom out far enough to see all of British Columbia', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       expect(latestMapProps().mapOptions.minZoom).toBe(MAP_MIN_ZOOM);
@@ -199,7 +183,7 @@ describe('SearchResultMapLayout', () => {
     it('varies the tile url by context, so a new search does not reuse cached tiles', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       const source = latestMapProps().tileSources[SEARCH_RESULTS_SOURCE_ID];
@@ -210,7 +194,7 @@ describe('SearchResultMapLayout', () => {
     it('never places the token in the tile url', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession({ token: 'super-secret-token' }));
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       const source = latestMapProps().tileSources[SEARCH_RESULTS_SOURCE_ID];
@@ -223,7 +207,7 @@ describe('SearchResultMapLayout', () => {
     it('attaches the token as an Authorization header on tile requests only', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession({ token: 'token-abc' }));
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       const { transformRequest } = latestMapProps();
@@ -238,55 +222,64 @@ describe('SearchResultMapLayout', () => {
     });
   });
 
-  describe('feature selection', () => {
-    it('navigates to the selected feature', async () => {
+  describe('hidden map view', () => {
+    /** Render the map, then switch to the table view, which keeps this component mounted but inactive. */
+    const renderThenHide = async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
-      const onResultClick = vi.fn();
-
-      renderLayout({ onResultClick });
+      const { rerender } = renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
-      latestMapProps().onFeatureClick([{ properties: { submission_id: 3, submission_feature_id: 42 } }]);
+      await act(async () => {
+        rerender(
+          <SearchResultMapContainer featureTypeName="species_observation" expressionTree={null} isActive={false} />
+        );
+      });
 
-      expect(onResultClick).toHaveBeenCalledWith({ submission_id: 3, submission_feature_id: 42 });
+      return { rerender };
+    };
+
+    it('holds its session while hidden, so returning to it does not rebuild the map', async () => {
+      const { rerender } = await renderThenHide();
+      const mountsWhileHidden = mocks.slippyMapMounts.count;
+
+      // Still the map, not the loading state: dropping the session here is what would rebuild it on the way back.
+      expect(screen.getByTestId('search-result-map')).toBeInTheDocument();
+
+      await act(async () => {
+        rerender(<SearchResultMapContainer featureTypeName="species_observation" expressionTree={null} isActive />);
+      });
+
+      expect(mocks.slippyMapMounts.count).toBe(mountsWhileHidden);
     });
 
-    it('ignores a selection missing its identifiers', async () => {
-      mocks.createMartinSession.mockResolvedValue(buildSession());
-      const onResultClick = vi.fn();
+    it('makes no requests while hidden, and re-mints on the way back', async () => {
+      // Fake timers from the start, so the refresh scheduled on the first mint is one this test controls.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
 
-      renderLayout({ onResultClick });
-      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+      const { rerender } = await renderThenHide();
+      const mintsWhileHidden = mocks.createMartinSession.mock.calls.length;
 
-      latestMapProps().onFeatureClick([{ properties: {} }]);
+      // Well past the token refresh lead time: a hidden map talks to nobody.
+      await act(async () => {
+        vi.advanceTimersByTime(60 * 60 * 1000);
+      });
 
-      expect(onResultClick).not.toHaveBeenCalled();
+      expect(mocks.createMartinSession.mock.calls.length).toBe(mintsWhileHidden);
+
+      await act(async () => {
+        rerender(<SearchResultMapContainer featureTypeName="species_observation" expressionTree={null} isActive />);
+      });
+
+      // The token it was holding may have expired while hidden, so coming back rotates it.
+      expect(mocks.createMartinSession.mock.calls.length).toBe(mintsWhileHidden + 1);
     });
   });
 
   describe('states', () => {
-    it('explains that a search is too large to map, and renders no tile source', async () => {
-      mocks.createMartinSession.mockResolvedValue({ over_cap: true, cap: 50000 });
-
-      renderLayout();
-
-      await waitFor(() => expect(screen.getByTestId('search-result-map-over-cap')).toBeInTheDocument());
-      expect(screen.getByText(/too many results/i)).toBeInTheDocument();
-      expect(screen.queryByTestId('search-result-map')).not.toBeInTheDocument();
-    });
-
-    it('shows an empty state when the search matched nothing mappable', async () => {
-      mocks.createMartinSession.mockResolvedValue(buildSession({ feature_count: 0 }));
-
-      renderLayout();
-
-      await waitFor(() => expect(screen.getByTestId('search-result-map-empty')).toBeInTheDocument());
-    });
-
     it('surfaces a recoverable error when the session cannot be created', async () => {
       mocks.createMartinSession.mockRejectedValue(new Error('network down'));
 
-      renderLayout();
+      renderContainer();
 
       await waitFor(() => expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument());
       expect(mocks.setSnackbar).toHaveBeenCalledWith(
@@ -296,18 +289,45 @@ describe('SearchResultMapLayout', () => {
   });
 
   describe('recovery', () => {
-    it('requests a new session when the tile source reports a failure', async () => {
+    it('waits out an exponential backoff before each automatic re-mint', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
 
+      vi.useFakeTimers();
+
+      // First failure: the re-mint is scheduled, not fired — the service gets breathing room
+      // instead of an immediate burst of consecutive mints.
       await act(async () => {
         latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
       });
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
 
-      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        vi.advanceTimersByTime(999);
+      });
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(2);
+
+      // Second failure: the delay doubles.
+      await act(async () => {
+        latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(1999);
+      });
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(3);
     });
 
     it('holds the map remount until the recovery token has arrived', async () => {
@@ -316,7 +336,7 @@ describe('SearchResultMapLayout', () => {
       // requests MapLibre never retries, leaving a silently blank map.
       mocks.createMartinSession.mockResolvedValueOnce(buildSession({ token: 'token-1' }));
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       let resolveMint: (session: IMartinSession) => void = () => undefined;
@@ -326,9 +346,9 @@ describe('SearchResultMapLayout', () => {
 
       const mountsBeforeFailure = mocks.slippyMapMounts.count;
 
-      await act(async () => {
-        latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
-      });
+      vi.useFakeTimers();
+
+      await failTilesAndAwaitRecovery(1000);
 
       // The remount has NOT happened while the re-mint is pending: a remounted map would request
       // its tiles with the old token still in the ref. Further failures from the same burst are
@@ -351,7 +371,7 @@ describe('SearchResultMapLayout', () => {
       });
 
       // Only after the new token is in the ref does the map remount and re-request its tiles.
-      await waitFor(() => expect(mocks.slippyMapMounts.count).toBe(mountsBeforeFailure + 1));
+      expect(mocks.slippyMapMounts.count).toBe(mountsBeforeFailure + 1);
       expect(latestMapProps().transformRequest('https://biohub.test/martin/search/5/5/11')).toEqual({
         url: 'https://biohub.test/martin/search/5/5/11',
         headers: { Authorization: 'Bearer token-2' }
@@ -361,7 +381,7 @@ describe('SearchResultMapLayout', () => {
     it('ignores failures from the basemap source', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       await act(async () => {
@@ -371,11 +391,11 @@ describe('SearchResultMapLayout', () => {
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
     });
 
-    it('re-requests the session when the user retries from the error state', async () => {
+    it('re-requests the session immediately when the user retries from the error state', async () => {
       mocks.createMartinSession.mockRejectedValueOnce(new Error('network down'));
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument());
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
 
@@ -392,16 +412,20 @@ describe('SearchResultMapLayout', () => {
       // immediately - firing every tile request with no usable token - instead of the skeleton.
       mocks.createMartinSession.mockResolvedValueOnce(buildSession({ token: 'token-1' }));
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
+      vi.useFakeTimers();
+
       // Spend the recovery budget (each re-mint succeeds, but tiles keep failing)...
-      for (let failure = 0; failure < 3; failure++) {
-        await act(async () => latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID));
-      }
+      await failTilesAndAwaitRecovery(1000);
+      await failTilesAndAwaitRecovery(2000);
+      await act(async () => {
+        latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
+      });
 
       // ...giving up removes the map entirely; there is no stale session left to render.
-      await waitFor(() => expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument());
+      expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument();
       expect(screen.queryByTestId('search-result-map')).not.toBeInTheDocument();
 
       mocks.createMartinSession.mockImplementationOnce(() => new Promise(() => undefined));
@@ -411,6 +435,7 @@ describe('SearchResultMapLayout', () => {
       });
 
       // The retry mint is pending: the layout shows the loading skeleton, not a token-less map.
+      expect(screen.getByTestId('search-result-map-loading')).toBeInTheDocument();
       expect(screen.queryByTestId('search-result-map')).not.toBeInTheDocument();
       expect(screen.queryByTestId('search-result-map-error')).not.toBeInTheDocument();
     });
@@ -418,21 +443,45 @@ describe('SearchResultMapLayout', () => {
     it('gives up re-minting after the recovery budget is spent, instead of looping', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
-      renderLayout();
+      renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
 
-      // The first two tile failures each re-mint to recover a possibly-expired token...
-      await act(async () => latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID));
-      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(2));
+      vi.useFakeTimers();
 
-      await act(async () => latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID));
-      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(3));
+      // The first two tile failures each re-mint to recover a possibly-expired token...
+      await failTilesAndAwaitRecovery(1000);
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(2);
+
+      await failTilesAndAwaitRecovery(2000);
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(3);
 
       // ...the third gives up and surfaces the error rather than re-minting forever.
-      await act(async () => latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID));
-      await waitFor(() => expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument());
+      await act(async () => {
+        latestMapProps().onSourceError(SEARCH_RESULTS_SOURCE_ID);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument();
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not stack a snackbar per failed automatic recovery', async () => {
+      mocks.createMartinSession.mockResolvedValueOnce(buildSession());
+
+      renderContainer();
+      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+
+      vi.useFakeTimers();
+
+      // The recovery mint itself fails; the error state (with its "Try again") is the surface for
+      // that, not a snackbar per attempt.
+      mocks.createMartinSession.mockRejectedValueOnce(new Error('still down'));
+      await failTilesAndAwaitRecovery(1000);
+
+      expect(screen.getByTestId('search-result-map-error')).toBeInTheDocument();
+      expect(mocks.setSnackbar).not.toHaveBeenCalled();
     });
   });
 
@@ -440,26 +489,22 @@ describe('SearchResultMapLayout', () => {
     it('shows the loading state while the new search mints, not the previous search results', async () => {
       mocks.createMartinSession.mockResolvedValueOnce(buildSession());
 
-      const { rerender } = renderLayout();
+      const { rerender } = renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
-      // Materializing a filtered context can take seconds; the mint never resolves in this test.
+      // The new session's mint never resolves in this test.
       mocks.createMartinSession.mockImplementationOnce(() => new Promise(() => undefined));
 
       const nextExpression = { type: 'expression', operator: 'AND', clauses: [] } as any;
 
       await act(async () => {
         rerender(
-          <SearchResultMapLayout
-            featureTypeName="species_observation"
-            expressionTree={nextExpression}
-            onResultClick={vi.fn()}
-          />
+          <SearchResultMapContainer featureTypeName="species_observation" expressionTree={nextExpression} isActive />
         );
       });
 
-      // Rendering the old search's geometry here would be wrong data, not just a stale spinner:
-      // its features are clickable and navigate.
+      // Rendering the old search's geometry here would be wrong data, not just a stale spinner.
+      expect(screen.getByTestId('search-result-map-loading')).toBeInTheDocument();
       expect(screen.queryByTestId('search-result-map')).not.toBeInTheDocument();
     });
   });

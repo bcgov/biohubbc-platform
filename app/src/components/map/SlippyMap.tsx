@@ -13,7 +13,7 @@ import {
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { SlippyMapDrawToolbar } from './components/SlippyMapDrawToolbar';
-import type { ISlippyMapProps, SlippyMapDrawMode } from './SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapProps, SlippyMapDrawMode } from './SlippyMap.interface';
 import {
   areFeatureSetsEqual,
   extractSnapshotFeatures,
@@ -33,6 +33,13 @@ const SELECT_MODE_FLAGS = {
   linestring: { feature: { draggable: true, coordinates: { draggable: true, midpoints: true, deletable: true } } },
   polygon: { feature: { draggable: true, coordinates: { draggable: true, midpoints: true, deletable: true } } }
 };
+
+/**
+ * Prefix of the map layer ids the drawing library registers. Passed to the adapter explicitly (rather than relying
+ * on its default) because consumer layers are inserted BELOW the first layer carrying this prefix: drawn geometry
+ * must always render above tile/basemap content, whichever order the two are (re)applied in.
+ */
+const TERRA_DRAW_LAYER_PREFIX = 'td';
 
 /**
  * A reusable interactive map component (MapLibre) that displays GeoJSON features and exposes drawing events through
@@ -69,8 +76,6 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     tileSources,
     layers,
     transformRequest,
-    interactiveLayerIds,
-    onFeatureClick,
     onMapLoad,
     onSourceError,
     sx
@@ -88,14 +93,15 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const realFeatureIdsRef = useRef<Set<string | number>>(new Set());
   const selectedFeatureIdRef = useRef<string | number | null>(null);
   // Latest props, so drawing event handlers (bound once on map load) never read stale values
-  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onFeatureClick, onMapLoad, onSourceError });
+  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
   // Source/layer ids this component applied, so replacing them never touches the drawing library's own
   const appliedSourceIdsRef = useRef<string[]>([]);
   const appliedLayerIdsRef = useRef<string[]>([]);
   const mapContentRef = useRef({ tileSources, layers });
-  const interactiveLayerIdsRef = useRef(interactiveLayerIds);
+  // Layers that take part in hit testing: those declaring a click handler.
+  const interactiveLayersRef = useRef<ISlippyMapLayer[]>([]);
   // Read per request rather than captured at mount, so a rotated credential applies without rebuilding the map
   const transformRequestRef = useRef(transformRequest);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -111,11 +117,11 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
 
   useEffect(() => {
-    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onFeatureClick, onMapLoad, onSourceError };
+    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
     mapContentRef.current = { tileSources, layers };
-    interactiveLayerIdsRef.current = interactiveLayerIds;
+    interactiveLayersRef.current = (layers ?? []).filter((layer) => layer.onClick);
     transformRequestRef.current = transformRequest;
   });
 
@@ -123,8 +129,10 @@ export const SlippyMap = (props: ISlippyMapProps) => {
    * Replaces the sources and layers this component applied with the current props.
    *
    * Layers are removed before their sources (MapLibre rejects removing a source still in use), then re-added in the
-   * order given so the consumer controls draw order. Only ids this component added are removed, so the drawing
-   * library's own sources and layers are left untouched.
+   * order given so the consumer controls draw order among its own layers. Every consumer layer is inserted BELOW the
+   * drawing library's layers: an opaque basemap added above them would hide drawn geometry entirely, and this holds
+   * on every re-apply, not just the first. Only ids this component added are removed, so the drawing library's own
+   * sources and layers are left untouched.
    */
   const applyMapContent = useCallback((map: MapLibreMap) => {
     const { tileSources: currentSources, layers: currentLayers } = mapContentRef.current;
@@ -149,9 +157,14 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       appliedSourceIdsRef.current.push(sourceId);
     }
 
+    // The lowest drawing-library layer; consumer layers are inserted before (below) it.
+    const firstDrawLayerId = map
+      .getStyle()
+      .layers?.find((layer) => layer.id.startsWith(`${TERRA_DRAW_LAYER_PREFIX}-`))?.id;
+
     for (const layer of currentLayers ?? []) {
-      map.addLayer(layer);
-      appliedLayerIdsRef.current.push(layer.id);
+      map.addLayer(layer.specification, firstDrawLayerId);
+      appliedLayerIdsRef.current.push(layer.specification.id);
     }
   }, []);
 
@@ -312,29 +325,41 @@ export const SlippyMap = (props: ISlippyMapProps) => {
      * map and requires a loaded style).
      */
     /**
-     * Emits the feature click callback with the rendered features under the cursor.
+     * Routes a click to the handler of the layer that rendered the topmost feature under the cursor.
      */
     const handleMapClick = (event: MapMouseEvent) => {
-      const layerIds = (interactiveLayerIdsRef.current ?? []).filter((layerId) => map.getLayer(layerId));
+      const interactiveLayers = interactiveLayersRef.current.filter((layer) => map.getLayer(layer.specification.id));
 
-      if (!layerIds.length || !callbacksRef.current.onFeatureClick) {
+      if (!interactiveLayers.length) {
         return;
       }
 
-      const renderedFeatures = map.queryRenderedFeatures(event.point, { layers: layerIds });
+      // Topmost first, so where interactive layers overlap the one drawn on top wins.
+      const [topmost] = map.queryRenderedFeatures(event.point, {
+        layers: interactiveLayers.map((layer) => layer.specification.id)
+      });
 
-      if (!renderedFeatures.length) {
+      if (!topmost) {
         return;
       }
 
-      callbacksRef.current.onFeatureClick(renderedFeatures, { lng: event.lngLat.lng, lat: event.lngLat.lat });
+      interactiveLayers.find((layer) => layer.specification.id === topmost.layer.id)?.onClick?.(topmost);
     };
 
     /**
      * Shows a pointer cursor over interactive layers, so clickable features look clickable.
      */
     const handleMapMouseMove = (event: MapMouseEvent) => {
-      const layerIds = (interactiveLayerIdsRef.current ?? []).filter((layerId) => map.getLayer(layerId));
+      // The drawing library manages the cursor itself in its select and draw modes (crosshair while
+      // drawing, move over a draggable feature); writing to the canvas cursor here every mousemove
+      // would clobber it. Hover styling only applies in the read-only `static` mode.
+      if (drawRef.current?.getMode() !== 'static') {
+        return;
+      }
+
+      const layerIds = interactiveLayersRef.current
+        .map((layer) => layer.specification.id)
+        .filter((layerId) => map.getLayer(layerId));
 
       if (!layerIds.length) {
         return;
@@ -359,7 +384,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     };
 
     const handleMapLoad = () => {
-      const adapter = new TerraDrawMapLibreGLAdapter({ map });
+      const adapter = new TerraDrawMapLibreGLAdapter({ map, prefixId: TERRA_DRAW_LAYER_PREFIX });
 
       const draw = new TerraDraw({
         adapter,
@@ -382,7 +407,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
       syncFeaturesIntoDraw(featuresRef.current);
 
-      // Applied after the drawing library starts, so consumer layers render above the drawing layers.
+      // Applied after the drawing library starts, so its layers exist and consumer layers can be
+      // inserted below them (drawn geometry always renders on top).
       applyMapContent(map);
 
       setIsMapLoaded(true);
@@ -397,6 +423,16 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
+        // A hidden container measures 0x0 and reports it here — a consumer that keeps the map mounted behind
+        // another view (as the search results panel does) hits this on every switch. Resizing the map to nothing
+        // would only be undone by the resize back, so it is skipped: the map keeps the dimensions it had, and the
+        // observer fires again with the real ones when the container is shown.
+        const { width, height } = container.getBoundingClientRect();
+
+        if (!width || !height) {
+          return;
+        }
+
         mapRef.current?.resize();
       });
       resizeObserver.observe(container);
@@ -444,7 +480,10 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     }
 
     applyMapContent(map);
-  }, [tileSources ?? {}, layers ?? [], isMapLoaded, applyMapContent]);
+    // Compared against the layer specifications rather than the layers themselves: the click handlers are read from a
+    // ref at event time, and a deep compare tests functions by reference, so an inline handler would re-apply (and
+    // re-request every tile) on every render.
+  }, [tileSources ?? {}, (layers ?? []).map((layer) => layer.specification), isMapLoaded, applyMapContent]);
 
   // The drawing library's mode is state of its own, so it has to be re-reconciled with the props on every change to
   // them, not only when editability flips. A mode whose control has since been withdrawn keeps interpreting map

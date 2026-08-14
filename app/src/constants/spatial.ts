@@ -28,6 +28,12 @@ export const MAP_FIT_MAX_ZOOM = 14;
 /** Padding in pixels kept between a fitted extent and the edge of the map. */
 export const MAP_FIT_PADDING = 40;
 
+/**
+ * Shortest the search-result map view may be, in pixels. It grows to fill the result panel, but the panel is a flex
+ * container: without a floor the map would collapse to nothing on a short viewport.
+ */
+export const MAP_VIEW_MIN_HEIGHT = 500;
+
 export const ALL_OF_BC_BOUNDARY: Feature = {
   type: 'Feature',
   properties: {},
@@ -44,6 +50,25 @@ export const ALL_OF_BC_BOUNDARY: Feature = {
     ]
   }
 };
+
+/**
+ * Extent of {@link ALL_OF_BC_BOUNDARY} as `[minX, minY, maxX, maxY]` in WGS84, for map viewports
+ * that open on the whole province.
+ */
+export const ALL_OF_BC_BBOX: [number, number, number, number] = (() => {
+  const geometry = ALL_OF_BC_BOUNDARY.geometry;
+
+  if (geometry.type !== 'Polygon') {
+    // The constant is a Polygon; this is only here so a future change to it fails loudly rather than silently.
+    return [-139, 48, -114, 60];
+  }
+
+  const [ring] = geometry.coordinates;
+  const longitudes = ring.map(([longitude]) => longitude);
+  const latitudes = ring.map(([, latitude]) => latitude);
+
+  return [Math.min(...longitudes), Math.min(...latitudes), Math.max(...longitudes), Math.max(...latitudes)];
+})();
 
 export enum SPATIAL_COMPONENT_TYPE {
   OCCURRENCE = 'Occurrence',

@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => {
     // Sources/layers currently on the map, so tests can assert what was applied and in what order.
     sources = new Map<string, unknown>();
     layers = new Map<string, unknown>();
+    // Style order of the layers, matching how MapLibre stacks them (later entries render on top).
+    layerOrder: string[] = [];
     // Ordered record of source/layer mutations, for asserting layers are removed before their sources.
     operations: string[] = [];
     canvas = { style: { cursor: '' } };
@@ -52,17 +54,26 @@ const mocks = vi.hoisted(() => {
 
     getSource = vi.fn((sourceId: string) => this.sources.get(sourceId));
 
-    addLayer = vi.fn((layer: { id: string }) => {
+    addLayer = vi.fn((layer: { id: string }, beforeId?: string) => {
       this.layers.set(layer.id, layer);
+      const beforeIndex = beforeId ? this.layerOrder.indexOf(beforeId) : -1;
+      if (beforeIndex === -1) {
+        this.layerOrder.push(layer.id);
+      } else {
+        this.layerOrder.splice(beforeIndex, 0, layer.id);
+      }
       this.operations.push(`addLayer:${layer.id}`);
     });
 
     removeLayer = vi.fn((layerId: string) => {
       this.layers.delete(layerId);
+      this.layerOrder = this.layerOrder.filter((id) => id !== layerId);
       this.operations.push(`removeLayer:${layerId}`);
     });
 
     getLayer = vi.fn((layerId: string) => this.layers.get(layerId));
+
+    getStyle = vi.fn(() => ({ layers: this.layerOrder.map((id) => this.layers.get(id)) }));
 
     queryRenderedFeatures = vi.fn(() => this.renderedFeatures);
 
@@ -81,15 +92,26 @@ const mocks = vi.hoisted(() => {
     config: { adapter: unknown; modes: { mode?: string }[] };
     handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
     snapshot: unknown[] = [];
+    currentMode = '';
 
-    mode = 'static';
+    // Mirrors the real adapter: starting the drawing library registers its layers on the map,
+    // named from the adapter's configured prefix.
+    start = vi.fn(() => {
+      const adapter = this.config.adapter as {
+        config?: { map?: { addLayer: (layer: { id: string }) => void }; prefixId?: string };
+      };
+      const map = adapter?.config?.map;
+      const prefix = adapter?.config?.prefixId ?? 'td';
 
-    start = vi.fn();
+      for (const suffix of ['polygon', 'linestring', 'point']) {
+        map?.addLayer({ id: `${prefix}-${suffix}` });
+      }
+    });
     stop = vi.fn();
     setMode = vi.fn((mode: string) => {
-      this.mode = mode;
+      this.currentMode = mode;
     });
-    getMode = vi.fn(() => this.mode);
+    getMode = vi.fn(() => this.currentMode);
     clear = vi.fn();
     removeFeatures = vi.fn();
     deselectFeature = vi.fn();
@@ -116,9 +138,9 @@ const mocks = vi.hoisted(() => {
   class MockTerraDrawAdapter {
     static instances: MockTerraDrawAdapter[] = [];
 
-    config: { map: unknown };
+    config: { map: unknown; prefixId?: string };
 
-    constructor(config: { map: unknown }) {
+    constructor(config: { map: unknown; prefixId?: string }) {
       this.config = config;
       MockTerraDrawAdapter.instances.push(this);
     }
@@ -600,6 +622,14 @@ describe('SlippyMap', () => {
   });
 
   describe('container resizing', () => {
+    /**
+     * Give the container a measurable box. jsdom lays nothing out, so `getBoundingClientRect` reports zeros for
+     * every element unless it is stubbed — and a zero-sized container is exactly the hidden case the map ignores.
+     */
+    const sizeContainer = (container: HTMLElement, width: number, height: number) => {
+      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ width, height } as DOMRect);
+    };
+
     it('resizes the map when the container size changes, without recreating the map', () => {
       const { map, getByTestId } = renderSlippyMap();
 
@@ -607,12 +637,30 @@ describe('SlippyMap', () => {
 
       expect(resizeObserver.observe).toHaveBeenCalledWith(getByTestId('slippy-map-container'));
 
+      sizeContainer(getByTestId('slippy-map-container'), 800, 600);
+
       act(() => {
         resizeObserver.trigger();
       });
 
       expect(map.resize).toHaveBeenCalledTimes(1);
       expect(mocks.MockMaplibreMap.instances).toHaveLength(1);
+    });
+
+    it('ignores a resize to nothing, so a consumer can hide the map without disturbing it', () => {
+      // A consumer that keeps the map mounted behind another view hides it with CSS, and a hidden container reports
+      // 0x0 here. Resizing the map to nothing would only be undone by the resize back.
+      const { map, getByTestId } = renderSlippyMap();
+
+      const resizeObserver = MockResizeObserver.instances[0];
+
+      sizeContainer(getByTestId('slippy-map-container'), 0, 0);
+
+      act(() => {
+        resizeObserver.trigger();
+      });
+
+      expect(map.resize).not.toHaveBeenCalled();
     });
   });
 
@@ -651,7 +699,14 @@ describe('SlippyMap', () => {
       'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
     };
     const layers = [
-      { id: 'search-points', type: 'circle' as const, source: 'search-results', 'source-layer': 'features' }
+      {
+        specification: {
+          id: 'search-points',
+          type: 'circle' as const,
+          source: 'search-results',
+          'source-layer': 'features'
+        }
+      }
     ];
 
     it('applies sources and layers once the map has loaded', () => {
@@ -663,7 +718,8 @@ describe('SlippyMap', () => {
       loadMap(map);
 
       expect(map.addSource).toHaveBeenCalledWith('search-results', tileSources['search-results']);
-      expect(map.addLayer).toHaveBeenCalledWith(layers[0]);
+      // Inserted before the lowest drawing-library layer, so drawn geometry stays on top.
+      expect(map.addLayer).toHaveBeenCalledWith(layers[0].specification, 'td-polygon');
     });
 
     it('replaces sources and layers when they change, removing layers before their sources', () => {
@@ -687,6 +743,39 @@ describe('SlippyMap', () => {
         'addLayer:search-points'
       ]);
       expect(map.getSource('search-results')).toEqual(nextSources['search-results']);
+    });
+
+    it('keeps every consumer layer below the drawing layers', () => {
+      // An opaque basemap added above the drawing layers would hide drawn geometry entirely.
+      const { map } = renderSlippyMap({ tileSources, layers });
+      loadMap(map);
+
+      const firstDrawLayerIndex = map.layerOrder.findIndex((id: string) => id.startsWith('td-'));
+      const consumerLayerIndex = map.layerOrder.indexOf('search-points');
+
+      expect(consumerLayerIndex).toBeGreaterThanOrEqual(0);
+      expect(consumerLayerIndex).toBeLessThan(firstDrawLayerIndex);
+    });
+
+    it('keeps the drawing layers on top when content is re-applied', () => {
+      // Content is re-applied on every tile-source change (eg: a session refresh); each re-apply
+      // removes and re-adds the consumer layers, and must not let them climb above drawn geometry.
+      const { map, rerender } = renderSlippyMap({ tileSources, layers });
+      loadMap(map);
+
+      const nextSources = {
+        'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}?ctx=next'] }
+      };
+
+      act(() => {
+        rerender(<SlippyMap tileSources={nextSources} layers={layers} />);
+      });
+
+      const lastConsumerIndex = map.layerOrder.indexOf('search-points');
+      const firstDrawLayerIndex = map.layerOrder.findIndex((id: string) => id.startsWith('td-'));
+
+      expect(lastConsumerIndex).toBeGreaterThanOrEqual(0);
+      expect(lastConsumerIndex).toBeLessThan(firstDrawLayerIndex);
     });
 
     it('does not rebuild the map when the sources change', () => {
@@ -734,43 +823,47 @@ describe('SlippyMap', () => {
     });
   });
 
-  describe('feature clicks', () => {
+  describe('layer clicks', () => {
     const tileSources = {
       'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
     };
     const layers = [
-      { id: 'search-points', type: 'circle' as const, source: 'search-results', 'source-layer': 'features' }
+      {
+        specification: {
+          id: 'search-points',
+          type: 'circle' as const,
+          source: 'search-results',
+          'source-layer': 'features'
+        }
+      }
     ];
 
-    it('reports the rendered features under the cursor', () => {
-      const onFeatureClick = vi.fn();
-      const { map } = renderSlippyMap({
-        tileSources,
-        layers,
-        interactiveLayerIds: ['search-points'],
-        onFeatureClick
-      });
+    /**
+     * Builds the layer fixture with a click handler attached, mirroring how a consumer declares an
+     * interactive layer.
+     */
+    const interactiveLayers = (onClick: () => void) => [{ ...layers[0], onClick }];
+
+    it('routes the clicked feature to the handler of the layer that rendered it', () => {
+      const onClick = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(onClick) });
       loadMap(map);
 
-      const feature = { properties: { submission_feature_id: 7, submission_id: 3 } };
+      const feature = { layer: { id: 'search-points' }, properties: { feature_count: 7 } };
       map.renderedFeatures = [feature];
 
       act(() => {
         map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
       });
 
+      // Only layers that declared a handler take part in hit testing.
       expect(map.queryRenderedFeatures).toHaveBeenCalledWith({ x: 10, y: 10 }, { layers: ['search-points'] });
-      expect(onFeatureClick).toHaveBeenCalledWith([feature], { lng: -123, lat: 48 });
+      expect(onClick).toHaveBeenCalledWith(feature);
     });
 
     it('ignores clicks that hit no feature', () => {
-      const onFeatureClick = vi.fn();
-      const { map } = renderSlippyMap({
-        tileSources,
-        layers,
-        interactiveLayerIds: ['search-points'],
-        onFeatureClick
-      });
+      const onClick = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(onClick) });
       loadMap(map);
 
       map.renderedFeatures = [];
@@ -779,16 +872,57 @@ describe('SlippyMap', () => {
         map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
       });
 
-      expect(onFeatureClick).not.toHaveBeenCalled();
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('ignores clicks on a display-only layer', () => {
+      // A layer with no handler is not hit tested at all, so a click over it falls through.
+      const { map } = renderSlippyMap({ tileSources, layers });
+      loadMap(map);
+
+      map.renderedFeatures = [{ layer: { id: 'search-points' }, properties: {} }];
+
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
+      });
+
+      expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
+    });
+
+    it('gives the topmost rendered feature to its own layer where layers overlap', () => {
+      const onClickLower = vi.fn();
+      const onClickUpper = vi.fn();
+      const { map } = renderSlippyMap({
+        tileSources,
+        layers: [
+          { ...layers[0], onClick: onClickLower },
+          {
+            specification: {
+              id: 'search-clusters',
+              type: 'circle' as const,
+              source: 'search-results',
+              'source-layer': 'features'
+            },
+            onClick: onClickUpper
+          }
+        ]
+      });
+      loadMap(map);
+
+      // queryRenderedFeatures returns topmost first.
+      const topmost = { layer: { id: 'search-clusters' }, properties: {} };
+      map.renderedFeatures = [topmost, { layer: { id: 'search-points' }, properties: {} }];
+
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
+      });
+
+      expect(onClickUpper).toHaveBeenCalledWith(topmost);
+      expect(onClickLower).not.toHaveBeenCalled();
     });
 
     it('shows a pointer cursor only while over an interactive feature', () => {
-      const { map } = renderSlippyMap({
-        tileSources,
-        layers,
-        interactiveLayerIds: ['search-points'],
-        onFeatureClick: vi.fn()
-      });
+      const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(vi.fn()) });
       loadMap(map);
 
       map.renderedFeatures = [{ properties: {} }];
@@ -802,6 +936,28 @@ describe('SlippyMap', () => {
         map.fire('mousemove', { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
       });
       expect(map.canvas.style.cursor).toBe('');
+    });
+
+    it('leaves the cursor to the drawing library outside the static mode', () => {
+      const { map } = renderSlippyMap({
+        tileSources,
+        layers: interactiveLayers(vi.fn()),
+        drawControls: { polygon: true }
+      });
+      const draw = loadMap(map);
+
+      // With draw controls enabled the component starts in select mode, and the drawing library
+      // owns the cursor (crosshair while drawing, move over a draggable feature).
+      draw.setMode('polygon');
+      map.canvas.style.cursor = 'crosshair';
+
+      map.renderedFeatures = [{ properties: {} }];
+      act(() => {
+        map.fire('mousemove', { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
+      });
+
+      // The hover handler must not clobber it with 'pointer' or reset it to ''.
+      expect(map.canvas.style.cursor).toBe('crosshair');
     });
   });
 

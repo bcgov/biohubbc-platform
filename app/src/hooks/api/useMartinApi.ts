@@ -1,6 +1,6 @@
 import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { CreateMartinSessionResponse } from 'interfaces/useMartinApi.interface';
+import { IMartinSession } from 'interfaces/useMartinApi.interface';
 
 /**
  * Returns API methods for map Martin sessions.
@@ -16,23 +16,21 @@ export const useMartinApi = (axios: AxiosInstance) => {
    * this search only; the API resolves the caller's access and stores it server-side, so nothing sensitive travels in
    * the token itself.
    *
-   * Returns an over-cap result instead of a token when the search matches more features than can be mapped.
-   *
    * @param {string} featureType - Feature type being searched.
    * @param {(ExpressionTreeExpression | null)} [expressionTree] - Search expression, or null for an unfiltered view.
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
-   * @return {Promise<CreateMartinSessionResponse>}
+   * @return {Promise<IMartinSession>}
    */
   const createMartinSession = async (
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<CreateMartinSessionResponse> => {
+  ): Promise<IMartinSession> => {
     const body = expressionTree
       ? { feature_type: featureType, expression: expressionTree }
       : { feature_type: featureType };
 
-    const { data } = await axios.post<CreateMartinSessionResponse>('/api/martin/token', body, {
+    const { data } = await axios.post<IMartinSession>('/api/martin/token', body, {
       signal: options?.signal
     });
 

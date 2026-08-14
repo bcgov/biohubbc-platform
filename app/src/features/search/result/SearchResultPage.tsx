@@ -10,7 +10,7 @@ import { PageTitle } from 'utils/RouteWithMeta';
 import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultPanel } from './content/SearchResultPanel';
-import { SearchResultMapLayout } from './layout/map/SearchResultMapLayout';
+import { SearchResultMapContainer } from './layout/map/SearchResultMapContainer';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
 import { SearchResultPageHeader } from './header/SearchResultPageHeader';
 import { useSearchResultDataRequest } from './hooks/useSearchResultDataRequest';
@@ -101,10 +101,10 @@ export const SearchResultPage = () => {
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
             mapContent={
-              <SearchResultMapLayout
+              <SearchResultMapContainer
                 featureTypeName={routeConfig.featureTypeName}
                 expressionTree={expressionTree ?? null}
-                onResultClick={handleResultClick}
+                isActive={view === SEARCH_RESULT_VIEW.MAP}
               />
             }
           />

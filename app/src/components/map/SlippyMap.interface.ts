@@ -15,6 +15,23 @@ import type {
 export type SlippyMapDrawMode = 'point' | 'linestring' | 'polygon';
 
 /**
+ * A layer to render, together with how it responds to a click.
+ *
+ * Styling and behaviour travel together so a layer cannot be made interactive in one prop and styled in another. A
+ * layer with no `onClick` is display-only: it takes no part in hit testing and shows no pointer cursor.
+ */
+export interface ISlippyMapLayer {
+  /**
+   * The MapLibre layer. Its `source` must name an entry in `tileSources`.
+   */
+  specification: LayerSpecification;
+  /**
+   * Fired when a rendered feature in this layer is clicked. Where layers overlap, the topmost rendered feature wins.
+   */
+  onClick?: (feature: MapGeoJSONFeature) => void;
+}
+
+/**
  * Configures which drawing controls the `SlippyMap` toolbar exposes.
  */
 export interface ISlippyMapDrawControls {
@@ -95,10 +112,9 @@ export interface ISlippyMapProps {
    */
   tileSources?: Record<string, SourceSpecification>;
   /**
-   * Layers to render, in draw order (first is drawn lowest). Each layer's `source` must name an entry in
-   * `tileSources`. Applied and replaced alongside `tileSources`.
+   * Layers to render, in draw order (first is drawn lowest). Applied and replaced alongside `tileSources`.
    */
-  layers?: LayerSpecification[];
+  layers?: ISlippyMapLayer[];
   /**
    * Hook applied to every request the map makes, used to attach headers such as `Authorization`.
    *
@@ -106,15 +122,6 @@ export interface ISlippyMapProps {
    * short-lived credential without rebuilding the map.
    */
   transformRequest?: RequestTransformFunction;
-  /**
-   * Layer ids that respond to clicks and show a pointer cursor. Layers not listed here are display-only.
-   */
-  interactiveLayerIds?: string[];
-  /**
-   * Fired when a rendered feature in an interactive layer is clicked. Receives the features under the cursor
-   * (topmost first) and the clicked position.
-   */
-  onFeatureClick?: (features: MapGeoJSONFeature[], lngLat: { lng: number; lat: number }) => void;
   /**
    * Fired once the map style has loaded and any sources/layers have been applied.
    */

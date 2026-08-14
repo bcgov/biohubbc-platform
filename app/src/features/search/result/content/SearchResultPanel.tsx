@@ -8,6 +8,7 @@ import { ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { useState } from 'react';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { SearchResultOptions } from './option/SearchResultOptions';
 import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchResultToolbar';
@@ -48,6 +49,9 @@ interface SearchResultPanelProps {
    *
    * A slot rather than another branch inside `SearchResultOptions`: the map's loading and empty states are driven by
    * its Martin session, not by the row count, and the page owns that session.
+   *
+   * Mounted on first use and kept mounted afterwards, so returning to the map does not rebuild it. The content is
+   * expected to stand down while hidden; see `isActive` on `SearchResultMapContainer`.
    */
   mapContent?: React.ReactNode;
 }
@@ -81,6 +85,16 @@ export const SearchResultPanel = ({
   mapContent
 }: SearchResultPanelProps) => {
   const isMapView = view === SEARCH_RESULT_VIEW.MAP;
+
+  // The map is created the first time it is opened, and stays mounted from then on. Mounting it lazily keeps it out of
+  // the way of users who never leave the table view, and means it is never built inside a hidden container: MapLibre
+  // measures its container once, at construction, and a `display: none` container measures 0x0.
+  const [hasOpenedMapView, setHasOpenedMapView] = useState(isMapView);
+
+  if (isMapView && !hasOpenedMapView) {
+    setHasOpenedMapView(true);
+  }
+
   return (
     <Container
       maxWidth="md"
@@ -124,10 +138,24 @@ export const SearchResultPanel = ({
 
         <Divider />
 
-        <Box sx={{ flex: 1, minHeight: 0, overflow: isMapView ? 'hidden' : 'auto', display: 'flex' }}>
-          {isMapView ? (
-            mapContent
-          ) : (
+        {/*
+          The map is hidden with CSS rather than unmounted, so switching to the table and back leaves its session,
+          viewport and loaded tiles as they were; unmounting would discard all three and re-request every tile on
+          return. The table has no such state to lose and stays conditional.
+        */}
+        <Box
+          data-testid="search-result-map-view"
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: isMapView ? 'flex' : 'none'
+          }}>
+          {hasOpenedMapView && mapContent}
+        </Box>
+
+        {!isMapView && (
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex' }}>
             <SearchResultOptions
               rows={rows}
               featureTypeProperties={featureTypeProperties}
@@ -135,8 +163,8 @@ export const SearchResultPanel = ({
               view={view}
               onClick={onResultClick}
             />
-          )}
-        </Box>
+          </Box>
+        )}
 
         {/* The map shows the whole result set at once, so paging through it would be meaningless. */}
         {!isMapView && (
