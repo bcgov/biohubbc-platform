@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { SlippyMap } from 'components/map/SlippyMap';
-import type { ISlippyMapLayer, MapClickPosition, SlippyMapHandle } from 'components/map/SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
 import {
   ALL_OF_BC_BBOX,
   MAP_CLUSTER_ZOOM_INCREMENT,
@@ -15,8 +15,8 @@ import {
 } from 'constants/spatial';
 import { useConfigContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import type { MapGeoJSONFeature, SourceSpecification } from 'maplibre-gl';
-import { PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SourceSpecification } from 'maplibre-gl';
+import { PropsWithChildren, useCallback, useMemo } from 'react';
 import {
   BASEMAP_SOURCE_ID,
   buildBasemapLayer,
@@ -25,7 +25,7 @@ import {
   buildSearchResultsSource,
   SEARCH_RESULTS_SOURCE_ID
 } from './map-layers';
-import { MapSelection, resolveMapSelection } from './map-selection';
+import { resolveMapSelection } from './map-selection';
 import { SearchResultMapPopper } from './SearchResultMapPopper';
 import { useMartinSession } from './useMartinSession';
 
@@ -82,9 +82,6 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     isActive
   );
 
-  const slippyMapRef = useRef<SlippyMapHandle>(null);
-  const [selection, setSelection] = useState<MapSelection | null>(null);
-
   const tileSources = useMemo((): Record<string, SourceSpecification> => {
     const sources: Record<string, SourceSpecification> = {};
 
@@ -103,17 +100,32 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
   }, [config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION, session]);
 
   /**
-   * Interpret a click on a cluster. A cluster whose properties do not resolve to a selection is ignored, leaving any
-   * current selection in place, so a malformed tile cannot break the page.
+   * Describe a clicked cluster. A cluster whose properties do not resolve to a selection gets no popper at all, so a
+   * malformed tile cannot break the page.
+   *
+   * Zooming in centres on the cluster and zooms by the configured increment, never past the maximum: clusters carry
+   * no expansion zoom of their own. Dismissing first keeps the popper from riding along with the camera.
    */
-  const handleClusterClick = useCallback((feature: MapGeoJSONFeature, position: MapClickPosition) => {
-    const resolved = resolveMapSelection(feature, position);
+  const renderClusterPopup = useCallback((context: ISlippyMapPopupContext) => {
+    const selection = resolveMapSelection(context.feature);
 
-    if (!resolved) {
-      return;
+    if (!selection) {
+      return null;
     }
 
-    setSelection(resolved);
+    const handleZoomIn = () => {
+      const currentZoom = context.getZoom() ?? MAP_MIN_ZOOM;
+
+      context.close();
+      context.easeTo({
+        center: [context.lngLat.lng, context.lngLat.lat],
+        zoom: Math.min(currentZoom + MAP_CLUSTER_ZOOM_INCREMENT, MAP_MAX_ZOOM)
+      });
+    };
+
+    return (
+      <SearchResultMapPopper featureCount={selection.featureCount} onZoomIn={handleZoomIn} onClose={context.close} />
+    );
   }, []);
 
   const layers = useMemo((): ISlippyMapLayer[] => {
@@ -124,11 +136,11 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     }
 
     if (session) {
-      mapLayers.push(...buildSearchResultLayers(handleClusterClick));
+      mapLayers.push(...buildSearchResultLayers(renderClusterPopup));
     }
 
     return mapLayers;
-  }, [config?.BASEMAP_URL, session, handleClusterClick]);
+  }, [config?.BASEMAP_URL, session, renderClusterPopup]);
 
   /**
    * Attach the tile token to tile requests only.
@@ -148,65 +160,6 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     },
     [tokenRef]
   );
-
-  const handleEmptyMapClick = useCallback(() => {
-    setSelection(null);
-  }, []);
-
-  // Any camera movement (pan or zoom, user or programmatic) dismisses the popper: it is anchored to screen
-  // coordinates, which stop matching its geography the moment the map moves. This also satisfies "a cluster popper
-  // closes when the zoom changes".
-  const handleMoveStart = useCallback(() => {
-    setSelection(null);
-  }, []);
-
-  const handleClosePopper = useCallback(() => {
-    setSelection(null);
-  }, []);
-
-  /**
-   * Zoom into the selected cluster: center on it and zoom in by the configured increment, never past the maximum.
-   * Clusters carry no expansion zoom, so the increment always applies. The camera movement itself closes the popper
-   * via the move handler.
-   */
-  const handleZoomIn = useCallback(() => {
-    if (!selection) {
-      return;
-    }
-
-    const currentZoom = slippyMapRef.current?.getZoom() ?? MAP_MIN_ZOOM;
-
-    setSelection(null);
-    slippyMapRef.current?.easeTo({
-      center: [selection.lngLat.lng, selection.lngLat.lat],
-      zoom: Math.min(currentZoom + MAP_CLUSTER_ZOOM_INCREMENT, MAP_MAX_ZOOM)
-    });
-  }, [selection]);
-
-  // A new result set (new context) or a forced reload rebuilds the map, so any selection made against the old
-  // tiles is stale — drop it.
-  useEffect(() => {
-    setSelection(null);
-  }, [session?.martin_context_id, reloadNonce]);
-
-  // Escape dismisses the popper, matching how transient surfaces behave elsewhere.
-  useEffect(() => {
-    if (!selection) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelection(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selection]);
 
   const handleSourceError = useCallback(
     (sourceId: string) => {
@@ -255,7 +208,6 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         // reloadNonce to force a remount that re-requests the tiles; a token-only refresh before expiry changes
         // neither the context id nor the nonce and therefore never remounts.
         key={`${session.martin_context_id}:${reloadNonce}`}
-        ref={slippyMapRef}
         readOnly
         mapOptions={{
           minZoom: MAP_MIN_ZOOM,
@@ -275,12 +227,9 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         tileSources={tileSources}
         layers={layers}
         transformRequest={transformRequest}
-        onEmptyMapClick={handleEmptyMapClick}
-        onMoveStart={handleMoveStart}
         onSourceError={handleSourceError}
         sx={{ flex: '1 1 auto', minHeight: MAP_VIEW_MIN_HEIGHT }}
       />
-      {selection && <SearchResultMapPopper selection={selection} onZoomIn={handleZoomIn} onClose={handleClosePopper} />}
     </MapFrame>
   );
 };

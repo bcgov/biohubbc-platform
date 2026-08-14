@@ -203,31 +203,6 @@ describe('Tile search function (integration)', function () {
   };
 
   /**
-   * Ask the tile function for the tile containing the test point, and return the raw MVT bytes.
-   */
-  const renderTileBuffer = async (martinContextId: string, zoom: number): Promise<Buffer | null> => {
-    const result = await connection.sql(
-      SQL`
-        WITH t AS (
-          SELECT
-            ${zoom}::integer AS z,
-            floor((${TEST_LNG}::double precision + 180.0) / 360.0 * (2 ^ ${zoom}))::integer AS x,
-            floor(
-              (1.0 - ln(tan(radians(${TEST_LAT}::double precision)) + 1.0 / cos(radians(${TEST_LAT}::double precision))) / pi())
-              / 2.0 * (2 ^ ${zoom})
-            )::integer AS y
-        )
-        SELECT biohub.martin_search(t.z, t.x, t.y, ${JSON.stringify({
-          context: martinContextId
-        })}::json) AS tile FROM t;
-      `,
-      z.object({ tile: z.instanceof(Buffer).nullable() })
-    );
-
-    return result.rows[0].tile;
-  };
-
-  /**
    * Decode an MVT into its layers: each feature as its MVT feature id plus decoded properties.
    */
   const decodeTile = (
@@ -323,6 +298,46 @@ describe('Tile search function (integration)', function () {
     `);
 
     return { scopeId, teamId };
+  };
+
+  /** Insert a typed number property value on a feature. */
+  const setNumberValue = async (featureId: number, property: PropertyIds, value: number): Promise<void> => {
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
+      VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
+    `);
+  };
+
+  const predicate = (property: PropertyIds, operator: string, value?: unknown): ExpressionTree['clauses'][0] => ({
+    type: 'predicate',
+    feature_property_id: property.feature_property_id,
+    feature_type_property_id: property.feature_type_property_id,
+    operator: operator as never,
+    value
+  });
+
+  const tree = (operator: 'AND' | 'OR', clauses: ExpressionTree['clauses']): ExpressionTree => ({
+    type: 'expression',
+    operator,
+    clauses
+  });
+
+  /**
+   * Persist an expression matching only features whose sentinel number property equals `value`, and
+   * create a context evaluating it. Isolates a test's fixtures from whatever else the database holds.
+   */
+  const createSentinelContext = async (sentinelValue: number): Promise<string> => {
+    const numberProperty = await resolvePropertyByType('number');
+
+    if (!numberProperty) {
+      expect.fail('the sentinel-context tests need a number property on the feature type');
+    }
+
+    const { expression_id } = await new ExpressionTreeService(connection).writeExpressionTree(
+      tree('AND', [predicate(numberProperty, 'Equals', sentinelValue)])
+    );
+
+    return createContext({ expressionId: expression_id });
   };
 
   describe('context resolution', () => {
@@ -437,14 +452,6 @@ describe('Tile search function (integration)', function () {
   });
 
   describe('expression evaluation', () => {
-    /** Insert a typed property value on a feature. */
-    const setNumberValue = async (featureId: number, property: PropertyIds, value: number): Promise<void> => {
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
-        VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
-      `);
-    };
-
     const setStringValue = async (featureId: number, property: PropertyIds, value: string): Promise<void> => {
       await connection.sql(SQL`
         INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value, create_user)
@@ -470,20 +477,6 @@ describe('Tile search function (integration)', function () {
         VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
       `);
     };
-
-    const predicate = (property: PropertyIds, operator: string, value?: unknown): ExpressionTree['clauses'][0] => ({
-      type: 'predicate',
-      feature_property_id: property.feature_property_id,
-      feature_type_property_id: property.feature_type_property_id,
-      operator: operator as never,
-      value
-    });
-
-    const tree = (operator: 'AND' | 'OR', clauses: ExpressionTree['clauses']): ExpressionTree => ({
-      type: 'expression',
-      operator,
-      clauses
-    });
 
     /**
      * Assert the SQL evaluator and the TypeScript search evaluator agree on which of the given
@@ -843,21 +836,6 @@ describe('Tile search function (integration)', function () {
 
       expect(result.rows[0].tile).to.be.null;
     });
-
-    it('emits geometry-only features, with no identifying properties', async () => {
-      await createFeatureWithPoint(TEST_LNG, TEST_LAT);
-      const contextId = await createContext({});
-
-      const tile = await renderTileBytes(contextId, 12);
-
-      expect(tile).to.not.be.null;
-      // MVT property keys are embedded as plain UTF-8 strings in the protobuf, so their absence in
-      // the raw bytes proves no per-feature attributes are exposed.
-      const bytes = (tile as Buffer).toString('latin1');
-      expect(bytes).to.not.contain('submission_feature_id');
-      expect(bytes).to.not.contain('submission_id');
-      expect(bytes).to.not.contain('is_secured');
-    });
   });
 
   describe('zoom behaviour', () => {
@@ -881,12 +859,10 @@ describe('Tile search function (integration)', function () {
       await createFeatureWithPoint(TEST_LNG, TEST_LAT);
       const contextId = await createContext({});
 
-      const clustered = await renderTileBytes(contextId, CLUSTER_ZOOM);
+      const clustered = await renderTile(contextId, CLUSTER_ZOOM);
       const raw = await renderTile(contextId, 12);
 
-      expect(clustered).to.not.be.null;
-      // Cluster tiles keep their count attribute; it is an aggregate, not an identifier.
-      expect((clustered as Buffer).toString('latin1')).to.contain('location_count');
+      expect(clustered).to.be.greaterThan(0);
       expect(raw).to.be.greaterThan(0);
     });
 
@@ -912,34 +888,30 @@ describe('Tile search function (integration)', function () {
   });
 
   describe('tile contract', () => {
-    it('encodes an individual result as render_kind=feature with its ids, keyed by MVT feature id', async () => {
-      const featureId = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
-      const contextId = await createContext({ accessClass: 'anon' });
+    it('encodes individual results as geometry only: no identifiers, no attributes, no MVT id', async () => {
+      await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const contextId = await createContext({});
 
-      const tile = await renderTileBuffer(contextId, 12);
+      const tile = await renderTileBytes(contextId, 12);
       expect(tile).to.not.be.null;
 
       const layers = decodeTile(tile as Buffer);
       expect(Object.keys(layers)).to.deep.equal(['features']);
+      expect(layers.features.length).to.be.greaterThan(0);
 
-      const encoded = layers.features.find((feature) => feature.properties.submission_feature_id === featureId);
-      expect(encoded, 'the created feature should be encoded in the tile').to.not.be.undefined;
-
-      expect(encoded?.properties.render_kind).to.equal('feature');
-      expect(encoded?.properties.submission_id).to.be.a('number');
-      expect(encoded?.properties.is_secured).to.equal(false);
-      // The MVT feature id mirrors submission_feature_id, so fragments of one feature share an identity.
-      expect(encoded?.id).to.equal(featureId);
-      // The id column is consumed by ST_AsMVT, never duplicated into the attributes.
-      expect(encoded?.properties).to.not.have.property('mvt_feature_id');
+      for (const encoded of layers.features) {
+        // The shape itself is the entire payload; anything about the result stays behind the API.
+        expect(encoded.properties).to.deep.equal({});
+        expect(encoded.id, 'features carry no MVT feature id').to.be.undefined;
+      }
     });
 
-    it('encodes a cluster as render_kind=cluster with a count and no feature identity', async () => {
+    it('encodes a cluster as its count and nothing else', async () => {
       await createFeatureWithPoint(TEST_LNG, TEST_LAT);
       await createFeatureWithPoint(TEST_LNG + 0.001, TEST_LAT + 0.001);
-      const contextId = await createContext({ accessClass: 'anon' });
+      const contextId = await createContext({});
 
-      const tile = await renderTileBuffer(contextId, 6);
+      const tile = await renderTileBytes(contextId, 6);
       expect(tile).to.not.be.null;
 
       const layers = decodeTile(tile as Buffer);
@@ -947,12 +919,10 @@ describe('Tile search function (integration)', function () {
       expect(layers.clusters.length).to.be.greaterThan(0);
 
       for (const cluster of layers.clusters) {
-        expect(cluster.properties.render_kind).to.equal('cluster');
         expect(cluster.properties.feature_count).to.be.a('number');
         expect(cluster.properties.feature_count).to.be.greaterThan(0);
-        // A cluster must never masquerade as a single result.
-        expect(cluster.properties).to.not.have.property('submission_feature_id');
-        expect(cluster.properties).to.not.have.property('submission_id');
+        // The count is the only attribute: an aggregate, never an identity.
+        expect(Object.keys(cluster.properties)).to.deep.equal(['feature_count']);
         expect(cluster.id, 'clusters carry no MVT feature id').to.be.undefined;
       }
 
@@ -996,7 +966,7 @@ describe('Tile search function (integration)', function () {
       return clusters;
     };
 
-    it('never splits a cluster across a tile seam', async () => {
+    it('never splits a cluster across a tile seam', async function () {
       // Two adjacent tiles at a cluster zoom, and features hugging their shared edge. With a
       // min-corner snap origin, a grid NODE lands exactly ON the seam, so the points nearest the
       // edge break away from their cell-mates into an edge cluster - drawn from both sides with
@@ -1023,10 +993,21 @@ describe('Tile search function (integration)', function () {
       ];
       const rightFeatureId = await createFeatureWithPoint(seamLng + cellLng * 0.1, TEST_LAT);
 
-      const contextId = await createContext({
-        accessClass: 'anon',
-        materializedFeatureIds: [...leftFeatureIds, rightFeatureId]
-      });
+      // The exact-count assertions below need the tile to hold ONLY these fixtures, so the context
+      // evaluates a sentinel expression matching them alone rather than browsing the whole type.
+      const sentinel = 903001;
+      const numberProperty = await resolvePropertyByType('number');
+
+      if (!numberProperty) {
+        this.skip();
+        return;
+      }
+
+      for (const featureId of [...leftFeatureIds, rightFeatureId]) {
+        await setNumberValue(featureId, numberProperty, sentinel);
+      }
+
+      const contextId = await createSentinelContext(sentinel);
 
       const [leftTile, rightTile] = await Promise.all([
         renderTileAt(contextId, zoom, leftX, tileY),

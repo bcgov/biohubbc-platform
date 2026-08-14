@@ -70,10 +70,10 @@ export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: s
  * Only the cluster layer is interactive: selecting a cluster offers a zoom-in. Feature tiles are geometry only — they
  * carry nothing a click could resolve — so the raw feature layers stay display-only and take no part in hit testing.
  *
- * @param {ISlippyMapLayer['onClick']} onClusterClick - Called with the clicked cluster.
+ * @param {ISlippyMapLayer['popupRender']} renderClusterPopup - Renders the popup for a clicked cluster.
  * @return {*}  {ISlippyMapLayer[]}
  */
-export const buildSearchResultLayers = (onClusterClick: ISlippyMapLayer['onClick']): ISlippyMapLayer[] => [
+export const buildSearchResultLayers = (renderClusterPopup: ISlippyMapLayer['popupRender']): ISlippyMapLayer[] => [
   {
     specification: {
       id: FILL_LAYER_ID,
@@ -166,7 +166,7 @@ export const buildSearchResultLayers = (onClusterClick: ISlippyMapLayer['onClick
         'circle-stroke-color': '#ffffff'
       }
     },
-    onClick: onClusterClick
+    popupRender: renderClusterPopup
   }
 ];
 

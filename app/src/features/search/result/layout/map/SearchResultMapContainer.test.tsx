@@ -27,20 +27,35 @@ vi.mock('hooks/useContext', () => ({
   })
 }));
 
-// SlippyMap is exercised by its own suite; here we only care what the search page hands it. The stub honours the
-// component's ref contract so the layout's camera calls (cluster zoom-in) can be asserted.
+// SlippyMap is exercised by its own suite; here we only care what the search page hands it. The stub stands in for
+// the real component's popup ownership: it renders whatever the clicked layer's `popupRender` returns and supplies
+// the same camera helpers, so the container's popper content and its zoom-in action can be asserted.
 vi.mock('components/map/SlippyMap', async () => {
-  const { forwardRef, useEffect, useImperativeHandle } = await import('react');
+  const { useEffect, useState } = await import('react');
 
   return {
-    SlippyMap: forwardRef((props: Record<string, any>, ref) => {
-      mocks.slippyMapProps.push(props);
-      useImperativeHandle(ref, () => ({ easeTo: mocks.easeTo, getZoom: mocks.getZoom }));
+    SlippyMap: (props: Record<string, any>) => {
+      const [popup, setPopup] = useState<{ layerId: string; feature: any } | null>(null);
+
+      mocks.slippyMapProps.push({ ...props, openPopup: setPopup, closePopup: () => setPopup(null) });
       useEffect(() => {
         mocks.slippyMapMounts.count += 1;
       }, []);
-      return <div data-testid="slippy-map-stub" />;
-    })
+
+      const layer = popup ? props.layers?.find((entry: any) => entry.specification.id === popup.layerId) : undefined;
+
+      return (
+        <div data-testid="slippy-map-stub">
+          {layer?.popupRender?.({
+            feature: popup?.feature,
+            lngLat: { lng: -124, lat: 54 },
+            close: () => setPopup(null),
+            easeTo: mocks.easeTo,
+            getZoom: mocks.getZoom
+          })}
+        </div>
+      );
+    }
   };
 });
 
@@ -280,8 +295,6 @@ describe('SearchResultMapContainer', () => {
   });
 
   describe('cluster interaction', () => {
-    const POSITION = { point: { x: 120, y: 80 }, lngLat: { lng: -124, lat: 54 } };
-
     /** A decoded tile cluster, as the map's hit test returns it. */
     const tileCluster = (properties: Record<string, unknown> = {}) => ({
       source: 'search-results',
@@ -296,14 +309,14 @@ describe('SearchResultMapContainer', () => {
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
     };
 
-    /** The click handler the container declared on a layer, or undefined where the layer is display-only. */
-    const layerClickHandler = (layerId: string) =>
+    /** The popup renderer the container declared on a layer, or undefined where the layer is display-only. */
+    const layerPopupRender = (layerId: string) =>
       latestMapProps().layers.find((layer: { specification: { id: string } }) => layer.specification.id === layerId)
-        ?.onClick;
+        ?.popupRender;
 
     /** Click a cluster, as the map does when its hit test lands on the cluster layer. */
     const clickCluster = (cluster: Record<string, unknown>) =>
-      act(() => layerClickHandler('search-clusters')(cluster, POSITION));
+      act(() => latestMapProps().openPopup({ layerId: 'search-clusters', feature: cluster }));
 
     it('opens the cluster popper with the represented result count and a Zoom in action', async () => {
       await renderReadyMap();
@@ -341,10 +354,14 @@ describe('SearchResultMapContainer', () => {
     it('leaves the raw geometry layers display-only, since they carry nothing to resolve', async () => {
       await renderReadyMap();
 
-      // Feature tiles are geometry only, so those layers declare no handler at all: they take no part in the map's
-      // hit test, and there is deliberately no feature popper.
+      // Feature tiles are geometry only, so those layers declare nothing interactive at all: they take no part in
+      // the map's hit test, and there is deliberately no feature popper.
       for (const layerId of ['search-points', 'search-lines', 'search-fills', 'search-outlines']) {
-        expect(layerClickHandler(layerId)).toBeUndefined();
+        expect(layerPopupRender(layerId)).toBeUndefined();
+        expect(
+          latestMapProps().layers.find((layer: { specification: { id: string } }) => layer.specification.id === layerId)
+            ?.onClick
+        ).toBeUndefined();
       }
     });
 
@@ -356,35 +373,6 @@ describe('SearchResultMapContainer', () => {
 
       expect(screen.getAllByTestId('search-result-map-popper')).toHaveLength(1);
       expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('20 results');
-    });
-
-    it('closes the popper on an empty-map click', async () => {
-      await renderReadyMap();
-
-      clickCluster(tileCluster());
-      act(() => latestMapProps().onEmptyMapClick(POSITION));
-
-      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
-    });
-
-    it('closes the popper when Escape is pressed', async () => {
-      await renderReadyMap();
-
-      clickCluster(tileCluster());
-      act(() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      });
-
-      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
-    });
-
-    it('closes the cluster popper when the camera moves, e.g. a zoom change', async () => {
-      await renderReadyMap();
-
-      clickCluster(tileCluster());
-      act(() => latestMapProps().onMoveStart());
-
-      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
     });
 
     it('closes the popper from its explicit dismiss control', async () => {

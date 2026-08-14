@@ -1,74 +1,42 @@
-import type { MapClickPosition } from 'components/map/SlippyMap.interface';
 import type { MapGeoJSONFeature } from 'maplibre-gl';
-
-/**
- * An individual search result selected on the map.
- */
-export interface FeatureMapSelection {
-  kind: 'feature';
-  submissionId: number;
-  submissionFeatureId: number;
-  point: MapClickPosition['point'];
-  lngLat: MapClickPosition['lngLat'];
-}
+import { CLUSTER_LAYER_ID } from './map-layers';
 
 /**
  * A server-side cluster of search results selected on the map.
+ *
+ * The only selectable thing on the map: feature tiles are geometry only, so an individual result
+ * carries nothing a click could resolve.
  */
 export interface ClusterMapSelection {
   kind: 'cluster';
   featureCount: number;
-  point: MapClickPosition['point'];
-  lngLat: MapClickPosition['lngLat'];
 }
 
-export type MapSelection = FeatureMapSelection | ClusterMapSelection;
+export type MapSelection = ClusterMapSelection;
 
 /**
- * Interpret a rendered tile feature as a map selection, using only the decoded MVT properties.
+ * Interpret a rendered tile feature as a map selection.
  *
- * The tile contract marks every feature with `render_kind`: `feature` carries `submission_id` and
- * `submission_feature_id`, `cluster` carries `feature_count`. Anything else — an unknown kind, or a feature missing
- * the properties its kind requires — returns null and is ignored, so a malformed tile can never break the page.
+ * A cluster is recognised by the layer that rendered it — the cluster layer is the map's only
+ * interactive layer — and carries `feature_count`, its size. Anything else, including a cluster
+ * missing its count, returns null and is ignored, so a malformed tile can never break the page.
  *
- * @param {MapGeoJSONFeature} feature Topmost rendered feature from the map's hit test.
- * @param {MapClickPosition} position Where the click landed.
+ * @param {MapGeoJSONFeature} feature Clicked feature, as the map's hit test returns it.
  * @return {*}  {(MapSelection | null)}
  */
-export const resolveMapSelection = (feature: MapGeoJSONFeature, position: MapClickPosition): MapSelection | null => {
-  const properties = feature.properties ?? {};
-
-  if (properties.render_kind === 'feature') {
-    const submissionId = Number(properties.submission_id);
-    const submissionFeatureId = Number(properties.submission_feature_id);
-
-    if (!submissionId || !submissionFeatureId) {
-      return null;
-    }
-
-    return {
-      kind: 'feature',
-      submissionId,
-      submissionFeatureId,
-      point: position.point,
-      lngLat: position.lngLat
-    };
+export const resolveMapSelection = (feature: MapGeoJSONFeature): MapSelection | null => {
+  if (feature.layer?.id !== CLUSTER_LAYER_ID) {
+    return null;
   }
 
-  if (properties.render_kind === 'cluster') {
-    const featureCount = Number(properties.feature_count);
+  const featureCount = Number(feature.properties?.feature_count);
 
-    if (!featureCount || featureCount < 1) {
-      return null;
-    }
-
-    return {
-      kind: 'cluster',
-      featureCount,
-      point: position.point,
-      lngLat: position.lngLat
-    };
+  if (!featureCount || featureCount < 1) {
+    return null;
   }
 
-  return null;
+  return {
+    kind: 'cluster',
+    featureCount
+  };
 };
