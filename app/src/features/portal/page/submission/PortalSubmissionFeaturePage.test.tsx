@@ -80,9 +80,16 @@ describe('PortalSubmissionFeaturePage', () => {
     });
 
     mockGetSubmissionFeatureProperties.mockResolvedValue({
-      properties: [{ id: 'species_name', property: 'species name', value: 'Wolf' }],
+      properties: [
+        { id: 'species_name', property: 'species name', value: 'Wolf' },
+        {
+          id: 'taxon:1',
+          property: 'focal species',
+          value: { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' }
+        }
+      ],
       pagination: {
-        total: 1,
+        total: 2,
         current_page: 1,
         last_page: 1,
         per_page: 10
@@ -97,6 +104,16 @@ describe('PortalSubmissionFeaturePage', () => {
     await waitFor(() => {
       expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith('1', '10', expect.any(Object));
     });
+    expect(await findByText('Wolf')).toBeVisible();
+  });
+
+  it('links taxon property values to the portal taxon route', async () => {
+    const { findByRole } = renderPage();
+
+    expect(await findByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
+      'href',
+      '/portal/submission/1/taxon/180543'
+    );
   });
 
   it('uses portal route for related feature links', async () => {

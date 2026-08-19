@@ -1,6 +1,11 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { isAccessibleToUser, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import {
+  isAccessibleToUser,
+  isEffectivelySecured,
+  isSubmissionFeatureActive,
+  taxonPropertyValueJson
+} from './sql-fragments';
 
 describe('sql-fragments', () => {
   describe('isSubmissionFeatureActive', () => {
@@ -43,7 +48,7 @@ describe('sql-fragments', () => {
       const sql = isEffectivelySecured('wf.submission_feature_id');
 
       // Step 2: Count `?` placeholders — must be none
-      expect((sql.match(/\?/g) || []).length).to.equal(0);
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });
   });
 
@@ -95,7 +100,31 @@ describe('sql-fragments', () => {
       const sql = isAccessibleToUser('wf.submission_feature_id');
 
       // Step 2: Count `?` placeholders — must be exactly one (the system user id)
-      expect((sql.match(/\?/g) || []).length).to.equal(1);
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(1);
+    });
+  });
+
+  describe('taxonPropertyValueJson', () => {
+    it('builds the taxon value object from the aliased taxon row', () => {
+      const sql = taxonPropertyValueJson('t');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'taxon_id', t.taxon_id");
+      expect(sql).to.include("'tsn', t.itis_tsn");
+      expect(sql).to.include("'rank', t.rank");
+    });
+
+    it('labels with the scientific name', () => {
+      const sql = taxonPropertyValueJson('tx');
+
+      expect(sql).to.include("'label', tx.itis_scientific_name");
+      expect(sql).to.not.include('COALESCE(');
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = taxonPropertyValueJson('t');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });
   });
 });

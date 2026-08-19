@@ -30,4 +30,19 @@ describe('formatSubmissionPropertyValue', () => {
       '{"label":"structured value","meta":{"count":2}}'
     );
   });
+
+  it('formats reference values as their label', () => {
+    expect(
+      formatSubmissionPropertyValue({ taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' })
+    ).toBe('Ursus americanus');
+  });
+
+  it('flattens arrays of reference values into their labels', () => {
+    expect(
+      formatSubmissionPropertyValue([
+        { taxon_id: 1, tsn: 1, rank: 'Species', label: 'Ursus americanus' },
+        { taxon_id: 2, tsn: 2, rank: 'Species', label: 'Canis lupus' }
+      ])
+    ).toBe('Ursus americanus, Canis lupus');
+  });
 });

@@ -65,3 +65,19 @@ export const getSearchFeatureTypeRouteConfig = (
     title: configuredLabel ?? featureType.feature_type.display_name
   };
 };
+
+/**
+ * Builds the path of the taxon page for a taxon referenced from a submission's features.
+ *
+ * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string | number} submissionId - Submission the referencing feature belongs to.
+ * @param {number} taxonId - BioHub taxon identifier.
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {string} Taxon page path.
+ */
+export const buildSubmissionTaxonPath = (
+  basePath: string,
+  submissionId: string | number,
+  taxonId: number,
+  search = ''
+): string => `${basePath}/${submissionId}/taxon/${taxonId}${search}`;

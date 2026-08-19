@@ -12,12 +12,12 @@ import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
+import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
 import { IRelatedSubmissionFeature, ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
-import { SubmissionFeatureProperties } from './SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './SubmissionFeatureRelated';
 
 interface SubmissionFeatureDetailContentProps {
@@ -25,6 +25,8 @@ interface SubmissionFeatureDetailContentProps {
   feature?: ISubmissionFeature;
   relatedFeatures: IRelatedSubmissionFeature[];
   submissionId?: string;
+  /** Feature whose indexed properties the Properties section lists. */
+  submissionFeatureId?: string;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
   submissionDetailBasePath: string;
@@ -38,6 +40,7 @@ export const SubmissionFeatureDetailContent = ({
   feature,
   relatedFeatures,
   submissionId,
+  submissionFeatureId,
   rootBreadcrumbLabel,
   rootBreadcrumbTo,
   submissionDetailBasePath,
@@ -102,9 +105,11 @@ export const SubmissionFeatureDetailContent = ({
           </AlertBanner>
         )}
         <Stack spacing={3} py={4}>
-          <PageSection id="submission-feature-properties" label="Properties">
-            <SubmissionFeatureProperties data={feature?.data ?? {}} />
-          </PageSection>
+          <FeaturePropertiesSection
+            submissionId={submissionId}
+            submissionFeatureId={submissionFeatureId}
+            featureRouteBasePath={featureRouteBasePath}
+          />
           <PageSection id="submission-feature-map" label="Map">
             {feature && (
               <SubmissionFeatureMap

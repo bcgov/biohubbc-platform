@@ -5,6 +5,7 @@ import { getKnex } from '../database/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
+import { taxonPropertyValueJson } from './sql-fragments';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -129,10 +130,25 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_feature');
       expect(sql).to.include("fpt.name = 'number'");
       expect(sql).to.include("fpt.name = 'taxon'");
-      expect(sql).to.include('to_jsonb(t.itis_scientific_name) AS value');
+      expect(sql).to.include(`${taxonPropertyValueJson('t')} AS value`);
       expect(sql).to.include('contributor_codeset_code');
       expect(sql).to.include('public.ST_AsGeoJSON');
       expect(sql).to.include('referenced_sf.urn');
+    });
+
+    it('should hydrate taxon-valued properties as structured values built by the shared fragment', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      // The taxon branch emits the same object as the feature-detail properties read path
+      expect(sql).to.include(taxonPropertyValueJson('t'));
+      expect(sql).to.not.include('to_jsonb(t.itis_scientific_name)');
+      // ...and hides end-dated taxa, so search and feature detail agree on which rows exist
+      expect(sql).to.include('t.record_end_date IS NULL');
     });
   });
 
