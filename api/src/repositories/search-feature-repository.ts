@@ -9,6 +9,7 @@ import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
   buildSecurityFilter,
   codePropertyValueJson,
+  featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
   isSubmissionFeatureActive,
@@ -369,6 +370,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * `sql-fragments` builders so search rows and the feature-detail properties list agree:
    * - taxon: `{ taxon_id, tsn, rank, label }`
    * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
+   * - feature: `{ urn, label }`
    *
    * @return {string} LEFT JOIN LATERAL SQL fragment
    */
@@ -539,7 +541,7 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_feature_id AS ordinal,
-              to_jsonb(referenced_sf.urn) AS value
+              ${featureReferencePropertyValueJson('referenced_sf')} AS value
             FROM submission_feature_property_feature p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id

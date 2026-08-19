@@ -50,12 +50,28 @@ export const CodePropertyValue = z.object({
 export type CodePropertyValue = z.infer<typeof CodePropertyValue>;
 
 /**
+ * Structured value of a feature-valued submitted property: the referenced feature's URN, which is also
+ * the display `label`.
+ */
+export const FeatureReferencePropertyValue = z.object({
+  urn: z.string(),
+  label: z.string()
+});
+
+export type FeatureReferencePropertyValue = z.infer<typeof FeatureReferencePropertyValue>;
+
+/**
  * Value of an indexed submitted property as read by the feature-detail properties list.
  *
  * Scalar-typed values are plain strings; reference-typed values are structured objects that
  * always carry a `label` and are told apart by their identifier keys.
  */
-export const SubmissionFeaturePropertyValue = z.union([z.string(), TaxonPropertyValue, CodePropertyValue]);
+export const SubmissionFeaturePropertyValue = z.union([
+  z.string(),
+  TaxonPropertyValue,
+  CodePropertyValue,
+  FeatureReferencePropertyValue
+]);
 
 export type SubmissionFeaturePropertyValue = z.infer<typeof SubmissionFeaturePropertyValue>;
 

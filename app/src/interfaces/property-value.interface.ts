@@ -32,10 +32,20 @@ export type CodePropertyValue = {
 };
 
 /**
+ * Structured value of a feature-valued submitted property, as returned by the indexed-property read paths.
+ */
+export type FeatureReferencePropertyValue = {
+  /** URN of the referenced feature (`urn:<submission_id>:<feature_type_name>:<submission_feature_id>`). */
+  urn: string;
+  /** Display text: the referenced feature URN. */
+  label: string;
+};
+
+/**
  * Reference-typed submitted property values. Every member carries a display `label` plus the stable
  * identifiers the UI links with, and is told apart by its identifier keys.
  */
-export type StructuredPropertyValue = TaxonPropertyValue | CodePropertyValue;
+export type StructuredPropertyValue = TaxonPropertyValue | CodePropertyValue | FeatureReferencePropertyValue;
 
 /**
  * Value of an indexed submitted property: a plain string for scalar-typed properties, or a structured

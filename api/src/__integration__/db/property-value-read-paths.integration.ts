@@ -18,7 +18,9 @@ import {
   addCodeProperty,
   addTaxonProperty,
   createCodesetCode,
-  createTaxon
+  createFeatureTypeProperty,
+  createTaxon,
+  insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -239,6 +241,53 @@ describe('Indexed property value read paths (integration)', function () {
         { search: `strategies_${TOKEN.toLowerCase()}` }
       );
       expect(byCodesetKey).to.be.empty;
+    });
+  });
+
+  describe('feature reference values', () => {
+    const sourceFeatureTypeName = 'sample_period';
+    const targetFeatureTypeName = 'sample_site';
+
+    it('returns the same structured feature reference value from the search row and the properties list', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+        connection,
+        sourceFeatureTypeName,
+        targetFeatureTypeName
+      );
+      const targetId = await createTestFeature(connection, submissionId, targetFeatureTypeName, {});
+      const sourceId = await createTestFeature(connection, submissionId, sourceFeatureTypeName, {});
+      await insertSubmissionFeaturePropertyFeature(connection, sourceId, featureTypePropertyId, targetId);
+
+      const urn = `urn:${submissionId}:${targetFeatureTypeName}:${targetId}`;
+      const expected = { urn, label: urn };
+
+      const rows = await propertyRepository.getSubmissionFeatureProperties(sourceId, { page: 1, limit: 25 });
+      const featureRow = rows.find((row) => row.id.startsWith('feature:'));
+      expect(featureRow).to.not.be.undefined;
+      expect(featureRow?.value).to.deep.equal(expected);
+
+      const searchRow = await findSearchRow(sourceFeatureTypeName, sourceId);
+      const searchValue = searchRow.properties[propertyName];
+      expect(Array.isArray(searchValue) ? searchValue[0] : searchValue).to.deep.equal(expected);
+    });
+
+    it('omits references to features that are no longer active', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const { featureTypePropertyId } = await createFeatureTypeProperty(
+        connection,
+        sourceFeatureTypeName,
+        targetFeatureTypeName
+      );
+      const targetId = await createTestFeature(connection, submissionId, targetFeatureTypeName, {});
+      const sourceId = await createTestFeature(connection, submissionId, sourceFeatureTypeName, {});
+      await insertSubmissionFeaturePropertyFeature(connection, sourceId, featureTypePropertyId, targetId);
+      await connection.sql(SQL`
+        UPDATE submission_feature SET record_end_date = now() - interval '1 day' WHERE submission_feature_id = ${targetId};
+      `);
+
+      const rows = await propertyRepository.getSubmissionFeatureProperties(sourceId, { page: 1, limit: 25 });
+      expect(rows.filter((row) => row.id.startsWith('feature:'))).to.be.empty;
     });
   });
 });

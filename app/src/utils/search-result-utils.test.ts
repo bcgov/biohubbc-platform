@@ -44,6 +44,9 @@ describe('formatSubmissionPropertyValue', () => {
         label: 'Track'
       })
     ).toBe('Track');
+    expect(formatSubmissionPropertyValue({ urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' })).toBe(
+      'urn:18:sample_site:3339'
+    );
   });
 
   it('flattens arrays of reference values into their labels', () => {

@@ -44,9 +44,14 @@ describe('FeaturePropertiesSection', () => {
           id: 'code:3',
           property: 'sign',
           value: { codeset_key: 'sign', codeset_label: 'Sign', code_key: 'track', code_label: 'Track', label: 'Track' }
+        },
+        {
+          id: 'feature:4',
+          property: 'sample site',
+          value: { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' }
         }
       ],
-      pagination: { total: 3, current_page: 1, last_page: 1, per_page: 10 }
+      pagination: { total: 4, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
 
@@ -72,5 +77,9 @@ describe('FeaturePropertiesSection', () => {
       '/portal/submission/1/taxon/180543'
     );
     expect(await findByRole('link', { name: 'Track' })).toHaveAttribute('href', '/portal/submission/1/code/sign/track');
+    expect(await findByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
+      'href',
+      '/portal/submission/18/feature/3339'
+    );
   });
 });

@@ -1,4 +1,9 @@
-import { CodePropertyValue, StructuredPropertyValue, TaxonPropertyValue } from 'interfaces/property-value.interface';
+import {
+  CodePropertyValue,
+  FeatureReferencePropertyValue,
+  StructuredPropertyValue,
+  TaxonPropertyValue
+} from 'interfaces/property-value.interface';
 import { JsonValue } from 'types/json';
 import { safeJSONStringify } from './Utils';
 
@@ -38,13 +43,24 @@ export const isCodePropertyValue = (value: unknown): value is CodePropertyValue 
   typeof value.code_key === 'string';
 
 /**
+ * Determines whether a property value is a structured feature reference.
+ *
+ * Feature references are recognised by their identifier (`urn`) alongside the display `label`.
+ *
+ * @param {unknown} value - Any property value.
+ * @returns {boolean} `true` when the value is a feature reference.
+ */
+export const isFeatureReferencePropertyValue = (value: unknown): value is FeatureReferencePropertyValue =>
+  isPlainObject(value) && typeof value.label === 'string' && typeof value.urn === 'string';
+
+/**
  * Determines whether a property value is a structured reference value of any supported type.
  *
  * @param {unknown} value - Any property value.
  * @returns {boolean} `true` when the value is a structured reference value.
  */
 export const isStructuredPropertyValue = (value: unknown): value is StructuredPropertyValue =>
-  isTaxonPropertyValue(value) || isCodePropertyValue(value);
+  isTaxonPropertyValue(value) || isCodePropertyValue(value) || isFeatureReferencePropertyValue(value);
 
 /**
  * Builds a content-derived key for a property value rendered in a list, so that React keys do not
@@ -62,6 +78,10 @@ export const getPropertyValueKey = (value: JsonValue): string => {
 
   if (isCodePropertyValue(value)) {
     return `code:${value.codeset_key}:${value.code_key}`;
+  }
+
+  if (isFeatureReferencePropertyValue(value)) {
+    return `feature:${value.urn}`;
   }
 
   return `scalar:${safeJSONStringify(value)}`;

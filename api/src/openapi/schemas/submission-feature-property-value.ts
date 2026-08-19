@@ -72,9 +72,30 @@ export const codePropertyValueSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for a feature-valued property: `{ urn, label }`.
+ */
+export const featureReferencePropertyValueSchema: OpenAPIV3.SchemaObject = {
+  title: 'FeatureReferencePropertyValue',
+  type: 'object',
+  required: ['urn', 'label'],
+  additionalProperties: false,
+  properties: {
+    urn: {
+      type: 'string',
+      description:
+        'URN of the referenced feature (`urn:<submission_id>:<feature_type_name>:<submission_feature_id>`); identifies the feature a link targets'
+    },
+    label: {
+      type: 'string',
+      description: 'Display text: the referenced feature URN'
+    }
+  }
+};
+
+/**
  * Schema for the `value` of an indexed submitted property: a string for scalar-typed properties, or
  * one of the structured reference-value objects.
  */
 export const submissionFeaturePropertyValueSchema: OpenAPIV3.SchemaObject = {
-  oneOf: [{ type: 'string' }, taxonPropertyValueSchema, codePropertyValueSchema]
+  oneOf: [{ type: 'string' }, taxonPropertyValueSchema, codePropertyValueSchema, featureReferencePropertyValueSchema]
 };

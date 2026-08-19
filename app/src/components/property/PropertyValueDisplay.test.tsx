@@ -51,6 +51,15 @@ describe('PropertyValueDisplay', () => {
     expect(getByRole('link', { name: 'Track' })).toHaveAttribute('href', '/submission/3/code/sign/track');
   });
 
+  it('renders a feature reference value as a link to the referenced feature', () => {
+    const { getByRole } = renderValue({ urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' });
+
+    expect(getByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
+      'href',
+      '/submission/18/feature/3339'
+    );
+  });
+
   it('renders multi-value properties inline, comma-separated', () => {
     const { container, getAllByRole } = renderValue([taxon, { ...taxon, taxon_id: 2, label: 'Canis lupus' }, 'x']);
 
