@@ -1,6 +1,7 @@
 import { JsonValue } from 'types/json';
-import { isTaxonPropertyValue } from 'utils/property-value-utils';
+import { isCodePropertyValue, isTaxonPropertyValue } from 'utils/property-value-utils';
 import { safeJSONStringify } from 'utils/Utils';
+import { CodePropertyValueLink } from './CodePropertyValueLink';
 import { PropertyValueList } from './PropertyValueList';
 import { TaxonPropertyValueLink } from './TaxonPropertyValueLink';
 
@@ -16,7 +17,7 @@ export interface PropertyValueDisplayProps {
 /**
  * Renders a submitted property value for the search result table and the feature detail Properties block.
  *
- * Reference values (taxon) render their `label` as a link; multi-value arrays render inline via
+ * Reference values (taxon, code) render their `label` as a link; multi-value arrays render inline via
  * {@link PropertyValueList}; other objects (e.g. GeoJSON) render as JSON text; scalars render as text.
  *
  * @param {PropertyValueDisplayProps} props
@@ -34,6 +35,14 @@ export const PropertyValueDisplay = ({ value, submissionId, featureRouteBasePath
   if (isTaxonPropertyValue(value)) {
     return (
       <TaxonPropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+    );
+  }
+
+  if (isCodePropertyValue(value)) {
+    return submissionId === undefined ? (
+      <>{value.label}</>
+    ) : (
+      <CodePropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
     );
   }
 

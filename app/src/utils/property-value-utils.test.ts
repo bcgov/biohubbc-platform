@@ -1,8 +1,20 @@
-import { TaxonPropertyValue } from 'interfaces/property-value.interface';
+import { CodePropertyValue, TaxonPropertyValue } from 'interfaces/property-value.interface';
 import { describe, expect, it } from 'vitest';
-import { getPropertyValueKey, isStructuredPropertyValue, isTaxonPropertyValue } from './property-value-utils';
+import {
+  getPropertyValueKey,
+  isCodePropertyValue,
+  isStructuredPropertyValue,
+  isTaxonPropertyValue
+} from './property-value-utils';
 
 const taxon: TaxonPropertyValue = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' };
+const code: CodePropertyValue = {
+  codeset_key: 'sign',
+  codeset_label: 'Sign',
+  code_key: 'track',
+  code_label: 'Track',
+  label: 'Track'
+};
 
 describe('isTaxonPropertyValue', () => {
   it('recognises a taxon reference by its identifier and label', () => {
@@ -21,9 +33,23 @@ describe('isTaxonPropertyValue', () => {
   });
 });
 
+describe('isCodePropertyValue', () => {
+  it('recognises a code reference by its codeset and code keys and label', () => {
+    expect(isCodePropertyValue(code)).toBe(true);
+  });
+
+  it('rejects other reference values and objects missing a key', () => {
+    expect(isCodePropertyValue(taxon)).toBe(false);
+    expect(isCodePropertyValue({ codeset_key: 'sign', label: 'Track' })).toBe(false);
+    expect(isCodePropertyValue({ code_key: 'track', label: 'Track' })).toBe(false);
+    expect(isCodePropertyValue('track')).toBe(false);
+  });
+});
+
 describe('isStructuredPropertyValue', () => {
   it('accepts every supported reference value type', () => {
     expect(isStructuredPropertyValue(taxon)).toBe(true);
+    expect(isStructuredPropertyValue(code)).toBe(true);
   });
 
   it('rejects objects that only carry a label', () => {
@@ -34,6 +60,7 @@ describe('isStructuredPropertyValue', () => {
 describe('getPropertyValueKey', () => {
   it('keys reference values on their identifiers', () => {
     expect(getPropertyValueKey(taxon)).toBe('taxon:180543');
+    expect(getPropertyValueKey(code)).toBe('code:sign:track');
   });
 
   it('keys other values on their JSON text', () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildSubmissionTaxonPath, getSearchFeatureTypeRouteConfig, parseRouteId } from './routes';
+import {
+  buildSubmissionCodePath,
+  buildSubmissionTaxonPath,
+  getSearchFeatureTypeRouteConfig,
+  parseRouteId
+} from './routes';
 
 describe('getSearchFeatureTypeRouteConfig', () => {
   const featureTypes = [
@@ -42,5 +47,20 @@ describe('parseRouteId', () => {
     expect(parseRouteId('-1')).toBeNull();
     expect(parseRouteId('1.5')).toBeNull();
     expect(parseRouteId('12abc')).toBeNull();
+  });
+});
+
+describe('buildSubmissionCodePath', () => {
+  it('builds the code path under the given submission route base', () => {
+    expect(buildSubmissionCodePath('/submission', 18, 'sign', 'track')).toBe('/submission/18/code/sign/track');
+    expect(buildSubmissionCodePath('/portal/submission', '18', 'sign', 'track', '?view=table')).toBe(
+      '/portal/submission/18/code/sign/track?view=table'
+    );
+  });
+
+  it('URL-encodes contributor-supplied keys', () => {
+    expect(buildSubmissionCodePath('/submission', 18, 'site select/strategy', 'random walk')).toBe(
+      '/submission/18/code/site%20select%2Fstrategy/random%20walk'
+    );
   });
 });

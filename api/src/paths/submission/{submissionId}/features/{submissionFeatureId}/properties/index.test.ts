@@ -58,9 +58,20 @@ describe('properties index', () => {
               id: 'taxon:7',
               property: 'focal species',
               value: { taxon_id: 3, tsn: 180596, rank: 'Species', label: 'Canis lupus' }
+            },
+            {
+              id: 'code:8',
+              property: 'sign',
+              value: {
+                codeset_key: 'sign',
+                codeset_label: 'Sign',
+                code_key: 'track',
+                code_label: 'Track',
+                label: 'Track'
+              }
             }
           ],
-          total: 3
+          total: 4
         });
 
       const requestHandler = index.getSubmissionFeatureProperties();
@@ -92,9 +103,14 @@ describe('properties index', () => {
           id: 'taxon:7',
           property: 'focal species',
           value: { taxon_id: 3, tsn: 180596, rank: 'Species', label: 'Canis lupus' }
+        },
+        {
+          id: 'code:8',
+          property: 'sign',
+          value: { codeset_key: 'sign', codeset_label: 'Sign', code_key: 'track', code_label: 'Track', label: 'Track' }
         }
       ]);
-      expect(mockRes.jsonValue.pagination.total).to.equal(3);
+      expect(mockRes.jsonValue.pagination.total).to.equal(4);
     });
 
     it('uses the API user connection for anonymous (no token) requests', async () => {

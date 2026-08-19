@@ -8,6 +8,7 @@ import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
   buildSecurityFilter,
+  codePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
   isSubmissionFeatureActive,
@@ -367,6 +368,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * structured objects carrying a display `label` plus stable identifiers, built by the shared
    * `sql-fragments` builders so search rows and the feature-detail properties list agree:
    * - taxon: `{ taxon_id, tsn, rank, label }`
+   * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
    *
    * @return {string} LEFT JOIN LATERAL SQL fragment
    */
@@ -472,7 +474,7 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_code_id AS ordinal,
-              to_jsonb(ccc.label) AS value
+              ${codePropertyValueJson('ccc', 'cs')} AS value
             FROM submission_feature_property_code p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id
@@ -483,6 +485,9 @@ export class SearchFeatureRepository extends BaseRepository {
              AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
+             AND ccc.record_end_date IS NULL
+            JOIN contributor_codeset cs
+              ON cs.contributor_codeset_id = ccc.contributor_codeset_id
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL

@@ -4,7 +4,7 @@ import { SubmissionFeatureProperty } from '../models/feature-property';
 import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureActive, taxonPropertyValueJson } from './sql-fragments';
+import { codePropertyValueJson, isSubmissionFeatureActive, taxonPropertyValueJson } from './sql-fragments';
 
 /**
  * Read repository for canonical indexed properties attached to submission features.
@@ -152,6 +152,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
    * identifiers (built by the shared `sql-fragments` builders, so this list and the search result rows
    * agree on the shapes):
    * - taxon: `{ taxon_id, tsn, rank, label }`
+   * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
    *
    * `labelled_property_rows` derives `value_text` — a structured value's label, or the scalar text —
    * which backs the search predicate and sorting.
@@ -261,7 +262,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'code:' || p.submission_feature_property_code_id::text AS id,
           fp.display_name AS property,
-          to_jsonb(ccc.label::text) AS value,
+          ${codePropertyValueJson('ccc', 'cs')} AS value,
           ftp.sort
         FROM submission_feature_property_code p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -275,6 +276,8 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         JOIN contributor_codeset_code ccc
           ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
          AND ccc.record_end_date IS NULL
+        JOIN contributor_codeset cs
+          ON cs.contributor_codeset_id = ccc.contributor_codeset_id
 
         UNION ALL
 
