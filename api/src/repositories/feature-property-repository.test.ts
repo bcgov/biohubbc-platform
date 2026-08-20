@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { FeatureProperty } from '../models/feature-property';
+import { FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
 import { FeaturePropertyRepository } from './feature-property-repository';
 
 chai.use(sinonChai);
@@ -93,6 +93,27 @@ describe('FeaturePropertyRepository', () => {
   });
 
   describe('updateFeatureProperty', () => {
+    it('ignores feature_property_type_id even if it is present at runtime', async () => {
+      const mockResponse = { rowCount: 1, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({
+        knex: async (query) => {
+          const statement = query.toSQL().toNative();
+
+          expect(statement.sql).not.to.include('feature_property_type_id');
+          expect(statement.bindings).not.to.include(3);
+
+          return mockResponse;
+        }
+      });
+      const repository = new FeaturePropertyRepository(mockConnection);
+      const runtimePayload = {
+        display_name: 'Updated',
+        feature_property_type_id: 3
+      } as UpdateFeatureProperty & { feature_property_type_id: number };
+
+      await repository.updateFeatureProperty(1, runtimePayload);
+    });
+
     it('throws when no active row is updated', async () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
