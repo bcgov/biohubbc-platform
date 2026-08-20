@@ -22,6 +22,7 @@ vi.mock('components/data-grid/CustomDataGrid', () => ({
       data-has-pagination-model={String(Boolean(paginationModel))}
       data-page-size-options={pageSizeOptions?.join(',')}>
       <div data-testid="columns">{columns.map((column) => column.headerName).join('|')}</div>
+      <div data-testid="column-fields">{columns.map((column) => column.field).join('|')}</div>
       {rows.map((row) => (
         <div key={row.uuid} data-testid={`row-${row.submission_feature_id}`} onClick={() => onRowClick?.({ row })}>
           {columns
@@ -158,10 +159,12 @@ describe('SearchResultTableLayout', () => {
     expect(getByTestId('columns')).toHaveTextContent('Scientific Name');
     expect(getByTestId('columns')).toHaveTextContent('Count');
     expect(getByTestId('columns')).toHaveTextContent('Tags');
-    expect(getByTestId('cell-property:scientific_name')).toHaveTextContent('Canis lupus');
-    expect(getByTestId('cell-property:count')).toHaveTextContent('12');
-    expect(getByTestId('cell-property:tags')).toHaveTextContent('coastal, survey');
-    expect(getByTestId('cell-property:scientific_name').querySelector('.MuiTypography-root')).toBeInTheDocument();
+    expect(getByTestId('column-fields')).toHaveTextContent('1');
+    expect(getByTestId('column-fields')).not.toHaveTextContent('property:scientific_name');
+    expect(getByTestId('cell-1')).toHaveTextContent('Canis lupus');
+    expect(getByTestId('cell-2')).toHaveTextContent('12');
+    expect(getByTestId('cell-3')).toHaveTextContent('coastal, survey');
+    expect(getByTestId('cell-1').querySelector('.MuiTypography-root')).toBeInTheDocument();
   });
 
   it('does not configure internal data grid pagination', () => {

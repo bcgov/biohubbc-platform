@@ -37,7 +37,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
     };
 
     const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
-      field: `property:${property.name}`,
+      field: String(property.feature_type_property_id),
       headerName: property.display_name,
       minWidth: 160,
       flex: 1,
