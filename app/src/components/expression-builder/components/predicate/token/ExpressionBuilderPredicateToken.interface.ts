@@ -46,33 +46,34 @@ export interface UseExpressionBuilderPredicatePropertyParams {
   selectedProperties: ExpressionBuilderProperty[];
 }
 
-export interface ExpressionBuilderPredicateTextValueInputParams {
-  /** Text-field-compatible predicate value. */
-  value: string | number;
-  /** Whether the input should display validation error styling. */
-  error?: boolean;
-  /** Optional mobile keyboard hint for numeric predicates. */
-  inputMode?: 'decimal';
-}
-
-export interface ExpressionBuilderPredicateDatetimeValueFieldParams {
-  /** Datetime draft field to update when this input changes. */
-  field: 'date_value' | 'time_value';
-  /** Native input type used by this datetime field. */
-  type: 'date' | 'time';
-  /** Current draft value for the field. */
-  value: string | undefined;
-  /** Whether the input should display validation error styling. */
-  error: boolean;
-  /** Accessible label for the native input. */
-  ariaLabel: string;
-  /** Flex sizing for the compact predicate row layout. */
-  flex: string;
-  /** Minimum width for the compact predicate row layout. */
-  minWidth: number;
-}
-
 export interface ExpressionBuilderPredicateTokenSkeletonProps {
   /** Removes the unresolved predicate row from the parent-owned expression tree. */
   onRemove: () => unknown;
+}
+
+export interface ExpressionBuilderPredicateTokenTextProps {
+  value: unknown;
+  error?: boolean;
+  readOnly?: boolean;
+  onChange: (value: unknown) => unknown;
+}
+
+export interface ExpressionBuilderPredicateTokenBooleanProps {
+  value: unknown;
+  readOnly?: boolean;
+  onChange: (value: boolean | undefined) => unknown;
+}
+
+export interface ExpressionBuilderPredicateTokenDateProps {
+  operator: ExpressionPredicateOperator | null | undefined;
+  value: unknown;
+  readOnly?: boolean;
+  onChange: (value: unknown) => unknown;
+}
+
+export interface ExpressionBuilderPredicateTokenTaxonProps {
+  value: unknown;
+  error?: boolean;
+  readOnly?: boolean;
+  onChange: (value: number | undefined) => unknown;
 }

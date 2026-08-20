@@ -210,6 +210,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('LEFT JOIN taxon t');
       expect(sqlText).to.include("t.itis_tsn = (v.logical_value #>> '{}')::integer");
       expect(sqlText).to.include('t.taxon_id');
+      expect(sqlText).to.include('t.record_end_date IS NULL');
     });
   });
 
@@ -228,6 +229,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('SELECT DISTINCT c.tsn');
       expect(sqlText).to.include('FROM submission_upload_staging_taxon_candidate c');
       expect(sqlText).to.include('LEFT JOIN taxon t');
+      expect(sqlText).to.include('t.record_end_date IS NULL');
       expect(sqlText).to.include('c.taxon_id IS NULL');
       expect(sqlText).to.include('t.parent_taxon_id IS NULL');
       expect(sqlText).to.include("lower(t.rank) <> 'kingdom'");
@@ -250,6 +252,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('SET taxon_id = t.taxon_id');
       expect(sqlText).to.include('FROM taxon t');
       expect(sqlText).to.include('t.itis_tsn = c.tsn');
+      expect(sqlText).to.include('t.record_end_date IS NULL');
     });
   });
 

@@ -14,10 +14,12 @@ import {
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FindTaxonFilters, ItisTsnLookupValue } from '../models/taxon';
 import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
 import { parseTimestamp } from '../utils/timestamp';
 import { GeoJSONGeometryZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
+import { TaxonomyService } from './taxonomy-service';
 
 /**
  * Validates and normalizes expression predicates against database property metadata.
@@ -32,6 +34,7 @@ import { DBService } from './db-service';
  */
 export class ExpressionPredicateSemanticValidator extends DBService {
   featureTypePropertyRepository: FeatureTypePropertyRepository;
+  taxonomyService: TaxonomyService;
 
   /**
    * Build the semantic validator.
@@ -42,6 +45,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.featureTypePropertyRepository = new FeatureTypePropertyRepository(connection);
+    this.taxonomyService = new TaxonomyService(connection);
   }
 
   /**
@@ -121,7 +125,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     }
 
     // Convert the public scalar value into the internal typed payload expected downstream.
-    const internal_predicate = this.buildInternalPredicate(predicate, propertyType);
+    const internal_predicate = await this.buildInternalPredicate(predicate, propertyType);
 
     return {
       ...predicate,
@@ -139,14 +143,14 @@ export class ExpressionPredicateSemanticValidator extends DBService {
    *
    * @param {ExpressionTreePredicate} predicate - Public predicate leaf.
    * @param {PredicatePropertyTypeName} propertyType - Resolved property type name.
-   * @return {InternalTypedPredicate} Repository-ready predicate payload.
+   * @return {Promise<InternalTypedPredicate>} Repository-ready predicate payload.
    * @private
    * @memberof ExpressionPredicateSemanticValidator
    */
-  private buildInternalPredicate(
+  private async buildInternalPredicate(
     predicate: ExpressionTreePredicate,
     propertyType: PredicatePropertyTypeName
-  ): InternalTypedPredicate {
+  ): Promise<InternalTypedPredicate> {
     const isExists = predicate.operator === 'Exists';
 
     // Exists means "has a value row"; typed value columns remain null.
@@ -187,7 +191,7 @@ export class ExpressionPredicateSemanticValidator extends DBService {
       case FEATURE_PROPERTY_TYPE.DATETIME:
         return this.buildTimestampPredicate(predicate);
       case FEATURE_PROPERTY_TYPE.TAXON:
-        return { type: 'taxon', operator: predicate.operator, value: this.requirePositiveIntegerValue(predicate) };
+        return { type: 'taxon', operator: predicate.operator, value: await this.resolveTaxonValue(predicate) };
       case FEATURE_PROPERTY_TYPE.SPATIAL:
         return { type: 'geometry', operator: predicate.operator, value: this.requireGeometryValue(predicate) };
       case FEATURE_PROPERTY_TYPE.CODE:
@@ -273,6 +277,48 @@ export class ExpressionPredicateSemanticValidator extends DBService {
     }
 
     return predicate.value;
+  }
+
+  /**
+   * Resolve a taxon predicate value to an internal taxon id.
+   *
+   * The client-supplied value is an ITIS TSN (numeric or digit-only string) or an exact scientific name (string), not
+   * an internal `taxon_id`. Resolution is intentionally limited to locally stored taxa.
+   *
+   * @param {ExpressionTreePredicate} predicate - Public taxon predicate leaf.
+   * @return {Promise<number>} Resolved taxon id.
+   * @private
+   * @memberof ExpressionPredicateSemanticValidator
+   */
+  private async resolveTaxonValue(predicate: ExpressionTreePredicate): Promise<number> {
+    const value = typeof predicate.value === 'string' ? predicate.value.trim() : predicate.value;
+    let filters: FindTaxonFilters;
+
+    if (typeof value === 'string' && !/^\d+$/.test(value)) {
+      filters = { itis_scientific_name: value };
+    } else {
+      const parseResult = ItisTsnLookupValue.safeParse(value);
+
+      if (!parseResult.success) {
+        throw new ApiValidationError('Predicate value must be a valid ITIS TSN', [
+          'ExpressionPredicateSemanticValidator->resolveTaxonValue',
+          { predicate }
+        ]);
+      }
+
+      filters = { itis_tsn: parseResult.data };
+    }
+
+    const records = await this.taxonomyService.findTaxon(filters);
+
+    if (records.length !== 1) {
+      throw new ApiValidationError(records.length ? 'Taxon value matched multiple taxa' : 'Taxon not found', [
+        'ExpressionPredicateSemanticValidator->resolveTaxonValue',
+        { predicate, matches: records.length }
+      ]);
+    }
+
+    return records[0].taxon_id;
   }
 
   /**

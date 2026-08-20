@@ -31,7 +31,11 @@ export type SearchSubmissionResultWithCount = z.infer<typeof SearchSubmissionRes
 
 export const SearchTaxonResult = z.object({
   taxon_id: z.number().int().positive(),
-  itis_scientific_name: z.string()
+  itis_tsn: z.number().int().positive(),
+  itis_scientific_name: z.string(),
+  common_name: z.string().nullable(),
+  rank: z.string().nullable(),
+  relevancy_score: z.number()
 });
 export type SearchTaxonResult = z.infer<typeof SearchTaxonResult>;
 

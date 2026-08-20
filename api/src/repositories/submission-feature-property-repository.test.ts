@@ -32,6 +32,11 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.include('submission_feature_property_number');
       expect(sqlText).to.include('submission_feature_property_timestamp');
       expect(sqlText).to.include('submission_feature_artifact');
+      expect(sqlText).to.include("fpt.name = 'number'");
+      expect(sqlText).to.include("fpt.name = 'taxon'");
+      expect(sqlText).to.include('t.itis_scientific_name AS value');
+      expect(sqlText).to.include('t.record_end_date IS NULL');
+      expect(sqlText).to.not.include('COALESCE(t.itis_scientific_name');
       expect(sqlText).to.include('HAVING COUNT(*) = 1');
       expect(sqlText).to.include('SELECT id, property, value');
       expect(sqlText).to.include('ORDER BY sort asc NULLS LAST, property ASC, value ASC, id ASC');

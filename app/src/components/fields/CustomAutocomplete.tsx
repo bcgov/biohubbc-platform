@@ -6,12 +6,10 @@ export interface ICustomAutocompleteOption<T extends string | number> {
   label: string;
 }
 
-export type ICustomAutocompleteProps<T extends string | number> = MuiAutocompleteProps<
-  ICustomAutocompleteOption<T>,
-  false,
-  false,
-  false
-> & {
+export type ICustomAutocompleteProps<
+  T extends string | number,
+  FreeSolo extends boolean = false
+> = MuiAutocompleteProps<ICustomAutocompleteOption<T>, false, false, FreeSolo> & {
   label?: string;
 };
 
@@ -22,7 +20,9 @@ export type ICustomAutocompleteProps<T extends string | number> = MuiAutocomplet
  * @param {ICustomAutocompleteProps<T>} props
  * @return {*}
  */
-const CustomAutocomplete = <T extends string | number>(props: ICustomAutocompleteProps<T>) => {
+const CustomAutocomplete = <T extends string | number, FreeSolo extends boolean = false>(
+  props: ICustomAutocompleteProps<T, FreeSolo>
+) => {
   const { label, renderInput, ...rest } = props;
 
   return (

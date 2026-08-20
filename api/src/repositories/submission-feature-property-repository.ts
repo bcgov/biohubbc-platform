@@ -180,6 +180,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
          AND fp.record_end_date IS NULL
+        JOIN feature_property_type fpt
+          ON fpt.feature_property_type_id = fp.feature_property_type_id
+         AND fpt.name = 'number'
 
         UNION ALL
 
@@ -265,7 +268,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'taxon:' || p.submission_feature_property_taxon_id::text AS id,
           fp.display_name AS property,
-          COALESCE(t.itis_scientific_name, t.common_name, t.bc_taxon_code, t.itis_tsn::text) AS value,
+          t.itis_scientific_name AS value,
           ftp.sort
         FROM submission_feature_property_taxon p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
@@ -276,6 +279,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         JOIN feature_property fp
           ON fp.feature_property_id = ftp.feature_property_id
          AND fp.record_end_date IS NULL
+        JOIN feature_property_type fpt
+          ON fpt.feature_property_type_id = fp.feature_property_type_id
+         AND fpt.name = 'taxon'
         JOIN taxon t
           ON t.taxon_id = p.taxon_id
          AND t.record_end_date IS NULL
