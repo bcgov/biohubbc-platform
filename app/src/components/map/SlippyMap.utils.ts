@@ -186,3 +186,34 @@ export const hasEnabledDrawControl = (drawControls?: ISlippyMapDrawControls): bo
     drawControls && (drawControls.point || drawControls.lineString || drawControls.polygon || drawControls.trash)
   );
 };
+
+/**
+ * The draw control that enables each draw mode.
+ *
+ * The two vocabularies differ (the drawing library's `linestring` against the control's `lineString`), so the mapping
+ * is held here rather than derived at each use site: the toolbar and the mode effect must agree on which modes are
+ * reachable, or a mode stays active with no button to leave it by.
+ */
+export const DRAW_MODE_CONTROL_KEYS: Record<SlippyMapDrawMode, keyof ISlippyMapDrawControls> = {
+  point: 'point',
+  linestring: 'lineString',
+  polygon: 'polygon'
+};
+
+/**
+ * Checks whether a drawing mode is reachable under the given controls.
+ *
+ * Accepts any mode string, so a mode read back from the drawing library (which also reports `select` and `static`)
+ * can be tested without narrowing it first.
+ *
+ * @param {string} mode Drawing mode to test.
+ * @param {ISlippyMapDrawControls} [drawControls] Draw controls configuration.
+ * @return {boolean} `true` if the mode is a draw mode whose control is enabled.
+ */
+export const isDrawModeEnabled = (mode: string, drawControls?: ISlippyMapDrawControls): boolean => {
+  if (!Object.hasOwn(DRAW_MODE_CONTROL_KEYS, mode)) {
+    return false;
+  }
+
+  return Boolean(drawControls?.[DRAW_MODE_CONTROL_KEYS[mode as SlippyMapDrawMode]]);
+};

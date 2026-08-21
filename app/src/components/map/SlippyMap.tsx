@@ -18,6 +18,7 @@ import {
   areFeatureSetsEqual,
   extractSnapshotFeatures,
   hasEnabledDrawControl,
+  isDrawModeEnabled,
   isSupportedDrawFeature,
   normalizeFeaturesForDraw,
   SLIPPY_MAP_DEFAULT_STYLE
@@ -303,7 +304,13 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     syncFeaturesIntoDraw(features ?? []);
   }, [features ?? []]);
 
-  useEffect(() => {
+  // The drawing library's mode is state of its own, so it has to be re-reconciled with the props on every change to
+  // them, not only when editability flips. A mode whose control has since been withdrawn keeps interpreting map
+  // clicks even though the toolbar no longer offers a way out of it.
+  //
+  // Deep compared: `drawControls` is an object a consumer typically writes inline, so a reference comparison would
+  // reconcile on every render and drop the user out of the mode they are drawing in.
+  useDeepCompareEffect(() => {
     const draw = drawRef.current;
 
     if (!draw) {
@@ -311,20 +318,33 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       return;
     }
 
-    if (isEditable) {
-      draw.setMode('select');
-    } else {
+    if (!isEditable) {
       if (selectedFeatureIdRef.current !== null) {
         draw.deselectFeature(selectedFeatureIdRef.current);
       }
 
+      // The built-in `static` mode ignores all map interactions
       draw.setMode('static');
+      setActiveDrawMode(null);
+      setSelectedFeatureId(null);
+      selectedFeatureIdRef.current = null;
+
+      return;
     }
 
+    const currentMode = draw.getMode();
+
+    // Already in the neutral mode, or in a draw mode the consumer still offers: leave the user where they are.
+    if (currentMode === 'select' || isDrawModeEnabled(currentMode, drawControls)) {
+      return;
+    }
+
+    // Either `static`, because the map has just become editable, or a draw mode whose control has been withdrawn.
+    draw.setMode('select');
     setActiveDrawMode(null);
     setSelectedFeatureId(null);
     selectedFeatureIdRef.current = null;
-  }, [isEditable]);
+  }, [isEditable, drawControls ?? {}]);
 
   /**
    * Activates the provided draw mode, or returns to the select mode when `null`.

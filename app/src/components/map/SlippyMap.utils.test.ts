@@ -5,6 +5,7 @@ import {
   areFeatureSetsEqual,
   extractSnapshotFeatures,
   hasEnabledDrawControl,
+  isDrawModeEnabled,
   isSupportedDrawFeature,
   normalizeFeaturesForDraw,
   toComparableFeature
@@ -224,6 +225,34 @@ describe('SlippyMap.utils', () => {
       expect(hasEnabledDrawControl()).toBe(false);
       expect(hasEnabledDrawControl({})).toBe(false);
       expect(hasEnabledDrawControl({ polygon: false, trash: false })).toBe(false);
+    });
+  });
+
+  describe('isDrawModeEnabled', () => {
+    it('returns true for a draw mode whose control is enabled', () => {
+      expect(isDrawModeEnabled('point', { point: true })).toBe(true);
+      expect(isDrawModeEnabled('polygon', { polygon: true })).toBe(true);
+    });
+
+    it('maps the line string mode onto its differently spelled control', () => {
+      expect(isDrawModeEnabled('linestring', { lineString: true })).toBe(true);
+      expect(isDrawModeEnabled('linestring', { lineString: false })).toBe(false);
+    });
+
+    it('returns false for a draw mode whose control is absent or disabled', () => {
+      expect(isDrawModeEnabled('point', { polygon: true })).toBe(false);
+      expect(isDrawModeEnabled('point', { point: false })).toBe(false);
+      expect(isDrawModeEnabled('point')).toBe(false);
+    });
+
+    it('returns false for the modes that are not draw modes', () => {
+      // The drawing library also reports `select` and `static`, neither of which any control enables.
+      expect(isDrawModeEnabled('select', { point: true, lineString: true, polygon: true })).toBe(false);
+      expect(isDrawModeEnabled('static', { point: true, lineString: true, polygon: true })).toBe(false);
+    });
+
+    it('returns false for an inherited object property rather than treating it as a mode', () => {
+      expect(isDrawModeEnabled('toString', { point: true })).toBe(false);
     });
   });
 });

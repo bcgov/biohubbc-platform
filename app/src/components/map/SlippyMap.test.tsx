@@ -42,9 +42,14 @@ const mocks = vi.hoisted(() => {
     handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
     snapshot: unknown[] = [];
 
+    mode = 'static';
+
     start = vi.fn();
     stop = vi.fn();
-    setMode = vi.fn();
+    setMode = vi.fn((mode: string) => {
+      this.mode = mode;
+    });
+    getMode = vi.fn(() => this.mode);
     clear = vi.fn();
     removeFeatures = vi.fn();
     deselectFeature = vi.fn();
@@ -429,6 +434,55 @@ describe('SlippyMap', () => {
 
       expect(draw.setMode).toHaveBeenLastCalledWith('select');
       expect(getByTestId('slippy-map-draw-mode-polygon')).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  describe('changing draw controls', () => {
+    it('returns to select mode when the control for the active draw mode is withdrawn', () => {
+      // Otherwise the drawing library stays in a mode the toolbar no longer offers a way out of, and map clicks
+      // keep creating geometry the consumer has stopped asking for.
+      const { map, getByTestId, queryByTestId, rerender } = renderSlippyMap({
+        drawControls: { point: true, polygon: true }
+      });
+      const draw = loadMap(map);
+
+      fireEvent.click(getByTestId('slippy-map-draw-mode-point'));
+
+      expect(draw.setMode).toHaveBeenLastCalledWith('point');
+
+      rerender(<SlippyMap drawControls={{ polygon: true }} />);
+
+      expect(draw.setMode).toHaveBeenLastCalledWith('select');
+      expect(queryByTestId('slippy-map-draw-mode-point')).not.toBeInTheDocument();
+      expect(getByTestId('slippy-map-draw-mode-polygon')).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('leaves the active draw mode alone when its control survives the change', () => {
+      const { map, getByTestId, rerender } = renderSlippyMap({ drawControls: { point: true, polygon: true } });
+      const draw = loadMap(map);
+
+      fireEvent.click(getByTestId('slippy-map-draw-mode-polygon'));
+
+      expect(draw.setMode).toHaveBeenLastCalledWith('polygon');
+
+      rerender(<SlippyMap drawControls={{ point: true, polygon: true, trash: true }} />);
+
+      expect(draw.setMode).toHaveBeenLastCalledWith('polygon');
+      expect(getByTestId('slippy-map-draw-mode-polygon')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('does not reconcile the mode when an equivalent controls object is passed', () => {
+      // Consumers write `drawControls` inline, so a reference comparison would reset the mode on every render.
+      const { map, getByTestId, rerender } = renderSlippyMap({ drawControls: { polygon: true } });
+      const draw = loadMap(map);
+
+      fireEvent.click(getByTestId('slippy-map-draw-mode-polygon'));
+      draw.setMode.mockClear();
+
+      rerender(<SlippyMap drawControls={{ polygon: true }} />);
+
+      expect(draw.setMode).not.toHaveBeenCalled();
+      expect(getByTestId('slippy-map-draw-mode-polygon')).toHaveAttribute('aria-pressed', 'true');
     });
   });
 

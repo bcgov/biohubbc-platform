@@ -6,6 +6,7 @@ import Paper from '@mui/material/Paper';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import type { ISlippyMapDrawControls, SlippyMapDrawMode } from '../SlippyMap.interface';
+import { DRAW_MODE_CONTROL_KEYS } from '../SlippyMap.utils';
 
 export interface ISlippyMapDrawToolbarProps {
   /**
@@ -32,6 +33,9 @@ export interface ISlippyMapDrawToolbarProps {
 
 /**
  * Buttons for the draw modes the toolbar can render, in display order.
+ *
+ * Which control gates each mode comes from `DRAW_MODE_CONTROL_KEYS`, the same mapping the map uses to decide whether
+ * the active mode is still reachable, so a button and its mode are enabled by the one control.
  */
 const DRAW_MODE_BUTTONS: {
   mode: SlippyMapDrawMode;
@@ -39,9 +43,14 @@ const DRAW_MODE_BUTTONS: {
   label: string;
   iconPath: string;
 }[] = [
-  { mode: 'point', controlKey: 'point', label: 'Draw a point', iconPath: mdiMapMarker },
-  { mode: 'linestring', controlKey: 'lineString', label: 'Draw a line', iconPath: mdiVectorLine },
-  { mode: 'polygon', controlKey: 'polygon', label: 'Draw a polygon', iconPath: mdiVectorPolygon }
+  { mode: 'point', controlKey: DRAW_MODE_CONTROL_KEYS.point, label: 'Draw a point', iconPath: mdiMapMarker },
+  {
+    mode: 'linestring',
+    controlKey: DRAW_MODE_CONTROL_KEYS.linestring,
+    label: 'Draw a line',
+    iconPath: mdiVectorLine
+  },
+  { mode: 'polygon', controlKey: DRAW_MODE_CONTROL_KEYS.polygon, label: 'Draw a polygon', iconPath: mdiVectorPolygon }
 ];
 
 /**
