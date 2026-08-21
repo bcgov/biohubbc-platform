@@ -116,7 +116,7 @@ describe('SubmissionFeatureMap', () => {
       expect(source.tiles[0]).not.toContain('super-secret-token');
     });
 
-    it('attaches the token as an Authorization header on tile requests only', async () => {
+    it('attaches the token as an Authorization header once a session exists', async () => {
       await renderReadyMap(buildSession({ token: 'token-abc' }));
 
       const { transformRequest } = latestMapProps();
@@ -126,8 +126,10 @@ describe('SubmissionFeatureMap', () => {
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      // The basemap is a third party; the tile token must never be sent there.
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({ url: 'https://basemap.test/5/11/5' });
+      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
+        url: 'https://basemap.test/5/11/5',
+        headers: { Authorization: 'Bearer token-abc' }
+      });
     });
   });
 

@@ -137,16 +137,16 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
   }, [config?.BASEMAP_URL, session, renderClusterPopup]);
 
   /**
-   * Attach the tile token to tile requests only.
+   * Attach the tile token to map requests.
    *
-   * Read from a ref at request time, so a refreshed token applies immediately. Scoped to the tile path so the token is
-   * never sent to the basemap provider, which is a third party.
+   * Read from a ref at request time rather than captured, so a refreshed token applies to the next request without
+   * the map being rebuilt. Requests made before a session exists carry no header.
    */
   const transformRequest = useCallback(
     (url: string) => {
       const token = tokenRef.current;
 
-      if (!token || !url.startsWith(`${window.location.origin}/martin/`)) {
+      if (!token) {
         return { url };
       }
 

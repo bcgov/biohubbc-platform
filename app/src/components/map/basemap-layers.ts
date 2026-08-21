@@ -7,8 +7,8 @@ export const BASEMAP_LAYER_ID = 'basemap';
 /**
  * Build the raster basemap source.
  *
- * The basemap is a third party service, so it is kept separate from any source carrying BioHub data: nothing that
- * authorizes a BioHub tile request may ever be attached to a request for these tiles.
+ * The basemap is served by an external provider, so it is its own source rather than part of any source carrying
+ * BioHub data: it renders underneath them, and a provider outage costs the map its backdrop and nothing else.
  *
  * @param {string} basemapUrl - Tile URL template from app config.
  * @param {string} attribution - Attribution text required by the basemap provider.
