@@ -124,7 +124,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     };
 
     return (
-      <SearchResultMapPopper featureCount={selection.featureCount} onZoomIn={handleZoomIn} onClose={context.close} />
+      <SearchResultMapPopper locationCount={selection.locationCount} onZoomIn={handleZoomIn} onClose={context.close} />
     );
   }, []);
 

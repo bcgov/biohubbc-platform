@@ -867,7 +867,7 @@ describe('SlippyMap', () => {
         source: 'search-results',
         sourceLayer: 'features',
         layer: { id: 'search-points' },
-        properties: { feature_count: 7 }
+        properties: { location_count: 7 }
       };
       map.renderedFeatures = [feature];
 
@@ -1005,7 +1005,7 @@ describe('SlippyMap', () => {
       'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
     };
 
-    const clusterFeature = { layer: { id: 'search-clusters' }, properties: { feature_count: 12 } };
+    const clusterFeature = { layer: { id: 'search-clusters' }, properties: { location_count: 12 } };
 
     /**
      * Builds a cluster layer whose popup renders its feature count, plus a display-only layer beneath it.
@@ -1028,7 +1028,9 @@ describe('SlippyMap', () => {
         },
         popupRender:
           popupRender ??
-          ((context) => <button onClick={context.close}>cluster of {context.feature.properties?.feature_count}</button>)
+          ((context) => (
+            <button onClick={context.close}>cluster of {context.feature.properties?.location_count}</button>
+          ))
       }
     ];
 
@@ -1081,7 +1083,7 @@ describe('SlippyMap', () => {
       loadMap(map);
 
       clickCluster(map);
-      clickCluster(map, { layer: { id: 'search-clusters' }, properties: { feature_count: 34 } });
+      clickCluster(map, { layer: { id: 'search-clusters' }, properties: { location_count: 34 } });
 
       expect(getAllByTestId('slippy-map-popup')).toHaveLength(1);
       expect(getByText('cluster of 34')).toBeInTheDocument();

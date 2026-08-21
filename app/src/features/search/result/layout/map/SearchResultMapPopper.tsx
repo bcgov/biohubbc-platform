@@ -7,9 +7,9 @@ import Typography from '@mui/material/Typography';
 
 export interface ISearchResultMapPopperProps {
   /**
-   * How many results the selected cluster represents.
+   * How many mapped locations the selected cluster represents.
    */
-  featureCount: number;
+  locationCount: number;
   /**
    * Fired when the user selects `Zoom in`.
    */
@@ -30,14 +30,14 @@ export interface ISearchResultMapPopperProps {
  * @return {*}
  */
 export const SearchResultMapPopper = (props: ISearchResultMapPopperProps) => {
-  const { featureCount, onZoomIn, onClose } = props;
+  const { locationCount, onZoomIn, onClose } = props;
 
   return (
     <Paper data-testid="search-result-map-popper" elevation={4} sx={{ p: 1.5, minWidth: 180, maxWidth: 260 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
         <Box>
           <Typography variant="subtitle2" data-testid="search-result-map-popper-count">
-            {featureCount.toLocaleString()} results
+            {locationCount.toLocaleString()} {locationCount === 1 ? 'location' : 'locations'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Zoom in to explore this area

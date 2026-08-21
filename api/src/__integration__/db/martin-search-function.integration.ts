@@ -919,14 +919,14 @@ describe('Tile search function (integration)', function () {
       expect(layers.clusters.length).to.be.greaterThan(0);
 
       for (const cluster of layers.clusters) {
-        expect(cluster.properties.feature_count).to.be.a('number');
-        expect(cluster.properties.feature_count).to.be.greaterThan(0);
+        expect(cluster.properties.location_count).to.be.a('number');
+        expect(cluster.properties.location_count).to.be.greaterThan(0);
         // The count is the only attribute: an aggregate, never an identity.
-        expect(Object.keys(cluster.properties)).to.deep.equal(['feature_count']);
+        expect(Object.keys(cluster.properties)).to.deep.equal(['location_count']);
         expect(cluster.id, 'clusters carry no MVT feature id').to.be.undefined;
       }
 
-      const total = layers.clusters.reduce((sum, cluster) => sum + Number(cluster.properties.feature_count), 0);
+      const total = layers.clusters.reduce((sum, cluster) => sum + Number(cluster.properties.location_count), 0);
       expect(total).to.be.at.least(2);
     });
   });
@@ -960,7 +960,7 @@ describe('Tile search function (integration)', function () {
       for (let index = 0; index < layer.length; index++) {
         const feature = layer.feature(index);
         const [point] = feature.loadGeometry()[0];
-        clusters.push({ x: point.x, y: point.y, count: Number(feature.properties.feature_count) });
+        clusters.push({ x: point.x, y: point.y, count: Number(feature.properties.location_count) });
       }
 
       return clusters;

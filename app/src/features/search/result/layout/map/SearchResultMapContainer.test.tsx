@@ -300,7 +300,7 @@ describe('SearchResultMapContainer', () => {
       source: 'search-results',
       sourceLayer: 'clusters',
       layer: { id: 'search-clusters' },
-      properties: { feature_count: 482391, ...properties }
+      properties: { location_count: 482391, ...properties }
     });
 
     const renderReadyMap = async () => {
@@ -318,13 +318,13 @@ describe('SearchResultMapContainer', () => {
     const clickCluster = (cluster: Record<string, unknown>) =>
       act(() => latestMapProps().openPopup({ layerId: 'search-clusters', feature: cluster }));
 
-    it('opens the cluster popper with the represented result count and a Zoom in action', async () => {
+    it('opens the cluster popper with the represented location count and a Zoom in action', async () => {
       await renderReadyMap();
       const mintCallsBefore = mocks.createMartinSession.mock.calls.length;
 
       clickCluster(tileCluster());
 
-      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('482,391 results');
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('482,391 locations');
       expect(screen.getByRole('button', { name: 'Zoom in' })).toHaveClass('MuiButton-contained');
       // Selecting a cluster requests nothing: everything shown comes from the decoded tile.
       expect(mocks.createMartinSession.mock.calls.length).toBe(mintCallsBefore);
@@ -368,11 +368,11 @@ describe('SearchResultMapContainer', () => {
     it('replaces the active selection instead of stacking poppers', async () => {
       await renderReadyMap();
 
-      clickCluster(tileCluster({ feature_count: 10 }));
-      clickCluster(tileCluster({ feature_count: 20 }));
+      clickCluster(tileCluster({ location_count: 10 }));
+      clickCluster(tileCluster({ location_count: 20 }));
 
       expect(screen.getAllByTestId('search-result-map-popper')).toHaveLength(1);
-      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('20 results');
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('20 locations');
     });
 
     it('closes the popper from its explicit dismiss control', async () => {
@@ -384,10 +384,18 @@ describe('SearchResultMapContainer', () => {
       expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
     });
 
+    it('names a single location in the singular', async () => {
+      await renderReadyMap();
+
+      clickCluster(tileCluster({ location_count: 1 }));
+
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('1 location');
+    });
+
     it('ignores a cluster missing its count', async () => {
       await renderReadyMap();
 
-      clickCluster(tileCluster({ feature_count: undefined }));
+      clickCluster(tileCluster({ location_count: undefined }));
 
       expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
     });

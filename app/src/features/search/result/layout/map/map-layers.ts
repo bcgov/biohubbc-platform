@@ -140,7 +140,7 @@ export const buildSearchResultLayers = (renderClusterPopup: ISlippyMapLayer['pop
         'circle-radius': [
           'interpolate',
           ['linear'],
-          ['get', 'feature_count'],
+          ['get', 'location_count'],
           1,
           6,
           10,
@@ -153,7 +153,7 @@ export const buildSearchResultLayers = (renderClusterPopup: ISlippyMapLayer['pop
         'circle-color': [
           'interpolate',
           ['linear'],
-          ['get', 'feature_count'],
+          ['get', 'location_count'],
           1,
           '#7fb2d9',
           100,
