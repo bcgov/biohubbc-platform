@@ -12,8 +12,6 @@ export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStat
   ingested: 'Ingested',
   reconciling: 'Reconciling',
   reconciled: 'Reconciled',
-  promoting: 'Promoting',
-  promoted: 'Promoted',
   indexing: 'Indexing',
   indexed: 'Indexed',
   invalid: 'Invalid',

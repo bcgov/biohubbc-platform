@@ -24,26 +24,6 @@ export const processSubmissionFeaturesJobDependencies: ProcessSubmissionFeatures
 };
 
 /**
- * Return true when a submission upload status is terminal.
- *
- * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} True when status is terminal.
- */
-function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return TERMINAL_UPLOAD_STATUSES.includes(status);
-}
-
-/**
- * Return true when process stage can start/resume from status.
- *
- * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} True when status is process-startable.
- */
-function isProcessStartableSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return PROCESS_START_STATUSES.includes(status);
-}
-
-/**
  * Serialize unknown thrown values into structured log-safe metadata.
  *
  * @param {unknown} error - Unknown thrown value.
@@ -113,7 +93,7 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
     const submissionValidationService = new SubmissionValidationService(connection);
     const currentUpload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
 
-    if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
+    if (TERMINAL_UPLOAD_STATUSES.includes(currentUpload.status)) {
       defaultLog.info({
         label: 'initializeProcessSubmissionFeaturesStage',
         message: 'Skipping process job because submission upload is terminal',
@@ -125,7 +105,7 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
       return false;
     }
 
-    if (!isProcessStartableSubmissionUploadStatus(currentUpload.status)) {
+    if (!PROCESS_START_STATUSES.includes(currentUpload.status)) {
       defaultLog.warn({
         label: 'initializeProcessSubmissionFeaturesStage',
         message: 'Skipping process job because submission upload is not in a process-startable state',

@@ -31,33 +31,6 @@ export interface IIndexSubmissionFeaturesJobData {
 const defaultLog = getLogger('queue/jobs/index-submission-features-job');
 
 /**
- * Determine whether an upload status is terminal for indexing purposes.
- *
- * Terminal statuses represent lifecycle completion where the index stage must not
- * run again for this upload (`indexed`, `invalid`, `failed`).
- *
- * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} `true` when the status is terminal and should short-circuit processing.
- */
-function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return TERMINAL_UPLOAD_STATUSES.includes(status);
-}
-
-/**
- * Determine whether indexing is allowed to start or resume from the current status.
- *
- * Indexing is allowed only from:
- * - `promoted`: first entry into the indexing stage
- * - `indexing`: retry/resume of an interrupted indexing attempt
- *
- * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} `true` when indexing is permitted for the given status.
- */
-function isIndexStartableSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return INDEX_START_STATUSES.includes(status);
-}
-
-/**
  * Guard and initialize the indexing stage for one upload.
  *
  * Workflow:
@@ -82,7 +55,7 @@ async function initializeIndexSubmissionFeaturesStage(
   const submissionUploadService = new SubmissionUploadService(connection);
   const currentUpload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
 
-  if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
+  if (TERMINAL_UPLOAD_STATUSES.includes(currentUpload.status)) {
     defaultLog.info({
       label: 'initializeIndexSubmissionFeaturesStage',
       message: 'Skipping index job because submission upload is terminal',
@@ -93,7 +66,7 @@ async function initializeIndexSubmissionFeaturesStage(
     return null;
   }
 
-  if (!isIndexStartableSubmissionUploadStatus(currentUpload.status)) {
+  if (!INDEX_START_STATUSES.includes(currentUpload.status)) {
     defaultLog.warn({
       label: 'initializeIndexSubmissionFeaturesStage',
       message: 'Skipping index job because submission upload is not index-startable',
@@ -125,8 +98,8 @@ async function executeIndexSubmissionFeaturesIngestion(
   submissionId: number,
   submissionUploadId: string
 ): Promise<SubmissionFeaturePropertyValidationOutcome> {
-  const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
-  return featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
+  const submissionFeaturePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
+  return submissionFeaturePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
     submissionId,
     submissionUploadId
   );

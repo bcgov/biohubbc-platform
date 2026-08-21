@@ -355,6 +355,29 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Link an indexed upload to the newer upload that supersedes it.
+   *
+   * @param {string} submissionUploadId Superseded submission upload identifier.
+   * @param {string} successorSubmissionUploadId Newer submission upload identifier.
+   * @returns {Promise<void>} Resolves after the successor relationship is persisted.
+   * @memberof SubmissionUploadService
+   */
+  async setSuccessorSubmissionUploadId(submissionUploadId: string, successorSubmissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUploadWithLock(submissionUploadId);
+    this.assertStatusCanChange(submissionUploadId, current.status, ['indexed']);
+
+    if (current.successor_submission_upload_id) {
+      throw new ApiConflictError('Submission upload cannot be superseded', [
+        { submissionUploadId, status: current.status, successorSubmissionUploadId }
+      ]);
+    }
+    await this.submissionUploadRepository.setSuccessorSubmissionUploadId(
+      submissionUploadId,
+      successorSubmissionUploadId
+    );
+  }
+
+  /**
    * Record a review decision and apply its submission-feature lifecycle effects.
    *
    * @param {string} submissionUploadId Submission upload identifier.

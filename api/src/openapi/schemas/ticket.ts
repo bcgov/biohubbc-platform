@@ -11,8 +11,6 @@ const SubmissionUploadJobStatusEnum = [
   'ingested',
   'reconciling',
   'reconciled',
-  'promoting',
-  'promoted',
   'indexing',
   'indexed',
   'invalid',

@@ -426,6 +426,32 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Link an upload to its direct successor.
+   *
+   * @param {string} submissionUploadId Superseded submission upload identifier.
+   * @param {string} successorSubmissionUploadId Direct successor upload identifier.
+   * @returns {Promise<void>} Resolves after the successor relationship is persisted.
+   * @throws {ApiExecuteSQLError} If the update does not affect exactly one upload.
+   * @memberof SubmissionUploadRepository
+   */
+  async setSuccessorSubmissionUploadId(submissionUploadId: string, successorSubmissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET successor_submission_upload_id = ${successorSubmissionUploadId}::uuid
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND successor_submission_upload_id IS NULL;
+    `;
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to set submission upload successor', [
+        'SubmissionUploadRepository->setSuccessorSubmissionUploadId',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+  }
+
+  /**
    * Get an active submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId - The upload_id to look up.

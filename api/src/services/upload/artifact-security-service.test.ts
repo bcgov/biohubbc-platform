@@ -742,8 +742,6 @@ describe('ArtifactSecurityService', () => {
         'ingested',
         'reconciling',
         'reconciled',
-        'promoting',
-        'promoted',
         'indexing',
         'failed'
       ]);

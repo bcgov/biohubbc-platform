@@ -68,6 +68,17 @@ export class SubmissionUploadReconciliationService extends DBService {
   }
 
   /**
+   * End pending feature occurrences after their upload has been superseded.
+   *
+   * @param {string} submissionUploadId Superseded submission upload identifier.
+   * @returns {Promise<void>} Resolves after pending occurrences are ended.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async endPendingSubmissionFeatures(submissionUploadId: string): Promise<void> {
+    await this.submissionFeatureReconciliationRepository.endPendingSubmissionFeatures(submissionUploadId);
+  }
+
+  /**
    * Publish the reconciliation result stored during initial intake.
    *
    * @param {string} submissionUploadId Submission upload identifier.
@@ -107,7 +118,7 @@ export class SubmissionUploadReconciliationService extends DBService {
    * Assert that publication applied every reconciled lifecycle transition exactly once.
    *
    * @param {ReconciliationCounts} reconciliationCounts Classified new, modified, and unmodified feature counts.
-   * @param {SubmissionFeatureActivationCounts} activationCounts Applied predecessor-link and activation counts.
+   * @param {number} activated Applied feature activation count.
    * @returns {void} Returns after confirming the applied lifecycle counts match reconciliation.
    * @throws {HTTP500} When applied lifecycle counts diverge from the reconciliation classification.
    * @memberof SubmissionUploadReconciliationService

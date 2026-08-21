@@ -207,24 +207,19 @@ describe('process-submission-features-job', () => {
       expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
     });
 
-    it('allows restart when current status is failed', async () => {
+    it('skips processing when current status is failed', async () => {
       (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
         status: 'failed'
       });
 
-      const ingestStub = sinon
-        .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')
-        .resolves({ valid: true, errors: [] });
-      sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
-        .resolves({ status: 'published', jobId: 'index-job-id' });
+      const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
+      const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob');
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
-      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
-      expect(ingestStub.calledOnce).to.be.true;
+      expect(ingestStub).not.to.have.been.called;
+      expect(publishStub).not.to.have.been.called;
     });
   });
 

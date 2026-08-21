@@ -10,8 +10,6 @@ export const SubmissionUploadJobStatus = z.enum([
   'ingested',
   'reconciling',
   'reconciled',
-  'promoting',
-  'promoted',
   'indexing',
   'indexed',
   // Terminal failure states

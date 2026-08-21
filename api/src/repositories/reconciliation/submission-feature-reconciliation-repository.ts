@@ -224,6 +224,24 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   }
 
   /**
+   * End pending feature occurrences owned by a superseded upload.
+   *
+   * @param {string} submissionUploadId Superseded submission upload identifier.
+   * @returns {Promise<void>} Resolves after its pending feature occurrences are ended.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async endPendingSubmissionFeatures(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_feature
+      SET record_end_date = now()
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND record_effective_date IS NULL
+        AND record_end_date IS NULL;
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Link current predecessors to their direct successors and end the predecessors.
    *
    * The caller must hold the submission feature-state lock and execute this method in the approval
