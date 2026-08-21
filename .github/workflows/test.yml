@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # Checkout the repo once and cache it for use in subsequent jobs
   checkoutRepo:
@@ -66,6 +69,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # api
       - name: Cache api node modules

@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   IMAGE_TAG: build-1.0.0-${{ github.event.number }}
   OC_VERSION: "4.16.60"
@@ -99,6 +102,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
@@ -106,9 +111,12 @@ jobs:
       # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
       # failed and successful runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the app image
       - name: Build and Push App Image
@@ -160,6 +168,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
@@ -167,9 +177,12 @@ jobs:
       # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
       # failed and successful runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database image using Docker
       - name: Build and Push Database Image
@@ -221,6 +234,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
@@ -228,9 +243,12 @@ jobs:
       # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
       # failed and successful runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database setup image using Docker
       - name: Build and Push Database Setup Image
@@ -282,6 +300,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
@@ -289,9 +309,12 @@ jobs:
       # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
       # failed and successful runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the API image
       - name: Build and Push API Image
@@ -352,6 +375,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
       - uses: ./.github/actions/setup-openshift-cli
@@ -421,6 +446,9 @@ jobs:
     name: Comment Trivy Results
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Only this job uses GITHUB_TOKEN: github-script posts the vulnerability summary as a PR comment.
+    permissions:
+      pull-requests: write
     if: ${{ github.event.pull_request.merged == false &&
       github.event.pull_request.draft == false }}
     needs:
