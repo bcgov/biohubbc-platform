@@ -1162,44 +1162,67 @@ describe('expression-evaluation (integration)', function () {
       const { a, b, c } = await seedLineage();
 
       const childrenOfB = await runTaxonOperator('ChildOf', b);
-      expect(childrenOfB.has(c)).to.equal(true);
-      expect(childrenOfB.has(b)).to.equal(false);
-      expect(childrenOfB.has(a)).to.equal(false);
+      expect(childrenOfB.has(c)).to.be.true;
+      expect(childrenOfB.has(b)).to.be.false;
+      expect(childrenOfB.has(a)).to.be.false;
 
       const childrenOfA = await runTaxonOperator('ChildOf', a);
-      expect(childrenOfA.has(b)).to.equal(true);
-      expect(childrenOfA.has(c)).to.equal(false);
+      expect(childrenOfA.has(b)).to.be.true;
+      expect(childrenOfA.has(c)).to.be.false;
     });
 
     it('ParentOf resolves only the immediate parent (depth 1)', async () => {
       const { a, b, c } = await seedLineage();
 
       const parentOfC = await runTaxonOperator('ParentOf', c);
-      expect(parentOfC.has(b)).to.equal(true);
-      expect(parentOfC.has(a)).to.equal(false);
-      expect(parentOfC.has(c)).to.equal(false);
+      expect(parentOfC.has(b)).to.be.true;
+      expect(parentOfC.has(a)).to.be.false;
+      expect(parentOfC.has(c)).to.be.false;
     });
 
     it('AscendsFrom resolves all ancestors of the target', async () => {
       const { a, b, c } = await seedLineage();
 
       const ancestorsOfC = await runTaxonOperator('AscendsFrom', c);
-      expect(ancestorsOfC.has(a)).to.equal(true);
-      expect(ancestorsOfC.has(b)).to.equal(true);
-      expect(ancestorsOfC.has(c)).to.equal(true);
+      expect(ancestorsOfC.has(a)).to.be.true;
+      expect(ancestorsOfC.has(b)).to.be.true;
+      expect(ancestorsOfC.has(c)).to.be.true;
     });
 
     it('DescendsFrom resolves all descendants of the target', async () => {
       const { a, b, c } = await seedLineage();
 
       const descendantsOfA = await runTaxonOperator('DescendsFrom', a);
-      expect(descendantsOfA.has(b)).to.equal(true);
-      expect(descendantsOfA.has(c)).to.equal(true);
+      expect(descendantsOfA.has(b)).to.be.true;
+      expect(descendantsOfA.has(c)).to.be.true;
 
       // A leaf has no descendants above it.
       const descendantsOfC = await runTaxonOperator('DescendsFrom', c);
-      expect(descendantsOfC.has(a)).to.equal(false);
-      expect(descendantsOfC.has(b)).to.equal(false);
+      expect(descendantsOfC.has(a)).to.be.false;
+      expect(descendantsOfC.has(b)).to.be.false;
+    });
+
+    it('resolves a scientific name (case-insensitive) to the taxon_id used by hierarchy operators', async () => {
+      const { a, b, c } = await seedLineage();
+
+      // The backend accepts a scientific-name string; it resolves against the local taxon cache to a taxon_id.
+      const [ancestor] = await new TaxonomyRepository(connection).findTaxon({
+        itis_scientific_name: 'ancestora testus'
+      });
+      expect(ancestor.taxon_id).to.equal(a);
+
+      const descendantsOfA = await runTaxonOperator('DescendsFrom', ancestor.taxon_id);
+      expect(descendantsOfA.has(b)).to.be.true;
+      expect(descendantsOfA.has(c)).to.be.true;
+    });
+
+    it('resolves a numeric TSN to the taxon_id used by hierarchy operators', async () => {
+      const { a } = await seedLineage();
+
+      // A numeric client value is an ITIS TSN (not a taxon_id); it resolves against the local taxon cache. 900001 is
+      // the seeded ancestor's TSN. This exercises the real findTaxon SQL for the numeric branch.
+      const [byTsn] = await new TaxonomyRepository(connection).findTaxon({ itis_tsn: 900001 });
+      expect(byTsn.taxon_id).to.equal(a);
     });
   });
 });

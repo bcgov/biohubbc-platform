@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
+import { getKnex } from '../database/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { parseTimestamp } from '../utils/timestamp';
 import {
+  applyTaxonExpressionOperator,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeFeatureIdsSubquery,
   buildUnfilteredExpressionTreeFeatureIdsSubquery
@@ -446,6 +448,65 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.not.include('team_security_scope');
       expect(sql).to.not.include('submission_feature_security');
+    });
+  });
+
+  describe('applyTaxonExpressionOperator', () => {
+    type TaxonOperator = Parameters<typeof applyTaxonExpressionOperator>[2];
+
+    // Build the taxon predicate SQL offline (getKnex() needs no live pool), mirroring how the
+    // integration test constructs the query but asserting on the generated SQL rather than running it.
+    const taxonOperatorSql = (operator: TaxonOperator, targetTaxonId: number): string => {
+      const knex = getKnex();
+      const query = knex.queryBuilder().select('t.taxon_id').from('taxon as t');
+      applyTaxonExpressionOperator(query, 't.taxon_id', operator, targetTaxonId, knex);
+
+      return query.toString();
+    };
+
+    it('walks taxon.parent_taxon_id and never parses itis_data->>parentTSN for any hierarchy operator', () => {
+      for (const operator of ['ChildOf', 'ParentOf', 'DescendsFrom', 'AscendsFrom'] as TaxonOperator[]) {
+        const sql = taxonOperatorSql(operator, 123);
+
+        expect(sql, operator).to.include('parent_taxon_id');
+        expect(sql, operator).to.not.include('parentTSN');
+        expect(sql, operator).to.not.include('itis_data');
+      }
+    });
+
+    it('ChildOf matches candidates whose immediate parent_taxon_id is the target (single hop, no recursion)', () => {
+      const sql = taxonOperatorSql('ChildOf', 123);
+
+      expect(sql).to.include('(SELECT parent_taxon_id FROM taxon WHERE taxon_id = t.taxon_id) =');
+      expect(sql).to.include('123');
+      expect(sql).to.not.include('WITH RECURSIVE');
+    });
+
+    it('ParentOf matches only the immediate parent via a depth-limited parent_taxon_id walk', () => {
+      const sql = taxonOperatorSql('ParentOf', 123);
+
+      expect(sql).to.include('WITH RECURSIVE ancestors');
+      expect(sql).to.include('AND depth = 1');
+      expect(sql).to.include('parent.record_end_date');
+      // Regression guard: the depth limit must extend the existing WHERE, not open an invalid second one.
+      expect(sql).to.not.match(/taxon_id = t\.taxon_id\s+where/i);
+    });
+
+    it('AscendsFrom walks all ancestors through parent_taxon_id with no depth limit', () => {
+      const sql = taxonOperatorSql('AscendsFrom', 123);
+
+      expect(sql).to.include('WITH RECURSIVE ancestors');
+      expect(sql).to.not.include('depth = 1');
+      expect(sql).to.include('parent.record_end_date');
+    });
+
+    it('DescendsFrom recursively walks up parent_taxon_id from the candidate to the target', () => {
+      const sql = taxonOperatorSql('DescendsFrom', 123);
+
+      expect(sql).to.include('WITH RECURSIVE ancestors');
+      expect(sql).to.include('WHERE taxon_id = t.taxon_id');
+      expect(sql).to.include('123');
+      expect(sql).to.include('parent.record_end_date');
     });
   });
 });

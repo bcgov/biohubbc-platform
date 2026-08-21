@@ -376,7 +376,14 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<InternalTypedPredicate, { type: 'taxon' }>
   ): Knex.QueryBuilder {
-    const taxonId = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+    if (predicate.operator !== 'Exists' && predicate.value === undefined) {
+      throw new ApiGeneralError('Taxon predicate value is required', [
+        'PredicateRepository->buildTaxonPredicateInsert',
+        { predicate }
+      ]);
+    }
+
+    const taxonId = predicate.operator === 'Exists' ? null : predicate.value;
 
     return knex('predicate_taxon').insert({
       predicate_id: predicateId,

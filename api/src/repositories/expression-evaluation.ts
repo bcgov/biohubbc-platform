@@ -738,7 +738,7 @@ function buildTaxonAncestorExistsQuery(
   candidateTaxonColumn: string,
   includeAllAncestors: boolean
 ): Knex.Raw {
-  const recursiveLimit = includeAllAncestors ? '' : 'WHERE depth = 1';
+  const recursiveLimit = includeAllAncestors ? '' : 'AND depth = 1';
 
   return knex.raw(
     `WITH RECURSIVE ancestors AS (

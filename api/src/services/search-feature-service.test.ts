@@ -121,6 +121,23 @@ describe('SearchFeatureService', () => {
     });
   });
 
+  it('normalizes expression-tree searches through the semantic validator', async () => {
+    const service = new SearchFeatureService(getMockDBConnection());
+    const tree = { type: 'leaf' } as unknown as Parameters<SearchFeatureService['searchFeaturesByExpressionTree']>[1];
+    const normalized = { normalized: true };
+
+    sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
+    const validateStub = sinon
+      .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+      .resolves(normalized as never);
+    const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree').resolves([]);
+
+    await service.searchFeaturesByExpressionTree('survey', tree);
+
+    expect(validateStub).to.have.been.calledOnceWith(tree);
+    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+  });
+
   describe('getSearchFeaturesCountByExpressionTree', () => {
     it('delegates the count to the repository after validating the anchor feature type', async () => {
       const service = new SearchFeatureService(getMockDBConnection());
@@ -135,6 +152,28 @@ describe('SearchFeatureService', () => {
       expect(countStub).to.have.been.calledOnce;
       expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, undefined]);
       expect(result).to.equal(5);
+    });
+
+    it('normalizes count expression-tree searches through the semantic validator', async () => {
+      const service = new SearchFeatureService(getMockDBConnection());
+      const tree = { type: 'leaf' } as unknown as Parameters<
+        SearchFeatureService['getSearchFeaturesCountByExpressionTree']
+      >[1];
+      const normalized = { normalized: true };
+
+      sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
+      const validateStub = sinon
+        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+        .resolves(normalized as never);
+      const countStub = sinon
+        .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTreeCount')
+        .resolves(0);
+
+      const result = await service.getSearchFeaturesCountByExpressionTree('survey', tree);
+
+      expect(validateStub).to.have.been.calledOnceWith(tree);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', normalized, undefined]);
+      expect(result).to.equal(0);
     });
   });
 });

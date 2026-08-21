@@ -36,7 +36,16 @@ describe('SearchService', () => {
         total: 1
       };
       const taxonomy: WithCount<SearchTaxonResult> = {
-        data: [{ taxon_id: 100, itis_scientific_name: 'TaxonA' }],
+        data: [
+          {
+            taxon_id: 100,
+            itis_tsn: 180702,
+            itis_scientific_name: 'TaxonA',
+            common_name: null,
+            rank: null,
+            relevancy_score: 1
+          }
+        ],
         total: 1
       };
 
@@ -106,6 +115,32 @@ describe('SearchService', () => {
       } catch (err) {
         expect(err).to.equal(error);
       }
+    });
+  });
+
+  describe('findTaxon', () => {
+    it('should return local taxon results', async () => {
+      const taxonomy: WithCount<SearchTaxonResult> = {
+        data: [
+          {
+            taxon_id: 100,
+            itis_tsn: 180702,
+            itis_scientific_name: 'Ovis dalli',
+            common_name: "Dall's sheep",
+            rank: 'Species',
+            relevancy_score: 2
+          }
+        ],
+        total: 1
+      };
+
+      const findTaxonStub = sinon.stub(SearchRepository.prototype, 'findTaxon').resolves(taxonomy);
+
+      const pagination: ApiPaginationOptions = { page: 1, limit: 10 };
+      const result = await searchService.findTaxon({ keyword: 'Ovis dalli' }, pagination);
+
+      expect(findTaxonStub).to.have.been.calledOnceWith({ keyword: 'Ovis dalli' }, pagination);
+      expect(result).to.eql(taxonomy);
     });
   });
 

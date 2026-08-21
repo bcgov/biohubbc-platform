@@ -149,6 +149,22 @@ describe('PredicateRepository', () => {
       }
     });
 
+    it('throws when taxon payload value is missing for a comparison operator', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
+
+      try {
+        await repository.writePredicatePayload('pred-1', {
+          type: 'taxon',
+          operator: 'Equals'
+        });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiGeneralError);
+        expect(knexStub).to.not.have.been.called;
+      }
+    });
+
     it('throws when insert row count is unexpected', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
       const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));

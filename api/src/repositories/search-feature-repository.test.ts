@@ -127,6 +127,9 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_code');
       expect(sql).to.include('submission_feature_property_taxon');
       expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include("fpt.name = 'number'");
+      expect(sql).to.include("fpt.name = 'taxon'");
+      expect(sql).to.include('to_jsonb(t.itis_scientific_name) AS value');
       expect(sql).to.include('contributor_codeset_code');
       expect(sql).to.include('public.ST_AsGeoJSON');
       expect(sql).to.include('referenced_sf.urn');

@@ -392,6 +392,9 @@ export class SearchFeatureRepository extends BaseRepository {
             JOIN feature_property fp
               ON fp.feature_property_id = ftp.feature_property_id
              AND fp.record_end_date IS NULL
+            JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+             AND fpt.name = 'number'
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -492,6 +495,9 @@ export class SearchFeatureRepository extends BaseRepository {
             JOIN feature_property fp
               ON fp.feature_property_id = ftp.feature_property_id
              AND fp.record_end_date IS NULL
+            JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+             AND fpt.name = 'taxon'
             JOIN taxon t
               ON t.taxon_id = p.taxon_id
             WHERE p.submission_feature_id = sf.submission_feature_id

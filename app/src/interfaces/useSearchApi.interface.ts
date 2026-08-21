@@ -56,7 +56,11 @@ export interface SearchSubmissionResult {
 /** Taxon search result */
 export interface SearchTaxonResult {
   taxon_id: number;
+  itis_tsn: number;
   itis_scientific_name: string;
+  common_name: string | null;
+  rank: string | null;
+  relevancy_score: number;
 }
 
 /** Combined search response */
@@ -98,6 +102,12 @@ export interface ISearchPropertyFilters {
   feature_types?: string[];
 }
 
+/** Request parameters for searching local taxon records */
+export interface ISearchTaxonFilters {
+  /** Free-text search term for taxon scientific name, common name, code, or TSN */
+  keyword?: string;
+}
+
 /**
  * Individual property result containing details and values grouped by type
  */
@@ -130,5 +140,11 @@ export interface GroupedPropertyResults {
  */
 export interface SearchPropertyResponse {
   properties: GroupedPropertyResults;
+  pagination: ApiPaginationResponseParams;
+}
+
+/** Complete local taxon search response */
+export interface SearchTaxonResponse {
+  taxonomy: SearchTaxonResult[];
   pagination: ApiPaginationResponseParams;
 }

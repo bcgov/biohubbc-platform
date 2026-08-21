@@ -1,6 +1,6 @@
 import { ITIS_TSN_LOOKUP_BATCH_SIZE, ITIS_TSN_LOOKUP_DELAY_MS } from '../constants/taxonomy';
 import { IDBConnection } from '../database/db';
-import { AddItisTaxonRecord, TaxonParentLinkRecord, TaxonRecord } from '../models/taxon';
+import { AddItisTaxonRecord, FindTaxonFilters, TaxonParentLinkRecord, TaxonRecord } from '../models/taxon';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getItisTaxonCommonNames } from '../utils/itis-utils';
 import { getLogger } from '../utils/logger';
@@ -57,10 +57,10 @@ export class TaxonomyService extends DBService {
 
     // First check the local taxon cache. The caller can pass duplicates, but the local query and the
     // ITIS ensure path should only work on distinct TSNs.
-    const existingTaxonRecords = await this.taxonRepository.getTaxonByTsnIds(uniqueTsnIds);
+    const existingTaxonRecords = await this.taxonRepository.findTaxonByTsnIds(uniqueTsnIds);
     const existingTsnIds = new Set(existingTaxonRecords.map((record) => record.itis_tsn));
 
-    // Only TSNs with no active local row need to go through ITIS from this read path.
+    // Only TSNs with no local row need to go through ITIS from this read path.
     const missingTsnIds = uniqueTsnIds.filter((tsnId) => !existingTsnIds.has(tsnId));
 
     if (!missingTsnIds.length) {
@@ -72,9 +72,23 @@ export class TaxonomyService extends DBService {
     // storing parent links), then re-read to include the newly patched records.
     await this.ensureTaxonHierarchyByTsnIds(missingTsnIds);
 
-    const taxonRecords = await this.taxonRepository.getTaxonByTsnIds(uniqueTsnIds);
+    const taxonRecords = await this.taxonRepository.findTaxonByTsnIds(uniqueTsnIds);
 
     return this._sanitizeTaxonRecordsData(taxonRecords);
+  }
+
+  /**
+   * Find locally cached taxon rows by TSN and/or scientific name.
+   *
+   * No rows is a valid empty result. Callers that need strict validation should enforce that at
+   * their own service boundary.
+   *
+   * @param {FindTaxonFilters} filters Taxon lookup filters.
+   * @return {*}  {Promise<TaxonRecord[]>}
+   * @memberof TaxonomyService
+   */
+  async findTaxon(filters: FindTaxonFilters): Promise<TaxonRecord[]> {
+    return this.taxonRepository.findTaxon(filters);
   }
 
   /**
@@ -85,7 +99,7 @@ export class TaxonomyService extends DBService {
    * TSN in the ordered lineage), and resolves `parent_taxon_id` by linking each child to its immediate
    * parent row.
    *
-   * The method also repairs active cached rows that predate the first-class hierarchy/rank columns:
+   * The method also repairs cached rows that predate the first-class hierarchy/rank columns:
    * - hierarchy repair fetches ITIS lineage data and writes parent links;
    * - rank repair fetches ITIS taxon records and patches rank.
    *
@@ -106,7 +120,7 @@ export class TaxonomyService extends DBService {
       return;
     }
 
-    const existingRecords = await this.taxonRepository.getTaxonByTsnIds(uniqueTsnIds);
+    const existingRecords = await this.taxonRepository.findTaxonByTsnIds(uniqueTsnIds);
     const { hierarchyTsnIds, incompleteRankTsnIds } = this.buildTaxonRepairPlan(uniqueTsnIds, existingRecords);
 
     if (!hierarchyTsnIds.length && !incompleteRankTsnIds.length) {
@@ -235,7 +249,7 @@ export class TaxonomyService extends DBService {
   ): Promise<void> {
     // Insert or reuse every taxon in the combined lineage, and patch rank for cached rows that predate
     // the first-class rank column. Fetch ITIS details once for the combined missing/patch set.
-    const existingLineageRecords = await this.taxonRepository.getTaxonByTsnIds(lineageTsnIds);
+    const existingLineageRecords = await this.taxonRepository.findTaxonByTsnIds(lineageTsnIds);
     const existingLineageTsnIds = new Set<number>();
     const incompleteLineageRankTsnIds: number[] = [];
 
@@ -264,7 +278,7 @@ export class TaxonomyService extends DBService {
       const missingLineageTsnIdSet = new Set(missingLineageTsnIds);
       const rankPatchTsnIdSet = new Set(rankPatchTsnIds);
 
-      // Insert only the detail responses for lineage TSNs that do not already have active local rows.
+      // Insert only the detail responses for lineage TSNs that do not already have local rows.
       // Existing rows are handled by the rank patch below so this path does not overwrite cached taxon
       // metadata beyond fields the repository explicitly patches.
       await this.addItisTaxonRecords(
@@ -320,7 +334,7 @@ export class TaxonomyService extends DBService {
    * Adds new taxon records in bulk.
    *
    * ITIS can return duplicate records for the same TSN when multiple requested lineages overlap. This
-   * method de-duplicates by TSN before writing, then inserts in bounded batches. Existing active rows are
+   * method de-duplicates by TSN before writing, then inserts in bounded batches. Existing rows are
    * reused by the repository insert query.
    *
    * @param {ItisSolrSearchResponse[]} itisSolrResponses
@@ -361,7 +375,7 @@ export class TaxonomyService extends DBService {
   /**
    * Patch existing taxon ranks from ITIS responses.
    *
-   * This only patches the first-class `rank` column for active cached rows. It does not upsert missing
+   * This only patches the first-class `rank` column for cached rows. It does not upsert missing
    * taxa, refresh the raw ITIS payload, or update names/common names.
    *
    * @param {ItisSolrSearchResponse[]} itisSolrResponses

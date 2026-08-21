@@ -1,5 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { paginatedDataSchema } from './search';
+import { taxonResultSchema } from './search-taxon';
 
 /**
  * Simplified schemas
@@ -25,21 +26,12 @@ const submissionSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-const taxonomySchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['taxon_id', 'itis_scientific_name'],
-  properties: {
-    taxon_id: { type: 'integer' },
-    itis_scientific_name: { type: 'string' }
-  }
-};
-
 export const searchAllResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['features', 'submissions', 'taxonomy'],
   properties: {
     features: paginatedDataSchema(featureSimpleSchema),
     submissions: paginatedDataSchema(submissionSchema),
-    taxonomy: paginatedDataSchema(taxonomySchema)
+    taxonomy: paginatedDataSchema(taxonResultSchema)
   }
 };
