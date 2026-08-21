@@ -15,7 +15,7 @@ import { DBService } from '../db-service';
 export class SubmissionFeatureIngestionService extends DBService {
   ingestionRepository: FeatureIngestionRepository;
   defaultLog = getLogger('services/ingestion/submission-feature-ingestion-service');
-  private activeFeatureTypeMapPromise: Promise<Map<string, number>> | null = null;
+  private knownFeatureTypeMapPromise: Promise<Map<string, number>> | null = null;
 
   /**
    * Creates an instance of SubmissionFeatureIngestionService.
@@ -37,7 +37,7 @@ export class SubmissionFeatureIngestionService extends DBService {
    * @param {number} submissionId
    * @param {string} submissionUploadId
    * @param {IFlattenedBlock[]} features
-   * @param {Map<string, number>} activeFeatureTypeMap
+   * @param {Map<string, number>} knownFeatureTypeMap
    * @returns {Promise<void>}
    * @memberof SubmissionFeatureIngestionService
    */
@@ -45,7 +45,7 @@ export class SubmissionFeatureIngestionService extends DBService {
     submissionId: number,
     submissionUploadId: string,
     features: IFlattenedBlock[],
-    activeFeatureTypeMap: Map<string, number>
+    knownFeatureTypeMap: Map<string, number>
   ): Promise<void> {
     if (!features.length) {
       return;
@@ -54,7 +54,7 @@ export class SubmissionFeatureIngestionService extends DBService {
     let droppedUnknownTypeCount = 0;
 
     const records = features.flatMap((feature) => {
-      const featureTypeId = activeFeatureTypeMap.get(feature.type);
+      const featureTypeId = knownFeatureTypeMap.get(feature.type);
       if (!featureTypeId) {
         droppedUnknownTypeCount += 1;
         return [];
@@ -101,18 +101,18 @@ export class SubmissionFeatureIngestionService extends DBService {
   }
 
   /**
-   * Resolve active feature type mappings once per service instance.
+   * Resolve known active and retired feature type mappings once per service instance.
    *
    * @private
    * @returns {Promise<Map<string, number>>}
    * @memberof SubmissionFeatureIngestionService
    */
-  async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
-    this.activeFeatureTypeMapPromise ??= this.ingestionRepository
-      .getActiveFeatureTypeMap()
+  async getKnownFeatureTypeMap(): Promise<Map<string, number>> {
+    this.knownFeatureTypeMapPromise ??= this.ingestionRepository
+      .getKnownFeatureTypeMap()
       .then((rows) => new Map(rows.map((row) => [row.name, row.feature_type_id])));
 
-    return this.activeFeatureTypeMapPromise;
+    return this.knownFeatureTypeMapPromise;
   }
 
   /**

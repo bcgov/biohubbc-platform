@@ -138,11 +138,11 @@ export class SubmissionIngestionService {
       contributorId
     });
 
-    // Resolve feature-type id mapping once per ingestion run so feature batches do
-    // not re-query the mapping for every callback invocation.
-    const activeFeatureTypeMap = await withConnection(async (connection) => {
+    // Resolve known active and retired feature-type ids once per ingestion run so
+    // feature batches do not re-query the mapping for every callback invocation.
+    const knownFeatureTypeMap = await withConnection(async (connection) => {
       const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-      return featureIngestionService.getActiveFeatureTypeMap();
+      return featureIngestionService.getKnownFeatureTypeMap();
     });
 
     // Step 4: Stream tarball once and fan out entry processing by folder:
@@ -185,7 +185,7 @@ export class SubmissionIngestionService {
               submissionId,
               submissionUploadId,
               featureBatch,
-              activeFeatureTypeMap
+              knownFeatureTypeMap
             );
           });
 
