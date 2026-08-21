@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
+import { isSubmissionFeatureActive } from './sql-fragments';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 
 describe('SubmissionFeatureRepository active feature lookup', () => {
@@ -27,5 +28,31 @@ describe('SubmissionFeatureRepository active feature lookup', () => {
     expect(text).to.include('sf.submission_id =');
     expect(text).to.include('JOIN submission_upload');
     expect(text).to.include('su.record_end_date IS NULL');
+  });
+
+  it('resolves a feature id only when it is active', async () => {
+    const row = {
+      submission_feature_id: 1,
+      uuid: 'uuid',
+      urn: 'urn',
+      submission_id: 2,
+      feature_type_id: 3,
+      source_id: 'A',
+      data: {},
+      feature_type_name: 'survey',
+      feature_type_display_name: 'Survey',
+      submission_name: 'Submission',
+      secured: false,
+      security_reasons: []
+    };
+    const sql = sinon.stub().resolves(mockQueryResult([row], 1));
+    const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.getSubmissionFeatureById(1)).to.eql(row);
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.include(isSubmissionFeatureActive('sf'));
+    expect(text).to.include('sfs.record_effective_date <= now()');
+    expect(text).to.include('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)');
+    expect(text).to.not.include('submission_feature sf_sec');
   });
 });

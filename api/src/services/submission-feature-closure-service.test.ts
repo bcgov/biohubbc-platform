@@ -17,7 +17,7 @@ describe('SubmissionFeatureClosureService', () => {
   describe('computeClosureForSubmission', () => {
     it('should delete the prior rows, recompute, and wrap the row count in insertedCount', async () => {
       const deleteStub = sinon
-        .stub(SubmissionFeatureClosureRepository.prototype, 'deleteClosureForSubmission')
+        .stub(SubmissionFeatureClosureRepository.prototype, 'invalidateClosureForSubmission')
         .resolves();
       const computeStub = sinon
         .stub(SubmissionFeatureClosureRepository.prototype, 'computeClosureForSubmission')
@@ -45,7 +45,7 @@ describe('SubmissionFeatureClosureService', () => {
         blueprint_id: 1
       } as SubmissionUpload);
       const deleteStub = sinon
-        .stub(SubmissionFeatureClosureRepository.prototype, 'deleteClosureForSubmission')
+        .stub(SubmissionFeatureClosureRepository.prototype, 'invalidateClosureForSubmission')
         .resolves();
       const computeStub = sinon
         .stub(SubmissionFeatureClosureRepository.prototype, 'computeClosureForSubmission')

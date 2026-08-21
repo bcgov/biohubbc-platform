@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import * as db from '../../database/db';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
@@ -18,6 +19,7 @@ chai.use(sinonChai);
 
 describe('computeSubmissionFeatureClosureJobHandler', () => {
   beforeEach(() => {
+    sinon.stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
       submission_upload_id: 'upload-uuid-1',
       submission_id: 1,
@@ -62,6 +64,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     await computeSubmissionFeatureClosureJobHandler([createMockJob({ submissionUploadId: 'upload-uuid-1' })]);
 
     expect(recomputeStub).to.have.been.calledOnceWith(1);
+    expect(SecurityScopeService.prototype.triggerAnchorComputationForSubmission).to.have.been.calledOnceWith(1);
     expect(mockDBConnection.query).to.have.been.calledOnceWith(
       "SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))",
       ['submission-feature-active-state', 1, 3]

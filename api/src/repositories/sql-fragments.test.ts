@@ -33,10 +33,13 @@ describe('sql-fragments', () => {
       expect(sql).to.include('is_ancestor');
       expect(sql).to.include('c.source_submission_feature_id =');
 
-      // Step 3: Verify the security join is on the closure target id and gated by effective date
+      // Step 3: Verify the security join is on the closure target id and its own lifecycle is enforcing
       expect(sql).to.include('sfs.submission_feature_id = c.target_submission_feature_id');
-      expect(sql).to.include('record_effective_date <= now()');
-      expect(sql).to.include('record_end_date is null or now() <');
+      expect(sql).to.include('sfs.record_effective_date <= now()');
+      expect(sql).to.include('(sfs.record_end_date is null or now() < sfs.record_end_date)');
+      expect(sql).to.not.include('submission_feature sf_sec');
+      expect(sql).to.not.include('sf_sec.record_effective_date');
+      expect(sql).to.not.include('sf_sec.record_end_date');
 
       // Step 4: Verify it does NOT fall back to the recursive parent walk
       expect(sql).to.not.include('with recursive');

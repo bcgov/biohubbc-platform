@@ -151,9 +151,10 @@ export class SecurityScopeRepository extends BaseRepository {
    * are deleted but the batch is not exhausted. A boundary query advances the
    * cursor past the fully-valid page.
    *
-   * @param securityScopeId UUID of the security scope to clean stale anchors for
-   * @param afterId Keyset cursor — process anchors with anchor_submission_feature_id > afterId (pass 0 to start)
-   * @returns Next cursor position, or null when no more anchors exist
+   * @param {string} securityScopeId Security scope identifier whose stale anchors are removed.
+   * @param {number} afterId Keyset cursor; pass zero to start with the first anchor.
+   * @returns {Promise<AnchorBatchResult | null>} Next cursor position, or null when no anchors remain.
+   * @memberof SecurityScopeRepository
    */
   async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
     const result = await this.connection.query<{
@@ -185,7 +186,15 @@ export class SecurityScopeRepository extends BaseRepository {
        SELECT b.anchor_submission_feature_id,
               (SELECT MAX(anchor_submission_feature_id) FROM batch) AS page_last_id
        FROM batch b
-       WHERE NOT EXISTS (
+       WHERE EXISTS (
+         -- Missing closure means the derived graph is invalidated or unavailable. Retain the anchor
+         -- until a completed rebuild can prove whether it is stale.
+         SELECT 1
+         FROM submission_feature_closure closure_ready
+         WHERE closure_ready.source_submission_feature_id = b.anchor_submission_feature_id
+           AND closure_ready.target_submission_feature_id = b.anchor_submission_feature_id
+       )
+       AND NOT EXISTS (
          SELECT 1
          FROM security_scope ss
          JOIN policy_statement ps ON ps.security_scope_id = ss.security_scope_id
@@ -298,8 +307,8 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * **Why keyset pagination:** Even though `*:*:*` scopes are not supported,
    * a single submission-scoped URN (`urn:{subId}:*:*`) can still match 1M+
-   * features. A monolithic recursive CTE would materialize the entire candidate
-   * set + ancestor walk in work_mem before results can be consumed. Keyset
+   * features. A monolithic query would materialize the entire candidate set and
+   * its closure ancestry in work_mem before results can be consumed. Keyset
    * pagination bounds memory per batch at the cost of repeated index probes —
    * trading time for OOM safety, acceptable for a background job.
    *
@@ -321,10 +330,11 @@ export class SecurityScopeRepository extends BaseRepository {
    * ON CONFLICT DO NOTHING makes each batch idempotent, so partial completion
    * followed by retry is safe.
    *
-   * @param securityScopeId UUID of the security scope to compute anchors for
-   * @param urn URN components resolved via `resolveUrnForScope`
-   * @param afterId Keyset cursor — process candidates with submission_feature_id > afterId (pass 0 to start from the beginning)
-   * @returns Next cursor position, or null when no more candidates exist
+   * @param {string} securityScopeId Security scope identifier whose anchors are computed.
+   * @param {SecurityScopeUrn} urn URN components resolved through {@link resolveUrnForScope}.
+   * @param {number} afterId Keyset cursor; pass zero to start with the first candidate.
+   * @returns {Promise<AnchorBatchResult | null>} Next cursor position, or null when no candidates remain.
+   * @memberof SecurityScopeRepository
    */
   async computeAnchorBatch(
     securityScopeId: string,
@@ -335,13 +345,19 @@ export class SecurityScopeRepository extends BaseRepository {
       submission_feature_id: number;
       page_last_id: number;
     }>(
-      `WITH RECURSIVE
-       batch AS (
-         SELECT candidate.submission_feature_id,
-                candidate.parent_submission_feature_id
+      `WITH batch AS (
+         SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
          WHERE ${isSubmissionFeatureActive('candidate')}
+           AND EXISTS (
+             -- isEffectivelySecured deliberately fails closed when closure is missing; cache writers
+             -- require positive evidence that the derived graph is available before creating anchors.
+             SELECT 1
+             FROM submission_feature_closure closure_ready
+             WHERE closure_ready.source_submission_feature_id = candidate.submission_feature_id
+               AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
+           )
            AND candidate.submission_feature_id > $1
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
@@ -351,31 +367,19 @@ export class SecurityScopeRepository extends BaseRepository {
          LIMIT $5
        ),
 
-       ancestor_walk AS (
-         SELECT b.submission_feature_id AS candidate_id,
-                b.parent_submission_feature_id AS ancestor_id
-         FROM batch b
-         WHERE b.parent_submission_feature_id IS NOT NULL
-
-         UNION ALL
-
-         SELECT aw.candidate_id,
-                sf.parent_submission_feature_id
-         FROM ancestor_walk aw
-         JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
-         WHERE sf.parent_submission_feature_id IS NOT NULL
-           AND ${isSubmissionFeatureActive('sf')}
-       ),
-
-       -- Re-evaluate candidate criteria per ancestor via index lookups.
-       -- Trades repeated index probes for bounded memory — acceptable for a bg job.
+       -- Closure is the authoritative current parent graph. Re-evaluate candidate criteria for
+       -- each proper ancestor (excluding the reflexive self-loop) via indexed closure lookups.
        has_candidate_ancestor AS (
-         SELECT DISTINCT aw.candidate_id
-         FROM ancestor_walk aw
-         JOIN submission_feature ancestor ON ancestor.submission_feature_id = aw.ancestor_id
+         SELECT DISTINCT b.submission_feature_id AS candidate_id
+         FROM batch b
+         JOIN submission_feature_closure ancestry
+           ON ancestry.source_submission_feature_id = b.submission_feature_id
+          AND ancestry.target_submission_feature_id <> b.submission_feature_id
+          AND ancestry.is_ancestor = true
+         JOIN submission_feature ancestor
+           ON ancestor.submission_feature_id = ancestry.target_submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = ancestor.feature_type_id
-         WHERE ${isSubmissionFeatureActive('ancestor')}
-           AND ($2 = ancestor.submission_id::text OR $2 = '*')
+         WHERE ($2 = ancestor.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                      OR $3 = '*')
            AND ($4 = ancestor.submission_feature_id::text OR $4 = '*')
            AND ${isEffectivelySecured('ancestor.submission_feature_id')}
@@ -419,6 +423,12 @@ export class SecurityScopeRepository extends BaseRepository {
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
          WHERE ${isSubmissionFeatureActive('candidate')}
+           AND EXISTS (
+             SELECT 1
+             FROM submission_feature_closure closure_ready
+             WHERE closure_ready.source_submission_feature_id = candidate.submission_feature_id
+               AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
+           )
            AND candidate.submission_feature_id > $1
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
