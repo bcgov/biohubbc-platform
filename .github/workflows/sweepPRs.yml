@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Checkout Target Branch
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli).
       - uses: ./.github/actions/setup-openshift-cli
