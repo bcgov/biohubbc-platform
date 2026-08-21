@@ -123,7 +123,7 @@ gateway:
   # upstream URL and Martin's cache keys include the query string. Required whenever
   # biohub.martin_search changes its output for identical inputs (including its cluster zoom
   # threshold or grid size).
-  sourceVersion: "2"
+  sourceVersion: "3"
 
   rateLimit:
     # Must absorb a viewport pan, which requests many tiles at once.

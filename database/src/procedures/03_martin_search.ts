@@ -938,7 +938,7 @@ export async function seed(knex: Knex): Promise<void> {
       );
 
       IF z < c_cluster_below_zoom THEN
-        -- Low zoom: emit per-cell counts instead of raw features. This bounds tile size where a
+        -- Low zoom: emit per-cell counts instead of raw geometries. This bounds tile size where a
         -- whole province is in view, and avoids handing out a bulk extract of every point.
         v_cell_width  := (public.ST_XMax(v_env_3857) - public.ST_XMin(v_env_3857)) / c_grid_cells;
         v_cell_height := (public.ST_YMax(v_env_3857) - public.ST_YMin(v_env_3857)) / c_grid_cells;
@@ -954,17 +954,19 @@ export async function seed(knex: Knex): Promise<void> {
               c_buffer,
               true
             ) AS geom,
-            count(*)::integer AS count
+            -- A cluster carries only its size: an aggregate, not an identifier, so a cluster can
+            -- never be mistaken for (or resolved to) a single result.
+            count(*)::integer AS location_count
           FROM (
             SELECT
               feature_points.point_3857,
               -- Snap to CELL CENTRES, not to the tile's min corner. ST_SnapToGrid rounds to the
               -- nearest grid NODE, so a min-corner origin puts nodes exactly on the tile edges,
               -- where a node is the same world coordinate as the neighbouring tile's - each tile
-              -- seeing only the features on its own side. Every seam then renders two overlapping
+              -- seeing only the points on its own side. Every seam then renders two overlapping
               -- cluster bubbles with split counts. Centre origins keep every node strictly inside
               -- one tile, and because the tile is exactly c_grid_cells cells wide, the lattice is
-              -- GLOBAL for a zoom level: every feature belongs to one world cell regardless of
+              -- GLOBAL for a zoom level: every point belongs to one world cell regardless of
               -- which tile is being rendered.
               public.ST_SnapToGrid(
                 feature_points.point_3857,
@@ -974,37 +976,25 @@ export async function seed(knex: Knex): Promise<void> {
                 v_cell_height
               ) AS cell_node
             FROM (
-              -- One point per feature, so a feature with many geometries counts once WITHIN a tile.
-              --
-              -- KNOWN LIMIT: this point is the centroid of the geometry rows that intersect THIS
-              -- tile, not of the feature's whole geometry, so it is tile-dependent. For a feature
-              -- with several geometry rows far enough apart to be returned by different tiles, each
-              -- tile computes a different point, and two consequences follow: the feature can be
-              -- counted once per tile, and - because the ownership filter below emits a cell only
-              -- from the tile containing it - it can also be counted by NO tile, if its computed
-              -- point lands in a tile that sees none of its geometry.
-              --
-              -- Both are unreachable while every feature has exactly one geometry row, which is the
-              -- case today, and neither affects zoom >= c_cluster_below_zoom, where geometries are
-              -- emitted individually. Fixing it properly means selecting cluster candidates by a
-              -- PRECOMPUTED per-feature centroid rather than by geometry intersection, which would
-              -- make the point tile-independent (and low-zoom tiles cheaper). That needs a stored,
-              -- indexed centroid kept current on ingestion, so it is deliberately not done here.
+              -- One point per geometry row. A submission feature holds each of its spatial
+              -- properties as its own row, and this map is of those geometries: a feature recorded
+              -- in Vancouver and in Victoria places a point at each. Emitting one point per
+              -- geometry row is also what makes the two zoom branches agree - the shapes drawn at
+              -- high zoom are exactly the things counted at low zoom - and it keeps the point
+              -- independent of which tile is being rendered, because it is derived from a single
+              -- geometry rather than from whichever subset of a feature's geometries this tile
+              -- happens to see.
               SELECT
-                public.ST_Transform(
-                  public.ST_Centroid(public.ST_Collect(visible.geometry_4326)),
-                  3857
-                ) AS point_3857
+                public.ST_Transform(public.ST_Centroid(visible.geometry_4326), 3857) AS point_3857
               FROM biohub.martin_search_visible_geometries(
                 v_ctx.feature_type_id,
                 v_ctx.system_user_id,
                 v_ctx.expression_id,
                 v_candidates_4326
               ) visible
-              GROUP BY visible.submission_feature_id
             ) feature_points
           ) gridded
-          -- Emit only the cells this tile OWNS. A feature straddling the tile edge is a candidate
+          -- Emit only the cells this tile OWNS. A geometry straddling the tile edge is a candidate
           -- for both neighbouring tiles, but its cell node lies in exactly one of them, so exactly
           -- one tile renders its cluster - the other would otherwise paint a second bubble in its
           -- buffer margin.

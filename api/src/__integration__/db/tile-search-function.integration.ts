@@ -15,7 +15,9 @@
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
 
+import { VectorTile } from '@mapbox/vector-tile';
 import { expect } from 'chai';
+import Protobuf from 'pbf';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -103,12 +105,10 @@ describe('Tile search function (integration)', function () {
   };
 
   /**
-   * Create a feature carrying a point geometry, and its closure self-loop so it is not fail-closed.
+   * Add a point geometry to an existing feature. A feature holds each of its spatial properties as
+   * its own geometry row, so this can be called more than once for the same feature.
    */
-  const createFeatureWithPoint = async (lng: number, lat: number, withSelfLoop = true): Promise<number> => {
-    const submissionId = await createTestSubmission(connection);
-    const featureId = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'tile test' });
-
+  const addPointToFeature = async (featureId: number, lng: number, lat: number): Promise<void> => {
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
       VALUES (
@@ -118,6 +118,16 @@ describe('Tile search function (integration)', function () {
         ${connection.systemUserId()}
       );
     `);
+  };
+
+  /**
+   * Create a feature carrying a point geometry, and its closure self-loop so it is not fail-closed.
+   */
+  const createFeatureWithPoint = async (lng: number, lat: number, withSelfLoop = true): Promise<number> => {
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'tile test' });
+
+    await addPointToFeature(featureId, lng, lat);
 
     if (withSelfLoop) {
       await connection.sql(SQL`
@@ -805,17 +815,53 @@ describe('Tile search function (integration)', function () {
   });
 
   describe('zoom behaviour', () => {
+    /** Cluster zoom, and a longitude offset landing in the same tile but a different grid cell. */
+    const CLUSTER_ZOOM = 8;
+    const OTHER_CELL_LNG_OFFSET = 0.4;
+
+    /** Total of every cluster's count in a rendered tile. */
+    const sumClusterCounts = (tile: Buffer): number => {
+      const layer = new VectorTile(new Protobuf(tile)).layers.clusters;
+      let total = 0;
+
+      for (let index = 0; index < layer.length; index++) {
+        total += Number(layer.feature(index).properties.location_count);
+      }
+
+      return total;
+    };
+
     it('emits aggregate counts below the cluster threshold and raw features at or above it', async () => {
       await createFeatureWithPoint(TEST_LNG, TEST_LAT);
       const contextId = await createContext({});
 
-      const clustered = await renderTileBytes(contextId, 8);
+      const clustered = await renderTileBytes(contextId, CLUSTER_ZOOM);
       const raw = await renderTile(contextId, 12);
 
       expect(clustered).to.not.be.null;
       // Cluster tiles keep their count attribute; it is an aggregate, not an identifier.
-      expect((clustered as Buffer).toString('latin1')).to.contain('count');
+      expect((clustered as Buffer).toString('latin1')).to.contain('location_count');
       expect(raw).to.be.greaterThan(0);
+    });
+
+    it('counts every geometry of a feature separately', async () => {
+      // A feature records each spatial property as its own geometry row, and every row is drawn
+      // individually at high zoom. Clustering counts the same things, so a second geometry on an
+      // existing feature adds one to the totals rather than merely moving that feature's point.
+      const featureId = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const contextId = await createContext({});
+
+      const before = await renderTileBytes(contextId, CLUSTER_ZOOM);
+
+      expect(before).to.not.be.null;
+
+      await addPointToFeature(featureId, TEST_LNG + OTHER_CELL_LNG_OFFSET, TEST_LAT);
+
+      const after = await renderTileBytes(contextId, CLUSTER_ZOOM);
+
+      expect(after).to.not.be.null;
+      // A delta rather than an absolute, so seeded features sharing the tile cannot affect it.
+      expect(sumClusterCounts(after as Buffer) - sumClusterCounts(before as Buffer)).to.equal(1);
     });
   });
 

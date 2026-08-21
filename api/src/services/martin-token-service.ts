@@ -3,11 +3,9 @@ import fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
 import { HTTP500 } from '../errors/http-error';
 import { getLogger } from '../utils/logger';
+import { getMartinConfig } from '../utils/martin-config';
 
 const defaultLog = getLogger('services/martin-token-service');
-
-/** Default lifetime of a tile token, seconds. */
-const DEFAULT_TOKEN_TTL_SECONDS = 900;
 
 export interface MartinTokenClaims {
   /** The single source the token grants access to. */
@@ -92,7 +90,7 @@ export class MartinTokenService {
       throw new HTTP500('Tile tokens are not configured');
     }
 
-    const expiresIn = Number(process.env.MARTIN_TOKEN_TTL_SECONDS) || DEFAULT_TOKEN_TTL_SECONDS;
+    const { tokenTtlSeconds: expiresIn } = getMartinConfig();
     const jti = uuidv4();
 
     const token = jwt.sign({ source: claims.source, ctx: claims.ctx, scope: 'tiles:read' }, privateKey, {

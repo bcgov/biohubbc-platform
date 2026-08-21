@@ -171,8 +171,6 @@ spec:
               value: {{ .Values.app.martin.mintRateLimitWindowMinutes | quote }}
             - name: MARTIN_CONTEXT_TTL_SECONDS
               value: {{ .Values.app.martin.contextTtlSeconds | quote }}
-            - name: MARTIN_CONTEXT_MAX_FEATURES
-              value: {{ .Values.app.martin.maxFeatures | quote }}
             - name: MARTIN_CONTEXT_MAX_LIVE
               value: {{ .Values.app.martin.contextMaxLive | quote }}
             {{- end }}

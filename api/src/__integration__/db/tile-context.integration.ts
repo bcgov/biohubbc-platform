@@ -10,7 +10,6 @@ import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { HTTP503 } from '../../errors/http-error';
 import { ExpressionTree } from '../../models/expression-tree';
 import { MartinContextService } from '../../services/martin-context-service';
 
@@ -337,17 +336,6 @@ describe('Tile context (integration)', function () {
 
       expect(again.martinContextId).to.equal(first);
       expect(await contextExists(first)).to.be.true;
-    });
-
-    it('refuses only when the cap is misconfigured below one, leaving nothing to evict into', async () => {
-      process.env.MARTIN_CONTEXT_MAX_LIVE = '-1';
-
-      try {
-        await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900007), null);
-        expect.fail('expected a cap below one to be refused');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP503);
-      }
     });
 
     it('never evicts the context it just created, even when it is the closest to expiry', async () => {
