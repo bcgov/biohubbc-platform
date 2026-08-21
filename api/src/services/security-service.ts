@@ -9,6 +9,7 @@ import { getLogger } from '../utils/logger';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
+import { SubmissionService } from './submission-service';
 
 const defaultLog = getLogger('services/security-service');
 
@@ -22,6 +23,7 @@ export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
   securityScopeService: SecurityScopeService;
+  submissionService: SubmissionService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -29,6 +31,7 @@ export class SecurityService extends DBService {
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
+    this.submissionService = new SubmissionService(connection);
   }
 
   /**
@@ -296,6 +299,9 @@ export class SecurityService extends DBService {
       return;
     }
 
+    // Serialize security changes with reconciliation so its predecessor snapshot is stable.
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionId);
+
     if (removeRuleIds.length > 0) {
       await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(
         submissionId,
@@ -342,6 +348,9 @@ export class SecurityService extends DBService {
       removeRuleIds
     });
 
+    // See patchSecurityRulesOnSubmissionFeatures: reconciliation takes this same submission-scoped lock.
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionId);
+
     // Remove rules first
     if (removeRuleIds?.length) {
       await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds);
@@ -354,6 +363,24 @@ export class SecurityService extends DBService {
 
     // Trigger scope recomputation — the recompute job handles both added and removed rules
     await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+  }
+
+  /**
+   * Copy live predecessor rules to pending successor occurrences, preserving status and provenance.
+   *
+   * @param {string} submissionUploadId Pending successor upload identifier.
+   * @param {string | null} predecessorSubmissionUploadId Preferred pending predecessor upload identifier.
+   * @returns {Promise<void>} Resolves after missing inherited assignments have been inserted.
+   * @memberof SecurityService
+   */
+  async copyPredecessorSecurityRulesToSuccessors(
+    submissionUploadId: string,
+    predecessorSubmissionUploadId: string | null
+  ): Promise<void> {
+    await this.securityRepository.copyPredecessorSecurityRulesToSuccessors(
+      submissionUploadId,
+      predecessorSubmissionUploadId
+    );
   }
 
   /**

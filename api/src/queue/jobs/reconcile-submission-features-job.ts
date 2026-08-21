@@ -1,6 +1,7 @@
 import PgBoss from 'pg-boss';
 import { RECONCILE_START_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
+import { SecurityService } from '../../services/security-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
@@ -45,6 +46,11 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
 
       const reconciliation = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
         submissionUploadId
+      );
+      const securityService = new SecurityService(connection);
+      await securityService.copyPredecessorSecurityRulesToSuccessors(
+        submissionUploadId,
+        reconciliation.predecessorSubmissionUploadId
       );
       if (reconciliation.predecessorSubmissionUploadId) {
         await submissionUploadReconciliationService.endPendingSubmissionFeatures(

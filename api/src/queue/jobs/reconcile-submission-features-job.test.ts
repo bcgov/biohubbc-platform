@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
+import { SecurityService } from '../../services/security-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
   reconcileSubmissionFeaturesJobDependencies,
@@ -31,6 +32,7 @@ describe('reconcile-submission-features-job', () => {
       status: 'ingested'
     } as any);
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciling').resolves();
+    sinon.stub(SecurityService.prototype, 'copyPredecessorSecurityRulesToSuccessors').resolves();
   }
 
   it('routes a valid reconciliation directly to indexing', async () => {
@@ -69,6 +71,10 @@ describe('reconcile-submission-features-job', () => {
     await reconcileSubmissionFeaturesJobHandler([job]);
 
     expect(endFeatures).to.have.been.calledOnceWithExactly('upload-0');
+    expect(SecurityService.prototype.copyPredecessorSecurityRulesToSuccessors).to.have.been.calledOnceWithExactly(
+      'upload-1',
+      'upload-0'
+    );
   });
 
   it('marks invalid source identity without reconciling or indexing', async () => {
