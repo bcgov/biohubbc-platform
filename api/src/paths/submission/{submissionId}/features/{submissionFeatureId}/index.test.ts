@@ -53,7 +53,6 @@ describe('index', () => {
         submission_id: 1,
         feature_type_id: 1,
         source_id: null,
-        data: { key: 'value' },
         feature_type_name: 'sample_site',
         feature_type_display_name: 'Sample Site',
         submission_name: 'Test Submission',

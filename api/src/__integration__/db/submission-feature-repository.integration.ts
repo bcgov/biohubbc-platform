@@ -46,9 +46,9 @@ describe('SubmissionFeatureRepository (integration)', function () {
   // ── Helpers ──────────────────────────────────────────────────────────
 
   /**
-   * Insert ONE active submission_feature bound to a SPECIFIC upload, resolving feature_type_id by name.
+   * Insert ONE current submission_feature row bound to a SPECIFIC upload, resolving feature_type_id by name.
    *
-   * record_effective_date = now() is MANDATORY — without it isSubmissionFeatureActive('sf') excludes the
+   * record_effective_date = now() is MANDATORY — without it isSubmissionFeaturePublished('sf') excludes the
    * row and getSubmissionFeatureById throws (rowCount !== 1). uuid/urn auto-fill via default/trigger.
    * Mirrors the insertFeatureRow helper in security-scope-search.integration.ts.
    *
@@ -259,5 +259,115 @@ describe('SubmissionFeatureRepository (integration)', function () {
 
     expect(result.secured).to.equal(true);
     expect(result.security_reasons).to.deep.equal([]);
+  });
+
+  it('8. historical detail reconstructs inherited security without retaining historical closure', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const historicalUploadId = await createTestUpload(connection, submissionId);
+    const parentId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'dataset'
+    });
+    const historicalId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'dataset',
+      parentFeatureId: parentId
+    });
+    await insertSecurity(parentId, 'Moose');
+    await buildClosure(historicalUploadId);
+
+    const currentUploadId = await createTestUpload(connection, submissionId);
+    const currentId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: currentUploadId,
+      featureTypeName: 'dataset'
+    });
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET successor_submission_feature_id = ${currentId},
+          record_end_date = clock_timestamp()
+      WHERE submission_feature_id = ${historicalId};
+    `);
+    await buildClosure(currentUploadId);
+
+    const historicalClosure = await connection.sql(SQL`
+      SELECT 1
+      FROM submission_feature_closure
+      WHERE source_submission_feature_id = ${historicalId};
+    `);
+    expect(historicalClosure.rowCount).to.equal(0);
+
+    const result = await repo.getSubmissionFeatureById(historicalId);
+    expect(result.submission_feature_id).to.equal(historicalId);
+    expect(result.secured).to.equal(true);
+    expect(result.security_reasons).to.deep.equal(['Moose']);
+    expect(result).not.to.have.property('data');
+  });
+
+  it('9. superseded feature metadata reflects current security on its stored ancestry', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const historicalUploadId = await createTestUpload(connection, submissionId);
+    const parentId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'dataset'
+    });
+    const historicalId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'dataset',
+      parentFeatureId: parentId
+    });
+    await insertSecurity(parentId, 'Moose');
+
+    const currentUploadId = await createTestUpload(connection, submissionId);
+    const currentId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: currentUploadId,
+      featureTypeName: 'dataset'
+    });
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET successor_submission_feature_id = ${currentId},
+          record_end_date = clock_timestamp()
+      WHERE submission_feature_id = ${historicalId};
+    `);
+    await buildClosure(currentUploadId);
+
+    const initiallySecured = await repo.getSubmissionFeatureById(historicalId);
+    expect(initiallySecured.secured).to.equal(true);
+    expect(initiallySecured.security_reasons).to.deep.equal(['Moose']);
+
+    await connection.sql(SQL`
+      DELETE FROM submission_feature_security
+      WHERE submission_feature_id = ${parentId};
+    `);
+    const afterRemoval = await repo.getSubmissionFeatureById(historicalId);
+    expect(afterRemoval.secured).to.equal(false);
+    expect(afterRemoval.security_reasons).to.deep.equal([]);
+
+    await insertSecurity(parentId, 'Moose');
+    const afterReapplication = await repo.getSubmissionFeatureById(historicalId);
+    expect(afterReapplication.secured).to.equal(true);
+    expect(afterReapplication.security_reasons).to.deep.equal(['Moose']);
+  });
+
+  it('10. rejects an ended published feature whose lineage has no current terminal', async () => {
+    const { featureId } = await createFeature();
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET record_end_date = now() - INTERVAL '1 second'
+      WHERE submission_feature_id = ${featureId};
+    `);
+
+    let caughtError: Error | undefined;
+    try {
+      await repo.getSubmissionFeatureById(featureId);
+    } catch (error) {
+      caughtError = error as Error;
+    }
+    expect(caughtError?.message).to.equal('Failed to get submission feature record');
   });
 });

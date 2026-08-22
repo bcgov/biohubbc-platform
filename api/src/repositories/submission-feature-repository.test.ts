@@ -1,13 +1,13 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
-import { isSubmissionFeatureActive } from './sql-fragments';
+import { isSubmissionFeatureCurrent, isSubmissionFeaturePublished } from './sql-fragments';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 
-describe('SubmissionFeatureRepository active feature lookup', () => {
+describe('SubmissionFeatureRepository feature lookup', () => {
   afterEach(() => sinon.restore());
 
-  it('counts every upload-owned feature that has ever been activated', async () => {
+  it('counts every upload-owned feature that has ever been published', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([{ count: 2 }], 1));
     const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
 
@@ -19,7 +19,7 @@ describe('SubmissionFeatureRepository active feature lookup', () => {
     expect(text).to.not.include('record_end_date IS NULL');
   });
 
-  it('counts every activated feature across a submission', async () => {
+  it('counts every published feature across a submission', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([{ count: 3 }], 1));
     const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
 
@@ -30,7 +30,7 @@ describe('SubmissionFeatureRepository active feature lookup', () => {
     expect(text).to.include('su.record_end_date IS NULL');
   });
 
-  it('resolves a feature id only when it is active', async () => {
+  it('resolves a feature id when it has been published', async () => {
     const row = {
       submission_feature_id: 1,
       uuid: 'uuid',
@@ -38,7 +38,6 @@ describe('SubmissionFeatureRepository active feature lookup', () => {
       submission_id: 2,
       feature_type_id: 3,
       source_id: 'A',
-      data: {},
       feature_type_name: 'survey',
       feature_type_display_name: 'Survey',
       submission_name: 'Submission',
@@ -50,9 +49,19 @@ describe('SubmissionFeatureRepository active feature lookup', () => {
 
     expect(await repository.getSubmissionFeatureById(1)).to.eql(row);
     const text = sql.firstCall.args[0].text as string;
-    expect(text).to.include(isSubmissionFeatureActive('sf'));
+    expect(text).to.include(isSubmissionFeaturePublished('sf'));
+    expect(text).to.include('WITH RECURSIVE successor_chain');
+    expect((text.match(/WITH RECURSIVE successor_chain/g) || []).length).to.equal(1);
+    expect(text).to.include('terminal.terminal_submission_feature_id');
+    expect(text).to.include('successor.submission_id = chain.submission_id');
+    expect(text).to.include('WITH RECURSIVE historical_ancestry');
+    expect(text).to.include(`NOT (${isSubmissionFeatureCurrent('sf')})`);
+    expect(text).to.include('parent.parent_submission_feature_id');
+    expect(text).to.not.include('sf.record_end_date <= sfs.record_end_date');
+    expect(text).to.not.include('sfs.record_effective_date <= sf.record_end_date');
     expect(text).to.include('sfs.record_effective_date <= now()');
     expect(text).to.include('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)');
     expect(text).to.not.include('submission_feature sf_sec');
+    expect(text).to.not.match(/\bsf\.data\b/);
   });
 });

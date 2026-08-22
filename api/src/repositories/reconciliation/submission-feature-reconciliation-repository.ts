@@ -55,7 +55,7 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * which can exceed the number of inserted error rows when a duplicate group contains many rows.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<number>} Number of feature occurrences with an invalid source identifier.
+   * @returns {Promise<number>} Number of features with an invalid source identifier.
    * @memberof SubmissionFeatureReconciliationRepository
    */
   async insertSourceIdentityErrors(submissionUploadId: string): Promise<number> {
@@ -231,6 +231,7 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
 
   /**
    * Link current predecessors to their direct successors and end the predecessors.
+   * A current predecessor is published, not ended, and has no successor feature.
    *
    * The caller must hold the submission feature-state lock and execute this method in the approval
    * transaction. Any currently published occurrence with the same source identifier is replaced.
@@ -269,8 +270,8 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * linking in the approval transaction.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @param {number} submissionId Submission identifier used to scope feature activation.
-   * @returns {Promise<number>} Number of reconciled feature rows activated.
+   * @param {number} submissionId Submission identifier used to scope feature publication.
+   * @returns {Promise<number>} Number of reconciled features published.
    * @memberof SubmissionFeatureReconciliationRepository
    */
   async activateReconciledSubmissionFeatures(submissionUploadId: string, submissionId: number): Promise<number> {

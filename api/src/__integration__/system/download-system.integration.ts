@@ -291,7 +291,7 @@ describe('Download Worker', function () {
         data_byte_size: db.raw(`octet_length(?::jsonb::text) + 500`, [dataJson]),
         submission_upload_id: bridge.submission_upload_id,
         // The download broad-path only projects effective (published) features
-        // (isSubmissionFeatureActive: record_effective_date <= now()); without this the feature
+        // (isSubmissionFeatureCurrent: record_effective_date <= now(), not end-dated, no successor); without this the feature
         // is treated as an unpublished draft and never appears in the export.
         record_effective_date: db.fn.now(),
         create_user: SYSTEM_USER_ID
@@ -320,7 +320,7 @@ describe('Download Worker', function () {
    * Create a policy-backed download, publish the job to pg-boss, and wait for completion.
    *
    * Features are resolved at pipeline time by evaluating each `policy_statement` against
-   * the database. With `expression_id IS NULL` the broad path picks every active feature
+   * the database. With `expression_id IS NULL` the broad path picks every current feature
    * of the named type — same selection model as the route handler.
    *
    * The worker is the single owner of artifact writes — for parquet it creates one
@@ -343,7 +343,7 @@ describe('Download Worker', function () {
     createdPolicyIds.push(policy.policy_id);
 
     // One ALLOW statement per feature type — the broad-path projection at write-time
-    // picks every active submission_feature of the type for the policy creator's
+    // picks every current submission_feature of the type for the policy creator's
     // visibility scope. A statement's URN is normalized into a reusable security_scope
     // (deduped by hash), which the statement references by security_scope_id — mirroring
     // the API write path (see 07_access_policy seed's ensureSecurityScope).
@@ -504,7 +504,7 @@ describe('Download Worker', function () {
     const fileUuid = uuidBySubmissionFeatureId.get(fileFeatureId)!;
 
     // 2. Create parquet download, publish job, and wait for completion
-    // The policy projects every active feature of the named types — a single test
+    // The policy projects every current feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
     const { downloadId, downloadVersionId } = await createDownloadAndProcess(['survey', 'sample_site', 'file'], {
@@ -615,7 +615,7 @@ describe('Download Worker', function () {
         expect(fields.uuid.originalType).to.equal('UTF8');
         expect(fields.parent_uuid.originalType).to.equal('UTF8');
 
-        // Collect rows. The broad-path policy projects every active feature of
+        // Collect rows. The broad-path policy projects every current feature of
         // the type, so the file may also contain features from seed data —
         // assert this submission's feature is present rather than asserting
         // exclusivity.
@@ -699,7 +699,7 @@ describe('Download Worker', function () {
     });
 
     // Run 1
-    // The policy projects every active feature of the named types — a single test
+    // The policy projects every current feature of the named types — a single test
     // submission owns the only matching rows, so the broad path returns exactly the
     // features seeded above.
     const { downloadId, downloadVersionId } = await createDownloadAndProcess(['survey', 'sample_site', 'file'], {

@@ -7,7 +7,7 @@ import { BaseRepository } from './base-repository';
 import {
   codePropertyValueJson,
   featureReferencePropertyValueJson,
-  isSubmissionFeatureActive,
+  isSubmissionFeaturePublished,
   taxonPropertyValueJson
 } from './sql-fragments';
 
@@ -146,10 +146,10 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Build the shared active-feature and indexed-property CTEs used by the list and count queries.
+   * Build the shared published-feature and indexed-property CTEs used by the list and count queries.
    *
    * This is the only source of property values for this read path: it unions the typed/indexed property
-   * tables and artifact links, filters the root feature and feature-valued references to active
+   * tables and artifact links, filters the root feature and feature-valued references to published
    * `submission_feature` records, and intentionally does not read `submission_feature.data`.
    *
    * Every branch projects `value` as jsonb: scalar-typed tables contribute their text as a JSON string,
@@ -181,7 +181,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         WHERE sf.submission_feature_id = `);
     sqlStatement.append(SQL`${submissionFeatureId}`);
     sqlStatement.append(`
-          AND ${isSubmissionFeatureActive('sf')}
+          AND ${isSubmissionFeaturePublished('sf')}
       ),
       property_rows AS (
         SELECT
@@ -343,7 +343,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
          AND fp.record_end_date IS NULL
         JOIN submission_feature referenced_sf
           ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-         AND ${isSubmissionFeatureActive('referenced_sf')}
+         AND ${isSubmissionFeaturePublished('referenced_sf')}
 
         UNION ALL
 

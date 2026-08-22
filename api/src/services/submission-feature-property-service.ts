@@ -21,7 +21,7 @@ export class SubmissionFeaturePropertyService extends DBService {
   }
 
   /**
-   * Get paginated, searchable feature properties for a single active submission feature.
+   * Get paginated, searchable feature properties for a single published submission feature.
    *
    * @param {number} submissionFeatureId
    * @param {ApiPaginationOptions} pagination

@@ -54,7 +54,7 @@ describe('single-table reconciliation (integration)', function () {
     return result.rows[0];
   }
 
-  it('creates a distinct unmodified occurrence and preserves a direct successor chain', async () => {
+  it('creates a distinct unmodified feature and preserves a direct successor chain', async () => {
     const submissionId = await createTestSubmission(connection);
 
     const uploadA = await createUpload(submissionId, HASH_X);

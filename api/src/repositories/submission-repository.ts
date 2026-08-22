@@ -11,7 +11,7 @@ import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -83,7 +83,6 @@ export const SubmissionFeature = z.object({
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
-  data: z.record(z.any()),
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
   submission_name: z.string(),
@@ -314,9 +313,9 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  */
 export class SubmissionRepository extends BaseRepository {
   /**
-   * Lock the submission's active feature state for the current transaction.
+   * Lock the submission's current feature state for the current transaction.
    *
-   * Reconciliation and activation use the same submission-scoped advisory lock so
+   * Reconciliation and publication use the same submission-scoped advisory lock so
    * that a baseline cannot change while an upload is being classified or published.
    *
    * @param {number} submissionId Submission identifier.
@@ -847,6 +846,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -949,6 +952,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1026,6 +1033,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1078,10 +1089,14 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission_id = ${submissionId}
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')}`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')}`);
     sqlStatement.append(`
       GROUP BY
         submission_feature.submission_feature_id,
@@ -1134,10 +1149,13 @@ export class SubmissionRepository extends BaseRepository {
         this.on('s.team_id', '=', 'tm.team_id').andOnNull('s.record_end_date');
       })
       .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
+        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id')
+          .andOnVal('sfs.status', '=', 'active')
+          .andOn(knex.raw('sfs.record_effective_date <= now()'))
+          .andOn(knex.raw('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)'));
       })
       .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
       .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
@@ -1293,6 +1311,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
@@ -1427,6 +1449,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       INNER JOIN
         feature_type
       ON
@@ -1641,7 +1667,7 @@ export class SubmissionRepository extends BaseRepository {
       and
         parent_submission_feature_id is null
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -1675,7 +1701,7 @@ export class SubmissionRepository extends BaseRepository {
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .where('submission_feature.submission_id', submissionId)
-      .whereRaw(isSubmissionFeatureActive('submission_feature'));
+      .whereRaw(isSubmissionFeatureCurrent('submission_feature'));
 
     const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
     if (securityFilter) {
