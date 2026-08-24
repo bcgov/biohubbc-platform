@@ -7,8 +7,6 @@ import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridRowParams } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
@@ -18,58 +16,9 @@ import { SubmissionFeatureMap } from 'features/submissions/page/features/compone
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { parseRouteId } from 'utils/routes';
-
-interface IPortalFeatureRelatedSectionProps {
-  submissionId: number;
-  relatedFeatures: IRelatedSubmissionFeature[];
-}
-
-const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalFeatureRelatedSectionProps) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const columns: GridColDef<IRelatedSubmissionFeature>[] = [
-    {
-      field: 'submission_feature_id',
-      headerName: 'ID',
-      width: 120
-    },
-    {
-      field: 'name',
-      headerName: 'Name',
-      flex: 1,
-      renderCell: (params) => params.row.data?.name || params.row.feature_type_display_name
-    },
-    {
-      field: 'feature_type_display_name',
-      headerName: 'Feature Type',
-      flex: 1
-    }
-  ];
-
-  const handleRowClick = (params: GridRowParams<IRelatedSubmissionFeature>) => {
-    navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
-  };
-
-  return (
-    <PageSection id="portal-submission-feature-related" label="Related">
-      <CustomDataGrid
-        autoHeight
-        rows={relatedFeatures}
-        columns={columns}
-        getRowId={(row) => row.submission_feature_id}
-        onRowClick={handleRowClick}
-        noRowsMessage="No related features"
-        hideFooter
-        rowSelection={false}
-      />
-    </PageSection>
-  );
-};
 
 /**
  * Portal submission feature detail page scoped to the current user's submission.
@@ -102,10 +51,7 @@ export const PortalSubmissionFeaturePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 
-  const { feature, relatedFeatures } = useMemo(
-    () => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined },
-    [featureDataLoader.data]
-  );
+  const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
@@ -167,7 +113,6 @@ export const PortalSubmissionFeaturePage = () => {
               />
             )}
           </PageSection>
-          <PortalFeatureRelatedSection submissionId={submissionId} relatedFeatures={relatedFeatures ?? []} />
         </Stack>
       </Container>
     </LoadingGuard>

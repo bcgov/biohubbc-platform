@@ -16,7 +16,6 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get a submission feature by its ID
-   * Also gets related features if there is any
    *
    * @param {number} submissionId
    * @param {number} submissionFeatureId

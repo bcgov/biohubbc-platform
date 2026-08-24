@@ -14,16 +14,14 @@ import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
 import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
-import { IRelatedSubmissionFeature, ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
+import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
-import { SubmissionFeatureRelated } from './SubmissionFeatureRelated';
 
 interface SubmissionFeatureDetailContentProps {
   isLoading: boolean;
   feature?: ISubmissionFeature;
-  relatedFeatures: IRelatedSubmissionFeature[];
   submissionId: number;
   /** Feature whose indexed properties the Properties section lists. */
   submissionFeatureId: number;
@@ -38,7 +36,6 @@ interface SubmissionFeatureDetailContentProps {
 export const SubmissionFeatureDetailContent = ({
   isLoading,
   feature,
-  relatedFeatures,
   submissionId,
   submissionFeatureId,
   rootBreadcrumbLabel,
@@ -117,13 +114,6 @@ export const SubmissionFeatureDetailContent = ({
                 submissionFeatureId={feature.submission_feature_id}
               />
             )}
-          </PageSection>
-          <PageSection id="submission-feature-related" label="Related">
-            <SubmissionFeatureRelated
-              submissionId={submissionId}
-              relatedFeatures={relatedFeatures}
-              featureRouteBasePath={featureRouteBasePath}
-            />
           </PageSection>
         </Stack>
       </Container>
