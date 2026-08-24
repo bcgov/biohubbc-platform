@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
+import { act, fireEvent, render, screen } from 'test-helpers/test-utils';
 import { ExpressionBuilderPredicateTokenTaxon } from './ExpressionBuilderPredicateTokenTaxon';
 
 const searchTaxonMock = vi.hoisted(() => vi.fn());
@@ -40,9 +40,23 @@ const TaxonHarness = ({ onChange }: { onChange: (value: number | undefined) => v
   );
 };
 
+// Use to run the 300ms taxon search debounce and flush the resulting state updates.
+const advancePastTaxonSearchDebounce = async () => {
+  await act(async () => {
+    vi.advanceTimersByTime(300);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
 describe('ExpressionBuilderPredicateTokenTaxon', () => {
   beforeEach(() => {
     searchTaxonMock.mockReset();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('clears the committed TSN when selected taxon text is edited without choosing a replacement', async () => {
@@ -51,7 +65,9 @@ describe('ExpressionBuilderPredicateTokenTaxon', () => {
     render(<TaxonHarness onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '180701' } });
-    fireEvent.click(await screen.findByRole('option', { name: 'Ovis canadensis' }));
+    await advancePastTaxonSearchDebounce();
+
+    fireEvent.click(screen.getByRole('option', { name: 'Ovis canadensis' }));
 
     expect(onChange).toHaveBeenLastCalledWith(180701);
 
@@ -76,16 +92,18 @@ describe('ExpressionBuilderPredicateTokenTaxon', () => {
     render(<TaxonHarness onChange={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: 'Ovis' } });
-    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
+    await advancePastTaxonSearchDebounce();
+    expect(searchTaxonMock).toHaveBeenCalledTimes(1);
 
     fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: 'Cervus' } });
-    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(2));
+    await advancePastTaxonSearchDebounce();
+    expect(searchTaxonMock).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       resolveCervusSearch(taxonSearchResponse(180694, 'Cervus canadensis'));
       await cervusSearch;
     });
-    expect(await screen.findByRole('option', { name: 'Cervus canadensis' })).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Cervus canadensis' })).toBeVisible();
 
     await act(async () => {
       resolveOvisSearch(taxonSearchResponse(180701, 'Ovis canadensis'));
