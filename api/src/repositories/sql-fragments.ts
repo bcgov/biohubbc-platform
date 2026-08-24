@@ -115,6 +115,11 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         SELECT 1
         FROM submission_feature_closure c
         JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
+        JOIN security_scope ss ON ss.security_scope_id = ssa.security_scope_id
+        JOIN submission_feature anchor_sf
+          ON anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
+          AND ${isSubmissionFeatureActive('anchor_sf')}
+        JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor_sf.feature_type_id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
         JOIN team t ON t.team_id = tss.team_id
           AND t.record_end_date IS NULL
@@ -123,6 +128,18 @@ export function isAccessibleToUser(featureIdExpr: string): string {
           AND tm.record_end_date IS NULL
         WHERE c.source_submission_feature_id = ${featureIdExpr}
           AND c.is_ancestor = true
+          -- Anchors are an asynchronous cache. Revalidate the security- and scope-sensitive facts
+          -- whose revocation must take effect immediately instead of trusting a stale cache row.
+          AND EXISTS (
+            SELECT 1
+            FROM submission_feature_closure closure_ready
+            WHERE closure_ready.source_submission_feature_id = anchor_sf.submission_feature_id
+              AND closure_ready.target_submission_feature_id = anchor_sf.submission_feature_id
+          )
+          AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
+          AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
+          AND (ss.urn_feature_type = anchor_ft.name OR ss.urn_feature_type = '*')
+          AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
       )
   )`;
 }

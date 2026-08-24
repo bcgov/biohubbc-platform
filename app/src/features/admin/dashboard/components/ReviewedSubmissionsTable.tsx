@@ -1,4 +1,4 @@
-import { mdiTextBoxSearchOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiTextBoxSearchOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -18,26 +18,18 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import useDownload from 'hooks/useDownload';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
 const ReviewedSubmissionsTable = () => {
   const biohubApi = useApi();
-  const { downloadJSON } = useDownload();
 
   const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissionsForAdmins());
 
   reviewedSubmissionsDataLoader.load();
 
   const submissionRecords = reviewedSubmissionsDataLoader.data || [];
-
-  const onDownload = async (submission: SubmissionRecordWithSecurityAndRootFeature) => {
-    // make request here for JSON data of submission and children
-    const data = await biohubApi.submissions.getSubmissionDownloadPackage(submission.submission_id);
-    downloadJSON(data, `${submission.name.toLowerCase().replace(/ /g, '-')}-${submission.submission_id}`);
-  };
 
   const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
     reviewedSubmissionsDataLoader.setData(submissions);
@@ -218,14 +210,6 @@ const ReviewedSubmissionsTable = () => {
                         minWidth: '7rem'
                       }}>
                       View
-                    </Button>
-                  </Stack>
-                  <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
-                    <Button
-                      variant="contained"
-                      startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}
-                      onClick={() => onDownload(submissionRecord)}>
-                      Download
                     </Button>
                   </Stack>
                 </Stack>

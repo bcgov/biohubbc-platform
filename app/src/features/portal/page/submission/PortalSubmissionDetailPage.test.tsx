@@ -101,20 +101,4 @@ describe('PortalSubmissionDetailPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/portal/submission/1/feature/10');
     });
   });
-
-  it('searches features server-side by name', async () => {
-    const { findByPlaceholderText } = renderPage();
-
-    const searchInput = await findByPlaceholderText('Search by feature name');
-    fireEvent.change(searchInput, { target: { value: 'obs' } });
-
-    await waitFor(() => {
-      expect(mockGetSubmissionFeatures).toHaveBeenLastCalledWith(
-        1,
-        expect.objectContaining({
-          search: 'obs'
-        })
-      );
-    });
-  });
 });

@@ -1,23 +1,34 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
-import { SubmissionFeatureFilters } from '../../../../models/submission-feature';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getLogger } from '../../../../utils/logger';
-import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
+import { SYSTEM_ROLE } from '../../../../../constants/roles';
+import { getDBConnection } from '../../../../../database/db';
+import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../../../services/submission-service';
+import { getLogger } from '../../../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../utils/pagination';
 
-const defaultLog = getLogger('paths/submission/{submissionId}');
+const defaultLog = getLogger('paths/administrative/submission/{submissionId}/features');
 
-export const GET: Operation = [getSubmissionFeatures()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => ({
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        discriminator: 'SystemRole'
+      }
+    ]
+  })),
+  getSubmissionFeatures()
+];
 
 GET.apiDoc = {
-  description: 'Retrieves submission features. Supports both authenticated and anonymous users.',
-  tags: ['submission'],
+  description: 'Retrieves submission features for administrative review.',
+  tags: ['admin'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   parameters: [
@@ -30,15 +41,6 @@ GET.apiDoc = {
         minimum: 1
       },
       required: true
-    },
-    {
-      in: 'query',
-      name: 'search',
-      required: false,
-      schema: {
-        type: 'string'
-      },
-      description: 'Optional case-insensitive search across feature type name.'
     },
     ...paginationRequestQueryParamSchema
   ],
@@ -84,19 +86,16 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves paginated submission feature records. Uses the request token when present, otherwise the API user connection for anonymous requests.
- *
- * Returns all features (secured and unsecured).
+ * Retrieves paginated submission feature records for administrative review.
  *
  * @returns {RequestHandler}
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token);
 
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);
-    const filters = { search: req.query.search } as SubmissionFeatureFilters;
 
     try {
       await connection.open();
@@ -104,8 +103,8 @@ export function getSubmissionFeatures(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const [features, count] = await Promise.all([
-        submissionService.getSubmissionFeatures(submissionId, paginationOptions, filters),
-        submissionService.getSubmissionFeaturesCount(submissionId, filters)
+        submissionService.getSubmissionFeatures(submissionId, paginationOptions),
+        submissionService.getSubmissionFeaturesCount(submissionId)
       ]);
 
       await connection.commit();
