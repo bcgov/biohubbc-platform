@@ -17,7 +17,7 @@ describe('SubmissionFeatureIngestionService', () => {
       const insertStub = sinon
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(2);
-      const activeFeatureTypeMap = new Map<string, number>([
+      const knownFeatureTypeMap = new Map<string, number>([
         ['survey', 1],
         ['sample_site', 2]
       ]);
@@ -39,7 +39,7 @@ describe('SubmissionFeatureIngestionService', () => {
         }
       ];
 
-      await service.ingestFeatureBatch(42, 'submission-upload-1', features, activeFeatureTypeMap);
+      await service.ingestFeatureBatch(42, 'submission-upload-1', features, knownFeatureTypeMap);
 
       expect(insertStub.calledOnce).to.be.true;
       const insertedRows = insertStub.firstCall.args[0] as Array<{
@@ -79,12 +79,49 @@ describe('SubmissionFeatureIngestionService', () => {
       expect(insertStub.called).to.be.false;
     });
 
+    it('inserts a retired feature type using its original feature type id', async () => {
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      const insertStub = sinon
+        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
+        .resolves(1);
+      const knownFeatureTypeMap = new Map<string, number>([
+        ['dataset', 1],
+        ['survey', 2]
+      ]);
+      const feature: IFlattenedBlock = {
+        id: 'legacy-feature',
+        type: 'dataset',
+        properties: { name: 'Legacy Dataset' },
+        content: [],
+        parent: null
+      };
+
+      await service.ingestFeatureBatch(42, 'submission-upload-1', [feature], knownFeatureTypeMap);
+
+      expect(insertStub.calledOnce).to.be.true;
+      const insertedRows = insertStub.firstCall.args[0] as Array<{
+        submissionId: number;
+        submissionUploadId: string;
+        sourceId: string;
+        featureTypeId: number;
+        data: IFlattenedBlock;
+      }>;
+      expect(insertedRows).to.have.length(1);
+      expect(insertedRows[0]).to.include({
+        submissionId: 42,
+        submissionUploadId: 'submission-upload-1',
+        sourceId: 'legacy-feature',
+        featureTypeId: 1
+      });
+      expect(insertedRows[0].data).to.deep.equal(feature);
+    });
+
     it('skips unknown feature types and only inserts known feature rows', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
       const insertStub = sinon
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(1);
-      const activeFeatureTypeMap = new Map<string, number>([['survey', 1]]);
+      const knownFeatureTypeMap = new Map<string, number>([['survey', 1]]);
 
       const features: IFlattenedBlock[] = [
         {
@@ -103,7 +140,7 @@ describe('SubmissionFeatureIngestionService', () => {
         }
       ];
 
-      await service.ingestFeatureBatch(42, 'submission-upload-1', features, activeFeatureTypeMap);
+      await service.ingestFeatureBatch(42, 'submission-upload-1', features, knownFeatureTypeMap);
 
       expect(insertStub.calledOnce).to.be.true;
       const insertedRows = insertStub.firstCall.args[0] as Array<{ sourceId: string; featureTypeId: number }>;

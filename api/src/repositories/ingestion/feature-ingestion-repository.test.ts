@@ -20,8 +20,8 @@ describe('FeatureIngestionRepository', () => {
       const mockQueryResponse = {
         rowCount: 2,
         rows: [
-          { feature_type_id: 1, name: 'survey' },
-          { feature_type_id: 2, name: 'sample_site' }
+          { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
+          { feature_type_id: 2, name: 'sample_site', display_name: 'Sample Site', description: null }
         ]
       } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -30,8 +30,32 @@ describe('FeatureIngestionRepository', () => {
       const result = await ingestionRepository.getActiveFeatureTypeMap();
 
       expect(result).to.deep.equal([
-        { feature_type_id: 1, name: 'survey' },
-        { feature_type_id: 2, name: 'sample_site' }
+        { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
+        { feature_type_id: 2, name: 'sample_site', display_name: 'Sample Site', description: null }
+      ]);
+    });
+  });
+
+  describe('getKnownFeatureTypeMap', () => {
+    it('returns active and retired feature type rows without filtering on record_end_date', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [
+          { feature_type_id: 1, name: 'dataset', display_name: 'Dataset', description: null },
+          { feature_type_id: 2, name: 'survey', display_name: 'Survey', description: null }
+        ]
+      } as any as Promise<QueryResult<any>>;
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.not.match(/WHERE\s+record_end_date IS NULL/);
+        return mockQueryResponse;
+      });
+      const ingestionRepository = new FeatureIngestionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await ingestionRepository.getKnownFeatureTypeMap();
+
+      expect(result).to.deep.equal([
+        { feature_type_id: 1, name: 'dataset', display_name: 'Dataset', description: null },
+        { feature_type_id: 2, name: 'survey', display_name: 'Survey', description: null }
       ]);
     });
   });
