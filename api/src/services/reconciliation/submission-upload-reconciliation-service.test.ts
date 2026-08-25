@@ -42,7 +42,7 @@ describe('SubmissionUploadReconciliationService', () => {
   it('classifies an upload under the feature-state lock', async () => {
     stubUpload();
     sinon
-      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getPredecessorSubmissionUploadId')
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'findPredecessorSubmissionUploadId')
       .resolves('predecessor-upload-id');
     const reconcile = sinon
       .stub(SubmissionFeatureReconciliationRepository.prototype, 'reconcileSubmissionFeatures')

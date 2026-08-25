@@ -34,6 +34,26 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     expect(text).to.include('GROUP BY source_id');
   });
 
+  it('resolves and locks the direct upload predecessor recorded at creation', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([{ submission_upload_id: 'predecessor-upload-id' }], 1));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.findPredecessorSubmissionUploadId('upload-id', 9)).to.equal('predecessor-upload-id');
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.include('candidate.successor_submission_upload_id =');
+    expect(text).to.include('FOR UPDATE OF candidate');
+    expect(text).to.not.include('submission_upload_status');
+    expect(text).to.not.include("candidate.status = 'indexed'");
+    expect(text).to.not.include('candidate.record_end_date IS NULL');
+  });
+
+  it('returns null when no direct upload predecessor exists', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([], 0));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.findPredecessorSubmissionUploadId('upload-id', 9)).to.be.null;
+  });
+
   it('classifies by submission and source id against the pending predecessor before published state', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([], 3));
     const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));

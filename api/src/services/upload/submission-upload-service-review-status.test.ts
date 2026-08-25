@@ -163,6 +163,49 @@ describe('SubmissionUploadService review decisions', () => {
       expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
     });
 
+    it('blocks approval after a newer upload has superseded the upload', async () => {
+      const lockStub = SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub;
+      lockStub.resolves({
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        submission_id: 1,
+        upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        team_id: '990e8400-e29b-41d4-a716-446655440000',
+        status: 'indexed',
+        ticket_id: '550e8400-e29b-41d4-a716-446655440000',
+        blueprint_id: 1,
+        successor_submission_upload_id: '660e8400-e29b-41d4-a716-446655440000'
+      });
+      const validationStub = sinon.stub(
+        SubmissionValidationService.prototype,
+        'getSubmissionValidationBySubmissionUploadId'
+      );
+      const activateStub = sinon.stub(
+        SubmissionUploadReconciliationService.prototype,
+        'activateSubmissionUploadReconciliation'
+      );
+      const insertStatusStub = sinon.stub(
+        SubmissionUploadReviewStatusRepository.prototype,
+        'insertSubmissionUploadReviewStatus'
+      );
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+
+      try {
+        await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
+          status: 'approved'
+        });
+        expect.fail('Expected HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+        expect((error as HTTP400).message).to.equal('Submission upload has been superseded by a newer upload');
+      }
+
+      expect(validationStub).not.to.have.been.called;
+      expect(activateStub).not.to.have.been.called;
+      expect(insertStatusStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
+    });
+
     it('returns the existing review status when the upload is already approved', async () => {
       const getStatusStub = SubmissionUploadReviewStatusRepository.prototype
         .getSubmissionUploadReviewStatus as sinon.SinonStub;

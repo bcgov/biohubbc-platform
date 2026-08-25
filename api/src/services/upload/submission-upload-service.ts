@@ -19,6 +19,7 @@ import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
+import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 
@@ -27,6 +28,7 @@ export class SubmissionUploadService extends DBService {
   blueprintRepository: BlueprintRepository;
   submissionUploadReviewStatusService: SubmissionUploadReviewStatusService;
   teamService: TeamService;
+  submissionService: SubmissionService;
 
   /** Mutable dependency bag used by tests to stub queue publication under ESM. */
   static readonly dependencies = {
@@ -45,6 +47,7 @@ export class SubmissionUploadService extends DBService {
     this.blueprintRepository = new BlueprintRepository(connection);
     this.submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(connection);
     this.teamService = new TeamService(connection);
+    this.submissionService = new SubmissionService(connection);
   }
 
   /**
@@ -199,6 +202,11 @@ export class SubmissionUploadService extends DBService {
       system_user_ids: [...new Set([requestorSystemUserId, ...submitterSystemUserIds])]
     });
 
+    // Match approval's row-lock-before-submission-lock order. The insert then atomically links the
+    // latest upload as its predecessor; the advisory lock also serializes concurrent first uploads.
+    await this.submissionUploadRepository.lockSubmissionUploadsForSubmissionId(submissionUpload.submission_id);
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionUpload.submission_id);
+
     return this.submissionUploadRepository.insertSubmissionUpload({
       ...submissionUpload,
       team_id: team.team_id
@@ -352,29 +360,6 @@ export class SubmissionUploadService extends DBService {
    */
   async transitionSubmissionUploadToReconciled(submissionUploadId: string): Promise<void> {
     await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', ['reconciling']);
-  }
-
-  /**
-   * Link an indexed upload to the newer upload that supersedes it.
-   *
-   * @param {string} submissionUploadId Superseded submission upload identifier.
-   * @param {string} successorSubmissionUploadId Newer submission upload identifier.
-   * @returns {Promise<void>} Resolves after the successor relationship is persisted.
-   * @memberof SubmissionUploadService
-   */
-  async setSuccessorSubmissionUploadId(submissionUploadId: string, successorSubmissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUploadWithLock(submissionUploadId);
-    this.assertStatusCanChange(submissionUploadId, current.status, ['indexed']);
-
-    if (current.successor_submission_upload_id) {
-      throw new ApiConflictError('Submission upload cannot be superseded', [
-        { submissionUploadId, status: current.status, successorSubmissionUploadId }
-      ]);
-    }
-    await this.submissionUploadRepository.setSuccessorSubmissionUploadId(
-      submissionUploadId,
-      successorSubmissionUploadId
-    );
   }
 
   /**

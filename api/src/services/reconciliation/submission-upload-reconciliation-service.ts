@@ -54,7 +54,7 @@ export class SubmissionUploadReconciliationService extends DBService {
   async reconcileSubmissionFeatures(submissionUploadId: string): Promise<SubmissionUploadReconciliation> {
     const upload = await this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
     const predecessorSubmissionUploadId =
-      await this.submissionFeatureReconciliationRepository.getPredecessorSubmissionUploadId(
+      await this.submissionFeatureReconciliationRepository.findPredecessorSubmissionUploadId(
         submissionUploadId,
         upload.submission_id
       );

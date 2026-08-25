@@ -47,10 +47,6 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
         submissionUploadId
       );
       if (reconciliation.predecessorSubmissionUploadId) {
-        await submissionUploadService.setSuccessorSubmissionUploadId(
-          reconciliation.predecessorSubmissionUploadId,
-          submissionUploadId
-        );
         await submissionUploadReconciliationService.endPendingSubmissionFeatures(
           reconciliation.predecessorSubmissionUploadId
         );

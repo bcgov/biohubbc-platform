@@ -52,13 +52,12 @@ describe('reconcile-submission-features-job', () => {
     expect(publish).to.have.been.calledOnce;
   });
 
-  it('supersedes the prior reviewable upload after reconciliation', async () => {
+  it('ends pending features from the predecessor after reconciliation', async () => {
     stubUpload();
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'validateSubmissionFeatureSourceIdentity').resolves(0);
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves({
       predecessorSubmissionUploadId: 'upload-0'
     });
-    const supersede = sinon.stub(SubmissionUploadService.prototype, 'setSuccessorSubmissionUploadId').resolves();
     const endFeatures = sinon
       .stub(SubmissionUploadReconciliationService.prototype, 'endPendingSubmissionFeatures')
       .resolves();
@@ -69,7 +68,6 @@ describe('reconcile-submission-features-job', () => {
 
     await reconcileSubmissionFeaturesJobHandler([job]);
 
-    expect(supersede).to.have.been.calledOnceWithExactly('upload-0', 'upload-1');
     expect(endFeatures).to.have.been.calledOnceWithExactly('upload-0');
   });
 
