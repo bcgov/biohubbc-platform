@@ -14,19 +14,19 @@ import { DBService } from '../db-service';
  * @extends {DBService}
  */
 export class SubmissionFeatureIngestionService extends DBService {
-  ingestionRepository: FeatureIngestionRepository;
+  featureIngestionRepository: FeatureIngestionRepository;
   defaultLog = getLogger('services/ingestion/submission-feature-ingestion-service');
   private knownFeatureTypeMapPromise: Promise<Map<string, number>> | null = null;
 
   /**
    * Creates an instance of SubmissionFeatureIngestionService.
    *
-   * @param {IDBConnection} connection
+   * @param {IDBConnection} connection Database connection used for feature ingestion operations.
    * @memberof SubmissionFeatureIngestionService
    */
   constructor(connection: IDBConnection) {
     super(connection);
-    this.ingestionRepository = new FeatureIngestionRepository(connection);
+    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**
@@ -35,11 +35,11 @@ export class SubmissionFeatureIngestionService extends DBService {
    * This method does not resolve parent/content references. Those are resolved later by
    * the indexing workflow from persisted raw payload.
    *
-   * @param {number} submissionId
-   * @param {string} submissionUploadId
-   * @param {IFlattenedBlock[]} features
-   * @param {Map<string, number>} knownFeatureTypeMap
-   * @returns {Promise<void>}
+   * @param {number} submissionId Submission identifier assigned to every feature in the batch.
+   * @param {string} submissionUploadId Submission upload identifier assigned to every feature in the batch.
+   * @param {IFlattenedBlock[]} features Shallow-validated feature payloads to persist.
+   * @param {Map<string, number>} knownFeatureTypeMap Known feature type names mapped to database identifiers.
+   * @returns {Promise<void>} Resolves after all recognized feature rows have been inserted.
    * @memberof SubmissionFeatureIngestionService
    */
   async ingestFeatureBatch(
@@ -62,6 +62,7 @@ export class SubmissionFeatureIngestionService extends DBService {
       }
 
       return {
+        submissionId,
         submissionUploadId,
         sourceId: feature.id,
         featureTypeId,
@@ -86,7 +87,7 @@ export class SubmissionFeatureIngestionService extends DBService {
       return;
     }
 
-    const insertedCount = await this.ingestionRepository.insertSubmissionUploadFeatures(records);
+    const insertedCount = await this.featureIngestionRepository.insertSubmissionFeatures(records);
     const expectedCount = records.length;
 
     if (insertedCount < expectedCount) {
@@ -106,11 +107,11 @@ export class SubmissionFeatureIngestionService extends DBService {
    * Resolve known active and retired feature type mappings once per service instance.
    *
    * @private
-   * @returns {Promise<Map<string, number>>}
+   * @returns {Promise<Map<string, number>>} Known feature type names mapped to their database identifiers.
    * @memberof SubmissionFeatureIngestionService
    */
   async getKnownFeatureTypeMap(): Promise<Map<string, number>> {
-    this.knownFeatureTypeMapPromise ??= this.ingestionRepository
+    this.knownFeatureTypeMapPromise ??= this.featureIngestionRepository
       .getKnownFeatureTypeMap()
       .then((rows) => new Map(rows.map((row) => [row.name, row.feature_type_id])));
 
@@ -118,24 +119,31 @@ export class SubmissionFeatureIngestionService extends DBService {
   }
 
   /**
-   * Delete raw upload features before rebuilding an upload's retained feature set.
+   * Delete pending rows from an incomplete ingestion attempt.
    *
-   * @param {string} submissionUploadId
-   * @returns {Promise<void>}
+   * @param {string} submissionUploadId Submission upload identifier whose pending features are removed.
+   * @returns {Promise<void>} Resolves after pending feature rows for the upload have been deleted.
    * @memberof SubmissionFeatureIngestionService
    */
-  async deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
-    await this.ingestionRepository.deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId);
+  async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.featureIngestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
   }
 
   /**
-   * Return whether retained upload features have already produced submission_feature rows.
+   * Resolve parent feature references for rows belonging to one upload.
    *
-   * @param {string} submissionUploadId
-   * @returns {Promise<boolean>}
+   * @param {string} submissionUploadId The submission_upload_id scope.
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after parent references have been updated for the upload rows.
    * @memberof SubmissionFeatureIngestionService
    */
-  async hasSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<boolean> {
-    return this.ingestionRepository.hasSubmissionFeaturesForSubmissionUploadId(submissionUploadId);
+  async updateSubmissionFeatureParentsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
+    await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(
+      submissionUploadId,
+      submissionId
+    );
   }
 }

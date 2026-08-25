@@ -292,7 +292,7 @@ async function finalizeProcessSubmissionFeaturesStage(
  * - Initialize stage guards + start markers.
  * - Execute archive ingestion.
  * - Finalize upload/validation/archive statuses.
- * - Publish downstream indexing when ingestion succeeds.
+ * - Publish downstream reconciliation when ingestion succeeds.
  *
  * Each phase is delegated to methods that commit through short-lived `withConnection`
  * blocks to preserve partial progress and keep transactions bounded.
@@ -367,42 +367,24 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
 /**
  * Best-effort cleanup for partial feature rows after a process-stage failure.
  *
- * Cleanup is scoped to the current submission upload and only runs before any
- * retained row has produced a submission feature.
+ * Cleanup is scoped to never-activated rows from the current upload.
  *
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
  * @returns {Promise<void>}
  */
 async function cleanupFailedProcessSubmissionFeatures(submissionUploadId: string, jobId: string): Promise<void> {
-  const cleanedUp = await withConnection(async (connection) => {
+  await withConnection(async (connection) => {
     const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
-    const hasPromotedFeatures = await submissionFeatureIngestionService.hasSubmissionFeaturesForSubmissionUploadId(
-      submissionUploadId
-    );
-
-    if (hasPromotedFeatures) {
-      defaultLog.info({
-        label: 'cleanupFailedProcessSubmissionFeatures',
-        message: 'Skipped raw upload feature cleanup because promoted submission features exist',
-        jobId,
-        submissionUploadId
-      });
-      return false;
-    }
-
-    await submissionFeatureIngestionService.deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId);
-    return true;
+    await submissionFeatureIngestionService.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
   });
 
-  if (cleanedUp) {
-    defaultLog.info({
-      label: 'cleanupFailedProcessSubmissionFeatures',
-      message: 'Cleaned up raw upload features after process-stage failure',
-      jobId,
-      submissionUploadId
-    });
-  }
+  defaultLog.info({
+    label: 'cleanupFailedProcessSubmissionFeatures',
+    message: 'Deleted never-activated submission features after process-stage failure',
+    jobId,
+    submissionUploadId
+  });
 }
 
 /**

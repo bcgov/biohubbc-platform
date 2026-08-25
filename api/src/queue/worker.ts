@@ -41,11 +41,6 @@ import {
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
 import {
-  IPromoteSubmissionFeaturesJobData,
-  promoteSubmissionFeaturesFailedHandler,
-  promoteSubmissionFeaturesJobHandler
-} from './jobs/promote-submission-features-job';
-import {
   IReconcileSubmissionFeaturesJobData,
   reconcileSubmissionFeaturesFailedHandler,
   reconcileSubmissionFeaturesJobHandler
@@ -72,8 +67,6 @@ export interface WorkerDependencies {
   processSubmissionFeaturesFailedHandler: typeof processSubmissionFeaturesFailedHandler;
   reconcileSubmissionFeaturesJobHandler: typeof reconcileSubmissionFeaturesJobHandler;
   reconcileSubmissionFeaturesFailedHandler: typeof reconcileSubmissionFeaturesFailedHandler;
-  promoteSubmissionFeaturesJobHandler: typeof promoteSubmissionFeaturesJobHandler;
-  promoteSubmissionFeaturesFailedHandler: typeof promoteSubmissionFeaturesFailedHandler;
   malwareScanJobHandler: typeof malwareScanJobHandler;
   malwareScanFailedHandler: typeof malwareScanFailedHandler;
   processDownloadJobHandler: typeof processDownloadJobHandler;
@@ -100,8 +93,6 @@ export const workerDependencies: WorkerDependencies = {
   processSubmissionFeaturesFailedHandler,
   reconcileSubmissionFeaturesJobHandler,
   reconcileSubmissionFeaturesFailedHandler,
-  promoteSubmissionFeaturesJobHandler,
-  promoteSubmissionFeaturesFailedHandler,
   malwareScanJobHandler,
   malwareScanFailedHandler,
   processDownloadJobHandler,
@@ -183,23 +174,6 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IReconcileSubmissionFeaturesJobData>(
     JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED,
     workerDependencies.reconcileSubmissionFeaturesFailedHandler
-  );
-
-  await boss.createQueue(JobQueues.PROMOTE_SUBMISSION_FEATURES_FAILED);
-  await boss.createQueue(JobQueues.PROMOTE_SUBMISSION_FEATURES, {
-    deadLetter: JobQueues.PROMOTE_SUBMISSION_FEATURES_FAILED,
-    retryLimit: 3,
-    retryDelay: 60,
-    retryBackoff: true,
-    policy: 'short'
-  });
-  await boss.work<IPromoteSubmissionFeaturesJobData>(
-    JobQueues.PROMOTE_SUBMISSION_FEATURES,
-    workerDependencies.promoteSubmissionFeaturesJobHandler
-  );
-  await boss.work<IPromoteSubmissionFeaturesJobData>(
-    JobQueues.PROMOTE_SUBMISSION_FEATURES_FAILED,
-    workerDependencies.promoteSubmissionFeaturesFailedHandler
   );
 
   // Register malware scan job handler

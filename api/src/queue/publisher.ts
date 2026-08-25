@@ -11,7 +11,6 @@ import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submissi
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
-import { IPromoteSubmissionFeaturesJobData } from './jobs/promote-submission-features-job';
 import { IReconcileSubmissionFeaturesJobData } from './jobs/reconcile-submission-features-job';
 import { ISubmissionUploadSecurityJobData } from './jobs/submission-upload-security-job';
 import { getPgBoss } from './pg-boss-service';
@@ -563,56 +562,6 @@ export const publishReconcileSubmissionFeaturesJob = async (
     defaultLog.error({
       label: 'publishReconcileSubmissionFeaturesJob',
       message: 'Failed to publish reconciliation job',
-      submissionUploadId: data.submissionUploadId,
-      error
-    });
-    throw error;
-  }
-};
-
-/**
- * Publish feature promotion in the caller's transaction.
- *
- * @param {IDBConnection} connection Active database connection.
- * @param {IPromoteSubmissionFeaturesJobData} data Upload scope.
- * @param {IPublishOptions} [options={}] Optional pg-boss overrides.
- * @returns {Promise<PublishJobResult>} Publish result.
- */
-export const publishPromoteSubmissionFeaturesJob = async (
-  connection: IDBConnection,
-  data: IPromoteSubmissionFeaturesJobData,
-  options: IPublishOptions = {}
-): Promise<PublishJobResult> => {
-  try {
-    const boss = publisherDependencies.getPgBoss();
-    await boss.createQueue(JobQueues.PROMOTE_SUBMISSION_FEATURES);
-    const jobId = await boss.send(JobQueues.PROMOTE_SUBMISSION_FEATURES, data, {
-      ...FEATURE_PIPELINE_STAGE_OPTIONS,
-      ...options,
-      singletonKey: `submission-upload-promote-${data.submissionUploadId}`,
-      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
-    });
-
-    if (jobId) {
-      defaultLog.info({
-        label: 'publishPromoteSubmissionFeaturesJob',
-        message: 'Promotion job published',
-        jobId,
-        submissionUploadId: data.submissionUploadId
-      });
-      return { status: 'published', jobId };
-    }
-
-    defaultLog.warn({
-      label: 'publishPromoteSubmissionFeaturesJob',
-      message: 'Promotion job not published because it already exists',
-      submissionUploadId: data.submissionUploadId
-    });
-    return { status: 'duplicate', message: 'Promotion job already exists' };
-  } catch (error) {
-    defaultLog.error({
-      label: 'publishPromoteSubmissionFeaturesJob',
-      message: 'Failed to publish promotion job',
       submissionUploadId: data.submissionUploadId,
       error
     });

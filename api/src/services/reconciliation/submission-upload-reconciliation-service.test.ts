@@ -1,117 +1,17 @@
-import chai, { expect } from 'chai';
+import { expect } from 'chai';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { HTTP409 } from '../../errors/http-error';
-import { ReconciliationCounts } from '../../models/reconciliation';
-import { SubmissionUploadFeatureRepository } from '../../repositories/reconciliation/submission-upload-feature-repository';
-import { SubmissionUploadReconciliationRepository } from '../../repositories/reconciliation/submission-upload-reconciliation-repository';
-import { SubmissionFeatureErrorRepository } from '../../repositories/submission-feature-error-repository';
-import { SubmissionFeatureRepository } from '../../repositories/submission-feature-repository';
+import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { SubmissionUploadReconciliationService } from './submission-upload-reconciliation-service';
 
-chai.use(sinonChai);
-
 const UPLOAD_ID = '550e8400-e29b-41d4-a716-446655440000';
-const COUNTS: ReconciliationCounts = { new: 1, unchanged: 0, superseded: 2, conflict: 0 };
-
-function stubIndexedUpload() {
-  return sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUpload').resolves({
-    submission_upload_id: UPLOAD_ID,
-    submission_id: 9,
-    upload_id: '660e8400-e29b-41d4-a716-446655440000',
-    team_id: '880e8400-e29b-41d4-a716-446655440000',
-    ticket_id: '770e8400-e29b-41d4-a716-446655440000',
-    blueprint_id: 1,
-    status: 'indexed'
-  });
-}
 
 describe('SubmissionUploadReconciliationService', () => {
-  beforeEach(() => {
-    sinon
-      .stub(SubmissionUploadFeatureRepository.prototype, 'isSubmissionUploadFeaturesStale')
-      .resolves({ stale: false });
-  });
-
   afterEach(() => sinon.restore());
 
-  it('returns reconciliation counts from the repository summary row', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: COUNTS });
-
-    expect(await service.getSubmissionUploadReconciliationCountsForSubmissionUploadId(UPLOAD_ID)).to.eql(COUNTS);
-  });
-
-  it('returns null before reconciliation has run', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: null });
-
-    expect(await service.getSubmissionUploadReconciliationCountsForSubmissionUploadId(UPLOAD_ID)).to.be.null;
-  });
-
-  it('classifies staging and persists one complete reconciliation summary', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    sinon
-      .stub(SubmissionUploadFeatureRepository.prototype, 'updateSubmissionUploadFeaturesWithReconciliation')
-      .resolves({ reconciliation: { new: 2, unchanged: 3, superseded: 1, conflict: 0 } });
-    const insertErrors = sinon
-      .stub(SubmissionFeatureErrorRepository.prototype, 'insertSubmissionFeatureErrorForSubmissionUploadId')
-      .resolves();
-
-    const result = await service.reconcileSubmissionUploadFeatures(UPLOAD_ID);
-
-    expect(result).to.eql({ new: 2, unchanged: 3, superseded: 1, conflict: 0 });
-    expect(insertErrors).to.have.been.calledOnceWith(UPLOAD_ID);
-  });
-
-  it('promotes only conflict-free reconciliations', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: { new: 2, unchanged: 0, superseded: 0, conflict: 0 } });
-    const promote = sinon
-      .stub(SubmissionFeatureRepository.prototype, 'insertPendingSubmissionFeaturesForSubmissionUploadId')
-      .resolves({ count: 2 });
-    const link = sinon
-      .stub(
-        SubmissionUploadFeatureRepository.prototype,
-        'updateSubmissionFeatureIdsForPromotedFeaturesBySubmissionUploadId'
-      )
-      .resolves();
-    sinon
-      .stub(SubmissionFeatureRepository.prototype, 'getPendingSubmissionFeatureCountForSubmissionUploadId')
-      .resolves({ count: 2 });
-
-    expect(await service.promoteSubmissionUploadFeatures(UPLOAD_ID)).to.equal(2);
-    expect(promote).to.have.been.calledOnceWith(UPLOAD_ID);
-    expect(link).to.have.been.calledOnceWith(UPLOAD_ID);
-  });
-
-  it('rejects promotion when reconciliation contains a conflict', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: { new: 0, unchanged: 0, superseded: 0, conflict: 1 } });
-
-    try {
-      await service.promoteSubmissionUploadFeatures(UPLOAD_ID);
-      expect.fail('Expected conflict');
-    } catch (error) {
-      expect(error).to.be.instanceOf(HTTP409);
-    }
-  });
-
-  it('does not gate activation on the upload processing status', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+  function stubUpload() {
     sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUpload').resolves({
       submission_upload_id: UPLOAD_ID,
       submission_id: 9,
@@ -119,96 +19,82 @@ describe('SubmissionUploadReconciliationService', () => {
       team_id: '880e8400-e29b-41d4-a716-446655440000',
       ticket_id: '770e8400-e29b-41d4-a716-446655440000',
       blueprint_id: 1,
-      status: 'promoted'
+      status: 'indexed'
     });
-    const lock = sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: { new: 0, unchanged: 1, superseded: 0, conflict: 0 } });
+    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
+  }
 
-    expect(await service.activateSubmissionUploadReconciliation(UPLOAD_ID)).to.eql({
-      new: 0,
-      unchanged: 1,
-      superseded: 0,
-      conflict: 0
-    });
-    expect(lock).to.have.been.calledOnceWith(9);
+  it('replaces source identity errors and returns the invalid feature occurrence count', async () => {
+    const deleteErrors = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'deleteSourceIdentityErrors')
+      .resolves();
+    const insertErrors = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'insertSourceIdentityErrors')
+      .resolves(3);
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+
+    expect(await service.validateSubmissionFeatureSourceIdentity(UPLOAD_ID)).to.equal(3);
+    expect(deleteErrors).to.have.been.calledOnceWithExactly(UPLOAD_ID);
+    expect(insertErrors).to.have.been.calledOnceWithExactly(UPLOAD_ID);
+    expect(deleteErrors).to.have.been.calledBefore(insertErrors);
   });
 
-  it('does not mutate feature state for an unchanged-only reconciliation', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
+  it('classifies an upload under the feature-state lock', async () => {
+    stubUpload();
     sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: { new: 0, unchanged: 2, superseded: 0, conflict: 0 } });
-    const deactivate = sinon.stub(
-      SubmissionFeatureRepository.prototype,
-      'deactivateReplacedSubmissionFeaturesForSubmissionUploadId'
-    );
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getPredecessorSubmissionUploadId')
+      .resolves('predecessor-upload-id');
+    const reconcile = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'reconcileSubmissionFeatures')
+      .resolves();
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
 
-    expect(await service.activateSubmissionUploadReconciliation(UPLOAD_ID)).to.eql({
-      new: 0,
-      unchanged: 2,
-      superseded: 0,
-      conflict: 0
+    expect(await service.reconcileSubmissionFeatures(UPLOAD_ID)).to.eql({
+      predecessorSubmissionUploadId: 'predecessor-upload-id'
     });
-    expect(deactivate).not.to.have.been.called;
+    expect(reconcile).to.have.been.calledWith(UPLOAD_ID, 9, 'predecessor-upload-id');
   });
 
-  it('rejects approval when an unchanged reconciliation is stale', async () => {
+  it('activates the stored reconciliation during approval', async () => {
+    stubUpload();
+    const getCounts = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getSubmissionFeatureReconciliationCounts')
+      .resolves({ new: 1, modified: 1, unmodified: 1 });
+    const link = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'linkReconciledSubmissionFeaturePredecessors')
+      .resolves(2);
+    const activate = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'activateReconciledSubmissionFeatures')
+      .resolves(3);
     const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    const stale = SubmissionUploadFeatureRepository.prototype.isSubmissionUploadFeaturesStale as sinon.SinonStub;
-    stale.resolves({ stale: true });
+
+    expect(await service.activateSubmissionUploadReconciliation(UPLOAD_ID)).to.eql({
+      new: 1,
+      modified: 1,
+      unmodified: 1
+    });
+    expect(getCounts).to.have.been.calledBefore(link);
+    expect(link).to.have.been.calledBefore(activate);
+    expect(activate).to.have.been.calledWith(UPLOAD_ID, 9);
+  });
+
+  it('rejects publication when activation count diverges from reconciliation', async () => {
+    stubUpload();
+    sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getSubmissionFeatureReconciliationCounts')
+      .resolves({ new: 1, modified: 1, unmodified: 1 });
+    sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'linkReconciledSubmissionFeaturePredecessors')
+      .resolves(2);
+    sinon.stub(SubmissionFeatureReconciliationRepository.prototype, 'activateReconciledSubmissionFeatures').resolves(2);
 
     try {
-      await service.activateSubmissionUploadReconciliation(UPLOAD_ID);
-      expect.fail('Expected stale reconciliation rejection');
+      await new SubmissionUploadReconciliationService(getMockDBConnection()).activateSubmissionUploadReconciliation(
+        UPLOAD_ID
+      );
+      expect.fail('Expected lifecycle count assertion to fail');
     } catch (error) {
-      expect(error).to.be.instanceOf(HTTP409);
+      expect((error as Error).message).to.equal('Applied feature lifecycle counts diverged from reconciliation');
     }
-  });
-
-  it('activates changed features without synchronously rebuilding closure', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    sinon
-      .stub(SubmissionUploadReconciliationRepository.prototype, 'getSubmissionUploadReconciliationCounts')
-      .resolves({ reconciliation: COUNTS });
-    sinon
-      .stub(SubmissionFeatureRepository.prototype, 'deactivateReplacedSubmissionFeaturesForSubmissionUploadId')
-      .resolves({ count: 2 });
-    sinon
-      .stub(SubmissionFeatureRepository.prototype, 'activateSubmissionFeaturesForSubmissionUploadId')
-      .resolves({ count: 3 });
-
-    expect(await service.activateSubmissionUploadReconciliation(UPLOAD_ID)).to.eql(COUNTS);
-  });
-
-  it('revokes owned features and restores predecessors without synchronously rebuilding closure', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    const revoke = sinon
-      .stub(SubmissionFeatureRepository.prototype, 'revokeSubmissionFeaturesForSubmissionUploadId')
-      .resolves({ revokedFeatureCount: 2, restoredFeatureCount: 2 });
-    await service.revokeSubmissionUploadReconciliation(UPLOAD_ID);
-
-    expect(revoke).to.have.been.calledOnceWith(UPLOAD_ID);
-  });
-
-  it('does nothing when the revoked upload no longer owns active features', async () => {
-    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
-    stubIndexedUpload();
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
-    const revoke = sinon
-      .stub(SubmissionFeatureRepository.prototype, 'revokeSubmissionFeaturesForSubmissionUploadId')
-      .resolves({ revokedFeatureCount: 0, restoredFeatureCount: 0 });
-    await service.revokeSubmissionUploadReconciliation(UPLOAD_ID);
-
-    expect(revoke).to.have.been.calledOnceWith(UPLOAD_ID);
   });
 });

@@ -1,7 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { CountResult } from '../models/count';
-import { SubmissionFeatureRevocationResult } from '../models/submission-feature';
 import { BaseRepository } from './base-repository';
 import { isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 import { SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
@@ -15,10 +14,61 @@ import { SubmissionFeature, SubmissionFeatureRecord } from './submission-reposit
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
+   * Count feature rows from an upload that have ever been activated.
+   *
+   * Historical and superseded rows remain included because a prior activation permanently makes the
+   * owning upload immutable.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<number>} Number of upload-owned feature rows with an effective date.
+   * @memberof SubmissionFeatureRepository
+   */
+  async getActivatedSubmissionFeatureCountBySubmissionUploadId(submissionUploadId: string): Promise<number> {
+    const response = await this.connection.sql(
+      SQL`
+        SELECT COUNT(*)::integer AS count
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_effective_date IS NOT NULL;
+      `,
+      CountResult
+    );
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Count feature rows in a submission that have ever been activated.
+   *
+   * Only features belonging to active upload records are considered. Historical and superseded feature
+   * rows remain included so bulk upload mutations cannot reverse previously published state.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<number>} Number of activated feature rows owned by active submission uploads.
+   * @memberof SubmissionFeatureRepository
+   */
+  async getActivatedSubmissionFeatureCountBySubmissionId(submissionId: number): Promise<number> {
+    const response = await this.connection.sql(
+      SQL`
+        SELECT COUNT(*)::integer AS count
+        FROM submission_feature sf
+        JOIN submission_upload su
+          ON su.submission_upload_id = sf.submission_upload_id
+         AND su.record_end_date IS NULL
+        WHERE sf.submission_id = ${submissionId}
+          AND sf.record_effective_date IS NOT NULL;
+      `,
+      CountResult
+    );
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
    * Get a submission feature record by uuid.
    *
-   * @param {string} submissionUuid
-   * @returns {Promise<SubmissionFeatureRecord>}
+   * @param {string} submissionUuid Submission feature UUID.
+   * @returns {Promise<SubmissionFeatureRecord>} Active submission feature record matching the UUID.
    * @memberof SubmissionFeatureRepository
    */
   async getSubmissionFeatureByUuid(submissionUuid: string): Promise<SubmissionFeatureRecord> {
@@ -114,231 +164,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
         `rowCount was ${response.rowCount}, expected rowCount === 1`
       ]);
     }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Insert pending submission features from changed staging rows.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<CountResult>} Number of pending submission features inserted.
-   * @memberof SubmissionFeatureRepository
-   */
-  async insertPendingSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<CountResult> {
-    const sqlStatement = SQL`
-      WITH inserted AS (
-        INSERT INTO submission_feature (
-          submission_id,
-          submission_upload_id,
-          parent_submission_feature_id,
-          source_id,
-          feature_type_id,
-          data,
-          data_byte_size,
-          content_hash,
-          universal_id,
-          submission_upload_feature_id
-        )
-        SELECT
-          upload.submission_id,
-          staged.submission_upload_id,
-          NULL,
-          staged.source_id,
-          staged.feature_type_id,
-          staged.data,
-          staged.data_byte_size,
-          staged.content_hash,
-          staged.universal_id,
-          staged.submission_upload_feature_id
-        FROM submission_upload_feature staged
-        JOIN submission_upload upload USING (submission_upload_id)
-        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-          AND staged.reconciliation IN ('new', 'superseded')
-        ON CONFLICT (submission_upload_id, feature_type_id, source_id)
-          WHERE record_end_date IS NULL AND record_effective_date IS NULL AND source_id IS NOT NULL
-        DO NOTHING
-        RETURNING submission_feature_id
-      )
-      SELECT COUNT(*)::integer AS count
-      FROM inserted;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, CountResult);
-    return response.rows[0];
-  }
-
-  /**
-   * Deactivate active feature versions replaced by an upload's changed rows.
-   *
-   * The prepared reconciliation describes the baseline when the upload was
-   * classified, but another upload may have been approved since then. Publication is
-   * therefore last-approval-wins for every changed natural key (`new` or `superseded`).
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<CountResult>} Number of active submission features deactivated.
-   * @memberof SubmissionFeatureRepository
-   */
-  async deactivateReplacedSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<CountResult> {
-    const response = await this.connection.sql(
-      SQL`
-        WITH changed_features AS (
-          SELECT
-            upload.submission_id,
-            staged.submission_upload_id,
-            staged.feature_type_id,
-            staged.source_id
-          FROM submission_upload_feature staged
-          JOIN submission_upload upload USING (submission_upload_id)
-          WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-            AND staged.reconciliation IN ('new', 'superseded')
-        ),
-        ended AS (
-          UPDATE submission_feature feature
-          SET record_end_date = now()
-          FROM changed_features changed
-          WHERE feature.submission_id = changed.submission_id
-            AND feature.submission_upload_id <> changed.submission_upload_id
-            AND feature.feature_type_id = changed.feature_type_id
-            AND feature.source_id = changed.source_id
-            AND feature.record_effective_date <= now()
-            AND (feature.record_end_date IS NULL OR now() < feature.record_end_date)
-          RETURNING feature.submission_feature_id
-        )
-        SELECT COUNT(*)::integer AS count
-        FROM ended;
-      `,
-      CountResult
-    );
-
-    return response.rows[0];
-  }
-
-  /**
-   * Activate or reactivate promoted submission features for an upload.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<CountResult>} Number of submission features activated.
-   * @memberof SubmissionFeatureRepository
-   */
-  async activateSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<CountResult> {
-    const sqlStatement = SQL`
-      WITH activated AS (
-        UPDATE submission_feature feature
-        SET record_effective_date = COALESCE(feature.record_effective_date, now()),
-            record_end_date = NULL
-        FROM submission_upload_feature staged
-        JOIN submission_upload upload USING (submission_upload_id)
-        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-          AND staged.reconciliation IN ('new', 'superseded')
-          AND feature.submission_upload_feature_id = staged.submission_upload_feature_id
-          AND feature.submission_id = upload.submission_id
-          AND (
-            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
-            OR feature.record_effective_date <= now()
-          )
-        RETURNING feature.submission_feature_id
-      )
-      SELECT COUNT(*)::integer AS count
-      FROM activated;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, CountResult);
-    return response.rows[0];
-  }
-
-  /**
-   * Count pending submission features prepared from an upload's changed staging rows.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<CountResult>} Number of pending prepared features.
-   */
-  async getPendingSubmissionFeatureCountForSubmissionUploadId(submissionUploadId: string): Promise<CountResult> {
-    const response = await this.connection.sql(
-      SQL`
-        SELECT COUNT(*)::integer AS count
-        FROM submission_upload_feature staged
-        JOIN submission_feature feature
-          ON feature.submission_upload_feature_id = staged.submission_upload_feature_id
-         AND feature.record_effective_date IS NULL
-         AND feature.record_end_date IS NULL
-        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-          AND staged.reconciliation IN ('new', 'superseded');
-      `,
-      CountResult
-    );
-
-    return response.rows[0];
-  }
-
-  /**
-   * End the active features created by a revoked upload and restore their latest
-   * eligible predecessors by reconciliation key.
-   *
-   * The upload is transaction provenance, not feature identity. The reconciliation
-   * key `(submission_id, feature_type_id, source_id)` locates the newest previously
-   * effective version whose upload remains approved. Features already superseded by
-   * a later upload are not ended by this statement and therefore are not restored.
-   * Parent relationships are submitted feature data and are never repointed here.
-   *
-   * @param {string} submissionUploadId Revoked submission upload identifier.
-   * @returns {Promise<SubmissionFeatureRevocationResult>} Counts of ended and restored features.
-   */
-  async revokeSubmissionFeaturesForSubmissionUploadId(
-    submissionUploadId: string
-  ): Promise<SubmissionFeatureRevocationResult> {
-    const response = await this.connection.sql(
-      SQL`
-      WITH revoked AS (
-        UPDATE submission_feature feature
-        SET record_end_date = now()
-        WHERE feature.submission_upload_id = ${submissionUploadId}::uuid
-          AND feature.record_effective_date <= now()
-          AND (feature.record_end_date IS NULL OR now() < feature.record_end_date)
-        RETURNING
-          feature.submission_feature_id,
-          feature.submission_id,
-          feature.feature_type_id,
-          feature.source_id
-      ),
-      predecessors AS (
-        SELECT DISTINCT ON (revoked.submission_feature_id)
-          revoked.submission_feature_id AS revoked_submission_feature_id,
-          predecessor.submission_feature_id AS predecessor_submission_feature_id
-        FROM revoked
-        JOIN submission_feature predecessor
-          ON predecessor.submission_id = revoked.submission_id
-         AND predecessor.feature_type_id = revoked.feature_type_id
-         AND predecessor.source_id = revoked.source_id
-        WHERE revoked.source_id IS NOT NULL
-          AND predecessor.submission_upload_id <> ${submissionUploadId}::uuid
-          AND predecessor.record_effective_date <= now()
-          AND predecessor.record_end_date <= now()
-          AND (
-            SELECT status::text
-            FROM submission_upload_status review_status
-            WHERE review_status.submission_upload_id = predecessor.submission_upload_id
-            ORDER BY review_status.create_date DESC, review_status.submission_upload_status_id DESC
-            LIMIT 1
-          ) = 'approved'
-        ORDER BY
-          revoked.submission_feature_id,
-          predecessor.record_end_date DESC,
-          predecessor.submission_feature_id DESC
-      ),
-      restored AS (
-        UPDATE submission_feature feature
-        SET record_end_date = NULL
-        FROM predecessors
-        WHERE feature.submission_feature_id = predecessors.predecessor_submission_feature_id
-        RETURNING feature.submission_feature_id
-      )
-      SELECT
-        (SELECT COUNT(*)::integer FROM revoked) AS "revokedFeatureCount",
-        (SELECT COUNT(*)::integer FROM restored) AS "restoredFeatureCount";
-    `,
-      SubmissionFeatureRevocationResult
-    );
 
     return response.rows[0];
   }

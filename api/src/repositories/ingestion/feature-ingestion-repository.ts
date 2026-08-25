@@ -1,8 +1,18 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { FeatureType, FeatureTypeWithProperties } from '../../models/feature-type';
 import { BaseRepository } from '../base-repository';
 import { isSubmissionFeatureActive } from '../sql-fragments';
+
+type SubmissionFeatureIngestionRecord = {
+  submissionId: number;
+  submissionUploadId: string;
+  sourceId: string;
+  featureTypeId: number;
+  data: unknown;
+  dataByteSize: number;
+  contentHash: string;
+  universalId?: string;
+};
 
 /**
  * A repository class for ingestion-related data access.
@@ -71,35 +81,18 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Bulk insert raw features into the retained submission upload feature table.
+   * Bulk insert uploaded feature occurrences directly into submission_feature.
    *
-   * @param {Array<{
-   *   submissionUploadId: string;
-   *   sourceId: string;
-   *   featureTypeId: number;
-   *   data: unknown;
-   *   dataByteSize: number;
-   *   contentHash: string;
-   *   universalId?: string;
-   * }>} records
-   * @returns {Promise<number>}
+   * @param {SubmissionFeatureIngestionRecord[]} records Feature records prepared from the shallow-validated upload batch.
+   * @returns {Promise<number>} Number of feature occurrence rows inserted.
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionUploadFeatures(
-    records: Array<{
-      submissionUploadId: string;
-      sourceId: string;
-      featureTypeId: number;
-      data: unknown;
-      dataByteSize: number;
-      contentHash: string;
-      universalId?: string;
-    }>
-  ): Promise<number> {
+  async insertSubmissionFeatures(records: SubmissionFeatureIngestionRecord[]): Promise<number> {
     if (!records.length) {
       return 0;
     }
 
+    const submissionIds = records.map((record) => record.submissionId);
     const submissionUploadIds = records.map((record) => record.submissionUploadId);
     const sourceIds = records.map((record) => record.sourceId);
     const featureTypeIds = records.map((record) => record.featureTypeId);
@@ -109,8 +102,10 @@ export class FeatureIngestionRepository extends BaseRepository {
     const universalIds = records.map((record) => record.universalId ?? null);
 
     const sqlStatement = SQL`
-      INSERT INTO submission_upload_feature (
+      INSERT INTO submission_feature (
+        submission_id,
         submission_upload_id,
+        parent_submission_feature_id,
         source_id,
         feature_type_id,
         data,
@@ -119,7 +114,9 @@ export class FeatureIngestionRepository extends BaseRepository {
         universal_id
       )
       SELECT
+        staged.submission_id,
         staged.submission_upload_id,
+        NULL,
         staged.source_id,
         staged.feature_type_id,
         parsed.data,
@@ -127,6 +124,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         staged.content_hash,
         staged.universal_id
       FROM unnest(
+        ${submissionIds}::integer[],
         ${submissionUploadIds}::uuid[],
         ${sourceIds}::text[],
         ${featureTypeIds}::integer[],
@@ -135,6 +133,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         ${contentHashes}::text[],
         ${universalIds}::text[]
       ) AS staged(
+        submission_id,
         submission_upload_id,
         source_id,
         feature_type_id,
@@ -151,58 +150,35 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Delete raw staged features scoped to a specific upload attempt.
+   * Delete never-activated rows from an incomplete ingestion attempt.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after all never-activated rows for the upload have been deleted.
    * @memberof FeatureIngestionRepository
    */
-  async deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      DELETE FROM submission_upload_feature
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+      DELETE FROM submission_feature
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND record_effective_date IS NULL;
     `;
 
     await this.connection.sql(sqlStatement);
   }
 
   /**
-   * Return whether retained upload features have already produced submission_feature rows.
-   *
-   * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @returns {Promise<boolean>} True when promoted rows reference this upload's retained features.
-   * @memberof FeatureIngestionRepository
-   */
-  async hasSubmissionFeaturesForSubmissionUploadId(submissionUploadId: string): Promise<boolean> {
-    const sqlStatement = SQL`
-      SELECT EXISTS (
-        SELECT 1
-        FROM submission_feature feature
-        JOIN submission_upload_feature staged
-          ON staged.submission_upload_feature_id = feature.submission_upload_feature_id
-        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-      ) AS exists;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ exists: z.boolean() }));
-    return response.rows[0]?.exists ?? false;
-  }
-
-  /**
-   * Resolve parent feature references for the upload's staged feature scope.
+   * Resolve parent feature references for rows belonging to one upload.
    *
    * Shallow ingestion stores raw feature payloads first. The indexing stage then
-   * resolves `data.parent` source identifiers to canonical `submission_feature_id`
+   * resolves `data.parent` source identifiers to persisted `submission_feature_id`
    * values after all rows for the upload have been inserted.
    *
    * Resolution prefers a pending row produced by the current upload, falling back to
-   * the submission's published live rows. The source scope follows retained staging
-   * links so unchanged features owned by an earlier upload are repointed when their
-   * logical parent is superseded. Ties resolve to the newest row for determinism.
+   * the submission's current published rows. Ties resolve to the newest row.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
    * @param {number} submissionId The submission the upload belongs to.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after parent identifiers have been updated for the upload rows.
    * @memberof FeatureIngestionRepository
    */
   async updateSubmissionFeatureParentsBySubmissionUploadId(
@@ -231,16 +207,10 @@ export class FeatureIngestionRepository extends BaseRepository {
           parent.submission_feature_id DESC
         LIMIT 1
       )
-      FROM submission_upload_feature staged
-      WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-        AND staged.submission_feature_id = child.submission_feature_id
+      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
         AND child.data->>'parent' IS NOT NULL
-        AND (
-          (child.record_effective_date IS NULL AND child.record_end_date IS NULL)
-          OR (`);
-    sqlStatement.append(isSubmissionFeatureActive('child'));
-    sqlStatement.append(`)
-        );`);
+        AND child.record_effective_date IS NULL
+        AND child.record_end_date IS NULL;`);
 
     await this.connection.sql(sqlStatement);
   }

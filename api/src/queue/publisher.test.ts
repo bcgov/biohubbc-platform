@@ -19,7 +19,6 @@ import {
   publishProcessDownloadJob,
   publishProcessDownloadVersionExportJob,
   publishProcessSubmissionFeaturesJob,
-  publishPromoteSubmissionFeaturesJob,
   publishReconcileSubmissionFeaturesJob
 } from './publisher';
 
@@ -455,14 +454,6 @@ describe('publisher', () => {
         jobId: 'reconcile-job-id',
         singletonKey: 'submission-upload-reconcile-upload-1',
         duplicateMessage: 'Reconciliation job already exists'
-      },
-      {
-        name: 'promotion',
-        publish: publishPromoteSubmissionFeaturesJob,
-        queue: JobQueues.PROMOTE_SUBMISSION_FEATURES,
-        jobId: 'promote-job-id',
-        singletonKey: 'submission-upload-promote-upload-1',
-        duplicateMessage: 'Promotion job already exists'
       }
     ];
 

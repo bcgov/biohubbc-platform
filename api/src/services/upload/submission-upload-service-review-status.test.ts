@@ -2,7 +2,8 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { HTTP400 } from '../../errors/http-error';
+import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { SubmissionFeatureRepository } from '../../repositories/submission-feature-repository';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
 import { SubmissionValidationService } from '../submission-validation-service';
@@ -30,6 +31,9 @@ describe('SubmissionUploadService review decisions', () => {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       status: 'submitted'
     });
+    sinon
+      .stub(SubmissionFeatureRepository.prototype, 'getActivatedSubmissionFeatureCountBySubmissionUploadId')
+      .resolves(0);
   });
 
   afterEach(() => {
@@ -90,7 +94,7 @@ describe('SubmissionUploadService review decisions', () => {
       });
       const reconcileStub = sinon
         .stub(SubmissionUploadReconciliationService.prototype, 'activateSubmissionUploadReconciliation')
-        .resolves({ new: 1, unchanged: 2, superseded: 3, conflict: 0 });
+        .resolves({ new: 1, modified: 3, unmodified: 2 });
       const updateUploadStub = sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000'
       });
@@ -124,7 +128,7 @@ describe('SubmissionUploadService review decisions', () => {
         submission_id: 1,
         upload_id: '550e8400-e29b-41d4-a716-446655440000',
         team_id: '990e8400-e29b-41d4-a716-446655440000',
-        status: 'promoted',
+        status: 'reconciled',
         ticket_id: '550e8400-e29b-41d4-a716-446655440000',
         blueprint_id: 1
       });
@@ -173,7 +177,7 @@ describe('SubmissionUploadService review decisions', () => {
       );
       const activateStub = sinon
         .stub(SubmissionUploadReconciliationService.prototype, 'activateSubmissionUploadReconciliation')
-        .resolves({ new: 0, unchanged: 1, superseded: 0, conflict: 0 });
+        .resolves({ new: 0, modified: 0, unmodified: 1 });
 
       const service = new SubmissionUploadService(getMockDBConnection());
       const result = await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
@@ -225,7 +229,7 @@ describe('SubmissionUploadService review decisions', () => {
       });
     });
 
-    it('records denial and revokes the active projection of an approved upload', async () => {
+    it('blocks denial when an upload is already approved', async () => {
       const getStatusStub = SubmissionUploadReviewStatusRepository.prototype
         .getSubmissionUploadReviewStatus as sinon.SinonStub;
       getStatusStub.resolves({
@@ -233,9 +237,9 @@ describe('SubmissionUploadService review decisions', () => {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
         status: 'approved'
       });
-      const revokeStub = sinon
-        .stub(SubmissionUploadReconciliationService.prototype, 'revokeSubmissionUploadReconciliation')
-        .resolves();
+      const approvalGuard = SubmissionFeatureRepository.prototype
+        .getActivatedSubmissionFeatureCountBySubmissionUploadId as sinon.SinonStub;
+      approvalGuard.resolves(1);
       const insertStatusStub = sinon
         .stub(SubmissionUploadReviewStatusRepository.prototype, 'insertSubmissionUploadReviewStatus')
         .resolves({
@@ -245,15 +249,18 @@ describe('SubmissionUploadService review decisions', () => {
         });
 
       const service = new SubmissionUploadService(getMockDBConnection());
-      const result = await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
-        status: 'denied'
-      });
+      try {
+        await service.updateSubmissionUploadReviewStatus('550e8400-e29b-41d4-a716-446655440000', {
+          status: 'denied'
+        });
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
 
-      expect(revokeStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
-      expect(insertStatusStub).to.have.been.calledOnce;
-      expect(insertStatusStub).to.have.been.calledBefore(revokeStub);
-      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).to.have.been.calledOnce;
-      expect(result.status).to.equal('denied');
+      expect(approvalGuard).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
+      expect(insertStatusStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
     });
 
     it('updates deleted without patching upload or feature rows', async () => {

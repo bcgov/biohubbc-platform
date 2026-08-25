@@ -48,7 +48,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
-      status: 'promoted',
+      status: 'reconciled',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       blueprint_id: 1
     } as const;
@@ -214,7 +214,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
         submission_upload_id: 'upload-1',
         submission_id: 1,
         upload_id: 'artifact-1',
-        status: 'promoted',
+        status: 'reconciled',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       })
@@ -223,7 +223,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
         submission_upload_id: 'upload-2',
         submission_id: 2,
         upload_id: 'artifact-2',
-        status: 'promoted',
+        status: 'reconciled',
         ticket_id: '22222222-2222-2222-2222-222222222222',
         blueprint_id: 1
       });
@@ -285,7 +285,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['promoted', 'indexing', 'failed'])).to.be
+    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['reconciled', 'indexing', 'failed'])).to.be
       .true;
   });
 
@@ -310,7 +310,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['promoted', 'indexing', 'failed'])).to.be
+    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['reconciled', 'indexing', 'failed'])).to.be
       .true;
   });
 });

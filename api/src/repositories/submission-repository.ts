@@ -61,6 +61,9 @@ export const SubmissionFeatureRecord = z.object({
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
   data: z.record(z.any()),
+  content_hash: z.string().nullable(),
+  reconciliation: z.enum(['new', 'modified', 'unmodified']).nullable(),
+  successor_submission_feature_id: z.number().nullable(),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
@@ -444,33 +447,23 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Delete feature relationships for the upload's staged feature scope.
+   * Delete feature relationships owned by features from one upload.
    *
-   * Relationship ownership follows the source feature. The staged scope includes
-   * unchanged source features owned by earlier uploads so their logical references
-   * can be repointed when a target is superseded.
-   *
-   * @param {string} submissionUploadId
-   * @return {Promise<void>}
+   * @param {string} submissionUploadId Submission upload identifier whose pending feature relationships are deleted.
+   * @returns {Promise<void>} Resolves after upload-owned feature relationship rows have been deleted.
    * @memberof SubmissionRepository
    */
   async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
       DELETE FROM submission_feature_feature
       WHERE source_feature_id IN (
-        SELECT staged.submission_feature_id
-        FROM submission_upload_feature staged
-        JOIN submission_feature feature
-          ON feature.submission_feature_id = staged.submission_feature_id
-        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
-          AND staged.submission_feature_id IS NOT NULL
-          AND (
-            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
-            OR (`;
-    sqlStatement.append(isSubmissionFeatureActive('feature'));
-    sqlStatement.append(`)
-          )
-      );`);
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_effective_date IS NULL
+          AND record_end_date IS NULL
+      );
+    `;
 
     await this.connection.sql(sqlStatement);
   }
