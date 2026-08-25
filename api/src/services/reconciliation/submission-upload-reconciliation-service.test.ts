@@ -25,18 +25,13 @@ describe('SubmissionUploadReconciliationService', () => {
   }
 
   it('replaces source identity errors and returns the invalid feature occurrence count', async () => {
-    const deleteErrors = sinon
-      .stub(SubmissionFeatureReconciliationRepository.prototype, 'deleteSourceIdentityErrors')
-      .resolves();
-    const insertErrors = sinon
-      .stub(SubmissionFeatureReconciliationRepository.prototype, 'insertSourceIdentityErrors')
+    const replaceErrors = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'replaceSourceIdentityErrors')
       .resolves(3);
     const service = new SubmissionUploadReconciliationService(getMockDBConnection());
 
     expect(await service.validateSubmissionFeatureSourceIdentity(UPLOAD_ID)).to.equal(3);
-    expect(deleteErrors).to.have.been.calledOnceWithExactly(UPLOAD_ID);
-    expect(insertErrors).to.have.been.calledOnceWithExactly(UPLOAD_ID);
-    expect(deleteErrors).to.have.been.calledBefore(insertErrors);
+    expect(replaceErrors).to.have.been.calledOnceWithExactly(UPLOAD_ID);
   });
 
   it('classifies an upload under the feature-state lock', async () => {
@@ -49,9 +44,7 @@ describe('SubmissionUploadReconciliationService', () => {
       .resolves();
     const service = new SubmissionUploadReconciliationService(getMockDBConnection());
 
-    expect(await service.reconcileSubmissionFeatures(UPLOAD_ID)).to.eql({
-      predecessorSubmissionUploadId: 'predecessor-upload-id'
-    });
+    expect(await service.reconcileSubmissionFeatures(UPLOAD_ID)).to.equal('predecessor-upload-id');
     expect(reconcile).to.have.been.calledWith(UPLOAD_ID, 9, 'predecessor-upload-id');
   });
 

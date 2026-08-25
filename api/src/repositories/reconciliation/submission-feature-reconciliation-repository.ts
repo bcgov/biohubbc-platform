@@ -31,24 +31,7 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   }
 
   /**
-   * Delete existing source-identity errors for an upload before validation is rerun.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<void>} Resolves after the prior source-identity errors are deleted.
-   * @memberof SubmissionFeatureReconciliationRepository
-   */
-  async deleteSourceIdentityErrors(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_feature_error
-      WHERE submission_upload_id = ${submissionUploadId}::uuid
-        AND error_code IN ('MISSING_FEATURE_SOURCE_ID', 'DUPLICATE_FEATURE_SOURCE_ID');
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Identify and persist missing and duplicate source-identity errors for an upload.
+   * Replace missing and duplicate source-identity errors for an upload.
    *
    * Detection remains database-side so potentially large source-identifier collections are never
    * materialized in the application. The returned count represents invalid feature occurrences,
@@ -58,9 +41,14 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * @returns {Promise<number>} Number of features with an invalid source identifier.
    * @memberof SubmissionFeatureReconciliationRepository
    */
-  async insertSourceIdentityErrors(submissionUploadId: string): Promise<number> {
+  async replaceSourceIdentityErrors(submissionUploadId: string): Promise<number> {
     const sql = SQL`
-      WITH missing AS (
+      WITH deleted AS (
+        DELETE FROM submission_feature_error
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND error_code IN ('MISSING_FEATURE_SOURCE_ID', 'DUPLICATE_FEATURE_SOURCE_ID')
+      ),
+      missing AS (
         SELECT COUNT(*)::integer AS count
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid

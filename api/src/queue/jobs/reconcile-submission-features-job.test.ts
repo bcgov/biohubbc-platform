@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
@@ -6,6 +7,7 @@ import { SubmissionUploadReconciliationService } from '../../services/reconcilia
 import { SecurityService } from '../../services/security-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
+  IReconcileSubmissionFeaturesJobData,
   reconcileSubmissionFeaturesJobDependencies,
   reconcileSubmissionFeaturesJobHandler
 } from './reconcile-submission-features-job';
@@ -13,7 +15,10 @@ import {
 describe('reconcile-submission-features-job', () => {
   afterEach(() => sinon.restore());
 
-  const job = { id: 'job-1', data: { submissionUploadId: 'upload-1' } } as any;
+  const job = {
+    id: 'job-1',
+    data: { submissionUploadId: 'upload-1' }
+  } as PgBoss.Job<IReconcileSubmissionFeaturesJobData>;
 
   function stubUpload() {
     const connection = getMockDBConnection();
@@ -30,7 +35,7 @@ describe('reconcile-submission-features-job', () => {
       ticket_id: 'ticket',
       blueprint_id: 1,
       status: 'ingested'
-    } as any);
+    });
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciling').resolves();
     sinon.stub(SecurityService.prototype, 'copyPredecessorSecurityRulesToSuccessors').resolves();
   }
@@ -38,9 +43,7 @@ describe('reconcile-submission-features-job', () => {
   it('routes a valid reconciliation directly to indexing', async () => {
     stubUpload();
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'validateSubmissionFeatureSourceIdentity').resolves(0);
-    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves({
-      predecessorSubmissionUploadId: null
-    });
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves(null);
     const reconciled = sinon
       .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciled')
       .resolves();
@@ -57,9 +60,7 @@ describe('reconcile-submission-features-job', () => {
   it('ends pending features from the predecessor after reconciliation', async () => {
     stubUpload();
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'validateSubmissionFeatureSourceIdentity').resolves(0);
-    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves({
-      predecessorSubmissionUploadId: 'upload-0'
-    });
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves('upload-0');
     const endFeatures = sinon
       .stub(SubmissionUploadReconciliationService.prototype, 'endPendingSubmissionFeatures')
       .resolves();

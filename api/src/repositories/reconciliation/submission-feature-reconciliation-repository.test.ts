@@ -6,25 +6,13 @@ import { SubmissionFeatureReconciliationRepository } from './submission-feature-
 describe('SubmissionFeatureReconciliationRepository', () => {
   afterEach(() => sinon.restore());
 
-  it('deletes existing source identity errors', async () => {
-    const sql = sinon.stub().resolves(mockQueryResult([], 2));
-    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
-
-    await repository.deleteSourceIdentityErrors('upload-id');
-
-    const text = sql.firstCall.args[0].text as string;
-    expect(text).to.include('DELETE FROM submission_feature_error');
-    expect(text).to.include('MISSING_FEATURE_SOURCE_ID');
-    expect(text).to.include('DUPLICATE_FEATURE_SOURCE_ID');
-  });
-
-  it('inserts source identity errors and returns the invalid feature occurrence count', async () => {
+  it('replaces source identity errors and returns the invalid feature occurrence count', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([{ count: 3 }], 1));
     const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
 
-    expect(await repository.insertSourceIdentityErrors('upload-id')).to.equal(3);
+    expect(await repository.replaceSourceIdentityErrors('upload-id')).to.equal(3);
     const text = sql.firstCall.args[0].text as string;
-    expect(text).not.to.include('DELETE FROM submission_feature_error');
+    expect(text).to.include('DELETE FROM submission_feature_error');
     expect(text).to.include('MISSING_FEATURE_SOURCE_ID');
     expect(text).to.include('DUPLICATE_FEATURE_SOURCE_ID');
     expect(text).to.include('missing AS');

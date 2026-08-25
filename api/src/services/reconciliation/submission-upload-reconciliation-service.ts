@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { HTTP500 } from '../../errors/http-error';
-import { ReconciliationCounts, SubmissionUploadReconciliation } from '../../models/reconciliation';
+import { ReconciliationCounts } from '../../models/reconciliation';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
@@ -36,8 +36,7 @@ export class SubmissionUploadReconciliationService extends DBService {
    * @memberof SubmissionUploadReconciliationService
    */
   async validateSubmissionFeatureSourceIdentity(submissionUploadId: string): Promise<number> {
-    await this.submissionFeatureReconciliationRepository.deleteSourceIdentityErrors(submissionUploadId);
-    return this.submissionFeatureReconciliationRepository.insertSourceIdentityErrors(submissionUploadId);
+    return this.submissionFeatureReconciliationRepository.replaceSourceIdentityErrors(submissionUploadId);
   }
 
   /**
@@ -48,10 +47,10 @@ export class SubmissionUploadReconciliationService extends DBService {
    * written in this phase.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<SubmissionUploadReconciliation>} Pending predecessor upload used as the baseline.
+   * @returns {Promise<string | null>} Pending predecessor upload used as the baseline, when present.
    * @memberof SubmissionUploadReconciliationService
    */
-  async reconcileSubmissionFeatures(submissionUploadId: string): Promise<SubmissionUploadReconciliation> {
+  async reconcileSubmissionFeatures(submissionUploadId: string): Promise<string | null> {
     const upload = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
     const predecessorSubmissionUploadId =
       await this.submissionFeatureReconciliationRepository.findPredecessorSubmissionUploadId(
@@ -64,7 +63,7 @@ export class SubmissionUploadReconciliationService extends DBService {
       upload.submission_id,
       predecessorSubmissionUploadId
     );
-    return { predecessorSubmissionUploadId };
+    return predecessorSubmissionUploadId;
   }
 
   /**

@@ -25,8 +25,3 @@ export const ReconciliationCounts = z.object({
 });
 
 export type ReconciliationCounts = z.infer<typeof ReconciliationCounts>;
-
-/** The pending upload used as a reconciliation baseline, when present. */
-export interface SubmissionUploadReconciliation {
-  predecessorSubmissionUploadId: string | null;
-}

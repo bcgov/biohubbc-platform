@@ -44,18 +44,13 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
         return;
       }
 
-      const reconciliation = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
+      const predecessorSubmissionUploadId = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
         submissionUploadId
       );
       const securityService = new SecurityService(connection);
-      await securityService.copyPredecessorSecurityRulesToSuccessors(
-        submissionUploadId,
-        reconciliation.predecessorSubmissionUploadId
-      );
-      if (reconciliation.predecessorSubmissionUploadId) {
-        await submissionUploadReconciliationService.endPendingSubmissionFeatures(
-          reconciliation.predecessorSubmissionUploadId
-        );
+      await securityService.copyPredecessorSecurityRulesToSuccessors(submissionUploadId, predecessorSubmissionUploadId);
+      if (predecessorSubmissionUploadId) {
+        await submissionUploadReconciliationService.endPendingSubmissionFeatures(predecessorSubmissionUploadId);
       }
       await submissionUploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
       await reconcileSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {

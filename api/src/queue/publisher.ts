@@ -501,17 +501,7 @@ export const publishProcessDownloadVersionExportJob = async (
   }
 };
 
-/**
- * Options for index submission features jobs.
- * Same timeout as validation — indexing should complete within minutes.
- */
-const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
-  retryLimit: 3,
-  retryDelay: 60,
-  retryBackoff: true,
-  expireInSeconds: 60 * 10 // 10 minutes
-};
-
+/** Shared retry and timeout policy for reconciliation and indexing pipeline stages. */
 const FEATURE_PIPELINE_STAGE_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
@@ -590,7 +580,7 @@ export const publishIndexSubmissionFeaturesJob = async (
 ): Promise<PublishJobResult> => {
   try {
     const boss = publisherDependencies.getPgBoss();
-    const mergedOptions = { ...INDEX_SUBMISSION_FEATURES_OPTIONS, ...options };
+    const mergedOptions = { ...FEATURE_PIPELINE_STAGE_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
 
