@@ -1,9 +1,14 @@
-# Add automated comments to the PR
-name: Add Comments
+# Keep the OpenShift URL comment in sync with the PR's preview environment.
+#
+# The routes stop resolving the moment cleanPR.yml uninstalls the Helm release, so the comment
+# is posted while the PR has a preview and deleted when it loses one. "Has a preview" is
+# deploy.yml's deployPreview rule. Each run reconciles rather than appends, so toggling draft
+# or the label never leaves duplicates.
+name: PR Comments
 
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [opened, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
 
 permissions:
   pull-requests: write
@@ -12,18 +17,78 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  addOpenshiftURLComment:
-    name: Add OpenShift URL Comment
+  syncOpenshiftURLComment:
+    name: Sync OpenShift URL Comment
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Label events fire for every label; only "No Preview" changes whether a preview exists.
+    if: ${{ (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+      github.event.label.name == 'No Preview' }}
     steps:
-      - name: Add Comment
-        uses: peter-evans/create-or-update-comment@v5
+      - name: Sync Comment
+        uses: actions/github-script@v8
+        env:
+          # deploy.yml's deployPreview rule: open, not draft, not labelled "No Preview".
+          PREVIEW_EXPECTED: ${{ github.event.pull_request.draft == false &&
+            !contains(github.event.pull_request.labels.*.name, 'No Preview') }}
+          LICENSE_PLATE: ${{ vars.OPENSHIFT_LICENSE_PLATE }}
         with:
-          issue-number: ${{ github.event.number }}
-          body: |
-            OpenShift URLs for the PR Deployment:
-            - App Route: https://biohub-platform-app-${{ github.event.number }}-${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev.apps.silver.devops.gov.bc.ca/
-            - API Route: https://biohub-platform-api-${{ github.event.number }}-${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev.apps.silver.devops.gov.bc.ca/
-            - Pods: https://console.apps.silver.devops.gov.bc.ca/k8s/ns/${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev/pods?name=${{ github.event.number }}
-            - Helm Release: https://console.apps.silver.devops.gov.bc.ca/helm-releases/ns/${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev/release/pr-${{ github.event.number }}
+          script: |
+            // Opens the body and identifies the comment on later runs. Changing it orphans
+            // the comments already sitting on open PRs.
+            const HEADING = 'OpenShift URLs for the PR Deployment:';
+
+            const previewExpected = process.env.PREVIEW_EXPECTED === 'true';
+            const plate = process.env.LICENSE_PLATE;
+            const prNumber = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100
+            });
+
+            // Bot authors only, so a person quoting the comment is never deleted.
+            const existing = comments.find(
+              (comment) => comment.user?.type === 'Bot' && comment.body?.includes(HEADING)
+            );
+
+            if (!previewExpected) {
+              if (!existing) {
+                console.log(`PR #${prNumber} has no preview environment and no comment to remove.`);
+                return;
+              }
+
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id
+              });
+
+              console.log(`Removed the OpenShift URL comment from PR #${prNumber}; its preview environment is gone.`);
+              return;
+            }
+
+            // The routes derive from the PR number alone, so an existing comment is correct.
+            if (existing) {
+              console.log(`PR #${prNumber} already has the OpenShift URL comment.`);
+              return;
+            }
+
+            const body = [
+              HEADING,
+              `- App Route: https://biohub-platform-app-${prNumber}-${plate}-dev.apps.silver.devops.gov.bc.ca/`,
+              `- API Route: https://biohub-platform-api-${prNumber}-${plate}-dev.apps.silver.devops.gov.bc.ca/`,
+              `- Pods: https://console.apps.silver.devops.gov.bc.ca/k8s/ns/${plate}-dev/pods?name=${prNumber}`,
+              `- Helm Release: https://console.apps.silver.devops.gov.bc.ca/helm-releases/ns/${plate}-dev/release/pr-${prNumber}`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body
+            });
+
+            console.log(`Posted the OpenShift URL comment to PR #${prNumber}.`);

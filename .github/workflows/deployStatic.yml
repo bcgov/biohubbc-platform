@@ -101,8 +101,9 @@ jobs:
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
         env:
           OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -151,8 +152,9 @@ jobs:
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
         env:
           OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -201,8 +203,9 @@ jobs:
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
         env:
           OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -251,8 +254,9 @@ jobs:
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
         env:
           OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
