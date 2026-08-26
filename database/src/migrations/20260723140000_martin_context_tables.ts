@@ -53,10 +53,12 @@ export async function up(knex: Knex): Promise<void> {
     -- Indexes
     ----------------------------------------------------------------------------------------
 
+    -- Serves the reuse lookup on the mint path, which reads the newest qualifying row for a hash.
+    --
     -- Deliberately NOT unique. A "unique among live rows" partial index is impossible here because
-    -- the liveness predicate depends on now(), which is not immutable. Two concurrent mints of the
-    -- same search can therefore create duplicate live contexts; both are correct, both expire, and
-    -- the cleanup job removes them. Reuse picks the newest qualifying row.
+    -- the liveness predicate depends on now(), which is not immutable. Uniqueness among live
+    -- contexts is instead upheld by the mint path, which reads and inserts in one statement behind
+    -- an advisory lock keyed on the hash.
     CREATE INDEX martin_context_idx1 ON martin_context(context_hash);
 
     -- Serves the expiry sweep and the live-context cap's eviction ordering.

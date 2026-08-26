@@ -68,8 +68,9 @@ export class MartinContextService extends DBService {
     // Resolved exactly as feature search resolves it, so an unknown feature type fails identically.
     const { feature_type_id } = await this.submissionRepository.getFeatureTypeIdByName(featureTypeName);
 
-    // Normalized for the secured-results probe below; persistence runs the same validator
-    // internally, so both operate on one identity for the search.
+    // Validated once, then used twice: the secured-results probe below and the write path both take
+    // the normalized tree, so the search has one identity here and the metadata reads behind
+    // validation are not repeated per mint.
     const normalizedExpression: NormalizedExpressionTreeExpression | undefined = expressionTree
       ? await this.semanticValidator.validateExpressionTree(expressionTree)
       : undefined;
@@ -77,8 +78,8 @@ export class MartinContextService extends DBService {
     // Persisting (with reuse by semantic hash) is what gives the search a stable id the tile
     // function can evaluate at serve time. NULL means browse-all: no filtering beyond the feature
     // type and the caller's authorization.
-    const expressionId = expressionTree
-      ? (await this.expressionTreeService.writeExpressionTree(expressionTree)).expression_id
+    const expressionId = normalizedExpression
+      ? (await this.expressionTreeService.writeNormalizedExpressionTree(normalizedExpression)).expression_id
       : null;
 
     const contextHash = computeMartinContextHash({
@@ -97,63 +98,53 @@ export class MartinContextService extends DBService {
       systemUserId
     );
 
-    const reusable = await this.martinContextRepository.findReusableLiveContext(contextHash, tokenTtlSeconds);
-
-    if (reusable) {
-      // NOTE: log the expression id, never the expression itself.
-      defaultLog.info({
-        label: 'createOrReuseMartinContext',
-        message: 'reused tile context',
-        martin_context_id: reusable.martin_context_id,
-        expression_id: expressionId
-      });
-
-      return {
-        martinContextId: reusable.martin_context_id,
-        expiresInSeconds: reusable.expires_in_seconds,
-        hasMoreSecuredFeatures
-      };
-    }
-
-    const created = await this.martinContextRepository.insertMartinContext(
+    // Reuse and creation are one statement, serialized per context hash: two identical mints racing
+    // here would otherwise both find nothing and both insert, and Martin would cache one search's
+    // tiles twice.
+    const context = await this.martinContextRepository.ensureLiveContext(
       {
         context_hash: contextHash,
         expression_id: expressionId,
         feature_type_id,
         system_user_id: systemUserId ?? null
       },
+      tokenTtlSeconds,
       contextTtlSeconds
     );
 
-    // Bound the context rows a caller can force by varying a search per mint. Enforced by eviction
-    // rather than refusal, because a global refusal hands anyone a denial of service costing one
-    // request per context. Evicting the context closest to expiry puts the cost on the least useful
-    // session instead, and that caller re-mints on its next refresh. The new context is passed so it
-    // can never be chosen as its own victim.
-    const evicted = await this.martinContextRepository.enforceLiveContextCap(
-      maxLiveContexts,
-      created.martin_context_id
-    );
+    if (context.inserted) {
+      // Bound the context rows a caller can force by varying a search per mint. Only a genuine
+      // insert grows the table, so reuse never reaches this. Enforced by eviction rather than
+      // refusal, because a global refusal hands anyone a denial of service costing one request per
+      // context. Evicting the context closest to expiry puts the cost on the least useful session
+      // instead, and that caller re-mints on its next refresh. The new context is passed so it can
+      // never be chosen as its own victim.
+      const evicted = await this.martinContextRepository.enforceLiveContextCap(
+        maxLiveContexts,
+        context.martin_context_id
+      );
 
-    if (evicted) {
-      defaultLog.warn({
-        label: 'createOrReuseMartinContext',
-        message: 'live tile context cap reached; evicted the contexts closest to expiry',
-        evicted,
-        max_live_contexts: maxLiveContexts
-      });
+      if (evicted) {
+        defaultLog.warn({
+          label: 'createOrReuseMartinContext',
+          message: 'live tile context cap reached; evicted the contexts closest to expiry',
+          evicted,
+          max_live_contexts: maxLiveContexts
+        });
+      }
     }
 
+    // NOTE: log the expression id, never the expression itself.
     defaultLog.info({
       label: 'createOrReuseMartinContext',
-      message: 'created tile context',
-      martin_context_id: created.martin_context_id,
+      message: context.inserted ? 'created tile context' : 'reused tile context',
+      martin_context_id: context.martin_context_id,
       expression_id: expressionId
     });
 
     return {
-      martinContextId: created.martin_context_id,
-      expiresInSeconds: created.expires_in_seconds,
+      martinContextId: context.martin_context_id,
+      expiresInSeconds: context.expires_in_seconds,
       hasMoreSecuredFeatures
     };
   }

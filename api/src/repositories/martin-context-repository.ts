@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings';
-import { CreateMartinContext, MartinContextWithExpiry } from '../models/martin-context';
+import { CreateMartinContext, ResolvedMartinContext } from '../models/martin-context';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -7,75 +7,91 @@ import { BaseRepository } from './base-repository';
  */
 export class MartinContextRepository extends BaseRepository {
   /**
-   * Find a live context that an identical request can reuse.
+   * Return the live context an identical request reuses, creating one when there is none.
    *
    * Reuse is what makes tile caching effective: every caller with the same identity running the same
-   * search shares one context, and therefore one set of cached tiles.
+   * search shares one context, and therefore one set of cached tiles. Two identical mints arriving
+   * together would otherwise both read nothing and both insert, and Martin would then cache one
+   * search's tiles twice under two ids.
+   *
+   * Serialized by an advisory lock keyed on the context hash, held for the rest of the caller's
+   * transaction. Keying on the hash is what keeps the wait narrow: a different search, or the same
+   * search by a different user, hashes differently and never waits. The two-key form addresses a
+   * `martin_context` namespace, so these locks cannot collide with the single-key locks the queue
+   * jobs take.
+   *
+   * The lock is taken as its own statement, deliberately. Under READ COMMITTED a statement's
+   * snapshot is taken before the statement runs, so acquiring the lock inside the same statement
+   * that reads leaves the reader looking at a snapshot from before the winner committed — it waits,
+   * then inserts a duplicate anyway. Locking first means the read below runs on a snapshot taken
+   * after the wait, which is what actually makes the loser see the winner's row.
    *
    * A context is only reusable while it still has at least `minRemainingSeconds` of life, which the
    * caller sets to the token lifetime. Handing out a fresh token against a context due to expire
    * sooner would produce a session whose tiles die mid-use. The context's own expiry is never
-   * extended.
-   *
-   * @param {string} contextHash
-   * @param {number} minRemainingSeconds
-   * @return {Promise<MartinContextWithExpiry | null>}
-   * @memberof MartinContextRepository
-   */
-  async findReusableLiveContext(
-    contextHash: string,
-    minRemainingSeconds: number
-  ): Promise<MartinContextWithExpiry | null> {
-    const sqlStatement = SQL`
-      SELECT
-        martin_context_id,
-        floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds
-      FROM martin_context
-      WHERE context_hash = ${contextHash}
-        AND record_end_date >= now() + make_interval(secs => ${minRemainingSeconds})
-      ORDER BY create_date DESC
-      LIMIT 1;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, MartinContextWithExpiry);
-
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Insert a tile context.
+   * extended, so reuse cannot keep a context alive indefinitely.
    *
    * `create_user` comes from the connection's audit context (`api_get_context_user_id()`): the
    * searcher when the request is authenticated, the API service account for anonymous mints.
    *
-   * @param {CreateMartinContext} context
-   * @param {number} ttlSeconds
-   * @return {Promise<MartinContextWithExpiry>}
+   * @param {CreateMartinContext} context - Context to insert if none is reusable.
+   * @param {number} minRemainingSeconds - Life a context must still have to be reusable.
+   * @param {number} ttlSeconds - Lifetime given to a context this call creates.
+   * @return {Promise<ResolvedMartinContext>} The reused or inserted context, and which of the two it was.
    * @memberof MartinContextRepository
    */
-  async insertMartinContext(context: CreateMartinContext, ttlSeconds: number): Promise<MartinContextWithExpiry> {
+  async ensureLiveContext(
+    context: CreateMartinContext,
+    minRemainingSeconds: number,
+    ttlSeconds: number
+  ): Promise<ResolvedMartinContext> {
+    await this.connection.sql(
+      SQL`SELECT pg_advisory_xact_lock(hashtext('martin_context'), hashtext(${context.context_hash}));`
+    );
+
     const sqlStatement = SQL`
-      INSERT INTO martin_context (
-        context_hash,
-        expression_id,
-        feature_type_id,
-        system_user_id,
-        record_end_date,
-        create_user
-      ) VALUES (
-        ${context.context_hash},
-        ${context.expression_id},
-        ${context.feature_type_id},
-        ${context.system_user_id},
-        now() + make_interval(secs => ${ttlSeconds}),
-        api_get_context_user_id()
+      WITH reused_context AS (
+        SELECT
+          martin_context_id,
+          floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds,
+          false AS inserted
+        FROM martin_context
+        WHERE context_hash = ${context.context_hash}
+          AND record_end_date >= now() + make_interval(secs => ${minRemainingSeconds})
+        ORDER BY create_date DESC
+        LIMIT 1
+      ),
+      created_context AS (
+        INSERT INTO martin_context (
+          context_hash,
+          expression_id,
+          feature_type_id,
+          system_user_id,
+          record_end_date,
+          create_user
+        )
+        SELECT
+          ${context.context_hash},
+          ${context.expression_id},
+          ${context.feature_type_id},
+          ${context.system_user_id},
+          now() + make_interval(secs => ${ttlSeconds}),
+          api_get_context_user_id()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM reused_context
+        )
+        RETURNING
+          martin_context_id,
+          floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds,
+          true AS inserted
       )
-      RETURNING
-        martin_context_id,
-        floor(extract(epoch FROM (record_end_date - now())))::integer AS expires_in_seconds;
+      SELECT martin_context_id, expires_in_seconds, inserted FROM reused_context
+      UNION ALL
+      SELECT martin_context_id, expires_in_seconds, inserted FROM created_context;
     `;
 
-    const response = await this.connection.sql(sqlStatement, MartinContextWithExpiry);
+    const response = await this.connection.sql(sqlStatement, ResolvedMartinContext);
 
     return response.rows[0];
   }

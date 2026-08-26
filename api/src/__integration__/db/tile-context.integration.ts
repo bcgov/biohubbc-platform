@@ -7,10 +7,13 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ExpressionTree } from '../../models/expression-tree';
+import { MartinContextRepository } from '../../repositories/martin-context-repository';
+import { ExpressionPredicateSemanticValidator } from '../../services/expression-predicate-semantic-validator';
 import { MartinContextService } from '../../services/martin-context-service';
 
 const FEATURE_TYPE = 'species_observation';
@@ -58,6 +61,21 @@ const resolveNumericProperty = async (connection: IDBConnection): Promise<Proper
   return result.rows[0];
 };
 
+/**
+ * Resolve the id of the feature type under test.
+ *
+ * @param {IDBConnection} connection
+ * @return {*}  {Promise<number>}
+ */
+const resolveFeatureTypeId = async (connection: IDBConnection): Promise<number> => {
+  const result = await connection.sql(
+    SQL`SELECT feature_type_id FROM feature_type WHERE name = ${FEATURE_TYPE} AND record_end_date IS NULL;`,
+    z.object({ feature_type_id: z.number() })
+  );
+
+  return result.rows[0].feature_type_id;
+};
+
 const storedContextSchema = z.object({
   expression_id: z.string().nullable(),
   system_user_id: z.number().nullable(),
@@ -85,6 +103,7 @@ describe('Tile context (integration)', function () {
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
     process.env = { ...originalEnv };
@@ -150,6 +169,17 @@ describe('Tile context (integration)', function () {
       expect(stored.expression_id).to.be.null;
       expect(stored.system_user_id).to.be.null;
       expect(stored.create_user).to.be.a('number');
+    });
+
+    it('validates the search once, and reuses that normalized tree to persist it', async () => {
+      // Validation resolves property metadata from the database. The probe for secured results and
+      // the write path both need the normalized tree, so validating per consumer would repeat those
+      // reads on every mint.
+      const validate = sinon.spy(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree');
+
+      await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900103), null);
+
+      expect(validate.callCount).to.equal(1);
     });
 
     it('persists the search expression and references it from the context', async () => {
@@ -252,6 +282,70 @@ describe('Tile context (integration)', function () {
       const stored = await readContext(authenticated.martinContextId);
 
       expect(stored.system_user_id).to.equal(systemUserId ?? 1);
+    });
+
+    it('resolves two simultaneous identical mints to one context', async () => {
+      // The reuse check and the insert are one logical step. Without serialization two callers
+      // arriving together both read nothing — neither can see the other's uncommitted row — and both
+      // insert, so Martin caches one search's tiles twice under two ids.
+      //
+      // Exercised at the repository, where that step lives: the service does several round trips
+      // before reaching it, which makes the window this covers a matter of timing rather than a
+      // property of the code. Two real connections, because two transactions on one connection
+      // serialize regardless and would pass whatever the implementation does.
+      const contextHash = 'integration-concurrent-mint';
+      const featureTypeId = await resolveFeatureTypeId(connection);
+      const newContext = {
+        context_hash: contextHash,
+        expression_id: null,
+        feature_type_id: featureTypeId,
+        system_user_id: null
+      };
+
+      const [connectionA, connectionB] = [getAPIUserDBConnection(), getAPIUserDBConnection()];
+
+      await Promise.all([connectionA.open(), connectionB.open()]);
+
+      try {
+        // A creates and holds its transaction open, so its row is written but invisible to B.
+        const first = await new MartinContextRepository(connectionA).ensureLiveContext(newContext, 900, 1800);
+
+        expect(first.inserted).to.be.true;
+
+        // B starts inside exactly that window, and must wait rather than insert alongside it.
+        const secondPending = new MartinContextRepository(connectionB).ensureLiveContext(newContext, 900, 1800);
+
+        await new Promise((resolve) => setTimeout(resolve, 250));
+
+        await connectionA.commit();
+
+        const second = await secondPending;
+
+        await connectionB.commit();
+
+        expect(second.inserted, 'the second caller must reuse rather than insert').to.be.false;
+        expect(second.martin_context_id).to.equal(first.martin_context_id);
+
+        const stored = await connection.sql(
+          SQL`SELECT count(*)::integer AS total FROM martin_context WHERE context_hash = ${contextHash};`,
+          z.object({ total: z.number() })
+        );
+
+        expect(stored.rows[0].total).to.equal(1);
+      } finally {
+        connectionA.release();
+        connectionB.release();
+
+        // These rows are committed, so they outlive the suite's rollback — and the suite connection
+        // is rolled back, so deleting them through it would not stick either. Cleanup gets its own
+        // committed transaction. Deleting by hash also clears the duplicate a regression leaves.
+        const cleanupConnection = getAPIUserDBConnection();
+
+        await cleanupConnection.open();
+        await cleanupConnection.sql(SQL`DELETE FROM martin_context WHERE context_hash = ${contextHash};`);
+        await cleanupConnection.commit();
+        cleanupConnection.release();
+      }
     });
   });
 

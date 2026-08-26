@@ -31,10 +31,19 @@ export const CreateMartinContext = MartinContext.omit({
 });
 export type CreateMartinContext = z.infer<typeof CreateMartinContext>;
 
-/** A context row plus the remaining lifetime the client needs in order to schedule a refresh. */
-export const MartinContextWithExpiry = MartinContext.pick({
+/**
+ * The context a mint resolved to, reused or newly inserted.
+ *
+ * `expires_in_seconds` is the remaining lifetime the client schedules its refresh from.
+ *
+ * `inserted` distinguishes the two outcomes of the one statement that either reuses a live context
+ * or creates one. Only a genuine insert grows the table, so it is what the live-context cap keys
+ * off, and what the mint logs report.
+ */
+export const ResolvedMartinContext = MartinContext.pick({
   martin_context_id: true
 }).extend({
-  expires_in_seconds: z.number()
+  expires_in_seconds: z.number(),
+  inserted: z.boolean()
 });
-export type MartinContextWithExpiry = z.infer<typeof MartinContextWithExpiry>;
+export type ResolvedMartinContext = z.infer<typeof ResolvedMartinContext>;
