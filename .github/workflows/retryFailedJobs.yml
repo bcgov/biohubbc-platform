@@ -17,7 +17,6 @@ on:
       - "PR-Based Deploy on OpenShift"
       - "Static Deploy on OpenShift"
       - "Clean PR Artifacts"
-      - "Draft Scale Down"
       - "Sweep Stale PR Environments"
     types: [completed]
 
