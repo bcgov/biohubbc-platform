@@ -1,15 +1,15 @@
-# Auto-retry workflow runs that failed due to intermittent connection timeouts to OpenShift
-# endpoints — the API server (oc login, :6443) or the image registry route (docker login) —
-# caused by source-IP dependent drops of some GitHub-hosted runner egress IPs.
+# Auto-retry workflow runs that failed reaching OpenShift — the API server (oc login, :6443)
+# or the image registry route (docker login) — when some GitHub-hosted runner egress IPs are
+# dropped by source IP.
 #
-# Why this exists: in-job retry loops never recover from the timeout because the runner's
-# egress IP is fixed for the life of the job — every retry re-sends from the same blocked IP.
-# Re-running the *job* lands it on a fresh runner (fresh egress IP), which is the only retry
-# that works. This workflow watches for failed runs, checks whether the failure was the
-# connection timeout (and not a genuine build/deploy error), and re-runs only the failed jobs.
+# Why this exists: in-job retry loops never recover, because the runner's egress IP is fixed
+# for the life of the job — every retry re-sends from the same blocked IP. Re-running the
+# *job* lands it on a fresh runner with a fresh egress IP, which is the only retry that works.
+# This workflow watches for failed runs, decides whether the failure was connectivity rather
+# than a genuine build or deploy error, and re-runs only the failed jobs.
 #
 # See SIMSBIOHUB-1079.
-name: Retry Jobs Failed on OpenShift Connection Timeout
+name: Retry Jobs Failed on OpenShift Connectivity
 
 on:
   workflow_run:
@@ -33,19 +33,43 @@ jobs:
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.run_attempt < 4
     steps:
-      # Only retry if a failed job's log shows a connection timeout to the API (:6443) or the
-      # image registry route. Genuine build, test, or deploy failures are left alone for a
-      # human to look at.
-      - name: Detect OpenShift connection timeout in failed jobs
+      - name: Detect retryable OpenShift failures
         id: detect
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
+          # This step name is load-bearing: deploy.yml and deployStatic.yml must keep it, or
+          # the registry-auth retry below silently stops firing.
+          DOCKER_AUTH_STEP="Authenticate Docker with OpenShift registry"
+
+          jobs_json="$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100")"
+
+          # The registry auth step is retried on *any* failure rather than on a recognised
+          # error string, because it reports the same drop under several wordings and a new
+          # one puts us back here. The token is either valid or it is not, so anything else is
+          # connectivity — and a misconfigured token fails all eight build jobs identically,
+          # which is unmistakable. A failed `docker login` costs seconds, so a fresh runner is
+          # cheaper than classifying the error. Match the name exactly: the same response also
+          # reports workflowStatus's "Report failure" step as failed.
+          docker_auth_failures="$(printf '%s' "${jobs_json}" | jq --arg step "${DOCKER_AUTH_STEP}" '
+            [.jobs[] | select(.conclusion == "failure")
+             | .steps[] | select(.conclusion == "failure" and .name == $step)] | length')"
+
+          if [ "${docker_auth_failures}" -gt 0 ]; then
+            echo "A job failed on \"${DOCKER_AUTH_STEP}\"; re-running on a fresh runner."
+            echo "timeout_failure=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          # Every other step is retried only when its log shows a connection timeout to the API
+          # server (:6443) or the registry route. Genuine build, test and deploy failures are
+          # left for a human — in particular Helm's "context deadline exceeded", which means the
+          # release never became ready inside its --wait timeout. Retrying that cannot fix it
+          # and costs another full deploy per attempt, so do not add the bare string here.
           found=false
-          for job_id in $(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" \
-              --jq '.jobs[] | select(.conclusion == "failure") | .id'); do
+          for job_id in $(printf '%s' "${jobs_json}" | jq '.jobs[] | select(.conclusion == "failure") | .id'); do
             if gh api "repos/${REPO}/actions/jobs/${job_id}/logs" 2>/dev/null \
                 | grep -qE ':6443: i/o timeout|Client\.Timeout exceeded while awaiting headers|request canceled while waiting for connection|net/http: TLS handshake timeout'; then
               echo "Job ${job_id} failed on an OpenShift connection timeout."
