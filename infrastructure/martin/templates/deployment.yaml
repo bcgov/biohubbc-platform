@@ -48,12 +48,23 @@ spec:
           command: ['sh', '-c']
           args:
             - |
+              set -eu
+              # The credentials come from a secret whose keys are populated from CI values, and an
+              # unset CI value yields a present-but-empty key rather than a missing one, so the
+              # secretKeyRef resolves and the emptiness only surfaces here. Checked before the loop
+              # because an empty user is otherwise swallowed by psql's own argument parsing: the
+              # shell drops the empty word, `-U` takes the next flag as its value, and the pod waits
+              # forever reporting an authentication failure for a user named after a flag.
+              : "${DB_USER:?is empty: set the martin database user (DATABASE_USER_MARTIN in CI, or the operator-managed secret)}"
+              : "${DB_PASS:?is empty: set the martin database password (DATABASE_USER_MARTIN_PASSWORD in CI, or the operator-managed secret)}"
+              : "${DB_NAME:?is empty: set the database name}"
+
               echo "Waiting for the Martin tile functions to be created..."
               {{- $predicates := list }}
               {{- range $id, $source := .Values.app.martin.functions }}
               {{- $predicates = append $predicates (printf "to_regprocedure('%s.%s(integer, integer, integer, json)') IS NOT NULL" $source.schema $source.function) }}
               {{- end }}
-              until PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -tAc \
+              until PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
                 "SELECT {{ join " AND " $predicates }}" | grep -q '^t$'; do
                 echo "Tile functions not created yet, waiting..."
                 sleep 5
