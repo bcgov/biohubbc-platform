@@ -213,7 +213,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('"sf"."submission_id" = ?');
           expect(sql).to.include('sf.record_effective_date <= now()');
           expect(sql).to.include('with recursive successor_chain');
-          expect((sql.match(/with recursive successor_chain/g) || []).length).to.equal(1);
+          expect(sql.match(/with recursive successor_chain/g) || []).to.have.lengthOf(1);
           expect(sql).to.include('terminal.terminal_submission_feature_id');
           expect(sql).to.include('successor.submission_id = chain.submission_id');
           expect(sql).to.include('submission_feature_closure');

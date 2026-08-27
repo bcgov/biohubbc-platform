@@ -48,7 +48,7 @@ describe('sql-fragments', () => {
     it('contains zero bound placeholders', () => {
       const sql = buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id');
 
-      expect((sql.match(/\?/g) || []).length).to.equal(0);
+      expect(sql.match(/\?/g) || []).to.be.empty;
     });
   });
 

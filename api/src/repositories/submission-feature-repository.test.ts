@@ -51,7 +51,7 @@ describe('SubmissionFeatureRepository feature lookup', () => {
     const text = sql.firstCall.args[0].text as string;
     expect(text).to.include(isSubmissionFeaturePublished('sf'));
     expect(text).to.include('WITH RECURSIVE successor_chain');
-    expect((text.match(/WITH RECURSIVE successor_chain/g) || []).length).to.equal(1);
+    expect(text.match(/WITH RECURSIVE successor_chain/g) || []).to.have.lengthOf(1);
     expect(text).to.include('terminal.terminal_submission_feature_id');
     expect(text).to.include('successor.submission_id = chain.submission_id');
     expect(text).to.include('WITH RECURSIVE historical_ancestry');
