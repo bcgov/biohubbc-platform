@@ -18,6 +18,13 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// The map owns its own data loading and is covered by its own suite; this one is about the page layout.
+vi.mock('features/submissions/page/features/components/map/SubmissionFeatureMap', () => ({
+  SubmissionFeatureMap: (props: { submissionId: number; submissionFeatureId: number }) => (
+    <div data-testid="submission-feature-map-stub" data-props={JSON.stringify(props)} />
+  )
+}));
+
 const mockGetSubmissionFeatureById = vi.fn();
 const mockGetSubmissionFeatureProperties = vi.fn();
 
@@ -107,5 +114,25 @@ describe('PortalSubmissionFeaturePage', () => {
     const { findByRole } = renderPage();
 
     expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal/submission');
+  });
+
+  it('places the map between Properties and Related', async () => {
+    const { findByText, getAllByRole } = renderPage();
+    await findByText('Properties');
+
+    const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+
+    expect(sectionLabels).toEqual(['Properties', 'Map', 'Related']);
+  });
+
+  it('maps the feature being viewed', async () => {
+    const { findByTestId } = renderPage();
+
+    const stub = await findByTestId('submission-feature-map-stub');
+
+    expect(JSON.parse(stub.dataset.props ?? '{}')).toEqual({
+      submissionId: mockFeature.submission_id,
+      submissionFeatureId: mockFeature.submission_feature_id
+    });
   });
 });

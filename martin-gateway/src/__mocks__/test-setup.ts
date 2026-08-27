@@ -45,6 +45,8 @@ export const testKeys = {
 export const TEST_AUDIENCE = 'biohub-tiles';
 export const TEST_ISSUER = 'biohub-api';
 export const TEST_SOURCE = 'search';
+/** A second allowlisted source, so cross-source isolation is testable. */
+export const TEST_SECOND_SOURCE = 'feature';
 
 process.env.NODE_ENV = 'test';
 process.env.MARTIN_TOKEN_PUBLIC_KEY_DIR = keyDir;
@@ -52,7 +54,7 @@ process.env.MARTIN_TOKEN_PUBLIC_KEY_DIR = keyDir;
 process.env.MARTIN_TOKEN_KID = PRIMARY_KID;
 process.env.MARTIN_TOKEN_AUD = TEST_AUDIENCE;
 process.env.MARTIN_TOKEN_ISS = TEST_ISSUER;
-process.env.MARTIN_ALLOWED_SOURCES = TEST_SOURCE;
+process.env.MARTIN_ALLOWED_SOURCES = `${TEST_SOURCE},${TEST_SECOND_SOURCE}`;
 process.env.MARTIN_MIN_ZOOM = '0';
 process.env.MARTIN_MAX_ZOOM = '15';
 process.env.MARTIN_SOURCE_VERSION = 'testv1';

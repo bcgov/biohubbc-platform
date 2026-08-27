@@ -3,7 +3,7 @@ import { after, afterEach, before, describe, it } from 'mocha';
 import http from 'node:http';
 import { rawGet } from '../__mocks__/http-client.js';
 import { defaultTileResponse, gzippedTileBody, startStubMartin, StubMartin } from '../__mocks__/stub-martin.js';
-import { TEST_SOURCE } from '../__mocks__/test-setup.js';
+import { TEST_SECOND_SOURCE, TEST_SOURCE } from '../__mocks__/test-setup.js';
 import { bearer } from '../__mocks__/token-helpers.js';
 import { app } from '../app.js';
 import { clearInflight } from '../upstream/inflight.js';
@@ -116,6 +116,59 @@ describe('tile route', () => {
 
       expect(response.status).to.equal(401);
       expect(martin.requests).to.have.length(0);
+    });
+  });
+
+  describe('source isolation', () => {
+    it('serves a second allowlisted source', async () => {
+      const response = await rawGet(server, `/martin/${TEST_SECOND_SOURCE}/5/5/11`, {
+        authorization: bearer({ source: TEST_SECOND_SOURCE })
+      });
+
+      expect(response.status).to.equal(200);
+      expect(martin.requests[0].url).to.equal(`/${TEST_SECOND_SOURCE}/5/5/11?context=ctx-test&v=testv1`);
+    });
+
+    it('rejects a token minted for a different allowlisted source', async () => {
+      // Both sources are served, so this is the check that keeps one source's token from reading
+      // another's tiles: being allowlisted is not the same as being granted.
+      const response = await rawGet(server, `/martin/${TEST_SECOND_SOURCE}/5/5/11`, {
+        authorization: bearer({ source: TEST_SOURCE })
+      });
+
+      expect(response.status).to.equal(403);
+      expect(martin.requests).to.have.length(0);
+    });
+
+    it('rejects the reverse pairing too', async () => {
+      const response = await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, {
+        authorization: bearer({ source: TEST_SECOND_SOURCE })
+      });
+
+      expect(response.status).to.equal(403);
+      expect(martin.requests).to.have.length(0);
+    });
+
+    it('requests each source under its own upstream URL', async () => {
+      const context = 'sf:12:34';
+
+      await rawGet(server, `/martin/${TEST_SOURCE}/5/5/11`, {
+        authorization: bearer({ source: TEST_SOURCE, ctx: context })
+      });
+      await rawGet(server, `/martin/${TEST_SECOND_SOURCE}/5/5/11`, {
+        authorization: bearer({ source: TEST_SECOND_SOURCE, ctx: context })
+      });
+
+      // Same context and same tile coordinates: only the source path keeps these apart in Martin's
+      // cache. The context is percent encoded on the way out, so Martin decodes it back before the
+      // tile function sees it.
+      const encodedContext = encodeURIComponent(context);
+
+      expect(martin.requests).to.have.length(2);
+      expect(martin.requests.map((request) => request.url)).to.eql([
+        `/${TEST_SOURCE}/5/5/11?context=${encodedContext}&v=testv1`,
+        `/${TEST_SECOND_SOURCE}/5/5/11?context=${encodedContext}&v=testv1`
+      ]);
     });
   });
 

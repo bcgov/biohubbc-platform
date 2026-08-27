@@ -50,6 +50,19 @@ app:
         # [west, south, east, north] - British Columbia
         bounds: [-139.06, 48.30, -114.03, 60.00]
 
+      # Spatial properties of a single submission feature. The submission and feature ids are
+      # carried by the token the gateway verifies, so this source needs no context lookup.
+      # See database/src/procedures/04_martin_feature.ts
+      #
+      # No bounds: a feature's extent is its own, and the client frames the map from the bbox the
+      # tile session returns rather than from TileJSON.
+      feature:
+        schema: biohub
+        function: martin_feature
+        minzoom: 0
+        # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+        maxzoom: 15
+
   database:
     port: 5432
     # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments
@@ -111,7 +124,7 @@ gateway:
 
   # Sources the gateway will serve. Comma separated. Anything else is rejected regardless of what
   # Martin publishes, so an accidentally published source is still not publicly reachable.
-  allowedSources: search
+  allowedSources: search,feature
 
   # Zoom range the gateway will proxy. Deliberately WIDER than the client floor
   # (MAP_MIN_ZOOM in app/src/constants/spatial.ts): this is a bound on what a token holder may

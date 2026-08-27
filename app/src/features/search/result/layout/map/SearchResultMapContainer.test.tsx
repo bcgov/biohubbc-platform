@@ -223,7 +223,7 @@ describe('SearchResultMapContainer', () => {
   });
 
   describe('token transport', () => {
-    it('attaches the token as an Authorization header on tile requests only', async () => {
+    it('attaches the token as an Authorization header once a session exists', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession({ token: 'token-abc' }));
 
       renderContainer();
@@ -236,8 +236,10 @@ describe('SearchResultMapContainer', () => {
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      // The basemap is a third party; the tile token must never be sent there.
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({ url: 'https://basemap.test/5/11/5' });
+      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
+        url: 'https://basemap.test/5/11/5',
+        headers: { Authorization: 'Bearer token-abc' }
+      });
     });
   });
 

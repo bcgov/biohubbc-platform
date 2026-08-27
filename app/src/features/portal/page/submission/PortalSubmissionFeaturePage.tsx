@@ -15,6 +15,7 @@ import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
+import { SubmissionFeatureMap } from 'features/submissions/page/features/components/map/SubmissionFeatureMap';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -254,6 +255,14 @@ export const PortalSubmissionFeaturePage = () => {
       <Container maxWidth="xl">
         <Stack spacing={3} py={4}>
           <PortalFeaturePropertiesSection submissionId={submissionId} submissionFeatureId={submissionFeatureId} />
+          <PageSection id="portal-submission-feature-map" label="Map">
+            {feature && (
+              <SubmissionFeatureMap
+                submissionId={feature.submission_id}
+                submissionFeatureId={feature.submission_feature_id}
+              />
+            )}
+          </PageSection>
           <PortalFeatureRelatedSection submissionId={submissionId} relatedFeatures={relatedFeatures ?? []} />
         </Stack>
       </Container>

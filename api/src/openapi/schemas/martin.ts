@@ -74,3 +74,68 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
   },
   additionalProperties: false
 };
+
+/**
+ * Response returned when a tile session is created for a single submission feature.
+ *
+ * Two shapes: a session with a token, or a statement that the feature has no spatial properties to
+ * map. The empty shape carries no token, because there is nothing to authorize a request for.
+ */
+export const martinFeatureSessionResponseSchema: OpenAPIV3.SchemaObject = {
+  oneOf: [
+    {
+      type: 'object',
+      required: [
+        'has_spatial_properties',
+        'token',
+        'token_type',
+        'token_expires_in',
+        'source',
+        'source_layer',
+        'martin_url_template',
+        'bbox',
+        'min_zoom',
+        'max_zoom'
+      ],
+      properties: {
+        has_spatial_properties: { type: 'boolean', enum: [true] },
+        token: {
+          type: 'string',
+          description: 'Short lived RS256 tile token. Attach as a Bearer token on tile requests.'
+        },
+        token_type: { type: 'string', enum: ['Bearer'] },
+        token_expires_in: {
+          type: 'integer',
+          description: 'Token lifetime in seconds. Request a new session before this elapses.'
+        },
+        source: { type: 'string', description: 'Tile source this token grants access to.' },
+        source_layer: {
+          type: 'string',
+          description: 'Layer name inside the vector tiles, required to configure a MapLibre layer.'
+        },
+        martin_url_template: {
+          type: 'string',
+          description: 'Tile URL template for MapLibre, e.g. "/martin/feature/{z}/{x}/{y}".'
+        },
+        bbox: {
+          type: 'array',
+          description: "Combined extent of the feature's spatial properties as [minX, minY, maxX, maxY] in WGS84.",
+          items: { type: 'number' },
+          minItems: 4,
+          maxItems: 4
+        },
+        min_zoom: { type: 'integer', description: 'Lowest zoom the tile source serves.' },
+        max_zoom: { type: 'integer', description: 'Highest zoom the tile source serves.' }
+      },
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      required: ['has_spatial_properties'],
+      properties: {
+        has_spatial_properties: { type: 'boolean', enum: [false] }
+      },
+      additionalProperties: false
+    }
+  ]
+};
