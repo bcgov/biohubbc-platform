@@ -20,7 +20,6 @@ describe('FeaturePropertyValueLink', () => {
     const link = getByRole('link', { name: 'urn:18:sample_site:3339' });
     expect(link).toHaveAttribute('href', '/submission/18/feature/3339?view=table');
     expect(link).toHaveAttribute('title', 'urn:18:sample_site:3339');
-    expect(link).toHaveAttribute('data-urn', 'urn:18:sample_site:3339');
   });
 
   it('uses the portal route base when given', () => {

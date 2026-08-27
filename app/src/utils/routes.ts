@@ -127,14 +127,14 @@ export const buildSubmissionCodePath = (
  * Builds the path of a submission feature's detail page.
  *
  * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
- * @param {string | number} submissionId - Submission the feature belongs to.
- * @param {string | number} submissionFeatureId - The feature.
+ * @param {number} submissionId - Submission the feature belongs to.
+ * @param {number} submissionFeatureId - The feature.
  * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
  * @returns {string} Feature detail page path.
  */
 export const buildSubmissionFeaturePath = (
   basePath: string,
-  submissionId: string | number,
-  submissionFeatureId: string | number,
+  submissionId: number,
+  submissionFeatureId: number,
   search = ''
 ): string => `${basePath}/${submissionId}/feature/${submissionFeatureId}${search}`;

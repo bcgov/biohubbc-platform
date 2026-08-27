@@ -38,7 +38,6 @@ export const FeaturePropertyValueLink = ({ value, featureRouteBasePath }: Featur
       )}
       label={value.label}
       title={value.urn}
-      dataAttributes={{ 'data-urn': value.urn }}
     />
   );
 };
