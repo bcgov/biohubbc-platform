@@ -270,3 +270,184 @@ export async function getPropertyFeatureRows(
   `);
   return result.rows;
 }
+
+// Indexed-property fixtures shared by the read-path suites (search-repository, property-value-read-paths).
+// They write canonical rows straight into the typed property tables against seeded feature types, which is
+// enough for read paths that resolve values by storage table and feature_type_property.
+
+/** Resolve the active feature_type_property for a (feature type, property name) pair. */
+export async function getFeatureTypePropertyId(
+  connection: IDBConnection,
+  featureTypeName: string,
+  propertyName: string
+): Promise<number> {
+  const result = await connection.sql(SQL`
+    SELECT ftp.feature_type_property_id
+    FROM feature_type_property ftp
+    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    WHERE ft.name = ${featureTypeName}
+      AND fp.name = ${propertyName}
+      AND ftp.record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  if (!result.rows[0]) {
+    throw new Error(`No feature_type_property row for (${featureTypeName}, ${propertyName})`);
+  }
+
+  return result.rows[0].feature_type_property_id;
+}
+
+/** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
+export async function getBlueprintFeatureTypePropertyId(
+  connection: IDBConnection,
+  submissionFeatureId: number,
+  featureTypePropertyId: number
+): Promise<number> {
+  const result = await connection.sql(SQL`
+    SELECT bftp.blueprint_feature_type_property_id
+    FROM submission_feature sf
+    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+    JOIN blueprint_feature_type bft
+      ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp
+      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+     AND bftp.feature_type_property_id = ${featureTypePropertyId}
+     AND bftp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${submissionFeatureId}
+    LIMIT 1;
+  `);
+
+  if (!result.rows[0]) {
+    throw new Error(
+      `No blueprint_feature_type_property for feature ${submissionFeatureId}, ftp ${featureTypePropertyId}`
+    );
+  }
+
+  return result.rows[0].blueprint_feature_type_property_id;
+}
+
+/** Index a string value for a feature under a seeded (feature type, property name). */
+export async function addStringProperty(
+  connection: IDBConnection,
+  submissionFeatureId: number,
+  featureTypeName: string,
+  propertyName: string,
+  value: string
+): Promise<void> {
+  const systemUserId = connection.systemUserId();
+  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+
+  await connection.sql(SQL`
+    INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${value}, ${systemUserId});
+  `);
+}
+
+/** Index a code reference for a feature under a seeded (feature type, property name). */
+export async function addCodeProperty(
+  connection: IDBConnection,
+  submissionFeatureId: number,
+  featureTypeName: string,
+  propertyName: string,
+  contributorCodesetCodeId: number
+): Promise<void> {
+  const systemUserId = connection.systemUserId();
+  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+
+  await connection.sql(SQL`
+    INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
+    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
+  `);
+}
+
+/** Index a taxon reference for a feature under a seeded (feature type, property name). */
+export async function addTaxonProperty(
+  connection: IDBConnection,
+  submissionFeatureId: number,
+  featureTypeName: string,
+  propertyName: string,
+  taxonId: number
+): Promise<void> {
+  const systemUserId = connection.systemUserId();
+  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+
+  await connection.sql(SQL`
+    INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, taxon_id, create_user)
+    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${taxonId}, ${systemUserId});
+  `);
+}
+
+/**
+ * Create a contributor codeset (owned by the SIMS contributor) holding one code, and return the code id.
+ *
+ * The codeset key defaults to a unique synthetic value; pass `codeset` to pin the key/label a test asserts on.
+ */
+export async function createCodesetCode(
+  connection: IDBConnection,
+  key: string,
+  label: string,
+  description: string | null = null,
+  codeset: { key?: string; label?: string } = {}
+): Promise<number> {
+  const systemUserId = connection.systemUserId();
+  const codesetKey = codeset.key ?? `int_test_codeset_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+  const codesetLabel = codeset.label ?? `Codeset for ${key}`;
+
+  // Mirror createTestSubmission: ensure the SIMS contributor exists before referencing it.
+  await connection.sql(SQL`
+    INSERT INTO contributor (client_id, description)
+    SELECT 'SIMS', 'Integration test contributor'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL
+    );
+  `);
+
+  const codesetResult = await connection.sql(SQL`
+    INSERT INTO contributor_codeset (contributor_id, key, label, create_user)
+    VALUES (
+      (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1),
+      ${codesetKey},
+      ${codesetLabel},
+      ${systemUserId}
+    )
+    RETURNING contributor_codeset_id;
+  `);
+  const codesetId = codesetResult.rows[0].contributor_codeset_id;
+
+  const codeResult = await connection.sql(SQL`
+    INSERT INTO contributor_codeset_code (contributor_codeset_id, key, label, description, create_user)
+    VALUES (${codesetId}, ${key}, ${label}, ${description}, ${systemUserId})
+    RETURNING contributor_codeset_code_id;
+  `);
+
+  return codeResult.rows[0].contributor_codeset_code_id;
+}
+
+// Auto-assigned `itis_tsn` for taxa where the test doesn't care about the TSN value.
+// taxon.itis_tsn is NOT NULL UNIQUE, so each row needs a fresh integer.
+let nextSyntheticTsn = 100_000_000;
+
+/** Create a taxon row and return its id. `rank` is the ITIS rank string (e.g. 'Species'). */
+export async function createTaxon(
+  connection: IDBConnection,
+  scientificName: string,
+  commonName: string | null = null,
+  tsn: number | null = null,
+  bcCode: string | null = null,
+  rank: string | null = null
+): Promise<number> {
+  const systemUserId = connection.systemUserId();
+  const effectiveTsn = tsn ?? nextSyntheticTsn++;
+
+  const result = await connection.sql(SQL`
+    INSERT INTO taxon (itis_scientific_name, common_name, itis_tsn, bc_taxon_code, rank, itis_data, itis_update_date, create_user)
+    VALUES (${scientificName}, ${commonName}, ${effectiveTsn}, ${bcCode}, ${rank}, '{}'::jsonb, now(), ${systemUserId})
+    RETURNING taxon_id;
+  `);
+  return result.rows[0].taxon_id;
+}

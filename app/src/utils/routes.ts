@@ -65,3 +65,39 @@ export const getSearchFeatureTypeRouteConfig = (
     title: configuredLabel ?? featureType.feature_type.display_name
   };
 };
+
+/**
+ * Parses a route parameter that identifies a record into its numeric id.
+ *
+ * Route parameters arrive as strings and may be absent or malformed, so a page resolves them here before handing
+ * them to child components: anything that is not a positive integer yields `null`, which the page treats as a
+ * missing record rather than passing a falsy value down the tree.
+ *
+ * @param {string | undefined} value - Raw route parameter value.
+ * @returns {number | null} The parsed id, or `null` when the parameter does not identify a record.
+ */
+export const parseRouteId = (value: string | undefined): number | null => {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const id = Number(value);
+
+  return id > 0 ? id : null;
+};
+
+/**
+ * Builds the path of the taxon page for a taxon referenced from a submission's features.
+ *
+ * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {number} submissionId - Submission the referencing feature belongs to.
+ * @param {number} taxonId - BioHub taxon identifier.
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {string} Taxon page path.
+ */
+export const buildSubmissionTaxonPath = (
+  basePath: string,
+  submissionId: number,
+  taxonId: number,
+  search = ''
+): string => `${basePath}/${submissionId}/taxon/${taxonId}${search}`;

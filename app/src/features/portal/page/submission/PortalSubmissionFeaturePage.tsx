@@ -1,134 +1,32 @@
-import { mdiLock, mdiMagnify } from '@mdi/js';
+import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
-import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
+import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
 import { SubmissionFeatureMap } from 'features/submissions/page/features/components/map/SubmissionFeatureMap';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IRelatedSubmissionFeature, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
+import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
-
-interface IFeaturePropertyRow {
-  id: string;
-  property: string;
-  value: string;
-}
-
-interface IPortalFeaturePropertiesSectionProps {
-  submissionId?: string;
-  submissionFeatureId?: string;
-}
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { parseRouteId } from 'utils/routes';
 
 interface IPortalFeatureRelatedSectionProps {
-  submissionId?: string;
+  submissionId: number;
   relatedFeatures: IRelatedSubmissionFeature[];
 }
-
-const propertiesColumns: GridColDef<IFeaturePropertyRow>[] = [
-  {
-    field: 'property',
-    headerName: 'Property',
-    flex: 0.3,
-    renderCell: (params) => <span style={{ textTransform: 'capitalize' }}>{params.value}</span>
-  },
-  {
-    field: 'value',
-    headerName: 'Value',
-    flex: 0.7
-  }
-];
-
-const PortalFeaturePropertiesSection = ({
-  submissionId,
-  submissionFeatureId
-}: IPortalFeaturePropertiesSectionProps) => {
-  const api = useApi();
-
-  const propertyGrid = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({
-    fetcher: async (search, pagination) => {
-      if (!submissionId || !submissionFeatureId) {
-        return {
-          properties: [],
-          pagination: {
-            total: 0,
-            current_page: 1,
-            last_page: 1,
-            per_page: pagination.limit
-          }
-        };
-      }
-
-      return api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, {
-        search,
-        ...pagination
-      });
-    },
-    extractData: (response) => response.properties,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'property', sort: 'asc' },
-    defaultPageSize: 10
-  });
-
-  return (
-    <PageSection
-      id="portal-submission-feature-properties"
-      label="Properties"
-      headerContent={
-        <Stack gap={1} direction="row" alignItems="center">
-          <TextField
-            size="small"
-            placeholder="Search by property or value"
-            value={propertyGrid.searchTerm}
-            onChange={(event) => propertyGrid.handleSearch(event.target.value)}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Icon path={mdiMagnify} size={0.875} />
-                  </InputAdornment>
-                )
-              }
-            }}
-            sx={{ width: 250 }}
-          />
-        </Stack>
-      }>
-      <CustomDataGrid
-        autoHeight
-        rows={propertyGrid.rows}
-        columns={propertiesColumns}
-        getRowId={(row) => row.id}
-        loading={propertyGrid.isLoading}
-        noRowsMessage="No properties"
-        paginationMode="server"
-        paginationModel={propertyGrid.paginationModel}
-        onPaginationModelChange={propertyGrid.handlePaginationChange}
-        pageSizeOptions={[10, 25, 50]}
-        rowCount={propertyGrid.rowCount}
-        sortingMode="server"
-        sortModel={propertyGrid.sortModel}
-        onSortModelChange={propertyGrid.handleSortChange}
-        rowSelection={false}
-      />
-    </PageSection>
-  );
-};
 
 const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalFeatureRelatedSectionProps) => {
   const navigate = useNavigate();
@@ -154,10 +52,6 @@ const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalF
   ];
 
   const handleRowClick = (params: GridRowParams<IRelatedSubmissionFeature>) => {
-    if (!submissionId) {
-      return;
-    }
-
     navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
   };
 
@@ -185,7 +79,9 @@ const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalF
 export const PortalSubmissionFeaturePage = () => {
   const navigate = useNavigate();
   const api = useApi();
-  const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const submissionId = parseRouteId(params.submissionId);
+  const submissionFeatureId = parseRouteId(params.submissionFeatureId);
 
   const featureDataLoader = useDataLoader(
     (id, featureId) => api.features.getSubmissionFeatureById(id, featureId),
@@ -198,7 +94,7 @@ export const PortalSubmissionFeaturePage = () => {
   );
 
   useEffect(() => {
-    if (!submissionId || !submissionFeatureId) {
+    if (submissionId === null || submissionFeatureId === null) {
       return;
     }
 
@@ -210,6 +106,10 @@ export const PortalSubmissionFeaturePage = () => {
     () => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined },
     [featureDataLoader.data]
   );
+
+  if (submissionId === null || submissionFeatureId === null) {
+    return <Navigate to="/page-not-found" replace />;
+  }
 
   return (
     <LoadingGuard
@@ -254,7 +154,11 @@ export const PortalSubmissionFeaturePage = () => {
       />
       <Container maxWidth="xl">
         <Stack spacing={3} py={4}>
-          <PortalFeaturePropertiesSection submissionId={submissionId} submissionFeatureId={submissionFeatureId} />
+          <FeaturePropertiesSection
+            submissionId={submissionId}
+            submissionFeatureId={submissionFeatureId}
+            featureRouteBasePath="/portal/submission"
+          />
           <PageSection id="portal-submission-feature-map" label="Map">
             {feature && (
               <SubmissionFeatureMap

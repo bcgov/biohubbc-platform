@@ -11,6 +11,13 @@ vi.mock('./map/SubmissionFeatureMap', () => ({
   )
 }));
 
+// The Properties section fetches indexed properties through `useApi`; stub it so these tests stay focused on
+// the detail content's own rendering (header, secured banner, no-data fallback). The section owns its own
+// heading, so the stub renders one to keep it visible to the section-ordering assertion below.
+vi.mock('components/property/FeaturePropertiesSection', () => ({
+  FeaturePropertiesSection: () => <h2>Properties</h2>
+}));
+
 const mockFeature: ISubmissionFeature = {
   submission_feature_id: 10,
   uuid: 'feat-uuid-1',
@@ -30,7 +37,8 @@ const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   isLoading: false,
   feature: mockFeature,
   relatedFeatures: [],
-  submissionId: '1',
+  submissionId: 1,
+  submissionFeatureId: 10,
   rootBreadcrumbLabel: 'Submissions',
   rootBreadcrumbTo: '/submissions',
   submissionDetailBasePath: '/submission'

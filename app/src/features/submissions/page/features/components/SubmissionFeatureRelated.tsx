@@ -8,7 +8,7 @@ import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
 interface SubmissionFeatureRelatedProps {
-  submissionId: string | undefined;
+  submissionId: number;
   relatedFeatures: IRelatedSubmissionFeature[];
   featureRouteBasePath?: string;
 }

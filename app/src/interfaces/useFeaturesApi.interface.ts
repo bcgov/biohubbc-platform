@@ -1,3 +1,4 @@
+import { SubmissionPropertyValue } from 'interfaces/property-value.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 export interface IRelatedSubmissionFeature {
@@ -30,7 +31,7 @@ export interface ISubmissionFeatureResponse {
 export interface IFeaturePropertyRow {
   id: string;
   property: string;
-  value: string;
+  value: SubmissionPropertyValue;
 }
 
 export interface SubmissionFeaturePropertyFilters {

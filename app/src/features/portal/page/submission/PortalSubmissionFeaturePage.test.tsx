@@ -51,14 +51,15 @@ const mockRelatedFeatures = [
   }
 ];
 
-const renderPage = () =>
+const renderPage = (initialPath = '/portal/submission/1/feature/10') =>
   render(
-    <MemoryRouter initialEntries={['/portal/submission/1/feature/10']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route
           path="/portal/submission/:submissionId/feature/:submissionFeatureId"
           element={<PortalSubmissionFeaturePage />}
         />
+        <Route path="/page-not-found" element={<div>Page Not Found</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -80,9 +81,16 @@ describe('PortalSubmissionFeaturePage', () => {
     });
 
     mockGetSubmissionFeatureProperties.mockResolvedValue({
-      properties: [{ id: 'species_name', property: 'species name', value: 'Wolf' }],
+      properties: [
+        { id: 'species_name', property: 'species name', value: 'Wolf' },
+        {
+          id: 'taxon:1',
+          property: 'focal species',
+          value: { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' }
+        }
+      ],
       pagination: {
-        total: 1,
+        total: 2,
         current_page: 1,
         last_page: 1,
         per_page: 10
@@ -95,8 +103,25 @@ describe('PortalSubmissionFeaturePage', () => {
 
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
-      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith('1', '10', expect.any(Object));
+      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
     });
+    expect(await findByText('Wolf')).toBeVisible();
+  });
+
+  it('links taxon property values to the portal taxon route', async () => {
+    const { findByRole } = renderPage();
+
+    expect(await findByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
+      'href',
+      '/portal/submission/1/taxon/180543'
+    );
+  });
+
+  it('redirects to the not found page when a route param is not a record id', async () => {
+    const { findByText } = renderPage('/portal/submission/abc/feature/10');
+
+    expect(await findByText('Page Not Found')).toBeVisible();
+    expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
   });
 
   it('uses portal route for related feature links', async () => {

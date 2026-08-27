@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Box, Typography } from '@mui/material';
 import { GridCellParams, GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
@@ -21,7 +22,9 @@ interface SearchResultTableLayoutProps {
  * Renders search results in the table view.
  *
  * Table-view layout for result rows. Builds grid columns from the result schema
- * and forwards row clicks to `SearchResultOptions`.
+ * and forwards row clicks to `SearchResultOptions`. Property cells render via
+ * `PropertyValueDisplay`, so reference values (taxon) show their label as a link while the
+ * column's text value (tooltip) stays the formatted label.
  *
  * @param {SearchResultTableLayoutProps} props - Results, feature type properties, and optional row click callback.
  * @returns {JSX.Element} Search result data grid.
@@ -43,7 +46,19 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
       flex: 1,
       sortable: false,
       valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
-      renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
+      renderCell: (params) => (
+        <Typography
+          variant="body2"
+          noWrap
+          title={typeof params.value === 'string' ? params.value : ''}
+          sx={{ width: '100%' }}>
+          <PropertyValueDisplay
+            value={params.row.properties?.[property.name]}
+            submissionId={params.row.submission_id}
+            featureRouteBasePath="/submission"
+          />
+        </Typography>
+      )
     }));
 
     return [

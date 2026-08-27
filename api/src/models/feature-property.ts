@@ -22,10 +22,33 @@ export const FeaturePropertyTypeName = z.enum([
   'artifact_key'
 ]);
 
+/**
+ * Structured value of a taxon-valued submitted property: a display `label` (ITIS scientific name,
+ * which `taxon` stores NOT NULL) plus the identifiers the UI links with.
+ */
+export const TaxonPropertyValue = z.object({
+  taxon_id: z.number(),
+  tsn: z.number(),
+  rank: z.string().nullable(),
+  label: z.string()
+});
+
+export type TaxonPropertyValue = z.infer<typeof TaxonPropertyValue>;
+
+/**
+ * Value of an indexed submitted property as read by the feature-detail properties list.
+ *
+ * Scalar-typed values are plain strings; reference-typed values are structured objects that
+ * always carry a `label` and are told apart by their identifier keys.
+ */
+export const SubmissionFeaturePropertyValue = z.union([z.string(), TaxonPropertyValue]);
+
+export type SubmissionFeaturePropertyValue = z.infer<typeof SubmissionFeaturePropertyValue>;
+
 export const SubmissionFeatureProperty = z.object({
   id: z.string(),
   property: z.string(),
-  value: z.string()
+  value: SubmissionFeaturePropertyValue
 });
 
 export type SubmissionFeatureProperty = z.infer<typeof SubmissionFeatureProperty>;

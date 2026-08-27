@@ -190,3 +190,28 @@ export function buildSecurityFilter(
   // Authenticated: feature is unsecured OR user has team scope grant (indexed closure lookups)
   return knex.raw(`${isAccessibleToUser(submissionFeatureIdColumn)}`, [systemUserId]);
 }
+
+/**
+ * Structured value for a taxon-valued submitted property, built from a `taxon` row.
+ *
+ * The object is the read-model shape returned for taxon references by every indexed-property
+ * read path (search result rows and the feature-detail properties list), so the label, the
+ * identifiers and their precedence are defined once here:
+ * - `taxon_id` — BioHub surrogate key, the link target for the UI
+ * - `tsn` — ITIS TSN
+ * - `rank` — ITIS rank (nullable), used by the UI to format scientific-name style labels
+ * - `label` — display text: the ITIS scientific name, which `taxon` stores NOT NULL
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param alias SQL alias for the joined `taxon` row (e.g. 't').
+ * @returns SQL expression producing the taxon value object.
+ */
+export function taxonPropertyValueJson(alias: string): string {
+  return `jsonb_build_object(
+    'taxon_id', ${alias}.taxon_id,
+    'tsn', ${alias}.itis_tsn,
+    'rank', ${alias}.rank,
+    'label', ${alias}.itis_scientific_name
+  )`;
+}
