@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSubmissionCodePath,
+  buildSubmissionFeaturePath,
   buildSubmissionTaxonPath,
   getSearchFeatureTypeRouteConfig,
   parseRouteId
@@ -61,6 +62,15 @@ describe('buildSubmissionCodePath', () => {
   it('URL-encodes contributor-supplied keys', () => {
     expect(buildSubmissionCodePath('/submission', 18, 'site select/strategy', 'random walk')).toBe(
       '/submission/18/code/site%20select%2Fstrategy/random%20walk'
+    );
+  });
+});
+
+describe('buildSubmissionFeaturePath', () => {
+  it('builds the feature detail path under the given submission route base', () => {
+    expect(buildSubmissionFeaturePath('/submission', 18, 3339)).toBe('/submission/18/feature/3339');
+    expect(buildSubmissionFeaturePath('/portal/submission', 18, 3339, '?view=table')).toBe(
+      '/portal/submission/18/feature/3339?view=table'
     );
   });
 });

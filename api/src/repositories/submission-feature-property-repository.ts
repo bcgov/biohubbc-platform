@@ -4,7 +4,12 @@ import { SubmissionFeatureProperty } from '../models/feature-property';
 import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { codePropertyValueJson, isSubmissionFeatureActive, taxonPropertyValueJson } from './sql-fragments';
+import {
+  codePropertyValueJson,
+  featureReferencePropertyValueJson,
+  isSubmissionFeatureActive,
+  taxonPropertyValueJson
+} from './sql-fragments';
 
 /**
  * Read repository for canonical indexed properties attached to submission features.
@@ -153,6 +158,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
    * agree on the shapes):
    * - taxon: `{ taxon_id, tsn, rank, label }`
    * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
+   * - feature: `{ urn, label }`
    *
    * `labelled_property_rows` derives `value_text` — a structured value's label, or the scalar text —
    * which backs the search predicate and sorting.
@@ -324,7 +330,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         SELECT
           'feature:' || p.submission_feature_property_feature_id::text AS id,
           fp.display_name AS property,
-          to_jsonb(referenced_sf.urn::text) AS value,
+          ${featureReferencePropertyValueJson('referenced_sf')} AS value,
           ftp.sort
         FROM submission_feature_property_feature p
         JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id

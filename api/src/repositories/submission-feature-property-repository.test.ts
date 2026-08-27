@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { codePropertyValueJson, taxonPropertyValueJson } from './sql-fragments';
+import { codePropertyValueJson, featureReferencePropertyValueJson, taxonPropertyValueJson } from './sql-fragments';
 import { SubmissionFeaturePropertyRepository } from './submission-feature-property-repository';
 
 chai.use(sinonChai);
@@ -90,6 +90,18 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.include('JOIN contributor_codeset cs');
       expect(sqlText).to.include('ON cs.contributor_codeset_id = ccc.contributor_codeset_id');
       expect(sqlText).to.not.include('to_jsonb(ccc.label::text)');
+    });
+
+    it('builds feature reference values with the shared structured-value fragment', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeaturePropertyRepository = new SubmissionFeaturePropertyRepository(mockDBConnection);
+
+      await submissionFeaturePropertyRepository.getSubmissionFeatureProperties(10, { page: 1, limit: 25 });
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include(`${featureReferencePropertyValueJson('referenced_sf')} AS value`);
+      expect(sqlText).to.not.include('to_jsonb(referenced_sf.urn::text)');
     });
 
     it('sorts a public value sort by the derived value_text column', async () => {

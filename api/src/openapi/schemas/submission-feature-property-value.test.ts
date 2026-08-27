@@ -4,6 +4,7 @@ import { describe } from 'mocha';
 import { OpenAPIV3 } from 'openapi-types';
 import {
   codePropertyValueSchema,
+  featureReferencePropertyValueSchema,
   submissionFeaturePropertyValueSchema,
   taxonPropertyValueSchema
 } from './submission-feature-property-value';
@@ -27,11 +28,16 @@ describe('submissionFeaturePropertyValueSchema', () => {
     ).to.be.true;
   });
 
+  it('accepts a feature reference value', () => {
+    expect(validate({ urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' })).to.be.true;
+  });
+
   it('rejects objects that are not a known reference value', () => {
     expect(validate({ label: 'Canis lupus' })).to.be.false;
     expect(validate({ taxon_id: 1, tsn: 180596, rank: 'Species', label: 'Canis lupus', extra: true })).to.be.false;
     expect(validate({ type: 'Point', coordinates: [1, 2] })).to.be.false;
     expect(validate({ codeset_key: 'sign', code_key: 'track', label: 'Track' })).to.be.false;
+    expect(validate({ urn: 'urn:18:sample_site:3339' })).to.be.false;
   });
 
   it('keeps the reference value schemas disjoint', () => {
@@ -39,7 +45,7 @@ describe('submissionFeaturePropertyValueSchema', () => {
       (member): member is OpenAPIV3.SchemaObject => (member as OpenAPIV3.SchemaObject).type === 'object'
     );
 
-    expect(objectMembers).to.have.lengthOf(2);
+    expect(objectMembers).to.have.lengthOf(3);
     for (const member of objectMembers) {
       expect(member.additionalProperties).to.be.false;
       expect(member.required).to.have.members(Object.keys(member.properties ?? {}));
@@ -69,5 +75,12 @@ describe('codePropertyValueSchema', () => {
       'label'
     ]);
     expect(codePropertyValueSchema.additionalProperties).to.be.false;
+  });
+});
+
+describe('featureReferencePropertyValueSchema', () => {
+  it('requires the urn and label', () => {
+    expect(featureReferencePropertyValueSchema.required).to.have.members(['urn', 'label']);
+    expect(featureReferencePropertyValueSchema.additionalProperties).to.be.false;
   });
 });

@@ -242,3 +242,25 @@ export function codePropertyValueJson(codeAlias: string, codesetAlias: string): 
     'label', ${codeAlias}.label
   )`;
 }
+
+/**
+ * Structured value for a feature-valued submitted property, built from the referenced
+ * `submission_feature` row.
+ *
+ * The object is the read-model shape returned for feature references by every indexed-property read
+ * path (search result rows and the feature-detail properties list):
+ * - `urn` — the referenced feature's URN (`urn:<submission_id>:<feature_type_name>:<submission_feature_id>`),
+ *   which identifies the feature a link targets
+ * - `label` — display text: the URN
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param alias SQL alias for the joined referenced `submission_feature` row (e.g. 'referenced_sf').
+ * @returns SQL expression producing the feature reference value object.
+ */
+export function featureReferencePropertyValueJson(alias: string): string {
+  return `jsonb_build_object(
+    'urn', ${alias}.urn,
+    'label', ${alias}.urn
+  )`;
+}

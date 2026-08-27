@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import {
   codePropertyValueJson,
+  featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
   isSubmissionFeatureActive,
@@ -148,6 +149,22 @@ describe('sql-fragments', () => {
 
     it('contains zero bound placeholders', () => {
       const sql = codePropertyValueJson('ccc', 'cs');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
+    });
+  });
+
+  describe('featureReferencePropertyValueJson', () => {
+    it('builds the feature reference value object from the aliased referenced feature row', () => {
+      const sql = featureReferencePropertyValueJson('referenced_sf');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'urn', referenced_sf.urn");
+      expect(sql).to.include("'label', referenced_sf.urn");
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = featureReferencePropertyValueJson('referenced_sf');
 
       expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });

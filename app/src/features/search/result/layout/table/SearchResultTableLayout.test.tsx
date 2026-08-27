@@ -247,6 +247,37 @@ describe('SearchResultTableLayout', () => {
     expect(within(cell).getByRole('link')).toHaveAttribute('title', 'Sign / Track');
   });
 
+  it('renders feature reference values as links to the referenced feature', () => {
+    const featureProperty: FeatureTypeProperty = {
+      feature_type_property_id: 7,
+      name: 'sample_site',
+      display_name: 'Sample Site',
+      description: null,
+      type_name: 'feature',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: false
+    };
+    const result = {
+      ...createMockSearchFeature(1, 'Observation', false),
+      properties: {
+        sample_site: { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' }
+      }
+    };
+
+    const { getByTestId } = render(
+      <MemoryRouter>
+        <SearchResultTableLayout results={[result]} featureTypeProperties={[featureProperty]} />
+      </MemoryRouter>
+    );
+
+    const cell = getByTestId(`cell-${featureProperty.feature_type_property_id}`);
+    expect(within(cell).getByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
+      'href',
+      '/submission/18/feature/3339'
+    );
+  });
+
   it('renders multi-value taxon properties as a comma-separated list of links', () => {
     const taxonProperty: FeatureTypeProperty = {
       feature_type_property_id: 5,

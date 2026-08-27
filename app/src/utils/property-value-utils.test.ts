@@ -1,8 +1,13 @@
-import { CodePropertyValue, TaxonPropertyValue } from 'interfaces/property-value.interface';
+import {
+  CodePropertyValue,
+  FeatureReferencePropertyValue,
+  TaxonPropertyValue
+} from 'interfaces/property-value.interface';
 import { describe, expect, it } from 'vitest';
 import {
   getPropertyValueKey,
   isCodePropertyValue,
+  isFeatureReferencePropertyValue,
   isStructuredPropertyValue,
   isTaxonPropertyValue
 } from './property-value-utils';
@@ -15,6 +20,7 @@ const code: CodePropertyValue = {
   code_label: 'Track',
   label: 'Track'
 };
+const feature: FeatureReferencePropertyValue = { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' };
 
 describe('isTaxonPropertyValue', () => {
   it('recognises a taxon reference by its identifier and label', () => {
@@ -46,10 +52,24 @@ describe('isCodePropertyValue', () => {
   });
 });
 
+describe('isFeatureReferencePropertyValue', () => {
+  it('recognises a feature reference by its urn and label', () => {
+    expect(isFeatureReferencePropertyValue(feature)).toBe(true);
+  });
+
+  it('rejects other reference values and objects without a urn', () => {
+    expect(isFeatureReferencePropertyValue(taxon)).toBe(false);
+    expect(isFeatureReferencePropertyValue(code)).toBe(false);
+    expect(isFeatureReferencePropertyValue({ label: 'urn:18:sample_site:3339' })).toBe(false);
+    expect(isFeatureReferencePropertyValue('urn:18:sample_site:3339')).toBe(false);
+  });
+});
+
 describe('isStructuredPropertyValue', () => {
   it('accepts every supported reference value type', () => {
     expect(isStructuredPropertyValue(taxon)).toBe(true);
     expect(isStructuredPropertyValue(code)).toBe(true);
+    expect(isStructuredPropertyValue(feature)).toBe(true);
   });
 
   it('rejects objects that only carry a label', () => {
@@ -61,6 +81,7 @@ describe('getPropertyValueKey', () => {
   it('keys reference values on their identifiers', () => {
     expect(getPropertyValueKey(taxon)).toBe('taxon:180543');
     expect(getPropertyValueKey(code)).toBe('code:sign:track');
+    expect(getPropertyValueKey(feature)).toBe('feature:urn:18:sample_site:3339');
   });
 
   it('keys other values on their JSON text', () => {
