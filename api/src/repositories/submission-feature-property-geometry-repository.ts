@@ -115,7 +115,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
   }
 
   /**
-   * Get the combined extent and count of a submission feature's active spatial properties.
+   * Get the combined extent and count of a submission feature's published spatial properties.
    *
    * The joins here must stay aligned with `biohub.martin_feature`
    * (`database/src/procedures/04_martin_feature.ts`): this decides whether a map is offered and where
