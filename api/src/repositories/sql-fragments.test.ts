@@ -55,6 +55,17 @@ describe('sql-fragments', () => {
       expect(sql).to.include('and t.record_end_date is null');
     });
 
+    it('revalidates cached anchors before treating them as grants', () => {
+      const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
+
+      expect(sql).to.include('closure_ready');
+      expect(sql).to.include('submission_feature_security');
+      expect(sql).to.include('urn_submission_id');
+      expect(sql).to.include('urn_feature_type');
+      expect(sql).to.include('urn_feature_id');
+      expect(sql).to.include('anchor_sf.record_effective_date <= now()');
+    });
+
     it('probes the closure ancestry for a scope anchor instead of a recursive parent walk', () => {
       // Verifies: the rewritten access check resolves ancestry via the precomputed closure
       // (is_ancestor = true) and joins security_scope_anchor on the closure target id — no

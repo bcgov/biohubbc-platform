@@ -4,11 +4,10 @@ import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
-import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { isSubmissionFeatureActive } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -120,16 +119,6 @@ export const FeatureTypeRecord = z.object({
 });
 
 export type FeatureTypeRecord = z.infer<typeof FeatureTypeRecord>;
-
-export const SubmissionFeatureDownloadRecord = z.object({
-  submission_feature_id: z.number(),
-  parent_submission_feature_id: z.number().nullable(),
-  feature_type_name: z.string(),
-  data: z.record(z.any()),
-  level: z.number()
-});
-
-export type SubmissionFeatureDownloadRecord = z.infer<typeof SubmissionFeatureDownloadRecord>;
 
 export interface ISubmissionRecordWithSpatial {
   id: string;
@@ -1711,232 +1700,30 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Download Submission with all associated Features
-   *
-   * @param {number} submissionId
-   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
-   * @memberof SubmissionRepository
-   */
-  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
-    const sqlStatement = SQL`
-    WITH RECURSIVE w_submission_feature AS (
-      SELECT
-        sf.submission_id,
-        sf.submission_feature_id,
-        sf.parent_submission_feature_id,
-        ft.name as feature_type_name,
-        sf.data,
-        1 AS level
-      FROM
-        submission_feature sf
-      INNER JOIN
-        submission s
-      ON
-        sf.submission_id = s.submission_id
-      INNER JOIN
-        feature_type ft
-      ON
-        ft.feature_type_id = sf.feature_type_id
-      WHERE
-        parent_submission_feature_id IS null
-      AND
-        s.submission_id = ${submissionId}
-    `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
-    sqlStatement.append(SQL`
-
-      UNION ALL
-
-      SELECT
-        sf.submission_id,
-        sf.submission_feature_id,
-        sf.parent_submission_feature_id,
-        ft.name as feature_type_name,
-        sf.data,
-        wsf.level + 1
-      FROM
-        submission_feature sf
-      INNER JOIN
-        w_submission_feature wsf
-      ON
-        sf.parent_submission_feature_id = wsf.submission_feature_id
-      INNER JOIN
-        feature_type ft
-      ON
-      ft.feature_type_id = sf.feature_type_id
-      where
-        sf.submission_id = ${submissionId}
-    `);
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
-    sqlStatement.append(SQL`
-    )
-    SELECT
-      w_submission_feature.submission_feature_id,
-      w_submission_feature.parent_submission_feature_id,
-      w_submission_feature.feature_type_name,
-      w_submission_feature.data,
-      w_submission_feature.level
-    FROM
-      w_submission_feature
-    LEFT JOIN
-     submission
-    ON
-      w_submission_feature.submission_id = submission.submission_id
-    WHERE
-      submission.submission_id = ${submissionId}
-    ORDER BY
-      level,
-      submission_feature_id;
-    `);
-
-    const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to get submission with associated features', [
-        'SubmissionRepository->downloadSubmission',
-        `rowCount was ${response.rowCount}, expected rowCount > 0`
-      ]);
-    }
-
-    return response.rows;
-  }
-
-  /**
-   * Download Published Submission with all associated Features
-   *
-   * @param {number} submissionId
-   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
-   * @memberof SubmissionRepository
-   */
-  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
-    const sqlStatement = SQL`
-    WITH RECURSIVE w_submission_feature AS (
-      SELECT
-        sf.submission_id,
-        sf.submission_feature_id,
-        sf.parent_submission_feature_id,
-        ft.name as feature_type_name,
-        sf.data,
-        1 AS level
-      FROM
-        submission_feature sf
-      INNER JOIN
-        submission s
-      ON
-        sf.submission_id = s.submission_id
-      INNER JOIN
-        feature_type ft
-      ON
-        ft.feature_type_id = sf.feature_type_id
-      LEFT JOIN
-        submission_feature_security sfs
-      ON
-        sf.submission_feature_id = sfs.submission_feature_id
-      AND
-        sfs.status = 'active'
-      WHERE
-        parent_submission_feature_id IS null
-      AND
-        s.submission_id = ${submissionId}
-    `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
-    sqlStatement.append(SQL`
-      AND sfs.submission_feature_security_id IS NULL
-
-      UNION ALL
-
-      SELECT
-        sf.submission_id,
-        sf.submission_feature_id,
-        sf.parent_submission_feature_id,
-        ft.name as feature_type_name,
-        sf.data,
-        wsf.level + 1
-      FROM
-        submission_feature sf
-      INNER JOIN
-        w_submission_feature wsf
-      ON
-        sf.parent_submission_feature_id = wsf.submission_feature_id
-      INNER JOIN
-        feature_type ft
-      ON
-      ft.feature_type_id = sf.feature_type_id
-      LEFT JOIN
-        submission_feature_security sfs
-      ON
-        sf.submission_feature_id = sfs.submission_feature_id
-      AND
-        sfs.status = 'active'
-      WHERE
-        sf.submission_id = ${submissionId}
-    `);
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')}`);
-    sqlStatement.append(SQL`
-      AND sfs.submission_feature_security_id IS NULL
-    )
-    SELECT
-      w_submission_feature.submission_feature_id,
-      w_submission_feature.parent_submission_feature_id,
-      w_submission_feature.feature_type_name,
-      w_submission_feature.data,
-      w_submission_feature.level
-    FROM
-      w_submission_feature
-    LEFT JOIN
-     submission
-    ON
-      w_submission_feature.submission_id = submission.submission_id
-    WHERE
-      submission.submission_id = ${submissionId}
-    ORDER BY
-      level,
-      submission_feature_id;
-    `);
-
-    const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to get submission with associated features', [
-        'SubmissionRepository->downloadSubmission',
-        `rowCount was ${response.rowCount}, expected rowCount > 0`
-      ]);
-    }
-
-    return response.rows;
-  }
-
-  /**
    * Build the base query for submission features.
    *
-   * @param {number} submissionId
-   * @param {Knex} knex
-   * @returns {Knex.QueryBuilder}
+   * @param {number} submissionId ID of the submission whose features should be queried.
+   * @param {Knex} knex Knex instance used to construct the query.
+   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
+   * @returns {Knex.QueryBuilder} Query for distinct active submission features.
    * @memberof SubmissionRepository
    */
-  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, filters?: SubmissionFeatureFilters) {
+  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, systemUserId?: number | null) {
     const baseQuery = knex('submission_feature')
       .select(
         'submission_feature.submission_id',
         'submission_feature.submission_feature_id',
         'submission_feature.feature_type_id',
         knex.raw('feature_type.name AS feature_type_name'),
-        knex.raw(`
-        EXISTS (
-          SELECT 1
-          FROM submission_feature_security sfs
-          WHERE sfs.submission_feature_id = submission_feature.submission_feature_id
-            AND sfs.status = 'active'
-        ) AS secured
-      `)
+        knex.raw(`${isEffectivelySecured('submission_feature.submission_feature_id')} AS secured`)
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .where('submission_feature.submission_id', submissionId)
       .whereRaw(isSubmissionFeatureActive('submission_feature'));
 
-    const normalizedSearch = filters?.search?.trim().toLowerCase();
-    if (normalizedSearch) {
-      baseQuery.andWhereRaw('LOWER(feature_type.name) LIKE ?', [`%${normalizedSearch}%`]);
+    const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
+    if (securityFilter) {
+      baseQuery.whereRaw(securityFilter);
     }
 
     return knex.with('base_features', baseQuery).distinct('*').from('base_features');
@@ -1945,19 +1732,20 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submission features by submission id, paginated.
    *
-   * @param {number} submissionId
-   * @param {ApiPaginationOptions} pagination
-   * @returns {Promise<SubmissionFeatureForReview[]>}
+   * @param {number} submissionId ID of the submission whose features should be returned.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
+   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Active submission features visible to the requesting user.
    * @memberof SubmissionRepository
    */
   async getSubmissionFeatures(
     submissionId: number,
     pagination?: ApiPaginationOptions,
-    filters?: SubmissionFeatureFilters
+    systemUserId?: number | null
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, filters);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
 
     this.applyPagination(baseQuery, pagination);
 
@@ -1969,15 +1757,16 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get the total number of submission features for a given submission.
    *
-   * @param {number} submissionId
-   * @returns {Promise<number>}
+   * @param {number} submissionId ID of the submission whose features should be counted.
+   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
+   * @returns {Promise<number>} Number of matching active submission features visible to the requesting user.
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesCount(submissionId: number, filters?: SubmissionFeatureFilters): Promise<number> {
+  async getSubmissionFeaturesCount(submissionId: number, systemUserId?: number | null): Promise<number> {
     const knex = getKnex();
 
     // Wrap the base query as a subquery
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, filters);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
     const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));

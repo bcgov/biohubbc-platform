@@ -3,13 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { HTTPError } from '../errors/http-error';
 import { Artifact } from '../repositories/artifact-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { ArtifactService } from './old-artifact-service';
 import { SecurityService } from './security-service';
-import { UserService } from './user-service';
 
 chai.use(sinonChai);
 
@@ -230,188 +228,6 @@ describe('SecurityService', () => {
 
       expect(applySecurityRulesToArtifactStub).to.be.calledOnce;
       expect(response).to.be.eql(undefined);
-    });
-  });
-
-  describe('getSecuredArtifactBasedOnRulesAndPermissions', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error if user is not admin, and document is pending review (does not have a security review timestamp', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
-
-      const securityService = new SecurityService(mockDBConnection);
-
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-      const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-      const isArtifactPendingReviewStub = sinon
-        .stub(SecurityService.prototype, 'isArtifactPendingReview')
-        .resolves(true);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: undefined,
-        key: 'sample-key'
-      } as Artifact);
-
-      try {
-        await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(isUserAdminStub).to.be.calledOnce;
-        expect(isArtifactPendingReviewStub).to.be.calledOnce;
-        expect(getArtifactStub).to.not.be.called;
-        expect((actualError as HTTPError).status).to.equal(403);
-        expect((actualError as HTTPError).message).to.equal('You do not have access to this document.');
-      }
-    });
-
-    it('should throw an error if user is not admin, and user does not have exceptions to all the documents security rules', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
-
-      const securityService = new SecurityService(mockDBConnection);
-
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-      const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-      const isArtifactPendingReviewStub = sinon
-        .stub(SecurityService.prototype, 'isArtifactPendingReview')
-        .resolves(false);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: 'date',
-        key: 'sample-key'
-      } as Artifact);
-
-      const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRulesIds')
-        .resolves([1, 2, 3, 4]);
-      const getUserExceptionStub = sinon
-        .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
-        .resolves([1, 2, 3]);
-
-      try {
-        await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(isUserAdminStub).to.be.calledOnce;
-        expect(getArtifactStub).not.to.be.called;
-        expect(isArtifactPendingReviewStub).to.be.calledOnce;
-        expect(getDocumentRulesStub).to.be.calledOnce;
-        expect(getUserExceptionStub).to.be.calledOnce;
-        expect(getDocumentRulesStub).to.be.calledBefore(getUserExceptionStub);
-        expect((actualError as HTTPError).status).to.equal(403);
-        expect((actualError as HTTPError).message).to.equal('You do not have access to this document.');
-      }
-    });
-
-    it('should succeed when user is admin - even if document has security rules applied', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
-
-      const securityService = new SecurityService(mockDBConnection);
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-      const isArtifactPendingReviewStub = sinon
-        .stub(SecurityService.prototype, 'isArtifactPendingReview')
-        .resolves(false);
-
-      const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: 'date',
-        key: 'sample-key'
-      } as Artifact);
-
-      const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRulesIds')
-        .resolves([1, 2, 3, 4]);
-      const getUserExceptionStub = sinon
-        .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
-        .resolves([1, 2, 3]);
-
-      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
-
-      await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
-
-      expect(isUserAdminStub).to.be.calledOnce;
-      expect(getArtifactStub).to.be.calledOnce;
-      expect(isArtifactPendingReviewStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledOnce;
-      expect(getUserExceptionStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledBefore(getUserExceptionStub);
-      expect(getS3SignedURLStub).to.be.calledOnceWith('sample-key');
-    });
-
-    it('should succeed when user is not admin - but the document has no security rules applied', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
-
-      const securityService = new SecurityService(mockDBConnection);
-
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-      const isArtifactPendingReviewStub = sinon
-        .stub(SecurityService.prototype, 'isArtifactPendingReview')
-        .resolves(false);
-
-      const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: 'date',
-        key: 'sample-key'
-      } as Artifact);
-
-      const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRulesIds')
-        .resolves([]);
-      const getUserExceptionStub = sinon
-        .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
-        .resolves([]);
-
-      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
-
-      await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
-
-      expect(isUserAdminStub).to.be.calledOnce;
-      expect(getArtifactStub).to.be.calledOnce;
-      expect(isArtifactPendingReviewStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledOnce;
-      expect(getUserExceptionStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledBefore(getUserExceptionStub);
-      expect(getS3SignedURLStub).to.be.calledOnceWith('sample-key');
-    });
-
-    it('should succeed when user is not admin - but has exceptions to all of the applied security rules', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1000 });
-
-      const securityService = new SecurityService(mockDBConnection);
-
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-      const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-
-      const isArtifactPendingReviewStub = sinon
-        .stub(SecurityService.prototype, 'isArtifactPendingReview')
-        .resolves(false);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: 'date',
-        key: 'sample-key'
-      } as Artifact);
-
-      const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRulesIds')
-        .resolves([1, 2, 3, 4]);
-      const getUserExceptionStub = sinon
-        .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsIdsByUser')
-        .resolves([1, 2, 3, 4]);
-
-      const getS3SignedURLStub = sinon.stub(SecurityService.dependencies, 'getS3SignedURL').resolves('signed-url');
-
-      await securityService.getSecuredArtifactBasedOnRulesAndPermissions(1);
-
-      expect(isUserAdminStub).to.be.calledOnce;
-      expect(getArtifactStub).to.be.calledOnce;
-      expect(isArtifactPendingReviewStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledOnce;
-      expect(getUserExceptionStub).to.be.calledOnce;
-      expect(getDocumentRulesStub).to.be.calledBefore(getUserExceptionStub);
-      expect(getS3SignedURLStub).to.be.calledOnceWith('sample-key');
     });
   });
 
@@ -699,8 +515,8 @@ describe('SecurityService', () => {
 
       await service.patchSecurityRulesOnSubmissionFeatures(1, [1, 2, 3], [4, 5], [6, 7]);
 
-      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
-      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
+      expect(removeStub).to.be.calledWith(1, [1, 2, 3], [6, 7]);
+      expect(applyStub).to.be.calledWith(1, [1, 2, 3], [4, 5]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
@@ -739,7 +555,7 @@ describe('SecurityService', () => {
       await service.patchSecurityRulesOnSubmissionFeatures(1, [1, 2, 3], [4, 5], []);
 
       expect(removeStub).to.not.be.called;
-      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
+      expect(applyStub).to.be.calledWith(1, [1, 2, 3], [4, 5]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
@@ -760,7 +576,7 @@ describe('SecurityService', () => {
       await service.patchSecurityRulesOnSubmissionFeatures(1, [1, 2, 3], [], [6, 7]);
 
       expect(applyStub).to.not.be.called;
-      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
+      expect(removeStub).to.be.calledWith(1, [1, 2, 3], [6, 7]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
   });

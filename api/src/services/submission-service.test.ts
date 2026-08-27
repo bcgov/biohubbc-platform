@@ -11,7 +11,6 @@ import {
   PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
-  SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionRecord,
@@ -1043,64 +1042,6 @@ describe('SubmissionService', () => {
 
       expect(findSubmissionFeaturesStub).to.be.calledOnceWith(criteria);
       expect(response).to.be.eql(submissionFeaturesResponse);
-    });
-  });
-
-  describe('downloadSubmission', () => {
-    it('should get submission with associated features ready for download', async () => {
-      const submissionId = 1;
-
-      const mockResponse: SubmissionFeatureDownloadRecord[] = [
-        {
-          submission_feature_id: 1,
-          parent_submission_feature_id: null,
-          feature_type_name: 'string',
-          data: {},
-          level: 1
-        }
-      ];
-
-      const mockDBConnection = getMockDBConnection();
-
-      const downloadSubmissionStub = sinon
-        .stub(SubmissionRepository.prototype, 'downloadSubmission')
-        .resolves(mockResponse);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.downloadSubmission(submissionId);
-
-      expect(downloadSubmissionStub).to.be.calledOnceWith(submissionId);
-      expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('downloadPublishedSubmission', () => {
-    it('should get submission with associated features ready for download', async () => {
-      const submissionId = 1;
-
-      const mockResponse: SubmissionFeatureDownloadRecord[] = [
-        {
-          submission_feature_id: 1,
-          parent_submission_feature_id: null,
-          feature_type_name: 'string',
-          data: {},
-          level: 1
-        }
-      ];
-
-      const mockDBConnection = getMockDBConnection();
-
-      const downloadPublishedSubmissionStub = sinon
-        .stub(SubmissionRepository.prototype, 'downloadPublishedSubmission')
-        .resolves(mockResponse);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.downloadPublishedSubmission(submissionId);
-
-      expect(downloadPublishedSubmissionStub).to.be.calledOnceWith(submissionId);
-      expect(response).to.be.eql(mockResponse);
     });
   });
 });
